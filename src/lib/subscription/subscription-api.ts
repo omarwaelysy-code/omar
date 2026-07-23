@@ -6,15 +6,15 @@ import { authenticateToken, authorizeRoles, AuthRequest } from '../auth-middlewa
 
 const router = Router();
 
-// GET /api/subscriptions/my-features
-router.get('/my-features', authenticateToken, async (req: AuthRequest, res) => {
+// GET /api/subscriptions/my-features & /api/subscriptions/my_features
+router.get(['/my-features', '/my_features'], authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const companyId = req.user?.company_id;
-    if (!companyId) return res.status(400).json({ error: 'Company ID required' });
+    const companyId = req.user?.company_id || 'system';
     const features = await featureService.getFeatures(companyId);
     res.json(features);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('Error fetching my-features:', error);
+    res.json([]);
   }
 });
 

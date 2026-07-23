@@ -49,6 +49,14 @@ interface SuperAdminDashboardProps {
   initialTab?: 'companies' | 'users' | 'logs' | 'system' | 'audit' | 'subscriptions' | 'feature-manager' | 'settings' | 'monitoring' | 'reports';
 }
 
+const SUPER_ADMIN_EMAILS = ['omarwaelysy@gmail.com', 'omarwaelsys@gmail.com', 'acc.wael2005@gmail.com'];
+
+const isSuperAdminUser = (u: User): boolean => {
+  if (!u) return false;
+  const emailKey = (u.email || '').trim().toLowerCase();
+  return u.role === 'super_admin' || (u.role === 'admin' && u.company_id === 'system') || (Boolean(emailKey) && SUPER_ADMIN_EMAILS.includes(emailKey));
+};
+
 export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initialTab }) => {
   const { user, isSuperAdmin } = useAuth();
   const { showNotification } = useNotification();
@@ -518,10 +526,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
     }
   };
 
-  const isSuperAdminUser = (u: User) => {
-    const superAdminEmails = ['omarwaelysy@gmail.com', 'omarwaelsys@gmail.com', 'acc.wael2005@gmail.com'];
-    return u.role === 'super_admin' || (u.role === 'admin' && u.company_id === 'system') || (u.email && superAdminEmails.includes(u.email.trim().toLowerCase()));
-  };
+
 
   const clientCompanies = companies.filter(c => c.id !== 'system' && c.id !== 'SYSTEM' && c.code !== 'SYS-ROOT');
 
