@@ -28,6 +28,33 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     const decoded = jwt.verify(token, JWT_SECRET) as any;
     req.user = decoded;
 
+    // ================================================================
+    // SESSION VALIDATION: Ensure this token's session_token still matches
+    // the active_session_token in the database. If a force-login happened
+    // from another device, the DB token will differ and we reject old tokens.
+    // ================================================================
+    if (decoded.session_token && decoded.id) {
+      try {
+        const sessionRes = await pool.query(
+          'SELECT active_session_token FROM users WHERE id = $1 LIMIT 1',
+          [decoded.id]
+        );
+        if (sessionRes.rows.length > 0) {
+          const dbToken = sessionRes.rows[0].active_session_token;
+          // If DB has a token and it doesn't match our JWT's token → session was invalidated
+          if (dbToken && dbToken !== decoded.session_token) {
+            return res.status(401).json({ 
+              error: 'SESSION_INVALIDATED',
+              message: 'تم تسجيل دخولك من مكان آخر. تم إنهاء هذه الجلسة.'
+            });
+          }
+        }
+      } catch (sessionErr) {
+        // Non-fatal: if DB check fails, allow request to proceed
+        console.error('Session validation error (non-fatal):', sessionErr);
+      }
+    }
+
     // Resolve company_id from 'x-company-id' header if present to support seamless workspace switching
     const requestedCompanyId = req.headers['x-company-id'] as string;
     if (requestedCompanyId && requestedCompanyId !== decoded.company_id) {

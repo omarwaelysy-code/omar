@@ -1,12 +1,20 @@
 import React, { useState } from 'react';
-import { Lock, User as UserIcon, ArrowRight, Eye, EyeOff, Languages, Shield, AlertCircle } from 'lucide-react';
+import { Lock, User as UserIcon, ArrowRight, Eye, EyeOff, Languages, Shield, AlertCircle, MonitorX, LogIn } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Logo } from '../components/Logo';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface LoginProps {
   onToggle: () => void;
+}
+
+interface SessionConflict {
+  message: string;
+  lastActiveAt: string;
+  canForce: boolean;
+  email: string;
+  password: string;
 }
 
 export const Login: React.FC<LoginProps> = ({ onToggle }) => {
@@ -15,11 +23,54 @@ export const Login: React.FC<LoginProps> = ({ onToggle }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sessionConflict, setSessionConflict] = useState<SessionConflict | null>(null);
+  const [forceLoading, setForceLoading] = useState(false);
+
+  // Check for session invalidation message from a force-login by another device
+  const invalidationMsg = sessionStorage.getItem('session_invalidated_message');
+  const [error, setError] = useState(invalidationMsg || '');
+
+  React.useEffect(() => {
+    if (invalidationMsg) {
+      sessionStorage.removeItem('session_invalidated_message');
+    }
+  }, []);
+
 
   const handleForgotPassword = () => {
     setError('يرجى التواصل مع مدير النظام لإعادة تعيين كلمة المرور.');
+  };
+
+  const doLogin = async (emailVal: string, passwordVal: string, force = false) => {
+    const response = await fetch('/api/erp/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: emailVal, password: passwordVal, force })
+    });
+
+    const data = await response.json();
+
+    if (response.status === 409 && data.error === 'SESSION_CONFLICT') {
+      setSessionConflict({
+        message: data.message,
+        lastActiveAt: data.lastActiveAt,
+        canForce: data.canForce,
+        email: emailVal,
+        password: passwordVal
+      });
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(data.error || 'فشل تسجيل الدخول');
+    }
+
+    // success - let the auth context handle the rest
+    localStorage.setItem('auth_token', data.token);
+    localStorage.setItem('auth_user', JSON.stringify(data.user));
+    // Reload to trigger AuthContext initAuth
+    window.location.reload();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -27,6 +78,7 @@ export const Login: React.FC<LoginProps> = ({ onToggle }) => {
     const cleanEmail = email.trim().toLowerCase();
     setLoading(true);
     setError('');
+    setSessionConflict(null);
     
     try {
       const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail);
@@ -34,12 +86,26 @@ export const Login: React.FC<LoginProps> = ({ onToggle }) => {
         throw new Error("يرجى إدخال بريد إلكتروني صحيح");
       }
 
-      await login(cleanEmail, password);
+      await doLogin(cleanEmail, password);
     } catch (e: any) {
       console.error('Login error:', e);
       setError(e.message || "حدث خطأ أثناء تسجيل الدخول");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForceLogin = async () => {
+    if (!sessionConflict) return;
+    setForceLoading(true);
+    setError('');
+    try {
+      await doLogin(sessionConflict.email, sessionConflict.password, true);
+    } catch (e: any) {
+      setError(e.message || "حدث خطأ أثناء تسجيل الدخول");
+      setSessionConflict(null);
+    } finally {
+      setForceLoading(false);
     }
   };
 
@@ -64,7 +130,7 @@ export const Login: React.FC<LoginProps> = ({ onToggle }) => {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-[420px] z-10"
+        className="w-full max-w-[440px] z-10"
       >
         <div className="text-center mb-10">
           <Logo variant="full" size="lg" className="justify-center mb-4" />
@@ -72,6 +138,47 @@ export const Login: React.FC<LoginProps> = ({ onToggle }) => {
         </div>
 
         <div className="bg-white border border-slate-200 shadow-xl rounded-2xl p-10 relative">
+          
+          {/* Session Conflict Banner */}
+          <AnimatePresence>
+            {sessionConflict && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="mb-6 rounded-2xl border-2 border-amber-300 bg-amber-50 overflow-hidden"
+              >
+                <div className="flex items-center gap-3 p-4 border-b border-amber-200 bg-amber-100">
+                  <MonitorX className="text-amber-600 shrink-0" size={22} />
+                  <span className="font-black text-amber-800 text-sm">جلسة نشطة مكتشفة</span>
+                </div>
+                <div className="p-4">
+                  <p className="text-amber-800 text-sm font-medium leading-relaxed whitespace-pre-line mb-4">
+                    {sessionConflict.message}
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={handleForceLogin}
+                      disabled={forceLoading}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-xl transition-all active:scale-95 disabled:opacity-60 text-sm"
+                    >
+                      <LogIn size={16} />
+                      {forceLoading ? 'جارٍ تسجيل الدخول...' : 'تسجيل الدخول وإنهاء الجلسة الأخرى'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSessionConflict(null)}
+                      className="w-full px-4 py-2 text-slate-500 hover:text-slate-700 font-bold text-sm transition-colors"
+                    >
+                      إلغاء
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
               <motion.div 
@@ -133,7 +240,7 @@ export const Login: React.FC<LoginProps> = ({ onToggle }) => {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || forceLoading}
               className="premium-button-primary w-full flex items-center justify-center gap-3 transition-opacity"
             >
               <span className="text-base">

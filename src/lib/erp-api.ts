@@ -1877,7 +1877,7 @@ router.post('/auth/register', UsersLimitMiddleware, async (req, res) => {
       'INSERT INTO users (id, username, name, email, password_hash, company_id, role, must_change_password) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
       [id, username || cleanEmail, name || username || cleanEmail, cleanEmail, finalPasswordHash, company_id, role || 'user', mustChangePassword]
     );
-    
+
     // Log registration
     logAudit({
       company_id,
@@ -1906,7 +1906,7 @@ router.post('/auth/register', UsersLimitMiddleware, async (req, res) => {
         : 'تم إنشاء المستخدم بنجاح'
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: (error as any).message });
   }
 });
 
@@ -1976,6 +1976,55 @@ router.post('/auth/login', async (req, res) => {
           });
         }
       }
+    }
+
+    // =========================================================
+    // SINGLE-SESSION ENFORCEMENT
+    // Super admins are exempt (they manage multiple companies)
+    // =========================================================
+    const forceLogin = req.body.force === true;
+    const sessionTimeoutMs = 5 * 60 * 1000; // 5 minutes without heartbeat = session expired
+    const fiveMinutesAgo = new Date(Date.now() - sessionTimeoutMs);
+
+    if (!isSuperAdminUser && !forceLogin) {
+      // Check if any user record with this email has an active session
+      const activeSessionRes = await pool.query(
+        `SELECT id, email, username, company_id, active_session_token, last_active_at 
+         FROM users 
+         WHERE LOWER(email) = LOWER($1) 
+           AND active_session_token IS NOT NULL 
+           AND last_active_at IS NOT NULL
+           AND last_active_at > $2`,
+        [cleanEmail, fiveMinutesAgo.toISOString()]
+      );
+
+      if (activeSessionRes.rows.length > 0) {
+        const activeRow = activeSessionRes.rows[0];
+        const lastActiveFormatted = activeRow.last_active_at
+          ? new Date(activeRow.last_active_at).toLocaleString('ar-EG', {
+              timeZone: 'Africa/Cairo',
+              hour: '2-digit',
+              minute: '2-digit',
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric'
+            })
+          : 'غير محدد';
+        return res.status(409).json({
+          error: 'SESSION_CONFLICT',
+          message: `هذا الحساب مفتوح بالفعل في جهاز آخر. آخر نشاط: ${lastActiveFormatted}.\n\nيمكنك إنهاء الجلسة الأخرى وتسجيل الدخول هنا.`,
+          lastActiveAt: activeRow.last_active_at,
+          canForce: true
+        });
+      }
+    }
+
+    // If force login: clear all existing sessions for this email first
+    if (forceLogin) {
+      await pool.query(
+        'UPDATE users SET active_session_token = NULL, last_active_at = NULL WHERE LOWER(email) = LOWER($1)',
+        [cleanEmail]
+      );
     }
 
     // Set new active session token & activity timestamp

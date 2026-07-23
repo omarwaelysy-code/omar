@@ -243,7 +243,19 @@ export async function apiRequest<T>(path: string, method: string = 'GET', body?:
         }
       }
       
+      if (error.error === 'SESSION_INVALIDATED') {
+        // Session was invalidated by a force login from another device
+        // Clear local storage and redirect to login with a message
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+        // Store the message to show on the login page
+        sessionStorage.setItem('session_invalidated_message', error.message || 'تم تسجيل دخولك من مكان آخر. تم إنهاء هذه الجلسة.');
+        window.location.href = '/login';
+        throw new Error(error.message);
+      }
+      
       throw new Error(error.message || error.error || `API Request failed with status ${response.status}`);
+
     }
 
     return response.json();
