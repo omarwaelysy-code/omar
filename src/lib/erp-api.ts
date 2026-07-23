@@ -1946,24 +1946,10 @@ router.post('/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'حدث خطأ في البيانات المدخلة، يرجى التأكد من البريد الإلكتروني وكلمة المرور' });
     }
 
-    // Single Active Session Enforcement: Check if user is logged in elsewhere (active in last 15 mins)
-    const activeCheck = await pool.query(
-      `SELECT active_session_token, last_active_at 
-       FROM users 
-       WHERE LOWER(email) = LOWER($1) 
-         AND active_session_token IS NOT NULL 
-         AND last_active_at > (CURRENT_TIMESTAMP - INTERVAL '15 minutes')`,
-      [cleanEmail]
-    );
+    const isSuperAdminUser = validUser.role === 'super_admin' || ['omarwaelysy@gmail.com', 'omarwaelsys@gmail.com', 'acc.wael2005@gmail.com'].includes(cleanEmail);
 
-    if (activeCheck.rows.length > 0) {
-      return res.status(403).json({ 
-        error: 'هذا البريد الإلكتروني مفتوح حالياً في مكان آخر. يجب تسجيل الخروج من الجلسة المفتوحة أولاً لتتمكن من الدخول.' 
-      });
-    }
-
-    // Subscription Expiration Check: Prevent login if company subscription has expired
-    if (validUser.role !== 'super_admin' && validUser.company_id && validUser.company_id !== 'SYSTEM') {
+    // Subscription Expiration Check: Prevent login for regular users if company subscription has expired
+    if (!isSuperAdminUser && validUser.company_id && validUser.company_id !== 'SYSTEM') {
       const compRes = await pool.query(
         `SELECT subscription_status, subscription_end, subscription_expiry, company_status FROM companies WHERE id = $1`,
         [validUser.company_id]

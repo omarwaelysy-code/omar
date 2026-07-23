@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, User as UserIcon, ArrowRight, Eye, EyeOff, Languages, Shield } from 'lucide-react';
+import { Lock, User as UserIcon, ArrowRight, Eye, EyeOff, Languages, Shield, AlertCircle } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Logo } from '../components/Logo';
@@ -72,15 +72,15 @@ export const Login: React.FC<LoginProps> = ({ onToggle }) => {
         </div>
 
         <div className="bg-white border border-slate-200 shadow-xl rounded-2xl p-10 relative">
-          <form onSubmit={handleSubmit} className="space-y-8">
+          <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
               <motion.div 
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className={`p-4 bg-red-50 text-red-600 rounded-xl text-sm font-bold border border-red-100 ${dir === 'rtl' ? 'text-right' : 'text-left'} flex items-center gap-2`}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="p-4 bg-red-50 border-2 border-red-200 text-red-700 rounded-2xl text-sm font-bold text-right flex items-start gap-3 shadow-sm"
               >
-                <div className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
-                {error}
+                <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                <div className="leading-relaxed">{error}</div>
               </motion.div>
             )}
             
