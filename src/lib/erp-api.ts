@@ -3144,8 +3144,19 @@ modules.forEach(moduleName => {
             console.error('Error computing company storage sizes:', e);
           }
         }
+
+        if (transactionalModules.includes(moduleName)) {
+          const rowIds = rows.map((r: any) => r.id);
+          if (rowIds.length > 0) {
+            const itemsMap = await fetchItemsForMultiple(moduleName, rowIds);
+            for (let row of rows) {
+              row.items = itemsMap[row.id] || [];
+            }
+          }
+        }
+
+        res.json(rows.map((row: any) => parseRow(moduleName, row)));
       }
-      res.json(rows.map((row: any) => parseRow(moduleName, row)));
     } catch (error: any) {
       console.error(`[CRASH PREVENTED] Error in GET /${moduleName}:`, error);
       sendError(res, 500, `Failed to list ${moduleName}`, error.message);
