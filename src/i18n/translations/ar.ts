@@ -133,6 +133,11 @@ export const ar = {
   'contact_messages.delete': 'حذف',
   'contact_messages.delete_confirm': 'هل أنت متأكد من حذف هذه الرسالة نهائياً؟',
   'contact_messages.no_messages': 'لا توجد رسائل تواصل.',
+  'contact_messages.marked_read_success': 'تم تحديث حالة الرسالة إلى مقروءة بنجاح.',
+  'contact_messages.marked_new_success': 'تم تحديث حالة الرسالة إلى جديدة بنجاح.',
+  'contact_messages.archived_success': 'تم أرشفة الرسالة بنجاح.',
+  'contact_messages.deleted_success': 'تم حذف الرسالة بنجاح.',
+  'contact_messages.notes_saved_success': 'تم حفظ الملاحظات بنجاح.',
 
   'landing.footer.description': 'Obrain ERP هو نظام الإدارة المؤسسية الموحد للمالية والمخزون والمبيعات والعمليات.',
   'landing.footer.quick_links': 'روابط سريعة',

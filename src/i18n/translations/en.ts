@@ -133,6 +133,11 @@ export const en = {
   'contact_messages.delete': 'Delete',
   'contact_messages.delete_confirm': 'Are you sure you want to permanently delete this message?',
   'contact_messages.no_messages': 'No contact messages found.',
+  'contact_messages.marked_read_success': 'Message marked as read successfully.',
+  'contact_messages.marked_new_success': 'Message marked as new successfully.',
+  'contact_messages.archived_success': 'Message archived successfully.',
+  'contact_messages.deleted_success': 'Message deleted successfully.',
+  'contact_messages.notes_saved_success': 'Internal notes saved successfully.',
 
   'landing.footer.description': 'Obrain ERP is the unified enterprise management system for finance, inventory, sales, and operations.',
   'landing.footer.quick_links': 'Quick Links',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Mail,
@@ -21,10 +21,12 @@ import {
 } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useNotification } from '../contexts/NotificationContext';
 import { ContactMessage } from '../types';
 
 export const ContactMessages: React.FC = () => {
   const { t } = useLanguage();
+  const { showNotification } = useNotification();
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -35,25 +37,35 @@ export const ContactMessages: React.FC = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  const fetchMessages = async () => {
+  const selectedMessageRef = useRef<ContactMessage | null>(null);
+  useEffect(() => {
+    selectedMessageRef.current = selectedMessage;
+  }, [selectedMessage]);
+
+  const fetchMessages = async (showSpinner = false) => {
     try {
-      setLoading(true);
+      if (showSpinner) setLoading(true);
       const data = await dbService.getContactMessages();
-      setMessages(data || []);
-      // If a message is selected, update its reference
-      if (selectedMessage) {
-        const updated = (data || []).find((m: ContactMessage) => m.id === selectedMessage.id);
-        if (updated) setSelectedMessage(updated);
+      const list = data || [];
+      setMessages(list);
+
+      if (selectedMessageRef.current) {
+        const currentId = selectedMessageRef.current.id;
+        const updated = list.find((m: ContactMessage) => m.id === currentId);
+        if (updated) {
+          setSelectedMessage(updated);
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch contact messages:', error);
+      showNotification(error.message || 'فشل في تحميل رسائل التواصل', 'error');
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchMessages();
+    fetchMessages(true);
   }, []);
 
   useEffect(() => {
@@ -68,7 +80,8 @@ export const ContactMessages: React.FC = () => {
     if (msg.status === 'new') {
       try {
         await dbService.updateContactMessageStatus(msg.id, 'read');
-        fetchMessages();
+        setSelectedMessage(prev => prev && prev.id === msg.id ? { ...prev, status: 'read' } : prev);
+        await fetchMessages(false);
       } catch (err) {
         console.error('Failed to auto-mark message as read:', err);
       }
@@ -76,12 +89,27 @@ export const ContactMessages: React.FC = () => {
   };
 
   const handleUpdateStatus = async (id: string, status: 'new' | 'read' | 'archived') => {
+    if (!id) return;
     try {
       setActionLoading(true);
       await dbService.updateContactMessageStatus(id, status);
-      await fetchMessages();
-    } catch (error) {
+
+      if (selectedMessage?.id === id) {
+        setSelectedMessage(prev => prev ? { ...prev, status } : null);
+      }
+
+      await fetchMessages(false);
+
+      if (status === 'read') {
+        showNotification(t('contact_messages.marked_read_success') || 'تم تحديث حالة الرسالة إلى مقروءة بنجاح.');
+      } else if (status === 'archived') {
+        showNotification(t('contact_messages.archived_success') || 'تم أرشفة الرسالة بنجاح.');
+      } else if (status === 'new') {
+        showNotification(t('contact_messages.marked_new_success') || 'تم تحديث حالة الرسالة إلى جديدة بنجاح.');
+      }
+    } catch (error: any) {
       console.error('Failed to update status:', error);
+      showNotification(error.message || 'فشل في تحديث حالة الرسالة', 'error');
     } finally {
       setActionLoading(false);
     }
@@ -92,25 +120,35 @@ export const ContactMessages: React.FC = () => {
     try {
       setSavingNotes(true);
       await dbService.updateContactMessageNotes(selectedMessage.id, notesInput);
-      await fetchMessages();
-    } catch (error) {
+
+      setSelectedMessage(prev => prev ? { ...prev, notes: notesInput } : null);
+      await fetchMessages(false);
+
+      showNotification(t('contact_messages.notes_saved_success') || 'تم حفظ الملاحظات بنجاح.');
+    } catch (error: any) {
       console.error('Failed to save notes:', error);
+      showNotification(error.message || 'فشل في حفظ الملاحظات', 'error');
     } finally {
       setSavingNotes(false);
     }
   };
 
   const handleDelete = async (id: string) => {
+    if (!id) return;
     try {
       setActionLoading(true);
       await dbService.deleteContactMessage(id);
+
       if (selectedMessage?.id === id) {
         setSelectedMessage(null);
       }
       setDeleteConfirmId(null);
-      await fetchMessages();
-    } catch (error) {
+      await fetchMessages(false);
+
+      showNotification(t('contact_messages.deleted_success') || 'تم حذف الرسالة بنجاح.');
+    } catch (error: any) {
       console.error('Failed to delete message:', error);
+      showNotification(error.message || 'فشل في حذف الرسالة', 'error');
     } finally {
       setActionLoading(false);
     }
