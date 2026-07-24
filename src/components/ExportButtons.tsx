@@ -74,12 +74,12 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
               onExportExcel();
             }
           }}
-          className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-zinc-200 text-zinc-700 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm"
+          className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl font-bold hover:bg-emerald-100 transition-all active:scale-95 shadow-sm text-xs sm:text-sm"
           title={t('common.export_excel') || (isAr ? 'تصدير اكسيل' : 'Export Excel')}
         >
-          <Download size={20} className="text-emerald-600" />
-          <span className="hidden sm:inline">Excel</span>
-          {selectedCount > 0 && <ChevronDown size={14} className="text-zinc-400" />}
+          <Download size={18} className="text-emerald-600 shrink-0" />
+          <span>Excel</span>
+          {selectedCount > 0 && <ChevronDown size={14} className="text-emerald-500" />}
         </button>
 
         {showExcelMenu && selectedCount > 0 && (
@@ -110,12 +110,12 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
               onExportPDF();
             }
           }}
-          className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-zinc-200 text-zinc-700 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm"
+          className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl font-bold hover:bg-rose-100 transition-all active:scale-95 shadow-sm text-xs sm:text-sm"
           title={t('common.export_pdf') || (isAr ? 'تصدير PDF' : 'Export PDF')}
         >
-          <FileText size={20} className="text-red-600" />
-          <span className="hidden sm:inline">PDF</span>
-          {selectedCount > 0 && <ChevronDown size={14} className="text-zinc-400" />}
+          <FileText size={18} className="text-rose-600 shrink-0" />
+          <span>PDF</span>
+          {selectedCount > 0 && <ChevronDown size={14} className="text-rose-500" />}
         </button>
 
         {showPdfMenu && selectedCount > 0 && (
@@ -128,7 +128,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
             </button>
             <button
               onClick={() => { if (onExportPDFSelected) onExportPDFSelected(); setShowPdfMenu(false); }}
-              className="w-full text-right px-4 py-2 hover:bg-red-50 rounded-xl text-xs font-bold text-red-750 border-t border-zinc-50"
+              className="w-full text-right px-4 py-2 hover:bg-rose-50 rounded-xl text-xs font-bold text-rose-750 border-t border-zinc-50"
             >
               {isAr ? `تصدير المحدد فقط (${selectedCount})` : `Export Selected Only (${selectedCount})`}
             </button>
@@ -141,12 +141,12 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
         <div className="relative" ref={printRef}>
           <button 
             onClick={handlePrintClick}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-zinc-200 text-zinc-700 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm"
+            className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl font-bold hover:bg-blue-100 transition-all active:scale-95 shadow-sm text-xs sm:text-sm"
             title={isAr ? 'طباعة مباشرة' : 'Direct Print'}
           >
-            <Printer size={20} className="text-blue-600" />
-            <span className="hidden sm:inline">{isAr ? 'طباعة' : 'Print'}</span>
-            {selectedCount > 0 && onPrintSelected && <ChevronDown size={14} className="text-zinc-400" />}
+            <Printer size={18} className="text-blue-600 shrink-0" />
+            <span>{isAr ? 'طباعة' : 'Print'}</span>
+            {selectedCount > 0 && onPrintSelected && <ChevronDown size={14} className="text-blue-500" />}
           </button>
 
           {showPrintMenu && selectedCount > 0 && onPrintSelected && (
