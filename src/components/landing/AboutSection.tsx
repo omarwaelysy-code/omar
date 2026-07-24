@@ -30,11 +30,6 @@ export const AboutSection: React.FC = () => {
               {t('landing.about.tag')}
             </span>
 
-            <h2 className="text-3xl sm:text-4xl lg:text-[44px] font-extrabold text-[#0B0F19] tracking-tight leading-[1.16]">
-              {t('landing.about.title_1')}<br />
-              {t('landing.about.title_2')}
-            </h2>
-
             <div className="mt-6 space-y-4 text-[#4B5563] text-base lg:text-lg leading-relaxed font-normal">
               <p>{t('landing.about.description_1')}</p>
               <p>{t('landing.about.description_2')}</p>

@@ -29,6 +29,7 @@ export const pageLabels: { [key: string]: string } = {
   'dashboard': 'لوحة التحكم',
   'dashboard_designer': 'مصمم لوحات التحكم',
   'super_admin_dashboard': 'لوحة تحكم المدير العام',
+  'contact_messages': 'رسائل التواصل',
   'customers': 'العملاء',
   'suppliers': 'الموردين',
   'products': 'الأصناف',

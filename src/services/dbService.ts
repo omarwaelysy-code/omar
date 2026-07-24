@@ -639,5 +639,30 @@ export const dbService = {
     } catch (error) {
       console.error('Failed to log client audit:', error);
     }
+  },
+
+  // Contact Messages APIs
+  async sendContactMessage(data: { name: string; email: string; phone?: string; message: string }): Promise<any> {
+    return apiRequest<any>('/contact-messages', 'POST', data);
+  },
+
+  async getContactMessages(): Promise<any[]> {
+    return apiRequest<any[]>('/contact-messages');
+  },
+
+  async getUnreadContactMessagesCount(): Promise<{ count: number }> {
+    return apiRequest<{ count: number }>('/contact-messages/unread-count');
+  },
+
+  async updateContactMessageStatus(id: string, status: 'new' | 'read' | 'archived'): Promise<any> {
+    return apiRequest<any>(`/contact-messages/${id}/status`, 'PUT', { status });
+  },
+
+  async updateContactMessageNotes(id: string, notes: string): Promise<any> {
+    return apiRequest<any>(`/contact-messages/${id}/notes`, 'PUT', { notes });
+  },
+
+  async deleteContactMessage(id: string): Promise<any> {
+    return apiRequest<any>(`/contact-messages/${id}`, 'DELETE');
   }
 };

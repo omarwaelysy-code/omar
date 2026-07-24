@@ -1,22 +1,38 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Phone, MapPin, Send, CheckCircle2, MessageSquare } from 'lucide-react';
+import { Phone, MapPin, Send, CheckCircle2, MessageSquare, Loader2 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { dbService } from '../../services/dbService';
 
 export const ContactSection: React.FC = () => {
   const { t } = useLanguage();
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
     message: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
-    setFormData({ name: '', email: '', message: '' });
-    setTimeout(() => setSubmitted(false), 5000);
+    if (!formData.name || !formData.email || !formData.message) return;
+    
+    setSubmitting(true);
+    setErrorMsg('');
+    try {
+      await dbService.sendContactMessage(formData);
+      setSubmitted(true);
+      setFormData({ name: '', email: '', phone: '', message: '' });
+      setTimeout(() => setSubmitted(false), 6000);
+    } catch (err: any) {
+      console.error('Contact form submission error:', err);
+      setErrorMsg(err.message || t('common.error'));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -50,7 +66,7 @@ export const ContactSection: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="text-sm font-semibold text-[#4B5563]">{t('landing.contact.phone_label')}</h4>
-                  <a href="tel:+201010010156" className="font-bold text-[#0B0F19] hover:text-[#1B853A] transition-colors dir-ltr block text-right">
+                  <a href="tel:+201010010156" dir="ltr" className="font-bold text-[#0B0F19] hover:text-[#1B853A] transition-colors block text-right">
                     +022 01010010156
                   </a>
                 </div>
@@ -62,7 +78,7 @@ export const ContactSection: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="text-sm font-semibold text-[#4B5563]">{t('landing.contact.whatsapp_label')}</h4>
-                  <a href="https://wa.me/201010010156" target="_blank" rel="noopener noreferrer" className="font-bold text-[#0B0F19] hover:text-[#1B853A] transition-colors dir-ltr block text-right">
+                  <a href="https://wa.me/201010010156" target="_blank" rel="noopener noreferrer" dir="ltr" className="font-bold text-[#0B0F19] hover:text-[#1B853A] transition-colors block text-right">
                     +022 01010010156
                   </a>
                 </div>
@@ -91,7 +107,13 @@ export const ContactSection: React.FC = () => {
             {submitted && (
               <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-[#1B853A] text-sm font-medium flex items-center gap-3">
                 <CheckCircle2 className="w-5 h-5 shrink-0" />
-                <span>{t('landing.contact.success')}</span>
+                <span>{t('landing.contact.toast_success')}</span>
+              </div>
+            )}
+
+            {errorMsg && (
+              <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-medium">
+                {errorMsg}
               </div>
             )}
 
@@ -126,6 +148,20 @@ export const ContactSection: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-semibold text-[#0B0F19] mb-2">
+                  {t('landing.contact.form_phone')}
+                </label>
+                <input
+                  type="tel"
+                  placeholder={t('landing.contact.form_phone_placeholder')}
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#1B853A] text-sm"
+                  dir="ltr"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-[#0B0F19] mb-2">
                   {t('landing.contact.form_message')}
                 </label>
                 <textarea
@@ -140,10 +176,20 @@ export const ContactSection: React.FC = () => {
 
               <button
                 type="submit"
-                className="w-full bg-[#1B853A] hover:bg-[#167431] text-white py-3.5 px-6 rounded-xl font-semibold text-base flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer"
+                disabled={submitting}
+                className="w-full bg-[#1B853A] hover:bg-[#167431] disabled:opacity-60 text-white py-3.5 px-6 rounded-xl font-semibold text-base flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer"
               >
-                <span>{t('landing.contact.send')}</span>
-                <Send className="w-4 h-4" />
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>{t('common.saving')}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{t('landing.contact.send')}</span>
+                    <Send className="w-4 h-4" />
+                  </>
+                )}
               </button>
             </form>
           </motion.div>

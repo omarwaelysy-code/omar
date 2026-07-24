@@ -10,6 +10,19 @@ export interface UserPermissions {
   [moduleId: string]: ModulePermissions;
 }
 
+export interface ContactMessage {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  message: string;
+  status: 'new' | 'read' | 'archived';
+  created_at: string;
+  read_at?: string;
+  handled_by?: string;
+  notes?: string;
+}
+
 export interface User {
   id: string;
   username: string;

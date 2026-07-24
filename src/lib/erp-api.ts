@@ -9131,4 +9131,110 @@ router.get('/inventory_transaction_journal', authenticateToken, async (req: Auth
   }
 });
 
+// ==========================================
+// CONTACT MESSAGES ENDPOINTS
+// ==========================================
+
+// Public endpoint for Landing Page Contact Us form
+router.post('/contact-messages', async (req, res) => {
+  try {
+    const { name, email, phone, message } = req.body;
+    if (!name || !email || !message) {
+      return res.status(400).json({ error: 'Name, email, and message are required.' });
+    }
+
+    const id = uuidv4();
+    await pool.query(
+      `INSERT INTO contact_messages (id, name, email, phone, message, status, created_at)
+       VALUES ($1, $2, $3, $4, $5, 'new', CURRENT_TIMESTAMP)`,
+      [id, name.trim(), email.trim(), phone ? phone.trim() : null, message.trim()]
+    );
+
+    res.json({ success: true, message: 'Message sent successfully.' });
+  } catch (error: any) {
+    console.error('Error submitting contact message:', error);
+    res.status(500).json({ error: 'Failed to submit contact message.' });
+  }
+});
+
+// Protected endpoint to fetch all contact messages
+router.get('/contact-messages', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM contact_messages ORDER BY created_at DESC`
+    );
+    res.json(rows);
+  } catch (error: any) {
+    console.error('Error fetching contact messages:', error);
+    res.status(500).json({ error: 'Failed to fetch contact messages.' });
+  }
+});
+
+// Protected endpoint to fetch unread contact messages count
+router.get('/contact-messages/unread-count', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM contact_messages WHERE status = 'new'`
+    );
+    res.json({ count: rows[0]?.count || 0 });
+  } catch (error: any) {
+    console.error('Error fetching unread contact messages count:', error);
+    res.status(500).json({ error: 'Failed to fetch unread count.' });
+  }
+});
+
+// Protected endpoint to update contact message status
+router.put('/contact-messages/:id/status', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    if (!['new', 'read', 'archived'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status.' });
+    }
+
+    const userName = req.user?.username || (req.user as any)?.name || 'Super Admin';
+    await pool.query(
+      `UPDATE contact_messages 
+       SET status = $1, 
+           read_at = CASE WHEN $1 = 'read' AND read_at IS NULL THEN CURRENT_TIMESTAMP ELSE read_at END,
+           handled_by = $2
+       WHERE id = $3`,
+      [status, userName, id]
+    );
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error updating contact message status:', error);
+    res.status(500).json({ error: 'Failed to update message status.' });
+  }
+});
+
+// Protected endpoint to update contact message internal notes
+router.put('/contact-messages/:id/notes', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+    await pool.query(
+      `UPDATE contact_messages SET notes = $1 WHERE id = $2`,
+      [notes || '', id]
+    );
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error updating contact message notes:', error);
+    res.status(500).json({ error: 'Failed to update message notes.' });
+  }
+});
+
+// Protected endpoint to delete a contact message
+router.delete('/contact-messages/:id', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query(`DELETE FROM contact_messages WHERE id = $1`, [id]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error deleting contact message:', error);
+    res.status(500).json({ error: 'Failed to delete message.' });
+  }
+});
+
 export default router;

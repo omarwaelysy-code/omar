@@ -86,6 +86,7 @@ import { LoadingScreen } from './components/LoadingScreen';
 import { AnimatePresence } from 'framer-motion';
 
 import { SubscriptionExpiredScreen } from './components/SubscriptionExpiredScreen';
+import { ContactMessages } from './pages/ContactMessages';
 
 export default function App() {
   const { t, dir } = useLanguage();
@@ -182,6 +183,8 @@ export default function App() {
   );
 
   function getPageComponent(id: string) {
+    if (id === 'contact_messages') return <ContactMessages />;
+
     // Super Admin specific pages
     if (isSuperAdmin) {
       if (id === 'dashboard' || id === 'super_admin_dashboard') return <SuperAdminDashboard />;

@@ -100,6 +100,7 @@ async function startServer() {
       'ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "supplier_name" VARCHAR(255)',
       
       // Returns
+      'CREATE TABLE IF NOT EXISTS "contact_messages" ("id" VARCHAR(36) PRIMARY KEY, "name" VARCHAR(255) NOT NULL, "email" VARCHAR(255) NOT NULL, "phone" VARCHAR(50), "message" TEXT NOT NULL, "status" VARCHAR(20) DEFAULT \'new\', "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "read_at" TIMESTAMP, "handled_by" VARCHAR(100), "notes" TEXT)',
       'ALTER TABLE "returns" ADD COLUMN IF NOT EXISTS "description" TEXT',
       'ALTER TABLE "returns" ADD COLUMN IF NOT EXISTS "warehouse_id" VARCHAR(36)',
       'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "description" TEXT',

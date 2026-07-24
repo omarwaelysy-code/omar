@@ -50,7 +50,8 @@ import {
   Sliders,
   LayoutTemplate,
   Globe,
-  Activity
+  Activity,
+  Mail
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
@@ -73,6 +74,7 @@ const getTabIcon = (id: string) => {
   const iconProps = { size: 16 };
   switch (id) {
     case 'super_admin_dashboard': return <Shield {...iconProps} />;
+    case 'contact_messages': return <Mail {...iconProps} />;
     case 'dashboard': return <LayoutDashboard {...iconProps} />;
     case 'customers':
     case 'employees':
@@ -170,6 +172,22 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
   const [company, setCompany] = useState<Company | null>(null);
   const [activeFeatures, setActiveFeatures] = useState<string[]>([]);
   const [featuresLoaded, setFeaturesLoaded] = useState(false);
+  const [unreadContactMessagesCount, setUnreadContactMessagesCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchUnreadContactCount = async () => {
+      try {
+        const res = await dbService.getUnreadContactMessagesCount();
+        setUnreadContactMessagesCount(res?.count || 0);
+      } catch (e) {
+        // quiet catch
+      }
+    };
+    fetchUnreadContactCount();
+    const interval = setInterval(fetchUnreadContactCount, 15000);
+    return () => clearInterval(interval);
+  }, [user]);
   
   // Change Password Modal State
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
@@ -454,6 +472,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         label: t('nav.admin'),
         icon: Settings,
         subItems: [
+          { id: 'contact_messages', label: t('nav.contact_messages') || 'رسائل التواصل', icon: Mail, badge: unreadContactMessagesCount },
           { id: 'company_settings', label: t('nav.company_settings'), icon: Building2 },
           { id: 'users', label: t('nav.users'), icon: UsersIcon },
           { id: 'period_closing', label: language === 'ar' ? 'إغلاق الفترات المحاسبية' : 'Period Closing', icon: Lock },
@@ -467,6 +486,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
     const superAdminNavItems = [
       { id: 'dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
+      { id: 'contact_messages', label: t('nav.contact_messages') || 'رسائل التواصل', icon: Mail, badge: unreadContactMessagesCount },
       { id: 'companies', label: t('nav.companies'), icon: Building2 },
       { id: 'users', label: t('nav.users'), icon: UsersIcon },
       { id: 'subscriptions', label: t('nav.subscriptions') || 'Subscriptions', icon: CreditCard },
@@ -510,23 +530,23 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       const canView = hasPermission(item.id, 'view') || item.id === 'currencies' || item.id === 'templates_menu';
       
       if (item.subItems) {
-        const visibleSubItems = item.subItems.filter(sub => {
+        const visibleSubItems = (item.subItems as any[]).filter((sub: any) => {
           if (sub.isDivider || sub.isHeader) return true;
-          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template') return true;
+          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages') return true;
           return hasPermission(sub.id, 'view');
         });
         
         // Clean up empty headers and trailing dividers
-        const cleanedSubItems = visibleSubItems.filter((sub, idx) => {
+        const cleanedSubItems = visibleSubItems.filter((sub: any, idx: number) => {
           if (sub.isHeader) {
             const slice = visibleSubItems.slice(idx + 1);
-            const nextDividerIdx = slice.findIndex(s => s.isDivider);
+            const nextDividerIdx = slice.findIndex((s: any) => s.isDivider);
             const sectionItems = nextDividerIdx === -1 ? slice : slice.slice(0, nextDividerIdx);
-            return sectionItems.some(s => !s.isDivider && !s.isHeader);
+            return sectionItems.some((s: any) => !s.isDivider && !s.isHeader);
           }
           if (sub.isDivider) {
             const slice = visibleSubItems.slice(idx + 1);
-            return slice.some(s => !s.isDivider && !s.isHeader);
+            return slice.some((s: any) => !s.isDivider && !s.isHeader);
           }
           return true;
         });
@@ -1174,12 +1194,19 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                                         key={sub.id}
                                         onClick={() => handleNavClick(sub.id, sub.label, sub.path)}
                                         className={`
-                                          w-full flex items-center gap-3 p-3 rounded-xl transition-all text-right font-bold text-sm
+                                          w-full flex items-center justify-between p-3 rounded-xl transition-all text-right font-bold text-sm
                                           ${currentPage === sub.id ? 'text-emerald-600 bg-emerald-50' : 'text-slate-500 hover:bg-slate-50'}
                                         `}
                                       >
-                                        <sub.icon size={16} />
-                                        <span>{sub.label}</span>
+                                        <div className="flex items-center gap-3">
+                                          <sub.icon size={16} />
+                                          <span>{sub.label}</span>
+                                        </div>
+                                        {sub.badge && sub.badge > 0 ? (
+                                          <span className="px-2 py-0.5 text-[10px] font-extrabold bg-emerald-600 text-white rounded-full shadow-xs">
+                                            {sub.badge}
+                                          </span>
+                                        ) : null}
                                       </button>
                                     );
                                   })}
@@ -1191,12 +1218,19 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                           <button
                             onClick={() => handleNavClick(item.id, item.label, item.path)}
                             className={`
-                              w-full flex items-center gap-3 p-4 rounded-2xl transition-all font-bold
+                              w-full flex items-center justify-between p-4 rounded-2xl transition-all font-bold
                               ${currentPage === item.id ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-600 hover:bg-slate-50'}
                             `}
                           >
-                            <item.icon size={20} />
-                            <span>{item.label}</span>
+                            <div className="flex items-center gap-3">
+                              <item.icon size={20} />
+                              <span>{item.label}</span>
+                            </div>
+                            {item.badge && item.badge > 0 ? (
+                              <span className="px-2.5 py-0.5 text-xs font-extrabold bg-emerald-500 text-white rounded-full shadow-xs">
+                                {item.badge}
+                              </span>
+                            ) : null}
                           </button>
                         )}
                       </div>
