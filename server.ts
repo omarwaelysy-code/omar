@@ -9,6 +9,7 @@ import { initDatabase } from "./src/lib/init-db";
 import { runMigrations } from "./src/lib/migration-runner";
 import erpRouter from "./src/lib/erp-api";
 import subscriptionRouter from "./src/lib/subscription/subscription-api";
+import importRouter from "./src/lib/import-router";
 import { generatePDF } from "./src/lib/pdf-generator";
 
 async function startServer() {
@@ -480,6 +481,9 @@ async function startServer() {
 
   // ERP API Routes
   app.use("/api/erp", erpRouter);
+
+  // Excel Import Routes
+  app.use("/api/erp", importRouter);
 
   // Subscription API Routes
   app.use("/api/subscriptions", subscriptionRouter);

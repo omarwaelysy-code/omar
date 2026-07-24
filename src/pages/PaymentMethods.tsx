@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Plus, Trash2, X, CreditCard, History, ChevronRight, ChevronLeft, 
-  Wallet, Layers, Hash, Box, AlertCircle, Calendar, LayoutGrid, List, FileText
+  Wallet, Layers, Hash, Box, AlertCircle, Calendar, LayoutGrid, List, FileText, FileUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { dbService } from '../services/dbService';
@@ -13,6 +13,7 @@ import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { formatNumber } from '../utils/formatUtils';
+import { ExcelImportWizard } from '../components/ExcelImportWizard';
 
 export const PaymentMethods: React.FC = () => {
   const { user } = useAuth();
@@ -24,6 +25,7 @@ export const PaymentMethods: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [view, setView] = useState<'card' | 'table'>('card');
+  const [showImportWizard, setShowImportWizard] = useState(false);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
@@ -193,6 +195,14 @@ export const PaymentMethods: React.FC = () => {
               <div className="flex items-center gap-4">
                 <button onClick={() => setIsActivityLogOpen(true)} className="w-14 h-14 bg-white text-slate-400 border border-slate-100 rounded-2xl flex items-center justify-center shadow-sm hover:text-indigo-600 hover:border-indigo-100 transition-all active:scale-95">
                   <History size={24} />
+                </button>
+                <button
+                  onClick={() => setShowImportWizard(true)}
+                  className="flex items-center gap-2 px-5 py-3 bg-white text-emerald-700 border border-emerald-300 rounded-2xl font-bold hover:bg-emerald-50 transition-all active:scale-95 shadow-sm"
+                  title="استيراد من Excel"
+                >
+                  <FileUp size={18} />
+                  <span className="hidden md:inline">استيراد Excel</span>
                 </button>
                 <button 
                   onClick={() => openModal()}
@@ -560,6 +570,15 @@ export const PaymentMethods: React.FC = () => {
       </AnimatePresence>
 
       <PageActivityLog category="payment_methods" isOpen={isActivityLogOpen} onClose={() => setIsActivityLogOpen(false)} />
+
+      {showImportWizard && (
+        <ExcelImportWizard
+          module="payment_methods"
+          moduleNameAr="طرق السداد"
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={() => setShowImportWizard(false)}
+        />
+      )}
     </div>
   );
 };

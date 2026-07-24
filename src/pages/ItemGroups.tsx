@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Plus, Trash2, X, Folder, Layers, Hash, 
-  ChevronRight, ChevronLeft, LayoutGrid, List, Lock, FileText
+  ChevronRight, ChevronLeft, LayoutGrid, List, Lock, FileText, FileUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNotification } from '../contexts/NotificationContext';
@@ -9,6 +9,7 @@ import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { PaginationControls } from '../components/PaginationControls';
+import { ExcelImportWizard } from '../components/ExcelImportWizard';
 
 interface ItemGroup {
   id: string;
@@ -31,6 +32,7 @@ export function ItemGroups() {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [view, setView] = useState<'table' | 'card'>('table');
+  const [showImportWizard, setShowImportWizard] = useState(false);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<ItemGroup | null>(null);
@@ -230,6 +232,14 @@ export function ItemGroups() {
                 </p>
               </div>
               <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setShowImportWizard(true)}
+                  className="flex items-center justify-center gap-2 px-5 py-3 bg-white text-emerald-700 border border-emerald-300 rounded-2xl font-bold hover:bg-emerald-50 transition-all active:scale-95 shadow-sm"
+                  title="استيراد من Excel"
+                >
+                  <FileUp size={18} />
+                  <span className="hidden md:inline">استيراد Excel</span>
+                </button>
                 <button 
                   onClick={handleOpenCreate}
                   className="group relative px-8 py-4 bg-zinc-900 text-white rounded-[1.5rem] shadow-xl overflow-hidden transition-all hover:bg-zinc-800 active:scale-95"
@@ -515,6 +525,15 @@ export function ItemGroups() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {showImportWizard && (
+        <ExcelImportWizard
+          module="item_groups"
+          moduleNameAr="مجموعات الأصناف"
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={() => setShowImportWizard(false)}
+        />
+      )}
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { Supplier, Account, JournalEntry } from '../types';
 import { 
   Search, Plus, Trash2, Edit2, X, Truck, Phone, Mail, MapPin, 
   Wallet, Calendar, History, FileText, User, Hash, Box,
-  LayoutGrid, List, ChevronRight, ChevronLeft, CreditCard
+  LayoutGrid, List, ChevronRight, ChevronLeft, CreditCard, FileUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
@@ -20,6 +20,7 @@ import { formatNumber } from '../utils/formatUtils';
 import { useRef } from 'react';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { FormattedNumberInput } from '../components/FormattedNumberInput';
+import { ExcelImportWizard } from '../components/ExcelImportWizard';
 
 export const Suppliers: React.FC = () => {
   const { user } = useAuth();
@@ -38,6 +39,7 @@ export const Suppliers: React.FC = () => {
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
   const tableRef = useRef<HTMLTableElement>(null);
   const [view, setView] = useViewPreference('suppliers', 'table');
+  const [showImportWizard, setShowImportWizard] = useState(false);
 
   const handleExportExcel = () => {
     const headers = {
@@ -423,6 +425,14 @@ export const Suppliers: React.FC = () => {
               onExportExcel={handleExportExcel} 
               onExportPDF={handleExportPDF} 
             />
+            <button
+              onClick={() => setShowImportWizard(true)}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-emerald-700 border border-emerald-300 rounded-2xl font-bold hover:bg-emerald-50 transition-all active:scale-95 shadow-sm"
+              title="استيراد من Excel"
+            >
+              <FileUp size={18} />
+              <span className="hidden md:inline">استيراد Excel</span>
+            </button>
             <button 
               onClick={() => openModal()}
               className={`flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95 border border-emerald-500/50 ${isModalOpen ? 'opacity-50 pointer-events-none' : ''}`}
@@ -1069,6 +1079,15 @@ export const Suppliers: React.FC = () => {
         }} 
         documentId={activityLogDocumentId}
       />
+
+      {showImportWizard && (
+        <ExcelImportWizard
+          module="suppliers"
+          moduleNameAr="الموردين"
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={() => { loadData(); setShowImportWizard(false); }}
+        />
+      )}
     </div>
   );
 };

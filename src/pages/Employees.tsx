@@ -7,7 +7,7 @@ import {
   Search, Plus, Edit2, Trash2, X, History, FileText, User, 
   Hash, Calendar, Lock, LayoutGrid, List, ChevronRight, ChevronLeft, 
   Upload, Download, File, Printer, AlertCircle, RefreshCw,
-  ChevronDown, Paperclip, RotateCcw, Save
+  ChevronDown, Paperclip, RotateCcw, Save, FileUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
@@ -17,6 +17,7 @@ import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { usePermissions } from '../hooks/usePermissions';
 import { useViewPreference } from '../hooks/useViewPreference';
+import { ExcelImportWizard } from '../components/ExcelImportWizard';
 
 const COUNTRIES = [
   { code: 'EG', name_ar: 'مصر', name_en: 'Egypt', flag: '🇪🇬' },
@@ -50,6 +51,7 @@ export const Employees: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [view, setView] = useViewPreference('employees', 'table');
+  const [showImportWizard, setShowImportWizard] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
 
   // Filters State
@@ -513,6 +515,14 @@ export const Employees: React.FC = () => {
                 onExportExcel={handleExportExcel} 
                 onExportPDF={handleExportPDF} 
               />
+              <button
+                onClick={() => setShowImportWizard(true)}
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-emerald-700 border border-emerald-300 rounded-2xl font-bold hover:bg-emerald-50 transition-all active:scale-95 shadow-sm"
+                title="استيراد من Excel"
+              >
+                <FileUp size={18} />
+                <span className="hidden md:inline">استيراد Excel</span>
+              </button>
               {canCreate && (
                 <button 
                   onClick={() => openModal()}
@@ -1350,6 +1360,15 @@ export const Employees: React.FC = () => {
         }} 
         documentId={activityLogDocumentId}
       />
+
+      {showImportWizard && (
+        <ExcelImportWizard
+          module="employees"
+          moduleNameAr="الموظفين"
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={() => setShowImportWizard(false)}
+        />
+      )}
     </div>
   );
 };

@@ -6,7 +6,7 @@ import { Customer, Account, JournalEntry } from '../types';
 import { 
   Search, Plus, Edit2, Trash2, X, History, FileText, User, 
   Hash, Box, Wallet, Calendar, Phone, Mail, MapPin, Lock,
-  LayoutGrid, List, ChevronRight, ChevronLeft, AlertCircle, CreditCard
+  LayoutGrid, List, ChevronRight, ChevronLeft, AlertCircle, CreditCard, FileUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
@@ -21,6 +21,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import { formatNumber } from '../utils/formatUtils';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { FormattedNumberInput } from '../components/FormattedNumberInput';
+import { ExcelImportWizard } from '../components/ExcelImportWizard';
 
 export const Customers: React.FC = () => {
   const { user } = useAuth();
@@ -40,6 +41,7 @@ export const Customers: React.FC = () => {
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
   const tableRef = useRef<HTMLTableElement>(null);
   const [view, setView] = useViewPreference('customers', 'table');
+  const [showImportWizard, setShowImportWizard] = useState(false);
 
   const handleExportExcel = () => {
     const headers = {
@@ -435,6 +437,16 @@ export const Customers: React.FC = () => {
               onExportExcel={handleExportExcel} 
               onExportPDF={handleExportPDF} 
             />
+            {canCreate && (
+              <button
+                onClick={() => setShowImportWizard(true)}
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-emerald-700 border border-emerald-300 rounded-2xl font-bold hover:bg-emerald-50 transition-all active:scale-95 shadow-sm"
+                title="استيراد من Excel"
+              >
+                <FileUp size={18} />
+                <span className="hidden md:inline">استيراد Excel</span>
+              </button>
+            )}
             {canCreate && (
               <button 
                 onClick={() => openModal()}
@@ -1110,6 +1122,15 @@ export const Customers: React.FC = () => {
         }} 
         documentId={activityLogDocumentId}
       />
+
+      {showImportWizard && (
+        <ExcelImportWizard
+          module="customers"
+          moduleNameAr="العملاء"
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={() => { loadData(); setShowImportWizard(false); }}
+        />
+      )}
     </div>
   );
 };

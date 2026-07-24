@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Plus, Trash2, X, Package, History, ChevronRight, ChevronLeft, 
   Wallet, Layers, Hash, User, Calendar, Paperclip, LayoutGrid, List,
-  Lock, Camera, Printer, Download, FileText, RefreshCw, AlertCircle, Settings
+  Lock, Camera, Printer, Download, FileText, RefreshCw, AlertCircle, Settings, FileUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Barcode from 'react-barcode';
@@ -23,6 +23,7 @@ import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { formatNumber, formatMoney } from '../utils/formatUtils';
 import { FormattedNumberInput } from '../components/FormattedNumberInput';
+import { ExcelImportWizard } from '../components/ExcelImportWizard';
 
 interface ItemGroup {
   id: string;
@@ -162,6 +163,7 @@ export const Products: React.FC = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [view, setView] = useViewPreference('products', 'table');
+  const [showImportWizard, setShowImportWizard] = useState(false);
   const [isAutoCode, setIsAutoCode] = useState(true);
   
   // Stock Movement & Cost Ledger States
@@ -934,6 +936,14 @@ export const Products: React.FC = () => {
                   </button>
                 )}
                 <ExportButtons onExportExcel={handleExportExcel} onExportPDF={handleExportPDF} />
+                <button
+                  onClick={() => setShowImportWizard(true)}
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-emerald-700 border border-emerald-300 rounded-2xl font-bold hover:bg-emerald-50 transition-all active:scale-95 shadow-sm"
+                  title="استيراد من Excel"
+                >
+                  <FileUp size={18} />
+                  <span className="hidden md:inline">استيراد Excel</span>
+                </button>
                 {canCreate && (
                   <button 
                     onClick={() => openModal()}
@@ -2503,6 +2513,15 @@ export const Products: React.FC = () => {
         </div>
       )}
 
+      {showImportWizard && (
+        <ExcelImportWizard
+          module="products"
+          moduleNameAr="الأصناف"
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={() => setShowImportWizard(false)}
+        />
+      )}
     </div>
   );
 };
+
