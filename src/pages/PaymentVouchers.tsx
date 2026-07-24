@@ -42,6 +42,7 @@ export const PaymentVouchers: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVoucher, setEditingVoucher] = useState<any | null>(null);
+  const editModalRef = useRef<HTMLDivElement>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [voucherToDelete, setVoucherToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -2001,7 +2002,7 @@ export const PaymentVouchers: React.FC = () => {
       </div>
     </>
   ) : (
-    <div className="bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
+    <div ref={editModalRef} className="bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
           {/* Form Header */}
           <div className="p-4 md:p-6 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70]">
             <div className="flex items-center gap-3">
@@ -2014,7 +2015,7 @@ export const PaymentVouchers: React.FC = () => {
               </button>
             </div>
 
-            <div className="flex-1 flex justify-center">
+            <div className="flex-1 flex justify-center items-center gap-2">
               <button 
                 type="button"
                 onClick={() => setShowSidePanel(!showSidePanel)}
@@ -2022,6 +2023,56 @@ export const PaymentVouchers: React.FC = () => {
               >
                 <History size={18} />
                 <span>{language === 'ar' ? 'قيد اليومية \\ سجل التعديلات' : 'Journal Entry / Activity Log'}</span>
+              </button>
+
+              {/* Print, PDF, Excel Buttons */}
+              <button 
+                type="button"
+                onClick={() => {
+                  const el = editModalRef.current;
+                  if (el) printElement(el, 'سند صرف');
+                  else window.print();
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all font-bold text-xs border border-blue-200 shadow-sm"
+                title={language === 'ar' ? 'طباعة' : 'Print'}
+              >
+                <Printer size={14} />
+                <span>{language === 'ar' ? 'طباعة' : 'Print'}</span>
+              </button>
+              <button 
+                type="button"
+                onClick={() => {
+                  const el = editModalRef.current;
+                  if (el) {
+                    exportToPDFUtil(el, {
+                      filename: `Payment_Voucher_${editingVoucher?.voucher_number || 'Doc'}`,
+                      reportTitle: `سند صرف رقم ${editingVoucher?.voucher_number || ''}`,
+                      orientation: 'portrait'
+                    });
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all font-bold text-xs border border-rose-200 shadow-sm"
+                title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+              >
+                <FileText size={14} />
+                <span>PDF</span>
+              </button>
+              <button 
+                type="button"
+                onClick={() => {
+                  const exportData = (voucherData.items || []).map((item: any, idx: number) => ({
+                    'م': idx + 1,
+                    'الحساب': item.account_name || '-',
+                    'المبلغ': item.amount || 0,
+                    'البيان': item.description || '-'
+                  }));
+                  exportToExcel(exportData.length ? exportData : [{ 'المبلغ': voucherData.amount, 'البيان': voucherData.description }], { filename: `Payment_Voucher_${editingVoucher?.voucher_number || 'Doc'}`, sheetName: 'سند الصرف' });
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-xs border border-emerald-200 shadow-sm"
+                title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+              >
+                <FileSpreadsheet size={14} />
+                <span>Excel</span>
               </button>
             </div>
 
@@ -2049,7 +2100,7 @@ export const PaymentVouchers: React.FC = () => {
                 </div>
               )}
               <h3 className="text-xl md:text-2xl font-black text-zinc-900 tracking-tight">
-                editingVoucher ? t('payments.edit') : t('payments.add')
+                {editingVoucher ? (language === 'ar' ? 'تعديل سند الصرف' : t('payments.edit')) : (language === 'ar' ? 'إضافة سند صرف جديد' : t('payments.add'))}
               </h3>
             </div>
           </div>

@@ -6,9 +6,10 @@ import { Supplier, Product, PaymentMethod, JournalEntry, JournalEntryItem, Accou
 import { 
   Search, Plus, Trash2, X, RotateCcw, User, CreditCard, Calendar, Hash, Package, 
   Save, Eye, Download, History, Printer, Edit, Phone, Mail, MapPin, Wallet, Box, 
-  Maximize2, Minimize2, ChevronRight, ChevronLeft, FileText, Layers, ChevronDown, 
+  Maximize2, Minimize2, ChevronRight, ChevronLeft, FileText, FileSpreadsheet, Layers, ChevronDown, 
   LayoutGrid, List, CheckCheck, Coins, ImageIcon, ExternalLink, ChevronUp, Copy
 } from 'lucide-react';
+
 import { motion, AnimatePresence } from 'framer-motion';
 import Barcode from 'react-barcode';
 import { SmartAIInput } from '../components/SmartAIInput';
@@ -204,6 +205,9 @@ export const PurchaseReturns: React.FC = () => {
     };
     fetchCompany();
   }, [user?.company_id]);
+
+  const editModalRef = useRef<HTMLDivElement>(null);
+  const returnRef = useRef<HTMLDivElement>(null);
 
   const generateReturnNumber = async (selectedDate: string) => {
     return await dbService.getNextSequence('purchase_returns', selectedDate);
@@ -2111,7 +2115,7 @@ export const PurchaseReturns: React.FC = () => {
           </div>
         </>
       ) : (
-        <div className="bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
+        <div ref={editModalRef} className="bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
           {/* Form Header */}
           <div className="flex items-center justify-between p-2 md:p-3 border-b border-zinc-200 bg-zinc-50/50 backdrop-blur-md sticky top-0 z-[70] flex-row-reverse">
             <div className="flex items-center gap-2 flex-wrap">
@@ -2124,19 +2128,64 @@ export const PurchaseReturns: React.FC = () => {
                 <span>{language === 'ar' ? 'العودة للقائمة' : 'Return to List'}</span>
               </button>
               {editingReturn && (
-                <button 
-                  type="button"
-                  onClick={async () => {
-                    const newNum = await generateReturnNumber(returnData.date);
-                    setReturnNumber(newNum);
-                    setEditingReturn(null);
-                    showNotification(language === 'ar' ? 'تم نسخ المرتجع كجديد' : 'Return copied as new template', 'success');
-                  }} 
-                  className="flex items-center gap-1 px-2 py-0.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
-                >
-                  <Copy size={11} />
-                  <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
-                </button>
+                <>
+                  <button 
+                    type="button"
+                    onClick={async () => {
+                      const newNum = await generateReturnNumber(returnData.date);
+                      setReturnNumber(newNum);
+                      setEditingReturn(null);
+                      showNotification(language === 'ar' ? 'تم نسخ المرتجع كجديد' : 'Return copied as new template', 'success');
+                    }} 
+                    className="flex items-center gap-1 px-2 py-0.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
+                  >
+                    <Copy size={11} />
+                    <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const el = editModalRef.current || returnRef.current;
+                      if (el) printElement(el, 'مردود مشتريات');
+                      else window.print();
+                    }} 
+                    className="flex items-center gap-1 px-2 py-0.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-blue-200 shadow-sm"
+                    title={language === 'ar' ? 'طباعة' : 'Print'}
+                  >
+                    <Printer size={11} />
+                    <span>{language === 'ar' ? 'طباعة' : 'Print'}</span>
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const el = editModalRef.current || returnRef.current;
+                      if (el) exportToPDFUtil(el, { filename: `Purchase_Return_${editingReturn.return_number}`, reportTitle: `مردود مشتريات ${editingReturn.return_number}` });
+                    }} 
+                    className="flex items-center gap-1 px-2 py-0.5 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-rose-200 shadow-sm"
+                    title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+                  >
+                    <FileText size={11} />
+                    <span>PDF</span>
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const itemsData = items.map((item, idx) => ({
+                        'م': idx + 1,
+                        'اسم الصنف': item.product_name || '-',
+                        'الكمية': item.quantity || 0,
+                        'سعر التكلفة': item.unit_price || 0,
+                        'الإجمالي': item.total || 0
+                      }));
+                      exportToExcel(itemsData.length ? itemsData : [{ 'رقم المرتجع': editingReturn?.return_number }], { filename: `Purchase_Return_${editingReturn?.return_number || 'Doc'}`, sheetName: 'مردود المشتريات' });
+                    }} 
+                    className="flex items-center gap-1 px-2 py-0.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
+                    title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+                  >
+                    <FileSpreadsheet size={11} />
+                    <span>Excel</span>
+                  </button>
+                </>
               )}
             </div>
             

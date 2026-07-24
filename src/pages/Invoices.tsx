@@ -91,7 +91,9 @@ export const Invoices: React.FC = () => {
   const [previewJournalEntry, setPreviewJournalEntry] = useState<JournalEntry | null>(null);
   const [previewActivityLog, setPreviewActivityLog] = useState<Partial<ActivityLog> | null>(null);
   const invoiceRef = useRef<HTMLDivElement>(null);
+  const editModalRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
+
   const isInitialLoad = useRef(true);
   const [isAiParsing, setIsAiParsing] = useState(false);
   const [showSidePanel, setShowSidePanel] = useState(false);
@@ -1197,20 +1199,37 @@ export const Invoices: React.FC = () => {
   }, [productFormData.type, isProductModalOpen, products]);
 
   const handlePrint = () => {
-    if (invoiceRef.current) {
-      printElement(invoiceRef.current);
+    const element = invoiceRef.current || editModalRef.current;
+    if (element) {
+      printElement(element, 'فاتورة مبيعات');
+    } else {
+      window.print();
     }
   };
 
   const handleExportInvoicePDF = (invoice: Invoice) => {
-    if (invoiceRef.current) {
-      exportToPDFUtil(invoiceRef.current, {
-        filename: `Invoice_${invoice.invoice_number}`,
-        reportTitle: `فاتورة مبيعات رقم ${invoice.invoice_number}`,
+    const element = invoiceRef.current || editModalRef.current;
+    if (element) {
+      exportToPDFUtil(element, {
+        filename: `Invoice_${invoice?.invoice_number || 'Doc'}`,
+        reportTitle: `فاتورة مبيعات رقم ${invoice?.invoice_number || ''}`,
         orientation: 'portrait'
       });
     }
   };
+
+  const handleExportSingleInvoiceExcel = (invoice: Invoice) => {
+    const itemsData = items.map((item, idx) => ({
+      'م': idx + 1,
+      'اسم الصنف': item.product_name || '-',
+      'الباركود': item.barcode || '-',
+      'الكمية': item.quantity || 0,
+      'سعر الوحدة': item.unit_price || 0,
+      'إجمالي الصنف': item.total || 0
+    }));
+    exportToExcel(itemsData.length ? itemsData : [{ 'رقم الفاتورة': invoice?.invoice_number, 'إجمالي الفاتورة': invoice?.total_amount }], { filename: `Invoice_${invoice?.invoice_number || 'Doc'}`, sheetName: 'الفاتورة' });
+  };
+
 
   // Real-time Preview Logic
   useEffect(() => {
@@ -4029,7 +4048,7 @@ export const Invoices: React.FC = () => {
           </div>
         </>
       ) : (
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
+        <div ref={editModalRef} className="bg-white rounded-3xl border border-slate-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
           {/* Form Header */}
           <div className="p-2 md:p-2.5 md:px-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70] flex-wrap gap-2" dir={dir}>
             {/* Right side (start in RTL): Actions: Save, Cancel, Return to List */}
@@ -4070,6 +4089,15 @@ export const Invoices: React.FC = () => {
                     >
                       <FileText size={11} />
                       <span>PDF</span>
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => handleExportSingleInvoiceExcel(editingInvoice)} 
+                      className="flex items-center gap-1 px-2 py-0.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
+                      title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+                    >
+                      <FileSpreadsheet size={11} />
+                      <span>Excel</span>
                     </button>
                   </>
                 )}

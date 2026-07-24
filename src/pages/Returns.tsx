@@ -5,7 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { TransactionManager } from '../services/TransactionManager';
 import { ReturnSchema, JournalEntrySchema } from '../lib/schemas';
 import { Return, Customer, Product, ReturnItem, JournalEntry, JournalEntryItem, Account, PaymentMethod, Operation, Department, CostCenter, Currency, ExchangeRate } from '../types';
-import { Search, Plus, Trash2, X, Eye, Download, FileText, RotateCcw, History, Printer, Phone, Mail, MapPin, Wallet, Calendar, Box, CreditCard, User, ChevronDown, Layers, Save, Package, ChevronRight, ChevronLeft, Maximize2, Minimize2, LayoutGrid, List, CheckCheck, Copy, Coins, Image as ImageIcon } from 'lucide-react';
+import { Search, Plus, Trash2, X, Eye, Download, FileText, FileSpreadsheet, RotateCcw, History, Printer, Phone, Mail, MapPin, Wallet, Calendar, Box, CreditCard, User, ChevronDown, Layers, Save, Package, ChevronRight, ChevronLeft, Maximize2, Minimize2, LayoutGrid, List, CheckCheck, Copy, Coins, Image as ImageIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
@@ -1945,7 +1945,7 @@ export const Returns: React.FC = () => {
           </div>
         </>
       ) : (
-        <div className={`bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col ${isFullScreen ? 'fixed inset-0 z-[100] rounded-none' : 'min-h-[80vh] relative'}`}>
+        <div ref={editModalRef} className={`bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col ${isFullScreen ? 'fixed inset-0 z-[100] rounded-none' : 'min-h-[80vh] relative'}`}>
           {/* Form Header */}
           <div className="p-2 md:p-2.5 md:px-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70] flex-wrap gap-2" dir={dir}>
             {/* Right side (start in RTL): Actions: Save, Cancel, Return to List */}
@@ -1968,14 +1968,59 @@ export const Returns: React.FC = () => {
                   <span>{isFullScreen ? (language === 'ar' ? 'تصغير' : 'Minimize') : (language === 'ar' ? 'ملء الشاشة' : 'Fullscreen')}</span>
                 </button>
                 {editingReturn && (
-                  <button 
-                    type="button"
-                    onClick={handleCopyReturn} 
-                    className="flex items-center gap-1 px-2 py-0.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
-                  >
-                    <Copy size={11} />
-                    <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
-                  </button>
+                  <>
+                    <button 
+                      type="button"
+                      onClick={handleCopyReturn} 
+                      className="flex items-center gap-1 px-2 py-0.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
+                    >
+                      <Copy size={11} />
+                      <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const el = editModalRef.current;
+                        if (el) printElement(el, 'مردود مبيعات');
+                        else window.print();
+                      }} 
+                      className="flex items-center gap-1 px-2 py-0.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-blue-200 shadow-sm"
+                      title={language === 'ar' ? 'طباعة' : 'Print'}
+                    >
+                      <Printer size={11} />
+                      <span>{language === 'ar' ? 'طباعة' : 'Print'}</span>
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const el = editModalRef.current;
+                        if (el) exportToPDFUtil(el, { filename: `Return_${editingReturn.return_number}`, reportTitle: `مردود مبيعات ${editingReturn.return_number}` });
+                      }} 
+                      className="flex items-center gap-1 px-2 py-0.5 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-rose-200 shadow-sm"
+                      title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+                    >
+                      <FileText size={11} />
+                      <span>PDF</span>
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const itemsData = items.map((item, idx) => ({
+                          'م': idx + 1,
+                          'اسم الصنف': item.product_name || '-',
+                          'الكمية': item.quantity || 0,
+                          'سعر الوحدة': item.unit_price || 0,
+                          'الإجمالي': item.total || 0
+                        }));
+                        exportToExcel(itemsData.length ? itemsData : [{ 'رقم المردود': editingReturn?.return_number }], { filename: `Return_${editingReturn?.return_number || 'Doc'}`, sheetName: 'مردود المبيعات' });
+                      }} 
+                      className="flex items-center gap-1 px-2 py-0.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
+                      title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+                    >
+                      <FileSpreadsheet size={11} />
+                      <span>Excel</span>
+                    </button>
+                  </>
                 )}
               </div>
               <div className="flex items-center gap-1.5">

@@ -186,7 +186,9 @@ export const PurchaseInvoices: React.FC = () => {
   });
 
   const invoiceRef = useRef<HTMLDivElement>(null);
+  const editModalRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
+
   const isInitialLoad = useRef(true);
   const [allReceipts, setAllReceipts] = useState<any[]>([]);
   const [allPayments, setAllPayments] = useState<any[]>([]);
@@ -3369,7 +3371,7 @@ export const PurchaseInvoices: React.FC = () => {
       </div>
     </>
   ) : (
-    <div className="bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
+    <div ref={editModalRef} className="bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
       {/* Form Header */}
       <div className="p-2 md:p-2.5 md:px-4 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70] flex-wrap gap-2" dir={dir}>
         {/* Right side (start in RTL): Actions: Save, Cancel, Return to List */}
@@ -3381,7 +3383,7 @@ export const PurchaseInvoices: React.FC = () => {
               className="flex items-center gap-1 px-2.5 py-0.5 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap"
             >
               {dir === 'rtl' ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-              <span>{language === 'ar' ? '\u0627\u0644\u0639\u0648\u062f\u0629 \u0644\u0644\u0642\u0627\u0626\u0645\u0629' : 'Return to List'}</span>
+              <span>{language === 'ar' ? 'العودة للقائمة' : 'Return to List'}</span>
             </button>
             {editingInvoice && (
               <>
@@ -3395,7 +3397,11 @@ export const PurchaseInvoices: React.FC = () => {
                 </button>
                 <button 
                   type="button"
-                  onClick={() => { if (invoiceRef.current) printElement(invoiceRef.current, 'فاتورة مشتريات'); }} 
+                  onClick={() => {
+                    const el = editModalRef.current || invoiceRef.current;
+                    if (el) printElement(el, 'فاتورة مشتريات');
+                    else window.print();
+                  }} 
                   className="flex items-center gap-1 px-2 py-0.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-blue-200 shadow-sm"
                   title={language === 'ar' ? 'طباعة الفاتورة' : 'Print Invoice'}
                 >
