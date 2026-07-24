@@ -10,7 +10,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
-import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
+import { exportToExcel, exportSingleDocumentToExcel, formatDataForExcel } from '../utils/excelUtils';
+
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
@@ -1805,13 +1806,45 @@ export const Receipts: React.FC = () => {
               <button 
                 type="button"
                 onClick={() => {
-                  const exportData = (voucherData.items || []).map((item: any, idx: number) => ({
-                    'م': idx + 1,
-                    'الحساب': item.account_name || '-',
-                    'المبلغ': item.amount || 0,
-                    'البيان': item.description || '-'
-                  }));
-                  exportToExcel(exportData.length ? exportData : [{ 'المبلغ': voucherData.amount, 'البيان': voucherData.notes || (voucherData as any).description || '-' }], { filename: `Receipt_Voucher_${editingReceipt?.voucher_number || 'Doc'}`, sheetName: 'سند القبض' });
+                  const pm = paymentMethods.find(p => p.id === voucherData.payment_method_id);
+                  let partyName = '-';
+                  if (voucherData.customer_id) {
+                    const cust = customers.find(c => c.id === voucherData.customer_id);
+                    partyName = cust?.name || 'عميل';
+                  } else if (voucherData.supplier_id) {
+                    const sup = suppliers.find(s => s.id === voucherData.supplier_id);
+                    partyName = sup?.name || 'مورد';
+                  }
+
+                  const rawItems = (voucherData.items && voucherData.items.length > 0)
+                    ? voucherData.items
+                    : [{ account_name: partyName, amount: voucherData.amount, description: voucherData.notes || '-' }];
+
+                  exportSingleDocumentToExcel({
+                    filename: `Receipt_Voucher_${editingReceipt?.voucher_number || voucherNumber || 'Doc'}`,
+                    sheetName: 'سند قبض',
+                    docTitle: 'سند قبض نقدية / بنك',
+                    docNumber: editingReceipt?.voucher_number || voucherNumber || 'جديد',
+                    docDate: voucherData.date || new Date().toISOString().slice(0, 10),
+                    partyTitle: 'الجهة / المستلم منه',
+                    partyName,
+                    paymentMethod: pm?.name || 'نقداً',
+                    notes: voucherData.notes || '',
+                    columns: [
+                      { label: 'م', key: 'index' },
+                      { label: 'الحساب / البيان', key: 'account_name' },
+                      { label: 'الوصف / الشرح', key: 'description' },
+                      { label: 'المبلغ', key: 'amount' }
+                    ],
+                    items: rawItems.map(item => ({
+                      account_name: item.account_name || partyName,
+                      description: item.description || voucherData.notes || '-',
+                      amount: item.amount || 0
+                    })),
+                    summaryRows: [
+                      { label: 'إجمالي المبلغ المقبوض:', value: voucherData.amount }
+                    ]
+                  });
                 }}
                 className="flex items-center gap-1.5 px-3 py-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-xs border border-emerald-200 shadow-sm"
                 title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}

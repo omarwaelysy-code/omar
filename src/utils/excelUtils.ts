@@ -202,3 +202,104 @@ export const formatDataForExcel = (data: any[], keyMap: Record<string, string>) 
     return formattedItem;
   });
 };
+
+export interface SingleDocExportOptions {
+  filename: string;
+  sheetName?: string;
+  companyName?: string;
+  docTitle: string;
+  docNumber: string;
+  docDate: string;
+  partyTitle?: string;
+  partyName?: string;
+  paymentMethod?: string;
+  warehouseOrBranch?: string;
+  notes?: string;
+  columns: Array<{ label: string; key: string }>;
+  items: Array<Record<string, any>>;
+  summaryRows?: Array<{ label: string; value: any }>;
+}
+
+/**
+ * Formats a single transaction document (Invoice, Voucher, Return) into a professional Excel sheet
+ * with full Company Header, Metadata Grid, Items Table, and Totals Summary block.
+ */
+export const exportSingleDocumentToExcel = (options: SingleDocExportOptions) => {
+  const {
+    filename,
+    sheetName = 'مستند',
+    companyName = localStorage.getItem('company_name') || 'نظام ERP السحابي',
+    docTitle,
+    docNumber,
+    docDate,
+    partyTitle = 'الجهة',
+    partyName = '-',
+    paymentMethod = '-',
+    warehouseOrBranch = '-',
+    notes = '',
+    columns,
+    items,
+    summaryRows = []
+  } = options;
+
+  const aoa: any[][] = [];
+
+  // 1. Company Header & Title
+  aoa.push([companyName]);
+  aoa.push([`${docTitle} - رقم: ${docNumber}`]);
+  aoa.push([]);
+
+  // 2. Metadata Grid
+  aoa.push(['التاريخ:', docDate, `${partyTitle}:`, partyName]);
+  aoa.push(['طريقة الدفع:', paymentMethod, 'الفرع / المخزن:', warehouseOrBranch]);
+  aoa.push([]);
+
+  // 3. Items Table Header
+  const headerRow = columns.map(c => c.label);
+  aoa.push(headerRow);
+
+  // 4. Items Rows
+  items.forEach((item, index) => {
+    const row = columns.map(col => {
+      if (col.key === 'index' || col.key === 'م') return index + 1;
+      const val = item[col.key];
+      return val !== undefined && val !== null ? val : '-';
+    });
+    aoa.push(row);
+  });
+
+  // 5. Blank Separator
+  aoa.push([]);
+
+  // 6. Summary Rows
+  summaryRows.forEach(sum => {
+    const emptyCells = new Array(Math.max(0, columns.length - 2)).fill('');
+    aoa.push([...emptyCells, sum.label, sum.value]);
+  });
+
+  if (notes) {
+    aoa.push([]);
+    aoa.push(['البيان / ملاحظات:', notes]);
+  }
+
+  // 7. Generate Worksheet
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // Apply number formatting to numeric cells
+  Object.keys(ws).forEach(key => {
+    if (key[0] === '!') return;
+    const cell = ws[key];
+    if (cell.t === 'n' && typeof cell.v === 'number') {
+      cell.z = '#,##0.00';
+    }
+  });
+
+  // Set column widths
+  const colWidths = columns.map(c => ({ wch: Math.max(c.label.length + 5, 15) }));
+  ws['!cols'] = colWidths;
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, `${filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`}`);
+};
+

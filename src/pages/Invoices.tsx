@@ -14,7 +14,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Barcode from 'react-barcode';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
-import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
+import { exportToExcel, exportSingleDocumentToExcel, formatDataForExcel } from '../utils/excelUtils';
+
 import { dbService, apiRequest } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
@@ -1198,7 +1199,12 @@ export const Invoices: React.FC = () => {
     }
   }, [productFormData.type, isProductModalOpen, products]);
 
-  const handlePrint = () => {
+  const handlePrint = (invoiceToPrint?: Invoice) => {
+    const target = invoiceToPrint || editingInvoice || viewInvoice;
+    if (target?.id) {
+      printDocument('invoices', target.id);
+      return;
+    }
     const element = invoiceRef.current || editModalRef.current;
     if (element) {
       printElement(element, 'فاتورة مبيعات');
@@ -1208,6 +1214,10 @@ export const Invoices: React.FC = () => {
   };
 
   const handleExportInvoicePDF = (invoice: Invoice) => {
+    if (invoice?.id) {
+      printDocument('invoices', invoice.id);
+      return;
+    }
     const element = invoiceRef.current || editModalRef.current;
     if (element) {
       exportToPDFUtil(element, {
@@ -1219,16 +1229,49 @@ export const Invoices: React.FC = () => {
   };
 
   const handleExportSingleInvoiceExcel = (invoice: Invoice) => {
-    const itemsData = items.map((item, idx) => ({
-      'م': idx + 1,
-      'اسم الصنف': item.product_name || '-',
-      'الباركود': item.barcode || '-',
-      'الكمية': item.quantity || 0,
-      'سعر الوحدة': item.unit_price || 0,
-      'إجمالي الصنف': item.total || 0
-    }));
-    exportToExcel(itemsData.length ? itemsData : [{ 'رقم الفاتورة': invoice?.invoice_number, 'إجمالي الفاتورة': invoice?.total_amount }], { filename: `Invoice_${invoice?.invoice_number || 'Doc'}`, sheetName: 'الفاتورة' });
+    const targetInv = invoice || editingInvoice || viewInvoice;
+    const customer = customers.find(c => c.id === (targetInv?.customer_id || selectedCustomerId));
+    const warehouse = warehouses.find(w => w.id?.toString() === (targetInv?.warehouse_id || selectedWarehouseId)?.toString());
+    
+    exportSingleDocumentToExcel({
+      filename: `Invoice_${targetInv?.invoice_number || invoiceNumber || 'Doc'}`,
+      sheetName: 'فاتورة مبيعات',
+      docTitle: 'فاتورة مبيعات',
+      docNumber: targetInv?.invoice_number || invoiceNumber || 'جديد',
+      docDate: targetInv?.date || date || new Date().toISOString().slice(0, 10),
+      partyTitle: 'العميل',
+      partyName: customer?.name || targetInv?.customer_name || 'عميل نقدي',
+      paymentMethod: (targetInv?.payment_type || paymentType) === 'cash' ? 'نقدي' : 'آجل',
+      warehouseOrBranch: warehouse?.name || 'المخزن الرئيسي',
+      notes: targetInv?.notes || notes || '',
+      columns: [
+        { label: 'م', key: 'index' },
+        { label: 'كود / باركود', key: 'barcode' },
+        { label: 'اسم الصنف', key: 'product_name' },
+        { label: 'الكمية', key: 'quantity' },
+        { label: 'سعر الوحدة', key: 'unit_price' },
+        { label: 'الخصم', key: 'discount' },
+        { label: 'الضريبة (14%)', key: 'tax' },
+        { label: 'إجمالي الصنف', key: 'total' }
+      ],
+      items: items.map(item => ({
+        barcode: item.barcode || '-',
+        product_name: item.product_name || '-',
+        quantity: item.quantity || 0,
+        unit_price: item.unit_price || 0,
+        discount: item.discount || 0,
+        tax: item.tax || 0,
+        total: item.total || 0
+      })),
+      summaryRows: [
+        { label: 'الإجمالي قبل الضريبة:', value: targetInv?.subtotal ?? subtotal },
+        { label: 'إجمالي الخصم:', value: targetInv?.total_discount ?? totalDiscount },
+        { label: 'ضريبة القيمة المضافة (14%):', value: targetInv?.vat_amount ?? totalVat },
+        { label: 'الصافي النهائي:', value: targetInv?.total_amount ?? totalAmount }
+      ]
+    });
   };
+
 
 
   // Real-time Preview Logic

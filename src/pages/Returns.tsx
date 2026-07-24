@@ -9,7 +9,8 @@ import { Search, Plus, Trash2, X, Eye, Download, FileText, FileSpreadsheet, Rota
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
-import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
+import { exportToExcel, exportSingleDocumentToExcel, formatDataForExcel } from '../utils/excelUtils';
+
 import { dbService, apiRequest } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
@@ -1982,9 +1983,13 @@ export const Returns: React.FC = () => {
                     <button 
                       type="button"
                       onClick={() => {
-                        const el = editModalRef.current;
-                        if (el) printElement(el, 'مردود مبيعات');
-                        else window.print();
+                        if (editingReturn?.id) {
+                          printDocument('returns', editingReturn.id);
+                        } else if (editModalRef.current) {
+                          printElement(editModalRef.current, 'مردود مبيعات');
+                        } else {
+                          window.print();
+                        }
                       }} 
                       className="flex items-center gap-1 px-2 py-0.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-blue-200 shadow-sm"
                       title={language === 'ar' ? 'طباعة' : 'Print'}
@@ -1995,8 +2000,11 @@ export const Returns: React.FC = () => {
                     <button 
                       type="button"
                       onClick={() => {
-                        const el = editModalRef.current;
-                        if (el) exportToPDFUtil(el, { filename: `Return_${editingReturn.return_number}`, reportTitle: `مردود مبيعات ${editingReturn.return_number}` });
+                        if (editingReturn?.id) {
+                          printDocument('returns', editingReturn.id);
+                        } else if (editModalRef.current) {
+                          exportToPDFUtil(editModalRef.current, { filename: `Return_${editingReturn.return_number}`, reportTitle: `مردود مبيعات ${editingReturn.return_number}` });
+                        }
                       }} 
                       className="flex items-center gap-1 px-2 py-0.5 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-rose-200 shadow-sm"
                       title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
@@ -2007,14 +2015,37 @@ export const Returns: React.FC = () => {
                     <button 
                       type="button"
                       onClick={() => {
-                        const itemsData = items.map((item, idx) => ({
-                          'م': idx + 1,
-                          'اسم الصنف': item.product_name || '-',
-                          'الكمية': item.quantity || 0,
-                          'سعر الوحدة': item.unit_price || 0,
-                          'الإجمالي': item.total || 0
-                        }));
-                        exportToExcel(itemsData.length ? itemsData : [{ 'رقم المردود': editingReturn?.return_number }], { filename: `Return_${editingReturn?.return_number || 'Doc'}`, sheetName: 'مردود المبيعات' });
+                        const cust = customers.find(c => c.id === (editingReturn?.customer_id || selectedCustomerId));
+                        exportSingleDocumentToExcel({
+                          filename: `Sales_Return_${editingReturn?.return_number || returnNumber || 'Doc'}`,
+                          sheetName: 'مردود مبيعات',
+                          docTitle: 'مردود مبيعات',
+                          docNumber: editingReturn?.return_number || returnNumber || 'جديد',
+                          docDate: editingReturn?.date || date || new Date().toISOString().slice(0, 10),
+                          partyTitle: 'العميل',
+                          partyName: cust?.name || editingReturn?.customer_name || 'عميل نقدي',
+                          notes: notes || '',
+                          columns: [
+                            { label: 'م', key: 'index' },
+                            { label: 'اسم الصنف', key: 'product_name' },
+                            { label: 'الكمية المرتجعة', key: 'quantity' },
+                            { label: 'سعر الوحدة', key: 'unit_price' },
+                            { label: 'الضريبة (14%)', key: 'tax' },
+                            { label: 'الإجمالي', key: 'total' }
+                          ],
+                          items: items.map(item => ({
+                            product_name: item.product_name || '-',
+                            quantity: item.quantity || 0,
+                            unit_price: item.unit_price || 0,
+                            tax: item.tax || 0,
+                            total: item.total || 0
+                          })),
+                          summaryRows: [
+                            { label: 'الإجمالي قبل الضريبة:', value: editingReturn?.subtotal ?? subtotal },
+                            { label: 'ضريبة القيمة المضافة (14%):', value: editingReturn?.vat_amount ?? totalVat },
+                            { label: 'الصافي النهائي:', value: editingReturn?.total_amount ?? totalAmount }
+                          ]
+                        });
                       }} 
                       className="flex items-center gap-1 px-2 py-0.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
                       title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}

@@ -9,13 +9,14 @@ import {
   Eye, History, Printer, ArrowRight, ArrowLeft, Minimize2, 
   Maximize2, Phone, Mail, MapPin, Wallet, Layers, Paperclip, 
   Tag, Box, LayoutGrid, List, Receipt, ChevronDown, ChevronLeft, ChevronRight,
-  Coins, CheckCheck, ExternalLink, RotateCcw, ChevronUp, Copy, Sparkles
+  Coins, CheckCheck, ExternalLink, RotateCcw, ChevronUp, Copy, Sparkles, FileSpreadsheet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Barcode from 'react-barcode';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
-import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
+import { exportToExcel, exportSingleDocumentToExcel, formatDataForExcel } from '../utils/excelUtils';
+
 import { dbService, apiRequest } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
@@ -1395,7 +1396,78 @@ export const PurchaseInvoices: React.FC = () => {
     generatePreview();
   }, [isModalOpen, items, invoiceData, user, suppliers, products, categories, paymentMethods, accounts, editingInvoice, settings]);
 
+  const handlePrintPurchaseInvoice = (inv?: any) => {
+    const target = inv || editingInvoice || viewInvoice;
+    if (target?.id) {
+      printDocument('purchase_invoices', target.id);
+      return;
+    }
+    const el = editModalRef.current || invoiceRef.current;
+    if (el) printElement(el, 'فاتورة مشتريات');
+    else window.print();
+  };
+
+  const handleExportPurchaseInvoicePDF = (inv?: any) => {
+    const target = inv || editingInvoice || viewInvoice;
+    if (target?.id) {
+      printDocument('purchase_invoices', target.id);
+      return;
+    }
+    const el = editModalRef.current || invoiceRef.current;
+    if (el) {
+      exportToPDFUtil(el, {
+        filename: `Purchase_Invoice_${target?.invoice_number || 'Doc'}`,
+        reportTitle: `فاتورة مشتريات ${target?.invoice_number || ''}`
+      });
+    }
+  };
+
+  const handleExportSinglePurchaseInvoiceExcel = (inv?: any) => {
+    const targetInv = inv || editingInvoice || viewInvoice;
+    const supplier = suppliers.find(s => s.id === (targetInv?.supplier_id || selectedSupplierId));
+    const warehouse = warehouses.find(w => w.id?.toString() === (targetInv?.warehouse_id || selectedWarehouseId)?.toString());
+
+    exportSingleDocumentToExcel({
+      filename: `Purchase_Invoice_${targetInv?.invoice_number || invoiceNumber || 'Doc'}`,
+      sheetName: 'فاتورة مشتريات',
+      docTitle: 'فاتورة مشتريات',
+      docNumber: targetInv?.invoice_number || invoiceNumber || 'جديد',
+      docDate: targetInv?.date || invoiceData.date || new Date().toISOString().slice(0, 10),
+      partyTitle: 'المورد',
+      partyName: supplier?.name || targetInv?.supplier_name || 'مورد عام',
+      paymentMethod: (targetInv?.payment_type || invoiceData.payment_type) === 'cash' ? 'نقدي' : 'آجل',
+      warehouseOrBranch: warehouse?.name || 'المخزن الرئيسي',
+      notes: targetInv?.notes || notes || '',
+      columns: [
+        { label: 'م', key: 'index' },
+        { label: 'كود / باركود', key: 'barcode' },
+        { label: 'اسم الصنف', key: 'product_name' },
+        { label: 'الكمية', key: 'quantity' },
+        { label: 'سعر التكلفة', key: 'unit_price' },
+        { label: 'الخصم', key: 'discount' },
+        { label: 'الضريبة (14%)', key: 'tax' },
+        { label: 'إجمالي الصنف', key: 'total' }
+      ],
+      items: items.map(item => ({
+        barcode: item.barcode || '-',
+        product_name: item.product_name || '-',
+        quantity: item.quantity || 0,
+        unit_price: item.unit_price || 0,
+        discount: item.discount || 0,
+        tax: item.tax || 0,
+        total: item.total || 0
+      })),
+      summaryRows: [
+        { label: 'الإجمالي قبل الضريبة:', value: targetInv?.subtotal ?? subtotal },
+        { label: 'إجمالي الخصم:', value: targetInv?.total_discount ?? totalDiscount },
+        { label: 'ضريبة القيمة المضافة (14%):', value: targetInv?.vat_amount ?? totalVat },
+        { label: 'الصافي النهائي:', value: targetInv?.total_amount ?? totalAmount }
+      ]
+    });
+  };
+
   const currentInvoiceCurrencyCode = selectedCurrencyId 
+
     ? companyCurrencies.find(c => c.id === selectedCurrencyId)?.code || 'EGP'
     : companyData?.settings?.currency || 'EGP';
 
@@ -3397,11 +3469,15 @@ export const PurchaseInvoices: React.FC = () => {
                 </button>
                 <button 
                   type="button"
-                  onClick={() => {
-                    const el = editModalRef.current || invoiceRef.current;
-                    if (el) printElement(el, 'فاتورة مشتريات');
-                    else window.print();
-                  }} 
+                  onClick={handleCopyInvoice} 
+                  className="flex items-center gap-1 px-2 py-0.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
+                >
+                  <Copy size={11} />
+                  <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => handlePrintPurchaseInvoice(editingInvoice)} 
                   className="flex items-center gap-1 px-2 py-0.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-blue-200 shadow-sm"
                   title={language === 'ar' ? 'طباعة الفاتورة' : 'Print Invoice'}
                 >
@@ -3410,12 +3486,21 @@ export const PurchaseInvoices: React.FC = () => {
                 </button>
                 <button 
                   type="button"
-                  onClick={() => { if (invoiceRef.current) exportToPDFUtil(invoiceRef.current, { filename: `Purchase_Invoice_${editingInvoice.invoice_number}`, reportTitle: `فاتورة مشتريات ${editingInvoice.invoice_number}` }); }} 
+                  onClick={() => handleExportPurchaseInvoicePDF(editingInvoice)} 
                   className="flex items-center gap-1 px-2 py-0.5 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-rose-200 shadow-sm"
                   title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
                 >
                   <FileText size={11} />
                   <span>PDF</span>
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => handleExportSinglePurchaseInvoiceExcel(editingInvoice)} 
+                  className="flex items-center gap-1 px-2 py-0.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
+                  title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+                >
+                  <FileSpreadsheet size={11} />
+                  <span>Excel</span>
                 </button>
               </>
             )}
