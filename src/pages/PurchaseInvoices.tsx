@@ -3384,14 +3384,34 @@ export const PurchaseInvoices: React.FC = () => {
               <span>{language === 'ar' ? '\u0627\u0644\u0639\u0648\u062f\u0629 \u0644\u0644\u0642\u0627\u0626\u0645\u0629' : 'Return to List'}</span>
             </button>
             {editingInvoice && (
-              <button 
-                type="button"
-                onClick={handleCopyInvoice} 
-                className="flex items-center gap-1 px-2 py-0.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
-              >
-                <Copy size={11} />
-                <span>{language === 'ar' ? '\u0646\u0633\u062e' : 'Copy'}</span>
-              </button>
+              <>
+                <button 
+                  type="button"
+                  onClick={handleCopyInvoice} 
+                  className="flex items-center gap-1 px-2 py-0.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
+                >
+                  <Copy size={11} />
+                  <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => { if (invoiceRef.current) printElement(invoiceRef.current, 'فاتورة مشتريات'); }} 
+                  className="flex items-center gap-1 px-2 py-0.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-blue-200 shadow-sm"
+                  title={language === 'ar' ? 'طباعة الفاتورة' : 'Print Invoice'}
+                >
+                  <Printer size={11} />
+                  <span>{language === 'ar' ? 'طباعة' : 'Print'}</span>
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => { if (invoiceRef.current) exportToPDFUtil(invoiceRef.current, { filename: `Purchase_Invoice_${editingInvoice.invoice_number}`, reportTitle: `فاتورة مشتريات ${editingInvoice.invoice_number}` }); }} 
+                  className="flex items-center gap-1 px-2 py-0.5 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-rose-200 shadow-sm"
+                  title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+                >
+                  <FileText size={11} />
+                  <span>PDF</span>
+                </button>
+              </>
             )}
             <button 
               type="button"

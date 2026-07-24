@@ -4044,14 +4044,34 @@ export const Invoices: React.FC = () => {
                   <span>{language === 'ar' ? 'العودة للقائمة' : 'Return to List'}</span>
                 </button>
                 {editingInvoice && (
-                  <button 
-                    type="button"
-                    onClick={handleCopyInvoice} 
-                    className="flex items-center gap-1 px-2 py-0.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
-                  >
-                    <Copy size={11} />
-                    <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
-                  </button>
+                  <>
+                    <button 
+                      type="button"
+                      onClick={handleCopyInvoice} 
+                      className="flex items-center gap-1 px-2 py-0.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
+                    >
+                      <Copy size={11} />
+                      <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={handlePrint} 
+                      className="flex items-center gap-1 px-2 py-0.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-blue-200 shadow-sm"
+                      title={language === 'ar' ? 'طباعة الفاتورة' : 'Print Invoice'}
+                    >
+                      <Printer size={11} />
+                      <span>{language === 'ar' ? 'طباعة' : 'Print'}</span>
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => handleExportInvoicePDF(editingInvoice)} 
+                      className="flex items-center gap-1 px-2 py-0.5 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-rose-200 shadow-sm"
+                      title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+                    >
+                      <FileText size={11} />
+                      <span>PDF</span>
+                    </button>
+                  </>
                 )}
               </div>
               <div className="flex items-center gap-1.5">
