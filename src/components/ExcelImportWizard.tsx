@@ -373,20 +373,28 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
                               <tr className={`${isError ? 'bg-red-50' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
                                 <td className="px-3 py-2 text-slate-500 font-mono font-bold border-l border-slate-100">{row.rowNumber}</td>
                                 <td className="px-3 py-2 border-l border-slate-100">
-                                  {isError
+                  {isError
                                     ? <span className="inline-flex items-center gap-1 text-red-600 font-bold"><XCircle size={12} />خطأ</span>
                                     : <span className="inline-flex items-center gap-1 text-emerald-600 font-bold"><CheckCircle size={12} />صحيح</span>
                                   }
                                 </td>
-                                {validation.columns.map(col => (
-                                  <td key={col.key} className={`px-3 py-2 border-l border-slate-100 whitespace-nowrap ${
-                                    isError && (row.errors || []).some(e => e.includes(col.label.replace(' *', '')))
-                                      ? 'bg-red-100 text-red-700 font-bold'
-                                      : 'text-slate-700'
-                                  }`}>
-                                    {row.data[col.key] !== null && row.data[col.key] !== undefined ? String(row.data[col.key]) : <span className="text-slate-300">—</span>}
-                                  </td>
-                                ))}
+                                {validation.columns.map(col => {
+                                    // For account_code columns, show both code + resolved name
+                                    const codeVal = row.data[col.key];
+                                    const nameKey = col.key.replace('_code', '_name');
+                                    const resolvedName = (col.type === 'account_code' && row.data[nameKey]) ? row.data[nameKey] : null;
+                                    const hasColError = isError && (row.errors || []).some(e => e.includes(col.label.replace(' *', '')));
+                                    return (
+                                      <td key={col.key} className={`px-3 py-2 border-l border-slate-100 whitespace-nowrap ${hasColError ? 'bg-red-100 text-red-700 font-bold' : 'text-slate-700'}`}>
+                                        {codeVal !== null && codeVal !== undefined
+                                          ? resolvedName
+                                            ? <><span className="font-mono text-slate-500">{codeVal}</span> <span className="text-emerald-700 font-bold">- {resolvedName}</span></>
+                                            : String(codeVal)
+                                          : <span className="text-slate-300">—</span>
+                                        }
+                                      </td>
+                                    );
+                                  })}
                               </tr>
                               {isError && (
                                 <tr className="bg-red-50 border-b border-red-100">
