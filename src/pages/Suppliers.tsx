@@ -1085,7 +1085,7 @@ export const Suppliers: React.FC = () => {
           module="suppliers"
           moduleNameAr="الموردين"
           onClose={() => setShowImportWizard(false)}
-          onSuccess={() => { loadData(); setShowImportWizard(false); }}
+          onSuccess={() => setShowImportWizard(false)}
         />
       )}
     </div>

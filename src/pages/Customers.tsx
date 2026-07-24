@@ -1128,7 +1128,7 @@ export const Customers: React.FC = () => {
           module="customers"
           moduleNameAr="العملاء"
           onClose={() => setShowImportWizard(false)}
-          onSuccess={() => { loadData(); setShowImportWizard(false); }}
+          onSuccess={() => setShowImportWizard(false)}
         />
       )}
     </div>
