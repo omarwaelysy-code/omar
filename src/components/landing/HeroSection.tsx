@@ -85,7 +85,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onLogin }) => {
               <img
                 src="/hero-image.png"
                 alt="Obrain ERP Platform Illustration"
-                className="w-full h-auto object-contain select-none pointer-events-none drop-shadow-xl"
+                className="w-full h-auto object-contain select-none pointer-events-none mix-blend-multiply"
               />
             </div>
           </motion.div>

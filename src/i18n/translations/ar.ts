@@ -89,6 +89,7 @@ export const ar = {
   'landing.contact.description': 'لديك أسئلة حول Obrain ERP أو تحتاج إلى عرض توضيحي مخصص لشركتك؟ تواصل معنا وسنرد خلال 24 ساعة.',
   'landing.contact.email_label': 'البريد الإلكتروني',
   'landing.contact.phone_label': 'الهاتف',
+  'landing.contact.whatsapp_label': 'واتساب',
   'landing.contact.hq_label': 'المقر الرئيسي',
   'landing.contact.hq_val': 'برج الابتكار، الحي المالي',
   'landing.contact.form_name': 'الاسم الكامل',

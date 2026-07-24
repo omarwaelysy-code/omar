@@ -89,6 +89,7 @@ export const en = {
   'landing.contact.description': 'Have questions about Obrain ERP or need a tailored demo for your company? Contact our team and we will respond within 24 hours.',
   'landing.contact.email_label': 'Email',
   'landing.contact.phone_label': 'Phone',
+  'landing.contact.whatsapp_label': 'WhatsApp',
   'landing.contact.hq_label': 'HQ Location',
   'landing.contact.hq_val': 'Innovation Tower, Financial District',
   'landing.contact.form_name': 'Your Name',

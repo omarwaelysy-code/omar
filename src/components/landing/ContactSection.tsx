@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Phone, MapPin, Send, CheckCircle2 } from 'lucide-react';
+import { Phone, MapPin, Send, CheckCircle2, MessageSquare } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 
 export const ContactSection: React.FC = () => {
@@ -46,21 +46,25 @@ export const ContactSection: React.FC = () => {
             <div className="mt-8 space-y-6">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-[#1B853A]/10 flex items-center justify-center shrink-0">
-                  <Mail className="w-5 h-5 text-[#1B853A]" />
+                  <Phone className="w-5 h-5 text-[#1B853A]" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-semibold text-[#4B5563]">{t('landing.contact.email_label')}</h4>
-                  <p className="font-bold text-[#0B0F19]">contact@obrain.tech</p>
+                  <h4 className="text-sm font-semibold text-[#4B5563]">{t('landing.contact.phone_label')}</h4>
+                  <a href="tel:+201010010156" className="font-bold text-[#0B0F19] hover:text-[#1B853A] transition-colors dir-ltr block text-right">
+                    +022 01010010156
+                  </a>
                 </div>
               </div>
 
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-[#1B853A]/10 flex items-center justify-center shrink-0">
-                  <Phone className="w-5 h-5 text-[#1B853A]" />
+                  <MessageSquare className="w-5 h-5 text-[#1B853A]" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-semibold text-[#4B5563]">{t('landing.contact.phone_label')}</h4>
-                  <p className="font-bold text-[#0B0F19]">+966 (0) 11 800 9000</p>
+                  <h4 className="text-sm font-semibold text-[#4B5563]">{t('landing.contact.whatsapp_label')}</h4>
+                  <a href="https://wa.me/201010010156" target="_blank" rel="noopener noreferrer" className="font-bold text-[#0B0F19] hover:text-[#1B853A] transition-colors dir-ltr block text-right">
+                    +022 01010010156
+                  </a>
                 </div>
               </div>
 
