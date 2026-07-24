@@ -1255,7 +1255,9 @@ export const Invoices: React.FC = () => {
       docNumber: targetInv?.invoice_number || invoiceNumber || 'جديد',
       docDate: targetInv?.date || date || new Date().toISOString().slice(0, 10),
       referenceNo: (targetInv as any)?.reference_number || (targetInv as any)?.po_number || '-',
+      createdByName: (targetInv as any)?.created_by || user?.username || '',
       partyTitle: 'العميل',
+
       partyName: customer?.name || targetInv?.customer_name || 'عميل نقدي',
       partyAddress: customer?.address || '',
       partyPhone: (customer as any)?.phone || (customer as any)?.mobile || '',
