@@ -1755,6 +1755,7 @@ export const PurchaseReturns: React.FC = () => {
               <ExportButtons 
                 onExportExcel={handleExportExcel} 
                 onExportPDF={handleExportPDF} 
+                onPrint={() => printElement(tableRef.current, 'مرتجعات المشتريات')}
               />
               <button 
                 onClick={openModal}

@@ -8,7 +8,11 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
 import { useNavigation } from '../contexts/NavigationContext';
 import { formatNumber, formatDate, formatMoney, isSupplierAccount } from '../utils/formatUtils';
-import { exportToExcel } from '../utils/excelUtils';
+import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
+import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
+import { ExportButtons } from '../components/ExportButtons';
+import { useRef } from 'react';
+
 
 interface Movement {
   id: string; // unique composite key (e.g. "INV_ID" or "VOU_ID-itemIdx")
@@ -42,6 +46,27 @@ export const SupplierSettlements: React.FC = () => {
   const [allPayments, setAllPayments] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const handleExportExcel = () => {
+    const data = historyList.map(h => ({
+      [language === 'ar' ? 'رقم التسوية' : 'Settlement No.']: h.settlement_number,
+      [language === 'ar' ? 'التاريخ' : 'Date']: formatDate(h.date),
+      [language === 'ar' ? 'المورد' : 'Supplier']: h.entity_name,
+      [language === 'ar' ? 'المبلغ' : 'Amount']: h.creditDocs.reduce((sum, d) => sum + d.amount, 0)
+    }));
+    exportToExcel(data, { filename: 'Supplier_Settlements', sheetName: 'تسويات الموردين' });
+  };
+
+  const handleExportPDF = async () => {
+    if (tableRef.current) {
+      await exportToPDFUtil(tableRef.current, {
+        filename: 'Supplier_Settlements',
+        reportTitle: 'سجل تسويات الموردين'
+      });
+    }
+  };
+
 
   // Active states
   const [activeTab, setActiveTab] = useState<'new' | 'history'>('new');
@@ -1226,6 +1251,11 @@ export const SupplierSettlements: React.FC = () => {
         
         {/* Tab Switcher & Layout Toggle */}
         <div className="flex flex-wrap items-center gap-3">
+          <ExportButtons
+            onExportExcel={handleExportExcel}
+            onExportPDF={handleExportPDF}
+            onPrint={() => printElement(tableRef.current, 'تسويات الموردين')}
+          />
           {selectedSupplierId && activeTab === 'new' && (
             <button
               onClick={handleToggleLayout}
@@ -1779,7 +1809,7 @@ export const SupplierSettlements: React.FC = () => {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
+            <div ref={tableRef} className="overflow-x-auto">
               <table className="w-full text-right text-sm">
                 <thead>
                   <tr className="bg-zinc-50/50 text-zinc-500 text-xs font-bold uppercase tracking-wider">

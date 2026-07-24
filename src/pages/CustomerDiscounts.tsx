@@ -13,7 +13,10 @@ import { TransactionManager } from '../services/TransactionManager';
 import { DiscountSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog } from '../types';
 import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
-import { PaginationControls } from '../components/PaginationControls';
+import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
+import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
+import { ExportButtons } from '../components/ExportButtons';
+import { useRef } from 'react';
 
 export const CustomerDiscounts: React.FC = () => {
   const { user } = useAuth();
@@ -45,6 +48,29 @@ export const CustomerDiscounts: React.FC = () => {
   const [serverSummary, setServerSummary] = useState<any>({});
   const [discountNumber, setDiscountNumber] = useState('');
   const [editingDiscount, setEditingDiscount] = useState<any | null>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
+
+  const handleExportExcel = () => {
+    const headers = {
+      'number': 'رقم الإذن',
+      'date': 'التاريخ',
+      'customer_name': 'العميل',
+      'amount': 'المبلغ',
+      'notes': 'البيان'
+    };
+    const formattedData = formatDataForExcel(discounts, headers);
+    exportToExcel(formattedData, { filename: 'Customer_Discounts', sheetName: 'خصم العملاء' });
+  };
+
+  const handleExportPDF = async () => {
+    if (tableRef.current) {
+      await exportToPDFUtil(tableRef.current, {
+        filename: 'Customer_Discounts',
+        reportTitle: 'إشعارات خصم العملاء'
+      });
+    }
+  };
+
 
   const generateDiscountNumber = async (selectedDate: string) => {
     return await dbService.getNextSequence('customer_discounts', selectedDate);
@@ -432,6 +458,11 @@ export const CustomerDiscounts: React.FC = () => {
             <History size={20} />
             {t('common.activity_log')}
           </button>
+          <ExportButtons 
+            onExportExcel={handleExportExcel} 
+            onExportPDF={handleExportPDF} 
+            onPrint={() => printElement(tableRef.current, 'إشعارات خصم العملاء')}
+          />
           <button 
             onClick={() => setIsModalOpen(true)}
             className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-[rgba(16,185,129,0.2)]"
@@ -476,7 +507,7 @@ export const CustomerDiscounts: React.FC = () => {
 
         {view === 'table' ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-right">
+            <table ref={tableRef} className="w-full text-right">
               <thead>
                 <tr className="bg-[rgba(244,244,245,0.5)] text-zinc-500 text-xs uppercase tracking-wider">
                   <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('customer_name')}>

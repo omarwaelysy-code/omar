@@ -305,9 +305,69 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
 };
 
 /**
- * Standard browser printing fallback
+ * Standard browser printing for HTML elements/tables
  */
-export const printElement = (element: HTMLElement) => {
-  if (!element) return;
-  window.print();
+export const printElement = (element: HTMLElement | null, reportTitle: string = 'تقرير') => {
+  if (!element) {
+    window.print();
+    return;
+  }
+  const companyName = localStorage.getItem('company_name') || 'نظام ERP السحابي';
+  const printWindow = window.open('', '_blank', 'width=1100,height=850');
+  if (!printWindow) {
+    window.print();
+    return;
+  }
+
+  // Clone element to remove interactive inputs or action columns if needed
+  const cloned = element.cloneNode(true) as HTMLElement;
+  // Remove last header and body column if it contains action buttons
+  cloned.querySelectorAll('tr').forEach(tr => {
+    const lastCell = tr.lastElementChild;
+    if (lastCell && (lastCell.querySelector('button') || lastCell.textContent?.includes('إجراءات') || lastCell.textContent?.includes('Actions'))) {
+      lastCell.remove();
+    }
+  });
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+      <meta charset="utf-8">
+      <title>${reportTitle}</title>
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 25px; direction: rtl; color: #1e293b; }
+        .header { text-align: center; margin-bottom: 25px; border-bottom: 2px solid #0f766e; padding-bottom: 15px; }
+        .header h1 { margin: 0 0 6px 0; font-size: 24px; color: #0f766e; font-weight: bold; }
+        .header h2 { margin: 0; font-size: 16px; color: #475569; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #fff; }
+        th, td { border: 1px solid #cbd5e1; padding: 10px 12px; text-align: right; font-size: 12px; }
+        th { background-color: #f1f5f9; font-weight: bold; color: #0f172a; }
+        tr:nth-child(even) { background-color: #f8fafc; }
+        .footer { margin-top: 25px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+        button, .no-print, input[type="checkbox"] { display: none !important; }
+        @media print {
+          @page { size: A4 landscape; margin: 10mm; }
+          body { padding: 0; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>${companyName}</h1>
+        <h2>${reportTitle}</h2>
+      </div>
+      ${cloned.outerHTML}
+      <div class="footer">تاريخ الطباعة: ${new Date().toLocaleDateString('ar-EG')} - ${new Date().toLocaleTimeString('ar-EG')}</div>
+      <script>
+        window.onload = function() {
+          window.print();
+          setTimeout(function() { window.close(); }, 500);
+        };
+      </script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
 };
+

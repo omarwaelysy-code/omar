@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -9,7 +9,7 @@ import {
   LayoutGrid, List, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, User, ChevronDown, Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
+import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
@@ -1484,6 +1484,7 @@ export const Receipts: React.FC = () => {
           <ExportButtons 
             onExportExcel={handleExportExcel} 
             onExportPDF={handleExportPDF} 
+            onPrint={() => printElement(tableRef.current, 'سندات القبض')}
           />
           <button 
             onClick={() => setIsModalOpen(true)}

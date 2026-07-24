@@ -13,6 +13,11 @@ import { formatNumber, formatDate } from '../utils/formatUtils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { PaginationControls } from '../components/PaginationControls';
 import { useNavigation } from '../contexts/NavigationContext';
+import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
+import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
+import { ExportButtons } from '../components/ExportButtons';
+import { useRef } from 'react';
+
 
 interface AdjItemInput {
   product_id: string;
@@ -33,6 +38,28 @@ export const StockAdjustments: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const handleExportExcel = () => {
+    const headers = {
+      'adjustment_number': 'رقم التسوية',
+      'date': 'التاريخ',
+      'account_name': 'الحساب المقابل',
+      'description': 'ملاحظات'
+    };
+    const formattedData = formatDataForExcel(adjustments, headers);
+    exportToExcel(formattedData, { filename: 'Stock_Adjustments', sheetName: 'تسويات المخزون' });
+  };
+
+  const handleExportPDF = async () => {
+    if (tableRef.current) {
+      await exportToPDFUtil(tableRef.current, {
+        filename: 'Stock_Adjustments',
+        reportTitle: 'جدول تسويات كميات وأسعار المخزون'
+      });
+    }
+  };
+
 
   // Filter/Pagination states
   const [searchTerm, setSearchTerm] = useState('');
@@ -346,7 +373,12 @@ export const StockAdjustments: React.FC = () => {
           </p>
         </div>
 
-        <div>
+        <div className="flex items-center gap-3">
+          <ExportButtons
+            onExportExcel={handleExportExcel}
+            onExportPDF={handleExportPDF}
+            onPrint={() => printElement(tableRef.current, 'جدول تسويات كميات وأسعار المخزون')}
+          />
           <button
             onClick={handleOpenCreateModal}
             className="flex items-center gap-2 px-6 py-3.5 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-black rounded-2xl shadow-lg shadow-emerald-500/20 transition-all text-sm"
@@ -413,7 +445,7 @@ export const StockAdjustments: React.FC = () => {
         </div>
       ) : (
         <div className="bg-white/60 backdrop-blur-xl rounded-[2rem] border border-white/20 shadow-xl overflow-hidden">
-          <div className="overflow-x-auto">
+          <div ref={tableRef} className="overflow-x-auto">
             <table className="w-full border-collapse text-right">
               <thead>
                 <tr className="bg-slate-50/75 border-b border-slate-100">

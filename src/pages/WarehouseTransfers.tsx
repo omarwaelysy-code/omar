@@ -13,6 +13,10 @@ import { dbService } from '../services/dbService';
 import { formatNumber, formatDate } from '../utils/formatUtils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { PaginationControls } from '../components/PaginationControls';
+import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
+import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
+import { ExportButtons } from '../components/ExportButtons';
+
 
 interface TransferItemInput {
   product_id: string;
@@ -29,6 +33,29 @@ export const WarehouseTransfers: React.FC = () => {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const handleExportExcel = () => {
+    const headers = {
+      'transfer_number': 'رقم التحويل',
+      'date': 'التاريخ',
+      'from_warehouse_name': 'من مخزن',
+      'to_warehouse_name': 'إلى مخزن',
+      'notes': 'ملاحظات'
+    };
+    const formattedData = formatDataForExcel(transfers, headers);
+    exportToExcel(formattedData, { filename: 'Warehouse_Transfers', sheetName: 'تحويلات المخازن' });
+  };
+
+  const handleExportPDF = async () => {
+    if (tableRef.current) {
+      await exportToPDFUtil(tableRef.current, {
+        filename: 'Warehouse_Transfers',
+        reportTitle: 'جدول تحويلات المخازن'
+      });
+    }
+  };
+
 
   // Filter/Pagination states
   const [searchTerm, setSearchTerm] = useState('');
@@ -265,13 +292,20 @@ export const WarehouseTransfers: React.FC = () => {
           </h1>
           <p className="text-slate-500 font-bold mt-1 text-sm">{t('warehouse_transfers.subtitle')}</p>
         </div>
-        <button
-          onClick={handleOpenCreateModal}
-          className="flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-[1.5rem] font-black text-base hover:shadow-lg hover:shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-        >
-          <Plus size={20} />
-          {t('warehouse_transfers.add')}
-        </button>
+        <div className="flex items-center gap-3">
+          <ExportButtons
+            onExportExcel={handleExportExcel}
+            onExportPDF={handleExportPDF}
+            onPrint={() => printElement(tableRef.current, 'جدول تحويلات المخازن')}
+          />
+          <button
+            onClick={handleOpenCreateModal}
+            className="flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-[1.5rem] font-black text-base hover:shadow-lg hover:shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+          >
+            <Plus size={20} />
+            {t('warehouse_transfers.add')}
+          </button>
+        </div>
       </div>
 
       {/* Filter and search bar */}
@@ -349,7 +383,7 @@ export const WarehouseTransfers: React.FC = () => {
         </div>
       ) : (
         <div className="bg-white/60 backdrop-blur-xl rounded-[2rem] border border-white/20 shadow-xl overflow-hidden">
-          <div className="overflow-x-auto">
+          <div ref={tableRef} className="overflow-x-auto">
             <table className="w-full border-collapse text-right">
               <thead>
                 <tr className="bg-slate-50/75 border-b border-slate-100">

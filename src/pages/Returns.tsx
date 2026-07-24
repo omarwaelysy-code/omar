@@ -1604,6 +1604,7 @@ export const Returns: React.FC = () => {
           <ExportButtons 
             onExportExcel={handleExportExcel} 
             onExportPDF={handleExportPDF} 
+            onPrint={() => printElement(tableRef.current, 'مرتجعات المبيعات')}
           />
           <button 
             onClick={() => openModal()}

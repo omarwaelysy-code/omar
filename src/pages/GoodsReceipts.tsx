@@ -514,6 +514,7 @@ export const GoodsReceipts: React.FC = () => {
           <ExportButtons
             onExportExcel={handleExportExcel}
             onExportPDF={handleExportPDF}
+            onPrint={() => printElement(tableRef.current, 'أذون استلام البضاعة')}
           />
         </div>
       </div>

@@ -3009,6 +3009,7 @@ export const PurchaseInvoices: React.FC = () => {
           <ExportButtons 
             onExportExcel={handleExportExcel} 
             onExportPDF={handleExportPDF} 
+            onPrint={() => printElement(tableRef.current, 'فواتير المشتريات')}
           />
           <button 
             onClick={() => setIsModalOpen(true)}

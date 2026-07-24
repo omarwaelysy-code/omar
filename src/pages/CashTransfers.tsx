@@ -11,7 +11,7 @@ import {
   Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, User, ChevronDown, LayoutGrid, List
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
+import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
@@ -479,6 +479,7 @@ export const CashTransfers: React.FC = () => {
           <ExportButtons 
             onExportExcel={handleExportExcel}
             onExportPDF={handleExportPDF}
+            onPrint={() => printElement(tableRef.current, 'سندات التحويل النقدي')}
           />
           <button 
             onClick={() => {

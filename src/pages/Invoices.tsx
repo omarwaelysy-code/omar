@@ -3127,8 +3127,10 @@ export const Invoices: React.FC = () => {
               <ExportButtons 
                 onExportExcel={() => handleExportExcel(false)} 
                 onExportPDF={() => handleExportPDF(false)} 
+                onPrint={() => printElement(tableRef.current, 'قائمة فواتير المبيعات')}
                 onExportExcelSelected={() => handleExportExcel(true)}
                 onExportPDFSelected={() => handleExportPDF(true)}
+                onPrintSelected={() => printElement(tableRef.current, 'فواتير المبيعات المحددة')}
                 selectedCount={selectedInvoiceIds.length}
               />
               {canCreate && (

@@ -14,6 +14,10 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { PaginationControls } from '../components/PaginationControls';
 import * as XLSX from 'xlsx';
 import { useNavigation } from '../contexts/NavigationContext';
+import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
+import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
+import { ExportButtons } from '../components/ExportButtons';
+
 
 interface ItemInput {
   product_id: string;
@@ -34,6 +38,29 @@ export const OpeningStockBalances: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const handleExportExcelList = () => {
+    const headers = {
+      'document_number': 'رقم السند',
+      'date': 'التاريخ',
+      'debit_account_name': 'الحساب المدين',
+      'credit_account_name': 'الحساب الدائن',
+      'description': 'ملاحظات'
+    };
+    const formattedData = formatDataForExcel(documents, headers);
+    exportToExcel(formattedData, { filename: 'Opening_Stock_Balances', sheetName: 'أرصدة أولية مخزون' });
+  };
+
+  const handleExportPDFList = async () => {
+    if (tableRef.current) {
+      await exportToPDFUtil(tableRef.current, {
+        filename: 'Opening_Stock_Balances',
+        reportTitle: 'جدول أرصدة أول المدة للمخزون'
+      });
+    }
+  };
+
 
   // Filter/Pagination states
   const [searchTerm, setSearchTerm] = useState('');
@@ -512,6 +539,12 @@ export const OpeningStockBalances: React.FC = () => {
             <span>{language === 'ar' ? 'استيراد من إكسيل' : 'Import Excel'}</span>
           </button>
 
+          <ExportButtons
+            onExportExcel={handleExportExcelList}
+            onExportPDF={handleExportPDFList}
+            onPrint={() => printElement(tableRef.current, 'جدول أرصدة أول المدة للمخزون')}
+          />
+
           <button
             onClick={handleOpenCreateModal}
             className="flex items-center gap-2 px-6 py-3.5 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-black rounded-2xl shadow-lg shadow-emerald-500/20 transition-all text-sm"
@@ -578,7 +611,7 @@ export const OpeningStockBalances: React.FC = () => {
         </div>
       ) : (
         <div className="bg-white/60 backdrop-blur-xl rounded-[2rem] border border-white/20 shadow-xl overflow-hidden">
-          <div className="overflow-x-auto">
+          <div ref={tableRef} className="overflow-x-auto">
             <table className="w-full border-collapse text-right">
               <thead>
                 <tr className="bg-slate-50/75 border-b border-slate-100">
