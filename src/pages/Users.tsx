@@ -107,6 +107,8 @@ export const Users: React.FC = () => {
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
+  const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
+
   
   const [userFormData, setUserFormData] = useState({ email: '', password: '', role: 'user' as 'admin' | 'user' | 'manager' });
   
@@ -1316,11 +1318,19 @@ export const Users: React.FC = () => {
         </div>
         <div className="flex items-center gap-3">
           <button 
+            onClick={() => setIsGuideModalOpen(true)}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-2xl font-bold hover:bg-emerald-100 transition-all active:scale-95 shadow-sm text-xs sm:text-sm"
+          >
+            <HelpCircle size={20} className="text-emerald-600" />
+            <span>{language === 'ar' ? 'دليل الصلاحيات والتعليمات' : 'Permissions User Manual'}</span>
+          </button>
+
+          <button 
             onClick={() => {
               setActivityLogDocumentId(undefined);
               setIsActivityLogOpen(true);
             }}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm text-xs sm:text-sm"
           >
             <History size={20} />
             <span>{language === 'ar' ? 'سجل الرقابة' : 'Audit Log'}</span>
@@ -1665,6 +1675,191 @@ export const Users: React.FC = () => {
                 className="flex-1 py-4 bg-red-650 text-white rounded-2xl font-bold hover:bg-red-700 transition-all shadow-xl shadow-red-500/20 active:scale-95"
               >
                 {language === 'ar' ? 'تأكيد حذف الدور' : 'Confirm Role Deletion'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Permissions User Manual Modal */}
+      {isGuideModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[999] animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-100 overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center font-bold">
+                  📘
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-900">
+                    {language === 'ar' ? 'دليل إعداد الأدوار والصلاحيات والقيود' : 'Permissions & Roles User Manual'}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-bold">
+                    {language === 'ar' ? 'Obrain ERP • منظومة الأمان وحماية البيانات المالية والمخزنية' : 'Obrain ERP Security & Data Restrictions Guide'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95"
+                >
+                  <span>🖨️</span>
+                  <span>{language === 'ar' ? 'طباعة / تصدير PDF' : 'Print / Export PDF'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsGuideModalOpen(false)}
+                  className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 text-sm font-sans custom-scrollbar leading-relaxed">
+              {/* Box 1 */}
+              <div className="bg-emerald-50/60 border border-emerald-200 p-4 rounded-2xl text-emerald-950">
+                <h4 className="font-black text-base mb-1">💡 الهيكل الثلاثي لمنظومة الأمان في Obrain ERP</h4>
+                <p className="text-xs font-medium leading-relaxed opacity-90">
+                  تتكون المنظومة من 3 مكونات: 
+                  <strong>1. الأدوار (Roles)</strong> لتحديد المهام الوظيفية للموظف، 
+                  <strong>2. الصلاحيات (Permissions)</strong> للتحكم في الأفعال (اعتماد، تعديل، حذف، رؤية التكلفة)، 
+                  و <strong>3. القيود (Restrictions)</strong> لعزل حركات مستودع أو خزينة معينة عن بقية المستخدمين.
+                </p>
+              </div>
+
+              {/* Section 2 */}
+              <div className="space-y-3">
+                <h4 className="font-black text-base text-slate-900 border-b border-slate-100 pb-2">
+                  1️⃣ خطوات تعيين وتعديل الصلاحيات والأدوار للموظف
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+                    <span className="font-black text-emerald-600 block">الخطوة 1: إنشاء الدور الوظيفي</span>
+                    <p className="text-slate-600">من تبويب <code>الأدوار</code> اضغط <code>+ إضافة دور جديد</code> وسَمِّ الدور (مثل: محاسب مبيعات).</p>
+                  </div>
+                  <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+                    <span className="font-black text-emerald-600 block">الخطوة 2: تحديد صلاحيات الشاشات</span>
+                    <p className="text-slate-600">حدد علامة صح أمام الشاشات المسموح بها (مبيعات، مشتريات، مخازن، نقدية، تقارير).</p>
+                  </div>
+                  <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+                    <span className="font-black text-emerald-600 block">الخطوة 3: تعيين الدور للمستخدم</span>
+                    <p className="text-slate-600">من قائمة المستخدمين اضغط <code>تعديل</code> واختر الدور الذي تم إنشاؤه.</p>
+                  </div>
+                  <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+                    <span className="font-black text-emerald-600 block">الخطوة 4: تخصيص القيود الاستثنائية</span>
+                    <p className="text-slate-600">يمكنك تقييد الموظف بمستودع أو خزينة أو بنك محدد لإخفاء بقية حركات الشركة.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Special Permissions */}
+              <div className="space-y-3">
+                <h4 className="font-black text-base text-slate-900 border-b border-slate-100 pb-2">
+                  2️⃣ الصلاحيات الاستثنائية والعمليات الحساسة
+                </h4>
+                <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+                  <table className="w-full text-right text-xs">
+                    <thead className="bg-slate-100 text-slate-700 font-bold">
+                      <tr>
+                        <th className="p-3">رمز الصلاحية</th>
+                        <th className="p-3">اسم الصلاحية</th>
+                        <th className="p-3">الوصف والتأثير</th>
+                        <th className="p-3">مستوى الخطورة</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      <tr>
+                        <td className="p-3 font-mono">approve</td>
+                        <td className="p-3 font-bold">اعتماد المستندات</td>
+                        <td className="p-3">ترحيل الفواتير والسندات وتوليد الأثر المحاسبي والمخزني.</td>
+                        <td className="p-3"><span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md font-bold">متوسط</span></td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 font-mono">cancel_approval</td>
+                        <td className="p-3 font-bold">إلغاء الاعتماد</td>
+                        <td className="p-3">إلغاء ترحيل الفواتير والسندات وعكس القيود اليومية.</td>
+                        <td className="p-3"><span className="px-2 py-0.5 bg-rose-100 text-rose-800 rounded-md font-bold">عالي جداً</span></td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 font-mono">edit_approved</td>
+                        <td className="p-3 font-bold">تعديل بعد الاعتماد</td>
+                        <td className="p-3">التعديل على بيانات الفواتير والسندات المعتمدة مسبقاً.</td>
+                        <td className="p-3"><span className="px-2 py-0.5 bg-rose-100 text-rose-800 rounded-md font-bold">عالي جداً</span></td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 font-mono">delete_approved</td>
+                        <td className="p-3 font-bold">حذف بعد الاعتماد</td>
+                        <td className="p-3">الحذف النهائي للمستندات المعتمدة من النظام.</td>
+                        <td className="p-3"><span className="px-2 py-0.5 bg-red-600 text-white rounded-md font-bold">حرج (خطر)</span></td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 font-mono">view_cost</td>
+                        <td className="p-3 font-bold">عرض التكلفة</td>
+                        <td className="p-3">إظهار أسعار التكلفة الحقيقية للأصناف في الفواتير والتقارير.</td>
+                        <td className="p-3"><span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md font-bold">سري</span></td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 font-mono">view_profit_margin</td>
+                        <td className="p-3 font-bold">عرض هامش الربح</td>
+                        <td className="p-3">إظهار أرباح الشركة ونسبة الربحية في الفواتير والبيع.</td>
+                        <td className="p-3"><span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md font-bold">سري</span></td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 font-mono">change_prices</td>
+                        <td className="p-3 font-bold">تغيير أسعار البيع</td>
+                        <td className="p-3">السماح بتعديل سعر بيع الصنف يدوياً أثناء سجل الفاتورة.</td>
+                        <td className="p-3"><span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md font-bold">متوسط</span></td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 font-mono">allow_negative</td>
+                        <td className="p-3 font-bold">السماح بالسالب</td>
+                        <td className="p-3">إتمام عمليات البيع والصرف حتى لو كانت الكمية صفراً أو أقل.</td>
+                        <td className="p-3"><span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md font-bold">متوسط</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Section 4: Data Access Restrictions */}
+              <div className="space-y-3">
+                <h4 className="font-black text-base text-slate-900 border-b border-slate-100 pb-2">
+                  3️⃣ القيود المكانية والمالية (Data Restrictions Guide)
+                </h4>
+                <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl text-amber-900 text-xs">
+                  <strong>⚠️ ملاحظة مهمة:</strong> عندما يكون المستخدم <u>بدون أي قيود</u>، يستطيع رؤية **كل فواتير وحركات الشركة بالكامل**. بمجرد تفعيل قيد محدد (مثل قيود المستودعات)، يقوم النظام تلقائياً بتقليص وإخفاء الفواتير الأخرى وتظهر فقط الفواتير التابعة للمستودع المسموح به.
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
+                    <span className="font-black text-slate-900 block text-sm">📦 1. قيود المستودعات</span>
+                    <p className="text-slate-600">تُحدد المستودعات المسموح للمستخدم برؤية فواتيرها واستلاماتها وحركاتها فقط (مثل: مستودع المعرض).</p>
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
+                    <span className="font-black text-slate-900 block text-sm">💵 2. قيود الخزائن</span>
+                    <p className="text-slate-600">تُحدد الخزينة النقدية المسموح للمستخدم بالتحصيل أو الصرف منها ورؤيتها في السندات.</p>
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
+                    <span className="font-black text-slate-900 block text-sm">🏦 3. قيود البنوك</span>
+                    <p className="text-slate-600">تُحدد الحسابات البنكية المسموح للمستخدم بالإيداع أو الصرف منها وحجب بقية الحسابات.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between">
+              <span className="text-xs text-slate-500 font-bold">Obrain ERP Security & Permissions Documentation</span>
+              <button
+                type="button"
+                onClick={() => setIsGuideModalOpen(false)}
+                className="px-6 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+              >
+                {language === 'ar' ? 'إغلاق الدليل' : 'Close Manual'}
               </button>
             </div>
           </div>
