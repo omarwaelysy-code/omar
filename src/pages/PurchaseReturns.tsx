@@ -2199,8 +2199,9 @@ export const PurchaseReturns: React.FC = () => {
                         partyTitle: 'المورد',
                         partyName: sup?.name || editingReturn?.supplier_name || 'مورد عام',
                         partyAddress: sup?.address || '',
-                        partyPhone: sup?.phone || sup?.mobile || '',
-                        partyTaxNumber: sup?.tax_number || '',
+                        partyPhone: (sup as any)?.phone || (sup as any)?.mobile || '',
+                        partyTaxNumber: (sup as any)?.tax_number || (sup as any)?.vat_number || '',
+
                         notes: editingReturn?.notes || returnData.notes || description || '',
                         columns: [
                           { label: 'م', key: 'index' },

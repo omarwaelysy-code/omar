@@ -1450,8 +1450,9 @@ export const PurchaseInvoices: React.FC = () => {
       partyTitle: 'المورد',
       partyName: supplier?.name || targetInv?.supplier_name || 'مورد عام',
       partyAddress: supplier?.address || '',
-      partyPhone: supplier?.phone || supplier?.mobile || '',
-      partyTaxNumber: supplier?.tax_number || '',
+      partyPhone: (supplier as any)?.phone || (supplier as any)?.mobile || '',
+      partyTaxNumber: (supplier as any)?.tax_number || (supplier as any)?.vat_number || '',
+
       paymentMethod: (targetInv?.payment_type || invoiceData.payment_type) === 'cash' ? 'نقدي' : 'آجل',
       warehouseOrBranch: warehouse?.name || 'المخزن الرئيسي',
       notes: targetInv?.notes || invoiceData.notes || '',

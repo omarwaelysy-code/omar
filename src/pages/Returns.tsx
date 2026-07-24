@@ -2035,8 +2035,9 @@ export const Returns: React.FC = () => {
                           partyTitle: 'العميل',
                           partyName: cust?.name || editingReturn?.customer_name || 'عميل نقدي',
                           partyAddress: cust?.address || '',
-                          partyPhone: cust?.phone || cust?.mobile || '',
-                          partyTaxNumber: cust?.tax_number || '',
+                          partyPhone: (cust as any)?.phone || (cust as any)?.mobile || '',
+                          partyTaxNumber: (cust as any)?.tax_number || (cust as any)?.vat_number || '',
+
                           notes: (editingReturn as any)?.notes || editingReturn?.notes || description || '',
                           columns: [
                             { label: 'م', key: 'index' },
