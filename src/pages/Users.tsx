@@ -103,13 +103,13 @@ export const Users: React.FC = () => {
   
   // Modals state
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
   const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
 
-  
   const [userFormData, setUserFormData] = useState({ email: '', password: '', role: 'user' as 'admin' | 'user' | 'manager' });
   
   // Role Modals state
@@ -124,6 +124,8 @@ export const Users: React.FC = () => {
   const [permissionsTargetType, setPermissionsTargetType] = useState<'user' | 'role'>('user');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [tempUserRole, setTempUserRole] = useState<'admin' | 'user' | 'manager'>('user');
+
   
   const [tempPermissions, setTempPermissions] = useState<any>({});
   const [tempUserRoleIds, setTempUserRoleIds] = useState<string[]>([]);
@@ -603,32 +605,46 @@ export const Users: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
+            {permissionsTargetType === 'user' && selectedUser && (
+              <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm">
+                <Shield size={16} className="text-emerald-600" />
+                <span className="text-xs font-bold text-slate-500">{language === 'ar' ? 'الرتبة في النظام:' : 'System Rank:'}</span>
+                <select
+                  value={tempUserRole}
+                  onChange={(e) => setTempUserRole(e.target.value as any)}
+                  className="text-xs font-black bg-transparent text-emerald-800 focus:outline-none cursor-pointer"
+                >
+                  <option value="user">{language === 'ar' ? 'مستخدم قياسي (يرث الصلاحيات)' : 'Standard User'}</option>
+                  <option value="manager">{language === 'ar' ? 'مدير قسم (صلاحية واسعة)' : 'Department Manager'}</option>
+                  <option value="admin">{language === 'ar' ? 'مدير عام للشركة (كامل الصلاحيات)' : 'Super Admin (Full Permissions)'}</option>
+                </select>
+              </div>
+            )}
+
             <button
               onClick={() => setIsPermissionsModalOpen(false)}
               className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all border border-slate-200 active:scale-95 text-xs"
             >
               {language === 'ar' ? 'إلغاء' : 'Cancel'}
             </button>
-            {!(permissionsTargetType === 'user' && (selectedUser?.role === 'admin' || selectedUser?.role === 'super_admin')) && (
-              <button
-                onClick={savePermissions}
-                disabled={loading}
-                className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 transition-all shadow-md active:scale-95 text-xs flex items-center gap-2"
-              >
-                {loading ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Save size={14} />
-                )}
-                <span>{loading ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...') : (language === 'ar' ? 'حفظ التعديلات وتطبيقها' : 'Save & Apply Changes')}</span>
-              </button>
-            )}
+            <button
+              onClick={savePermissions}
+              disabled={loading}
+              className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50 transition-all shadow-md active:scale-95 text-xs flex items-center gap-2"
+            >
+              {loading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Save size={14} />
+              )}
+              <span>{loading ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...') : (language === 'ar' ? 'حفظ التعديلات وتطبيقها' : 'Save & Apply Changes')}</span>
+            </button>
           </div>
         </div>
 
           {/* Modal Body */}
             <div className="flex-1 overflow-y-auto p-6 bg-slate-50/40 custom-scrollbar space-y-6">
-              {permissionsTargetType === 'user' && selectedUser && (selectedUser.role === 'admin' || selectedUser.role === 'super_admin') ? (
+              {permissionsTargetType === 'user' && selectedUser && (tempUserRole === 'admin' || selectedUser.role === 'super_admin') ? (
                 <div className="bg-emerald-50/50 border border-emerald-100 p-8 rounded-3xl flex flex-col items-center justify-center text-center gap-4 text-emerald-700">
                   <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-2">
                     <Shield size={40} className="shrink-0" />
