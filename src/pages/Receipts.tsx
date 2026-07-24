@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { 
   Search, Plus, Trash2, X, Receipt as ReceiptIcon, Pencil, 
-  CreditCard, Download, Eye, FileText, History, Printer, 
+  CreditCard, Download, Eye, FileText, FileSpreadsheet, History, Printer, 
   Phone, Mail, MapPin, Wallet, Calendar, Hash, Layers, 
   LayoutGrid, List, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, User, ChevronDown, Save
 } from 'lucide-react';
@@ -1811,7 +1811,7 @@ export const Receipts: React.FC = () => {
                     'المبلغ': item.amount || 0,
                     'البيان': item.description || '-'
                   }));
-                  exportToExcel(exportData.length ? exportData : [{ 'المبلغ': voucherData.amount, 'البيان': voucherData.description }], { filename: `Receipt_Voucher_${editingReceipt?.voucher_number || 'Doc'}`, sheetName: 'سند القبض' });
+                  exportToExcel(exportData.length ? exportData : [{ 'المبلغ': voucherData.amount, 'البيان': voucherData.notes || (voucherData as any).description || '-' }], { filename: `Receipt_Voucher_${editingReceipt?.voucher_number || 'Doc'}`, sheetName: 'سند القبض' });
                 }}
                 className="flex items-center gap-1.5 px-3 py-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-xs border border-emerald-200 shadow-sm"
                 title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}

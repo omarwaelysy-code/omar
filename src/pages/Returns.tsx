@@ -64,7 +64,9 @@ export const Returns: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [returnToDelete, setReturnToDelete] = useState<string | null>(null);
   const returnRef = useRef<HTMLDivElement>(null);
+  const editModalRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
+
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);

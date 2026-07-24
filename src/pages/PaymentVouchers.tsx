@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { 
   Search, Plus, Trash2, X, Wallet, User, CreditCard, Calendar, 
-  Hash, FileText, Save, Pencil, Eye, Download, History, Printer, 
+  Hash, FileText, FileSpreadsheet, Save, Pencil, Eye, Download, History, Printer, 
   Phone, Mail, MapPin, Layers, LayoutGrid, List, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -2066,7 +2066,7 @@ export const PaymentVouchers: React.FC = () => {
                     'المبلغ': item.amount || 0,
                     'البيان': item.description || '-'
                   }));
-                  exportToExcel(exportData.length ? exportData : [{ 'المبلغ': voucherData.amount, 'البيان': voucherData.description }], { filename: `Payment_Voucher_${editingVoucher?.voucher_number || 'Doc'}`, sheetName: 'سند الصرف' });
+                  exportToExcel(exportData.length ? exportData : [{ 'المبلغ': voucherData.amount, 'البيان': voucherData.notes || (voucherData as any).description || '-' }], { filename: `Payment_Voucher_${editingVoucher?.voucher_number || 'Doc'}`, sheetName: 'سند الصرف' });
                 }}
                 className="flex items-center gap-1.5 px-3 py-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-xs border border-emerald-200 shadow-sm"
                 title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}

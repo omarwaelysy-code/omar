@@ -4,7 +4,7 @@ import { useNotification } from '../contexts/NotificationContext';
 import { Invoice, Customer, Product, InvoiceItem, Account, JournalEntry, JournalEntryItem, ActivityLog, Company, Operation, Department, CostCenter, Currency, ExchangeRate } from '../types';
 import { 
   Search, Plus, Trash2, X, Eye, Download, Sparkles, Mic, 
-  Image as ImageIcon, FileText, Pencil, History, Printer, 
+  Image as ImageIcon, FileText, FileSpreadsheet, Pencil, History, Printer, 
   ChevronLeft, ChevronRight, Maximize2, Minimize2, Hash, 
   Wallet, Calendar, Package, Tag, Layers, Box, Paperclip, 
   Phone, Mail, Lock, LayoutGrid, List, Building2, ChevronDown, ChevronUp,

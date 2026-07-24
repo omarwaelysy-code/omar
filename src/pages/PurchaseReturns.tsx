@@ -207,7 +207,7 @@ export const PurchaseReturns: React.FC = () => {
   }, [user?.company_id]);
 
   const editModalRef = useRef<HTMLDivElement>(null);
-  const returnRef = useRef<HTMLDivElement>(null);
+
 
   const generateReturnNumber = async (selectedDate: string) => {
     return await dbService.getNextSequence('purchase_returns', selectedDate);
