@@ -1236,7 +1236,8 @@ export const Invoices: React.FC = () => {
     const warehouse = warehouses.find(w => w.id?.toString() === whId?.toString());
 
     const calcSubtotal = targetInv?.subtotal ?? items.reduce((s, i) => s + (Number(i.quantity || 0) * Number(i.unit_price || 0)), 0);
-    const calcDiscount = targetInv?.total_discount ?? (targetInv as any)?.discount_amount ?? discount;
+    const calcDiscount = (targetInv as any)?.total_discount ?? (targetInv as any)?.discount_amount ?? discount;
+
     const calcVat = (targetInv as any)?.vat_amount ?? (targetInv as any)?.tax_amount ?? items.reduce((s, i) => s + (Number((i as any).tax) || Number((i as any).vat_amount) || 0), 0);
     const calcTotal = targetInv?.total_amount ?? (calcSubtotal + calcVat - calcDiscount);
 
