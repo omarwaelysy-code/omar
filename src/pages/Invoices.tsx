@@ -1228,11 +1228,20 @@ export const Invoices: React.FC = () => {
     }
   };
 
-  const handleExportSingleInvoiceExcel = (invoice: Invoice) => {
-    const targetInv = invoice || editingInvoice || viewInvoice;
-    const customer = customers.find(c => c.id === (targetInv?.customer_id || selectedCustomerId));
-    const warehouse = warehouses.find(w => w.id?.toString() === (targetInv?.warehouse_id || selectedWarehouseId)?.toString());
-    
+  const handleExportSingleInvoiceExcel = (invoice?: Invoice) => {
+    const targetInv = (invoice && invoice.id) ? invoice : (editingInvoice || viewInvoice);
+    const custId = targetInv?.customer_id || selectedCustomerId;
+    const customer = customers.find(c => c.id === custId);
+    const whId = targetInv?.warehouse_id || selectedWarehouseId;
+    const warehouse = warehouses.find(w => w.id?.toString() === whId?.toString());
+
+    const calcSubtotal = targetInv?.subtotal ?? items.reduce((s, i) => s + (Number(i.quantity || 0) * Number(i.unit_price || 0)), 0);
+    const calcDiscount = targetInv?.total_discount ?? (targetInv as any)?.discount_amount ?? discount;
+    const calcVat = (targetInv as any)?.vat_amount ?? (targetInv as any)?.tax_amount ?? items.reduce((s, i) => s + (Number((i as any).tax) || Number((i as any).vat_amount) || 0), 0);
+    const calcTotal = targetInv?.total_amount ?? (calcSubtotal + calcVat - calcDiscount);
+
+    const rawItems = (targetInv?.items && targetInv.items.length > 0) ? targetInv.items : items;
+
     exportSingleDocumentToExcel({
       filename: `Invoice_${targetInv?.invoice_number || invoiceNumber || 'Doc'}`,
       sheetName: 'فاتورة مبيعات',
@@ -1243,7 +1252,7 @@ export const Invoices: React.FC = () => {
       partyName: customer?.name || targetInv?.customer_name || 'عميل نقدي',
       paymentMethod: (targetInv?.payment_type || paymentType) === 'cash' ? 'نقدي' : 'آجل',
       warehouseOrBranch: warehouse?.name || 'المخزن الرئيسي',
-      notes: targetInv?.notes || notes || '',
+      notes: (targetInv as any)?.notes || targetInv?.description || description || '',
       columns: [
         { label: 'م', key: 'index' },
         { label: 'كود / باركود', key: 'barcode' },
@@ -1254,23 +1263,24 @@ export const Invoices: React.FC = () => {
         { label: 'الضريبة (14%)', key: 'tax' },
         { label: 'إجمالي الصنف', key: 'total' }
       ],
-      items: items.map(item => ({
-        barcode: item.barcode || '-',
+      items: rawItems.map((item: any) => ({
+        barcode: item.barcode || item.product_code || '-',
         product_name: item.product_name || '-',
         quantity: item.quantity || 0,
         unit_price: item.unit_price || 0,
-        discount: item.discount || 0,
-        tax: item.tax || 0,
+        discount: item.discount || item.discount_amount || 0,
+        tax: item.tax || item.vat_amount || 0,
         total: item.total || 0
       })),
       summaryRows: [
-        { label: 'الإجمالي قبل الضريبة:', value: targetInv?.subtotal ?? subtotal },
-        { label: 'إجمالي الخصم:', value: targetInv?.total_discount ?? totalDiscount },
-        { label: 'ضريبة القيمة المضافة (14%):', value: targetInv?.vat_amount ?? totalVat },
-        { label: 'الصافي النهائي:', value: targetInv?.total_amount ?? totalAmount }
+        { label: 'الإجمالي قبل الضريبة:', value: calcSubtotal },
+        { label: 'إجمالي الخصم:', value: calcDiscount },
+        { label: 'ضريبة القيمة المضافة (14%):', value: calcVat },
+        { label: 'الصافي النهائي:', value: calcTotal }
       ]
     });
   };
+
 
 
 
@@ -4117,7 +4127,8 @@ export const Invoices: React.FC = () => {
                     </button>
                     <button 
                       type="button"
-                      onClick={handlePrint} 
+                      onClick={() => handlePrint(editingInvoice)} 
+
                       className="flex items-center gap-1 px-2 py-0.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-blue-200 shadow-sm"
                       title={language === 'ar' ? 'طباعة الفاتورة' : 'Print Invoice'}
                     >

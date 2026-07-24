@@ -1821,11 +1821,12 @@ export const Receipts: React.FC = () => {
                     : [{ account_name: partyName, amount: voucherData.amount, description: voucherData.notes || '-' }];
 
                   exportSingleDocumentToExcel({
-                    filename: `Receipt_Voucher_${editingReceipt?.voucher_number || voucherNumber || 'Doc'}`,
+                    filename: `Receipt_Voucher_${editingReceipt?.voucher_number || (voucherData as any).voucher_number || 'Doc'}`,
                     sheetName: 'سند قبض',
                     docTitle: 'سند قبض نقدية / بنك',
-                    docNumber: editingReceipt?.voucher_number || voucherNumber || 'جديد',
+                    docNumber: editingReceipt?.voucher_number || (voucherData as any).voucher_number || 'جديد',
                     docDate: voucherData.date || new Date().toISOString().slice(0, 10),
+
                     partyTitle: 'الجهة / المستلم منه',
                     partyName,
                     paymentMethod: pm?.name || 'نقداً',

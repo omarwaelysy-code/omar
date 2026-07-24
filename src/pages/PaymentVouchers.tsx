@@ -2076,11 +2076,12 @@ export const PaymentVouchers: React.FC = () => {
                     : [{ account_name: partyName, amount: voucherData.amount, description: voucherData.notes || '-' }];
 
                   exportSingleDocumentToExcel({
-                    filename: `Payment_Voucher_${editingVoucher?.voucher_number || voucherNumber || 'Doc'}`,
+                    filename: `Payment_Voucher_${editingVoucher?.voucher_number || (voucherData as any).voucher_number || 'Doc'}`,
                     sheetName: 'سند صرف',
                     docTitle: 'سند صرف نقدية / بنك',
-                    docNumber: editingVoucher?.voucher_number || voucherNumber || 'جديد',
+                    docNumber: editingVoucher?.voucher_number || (voucherData as any).voucher_number || 'جديد',
                     docDate: voucherData.date || new Date().toISOString().slice(0, 10),
+
                     partyTitle: 'الجهة / المدفوع له',
                     partyName,
                     paymentMethod: pm?.name || 'نقداً',

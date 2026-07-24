@@ -2016,6 +2016,11 @@ export const Returns: React.FC = () => {
                       type="button"
                       onClick={() => {
                         const cust = customers.find(c => c.id === (editingReturn?.customer_id || selectedCustomerId));
+                        const rawItems = (editingReturn?.items && editingReturn.items.length > 0) ? editingReturn.items : items;
+                        const calcSubtotal = editingReturn?.subtotal ?? rawItems.reduce((s: number, i: any) => s + (Number(i.quantity || 0) * Number(i.unit_price || 0)), 0);
+                        const calcVat = (editingReturn as any)?.vat_amount ?? (editingReturn as any)?.tax_amount ?? rawItems.reduce((s: number, i: any) => s + Number((i as any).tax || (i as any).vat_amount || 0), 0);
+                        const calcTotal = editingReturn?.total_amount ?? (calcSubtotal + calcVat);
+
                         exportSingleDocumentToExcel({
                           filename: `Sales_Return_${editingReturn?.return_number || returnNumber || 'Doc'}`,
                           sheetName: 'مردود مبيعات',
@@ -2024,7 +2029,7 @@ export const Returns: React.FC = () => {
                           docDate: editingReturn?.date || date || new Date().toISOString().slice(0, 10),
                           partyTitle: 'العميل',
                           partyName: cust?.name || editingReturn?.customer_name || 'عميل نقدي',
-                          notes: notes || '',
+                          notes: (editingReturn as any)?.notes || editingReturn?.notes || description || '',
                           columns: [
                             { label: 'م', key: 'index' },
                             { label: 'اسم الصنف', key: 'product_name' },
@@ -2033,17 +2038,17 @@ export const Returns: React.FC = () => {
                             { label: 'الضريبة (14%)', key: 'tax' },
                             { label: 'الإجمالي', key: 'total' }
                           ],
-                          items: items.map(item => ({
+                          items: rawItems.map((item: any) => ({
                             product_name: item.product_name || '-',
                             quantity: item.quantity || 0,
                             unit_price: item.unit_price || 0,
-                            tax: item.tax || 0,
+                            tax: item.tax || item.vat_amount || 0,
                             total: item.total || 0
                           })),
                           summaryRows: [
-                            { label: 'الإجمالي قبل الضريبة:', value: editingReturn?.subtotal ?? subtotal },
-                            { label: 'ضريبة القيمة المضافة (14%):', value: editingReturn?.vat_amount ?? totalVat },
-                            { label: 'الصافي النهائي:', value: editingReturn?.total_amount ?? totalAmount }
+                            { label: 'الإجمالي قبل الضريبة:', value: calcSubtotal },
+                            { label: 'ضريبة القيمة المضافة (14%):', value: calcVat },
+                            { label: 'الصافي النهائي:', value: calcTotal }
                           ]
                         });
                       }} 
@@ -2053,6 +2058,7 @@ export const Returns: React.FC = () => {
                       <FileSpreadsheet size={11} />
                       <span>Excel</span>
                     </button>
+
                   </>
                 )}
               </div>
