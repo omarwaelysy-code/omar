@@ -15,8 +15,10 @@ import { ActivityLog } from '../types';
 import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
+import { PaginationControls } from '../components/PaginationControls';
 import { ExportButtons } from '../components/ExportButtons';
 import { useRef } from 'react';
+
 
 export const SupplierDiscounts: React.FC = () => {
   const { user } = useAuth();
