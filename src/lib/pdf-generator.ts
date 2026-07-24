@@ -474,11 +474,12 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         }
 
         // Divider Line
-        doc.strokeColor('#10b981')
+        doc.strokeColor('#18181b')
            .lineWidth(isThermal ? 1 : 2)
            .moveTo(sideMargin, currentY)
            .lineTo(doc.page.width - sideMargin, currentY)
            .stroke();
+
 
         currentY += isThermal ? 8 : 15;
       };
@@ -553,8 +554,9 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
           // Draw backgrounds and borders
           if (isHeader) {
-            doc.fillColor('#10b981').rect(sideMargin, y, usableWidth, maxCellHeight).fill();
+            doc.fillColor('#18181b').rect(sideMargin, y, usableWidth, maxCellHeight).fill();
           } else if (isTotal) {
+
             doc.fillColor('#f3f4f6').rect(sideMargin, y, usableWidth, maxCellHeight).fill();
           } else {
             doc.strokeColor('#e5e7eb').lineWidth(0.5).moveTo(sideMargin, y + maxCellHeight).lineTo(sideMargin + usableWidth, y + maxCellHeight).stroke();
@@ -820,7 +822,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
           const summaryX = doc.page.width - sideMargin - summaryWidth;
           doc.fillColor('#f9fafb').rect(summaryX, currentY + 10, summaryWidth, summaryHeight).fill();
-          doc.strokeColor('#10b981').lineWidth(1.5).rect(summaryX, currentY + 10, summaryWidth, summaryHeight).stroke();
+          doc.strokeColor('#18181b').lineWidth(1.5).rect(summaryX, currentY + 10, summaryWidth, summaryHeight).stroke();
+
 
           let summaryY = currentY + (isThermal ? 13 : 15);
           const drawSummaryRow = (label: string, val: string, isBold = false) => {

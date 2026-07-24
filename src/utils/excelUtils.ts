@@ -207,11 +207,19 @@ export interface SingleDocExportOptions {
   filename: string;
   sheetName?: string;
   companyName?: string;
+  companyAddress?: string;
+  companyPhone?: string;
+  companyEmail?: string;
+  companyTaxNumber?: string;
   docTitle: string;
   docNumber: string;
   docDate: string;
+  referenceNo?: string;
   partyTitle?: string;
   partyName?: string;
+  partyAddress?: string;
+  partyPhone?: string;
+  partyTaxNumber?: string;
   paymentMethod?: string;
   warehouseOrBranch?: string;
   notes?: string;
@@ -222,18 +230,26 @@ export interface SingleDocExportOptions {
 
 /**
  * Formats a single transaction document (Invoice, Voucher, Return) into a professional Excel sheet
- * with full Company Header, Metadata Grid, Items Table, and Totals Summary block.
+ * with full Company Header, Metadata Grid, Items Table (padded grid rows), and Totals Summary block.
  */
 export const exportSingleDocumentToExcel = (options: SingleDocExportOptions) => {
   const {
     filename,
     sheetName = 'مستند',
     companyName = localStorage.getItem('company_name') || 'نظام ERP السحابي',
+    companyAddress = localStorage.getItem('company_address') || '',
+    companyPhone = localStorage.getItem('company_phone') || '',
+    companyEmail = localStorage.getItem('company_email') || '',
+    companyTaxNumber = localStorage.getItem('company_tax') || '',
     docTitle,
     docNumber,
     docDate,
+    referenceNo = '-',
     partyTitle = 'الجهة',
     partyName = '-',
+    partyAddress = '',
+    partyPhone = '',
+    partyTaxNumber = '',
     paymentMethod = '-',
     warehouseOrBranch = '-',
     notes = '',
@@ -244,21 +260,37 @@ export const exportSingleDocumentToExcel = (options: SingleDocExportOptions) => 
 
   const aoa: any[][] = [];
 
-  // 1. Company Header & Title
-  aoa.push([companyName]);
-  aoa.push([`${docTitle} - رقم: ${docNumber}`]);
+  // 1. Top Header Section: Company (Left) vs Document Info (Right)
+  aoa.push([companyName, '', '', '', docTitle.toUpperCase()]);
+  aoa.push([companyAddress || 'المقر الرئيسي', '', '', '', `رقم المستند / Doc #: ${docNumber}`]);
+  aoa.push([`هاتف / Phone: ${companyPhone || '-'}`, '', '', '', `التاريخ / Date: ${docDate}`]);
+  if (companyTaxNumber || referenceNo) {
+    aoa.push([`الرقم الضريبي: ${companyTaxNumber || '-'}`, '', '', '', `المرجع / Ref: ${referenceNo}`]);
+  }
+  if (companyEmail) {
+    aoa.push([`البريد / Email: ${companyEmail}`]);
+  }
+
+  // Blank separator
   aoa.push([]);
 
-  // 2. Metadata Grid
-  aoa.push(['التاريخ:', docDate, `${partyTitle}:`, partyName]);
-  aoa.push(['طريقة الدفع:', paymentMethod, 'الفرع / المخزن:', warehouseOrBranch]);
+  // 2. Party & Metadata Block
+  aoa.push([`${partyTitle}: ${partyName}`, '', '', '', `طريقة الدفع / Payment: ${paymentMethod}`]);
+  if (partyAddress || warehouseOrBranch) {
+    aoa.push([`العنوان / Address: ${partyAddress || '-'}`, '', '', '', `المخزن / الفرع: ${warehouseOrBranch}`]);
+  }
+  if (partyPhone || partyTaxNumber) {
+    aoa.push([`الهاتف / Phone: ${partyPhone || '-'}`, '', `الرقم الضريبي: ${partyTaxNumber || '-'}`]);
+  }
+
+  // Blank separator before table
   aoa.push([]);
 
-  // 3. Items Table Header
+  // 3. Table Headers
   const headerRow = columns.map(c => c.label);
   aoa.push(headerRow);
 
-  // 4. Items Rows
+  // 4. Data Rows
   items.forEach((item, index) => {
     const row = columns.map(col => {
       if (col.key === 'index' || col.key === 'م') return index + 1;
@@ -268,24 +300,38 @@ export const exportSingleDocumentToExcel = (options: SingleDocExportOptions) => 
     aoa.push(row);
   });
 
-  // 5. Blank Separator
+  // Pad extra empty grid rows if item list has fewer than 6 items to create a neat pre-printed grid look
+  const MIN_GRID_ROWS = 6;
+  if (items.length < MIN_GRID_ROWS) {
+    const padCount = MIN_GRID_ROWS - items.length;
+    for (let p = 0; p < padCount; p++) {
+      const emptyRow = columns.map(() => '');
+      aoa.push(emptyRow);
+    }
+  }
+
+  // Blank separator before summary
   aoa.push([]);
 
-  // 6. Summary Rows
+  // 5. Summary Block (Bottom Right aligned)
   summaryRows.forEach(sum => {
     const emptyCells = new Array(Math.max(0, columns.length - 2)).fill('');
     aoa.push([...emptyCells, sum.label, sum.value]);
   });
 
-  if (notes) {
+  // 6. Notes & Terms Footer
+  if (notes || companyEmail) {
     aoa.push([]);
-    aoa.push(['البيان / ملاحظات:', notes]);
+    if (notes) {
+      aoa.push(['ملاحظات / Terms & Notes:', notes]);
+    }
+    aoa.push([`شكراً لتعاملكم معنا | ${companyEmail || ''}`]);
   }
 
   // 7. Generate Worksheet
   const ws = XLSX.utils.aoa_to_sheet(aoa);
 
-  // Apply number formatting to numeric cells
+  // Apply financial formatting to numeric cells
   Object.keys(ws).forEach(key => {
     if (key[0] === '!') return;
     const cell = ws[key];
@@ -295,11 +341,12 @@ export const exportSingleDocumentToExcel = (options: SingleDocExportOptions) => 
   });
 
   // Set column widths
-  const colWidths = columns.map(c => ({ wch: Math.max(c.label.length + 5, 15) }));
+  const colWidths = columns.map(c => ({ wch: Math.max(c.label.length + 6, 16) }));
   ws['!cols'] = colWidths;
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
   XLSX.writeFile(wb, `${filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`}`);
 };
+
 

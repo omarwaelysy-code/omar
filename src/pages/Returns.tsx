@@ -2024,11 +2024,19 @@ export const Returns: React.FC = () => {
                         exportSingleDocumentToExcel({
                           filename: `Sales_Return_${editingReturn?.return_number || returnNumber || 'Doc'}`,
                           sheetName: 'مردود مبيعات',
+                          companyName: company?.name || localStorage.getItem('company_name') || 'نظام ERP السحابي',
+                          companyAddress: company?.address || localStorage.getItem('company_address') || '',
+                          companyPhone: company?.phone || localStorage.getItem('company_phone') || '',
+                          companyEmail: company?.email || localStorage.getItem('company_email') || '',
+                          companyTaxNumber: company?.tax_number || localStorage.getItem('company_tax') || '',
                           docTitle: 'مردود مبيعات',
                           docNumber: editingReturn?.return_number || returnNumber || 'جديد',
                           docDate: editingReturn?.date || date || new Date().toISOString().slice(0, 10),
                           partyTitle: 'العميل',
                           partyName: cust?.name || editingReturn?.customer_name || 'عميل نقدي',
+                          partyAddress: cust?.address || '',
+                          partyPhone: cust?.phone || cust?.mobile || '',
+                          partyTaxNumber: cust?.tax_number || '',
                           notes: (editingReturn as any)?.notes || editingReturn?.notes || description || '',
                           columns: [
                             { label: 'م', key: 'index' },
@@ -2051,6 +2059,7 @@ export const Returns: React.FC = () => {
                             { label: 'الصافي النهائي:', value: calcTotal }
                           ]
                         });
+
                       }} 
                       className="flex items-center gap-1 px-2 py-0.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
                       title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}

@@ -2188,11 +2188,19 @@ export const PurchaseReturns: React.FC = () => {
                       exportSingleDocumentToExcel({
                         filename: `Purchase_Return_${editingReturn?.return_number || returnNumber || 'Doc'}`,
                         sheetName: 'مردود مشتريات',
+                        companyName: company?.name || localStorage.getItem('company_name') || 'نظام ERP السحابي',
+                        companyAddress: company?.address || localStorage.getItem('company_address') || '',
+                        companyPhone: company?.phone || localStorage.getItem('company_phone') || '',
+                        companyEmail: company?.email || localStorage.getItem('company_email') || '',
+                        companyTaxNumber: company?.tax_number || localStorage.getItem('company_tax') || '',
                         docTitle: 'مردود مشتريات',
                         docNumber: editingReturn?.return_number || returnNumber || 'جديد',
                         docDate: editingReturn?.date || returnData.date || new Date().toISOString().slice(0, 10),
                         partyTitle: 'المورد',
                         partyName: sup?.name || editingReturn?.supplier_name || 'مورد عام',
+                        partyAddress: sup?.address || '',
+                        partyPhone: sup?.phone || sup?.mobile || '',
+                        partyTaxNumber: sup?.tax_number || '',
                         notes: editingReturn?.notes || returnData.notes || description || '',
                         columns: [
                           { label: 'م', key: 'index' },
@@ -2215,6 +2223,7 @@ export const PurchaseReturns: React.FC = () => {
                           { label: 'الصافي النهائي:', value: calcTotal }
                         ]
                       });
+
                     }} 
                     className="flex items-center gap-1 px-2 py-0.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
                     title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}

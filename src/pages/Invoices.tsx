@@ -1246,11 +1246,20 @@ export const Invoices: React.FC = () => {
     exportSingleDocumentToExcel({
       filename: `Invoice_${targetInv?.invoice_number || invoiceNumber || 'Doc'}`,
       sheetName: 'فاتورة مبيعات',
+      companyName: company?.name || localStorage.getItem('company_name') || 'نظام ERP السحابي',
+      companyAddress: company?.address || localStorage.getItem('company_address') || '',
+      companyPhone: company?.phone || localStorage.getItem('company_phone') || '',
+      companyEmail: company?.email || localStorage.getItem('company_email') || '',
+      companyTaxNumber: company?.tax_number || localStorage.getItem('company_tax') || '',
       docTitle: 'فاتورة مبيعات',
       docNumber: targetInv?.invoice_number || invoiceNumber || 'جديد',
       docDate: targetInv?.date || date || new Date().toISOString().slice(0, 10),
+      referenceNo: (targetInv as any)?.reference_number || (targetInv as any)?.po_number || '-',
       partyTitle: 'العميل',
       partyName: customer?.name || targetInv?.customer_name || 'عميل نقدي',
+      partyAddress: customer?.address || '',
+      partyPhone: customer?.phone || customer?.mobile || '',
+      partyTaxNumber: customer?.tax_number || '',
       paymentMethod: (targetInv?.payment_type || paymentType) === 'cash' ? 'نقدي' : 'آجل',
       warehouseOrBranch: warehouse?.name || 'المخزن الرئيسي',
       notes: (targetInv as any)?.notes || targetInv?.description || description || '',
@@ -1280,6 +1289,7 @@ export const Invoices: React.FC = () => {
         { label: 'الصافي النهائي:', value: calcTotal }
       ]
     });
+
   };
 
 

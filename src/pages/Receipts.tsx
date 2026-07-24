@@ -1823,14 +1823,19 @@ export const Receipts: React.FC = () => {
                   exportSingleDocumentToExcel({
                     filename: `Receipt_Voucher_${editingReceipt?.voucher_number || (voucherData as any).voucher_number || 'Doc'}`,
                     sheetName: 'سند قبض',
+                    companyName: companyData?.name || localStorage.getItem('company_name') || 'نظام ERP السحابي',
+                    companyAddress: companyData?.address || localStorage.getItem('company_address') || '',
+                    companyPhone: companyData?.phone || localStorage.getItem('company_phone') || '',
+                    companyEmail: companyData?.email || localStorage.getItem('company_email') || '',
+                    companyTaxNumber: companyData?.tax_number || localStorage.getItem('company_tax') || '',
                     docTitle: 'سند قبض نقدية / بنك',
                     docNumber: editingReceipt?.voucher_number || (voucherData as any).voucher_number || 'جديد',
                     docDate: voucherData.date || new Date().toISOString().slice(0, 10),
-
                     partyTitle: 'الجهة / المستلم منه',
                     partyName,
                     paymentMethod: pm?.name || 'نقداً',
                     notes: voucherData.notes || '',
+
                     columns: [
                       { label: 'م', key: 'index' },
                       { label: 'الحساب / البيان', key: 'account_name' },

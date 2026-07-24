@@ -2078,14 +2078,19 @@ export const PaymentVouchers: React.FC = () => {
                   exportSingleDocumentToExcel({
                     filename: `Payment_Voucher_${editingVoucher?.voucher_number || (voucherData as any).voucher_number || 'Doc'}`,
                     sheetName: 'سند صرف',
+                    companyName: companyData?.name || localStorage.getItem('company_name') || 'نظام ERP السحابي',
+                    companyAddress: companyData?.address || localStorage.getItem('company_address') || '',
+                    companyPhone: companyData?.phone || localStorage.getItem('company_phone') || '',
+                    companyEmail: companyData?.email || localStorage.getItem('company_email') || '',
+                    companyTaxNumber: companyData?.tax_number || localStorage.getItem('company_tax') || '',
                     docTitle: 'سند صرف نقدية / بنك',
                     docNumber: editingVoucher?.voucher_number || (voucherData as any).voucher_number || 'جديد',
                     docDate: voucherData.date || new Date().toISOString().slice(0, 10),
-
                     partyTitle: 'الجهة / المدفوع له',
                     partyName,
                     paymentMethod: pm?.name || 'نقداً',
                     notes: voucherData.notes || '',
+
                     columns: [
                       { label: 'م', key: 'index' },
                       { label: 'الحساب / البيان', key: 'account_name' },
