@@ -396,17 +396,9 @@ export const Users: React.FC = () => {
 
   // Open Permissions
   const openUserPermissions = (user: User) => {
-
-
-
-
-
-
-
-
-
     setSelectedUser(user);
     setPermissionsTargetType('user');
+    setTempUserRole((user.role as any) || 'user');
     setTempPermissions(JSON.parse(JSON.stringify(user.permissions || {})));
     const cleanRoleIds = Array.isArray(user.role_ids) ? user.role_ids : [];
     setTempUserRoleIds(cleanRoleIds);
@@ -424,20 +416,15 @@ export const Users: React.FC = () => {
     if (!currentUser) return;
     setLoading(true);
 
-
-
-
-
-
-
-
     const cleanSaveRoleIds = Array.isArray(tempUserRoleIds) ? tempUserRoleIds : [];
     try {
       if (permissionsTargetType === 'user' && selectedUser) {
         await dbService.update('users', selectedUser.id, {
+          role: tempUserRole,
           permissions: tempPermissions,
           role_ids: cleanSaveRoleIds
         });
+        setUsers(prev => prev.map(u => u.id === selectedUser.id ? { ...u, role: tempUserRole, permissions: tempPermissions, role_ids: cleanSaveRoleIds } : u));
         
         await dbService.logActivity(
           currentUser.id, 
