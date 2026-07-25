@@ -324,7 +324,13 @@ export const exportSingleDocumentToExcel = (options: SingleDocExportOptions) => 
   items.forEach((item, index) => {
     const row = columns.map(col => {
       if (col.key === 'index' || col.key === 'م') return index + 1;
-      const val = item[col.key];
+      let val = item[col.key];
+      // Hide raw 36-character database UUIDs
+      if (col.key.includes('code') || col.key.includes('barcode') || col.label.includes('كود')) {
+        if (typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim())) {
+          val = '-';
+        }
+      }
       return val !== undefined && val !== null ? val : '-';
     });
     aoa.push(row);
@@ -360,12 +366,12 @@ export const exportSingleDocumentToExcel = (options: SingleDocExportOptions) => 
   // 7. Generate Worksheet
   const ws = XLSX.utils.aoa_to_sheet(aoa);
 
-  // Apply financial formatting to numeric cells
+  // Apply accounting financial formatting to numeric cells: positive 55,000.00, negative (55,000.00)
   Object.keys(ws).forEach(key => {
     if (key[0] === '!') return;
     const cell = ws[key];
     if (cell.t === 'n' && typeof cell.v === 'number') {
-      cell.z = '#,##0.00';
+      cell.z = '#,##0.00;(#,##0.00);"0.00"';
     }
   });
 
@@ -377,6 +383,7 @@ export const exportSingleDocumentToExcel = (options: SingleDocExportOptions) => 
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
   XLSX.writeFile(wb, `${filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`}`);
 };
+
 
 
 
