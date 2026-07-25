@@ -849,50 +849,80 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           
           drawTable(columns, dto.items || [], null);
 
-          // Summary box
-          const summaryWidth = isThermal ? 130 : 200;
-          const summaryHeight = isThermal 
-            ? (50 + (Number(dto.discount_amount) > 0 ? 10 : 0))
-            : (65 + (Number(dto.discount_amount) > 0 ? 12 : 0));
+          // Modern Invoice Summary Card (ملخص الفاتورة)
+          const cardWidth = isThermal ? 140 : 220;
+          const cardHeight = isThermal 
+            ? (65 + (Number(dto.discount_amount) > 0 ? 12 : 0))
+            : (95 + (Number(dto.discount_amount) > 0 ? 14 : 0));
           
-          if (!isThermal && (currentY + summaryHeight > doc.page.height - 50)) {
+          if (!isThermal && (currentY + cardHeight > doc.page.height - 50)) {
             doc.addPage();
             currentY = 40;
           }
 
-          const summaryX = doc.page.width - sideMargin - summaryWidth;
-          doc.fillColor('#f9fafb').rect(summaryX, currentY + 10, summaryWidth, summaryHeight).fill();
-          doc.strokeColor('#18181b').lineWidth(1.5).rect(summaryX, currentY + 10, summaryWidth, summaryHeight).stroke();
+          // Position card on left side in RTL mode matching the screenshot
+          const cardX = isRtl ? sideMargin : (doc.page.width - sideMargin - cardWidth);
+          const cardY = currentY + 10;
 
+          // Card Outer Container (Soft Gray/Green Fill & Border)
+          doc.fillColor('#f8fafc').roundedRect(cardX, cardY, cardWidth, cardHeight, 6).fill();
+          doc.strokeColor('#e2e8f0').lineWidth(0.8).roundedRect(cardX, cardY, cardWidth, cardHeight, 6).stroke();
 
-          let summaryY = currentY + (isThermal ? 13 : 15);
-          const drawSummaryRow = (label: string, val: any, isBold = false) => {
-            const fontName = isBold ? 'ArabicBold' : 'ArabicRegular';
-            const fontSize = isThermal ? (isBold ? 8.5 : 7.5) : (isBold ? 9.5 : 8.5);
+          // Card Header: "ملخص الفاتورة"
+          let rowY = cardY + (isThermal ? 8 : 10);
+          const headerTitle = 'ملخص الفاتورة';
+          renderText(headerTitle, cardX + 10, rowY, { 
+            width: cardWidth - 20, 
+            align: isRtl ? 'right' : 'left', 
+            font: 'ArabicBold', 
+            size: isThermal ? 8.5 : 9.5, 
+            color: '#059669' 
+          });
+
+          rowY += isThermal ? 14 : 18;
+
+          // Helper to draw card row (Label & Value)
+          const drawCardRow = (label: string, val: any, isTotal = false, customValColor?: string) => {
+            const fontName = isTotal ? 'ArabicBold' : 'ArabicRegular';
+            const fontSize = isThermal ? (isTotal ? 8.5 : 7.5) : (isTotal ? 10.0 : 8.5);
+            const valColor = isTotal ? '#059669' : (customValColor || '#1e293b');
             const formattedVal = formatNumberValue(val);
+            const halfWidth = (cardWidth / 2) - 10;
 
             if (isRtl) {
-              renderText(label, summaryX + summaryWidth - 110, summaryY, { width: 105, align: 'right', font: fontName, size: fontSize });
-              renderText(formattedVal, summaryX + 5, summaryY, { width: 80, align: 'left', font: fontName, size: fontSize });
+              // Right: Label, Left: Value
+              renderText(label, cardX + (cardWidth / 2), rowY, { width: halfWidth, align: 'right', font: fontName, size: fontSize, color: '#475569' });
+              renderText(formattedVal, cardX + 10, rowY, { width: halfWidth, align: 'left', font: fontName, size: fontSize, color: valColor });
             } else {
-              renderText(label, summaryX + 5, summaryY, { width: 105, align: 'left', font: fontName, size: fontSize });
-              renderText(formattedVal, summaryX + 110, summaryY, { width: 80, align: 'right', font: fontName, size: fontSize });
+              // Left: Label, Right: Value
+              renderText(label, cardX + 10, rowY, { width: halfWidth, align: 'left', font: fontName, size: fontSize, color: '#475569' });
+              renderText(formattedVal, cardX + (cardWidth / 2), rowY, { width: halfWidth, align: 'right', font: fontName, size: fontSize, color: valColor });
             }
-            summaryY += isThermal ? 10 : 13;
+            rowY += isThermal ? 11 : 14;
           };
 
-          drawSummaryRow('الإجمالي الفرعي:', dto.subtotal || 0);
+          // 1. Subtotal Before Discount
+          const subtotalVal = dto.subtotal || (Number(dto.net_total || 0) - Number(dto.vat_amount || 0) + Number(dto.discount_amount || 0));
+          drawCardRow('الإجمالي قبل الخصم', subtotalVal);
+
+          // 2. Discount if present
           if (Number(dto.discount_amount) > 0) {
-            drawSummaryRow('الخصم:', dto.discount_amount);
+            drawCardRow('الخصم', `-${formatNumberValue(dto.discount_amount)}`, false, '#dc2626');
           }
-          drawSummaryRow('ضريبة القيمة المضافة (14%):', dto.vat_amount || 0);
-          summaryY += isThermal ? 1 : 2;
-          doc.strokeColor('#e5e7eb').lineWidth(0.5).moveTo(summaryX + 5, summaryY).lineTo(summaryX + summaryWidth - 5, summaryY).stroke();
-          summaryY += isThermal ? 3 : 4;
-          drawSummaryRow('الصافي النهائي:', dto.net_total || 0, true);
 
+          // 3. VAT (ضريبة القيمة المضافة)
+          drawCardRow('ضريبة القيمة المضافة', dto.vat_amount || 0);
 
-          currentY += summaryHeight + (isThermal ? 15 : 25);
+          // Thin Divider Line
+          rowY += isThermal ? 1 : 2;
+          doc.strokeColor('#cbd5e1').lineWidth(0.5).moveTo(cardX + 10, rowY).lineTo(cardX + cardWidth - 10, rowY).stroke();
+          rowY += isThermal ? 3 : 4;
+
+          // 4. Grand Total (الصافي النهائي) in Bold Emerald Green
+          drawCardRow('الصافي النهائي', dto.net_total || 0, true);
+
+          currentY += cardHeight + (isThermal ? 15 : 25);
+
 
           // QR Code rendering if present
           if (qrBuffer) {
