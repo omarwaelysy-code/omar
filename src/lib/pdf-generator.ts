@@ -419,9 +419,13 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               currentY += 10;
             }
             if (company.phone) {
-              renderText(`الهاتف: ${company.phone}`, sideMargin, currentY, { width: usableWidth, align: 'c          } else {
+              renderText(`الهاتف: ${company.phone}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7.5 });
+              currentY += 10;
+            }
+          } else {
             // Standard A4 mode - Header is clean and centered on title & branch name
           }
+
 
           // 3. Document Title
           if (isThermal) {
