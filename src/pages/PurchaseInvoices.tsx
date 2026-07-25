@@ -1462,10 +1462,10 @@ export const PurchaseInvoices: React.FC = () => {
         { label: 'اسم الصنف / البيان', key: 'product_name' },
         { label: 'الكمية', key: 'quantity' },
         { label: 'سعر التكلفة', key: 'cost_price' },
-        { label: 'الخصم', key: 'discount' },
         { label: 'الضريبة (14%)', key: 'tax' },
         { label: 'إجمالي الصنف', key: 'total' }
       ],
+
       items: rawItems.map((item: any) => ({
         barcode: item.barcode || item.product_code || '-',
         product_name: item.product_name || item.category_name || '-',

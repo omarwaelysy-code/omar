@@ -419,28 +419,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               currentY += 10;
             }
             if (company.phone) {
-              renderText(`الهاتف: ${company.phone}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7.5 });
-              currentY += 10;
-            }
-          } else {
-            const companyX = isRtl 
-              ? (doc.page.width - sideMargin - (logoBuffer ? logoSize + 15 : 0) - 220)
-              : (sideMargin + (logoBuffer ? logoSize + 15 : 0));
-            const companyAlign = isRtl ? 'right' : 'left';
-            
-            let compY = currentY + 5;
-            if (company.name) {
-              renderText(company.name, companyX, compY, { width: 220, align: companyAlign, font: 'ArabicBold', size: 11 });
-              compY += 14;
-            }
-            if (company.phone) {
-              renderText(`الهاتف: ${company.phone}`, companyX, compY, { width: 220, align: companyAlign, size: 8.5 });
-              compY += 12;
-            }
-            if (company.taxNumber) {
-              renderText(`الرقم الضريبي: ${company.taxNumber}`, companyX, compY, { width: 220, align: companyAlign, size: 8.5 });
-              compY += 12;
-            }
+              renderText(`الهاتف: ${company.phone}`, sideMargin, currentY, { width: usableWidth, align: 'c          } else {
+            // Standard A4 mode - Header is clean and centered on title & branch name
           }
 
           // 3. Document Title
@@ -453,44 +433,43 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               currentY += 10;
             }
           } else {
-            renderText(title, sideMargin, currentY + 12, { width: usableWidth, align: 'center', font: 'ArabicBold', size: 16 });
+            renderText(title, sideMargin, currentY + 5, { width: usableWidth, align: 'center', font: 'ArabicBold', size: 16 });
             if (branchName) {
-              renderText(`الفرع: ${branchName}`, sideMargin, currentY + 32, { width: usableWidth, align: 'center', size: 9 });
+              renderText(`الفرع: ${branchName}`, sideMargin, currentY + 25, { width: usableWidth, align: 'center', size: 9 });
             }
           }
 
-          // 4. Meta Info
-          const cleanUser = (name: any) => {
-            if (!name) return 'المشرف';
-            const s = String(name).trim();
-            if (s.includes('@')) {
-              const u = s.split('@')[0];
-              return u.charAt(0).toUpperCase() + u.slice(1);
-            }
-            return s;
-          };
-
-          const cleanDate = (d: any) => {
-            if (!d) return new Date().toISOString().substring(0, 10);
-            const s = String(d).trim();
-            if (s.includes('T')) return s.split('T')[0];
-            if (s.length > 10 && (s.includes('-') || s.includes('/'))) return s.substring(0, 10);
-            return s;
-          };
-
-          const dateValue = cleanDate(dateStr);
-          const userValue = cleanUser(userName);
-
+          // 4. Meta Info (Thermal only)
           if (isThermal) {
+            const cleanUser = (name: any) => {
+              if (!name) return 'المشرف';
+              const s = String(name).trim();
+              if (s.includes('@')) {
+                const u = s.split('@')[0];
+                return u.charAt(0).toUpperCase() + u.slice(1);
+              }
+              return s;
+            };
+
+            const cleanDate = (d: any) => {
+              if (!d) return new Date().toISOString().substring(0, 10);
+              const s = String(d).trim();
+              if (s.includes('T')) return s.split('T')[0];
+              if (s.length > 10 && (s.includes('-') || s.includes('/'))) return s.substring(0, 10);
+              return s;
+            };
+
+            const dateValue = cleanDate(dateStr);
+            const userValue = cleanUser(userName);
+
             renderText(`المستخدم: ${userValue}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7 });
             currentY += 9;
             renderText(`التاريخ: ${dateValue}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7 });
             currentY += 12;
-          } else {
-            const metaX = isRtl ? sideMargin : (doc.page.width - sideMargin - 220);
-            const metaAlign = isRtl ? 'left' : 'right';
-            renderText(`المستخدم: ${userValue}`, metaX, currentY + 5, { width: 220, align: metaAlign, size: 8.5 });
-            renderText(`التاريخ: ${dateValue}`, metaX, currentY + 17, { width: 220, align: metaAlign, size: 8.5 });
+          }
+
+          if (!isThermal) {
+            currentY += 40; // Advance currentY past header title
           }
 
 
@@ -854,15 +833,15 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             { id: 'quantity', label: 'الكمية', width: 15, align: 'right' },
             { id: 'total', label: 'الإجمالي', width: 30, align: 'right' }
           ] : [
-            { id: 'product_code', label: 'كود الصنف', width: 12, align: 'right' },
-            { id: 'product_name', label: 'الصنف', width: 33, align: 'right' },
+            { id: 'product_code', label: 'كود الصنف', width: 14, align: 'right' },
+            { id: 'product_name', label: 'الصنف', width: 38, align: 'right' },
             { id: 'quantity', label: 'الكمية', width: 10, align: 'right' },
             { id: 'unit', label: 'الوحدة', width: 10, align: 'right' },
-            { id: 'unit_price', label: 'السعر', width: 11, align: 'right' },
-            { id: 'discount', label: 'الخصم', width: 8, align: 'right' },
-            { id: 'vat_amount', label: 'الضريبة', width: 8, align: 'right' },
-            { id: 'total', label: 'الإجمالي', width: 8, align: 'right' }
+            { id: 'unit_price', label: 'السعر', width: 13, align: 'right' },
+            { id: 'vat_amount', label: 'الضريبة', width: 10, align: 'right' },
+            { id: 'total', label: 'الإجمالي', width: 15, align: 'right' }
           ];
+
           
           drawTable(columns, dto.items || [], null);
 
