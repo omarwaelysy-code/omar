@@ -871,12 +871,12 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           // Card Header: "ملخص الفاتورة"
           let rowY = cardY + (isThermal ? 8 : 10);
           const headerTitle = 'ملخص الفاتورة';
+          doc.fillColor('#059669');
           renderText(headerTitle, cardX + 10, rowY, { 
             width: cardWidth - 20, 
             align: isRtl ? 'right' : 'left', 
             font: 'ArabicBold', 
-            size: isThermal ? 8.5 : 9.5, 
-            color: '#059669' 
+            size: isThermal ? 8.5 : 9.5
           });
 
           rowY += isThermal ? 14 : 18;
@@ -891,15 +891,20 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
             if (isRtl) {
               // Right: Label, Left: Value
-              renderText(label, cardX + (cardWidth / 2), rowY, { width: halfWidth, align: 'right', font: fontName, size: fontSize, color: '#475569' });
-              renderText(formattedVal, cardX + 10, rowY, { width: halfWidth, align: 'left', font: fontName, size: fontSize, color: valColor });
+              doc.fillColor('#475569');
+              renderText(label, cardX + (cardWidth / 2), rowY, { width: halfWidth, align: 'right', font: fontName, size: fontSize });
+              doc.fillColor(valColor);
+              renderText(formattedVal, cardX + 10, rowY, { width: halfWidth, align: 'left', font: fontName, size: fontSize });
             } else {
               // Left: Label, Right: Value
-              renderText(label, cardX + 10, rowY, { width: halfWidth, align: 'left', font: fontName, size: fontSize, color: '#475569' });
-              renderText(formattedVal, cardX + (cardWidth / 2), rowY, { width: halfWidth, align: 'right', font: fontName, size: fontSize, color: valColor });
+              doc.fillColor('#475569');
+              renderText(label, cardX + 10, rowY, { width: halfWidth, align: 'left', font: fontName, size: fontSize });
+              doc.fillColor(valColor);
+              renderText(formattedVal, cardX + (cardWidth / 2), rowY, { width: halfWidth, align: 'right', font: fontName, size: fontSize });
             }
             rowY += isThermal ? 11 : 14;
           };
+
 
           // 1. Subtotal Before Discount
           const subtotalVal = dto.subtotal || (Number(dto.net_total || 0) - Number(dto.vat_amount || 0) + Number(dto.discount_amount || 0));
