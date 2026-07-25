@@ -424,17 +424,22 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             }
           } else {
             const companyX = isRtl 
-              ? (doc.page.width - sideMargin - (logoBuffer ? logoSize + 15 : 0) - 250)
+              ? (doc.page.width - sideMargin - (logoBuffer ? logoSize + 15 : 0) - 220)
               : (sideMargin + (logoBuffer ? logoSize + 15 : 0));
             const companyAlign = isRtl ? 'right' : 'left';
             
-            renderText(company.name || '', companyX, currentY + 5, { width: 250, align: companyAlign, font: 'ArabicBold', size: 12 });
-            
-            if (company.taxNumber) {
-              renderText(`الرقم الضريبي: ${company.taxNumber}`, companyX, currentY + 20, { width: 250, align: companyAlign, size: 8.5 });
+            let compY = currentY + 5;
+            if (company.name) {
+              renderText(company.name, companyX, compY, { width: 220, align: companyAlign, font: 'ArabicBold', size: 11 });
+              compY += 14;
             }
             if (company.phone) {
-              renderText(`الهاتف: ${company.phone}`, companyX, currentY + 32, { width: 250, align: companyAlign, size: 8.5 });
+              renderText(`الهاتف: ${company.phone}`, companyX, compY, { width: 220, align: companyAlign, size: 8.5 });
+              compY += 12;
+            }
+            if (company.taxNumber) {
+              renderText(`الرقم الضريبي: ${company.taxNumber}`, companyX, compY, { width: 220, align: companyAlign, size: 8.5 });
+              compY += 12;
             }
           }
 
@@ -455,18 +460,39 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           }
 
           // 4. Meta Info
-          const dateValue = dateStr || new Date().toLocaleDateString('ar-SA');
+          const cleanUser = (name: any) => {
+            if (!name) return 'المشرف';
+            const s = String(name).trim();
+            if (s.includes('@')) {
+              const u = s.split('@')[0];
+              return u.charAt(0).toUpperCase() + u.slice(1);
+            }
+            return s;
+          };
+
+          const cleanDate = (d: any) => {
+            if (!d) return new Date().toISOString().substring(0, 10);
+            const s = String(d).trim();
+            if (s.includes('T')) return s.split('T')[0];
+            if (s.length > 10 && (s.includes('-') || s.includes('/'))) return s.substring(0, 10);
+            return s;
+          };
+
+          const dateValue = cleanDate(dateStr);
+          const userValue = cleanUser(userName);
+
           if (isThermal) {
-            renderText(`المستخدم: ${userName || 'المشرف'}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7 });
+            renderText(`المستخدم: ${userValue}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7 });
             currentY += 9;
             renderText(`التاريخ: ${dateValue}`, sideMargin, currentY, { width: usableWidth, align: 'center', size: 7 });
             currentY += 12;
           } else {
-            const metaX = isRtl ? sideMargin : (doc.page.width - sideMargin - 250);
+            const metaX = isRtl ? sideMargin : (doc.page.width - sideMargin - 220);
             const metaAlign = isRtl ? 'left' : 'right';
-            renderText(`المستخدم: ${userName || 'المشرف'}`, metaX, currentY + 5, { width: 250, align: metaAlign, size: 8.5 });
-            renderText(`التاريخ: ${dateValue}`, metaX, currentY + 17, { width: 250, align: metaAlign, size: 8.5 });
+            renderText(`المستخدم: ${userValue}`, metaX, currentY + 5, { width: 220, align: metaAlign, size: 8.5 });
+            renderText(`التاريخ: ${dateValue}`, metaX, currentY + 17, { width: 220, align: metaAlign, size: 8.5 });
           }
+
 
           if (!isThermal) {
             currentY += 50; // Advance currentY past header texts to prevent overlapping
@@ -484,12 +510,42 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         currentY += isThermal ? 8 : 15;
       };
 
+      // Helper function to format numbers & clean raw UUID product codes
+      const formatNumberValue = (val: any, colKey = '', colLabel = ''): string => {
+        if (val === null || val === undefined || val === '') return '';
+        const s = String(val).trim();
+
+        // Hide raw 36-character database UUIDs
+        if (colKey.includes('code') || colKey.includes('barcode') || colLabel.includes('كود')) {
+          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) {
+            return '-';
+          }
+          return s;
+        }
+
+        // Format pure numbers to (55,000.00) or 55,000.00
+        if (/^-?\d+(\.\d+)?$/.test(s)) {
+          const num = parseFloat(s);
+          if (!isNaN(num)) {
+            const formatted = new Intl.NumberFormat('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+              useGrouping: true
+            }).format(Math.abs(num));
+            return num < 0 ? `(${formatted})` : formatted;
+          }
+        }
+
+        return s;
+      };
+
       // Helper to draw the table
       const drawTable = (
         columns: ColumnDef[],
         rows: any[],
         totals: any
       ) => {
+
         // Find the description/name column to allocate remaining/surplus width to it
         const descCol = columns.find(col => {
           const label = (col.label || '').toLowerCase();
@@ -628,7 +684,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         for (const row of rows) {
           const rowItems = columns.map(col => {
             let val = row[col.id];
-            // Translate system default descriptions on English LTR reports
+            val = formatNumberValue(val, col.id, col.label);
             const isDescCol = col.id === 'col_4' || col.id === 'description' || 
                               col.label.toLowerCase().includes('desc') || 
                               col.label.includes('البيان') || col.label.includes('بيان');
@@ -639,6 +695,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           });
           currentY = drawRow(rowItems, currentY);
         }
+
 
         // Draw Totals
         if (totals && Object.keys(totals).length > 0) {
@@ -826,23 +883,31 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
 
           let summaryY = currentY + (isThermal ? 13 : 15);
-          const drawSummaryRow = (label: string, val: string, isBold = false) => {
+          const drawSummaryRow = (label: string, val: any, isBold = false) => {
             const fontName = isBold ? 'ArabicBold' : 'ArabicRegular';
             const fontSize = isThermal ? (isBold ? 8.5 : 7.5) : (isBold ? 9.5 : 8.5);
-            renderText(label, summaryX + 2, summaryY, { width: isThermal ? 65 : 100, align: 'right', font: fontName, size: fontSize });
-            renderText(val, summaryX + (isThermal ? 70 : 105), summaryY, { width: isThermal ? 58 : 90, align: 'left', font: fontName, size: fontSize });
-            summaryY += isThermal ? 10 : 12;
+            const formattedVal = formatNumberValue(val);
+
+            if (isRtl) {
+              renderText(label, summaryX + summaryWidth - 110, summaryY, { width: 105, align: 'right', font: fontName, size: fontSize });
+              renderText(formattedVal, summaryX + 5, summaryY, { width: 80, align: 'left', font: fontName, size: fontSize });
+            } else {
+              renderText(label, summaryX + 5, summaryY, { width: 105, align: 'left', font: fontName, size: fontSize });
+              renderText(formattedVal, summaryX + 110, summaryY, { width: 80, align: 'right', font: fontName, size: fontSize });
+            }
+            summaryY += isThermal ? 10 : 13;
           };
 
-          drawSummaryRow('الإجمالي الفرعي:', dto.subtotal || '0.00');
+          drawSummaryRow('الإجمالي الفرعي:', dto.subtotal || 0);
           if (Number(dto.discount_amount) > 0) {
             drawSummaryRow('الخصم:', dto.discount_amount);
           }
-          drawSummaryRow('الضريبة (15%):', dto.vat_amount || '0.00');
+          drawSummaryRow('ضريبة القيمة المضافة (14%):', dto.vat_amount || 0);
           summaryY += isThermal ? 1 : 2;
           doc.strokeColor('#e5e7eb').lineWidth(0.5).moveTo(summaryX + 5, summaryY).lineTo(summaryX + summaryWidth - 5, summaryY).stroke();
           summaryY += isThermal ? 3 : 4;
-          drawSummaryRow('الصافي النهائي:', dto.net_total || '0.00', true);
+          drawSummaryRow('الصافي النهائي:', dto.net_total || 0, true);
+
 
           currentY += summaryHeight + (isThermal ? 15 : 25);
 
