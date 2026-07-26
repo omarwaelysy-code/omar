@@ -730,7 +730,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           )}
         </div>
 
-        <nav ref={desktopNavRef} className="flex items-center gap-0.5 2xl:gap-1 flex-1 min-w-0 overflow-x-auto no-scrollbar py-1">
+        <nav ref={desktopNavRef} className="flex items-center gap-0.5 2xl:gap-1 flex-1 min-w-0 py-1">
           {filteredNavItems.map((item: any) => {
             const isActive = item.subItems 
               ? item.subItems.some((sub: any) => sub.id === currentPage)
@@ -780,7 +780,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                           <button
                             key={sub.id}
                             type="button"
-                            onClick={() => handleNavClick(sub.id, sub.label, sub.path)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleNavClick(sub.id, sub.label, sub.path);
+                            }}
                             className={`
                               w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all cursor-pointer ${dir === 'rtl' ? 'text-right' : 'text-left'}
                               ${currentPage === sub.id 
@@ -803,7 +806,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
               <button
                 key={item.id}
                 type="button"
-                onClick={() => handleNavClick(item.id, item.label, item.path)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNavClick(item.id, item.label, item.path);
+                }}
                 className={`
                   flex items-center gap-0.5 px-1 2xl:px-1.5 py-1 rounded-lg transition-all font-semibold text-[11px] 2xl:text-xs whitespace-nowrap shrink-0 cursor-pointer
                   ${currentPage === item.id ? 'bg-brand-primary text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
