@@ -1740,7 +1740,7 @@ export const Users: React.FC = () => {
               <div className="space-y-3">
                 <h4 className="font-black text-base text-slate-900 border-b border-slate-100 pb-2 flex items-center justify-between">
                   <span>1️⃣ {language === 'ar' ? 'خطوات تعيين وتعديل الصلاحيات والأدوار للموظف' : 'Step-by-Step: Assigning Roles & Permissions'}</span>
-                  <span className="text-xs text-slate-400 font-normal">Workflow Guide</span>
+                  <span className="text-xs text-slate-400 font-normal">{language === 'ar' ? 'دليل خطوات العمل' : 'Workflow Guide'}</span>
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                   <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
@@ -1789,67 +1789,131 @@ export const Users: React.FC = () => {
               {/* Section 3: Special Permissions */}
               <div className="space-y-3">
                 <h4 className="font-black text-base text-slate-900 border-b border-slate-100 pb-2 flex items-center justify-between">
-                  <span>2️⃣ {language === 'ar' ? 'الصلاحيات الاستثنائية والعمليات الحساسة' : 'Special Action Permissions Matrix'}</span>
-                  <span className="text-xs text-slate-400 font-normal">Actions & Risk Levels</span>
+                  <span>2️⃣ {language === 'ar' ? 'مصفوفة الصلاحيات الاستثنائية والعمليات الحساسة' : 'Special Action Permissions Matrix'}</span>
+                  <span className="text-xs text-slate-400 font-normal">{language === 'ar' ? 'العمليات ومستويات الخطورة' : 'Actions & Risk Levels'}</span>
                 </h4>
                 <div className="overflow-x-auto border border-slate-200 rounded-2xl">
                   <table className="w-full text-right text-xs">
                     <thead className="bg-slate-100 text-slate-700 font-bold">
                       <tr>
-                        <th className="p-3">Key / رمز الصلاحية</th>
-                        <th className="p-3">اسم الصلاحية / Name</th>
-                        <th className="p-3">الوصف والتأثير / Description</th>
-                        <th className="p-3">الخطورة / Risk Level</th>
+                        <th className="p-3">{language === 'ar' ? 'رمز الصلاحية' : 'Key'}</th>
+                        <th className="p-3">{language === 'ar' ? 'اسم الصلاحية' : 'Name'}</th>
+                        <th className="p-3">{language === 'ar' ? 'الوصف والتأثير' : 'Description'}</th>
+                        <th className="p-3">{language === 'ar' ? 'درجة الخطورة' : 'Risk Level'}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       <tr>
                         <td className="p-3 font-mono text-emerald-700 font-bold">approve</td>
-                        <td className="p-3 font-bold">اعتماد المستندات<br/><span className="text-[10px] text-slate-500 font-normal">Approve Documents</span></td>
-                        <td className="p-3">ترحيل الفواتير والسندات وتوليد الأثر المحاسبي والمخزني.<br/><span className="text-[10px] text-slate-500 font-normal">Post invoices & vouchers to generate accounting & stock effects.</span></td>
-                        <td className="p-3"><span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md font-bold">متوسط / Medium</span></td>
+                        <td className="p-3 font-bold">
+                          {language === 'ar' ? 'اعتماد المستندات' : 'Approve Documents'}
+                        </td>
+                        <td className="p-3">
+                          {language === 'ar' ? 'ترحيل الفواتير والسندات وتوليد الأثر المحاسبي والمخزني.' : 'Post invoices & vouchers to generate accounting & stock effects.'}
+                        </td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md font-bold">
+                            {language === 'ar' ? 'متوسط' : 'Medium'}
+                          </span>
+                        </td>
                       </tr>
                       <tr>
                         <td className="p-3 font-mono text-rose-700 font-bold">cancel_approval</td>
-                        <td className="p-3 font-bold">إلغاء الاعتماد<br/><span className="text-[10px] text-slate-500 font-normal">Cancel Approval</span></td>
-                        <td className="p-3">إلغاء ترحيل الفواتير والسندات وعكس القيود اليومية.<br/><span className="text-[10px] text-slate-500 font-normal">Unpost approved documents and reverse ledger entries.</span></td>
-                        <td className="p-3"><span className="px-2 py-0.5 bg-rose-100 text-rose-800 rounded-md font-bold">عالي / High</span></td>
+                        <td className="p-3 font-bold">
+                          {language === 'ar' ? 'إلغاء الاعتماد' : 'Cancel Approval'}
+                        </td>
+                        <td className="p-3">
+                          {language === 'ar' ? 'إلغاء ترحيل الفواتير والسندات وعكس القيود اليومية.' : 'Unpost approved documents and reverse ledger entries.'}
+                        </td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 bg-rose-100 text-rose-800 rounded-md font-bold">
+                            {language === 'ar' ? 'عالي' : 'High'}
+                          </span>
+                        </td>
                       </tr>
                       <tr>
                         <td className="p-3 font-mono text-rose-700 font-bold">edit_approved</td>
-                        <td className="p-3 font-bold">تعديل بعد الاعتماد<br/><span className="text-[10px] text-slate-500 font-normal">Edit Approved</span></td>
-                        <td className="p-3">التعديل على بيانات الفواتير والسندات المعتمدة مسبقاً.<br/><span className="text-[10px] text-slate-500 font-normal">Modify contents of previously posted documents.</span></td>
-                        <td className="p-3"><span className="px-2 py-0.5 bg-rose-100 text-rose-800 rounded-md font-bold">عالي / High</span></td>
+                        <td className="p-3 font-bold">
+                          {language === 'ar' ? 'تعديل بعد الاعتماد' : 'Edit Approved'}
+                        </td>
+                        <td className="p-3">
+                          {language === 'ar' ? 'التعديل على بيانات الفواتير والسندات المعتمدة مسبقاً.' : 'Modify contents of previously posted documents.'}
+                        </td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 bg-rose-100 text-rose-800 rounded-md font-bold">
+                            {language === 'ar' ? 'عالي' : 'High'}
+                          </span>
+                        </td>
                       </tr>
                       <tr>
                         <td className="p-3 font-mono text-red-700 font-bold">delete_approved</td>
-                        <td className="p-3 font-bold">حذف بعد الاعتماد<br/><span className="text-[10px] text-slate-500 font-normal">Delete Approved</span></td>
-                        <td className="p-3">الحذف النهائي للمستندات المعتمدة من دفاتر الشركة.<br/><span className="text-[10px] text-slate-500 font-normal">Permanently delete approved documents from system databases.</span></td>
-                        <td className="p-3"><span className="px-2 py-0.5 bg-red-600 text-white rounded-md font-bold">حرج / Critical</span></td>
+                        <td className="p-3 font-bold">
+                          {language === 'ar' ? 'حذف بعد الاعتماد' : 'Delete Approved'}
+                        </td>
+                        <td className="p-3">
+                          {language === 'ar' ? 'الحذف النهائي للمستندات المعتمدة من دفاتر الشركة.' : 'Permanently delete approved documents from system databases.'}
+                        </td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 bg-red-600 text-white rounded-md font-bold">
+                            {language === 'ar' ? 'حرج' : 'Critical'}
+                          </span>
+                        </td>
                       </tr>
                       <tr>
                         <td className="p-3 font-mono text-blue-700 font-bold">view_cost</td>
-                        <td className="p-3 font-bold">عرض التكلفة<br/><span className="text-[10px] text-slate-500 font-normal">View Item Cost</span></td>
-                        <td className="p-3">إظهار أسعار التكلفة الحقيقية للأصناف في الفواتير والتقارير.<br/><span className="text-[10px] text-slate-500 font-normal">Display actual item purchasing costs in screens & reports.</span></td>
-                        <td className="p-3"><span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md font-bold">سري / Confidential</span></td>
+                        <td className="p-3 font-bold">
+                          {language === 'ar' ? 'عرض التكلفة' : 'View Item Cost'}
+                        </td>
+                        <td className="p-3">
+                          {language === 'ar' ? 'إظهار أسعار التكلفة الحقيقية للأصناف في الفواتير والتقارير.' : 'Display actual item purchasing costs in screens & reports.'}
+                        </td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md font-bold">
+                            {language === 'ar' ? 'سري' : 'Confidential'}
+                          </span>
+                        </td>
                       </tr>
                       <tr>
                         <td className="p-3 font-mono text-blue-700 font-bold">view_profit_margin</td>
-                        <td className="p-3 font-bold">عرض هامش الربح<br/><span className="text-[10px] text-slate-500 font-normal">View Profit Margin</span></td>
-                        <td className="p-3">إظهار أرباح الشركة ونسبة الربحية في الفواتير والبيع.<br/><span className="text-[10px] text-slate-500 font-normal">Show net profit amount & profit margin percentages in sales.</span></td>
-                        <td className="p-3"><span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md font-bold">سري / Confidential</span></td>
+                        <td className="p-3 font-bold">
+                          {language === 'ar' ? 'عرض هامش الربح' : 'View Profit Margin'}
+                        </td>
+                        <td className="p-3">
+                          {language === 'ar' ? 'إظهار أرباح الشركة ونسبة الربحية في الفواتير والبيع.' : 'Show net profit amount & profit margin percentages in sales.'}
+                        </td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md font-bold">
+                            {language === 'ar' ? 'سري' : 'Confidential'}
+                          </span>
+                        </td>
                       </tr>
                       <tr>
                         <td className="p-3 font-mono text-amber-700 font-bold">change_prices</td>
-                        <td className="p-3 font-bold">تغيير أسعار البيع<br/><span className="text-[10px] text-slate-500 font-normal">Change Selling Price</span></td>
-                        <td className="p-3">السماح بتعديل سعر بيع الصنف يدوياً أثناء تسجيل الفاتورة.<br/><span className="text-[10px] text-slate-500 font-normal">Allow overriding default item selling price manually.</span></td>
-                        <td className="p-3"><span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md font-bold">متوسط / Medium</span></td>
+                        <td className="p-3 font-bold">
+                          {language === 'ar' ? 'تغيير أسعار البيع' : 'Change Selling Price'}
+                        </td>
+                        <td className="p-3">
+                          {language === 'ar' ? 'السماح بتعديل سعر بيع الصنف يدوياً أثناء تسجيل الفاتورة.' : 'Allow overriding default item selling price manually.'}
+                        </td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md font-bold">
+                            {language === 'ar' ? 'متوسط' : 'Medium'}
+                          </span>
+                        </td>
                       </tr>
                       <tr>
                         <td className="p-3 font-mono text-amber-700 font-bold">allow_negative</td>
-                        <td className="p-3 font-bold">السماح بالسالب<br/><span className="text-[10px] text-slate-500 font-normal">Allow Negative Stock</span></td>
-                        <td className="p-3">إتمام عمليات البيع والصرف حتى لو كانت الكمية صفراً أو أقل.<br/><span className="text-[10px] text-slate-500 font-normal">Execute sales transactions even if physical stock is negative.</span></td>
-                        <td className="p-3"><span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md font-bold">متوسط / Medium</span></td>
+                        <td className="p-3 font-bold">
+                          {language === 'ar' ? 'السماح بالسالب' : 'Allow Negative Stock'}
+                        </td>
+                        <td className="p-3">
+                          {language === 'ar' ? 'إتمام عمليات البيع والصرف حتى لو كانت الكمية صفراً أو أقل.' : 'Execute sales transactions even if physical stock is negative.'}
+                        </td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md font-bold">
+                            {language === 'ar' ? 'متوسط' : 'Medium'}
+                          </span>
+                        </td>
                       </tr>
                     </tbody>
                   </table>
@@ -1859,8 +1923,8 @@ export const Users: React.FC = () => {
               {/* Section 4: Data Access Restrictions */}
               <div className="space-y-3">
                 <h4 className="font-black text-base text-slate-900 border-b border-slate-100 pb-2 flex items-center justify-between">
-                  <span>3️⃣ {language === 'ar' ? 'القيود المكانية والمالية' : 'Data Restrictions Guide'}</span>
-                  <span className="text-xs text-slate-400 font-normal">Data Isolation & Scope</span>
+                  <span>3️⃣ {language === 'ar' ? 'القيود المكانية والمالية لعزل البيانات' : 'Data Restrictions Guide'}</span>
+                  <span className="text-xs text-slate-400 font-normal">{language === 'ar' ? 'عزل البيانات ونطاق الوصول' : 'Data Isolation & Scope'}</span>
                 </h4>
                 <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl text-amber-900 text-xs leading-relaxed">
                   <strong>⚠️ {language === 'ar' ? 'ملاحظة مهمة لمدير النظام:' : 'Important Note for System Admin:'}</strong> {language === 'ar' ? 'عندما يكون المستخدم بدون أي قيود، يستطيع رؤية كل فواتير وحركات الشركة بالكامل. بمجرد تفعيل قيد محدد (مثل قيود المستودعات وتحديد مستودع المعرض)، يقوم النظام تلقائياً بتقليص وإخفاء الفواتير الأخرى وتظهر فقط الفواتير التابعة للمستودع المسموح به.' : 'When a user has no restrictions enabled, they can view all company records. Once a restriction (e.g. Restrict Warehouses) is checked and a warehouse is selected, the system automatically filters and isolates records to display only invoices belonging to that allowed warehouse.'}
@@ -1896,7 +1960,9 @@ export const Users: React.FC = () => {
 
             {/* Modal Footer */}
             <div className="p-4 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between">
-              <span className="text-xs text-slate-500 font-bold">Obrain ERP Security & Permissions Documentation • النسخة المزدوجة المبسطة</span>
+              <span className="text-xs text-slate-500 font-bold">
+                {language === 'ar' ? 'Obrain ERP • التوثيق الشامل لمنظومة الصلاحيات والقيود' : 'Obrain ERP Security & Permissions Documentation'}
+              </span>
               <button
                 type="button"
                 onClick={() => setIsGuideModalOpen(false)}
@@ -1905,6 +1971,7 @@ export const Users: React.FC = () => {
                 {language === 'ar' ? 'إغلاق الدليل' : 'Close Manual'}
               </button>
             </div>
+
           </div>
         </div>
       )}
