@@ -3978,72 +3978,76 @@ export const Dashboard: React.FC<DashboardProps> = ({ initialEditMode = false })
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* 1. Treasury / Cash Balance (Solid Emerald Green) */}
                 <motion.div 
                   whileHover={{ scale: 1.01 }}
-                  className="bg-brand-primary p-6 rounded-3xl text-white relative overflow-hidden group shadow-lg h-[220px] flex flex-col justify-between"
+                  className="bg-emerald-600 p-6 rounded-3xl text-white relative overflow-hidden group shadow-xl shadow-emerald-600/20 h-[220px] flex flex-col justify-between"
                 >
-                  <div className="absolute top-0 right-0 p-8 opacity-5 scale-150 group-hover:scale-[1.7] transition-transform duration-1000 rotate-12">
+                  <div className="absolute top-0 right-0 p-8 opacity-10 scale-150 group-hover:scale-[1.7] transition-transform duration-1000 rotate-12">
                     <Wallet size={120} />
                   </div>
                   <div className="relative z-10">
-                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-4">
+                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-4 backdrop-blur-md">
                       <Wallet className="text-white" size={20} />
                     </div>
-                    <p className="text-white/60 text-[10px] font-bold uppercase tracking-wider mb-2">رصيد النقدية</p>
-                    <h3 className="text-2xl md:text-3xl font-bold tracking-tight">
+                    <p className="text-emerald-100 text-xs font-bold uppercase tracking-wider mb-2">رصيد الخزينة</p>
+                    <h3 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white">
                       {formatMoney(stats?.totalCashBalance || 0)} 
                     </h3>
                   </div>
-                  <div className="flex items-center gap-2 text-white text-[9px] font-bold uppercase tracking-wider relative z-10 bg-white/10 self-start px-3 py-1.5 rounded-full border border-white/20">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
-                    سيولة نقدية
+                  <div className="flex items-center gap-2 text-white text-[10px] font-bold uppercase tracking-wider relative z-10 bg-white/20 self-start px-3.5 py-1.5 rounded-full backdrop-blur-sm border border-white/20">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-200 animate-pulse" />
+                    سيولة متاحة
                   </div>
                 </motion.div>
 
+                {/* 2. Customer Balances (Solid Royal Blue) */}
                 <motion.div 
                   whileHover={{ scale: 1.01 }}
-                  className="bg-slate-900 p-6 rounded-3xl text-white relative overflow-hidden group shadow-xl h-[220px] flex flex-col justify-between"
+                  className="bg-blue-600 p-6 rounded-3xl text-white relative overflow-hidden group shadow-xl shadow-blue-600/20 h-[220px] flex flex-col justify-between"
                 >
-                  <div className="absolute top-0 right-0 p-8 opacity-5 scale-150 group-hover:scale-[1.7] transition-transform duration-1000 rotate-12">
-                    <UsersIcon size={120} />
+                  <div className="absolute top-0 right-0 p-8 opacity-10 scale-150 group-hover:scale-[1.7] transition-transform duration-1000 rotate-12">
+                    <TrendingUp size={120} />
                   </div>
                   <div className="relative z-10">
-                    <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center mb-4">
-                      <TrendingUp className="text-emerald-400" size={20} />
+                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-4 backdrop-blur-md">
+                      <TrendingUp className="text-white" size={20} />
                     </div>
-                    <p className="text-white/40 text-[10px] font-bold uppercase tracking-wider mb-2">{t('dashboard.customer_balances')}</p>
-                    <h3 className="text-2xl md:text-3xl font-bold tracking-tight">
+                    <p className="text-blue-100 text-xs font-bold uppercase tracking-wider mb-2">{t('dashboard.customer_balances')}</p>
+                    <h3 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white">
                       {formatMoney(stats?.totalCustomerBalances || 0)} 
                     </h3>
                   </div>
-                  <div className="flex items-center gap-2 text-emerald-400 text-[9px] font-bold uppercase tracking-wider relative z-10 bg-emerald-400/10 self-start px-3 py-1.5 rounded-full border border-emerald-400/20">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    {t('dashboard.active_receivables')}
+                  <div className="flex items-center gap-2 text-white text-[10px] font-bold uppercase tracking-wider relative z-10 bg-white/20 self-start px-3.5 py-1.5 rounded-full backdrop-blur-sm border border-white/20">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-200 animate-pulse" />
+                    مستحقات قائمة
                   </div>
                 </motion.div>
 
+                {/* 3. Supplier Balances (Clean Slate) */}
                 <motion.div 
                   whileHover={{ scale: 1.01 }}
-                  className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden group h-[220px] flex flex-col justify-between"
+                  className="bg-slate-50 p-6 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden group h-[220px] flex flex-col justify-between"
                 >
-                  <div className="absolute top-0 right-0 p-8 opacity-[0.02] scale-150 group-hover:scale-[1.7] transition-transform duration-1000 -rotate-12">
+                  <div className="absolute top-0 right-0 p-8 opacity-[0.03] scale-150 group-hover:scale-[1.7] transition-transform duration-1000 -rotate-12">
                     <ReceiptIcon size={120} />
                   </div>
                   <div className="relative z-10">
-                    <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center mb-4 border border-slate-100">
-                      <ReceiptIcon className="text-slate-400" size={20} />
+                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center mb-4 border border-slate-200/80 shadow-sm">
+                      <ReceiptIcon className="text-slate-500" size={20} />
                     </div>
-                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-2">{t('dashboard.supplier_balances')}</p>
-                    <h3 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">
+                    <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">{t('dashboard.supplier_balances')}</p>
+                    <h3 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900">
                       {formatMoney(stats?.totalSupplierBalances || 0)} 
                     </h3>
                   </div>
-                  <div className="flex items-center gap-2 text-emerald-500 text-[9px] font-bold uppercase tracking-wider relative z-10 bg-emerald-50 self-start px-3 py-1.5 rounded-full border border-emerald-100">
+                  <div className="flex items-center gap-2 text-emerald-600 text-[10px] font-bold uppercase tracking-wider relative z-10 bg-emerald-50 self-start px-3.5 py-1.5 rounded-full border border-emerald-100">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    {t('dashboard.outstanding_debts')}
+                    ديون مستحقة
                   </div>
                 </motion.div>
               </div>
+
 
               <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
                 <div className="flex items-center justify-between mb-8">

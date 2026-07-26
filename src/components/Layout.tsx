@@ -51,8 +51,10 @@ import {
   LayoutTemplate,
   Globe,
   Activity,
-  Mail
+  Mail,
+  Camera
 } from 'lucide-react';
+
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { notificationService } from '../services/notificationService';
@@ -173,6 +175,33 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
   const [activeFeatures, setActiveFeatures] = useState<string[]>([]);
   const [featuresLoaded, setFeaturesLoaded] = useState(false);
   const [unreadContactMessagesCount, setUnreadContactMessagesCount] = useState(0);
+
+  const [isProfileModalOpen, setIsProfileModalOpen] = React.useState(false);
+  const [avatarUrl, setAvatarUrl] = React.useState<string | null>(() => {
+    if (!user?.id) return null;
+    return localStorage.getItem(`user_avatar_${user.id}`);
+  });
+
+  React.useEffect(() => {
+    if (user?.id) {
+      const saved = localStorage.getItem(`user_avatar_${user.id}`);
+      if (saved) setAvatarUrl(saved);
+    }
+  }, [user?.id]);
+
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && user?.id) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setAvatarUrl(result);
+        localStorage.setItem(`user_avatar_${user.id}`, result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
 
   useEffect(() => {
     if (!user) return;
@@ -864,17 +893,28 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             </div>
           )}
 
-          <div className="flex items-center gap-1.5 xl:gap-2">
+          <div 
+            onClick={() => setIsProfileModalOpen(true)}
+            className="flex items-center gap-2 cursor-pointer group p-1 rounded-xl hover:bg-slate-100 transition-all select-none"
+            title={language === 'ar' ? 'الملف الشخصي' : 'Profile'}
+          >
             <div className={`hidden xl:block ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-              <p className="font-bold text-xs text-slate-800 leading-none">{user?.username}</p>
+              <p className="font-bold text-xs text-slate-800 leading-none group-hover:text-emerald-600 transition-colors">
+                {user?.username ? (user.username[0].toUpperCase() + user.username.slice(1)) : ''}
+              </p>
               <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                {user?.role === 'super_admin' ? t('common.role_super_admin') : isCompanyAdmin ? t('common.role_company_admin') : t('common.role_user')}
+                {user?.role === 'super_admin' ? t('common.role_super_admin') : isCompanyAdmin ? 'company admin' : t('common.role_user')}
               </p>
             </div>
-            <div className="w-8 h-8 rounded-lg bg-brand-primary/10 flex items-center justify-center font-bold text-brand-primary shadow-sm">
-              {user?.username[0].toUpperCase()}
+            <div className="w-8 h-8 rounded-full bg-[#c8d6c5] border border-[#a8b8a5] text-[#2d3a2a] flex items-center justify-center font-bold text-sm shadow-sm overflow-hidden group-hover:scale-105 transition-transform">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                user?.username?.[0]?.toUpperCase() || 'N'
+              )}
             </div>
           </div>
+
 
           <button 
             onClick={logout}
@@ -1323,6 +1363,100 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           </AnimatePresence>
         </main>
       </div>
+
+      {/* User Profile Popup Modal matching Image 2 */}
+      <AnimatePresence>
+        {isProfileModalOpen && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsProfileModalOpen(false)}
+              className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+
+            {/* Modal Container */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative bg-white rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-100 max-w-sm w-full z-10 text-center"
+            >
+              {/* Close Button Top Right */}
+              <button
+                type="button"
+                onClick={() => setIsProfileModalOpen(false)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-2 rounded-full hover:bg-slate-100 transition-all cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+
+              {/* Sage Green Avatar Circle with Camera Overlay */}
+              <div className="relative inline-block my-2">
+                <div className="w-28 h-28 rounded-full bg-[#c8d6c5] border-2 border-[#b8c8b5] text-[#2d3a2a] flex items-center justify-center font-bold text-5xl shadow-sm overflow-hidden select-none">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    user?.username?.[0]?.toUpperCase() || 'N'
+                  )}
+                </div>
+
+                {/* Camera Overlay */}
+                <label
+                  htmlFor="profile-avatar-upload-input"
+                  className="absolute bottom-0 right-0 w-9 h-9 rounded-full bg-white text-slate-700 border border-slate-200 shadow-md flex items-center justify-center cursor-pointer hover:bg-slate-50 hover:scale-110 active:scale-95 transition-all"
+                  title={language === 'ar' ? 'رفع صورة جديدة' : 'Upload photo'}
+                >
+                  <Camera size={18} />
+                </label>
+                <input
+                  id="profile-avatar-upload-input"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                />
+              </div>
+
+              {/* User Information */}
+              <div className="mt-3 space-y-1">
+                <h3 className="text-xl font-bold text-slate-900 tracking-tight">
+                  {user?.display_name || (user?.username ? (user.username[0].toUpperCase() + user.username.slice(1)) : 'نور وائل')}
+                </h3>
+                <p className="text-sm font-medium text-slate-600 font-sans dir-ltr">
+                  {user?.email || `${user?.username || 'nour'}@gmail.com`}
+                </p>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                  {user?.role === 'super_admin'
+                    ? t('common.role_super_admin')
+                    : isCompanyAdmin
+                    ? 'company admin'
+                    : t('common.role_user')}
+                </p>
+              </div>
+
+              {/* Divider */}
+              <div className="my-6 border-t border-slate-100" />
+
+              {/* Logout Row */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsProfileModalOpen(false);
+                  logout();
+                }}
+                className="w-full flex items-center justify-start gap-3 px-4 py-3.5 bg-slate-50 hover:bg-red-50 text-slate-700 hover:text-red-600 rounded-2xl font-bold transition-all border border-slate-100 group cursor-pointer"
+              >
+                <LogOut size={20} className="text-slate-500 group-hover:text-red-600 transition-colors" />
+                <span className="text-sm font-bold">{t('common.logout') || 'Log out'}</span>
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
+
