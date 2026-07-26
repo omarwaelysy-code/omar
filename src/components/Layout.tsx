@@ -203,6 +203,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
   };
 
   const profilePopoverRef = React.useRef<HTMLDivElement>(null);
+  const desktopNavRef = React.useRef<HTMLElement>(null);
 
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -217,6 +218,20 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isProfileModalOpen]);
+
+  React.useEffect(() => {
+    const handleClickOutsideNav = (event: MouseEvent) => {
+      if (desktopNavRef.current && !desktopNavRef.current.contains(event.target as Node)) {
+        setExpandedMenus([]);
+      }
+    };
+    if (expandedMenus.length > 0) {
+      document.addEventListener('mousedown', handleClickOutsideNav);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutsideNav);
+    };
+  }, [expandedMenus]);
 
 
 
@@ -373,7 +388,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
   const toggleMenu = (id: string) => {
     setExpandedMenus(prev => 
-      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter(m => m !== id) : [id]
     );
   };
 
@@ -715,30 +730,38 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           )}
         </div>
 
-        <nav className="flex items-center gap-0.5 2xl:gap-1 flex-1 min-w-0 overflow-x-auto no-scrollbar py-1">
+        <nav ref={desktopNavRef} className="flex items-center gap-0.5 2xl:gap-1 flex-1 min-w-0 overflow-x-auto no-scrollbar py-1">
           {filteredNavItems.map((item: any) => {
             const isActive = item.subItems 
               ? item.subItems.some((sub: any) => sub.id === currentPage)
               : currentPage === item.id;
+            const isExpanded = expandedMenus.includes(item.id);
             
             if (item.subItems) {
               return (
                 <div key={item.id} className="relative group shrink-0">
                   <button
                     type="button"
-                    onClick={() => toggleMenu(item.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleMenu(item.id);
+                    }}
                     className={`
                       flex items-center gap-0.5 px-1 2xl:px-1.5 py-1 rounded-lg transition-all font-semibold text-[11px] 2xl:text-xs whitespace-nowrap cursor-pointer
-                      ${isActive ? 'bg-brand-primary/10 text-brand-primary' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
+                      ${isActive || isExpanded ? 'bg-brand-primary/10 text-brand-primary' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                     `}
                   >
                     <item.icon size={13} className="shrink-0" />
                     <span>{item.label}</span>
-                    <ChevronDown size={10} className="opacity-50 group-hover:rotate-180 transition-transform shrink-0" />
+                    <ChevronDown size={10} className={`opacity-50 transition-transform shrink-0 ${isExpanded ? 'rotate-180' : 'group-hover:rotate-180'}`} />
                   </button>
                   
                   {/* Dropdown Menu */}
-                  <div className={`absolute top-full ${dir === 'rtl' ? 'right-0' : 'left-0'} pt-2 opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-200 z-[220]`}>
+                  <div className={`absolute top-full ${dir === 'rtl' ? 'right-0' : 'left-0'} pt-2 transition-all duration-200 z-[220] ${
+                    isExpanded 
+                      ? 'opacity-100 translate-y-0 pointer-events-auto' 
+                      : 'opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto'
+                  }`}>
                     <div className="bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 min-w-[240px]">
                       {item.subItems.map((sub: any) => {
                         if (sub.isDivider) {
