@@ -1423,7 +1423,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
               {/* User Information */}
               <div className="mt-3 space-y-1">
                 <h3 className="text-xl font-bold text-slate-900 tracking-tight">
-                  {user?.display_name || (user?.username ? (user.username[0].toUpperCase() + user.username.slice(1)) : 'نور وائل')}
+                  {(user as any)?.display_name || (user?.username ? (user.username[0].toUpperCase() + user.username.slice(1)) : 'نور وائل')}
+
                 </h3>
                 <p className="text-sm font-medium text-slate-600 font-sans dir-ltr">
                   {user?.email || `${user?.username || 'nour'}@gmail.com`}
