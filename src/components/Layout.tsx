@@ -200,7 +200,22 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       };
       reader.readAsDataURL(file);
     }
-  };
+  const profilePopoverRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profilePopoverRef.current && !profilePopoverRef.current.contains(event.target as Node)) {
+        setIsProfileModalOpen(false);
+      }
+    };
+    if (isProfileModalOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isProfileModalOpen]);
+
 
 
   useEffect(() => {
@@ -894,26 +909,19 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           )}
 
           <div 
-            onClick={() => setIsProfileModalOpen(true)}
-            className="flex items-center gap-2 cursor-pointer group p-1 rounded-xl hover:bg-slate-100 transition-all select-none"
+            onClick={() => setIsProfileModalOpen(!isProfileModalOpen)}
+            className="flex items-center cursor-pointer group p-1 rounded-full hover:bg-slate-100 transition-all select-none"
             title={language === 'ar' ? 'الملف الشخصي' : 'Profile'}
           >
-            <div className={`hidden xl:block ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-              <p className="font-bold text-xs text-slate-800 leading-none group-hover:text-emerald-600 transition-colors">
-                {user?.username ? (user.username[0].toUpperCase() + user.username.slice(1)) : ''}
-              </p>
-              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                {user?.role === 'super_admin' ? t('common.role_super_admin') : isCompanyAdmin ? 'company admin' : t('common.role_user')}
-              </p>
-            </div>
             <div className="w-8 h-8 rounded-full bg-[#c8d6c5] border border-[#a8b8a5] text-[#2d3a2a] flex items-center justify-center font-bold text-sm shadow-sm overflow-hidden group-hover:scale-105 transition-transform">
               {avatarUrl ? (
                 <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
-                user?.username?.[0]?.toUpperCase() || 'N'
+                user?.username?.[0]?.toUpperCase() || 'W'
               )}
             </div>
           </div>
+
 
 
 
@@ -1361,22 +1369,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       {/* User Profile Popup Modal matching Google Chrome Profile style */}
       <AnimatePresence>
         {isProfileModalOpen && (
-          <div className="fixed inset-0 z-[300] flex items-start justify-end p-4 md:p-6 pt-16">
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsProfileModalOpen(false)}
-              className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px]"
-            />
-
+          <div className="fixed inset-0 z-[300] flex items-start justify-end p-4 md:p-6 pt-16 pointer-events-none">
             {/* Google Profile Popup Box */}
             <motion.div
+              ref={profilePopoverRef}
               initial={{ opacity: 0, scale: 0.95, y: -10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -10 }}
-              className="relative bg-[#e9eee4] text-slate-800 rounded-[32px] p-6 shadow-2xl border border-[#d2dcd0] max-w-sm w-full z-10 font-sans"
+              className="relative bg-[#e9eee4] text-slate-800 rounded-[32px] p-6 shadow-2xl border border-[#d2dcd0] max-w-sm w-full font-sans pointer-events-auto"
               dir={dir}
             >
               {/* Top Header Actions (Camera Upload + Close Button) */}
@@ -1384,7 +1384,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 <label
                   htmlFor="profile-avatar-upload-input"
                   className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 rounded-full transition-all cursor-pointer"
-                  title={language === 'ar' ? 'تغيير الصورة' : 'Customize profile'}
+                  title={language === 'ar' ? 'تعديل الصورة الشخصية' : 'Change profile picture'}
                 >
                   <Camera size={18} />
                 </label>
@@ -1406,7 +1406,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
               </div>
 
               {/* Avatar Circle & User Header */}
-              <div className="flex flex-col items-center text-center space-y-2 mb-6">
+              <div className="flex flex-col items-center text-center space-y-2 mb-5">
                 <div className="w-20 h-20 rounded-full bg-[#007a87] text-white flex items-center justify-center font-bold text-3xl shadow-md overflow-hidden select-none border-2 border-white/80">
                   {avatarUrl ? (
                     <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
@@ -1419,78 +1419,67 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                   {(user as any)?.display_name || (user?.username ? (user.username[0].toUpperCase() + user.username.slice(1)) : 'Wael')}
                 </h3>
 
-                <p className="text-[11px] text-slate-600 font-medium px-4 leading-relaxed">
-                  {language === 'ar'
-                    ? 'للوصول لبياناتك ومزامنة معلوماتك وسجل العمليات بسهولة'
-                    : "To easily get back to sites you've visited, sync your history and tabs"}
-                </p>
-
                 <p className="text-xs font-semibold text-slate-700 dir-ltr font-mono">
                   {user?.email || `${user?.username || 'acc.wael2005'}@gmail.com`}
                 </p>
 
-                <button
-                  type="button"
-                  className="mt-2 px-6 py-2 bg-[#233527] hover:bg-[#1a291e] text-white font-semibold text-xs rounded-full shadow-sm transition-all cursor-pointer active:scale-95"
-                >
-                  {language === 'ar' ? 'تفعيل المزامنة' : 'Turn on'}
-                </button>
+                <div className="mt-1 px-3 py-1 bg-[#233527]/10 text-[#233527] border border-[#233527]/20 font-bold text-[11px] rounded-full">
+                  {user?.role === 'super_admin'
+                    ? (language === 'ar' ? 'المشرف العام' : 'Super Admin')
+                    : isCompanyAdmin
+                    ? (language === 'ar' ? 'مدير الشركة' : 'Company Admin')
+                    : (language === 'ar' ? 'مستخدم' : 'User')}
+                </div>
               </div>
 
-              {/* Menu Options Box */}
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-2 border border-[#d8e2d4] space-y-0.5 text-xs font-medium text-slate-700">
-                <button
-                  type="button"
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100/80 transition-all text-right cursor-pointer"
-                >
-                  <span className="text-sm">☁️</span>
-                  <span>{language === 'ar' ? 'حفظ البيانات في الحساب' : 'Save 3 items in account'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100/80 transition-all text-right cursor-pointer"
-                >
-                  <span className="text-sm">🔑</span>
-                  <span>{language === 'ar' ? 'كلمات المرور والتعبئة التلقائية' : 'Passwords and autofill'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100/80 transition-all text-right cursor-pointer"
-                >
-                  <span className="text-sm">⚙️</span>
-                  <span>{language === 'ar' ? 'إدارة حسابك في النظام' : 'Manage your System Account'}</span>
-                </button>
-
+              {/* Menu Options Box (100% Working Real Actions) */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-2 border border-[#d8e2d4] space-y-0.5 text-xs font-semibold text-slate-700">
+                {/* 1. Change Photo */}
                 <label
                   htmlFor="profile-avatar-upload-input"
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100/80 transition-all text-right cursor-pointer"
                 >
-                  <span className="text-sm">✏️</span>
-                  <span>{language === 'ar' ? 'تخصيص الملف الشخصي' : 'Customize profile'}</span>
+                  <span className="text-base">📷</span>
+                  <span>{language === 'ar' ? 'تغيير صورة الملف الشخصي' : 'Change profile photo'}</span>
                 </label>
+
+                {/* 2. Company Settings */}
+                {(isCompanyAdmin || isSuperAdmin) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsProfileModalOpen(false);
+                      onNavigate('company_settings');
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100/80 transition-all text-right cursor-pointer"
+                  >
+                    <span className="text-base">🏢</span>
+                    <span>{language === 'ar' ? 'إعدادات الشركة والحساب' : 'Company & Account Settings'}</span>
+                  </button>
+                )}
 
                 <div className="h-px bg-slate-200/80 my-1" />
 
+                {/* 3. Close Popup */}
                 <button
                   type="button"
                   onClick={() => setIsProfileModalOpen(false)}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-100/80 transition-all text-right cursor-pointer text-slate-600"
                 >
-                  <span className="text-sm">❌</span>
-                  <span>{language === 'ar' ? 'إغلاق هذه النافذة' : 'Close this profile'}</span>
+                  <span className="text-base">❌</span>
+                  <span>{language === 'ar' ? 'إغلاق النافذة' : 'Close popup'}</span>
                 </button>
 
+                {/* 4. Sign Out */}
                 <button
                   type="button"
                   onClick={() => {
                     setIsProfileModalOpen(false);
                     logout();
                   }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-red-600 transition-all text-right cursor-pointer font-semibold"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 text-red-600 transition-all text-right cursor-pointer font-bold"
                 >
-                  <LogOut size={15} />
+                  <LogOut size={16} />
                   <span>{language === 'ar' ? 'تسجيل الخروج' : 'Sign out'}</span>
                 </button>
               </div>
@@ -1531,6 +1520,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           </div>
         )}
       </AnimatePresence>
+
 
     </div>
   );
