@@ -696,11 +696,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       )}
 
       {/* Desktop Top Navigation */}
-      <header className="hidden md:flex sticky top-0 z-[200] bg-white border-b border-slate-200 h-16 items-center px-2 xl:px-4 shadow-sm">
-        <div className={`flex items-center gap-1 xl:gap-2 ${dir === 'rtl' ? 'ml-1.5 xl:ml-3' : 'mr-1.5 xl:mr-3'} shrink-0`}>
+      <header className="hidden md:flex sticky top-0 z-[200] bg-white border-b border-slate-200 h-16 items-center px-1.5 2xl:px-4 shadow-sm">
+        <div className={`flex items-center gap-1 ${dir === 'rtl' ? 'ml-1 2xl:ml-2' : 'mr-1 2xl:mr-2'} shrink-0`}>
           {company?.logo_url ? (
-            <div className="flex items-center gap-1.5 xl:gap-2">
-              <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 p-1 flex items-center justify-center">
+            <div className="flex items-center gap-1 2xl:gap-2">
+              <div className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-100 p-0.5 flex items-center justify-center">
                 <img 
                   src={company.logo_url} 
                   alt={company.name} 
@@ -708,14 +708,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                   referrerPolicy="no-referrer"
                 />
               </div>
-              <span className="font-black text-slate-900 tracking-tight text-xs xl:text-sm truncate max-w-[80px] xl:max-w-[160px]">{company.name}</span>
+              <span className="font-black text-slate-900 tracking-tight text-xs 2xl:text-sm truncate max-w-[70px] 2xl:max-w-[140px]">{company.name}</span>
             </div>
           ) : (
             <Logo variant="full" size="md" />
           )}
         </div>
 
-        <nav className="flex items-center gap-0.5 xl:gap-1 flex-1 min-w-0">
+        <nav className="flex items-center gap-0.5 2xl:gap-1 flex-1 min-w-0 overflow-x-auto no-scrollbar py-1">
           {filteredNavItems.map((item: any) => {
             const isActive = item.subItems 
               ? item.subItems.some((sub: any) => sub.id === currentPage)
@@ -728,18 +728,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                     type="button"
                     onClick={() => toggleMenu(item.id)}
                     className={`
-                      flex items-center gap-0.5 xl:gap-1 px-1.5 xl:px-2 py-1 rounded-lg transition-all font-semibold text-[11px] xl:text-xs 2xl:text-sm whitespace-nowrap cursor-pointer
+                      flex items-center gap-0.5 px-1 2xl:px-1.5 py-1 rounded-lg transition-all font-semibold text-[11px] 2xl:text-xs whitespace-nowrap cursor-pointer
                       ${isActive ? 'bg-brand-primary/10 text-brand-primary' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                     `}
                   >
-                    <item.icon size={14} className="shrink-0" />
+                    <item.icon size={13} className="shrink-0" />
                     <span>{item.label}</span>
-                    <ChevronDown size={11} className="opacity-50 group-hover:rotate-180 transition-transform shrink-0" />
+                    <ChevronDown size={10} className="opacity-50 group-hover:rotate-180 transition-transform shrink-0" />
                   </button>
                   
                   {/* Dropdown Menu */}
                   <div className={`absolute top-full ${dir === 'rtl' ? 'right-0' : 'left-0'} pt-2 opacity-0 translate-y-1 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-200 z-[220]`}>
-                    <div className="bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 min-w-[260px]">
+                    <div className="bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 min-w-[240px]">
                       {item.subItems.map((sub: any) => {
                         if (sub.isDivider) {
                            return (
@@ -759,14 +759,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                             type="button"
                             onClick={() => handleNavClick(sub.id, sub.label, sub.path)}
                             className={`
-                              w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${dir === 'rtl' ? 'text-right' : 'text-left'}
+                              w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all cursor-pointer ${dir === 'rtl' ? 'text-right' : 'text-left'}
                               ${currentPage === sub.id 
                                 ? 'bg-brand-primary text-white shadow-sm' 
                                 : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                             `}
                           >
-                            <sub.icon size={15} />
-                            <span className="text-xs xl:text-sm font-semibold">{sub.label}</span>
+                            <sub.icon size={14} />
+                            <span className="text-xs font-semibold">{sub.label}</span>
                           </button>
                         );
                       })}
@@ -782,11 +782,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 type="button"
                 onClick={() => handleNavClick(item.id, item.label, item.path)}
                 className={`
-                  flex items-center gap-0.5 xl:gap-1 px-1.5 xl:px-2 py-1 rounded-lg transition-all font-semibold text-[11px] xl:text-xs 2xl:text-sm whitespace-nowrap shrink-0 cursor-pointer
+                  flex items-center gap-0.5 px-1 2xl:px-1.5 py-1 rounded-lg transition-all font-semibold text-[11px] 2xl:text-xs whitespace-nowrap shrink-0 cursor-pointer
                   ${currentPage === item.id ? 'bg-brand-primary text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                 `}
               >
-                <item.icon size={14} className="shrink-0" />
+                <item.icon size={13} className="shrink-0" />
                 <span>{item.label}</span>
               </button>
             );
