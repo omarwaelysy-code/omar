@@ -817,8 +817,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             )}
           </button>
 
-          <div className="h-8 w-px bg-white/10 mx-2" />
-
           {/* Company Switcher */}
           {(user?.role === 'super_admin' || userMemberships.length > 1) && (
             <div className="relative">
