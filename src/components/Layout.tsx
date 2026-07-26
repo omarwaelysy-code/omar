@@ -1520,12 +1520,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           </div>
         )}
       </AnimatePresence>
-
-
     </div>
   );
 };
 
 export default Layout;
-
-
