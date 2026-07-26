@@ -200,6 +200,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       };
       reader.readAsDataURL(file);
     }
+  };
+
   const profilePopoverRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
