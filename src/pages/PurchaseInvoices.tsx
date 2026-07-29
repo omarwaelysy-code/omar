@@ -3465,125 +3465,9 @@ export const PurchaseInvoices: React.FC = () => {
   ) : (
     <div ref={editModalRef} className="bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
       {/* Form Header */}
-      <div className="p-2 md:p-2.5 md:px-4 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70] flex-wrap gap-2" dir={dir}>
-        {/* Right side (start in RTL): Actions: Save, Cancel, Return to List */}
-        <div className="flex flex-col items-start gap-1 shrink-0">
-          <div className="flex items-center gap-2">
-            <button 
-              type="button"
-              onClick={closeModal} 
-              className="flex items-center gap-1 px-2.5 py-0.5 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap"
-            >
-              {dir === 'rtl' ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-              <span>{language === 'ar' ? 'العودة للقائمة' : 'Return to List'}</span>
-            </button>
-            {editingInvoice && (
-              <>
-                <button 
-                  type="button"
-                  onClick={handleCopyInvoice} 
-                  className="flex items-center gap-1 px-2 py-0.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
-                >
-                  <Copy size={11} />
-                  <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
-                </button>
-                <button 
-                  type="button"
-                  onClick={handleCopyInvoice} 
-                  className="flex items-center gap-1 px-2 py-0.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
-                >
-                  <Copy size={11} />
-                  <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => handlePrintPurchaseInvoice(editingInvoice)} 
-                  className="flex items-center gap-1 px-2 py-0.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-blue-200 shadow-sm"
-                  title={language === 'ar' ? 'طباعة الفاتورة' : 'Print Invoice'}
-                >
-                  <Printer size={11} />
-                  <span>{language === 'ar' ? 'طباعة' : 'Print'}</span>
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => handleExportPurchaseInvoicePDF(editingInvoice)} 
-                  className="flex items-center gap-1 px-2 py-0.5 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-rose-200 shadow-sm"
-                  title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
-                >
-                  <FileText size={11} />
-                  <span>PDF</span>
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => handleExportSinglePurchaseInvoiceExcel(editingInvoice)} 
-                  className="flex items-center gap-1 px-2 py-0.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
-                  title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
-                >
-                  <FileSpreadsheet size={11} />
-                  <span>Excel</span>
-                </button>
-              </>
-            )}
-            <button 
-              type="button"
-              onClick={() => setShowSidePanel(!showSidePanel)}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded-xl text-[11px] font-bold transition-all border ${showSidePanel ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-white text-zinc-500 border-zinc-200 hover:bg-zinc-50'}`}
-            >
-              <History size={11} />
-              <span>{language === 'ar' ? '\u0642\u064a\u062f \u0627\u0644\u064a\u0648\u0645\u064a\u0629 / \u0633\u062c\u0644 \u0627\u0644\u062a\u0639\u062f\u064a\u0644\u0627\u062a' : 'Journal / Logs'}</span>
-            </button>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <button 
-              type="button"
-              onClick={closeModal}
-              className="w-20 py-1 rounded-lg bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-all flex items-center gap-1 justify-center active:scale-95 border border-zinc-200 shadow-sm text-[11px] whitespace-nowrap font-sans"
-            >
-              <RotateCcw size={12} />
-              <span>{language === 'ar' ? '\u0625\u0644\u063a\u0627\u0621' : 'Cancel'}</span>
-            </button>
-            <button 
-              type="submit"
-              form="purchase-invoice-form"
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="w-20 py-1 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1 justify-center active:scale-95 shadow-sm text-[11px] whitespace-nowrap font-sans"
-            >
-              {isSubmitting ? (
-                <div className="w-3.5 h-3.5 border border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Save size={12} />
-              )}
-              <span>{language === 'ar' ? '\u062d\u0641\u0638' : 'Save'}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Left side (end in RTL): Document Info: Title, Invoice No, Linked Journal, and Status Badge */}
-        <div className="flex items-center gap-4 flex-wrap">
-          {/* Text Info Column */}
-          <div className="flex flex-col gap-1 items-start">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <h3 className="text-sm md:text-base font-black text-slate-900 tracking-tight leading-none font-sans">
-                {editingInvoice ? (language === 'ar' ? '\u062a\u0639\u062f\u064a\u0644 \u0641\u0627\u062a\u0648\u0631\u0629 \u0627\u0644\u0645\u0634\u062a\u0631\u064a\u0627\u062a' : 'Edit Purchase Invoice') : (language === 'ar' ? '\u0625\u0646\u0634\u0627\u0621 \u0641\u0627\u062a\u0648\u0631\u0629 \u0645\u0634\u062a\u0631\u064a\u0627\u062a \u062c\u062f\u064a\u062f\u0629' : 'Create New Purchase Invoice')}
-              </h3>
-              <span className="text-[11px] font-mono font-black text-slate-800 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-lg select-all shadow-sm">
-                {invoiceNumber}
-              </span>
-            </div>
-
-            {editingInvoice?.entry_number ? (
-              <div className="flex items-center gap-1 text-emerald-700 text-[10px] font-bold font-mono leading-none mt-0.5">
-                <span className="text-emerald-500 font-sans font-bold">{language === 'ar' ? '\u0627\u0644\u0642\u064a\u062f \u0627\u0644\u0645\u0631\u062a\u0628\u0637:' : 'Linked JE:'}</span>
-                <span className="bg-emerald-50 px-1 py-0.5 rounded border border-emerald-100 font-black">{editingInvoice.entry_number}</span>
-              </div>
-            ) : (
-              <div className="text-[9px] font-bold text-zinc-400 mt-0.5">
-                {language === 'ar' ? '\u0627\u0644\u0642\u064a\u062f \u0627\u0644\u0645\u0631\u062a\u0628\u0637: \u0644\u0627 \u064a\u0648\u062c\u062f \u0642\u064a\u062f \u0645\u0631\u062a\u0628\u0637 \u0628\u0639\u062f' : 'Linked JE: No journal entry linked yet'}
-              </div>
-            )}
-          </div>
-
+      <div className="p-2 md:px-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-[70] gap-2 flex-wrap" dir={dir}>
+        {/* Start side (Right in RTL): Status Badge, Title & Invoice Code, Linked Journal Entry */}
+        <div className="flex items-center gap-2 md:gap-3 flex-wrap">
           {/* Payment Status Badge */}
           <div className="flex items-center">
             {(() => {
@@ -3592,7 +3476,7 @@ export const PurchaseInvoices: React.FC = () => {
                 return (
                   <div className="px-2.5 py-1 border-2 border-emerald-600 text-emerald-600 bg-emerald-50/50 font-black text-[11px] uppercase rounded-xl select-none tracking-wider shadow-sm flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
-                    {language === 'ar' ? '\u0641\u0627\u062a\u0648\u0631\u0629 \u0646\u0642\u062f\u064a\u0629' : 'Cash Invoice'}
+                    {language === 'ar' ? 'فاتورة نقدية' : 'Cash Invoice'}
                   </div>
                 );
               }
@@ -3600,9 +3484,9 @@ export const PurchaseInvoices: React.FC = () => {
               if (editingInvoice) {
                 const status = getPaymentStatus(editingInvoice);
                 const statusLabels = {
-                  paid: language === 'ar' ? '\u0645\u062f\u0641\u0648\u0639\u0629' : 'Paid',
-                  partial: language === 'ar' ? '\u0645\u062f\u0641\u0648\u0639\u0629 \u062c\u0632\u0626\u064a\u0627\u064b' : 'Partially Paid',
-                  unpaid: language === 'ar' ? '\u063a\u064a\u0631 \u0645\u062f\u0641\u0648\u0639\u0629' : 'Unpaid'
+                  paid: language === 'ar' ? 'مدفوعة' : 'Paid',
+                  partial: language === 'ar' ? 'مدفوعة جزئياً' : 'Partially Paid',
+                  unpaid: language === 'ar' ? 'غير مدفوعة' : 'Unpaid'
                 };
                 const statusColors = {
                   paid: 'border-emerald-600 text-emerald-600 bg-emerald-50/50',

@@ -1950,185 +1950,9 @@ export const Returns: React.FC = () => {
       ) : (
         <div ref={editModalRef} className={`bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col ${isFullScreen ? 'fixed inset-0 z-[100] rounded-none' : 'min-h-[80vh] relative'}`}>
           {/* Form Header */}
-          <div className="p-2 md:p-2.5 md:px-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70] flex-wrap gap-2" dir={dir}>
-            {/* Right side (start in RTL): Actions: Save, Cancel, Return to List */}
-            <div className="flex flex-col items-start gap-1 shrink-0">
-              <div className="flex items-center gap-2">
-                <button 
-                  type="button"
-                  onClick={closeModal} 
-                  className="flex items-center gap-1 px-2.5 py-0.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap"
-                >
-                  {dir === 'rtl' ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-                  <span>{language === 'ar' ? 'العودة للقائمة' : 'Return to List'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsFullScreen(!isFullScreen)}
-                  className="flex items-center gap-1 px-2 py-0.5 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-zinc-200 shadow-sm cursor-pointer"
-                >
-                  {isFullScreen ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
-                  <span>{isFullScreen ? (language === 'ar' ? 'تصغير' : 'Minimize') : (language === 'ar' ? 'ملء الشاشة' : 'Fullscreen')}</span>
-                </button>
-                {editingReturn && (
-                  <>
-                    <button 
-                      type="button"
-                      onClick={handleCopyReturn} 
-                      className="flex items-center gap-1 px-2 py-0.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
-                    >
-                      <Copy size={11} />
-                      <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        if (editingReturn?.id) {
-                          printDocument('returns', editingReturn.id);
-                        } else if (editModalRef.current) {
-                          printElement(editModalRef.current, 'مردود مبيعات');
-                        } else {
-                          window.print();
-                        }
-                      }} 
-                      className="flex items-center gap-1 px-2 py-0.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-blue-200 shadow-sm"
-                      title={language === 'ar' ? 'طباعة' : 'Print'}
-                    >
-                      <Printer size={11} />
-                      <span>{language === 'ar' ? 'طباعة' : 'Print'}</span>
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        if (editingReturn?.id) {
-                          printDocument('returns', editingReturn.id);
-                        } else if (editModalRef.current) {
-                          exportToPDFUtil(editModalRef.current, { filename: `Return_${editingReturn.return_number}`, reportTitle: `مردود مبيعات ${editingReturn.return_number}` });
-                        }
-                      }} 
-                      className="flex items-center gap-1 px-2 py-0.5 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-rose-200 shadow-sm"
-                      title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
-                    >
-                      <FileText size={11} />
-                      <span>PDF</span>
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        const cust = customers.find(c => c.id === (editingReturn?.customer_id || selectedCustomerId));
-                        const rawItems = (editingReturn?.items && editingReturn.items.length > 0) ? editingReturn.items : items;
-                        const calcSubtotal = editingReturn?.subtotal ?? rawItems.reduce((s: number, i: any) => s + (Number(i.quantity || 0) * Number(i.unit_price || 0)), 0);
-                        const calcVat = (editingReturn as any)?.vat_amount ?? (editingReturn as any)?.tax_amount ?? rawItems.reduce((s: number, i: any) => s + Number((i as any).tax || (i as any).vat_amount || 0), 0);
-                        const calcTotal = editingReturn?.total_amount ?? (calcSubtotal + calcVat);
-
-                        exportSingleDocumentToExcel({
-                          filename: `Sales_Return_${editingReturn?.return_number || returnNumber || 'Doc'}`,
-                          sheetName: 'مردود مبيعات',
-                          companyName: company?.name || localStorage.getItem('company_name') || 'نظام ERP السحابي',
-                          companyAddress: company?.address || localStorage.getItem('company_address') || '',
-                          companyPhone: company?.phone || localStorage.getItem('company_phone') || '',
-                          companyEmail: company?.email || localStorage.getItem('company_email') || '',
-                          companyTaxNumber: company?.tax_number || localStorage.getItem('company_tax') || '',
-                          docTitle: 'مردود مبيعات',
-                          docNumber: editingReturn?.return_number || returnNumber || 'جديد',
-                          docDate: editingReturn?.date || date || new Date().toISOString().slice(0, 10),
-                          partyTitle: 'العميل',
-                          partyName: cust?.name || editingReturn?.customer_name || 'عميل نقدي',
-                          partyAddress: cust?.address || '',
-                          partyPhone: (cust as any)?.phone || (cust as any)?.mobile || '',
-                          partyTaxNumber: (cust as any)?.tax_number || (cust as any)?.vat_number || '',
-
-                          notes: (editingReturn as any)?.notes || editingReturn?.notes || description || '',
-                          columns: [
-                            { label: 'م', key: 'index' },
-                            { label: 'اسم الصنف', key: 'product_name' },
-                            { label: 'الكمية المرتجعة', key: 'quantity' },
-                            { label: 'سعر الوحدة', key: 'unit_price' },
-                            { label: 'الضريبة (14%)', key: 'tax' },
-                            { label: 'الإجمالي', key: 'total' }
-                          ],
-                          items: rawItems.map((item: any) => ({
-                            product_name: item.product_name || '-',
-                            quantity: item.quantity || 0,
-                            unit_price: item.unit_price || 0,
-                            tax: item.tax || item.vat_amount || 0,
-                            total: item.total || 0
-                          })),
-                          summaryRows: [
-                            { label: 'الإجمالي قبل الضريبة:', value: calcSubtotal },
-                            { label: 'ضريبة القيمة المضافة (14%):', value: calcVat },
-                            { label: 'الصافي النهائي:', value: calcTotal }
-                          ]
-                        });
-
-                      }} 
-                      className="flex items-center gap-1 px-2 py-0.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
-                      title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
-                    >
-                      <FileSpreadsheet size={11} />
-                      <span>Excel</span>
-                    </button>
-
-                  </>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5">
-                <button 
-                  type="button"
-                  onClick={closeModal}
-                  className="w-20 py-1 rounded-lg bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-all flex items-center gap-1 justify-center active:scale-95 border border-zinc-200 shadow-sm text-[11px] whitespace-nowrap font-sans"
-                >
-                  <RotateCcw size={12} />
-                  <span>{language === 'ar' ? 'إلغاء' : 'Cancel'}</span>
-                </button>
-                <button 
-                  type="submit"
-                  form="return-form"
-                  onClick={handleSubmit}
-                  className="w-20 py-1 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-1 justify-center active:scale-95 shadow-sm text-[11px] whitespace-nowrap font-sans"
-                >
-                  <Save size={12} />
-                  <span>{language === 'ar' ? 'حفظ' : 'Save'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Middle: Journal / Activity toggle */}
-            <div className="flex-1 flex justify-center">
-              <button 
-                type="button" 
-                onClick={() => setShowSidePanel(!showSidePanel)}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-[11px] font-bold transition-all border shadow-sm ${showSidePanel ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
-              >
-                <History size={13} />
-                <span>{language === 'ar' ? 'قيد اليومية / سجل التعديلات' : 'Journal Entry / Activity Log'}</span>
-              </button>
-            </div>
-
-            {/* Left side (end in RTL): Document Info: Title, Return No, Linked Journal, and Status Badge */}
-            <div className="flex items-center gap-4 flex-wrap">
-              <div className="flex flex-col gap-1 items-start">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <h3 className="text-sm md:text-base font-black text-slate-900 tracking-tight leading-none font-sans">
-                    {editingReturn ? (language === 'ar' ? 'تعديل مرتجع مبيعات' : 'Edit Sales Return') : (language === 'ar' ? 'إنشاء مرتجع مبيعات جديد' : 'Create New Sales Return')}
-                  </h3>
-                  <span className="text-[11px] font-mono font-black text-slate-800 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-lg select-all shadow-sm">
-                    {returnNumber}
-                  </span>
-                </div>
-
-                {editingReturn?.entry_number ? (
-                  <div className="flex items-center gap-1 text-emerald-700 text-[10px] font-bold font-mono leading-none mt-0.5">
-                    <span className="text-emerald-500 font-sans font-bold">{language === 'ar' ? 'القيد المرتبط:' : 'Linked JE:'}</span>
-                    <span className="bg-emerald-50 px-1 py-0.5 rounded border border-emerald-100 font-black">{editingReturn.entry_number}</span>
-                  </div>
-                ) : (
-                  <div className="text-[9px] font-bold text-zinc-400 mt-0.5">
-                    {language === 'ar' ? 'القيد المرتبط: لا يوجد قيد مرتبط بعد' : 'Linked JE: No journal entry linked yet'}
-                  </div>
-                )}
-              </div>
-
+          <div className="p-2 md:px-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-[70] gap-2 flex-wrap" dir={dir}>
+            {/* Start side (Right in RTL): Status Badge, Title & Return No, Linked Journal Entry */}
+            <div className="flex items-center gap-2 md:gap-3 flex-wrap">
               {/* Cash/Credit Badge */}
               <div className="flex items-center">
                 {paymentType === 'cash' ? (
@@ -2143,6 +1967,123 @@ export const Returns: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {/* Title & Return Code */}
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-sm md:text-base font-black text-slate-900 tracking-tight leading-none font-sans">
+                  {editingReturn ? (language === 'ar' ? 'تعديل مرتجع مبيعات' : 'Edit Sales Return') : (language === 'ar' ? 'إنشاء مرتجع مبيعات جديد' : 'Create New Sales Return')}
+                </h3>
+                <span className="text-[11px] font-mono font-black text-slate-800 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-lg select-all shadow-sm">
+                  {returnNumber}
+                </span>
+              </div>
+
+              {/* Linked Journal Entry (in the same row!) */}
+              {editingReturn?.entry_number ? (
+                <div className="flex items-center gap-1 text-emerald-700 text-[11px] font-bold font-mono leading-none">
+                  <span className="text-emerald-500 font-sans font-bold">{language === 'ar' ? 'القيد المرتبط:' : 'Linked JE:'}</span>
+                  <span className="bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 font-black">{editingReturn.entry_number}</span>
+                </div>
+              ) : (
+                <div className="text-[9px] font-bold text-zinc-400">
+                  {language === 'ar' ? 'القيد المرتبط: لا يوجد قيد مرتبط بعد' : 'Linked JE: No journal entry linked yet'}
+                </div>
+              )}
+            </div>
+
+            {/* End side (Left in RTL): All buttons in ONE single row */}
+            <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+              <button 
+                type="button"
+                onClick={closeModal} 
+                className="flex items-center gap-1 px-2.5 py-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-slate-200 shadow-sm"
+              >
+                {dir === 'rtl' ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+                <span>{language === 'ar' ? 'العودة للقائمة' : 'Return to List'}</span>
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => setIsFullScreen(!isFullScreen)}
+                className="flex items-center gap-1 px-2 py-1 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-zinc-200 shadow-sm cursor-pointer"
+              >
+                {isFullScreen ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
+                <span>{isFullScreen ? (language === 'ar' ? 'تصغير' : 'Minimize') : (language === 'ar' ? 'ملء الشاشة' : 'Fullscreen')}</span>
+              </button>
+
+              <button 
+                type="button" 
+                onClick={() => setShowSidePanel(!showSidePanel)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-xl text-[11px] font-bold transition-all border shadow-sm ${showSidePanel ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
+              >
+                <History size={12} />
+                <span>{language === 'ar' ? 'سجل القيد' : 'JE Log'}</span>
+              </button>
+
+              {editingReturn && (
+                <>
+                  <button 
+                    type="button"
+                    onClick={handleCopyReturn} 
+                    className="flex items-center gap-1 px-2 py-1 text-emerald-600 hover:text-emerald-800 bg-white hover:bg-emerald-50 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
+                  >
+                    <Copy size={11} />
+                    <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      if (editingReturn?.id) {
+                        printDocument('returns', editingReturn.id);
+                      } else if (editModalRef.current) {
+                        printElement(editModalRef.current, 'مردود مبيعات');
+                      } else {
+                        window.print();
+                      }
+                    }} 
+                    className="flex items-center gap-1 px-2 py-1 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-blue-200 shadow-sm"
+                    title={language === 'ar' ? 'طباعة' : 'Print'}
+                  >
+                    <Printer size={11} />
+                    <span>{language === 'ar' ? 'طباعة' : 'Print'}</span>
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      if (editingReturn?.id) {
+                        printDocument('returns', editingReturn.id);
+                      } else if (editModalRef.current) {
+                        exportToPDFUtil(editModalRef.current, { filename: `Return_${editingReturn.return_number}`, reportTitle: `مردود مبيعات ${editingReturn.return_number}` });
+                      }
+                    }} 
+                    className="flex items-center gap-1 px-2 py-1 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-rose-200 shadow-sm"
+                    title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+                  >
+                    <FileText size={11} />
+                    <span>PDF</span>
+                  </button>
+                </>
+              )}
+
+              <button 
+                type="submit"
+                form="return-form"
+                onClick={handleSubmit}
+                className="px-3.5 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-all flex items-center gap-1.5 justify-center active:scale-95 shadow-sm text-[11px] whitespace-nowrap font-sans"
+              >
+                <Save size={12} />
+                <span>{language === 'ar' ? 'حفظ' : 'Save'}</span>
+              </button>
+
+              {/* Close X button at the far edge of the screen */}
+              <button 
+                type="button"
+                onClick={closeModal}
+                className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all border border-slate-200 hover:border-slate-300 ml-1"
+                title={language === 'ar' ? 'إغلاق' : 'Close'}
+              >
+                <X size={16} />
+              </button>
             </div>
           </div>
 
@@ -2152,61 +2093,8 @@ export const Returns: React.FC = () => {
                 {/* Upper Layout: Combined Totals Summary and Metadata Form into a single card */}
                 <section className="bg-white p-2 md:p-2.5 rounded-xl border border-zinc-200 shadow-sm grid grid-cols-1 lg:grid-cols-4 gap-2 lg:gap-2.5 items-stretch">
                   
-                  {/* Left: Return Summary Card Column */}
-                  <div className="flex flex-col justify-center space-y-1 p-0.5">
-                    <div className="flex items-center gap-1 mb-0.5 text-emerald-600">
-                      <Layers className="w-3.5 h-3.5" />
-                      <h2 className="font-semibold text-zinc-900 text-[10px]">{language === 'ar' ? 'ملخص المرتجع' : 'Return Summary'}</h2>
-                    </div>
-
-                    <div className="bg-zinc-50 rounded-lg p-1.5 border border-zinc-100 space-y-0.5">
-                      <div className="flex justify-between items-center text-zinc-650 text-[10px]">
-                        <span className="font-medium">{language === 'ar' ? 'المجموع الفرعي' : 'Subtotal'}</span>
-                        <span className="font-bold text-[11px]">
-                          {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center text-emerald-600 text-[10px]">
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium">{language === 'ar' ? 'الخصم' : 'Discount'}</span>
-                          <input 
-                            type="number" 
-                            className="w-11 bg-white border border-zinc-200 rounded px-1 py-0.5 text-center font-bold text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-[10px]"
-                            value={Number(discount)}
-                            onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
-                          />
-                        </div>
-                        <span className="font-bold text-[11px]">-{formatMoney(discount)}</span>
-                      </div>
-                      {(() => {
-                        const isVatEnabled = company?.settings?.vat_enabled || company?.vat_enabled || false;
-                        if (!isVatEnabled) return null;
-                        return (
-                          <div className="flex justify-between items-center text-zinc-650 text-[10px] pt-0.5 border-t border-dashed border-zinc-200">
-                            <span className="font-medium">{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</span>
-                            <span className="font-bold text-[11px]">
-                              +{formatMoney(items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0))}
-                            </span>
-                          </div>
-                        );
-                      })()}
-                      <div className="flex justify-between items-center text-emerald-600 text-[10px] pt-0.5 border-t border-zinc-200">
-                        <span className="font-black text-[11px]">{language === 'ar' ? 'الإجمالي' : 'Total'}</span>
-                        <div className="flex flex-col items-end">
-                          <span className="font-black text-xs tracking-tighter text-left">
-                            {formatMoney(
-                              items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) + 
-                              ((company?.settings?.vat_enabled || company?.vat_enabled) ? items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0) : 0) - 
-                              discount
-                            )} {currentReturnCurrencyCode}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Right: Unified Metadata & Payment Settings Panel Column */}
-                  <div className="lg:col-span-3 space-y-1 relative lg:border-s lg:border-zinc-150 lg:ps-2.5 flex flex-col justify-between">
+                  <div className="lg:col-span-3 space-y-1 relative flex flex-col justify-between">
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-1.5">
                       {/* 1. Date */}
@@ -2547,6 +2435,59 @@ export const Returns: React.FC = () => {
                               <CheckCheck size={12} />
                             </button>
                           )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Left: Return Summary Card Column */}
+                  <div className="lg:col-span-1 flex flex-col justify-center space-y-1 p-0.5 lg:border-s lg:border-zinc-150 lg:ps-2.5">
+                    <div className="flex items-center gap-1 mb-0.5 text-emerald-600">
+                      <Layers className="w-3.5 h-3.5" />
+                      <h2 className="font-semibold text-zinc-900 text-[10px]">{language === 'ar' ? 'ملخص المرتجع' : 'Return Summary'}</h2>
+                    </div>
+
+                    <div className="bg-zinc-50 rounded-lg p-1.5 border border-zinc-100 space-y-0.5">
+                      <div className="flex justify-between items-center text-zinc-650 text-[10px]">
+                        <span className="font-medium">{language === 'ar' ? 'المجموع الفرعي' : 'Subtotal'}</span>
+                        <span className="font-bold text-[11px]">
+                          {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-emerald-600 text-[10px]">
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium">{language === 'ar' ? 'الخصم' : 'Discount'}</span>
+                          <input 
+                            type="number" 
+                            className="w-11 bg-white border border-zinc-200 rounded px-1 py-0.5 text-center font-bold text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-[10px]"
+                            value={Number(discount)}
+                            onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                          />
+                        </div>
+                        <span className="font-bold text-[11px]">-{formatMoney(discount)}</span>
+                      </div>
+                      {(() => {
+                        const isVatEnabled = company?.settings?.vat_enabled || company?.vat_enabled || false;
+                        if (!isVatEnabled) return null;
+                        return (
+                          <div className="flex justify-between items-center text-zinc-650 text-[10px] pt-0.5 border-t border-dashed border-zinc-200">
+                            <span className="font-medium">{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</span>
+                            <span className="font-bold text-[11px]">
+                              +{formatMoney(items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0))}
+                            </span>
+                          </div>
+                        );
+                      })()}
+                      <div className="flex justify-between items-center text-emerald-600 text-[10px] pt-0.5 border-t border-zinc-200">
+                        <span className="font-black text-[11px]">{language === 'ar' ? 'الإجمالي' : 'Total'}</span>
+                        <div className="flex flex-col items-end">
+                          <span className="font-black text-xs tracking-tighter text-left">
+                            {formatMoney(
+                              items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) + 
+                              ((company?.settings?.vat_enabled || company?.vat_enabled) ? items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0) : 0) - 
+                              discount
+                            )} {currentReturnCurrencyCode}
+                          </span>
                         </div>
                       </div>
                     </div>

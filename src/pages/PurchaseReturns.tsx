@@ -2350,57 +2350,8 @@ export const PurchaseReturns: React.FC = () => {
               {/* Upper Layout: Combined Totals Summary and Metadata Form into a single card */}
               <section className="bg-white p-3 rounded-2xl border border-zinc-200 shadow-sm grid grid-cols-1 lg:grid-cols-4 gap-4 items-stretch">
                 
-                {/* Left: Summary Column */}
-                <div className="flex flex-col justify-center space-y-1.5 p-1">
-                  <div className="flex items-center gap-1.5 mb-1 text-emerald-650">
-                    <Layers className="w-4 h-4" />
-                    <h2 className="font-semibold text-zinc-900 text-xs">{language === 'ar' ? 'ملخص المرتجع' : 'Return Summary'}</h2>
-                  </div>
-
-                  <div className="bg-zinc-50 rounded-xl p-3 border border-zinc-100 space-y-1.5">
-                    <div className="flex justify-between items-center text-zinc-650 text-xs">
-                      <span className="font-medium">{language === 'ar' ? 'الإجمالي قبل الخصم' : 'Subtotal'}</span>
-                      <span className="font-bold">
-                        {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-emerald-650 text-xs">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-medium">{language === 'ar' ? 'الخصم' : 'Discount'}</span>
-                        <input 
-                          type="number" 
-                          className="w-16 bg-white border border-zinc-200 rounded-lg px-2 py-0.5 text-center font-bold text-emerald-605 focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
-                          value={discount}
-                          onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
-                        />
-                      </div>
-                      <span className="font-bold">-{formatMoney(discount)}</span>
-                    </div>
-                    {isVatEnabled && (
-                      <div className="flex justify-between items-center text-zinc-650 text-xs pt-1 border-t border-dashed border-zinc-200">
-                        <span className="font-medium">{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</span>
-                        <span className="font-bold">
-                          +{formatMoney(items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0))}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex justify-between items-center text-emerald-650 text-xs pt-1.5 border-t border-zinc-200">
-                      <span className="font-black text-sm">{language === 'ar' ? 'الصافي النهائي' : 'Net Total'}</span>
-                      <div className="flex flex-col items-end">
-                        <span className="font-black text-lg tracking-tighter">
-                          {formatMoney(
-                            items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) + 
-                            (isVatEnabled ? items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0) : 0) - 
-                            discount
-                          )} {currentInvoiceCurrencyCode}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right: Metadata Panel */}
-                <div className="lg:col-span-3 space-y-3 relative lg:border-s lg:border-zinc-200 lg:ps-4 flex flex-col justify-between">
+                {/* Right: Metadata Panel Column */}
+                <div className="lg:col-span-3 space-y-3 relative flex flex-col justify-between">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {/* Date */}
                     <div>
@@ -2750,6 +2701,55 @@ export const PurchaseReturns: React.FC = () => {
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                     />
+                  </div>
+                </div>
+
+                {/* Left: Summary Column */}
+                <div className="lg:col-span-1 flex flex-col justify-center space-y-1.5 p-1 lg:border-s lg:border-zinc-200 lg:ps-4">
+                  <div className="flex items-center gap-1.5 mb-1 text-emerald-650">
+                    <Layers className="w-4 h-4" />
+                    <h2 className="font-semibold text-zinc-900 text-xs">{language === 'ar' ? 'ملخص المرتجع' : 'Return Summary'}</h2>
+                  </div>
+
+                  <div className="bg-zinc-50 rounded-xl p-3 border border-zinc-100 space-y-1.5">
+                    <div className="flex justify-between items-center text-zinc-650 text-xs">
+                      <span className="font-medium">{language === 'ar' ? 'الإجمالي قبل الخصم' : 'Subtotal'}</span>
+                      <span className="font-bold">
+                        {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-emerald-650 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium">{language === 'ar' ? 'الخصم' : 'Discount'}</span>
+                        <input 
+                          type="number" 
+                          className="w-16 bg-white border border-zinc-200 rounded-lg px-2 py-0.5 text-center font-bold text-emerald-605 focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
+                          value={discount}
+                          onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                        />
+                      </div>
+                      <span className="font-bold">-{formatMoney(discount)}</span>
+                    </div>
+                    {isVatEnabled && (
+                      <div className="flex justify-between items-center text-zinc-650 text-xs pt-1 border-t border-dashed border-zinc-200">
+                        <span className="font-medium">{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</span>
+                        <span className="font-bold">
+                          +{formatMoney(items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0))}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center text-emerald-650 text-xs pt-1.5 border-t border-zinc-200">
+                      <span className="font-black text-sm">{language === 'ar' ? 'الصافي النهائي' : 'Net Total'}</span>
+                      <div className="flex flex-col items-end">
+                        <span className="font-black text-lg tracking-tighter">
+                          {formatMoney(
+                            items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) + 
+                            (isVatEnabled ? items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0) : 0) - 
+                            discount
+                          )} {currentInvoiceCurrencyCode}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </section>
