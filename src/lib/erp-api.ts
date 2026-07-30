@@ -3733,6 +3733,85 @@ modules.forEach(moduleName => {
 
         await client.query('BEGIN');
 
+        if (moduleName === 'accounts') {
+          // 1. Check if there are journal entry lines linked to this account
+          const jeCheck = await client.query(
+            'SELECT COUNT(*) FROM journal_entry_items WHERE account_id = $1',
+            [id]
+          );
+          if (parseInt(jeCheck.rows[0]?.count || '0', 10) > 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, 'لا يمكن حذف هذا الحساب لأنه توجد قيود محاسبية أو حركات مالية مسجلة عليه في النظام.');
+          }
+
+          // 2. Check if there are child accounts referencing this account as parent
+          const childCheck = await client.query(
+            'SELECT COUNT(*) FROM accounts WHERE parent_id = $1',
+            [id]
+          );
+          if (parseInt(childCheck.rows[0]?.count || '0', 10) > 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, 'لا يمكن حذف هذا الحساب لأنه يحتوي على حسابات فرعية مندرجة تحته. يرجى نقل أو حذف الحسابات الفرعية أولاً.');
+          }
+
+          // 3. Check if linked to customers
+          const custCheck = await client.query(
+            'SELECT COUNT(*) FROM customers WHERE account_id = $1',
+            [id]
+          );
+          if (parseInt(custCheck.rows[0]?.count || '0', 10) > 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, 'لا يمكن حذف هذا الحساب لأنه مربوط بعميل أو أكثر في دليل العملاء.');
+          }
+
+          // 4. Check if linked to suppliers
+          const suppCheck = await client.query(
+            'SELECT COUNT(*) FROM suppliers WHERE account_id = $1',
+            [id]
+          );
+          if (parseInt(suppCheck.rows[0]?.count || '0', 10) > 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, 'لا يمكن حذف هذا الحساب لأنه مربوط بمورد أو أكثر في دليل الموردين.');
+          }
+
+          // 5. Check if linked to products
+          const prodCheck = await client.query(
+            'SELECT COUNT(*) FROM products WHERE revenue_account_id = $1 OR cost_account_id = $1 OR inventory_account_id = $1',
+            [id]
+          );
+          if (parseInt(prodCheck.rows[0]?.count || '0', 10) > 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, 'لا يمكن حذف هذا الحساب لأنه مربوط بأصناف في دليل المنتجات.');
+          }
+
+          // 6. Check if linked to payment methods
+          const pmCheck = await client.query(
+            'SELECT COUNT(*) FROM payment_methods WHERE account_id = $1',
+            [id]
+          );
+          if (parseInt(pmCheck.rows[0]?.count || '0', 10) > 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, 'لا يمكن حذف هذا الحساب لأنه مربوط بطريقة دفع أو خزينة/بنك.');
+          }
+
+          // 7. Check if linked to expense categories
+          const expCheck = await client.query(
+            'SELECT COUNT(*) FROM expense_categories WHERE account_id = $1',
+            [id]
+          );
+          if (parseInt(expCheck.rows[0]?.count || '0', 10) > 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, 'لا يمكن حذف هذا الحساب لأنه مربوط ببند مصروفات.');
+          }
+        }
+
         if (moduleName === 'companies') {
           const tablesToDelete = [
             'company_subscriptions', 'users', 'roles', 'journal_entry_items', 'journal_entries',
@@ -3879,6 +3958,12 @@ modules.forEach(moduleName => {
         await client.query('ROLLBACK');
         if (error.code === '22P02' || error.message?.includes('invalid input syntax for type uuid')) {
           return sendError(res, 400, `Invalid ID format for ${moduleName}`);
+        }
+        if (error.code === '23503' || error.message?.includes('violates foreign key constraint')) {
+          if (moduleName === 'accounts') {
+            return sendError(res, 400, 'لا يمكن حذف هذا الحساب لأنه مرتبط بقيود محاسبية أو حركات مالية في النظام.');
+          }
+          return sendError(res, 400, 'لا يمكن الحذف لأنه توجد بيانات أو حركات مرتبطة بهذا السجل.');
         }
         console.error(`Error in DELETE /${moduleName}:`, error);
         sendError(res, 500, `Failed to delete ${moduleName}`, error.message);

@@ -167,9 +167,9 @@ export const AccountTypes: React.FC = () => {
       setIsDeleteModalOpen(false);
       setTypeToDelete(null);
       showNotification(language === 'ar' ? 'تم حذف نوع الحساب بنجاح' : 'Account type deleted successfully', 'success');
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      showNotification(language === 'ar' ? 'حدث خطأ أثناء الحذف' : 'An error occurred while deleting', 'error');
+      showNotification(e?.message || (language === 'ar' ? 'حدث خطأ أثناء الحذف' : 'An error occurred while deleting'), 'error');
     }
   };
 

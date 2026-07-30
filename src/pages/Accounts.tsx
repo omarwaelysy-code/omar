@@ -239,9 +239,9 @@ export const Accounts: React.FC = () => {
       setIsDeleteModalOpen(false);
       setAccountToDelete(null);
       showNotification('تم حذف الحساب بنجاح', 'success');
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      showNotification('حدث خطأ أثناء الحذف', 'error');
+      showNotification(e?.message || 'حدث خطأ أثناء الحذف', 'error');
     }
   };
 
