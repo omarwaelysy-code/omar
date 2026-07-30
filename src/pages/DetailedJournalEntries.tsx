@@ -47,13 +47,62 @@ interface DetailedLine {
   account_code?: string | null;
 }
 
+/**
+ * Groups lines into pages such that no journal entry (journal_entry_id)
+ * is split across page boundaries.
+ * If adding a journal entry to the current page would exceed targetLimit 
+ * and the page is not empty, the entry is shifted to the next page.
+ */
+function buildUnsplitPages<T extends { journal_entry_id: string }>(
+  lines: T[],
+  targetLimit: number
+): T[][] {
+  if (!lines || lines.length === 0) return [];
+  if (targetLimit >= 1000000) return [lines];
+
+  const entryGroups: T[][] = [];
+  let currentGroup: T[] = [];
+
+  for (const line of lines) {
+    if (currentGroup.length === 0) {
+      currentGroup.push(line);
+    } else if (currentGroup[0].journal_entry_id === line.journal_entry_id) {
+      currentGroup.push(line);
+    } else {
+      entryGroups.push(currentGroup);
+      currentGroup = [line];
+    }
+  }
+  if (currentGroup.length > 0) {
+    entryGroups.push(currentGroup);
+  }
+
+  const pages: T[][] = [];
+  let currentPage: T[] = [];
+
+  for (const group of entryGroups) {
+    if (currentPage.length > 0 && currentPage.length + group.length > targetLimit) {
+      pages.push(currentPage);
+      currentPage = [...group];
+    } else {
+      currentPage.push(...group);
+    }
+  }
+
+  if (currentPage.length > 0) {
+    pages.push(currentPage);
+  }
+
+  return pages;
+}
+
 export const DetailedJournalEntries: React.FC = () => {
   const { user } = useAuth();
   const { dir, language } = useLanguage();
   const { setPendingViewDoc, setCurrentPage } = useNavigation();
 
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<DetailedLine[]>([]);
+  const [rawLines, setRawLines] = useState<DetailedLine[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [summary, setSummary] = useState({ total_debit: 0, total_credit: 0 });
   const [searchTerm, setSearchTerm] = useState('');
@@ -68,6 +117,14 @@ export const DetailedJournalEntries: React.FC = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const [preset, setPreset] = useState('this_month');
+
+  // Build unsplit pages: Ensure no journal entry is broken across page boundaries
+  const pages = React.useMemo(() => buildUnsplitPages(rawLines, limit), [rawLines, limit]);
+  const totalPages = pages.length || 1;
+  const data = pages[page - 1] || [];
+  const startRowIndex = React.useMemo(() => {
+    return pages.slice(0, page - 1).reduce((sum, p) => sum + p.length, 0);
+  }, [pages, page]);
 
   // Column definitions with visibility state
   const [columns, setColumns] = useState([
@@ -294,15 +351,15 @@ export const DetailedJournalEntries: React.FC = () => {
     try {
       const options = {
         company_id: user.company_id,
-        _page: page,
-        _limit: limit,
+        _page: 1,
+        _limit: 1000000,
         _search: searchTerm,
         date_from: dateRange.start,
         date_to: dateRange.end
       };
       const result = await dbService.listPaginated<DetailedLine>('detailed-journal-entries', options);
-      setData(result.data);
-      setTotalRecords(result.total);
+      setRawLines(result.data || []);
+      setTotalRecords(result.total || (result.data ? result.data.length : 0));
       setSummary(result.summary || { total_debit: 0, total_credit: 0 });
     } catch (error) {
       console.error('Error loading detailed entries', error);
@@ -313,7 +370,7 @@ export const DetailedJournalEntries: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, [user, page, limit, searchTerm, dateRange]);
+  }, [user, searchTerm, dateRange]);
 
   const handleTransactionClick = (type: string | null | undefined, reference: string | null | undefined) => {
     if (!reference || reference === '-' || reference === '') return;
@@ -577,11 +634,11 @@ export const DetailedJournalEntries: React.FC = () => {
                   {dir === 'rtl' ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
                 </button>
                 <span className="text-sm select-none font-mono">
-                  {page} / {Math.ceil(totalRecords / limit) || 1}
+                  {page} / {totalPages}
                 </span>
                 <button
                   type="button"
-                  disabled={page >= Math.ceil(totalRecords / limit)}
+                  disabled={page >= totalPages}
                   onClick={() => setPage(page + 1)}
                   className="p-1 hover:bg-zinc-200/50 dark:hover:bg-zinc-700 rounded-lg disabled:opacity-40 transition-colors"
                 >
@@ -607,6 +664,7 @@ export const DetailedJournalEntries: React.FC = () => {
                     <option value={50}>50</option>
                     <option value={100}>100</option>
                     <option value={200}>200</option>
+                    <option value={1000000}>{language === 'ar' ? 'الكل' : 'All'}</option>
                   </select>
                 </label>
               </div>
@@ -738,7 +796,7 @@ export const DetailedJournalEntries: React.FC = () => {
                     >
                       {/* Row Index */}
                       <td className="px-2 py-1.5 border-l border-zinc-300 dark:border-zinc-700 text-center bg-zinc-50/50 dark:bg-zinc-800/20 text-zinc-400 font-semibold select-none">
-                        {(page - 1) * limit + idx + 1}
+                        {startRowIndex + idx + 1}
                       </td>
 
                       {/* Debit (المدين) */}

@@ -2636,7 +2636,8 @@ router.get('/detailed-journal-entries', authenticateToken, async (req: AuthReque
     if (!companyId) return res.status(400).json({ error: 'company_id is required' });
 
     const page = parseInt(req.query._page as string, 10) || 1;
-    const limit = parseInt(req.query._limit as string, 10) || 50;
+    const rawLimit = req.query._limit as string;
+    const limit = (rawLimit === 'all' || rawLimit === '1000000') ? 1000000 : (parseInt(rawLimit, 10) || 50);
     const offset = (page - 1) * limit;
     const search = (req.query._search as string) || '';
     const dateFrom = req.query.date_from as string;
