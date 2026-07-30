@@ -3504,14 +3504,106 @@ export const PurchaseInvoices: React.FC = () => {
                 return (
                   <div className="px-2.5 py-1 border-2 border-blue-600 text-blue-600 bg-blue-50/50 font-black text-[11px] uppercase rounded-xl select-none tracking-wider shadow-sm flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                    {language === 'ar' ? '\u0641\u0627\u062a\u0648\u0631\u0629 \u062a\u0622\u062c\u0644\u0629' : 'Credit Invoice'}
+                    {language === 'ar' ? 'فاتورة آجلة' : 'Credit Invoice'}
                   </div>
                 );
               }
             })()}
           </div>
+
+          {/* Title & Invoice Code */}
+          <div className="flex items-center gap-1.5">
+            <h3 className="text-sm md:text-base font-black text-slate-900 tracking-tight leading-none font-sans">
+              {editingInvoice ? (language === 'ar' ? 'تعديل فاتورة المشتريات' : 'Edit Purchase Invoice') : (language === 'ar' ? 'إنشاء فاتورة مشتريات جديدة' : 'Create New Purchase Invoice')}
+            </h3>
+            <span className="text-[11px] font-mono font-black text-slate-800 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-lg select-all shadow-sm">
+              {invoiceNumber}
+            </span>
+          </div>
+
+          {/* Linked Journal Entry (in the same row!) */}
+          {editingInvoice?.entry_number ? (
+            <div className="flex items-center gap-1 text-emerald-700 text-[11px] font-bold font-mono leading-none">
+              <span className="text-emerald-500 font-sans font-bold">{language === 'ar' ? 'القيد المرتبط:' : 'Linked JE:'}</span>
+              <span className="bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 font-black">{editingInvoice.entry_number}</span>
+            </div>
+          ) : (
+            <div className="text-[9px] font-bold text-zinc-400">
+              {language === 'ar' ? 'القيد المرتبط: لا يوجد قيد مرتبط بعد' : 'Linked JE: No journal entry linked yet'}
+            </div>
+          )}
         </div>
-      </div><div className="flex-1 flex flex-col h-full relative overflow-hidden">
+
+        {/* End side (Left in RTL): All buttons in ONE single row */}
+        <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+          <button 
+            type="button"
+            onClick={closeModal} 
+            className="flex items-center gap-1 px-2.5 py-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-slate-200 shadow-sm"
+          >
+            {dir === 'rtl' ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+            <span>{language === 'ar' ? 'العودة للقائمة' : 'Return to List'}</span>
+          </button>
+          
+          {editingInvoice && (
+            <>
+              <button 
+                type="button"
+                onClick={() => printElement(editModalRef.current, `فاتورة مشتريات ${invoiceNumber}`)} 
+                className="flex items-center gap-1 px-2 py-1 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-blue-200 shadow-sm"
+                title={language === 'ar' ? 'طباعة الفاتورة' : 'Print Invoice'}
+              >
+                <Printer size={11} />
+                <span>{language === 'ar' ? 'طباعة' : 'Print'}</span>
+              </button>
+              <button 
+                type="button"
+                onClick={() => exportToPDFUtil(editModalRef.current, { filename: `PINV_${invoiceNumber}` })} 
+                className="flex items-center gap-1 px-2 py-1 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-rose-200 shadow-sm"
+                title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+              >
+                <FileText size={11} />
+                <span>PDF</span>
+              </button>
+              <button 
+                type="button"
+                onClick={() => exportSingleDocumentToExcel(editingInvoice, 'purchase_invoice')} 
+                className="flex items-center gap-1 px-2 py-1 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
+                title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+              >
+                <FileSpreadsheet size={11} />
+                <span>Excel</span>
+              </button>
+            </>
+          )}
+
+          <button 
+            type="submit"
+            form="purchase-invoice-form"
+            disabled={isSubmitting}
+            className="px-3.5 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 justify-center active:scale-95 shadow-sm text-[11px] whitespace-nowrap font-sans"
+          >
+            {isSubmitting ? (
+              <div className="w-3.5 h-3.5 border border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Save size={12} />
+            )}
+            <span>{language === 'ar' ? 'حفظ' : 'Save'}</span>
+          </button>
+
+          {/* Close X button at the far edge of the screen */}
+          <button 
+            type="button"
+            onClick={closeModal}
+            className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all border border-slate-200 hover:border-slate-300 ml-1"
+            title={language === 'ar' ? 'إغلاق' : 'Close'}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      </div>
+      
+      <div className="flex-1 flex flex-col h-full relative overflow-hidden">
               
               {/* AI Drawer (Smart Creation) sliding from the right */}
               <AnimatePresence>
