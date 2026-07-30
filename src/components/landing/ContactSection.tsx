@@ -67,7 +67,7 @@ export const ContactSection: React.FC = () => {
                 <div>
                   <h4 className="text-sm font-semibold text-[#4B5563]">{t('landing.contact.phone_label')}</h4>
                   <a href="tel:+201010010156" dir="ltr" className="font-bold text-[#0B0F19] hover:text-[#1B853A] transition-colors block text-right">
-                    +022 01010010156
+                    +20 01010010156
                   </a>
                 </div>
               </div>
@@ -79,7 +79,7 @@ export const ContactSection: React.FC = () => {
                 <div>
                   <h4 className="text-sm font-semibold text-[#4B5563]">{t('landing.contact.whatsapp_label')}</h4>
                   <a href="https://wa.me/201010010156" target="_blank" rel="noopener noreferrer" dir="ltr" className="font-bold text-[#0B0F19] hover:text-[#1B853A] transition-colors block text-right">
-                    +022 01010010156
+                    +20 01010010156
                   </a>
                 </div>
               </div>
