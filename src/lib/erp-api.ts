@@ -3482,6 +3482,14 @@ modules.forEach(moduleName => {
             return sendError(res, 401, 'Unauthorized');
           }
 
+          if (['products', 'customers', 'suppliers', 'payment_methods', 'operation_categories', 'expense_categories'].includes(moduleName)) {
+            const err = validateEntityAccountsData(moduleName, req.body);
+            if (err) {
+              await client.query('ROLLBACK');
+              return sendError(res, 400, err);
+            }
+          }
+
           // Special case for users: handle password/temp_password hashing
           if (moduleName === 'users') {
             if (req.body.password) {
@@ -3630,6 +3638,15 @@ modules.forEach(moduleName => {
               );
             } catch (syncErr) {
               console.error('Error syncing company_subscriptions on company update:', syncErr);
+            }
+          }
+
+          if (['products', 'customers', 'suppliers', 'payment_methods', 'operation_categories', 'expense_categories'].includes(moduleName)) {
+            const existingRes = await pool.query(`SELECT * FROM "${moduleName}" WHERE id = $1`, [id]);
+            if (existingRes.rows.length > 0) {
+              const merged = { ...existingRes.rows[0], ...req.body };
+              const err = validateEntityAccountsData(moduleName, merged);
+              if (err) return sendError(res, 400, err);
             }
           }
 
@@ -3872,71 +3889,156 @@ modules.forEach(moduleName => {
   });
 });
 
-// --- Invoices with Items (Transaction) ---
-// Helper to ensure default accounts exist for a company
-async function ensureDefaultAccounts(client: any, companyId: string) {
+// ─── Accounting Account Validation Helpers ────────────────────────────────────
+// These helpers prevent saving any entity or transaction when required
+// accounting accounts are not configured. No auto-creation of accounts.
 
-  // 1. Get or create a basic account type if needed (Assets, Liabilities, etc.)
-  const { rows: accountTypes } = await client.query(
-    'SELECT id, name, classification FROM account_types WHERE company_id = $1',
-    [companyId]
+/**
+ * Validates that a product has all required accounting accounts.
+ * Physical products (non-service) require: revenue, cost, and inventory accounts.
+ * Service products require: revenue account only.
+ */
+async function validateProductAccountsDB(
+  client: any,
+  companyId: string,
+  productId: string
+): Promise<{ valid: boolean; productName: string; missingFields: string[] }> {
+  const prodRes = await client.query(
+    'SELECT name, type, is_service, revenue_account_id, cost_account_id, inventory_account_id FROM products WHERE id = $1 AND company_id = $2',
+    [productId, companyId]
   );
-  
-  if (accountTypes.length === 0) {
+  if (prodRes.rows.length === 0) return { valid: true, productName: '', missingFields: [] };
 
-    const types = [
-      { id: uuidv4(), name: 'الأصول', code: '1', classification: 'asset', statement_type: 'balance_sheet' },
-      { id: uuidv4(), name: 'الالتزامات', code: '2', classification: 'liability', statement_type: 'balance_sheet' },
-      { id: uuidv4(), name: 'حقوق الملكية', code: '3', classification: 'equity', statement_type: 'balance_sheet' },
-      { id: uuidv4(), name: 'الإيرادات', code: '4', classification: 'revenue', statement_type: 'income_statement' },
-      { id: uuidv4(), name: 'المصروفات', code: '5', classification: 'expense', statement_type: 'income_statement' },
-    ];
-    
-    for (const type of types) {
-      await client.query(
-        'INSERT INTO account_types (id, company_id, name, code, classification, statement_type) VALUES ($1, $2, $3, $4, $5, $6)',
-        [type.id, companyId, type.name, type.code, type.classification, type.statement_type]
-      );
-    }
-  }
+  const prod = prodRes.rows[0];
+  const isService = prod.type === 'service' || prod.is_service;
+  const missing: string[] = [];
 
-  // Reload types
-  const { rows: currentTypes } = await client.query(
-    'SELECT id, name, classification FROM account_types WHERE company_id = $1',
-    [companyId]
-  );
+  if (!prod.revenue_account_id) missing.push('حساب الإيرادات (revenue_account_id)');
+  if (!prod.cost_account_id) missing.push('حساب التكلفة (cost_account_id)');
+  if (!isService && !prod.inventory_account_id) missing.push('حساب المخزون (inventory_account_id)');
 
-  const getType = (cls: string) => currentTypes.find(t => t.classification === cls)?.id;
-
-  // 2. Define standard accounts
-  const defaultAccounts = [
-    { name: 'الخزينة العامة', code: '1101', classification: 'asset', usage: 'cash' },
-    { name: 'حساب العملاء', code: '1201', classification: 'asset', usage: 'customer' },
-    { name: 'حساب الموردين', code: '2101', classification: 'liability', usage: 'supplier' },
-    { name: 'المبيعات', code: '4101', classification: 'revenue', usage: 'sales_revenue' },
-    { name: 'تكلفة المبيعات', code: '5101', classification: 'cost', usage: 'cost_of_sales' },
-    { name: 'الخصم المسموح به (مبيعات)', code: '4104', classification: 'revenue', usage: 'earned_discounts' },
-    { name: 'الخصم المكتسب (مشتريات)', code: '5105', classification: 'cost', usage: 'granted_discounts' },
-  ];
-
-  for (const acc of defaultAccounts) {
-    const { rows: existing } = await client.query(
-      'SELECT id FROM accounts WHERE company_id = $1 AND (name = $2 OR code = $3)',
-      [companyId, acc.name, acc.code]
-    );
-    
-    if (existing.length === 0) {
-
-      const typeId = getType(acc.classification);
-      if (typeId) {
-        await client.query(
-          'INSERT INTO accounts (id, company_id, name, code, type_id, is_active, account_usage) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-          [uuidv4(), companyId, acc.name, acc.code, typeId, true, acc.usage]
-        );
-      }
-    }
-  }
+  return { valid: missing.length === 0, productName: prod.name, missingFields: missing };
 }
+
+/**
+ * Validates that a customer has a required accounting account.
+ */
+async function validateCustomerAccountDB(
+  client: any,
+  companyId: string,
+  customerId: string
+): Promise<{ valid: boolean; customerName: string; missingFields: string[] }> {
+  const res = await client.query(
+    'SELECT name, account_id FROM customers WHERE id = $1 AND company_id = $2',
+    [customerId, companyId]
+  );
+  if (res.rows.length === 0) return { valid: true, customerName: '', missingFields: [] };
+  const cust = res.rows[0];
+  const missing: string[] = [];
+  if (!cust.account_id) missing.push('حساب العميل (account_id)');
+  return { valid: missing.length === 0, customerName: cust.name, missingFields: missing };
+}
+
+/**
+ * Validates that a supplier has a required accounting account.
+ */
+async function validateSupplierAccountDB(
+  client: any,
+  companyId: string,
+  supplierId: string
+): Promise<{ valid: boolean; supplierName: string; missingFields: string[] }> {
+  const res = await client.query(
+    'SELECT name, account_id FROM suppliers WHERE id = $1 AND company_id = $2',
+    [supplierId, companyId]
+  );
+  if (res.rows.length === 0) return { valid: true, supplierName: '', missingFields: [] };
+  const sup = res.rows[0];
+  const missing: string[] = [];
+  if (!sup.account_id) missing.push('حساب المورد (account_id)');
+  return { valid: missing.length === 0, supplierName: sup.name, missingFields: missing };
+}
+
+/**
+ * Validates that a payment method has a required accounting account.
+ */
+async function validatePaymentMethodAccountDB(
+  client: any,
+  companyId: string,
+  paymentMethodId: string
+): Promise<{ valid: boolean; methodName: string; missingFields: string[] }> {
+  const res = await client.query(
+    'SELECT name, account_id FROM payment_methods WHERE id = $1 AND company_id = $2',
+    [paymentMethodId, companyId]
+  );
+  if (res.rows.length === 0) return { valid: true, methodName: '', missingFields: [] };
+  const pm = res.rows[0];
+  const missing: string[] = [];
+  if (!pm.account_id) missing.push('الحساب المحاسبي (account_id)');
+  return { valid: missing.length === 0, methodName: pm.name, missingFields: missing };
+}
+
+/**
+ * Validates all products in an invoice/return items list.
+ * Returns an error message if any product is missing required accounts.
+ */
+async function validateInvoiceItemAccounts(
+  client: any,
+  companyId: string,
+  items: any[]
+): Promise<string | null> {
+  for (const item of (items || [])) {
+    if (!item.product_id) continue;
+    const v = await validateProductAccountsDB(client, companyId, item.product_id);
+    if (!v.valid) {
+      return `لا يمكن حفظ الحركة — الصنف "${v.productName}" يفتقد الحسابات المحاسبية التالية:\n• ${v.missingFields.join('\n• ')}\nيرجى فتح بيانات الصنف وتحديد الحسابات المطلوبة قبل المتابعة.`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Validates that an entity (product, customer, supplier, payment_method, operation_category)
+ * has all required accounting accounts configured before saving.
+ */
+function validateEntityAccountsData(moduleName: string, body: any): string | null {
+  if (moduleName === 'products') {
+    const isService = body.type === 'service' || body.is_service === true;
+    const missing: string[] = [];
+    if (!body.revenue_account_id) missing.push('حساب الإيرادات (revenue_account_id)');
+    if (!body.cost_account_id) missing.push('حساب التكلفة (cost_account_id)');
+    if (!isService && !body.inventory_account_id) missing.push('حساب المخزون (inventory_account_id)');
+    if (missing.length > 0) {
+      return `لا يمكن حفظ الصنف — يرجى تحديد الحسابات المحاسبية المطلوبة:\n• ${missing.join('\n• ')}`;
+    }
+  } else if (moduleName === 'customers') {
+    if (!body.account_id) {
+      return 'لا يمكن حفظ العميل — يرجى تحديد الحساب المحاسبي المربوط بالعميل (account_id).';
+    }
+  } else if (moduleName === 'suppliers') {
+    if (!body.account_id) {
+      return 'لا يمكن حفظ المورد — يرجى تحديد الحساب المحاسبي المربوط بالمورد (account_id).';
+    }
+  } else if (moduleName === 'payment_methods') {
+    if (!body.account_id) {
+      return 'لا يمكن حفظ طريقة الدفع — يرجى تحديد الحساب المحاسبي المربوط بطريقة الدفع (account_id).';
+    }
+  } else if (moduleName === 'operation_categories' || moduleName === 'expense_categories') {
+    if (!body.account_id) {
+      return 'لا يمكن حفظ بند المصروف — يرجى تحديد الحساب المحاسبي المربوط ببند المصروف (account_id).';
+    }
+  }
+  return null;
+}
+
+
+// ─── Legacy: ensureDefaultAccounts is now a no-op ────────────────────────────
+// Previously this function auto-created accounting accounts causing imbalances.
+// It is now disabled. All accounts must be manually configured.
+async function ensureDefaultAccounts(_client: any, _companyId: string) {
+  // INTENTIONALLY EMPTY — auto-creation of accounts is disabled.
+  // Accounts must be configured manually via the Accounts module.
+}
+
 
 router.post('/invoices', authenticateToken, TransactionsLimitMiddleware, async (req: AuthRequest, res) => {
   const client = await pool.connect();
@@ -3975,8 +4077,39 @@ router.post('/invoices', authenticateToken, TransactionsLimitMiddleware, async (
       }
     }
     
-    // Ensure default accounts exist
+    // ─── Accounting Account Validation ───────────────────────────────────────
+    // Validate all product accounts before saving the invoice
+    const itemAccountError = await validateInvoiceItemAccounts(client, companyId, items || []);
+    if (itemAccountError) {
+      await client.query('ROLLBACK');
+      client.release();
+      return sendError(res, 400, itemAccountError);
+    }
+
+    // Validate customer account
+    if (rawInvoiceData.customer_id) {
+      const custV = await validateCustomerAccountDB(client, companyId, rawInvoiceData.customer_id);
+      if (!custV.valid) {
+        await client.query('ROLLBACK');
+        client.release();
+        return sendError(res, 400, `لا يمكن حفظ الفاتورة — العميل "${custV.customerName}" لا يملك حساباً محاسبياً مربوطاً.\nيرجى فتح بيانات العميل وتحديد الحساب المحاسبي قبل المتابعة.`);
+      }
+    }
+
+    // Validate payment method account (if cash/card payment)
+    if (rawInvoiceData.payment_method_id) {
+      const pmV = await validatePaymentMethodAccountDB(client, companyId, rawInvoiceData.payment_method_id);
+      if (!pmV.valid) {
+        await client.query('ROLLBACK');
+        client.release();
+        return sendError(res, 400, `لا يمكن حفظ الفاتورة — طريقة الدفع "${pmV.methodName}" لا تملك حساباً محاسبياً مربوطاً.\nيرجى فتح بيانات طريقة الدفع وتحديد الحساب المحاسبي قبل المتابعة.`);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Ensure default accounts exist (no-op — disabled)
     await ensureDefaultAccounts(client, companyId);
+
 
     const invoiceData = sanitizeData('invoices', rawInvoiceData);
     
@@ -4078,35 +4211,11 @@ router.post('/invoices', authenticateToken, TransactionsLimitMiddleware, async (
 
             // Prepare perpetual queue / continuous inventory posting
             if (costInfo.totalCost > 0) {
-              // Find accounts
-              // 1. Cost of Goods Sold (COGS) Account
-              let costAccId = prod.cost_account_id;
-              let costAccName = prod.cost_account_name || 'تكلفة المبيعات';
-              
-              // 2. Inventory Account
-              let invAccId = prod.inventory_account_id;
-              let invAccName = prod.inventory_account_name || 'المخزون';
-
-              // Fallbacks if not configured on the product specifically
-              if (!costAccId || !invAccId) {
-                const accountsRes = await client.query('SELECT * FROM accounts WHERE company_id = $1', [companyId]);
-                const accounts = accountsRes.rows;
-                
-                if (!costAccId) {
-                  const fallbackCostAcc = accounts.find((a: any) => a.name.includes('تكلفة المبيعات') || a.name.includes('تكلفة مبيعات') || a.name.includes('تكلفة البضاعة المباعة'));
-                  if (fallbackCostAcc) {
-                    costAccId = fallbackCostAcc.id;
-                    costAccName = fallbackCostAcc.name;
-                  }
-                }
-                if (!invAccId) {
-                  const fallbackInvAcc = accounts.find((a: any) => a.name.includes('مخزون') || a.name.includes('مخازن'));
-                  if (fallbackInvAcc) {
-                    invAccId = fallbackInvAcc.id;
-                    invAccName = fallbackInvAcc.name;
-                  }
-                }
-              }
+              // Use only product's explicitly configured accounts — no fallback by name
+              const costAccId = prod.cost_account_id;
+              const costAccName = prod.cost_account_name || 'تكلفة المبيعات';
+              const invAccId = prod.inventory_account_id;
+              const invAccName = prod.inventory_account_name || 'المخزون';
 
               if (costAccId) {
                 cogsLines.push({
@@ -4117,6 +4226,7 @@ router.post('/invoices', authenticateToken, TransactionsLimitMiddleware, async (
                   description: `تكلفة البضاعة المباعة صنف: ${prod.name} - فاتورة ${invoiceData.invoice_number}`
                 });
               }
+
               if (invAccId) {
                 cogsLines.push({
                   account_id: invAccId,
@@ -4432,6 +4542,31 @@ router.post('/returns', authenticateToken, async (req: AuthRequest, res) => {
     const { items, ...rawReturnData } = req.body;
     const returnData = sanitizeData('returns', rawReturnData);
     if (!returnData.company_id) returnData.company_id = companyId;
+
+    // ─── Accounting Account Validation ───────────────────────────────────────
+    const itemAccountError = await validateInvoiceItemAccounts(client, companyId, items || []);
+    if (itemAccountError) {
+      await client.query('ROLLBACK');
+      client.release();
+      return sendError(res, 400, itemAccountError);
+    }
+    if (rawReturnData.customer_id) {
+      const custV = await validateCustomerAccountDB(client, companyId, rawReturnData.customer_id);
+      if (!custV.valid) {
+        await client.query('ROLLBACK');
+        client.release();
+        return sendError(res, 400, `لا يمكن حفظ المرتجع — العميل "${custV.customerName}" لا يملك حساباً محاسبياً مربوطاً.\nيرجى فتح بيانات العميل وتحديد الحساب المحاسبي قبل المتابعة.`);
+      }
+    }
+    if (rawReturnData.payment_method_id) {
+      const pmV = await validatePaymentMethodAccountDB(client, companyId, rawReturnData.payment_method_id);
+      if (!pmV.valid) {
+        await client.query('ROLLBACK');
+        client.release();
+        return sendError(res, 400, `لا يمكن حفظ المرتجع — طريقة الدفع "${pmV.methodName}" لا تملك حساباً محاسبياً مربوطاً.\nيرجى فتح بيانات طريقة الدفع وتحديد الحساب المحاسبي قبل المتابعة.`);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     const returnId = returnData.id || uuidv4();
     if (!isUUID(returnId)) return sendError(res, 400, 'Invalid Return ID format');
@@ -4927,6 +5062,35 @@ router.post('/purchase_invoices', authenticateToken, TransactionsLimitMiddleware
       await client.query('ROLLBACK');
       return sendError(res, 400, 'الشركة تعمل بنظام الدورة الكاملة. يجب إنشاء استلام مخزون وربطه بالفاتورة أولاً.');
     }
+
+    // ─── Accounting Account Validation ───────────────────────────────────────
+    const itemAccountError = await validateInvoiceItemAccounts(client, companyId, items || []);
+    if (itemAccountError) {
+      await client.query('ROLLBACK');
+      client.release();
+      return sendError(res, 400, itemAccountError);
+    }
+
+    // Validate supplier account
+    if (rawInvoiceData.supplier_id) {
+      const supV = await validateSupplierAccountDB(client, companyId, rawInvoiceData.supplier_id);
+      if (!supV.valid) {
+        await client.query('ROLLBACK');
+        client.release();
+        return sendError(res, 400, `لا يمكن حفظ فاتورة المشتريات — المورد "${supV.supplierName}" لا يملك حساباً محاسبياً مربوطاً.\nيرجى فتح بيانات المورد وتحديد الحساب المحاسبي قبل المتابعة.`);
+      }
+    }
+
+    // Validate payment method account (if used)
+    if (rawInvoiceData.payment_method_id) {
+      const pmV = await validatePaymentMethodAccountDB(client, companyId, rawInvoiceData.payment_method_id);
+      if (!pmV.valid) {
+        await client.query('ROLLBACK');
+        client.release();
+        return sendError(res, 400, `لا يمكن حفظ فاتورة المشتريات — طريقة الدفع "${pmV.methodName}" لا تملك حساباً محاسبياً مربوطاً.\nيرجى فتح بيانات طريقة الدفع وتحديد الحساب المحاسبي قبل المتابعة.`);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     const invoiceId = invoiceData.id || uuidv4();
     if (!isUUID(invoiceId)) return sendError(res, 400, 'Invalid Invoice ID format');
@@ -5610,6 +5774,31 @@ router.post('/purchase_returns', authenticateToken, async (req: AuthRequest, res
     const { items, ...rawReturnData } = req.body;
     const returnData = sanitizeData('purchase_returns', rawReturnData);
     if (!returnData.company_id) returnData.company_id = companyId;
+
+    // ─── Accounting Account Validation ───────────────────────────────────────
+    const itemAccountError = await validateInvoiceItemAccounts(client, companyId, items || []);
+    if (itemAccountError) {
+      await client.query('ROLLBACK');
+      client.release();
+      return sendError(res, 400, itemAccountError);
+    }
+    if (rawReturnData.supplier_id) {
+      const supV = await validateSupplierAccountDB(client, companyId, rawReturnData.supplier_id);
+      if (!supV.valid) {
+        await client.query('ROLLBACK');
+        client.release();
+        return sendError(res, 400, `لا يمكن حفظ مرتجع المشتريات — المورد "${supV.supplierName}" لا يملك حساباً محاسبياً مربوطاً.\nيرجى فتح بيانات المورد وتحديد الحساب المحاسبي قبل المتابعة.`);
+      }
+    }
+    if (rawReturnData.payment_method_id) {
+      const pmV = await validatePaymentMethodAccountDB(client, companyId, rawReturnData.payment_method_id);
+      if (!pmV.valid) {
+        await client.query('ROLLBACK');
+        client.release();
+        return sendError(res, 400, `لا يمكن حفظ مرتجع المشتريات — طريقة الدفع "${pmV.methodName}" لا تملك حساباً محاسبياً مربوطاً.\nيرجى فتح بيانات طريقة الدفع وتحديد الحساب المحاسبي قبل المتابعة.`);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     const returnId = returnData.id || uuidv4();
     if (!isUUID(returnId)) return sendError(res, 400, 'Invalid Return ID format');
@@ -8019,11 +8208,10 @@ router.post('/stock_adjustments', authenticateToken, async (req: AuthRequest, re
 
       productsToSync.push(item.product_id);
 
-      // Find product inventory account
-      let invAccountId = prod.inventory_account_id;
+      // Find product inventory account — no fallback allowed
+      const invAccountId = prod.inventory_account_id;
       if (!invAccountId) {
-        const fallbackRes = await client.query("SELECT id FROM accounts WHERE company_id = $1 AND (name LIKE '%مخزون%' OR name LIKE '%مخازن%') LIMIT 1", [companyId]);
-        invAccountId = fallbackRes.rows[0]?.id || null;
+        throw new Error(`الصنف "${prod.name}" لا يملك حساب مخزون مربوطاً (inventory_account_id). يرجى فتح بيانات الصنف وتحديد الحساب المحاسبي للمخزون قبل إجراء التسوية.`);
       }
 
       if (invAccountId && totalCostValue > 0) {

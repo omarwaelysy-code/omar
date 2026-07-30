@@ -52,16 +52,10 @@ export async function syncCOGSForJournalEntry(client: any, companyId: string, jo
             if (accRes.rows.length > 0) {
                 costAccName = accRes.rows[0].name || costAccName;
             }
-        } else {
-            const fallbackRes = await client.query(
-                "SELECT id, name FROM accounts WHERE company_id = $1 AND (name LIKE '%تكلفة المبيعات%' OR name LIKE '%تكلفة مبيعات%' OR name LIKE '%تكلفة البضاعة المباعة%') LIMIT 1",
-                [companyId]
-            );
-            if (fallbackRes.rows.length > 0) {
-                costAccId = fallbackRes.rows[0].id;
-                costAccName = fallbackRes.rows[0].name;
-            }
         }
+        // NOTE: No fallback by account name — if cost_account_id is not set on the product,
+        // we skip COGS posting for this item. The backend validation prevents reaching here
+        // in normal flow, but syncProductsCostAndJEs may be called in edge cases.
 
         let invAccId = prod.inventory_account_id;
         let invAccName = prod.inventory_account_name;
@@ -71,16 +65,9 @@ export async function syncCOGSForJournalEntry(client: any, companyId: string, jo
             if (accRes.rows.length > 0) {
                 invAccName = accRes.rows[0].name || invAccName;
             }
-        } else {
-            const fallbackRes = await client.query(
-                "SELECT id, name FROM accounts WHERE company_id = $1 AND (name LIKE '%مخزون%' OR name LIKE '%مخازن%') LIMIT 1",
-                [companyId]
-            );
-            if (fallbackRes.rows.length > 0) {
-                invAccId = fallbackRes.rows[0].id;
-                invAccName = fallbackRes.rows[0].name;
-            }
         }
+        // NOTE: No fallback by account name — if inventory_account_id is not set on the product,
+        // we skip COGS posting for this item.
 
         if (costAccId && invAccId) {
            addedCOGS = true;

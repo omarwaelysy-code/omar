@@ -874,10 +874,65 @@ export const Receipts: React.FC = () => {
       }
     }
 
+    // ─── Accounting Account Validation ───────────────────────────────────────
+    // Validate payment method has an account
+    const selectedPaymentMethod = paymentMethods.find(pm => pm.id === voucherData.payment_method_id);
+    if (!selectedPaymentMethod?.account_id) {
+      setIsSubmitting(false);
+      showNotification(
+        language === 'ar'
+          ? `لا يمكن حفظ السند — طريقة الدفع "${selectedPaymentMethod?.name || ''}" لا تملك حساباً محاسبياً مربوطاً. يرجى فتح بيانات طريقة الدفع وتحديد الحساب المحاسبي.`
+          : `Cannot save — Payment method "${selectedPaymentMethod?.name || ''}" has no linked account. Please configure it first.`,
+        'error'
+      );
+      return;
+    }
+    // Validate each item's account
+    for (const item of voucherData.items) {
+      if (item.type === 'customer') {
+        const customer = customers.find(c => c.id === item.entity_id);
+        if (!customer?.account_id) {
+          setIsSubmitting(false);
+          showNotification(
+            language === 'ar'
+              ? `لا يمكن حفظ السند — العميل "${customer?.name || ''}" لا يملك حساباً محاسبياً مربوطاً. يرجى فتح بيانات العميل وتحديد الحساب المحاسبي.`
+              : `Cannot save — Customer "${customer?.name || ''}" has no linked account.`,
+            'error'
+          );
+          return;
+        }
+      } else if (item.type === 'supplier') {
+        const supplier = suppliers.find(s => s.id === item.entity_id);
+        if (!supplier?.account_id) {
+          setIsSubmitting(false);
+          showNotification(
+            language === 'ar'
+              ? `لا يمكن حفظ السند — المورد "${supplier?.name || ''}" لا يملك حساباً محاسبياً مربوطاً. يرجى فتح بيانات المورد وتحديد الحساب المحاسبي.`
+              : `Cannot save — Supplier "${supplier?.name || ''}" has no linked account.`,
+            'error'
+          );
+          return;
+        }
+      } else if (item.type === 'expense') {
+        const category = categories.find(c => c.id === item.entity_id);
+        if (!category?.account_id) {
+          setIsSubmitting(false);
+          showNotification(
+            language === 'ar'
+              ? `لا يمكن حفظ السند — بند المصروف "${category?.name || ''}" لا يملك حساباً محاسبياً مربوطاً. يرجى فتح بيانات بند المصروف وتحديد الحساب المحاسبي.`
+              : `Cannot save — Expense category "${category?.name || ''}" has no linked account.`,
+            'error'
+          );
+          return;
+        }
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     try {
       const paymentMethod = paymentMethods.find(pm => pm.id === voucherData.payment_method_id);
-      const receipt_number = editingReceipt 
-        ? (editingReceipt.voucher_number || editingReceipt.id) 
+      const receipt_number = editingReceipt
+        ? (editingReceipt.voucher_number || editingReceipt.id)
         : (internalRef || `RCPT-${Date.now().toString().slice(-6)}`);
       
       const mappedItems = voucherData.items.map(item => {

@@ -300,8 +300,13 @@ export const SupplierDiscounts: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    if (discountData.amount <= 0) {
-      showNotification('يرجى إدخال مبلغ صحيح', 'error');
+    const supplier = suppliers.find(s => s.id === discountData.supplier_id);
+    if (!supplier?.account_id) {
+      showNotification(`لا يمكن حفظ الخصم — المورد "${supplier?.name || ''}" لا يملك حساباً محاسبياً مربوطاً. يرجى فتح بيانات المورد وتحديد الحساب المحاسبي.`, 'error');
+      return;
+    }
+    if (!discountData.account_id) {
+      showNotification('لا يمكن حفظ الخصم — يرجى اختيار حساب الخصم المحاسبي.', 'error');
       return;
     }
 
