@@ -3567,7 +3567,7 @@ export const PurchaseInvoices: React.FC = () => {
               </button>
               <button 
                 type="button"
-                onClick={() => exportSingleDocumentToExcel(editingInvoice, 'purchase_invoice')} 
+                onClick={() => handleExportSinglePurchaseInvoiceExcel(editingInvoice)} 
                 className="flex items-center gap-1 px-2 py-1 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
                 title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
               >
