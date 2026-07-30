@@ -183,7 +183,10 @@ export default function App() {
   );
 
   function getPageComponent(id: string) {
-    if (id === 'contact_messages') return <ContactMessages />;
+    if (id === 'contact_messages') {
+      if (!isSuperAdmin) return <NotFound />;
+      return <ContactMessages />;
+    }
 
     // Super Admin specific pages
     if (isSuperAdmin) {

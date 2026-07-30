@@ -9347,7 +9347,7 @@ router.post('/contact-messages', async (req, res) => {
 });
 
 // Protected endpoint to fetch all contact messages
-router.get('/contact-messages', authenticateToken, async (req: AuthRequest, res) => {
+router.get('/contact-messages', authenticateToken, authorizeRoles('super_admin'), async (req: AuthRequest, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT * FROM contact_messages ORDER BY created_at DESC`
@@ -9360,7 +9360,7 @@ router.get('/contact-messages', authenticateToken, async (req: AuthRequest, res)
 });
 
 // Protected endpoint to fetch unread contact messages count
-router.get('/contact-messages/unread-count', authenticateToken, async (req: AuthRequest, res) => {
+router.get('/contact-messages/unread-count', authenticateToken, authorizeRoles('super_admin'), async (req: AuthRequest, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT COUNT(*)::int AS count FROM contact_messages WHERE status = 'new'`
@@ -9373,7 +9373,7 @@ router.get('/contact-messages/unread-count', authenticateToken, async (req: Auth
 });
 
 // Protected endpoint to update contact message status
-router.put('/contact-messages/:id/status', authenticateToken, async (req: AuthRequest, res) => {
+router.put('/contact-messages/:id/status', authenticateToken, authorizeRoles('super_admin'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -9399,7 +9399,7 @@ router.put('/contact-messages/:id/status', authenticateToken, async (req: AuthRe
 });
 
 // Protected endpoint to update contact message internal notes
-router.put('/contact-messages/:id/notes', authenticateToken, async (req: AuthRequest, res) => {
+router.put('/contact-messages/:id/notes', authenticateToken, authorizeRoles('super_admin'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { notes } = req.body;
@@ -9415,7 +9415,7 @@ router.put('/contact-messages/:id/notes', authenticateToken, async (req: AuthReq
 });
 
 // Protected endpoint to delete a contact message
-router.delete('/contact-messages/:id', authenticateToken, async (req: AuthRequest, res) => {
+router.delete('/contact-messages/:id', authenticateToken, authorizeRoles('super_admin'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     await pool.query(`DELETE FROM contact_messages WHERE id = $1`, [id]);

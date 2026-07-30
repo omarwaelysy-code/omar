@@ -19,15 +19,27 @@ import {
   Inbox,
   AlertTriangle
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { ContactMessage } from '../types';
 
 export const ContactMessages: React.FC = () => {
+  const { user } = useAuth();
   const { t } = useLanguage();
   const { showNotification } = useNotification();
   const [messages, setMessages] = useState<ContactMessage[]>([]);
+
+  if (user?.role !== 'super_admin') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 p-8 text-center" dir="rtl">
+        <AlertTriangle className="w-16 h-16 text-rose-500 animate-bounce" />
+        <h2 className="text-2xl font-black text-zinc-900">غير مصرح بالدخول</h2>
+        <p className="text-zinc-500 font-medium">هذه الصفحة خاصة بالإدارة العليا (Super Admin) فقط.</p>
+      </div>
+    );
+  }
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'new' | 'read' | 'archived'>('all');

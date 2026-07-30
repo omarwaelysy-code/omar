@@ -238,7 +238,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !isSuperAdmin) return;
     const fetchUnreadContactCount = async () => {
       try {
         const res = await dbService.getUnreadContactMessagesCount();
@@ -250,7 +250,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
     fetchUnreadContactCount();
     const interval = setInterval(fetchUnreadContactCount, 15000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, isSuperAdmin]);
   
   // Change Password Modal State
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
@@ -535,7 +535,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         label: t('nav.admin'),
         icon: Settings,
         subItems: [
-          { id: 'contact_messages', label: t('nav.contact_messages') || 'رسائل التواصل', icon: Mail, badge: unreadContactMessagesCount },
           { id: 'company_settings', label: t('nav.company_settings'), icon: Building2 },
           { id: 'users', label: t('nav.users'), icon: UsersIcon },
           { id: 'period_closing', label: language === 'ar' ? 'إغلاق الفترات المحاسبية' : 'Period Closing', icon: Lock },
