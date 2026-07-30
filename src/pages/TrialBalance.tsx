@@ -134,6 +134,9 @@ export const TrialBalance: React.FC = () => {
     );
   }
 
+  const closingDifference = Math.round((totals.closingDebit - totals.closingCredit) * 100) / 100;
+  const isClosingBalanced = Math.abs(closingDifference) < 0.01;
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -247,27 +250,31 @@ export const TrialBalance: React.FC = () => {
       </div>
 
       {/* Balance Check */}
-      <div className={`p-8 rounded-[2.5rem] border-2 flex items-center justify-between shadow-lg ${
-        globalBalance.isBalanced 
+      <div className={`p-8 rounded-[2.5rem] border-2 flex items-center justify-between shadow-lg transition-colors ${
+        isClosingBalanced 
           ? 'bg-emerald-500 border-emerald-400 text-white shadow-emerald-500/20' 
-          : 'bg-emerald-500 border-emerald-400 text-white shadow-emerald-500/20'
+          : 'bg-rose-600 border-rose-500 text-white shadow-rose-600/20'
       }`}>
         <div className={`flex items-center gap-4 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse text-left'}`}>
-          {globalBalance.isBalanced ? <CheckCircle2 size={32} /> : <AlertTriangle size={32} />}
+          {isClosingBalanced ? <CheckCircle2 size={32} /> : <AlertTriangle size={32} />}
           <div>
             <p className="font-black text-xl">{t('trial.check_title')}</p>
-            <p className="text-sm opacity-80 font-bold">
-              {globalBalance.isBalanced 
+            <p className="text-sm opacity-90 font-bold">
+              {isClosingBalanced 
                 ? t('trial.balanced') 
-                : `${t('trial.unbalanced')} ${formatNumber(globalBalance.difference)}`}
+                : (dir === 'rtl'
+                    ? `ميزان المراجعة غير متوازن! يوجد فرق قدره ${formatNumber(closingDifference)}`
+                    : `Trial balance is unbalanced! Difference: ${formatNumber(closingDifference)}`
+                  )}
             </p>
           </div>
         </div>
         <div className={`${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-          <p className="text-xs font-black uppercase tracking-widest opacity-60">{t('trial.difference')}</p>
-          <p className="text-2xl font-black">{formatNumber(globalBalance.difference)}</p>
+          <p className="text-xs font-black uppercase tracking-widest opacity-70">{t('trial.difference')}</p>
+          <p className="text-2xl font-black">{formatNumber(closingDifference)}</p>
         </div>
       </div>
     </div>
   );
 };
+
