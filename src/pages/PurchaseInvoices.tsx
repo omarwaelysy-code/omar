@@ -4185,7 +4185,10 @@ export const PurchaseInvoices: React.FC = () => {
                                 <th className="p-2 border-r border-zinc-200 text-center w-16">{t('pi.quantity')}</th>
                                 <th className="p-2 border-r border-zinc-200 text-center w-24">{t('pi.price')}</th>
                                 {isVatEnabled && (
-                                  <th className="p-2 border-r border-zinc-200 text-center w-14">ض ق م %</th>
+                                  <>
+                                    <th className="p-2 border-r border-zinc-200 text-center w-14">ض ق م %</th>
+                                    <th className="p-2 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'مبلغ الضريبة' : 'VAT Amount'}</th>
+                                  </>
                                 )}
                                 <th className="p-2 border-r border-zinc-200 text-center w-24">{t('pi.total')}</th>
                                 <th className="p-2 w-10"></th>
