@@ -814,124 +814,182 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         case 'InvoiceTemplate':
         case 'SalesInvoicePdf':
         case 'PurchaseInvoicePdf': {
-          const isSales = templateName.includes('Sales') || templateName === 'InvoiceTemplate';
-          const title = isSales ? 'فاتورة مبيعات' : 'فاتورة مشتريات';
-          const partyLabel = isSales ? 'العميل' : 'المورد';
-          const partyName = isSales ? dto.customer_name : dto.supplier_name;
-          const partyTaxNum = isSales ? dto.customer_tax_number : dto.supplier_tax_number;
+          const docType = dto.operation_type || (templateName.includes('Sales') || templateName === 'InvoiceTemplate' ? 'invoices' : 'purchase_invoices');
+          const isSales = docType === 'invoices' || docType === 'returns' || docType === 'sales_orders' || templateName.includes('Sales') || templateName === 'InvoiceTemplate';
+          const isReturn = docType === 'returns' || docType === 'purchase_returns';
 
-          // Header
-          drawHeader(title, dto.branchName, dto.userName, dto.date);
+          // Language Check: Arabic vs English
+          const isEn = dto.language === 'en';
 
-          // Meta Grid
-          const metaItems = [
-            { label: 'رقم الفاتورة:', val: dto.invoice_number || '' },
-            { label: 'طريقة الدفع:', val: dto.payment_method || '' },
-            { label: partyLabel + ':', val: (partyName || '') + (partyTaxNum ? ` (الرقم الضريبي: ${partyTaxNum})` : '') }
-          ];
-          drawMetaGrid(metaItems);
-
-          // Table Columns (simplified structure for narrow thermal rolls)
-          const columns: ColumnDef[] = isThermal ? [
-            { id: 'product_name', label: 'الصنف', width: 55, align: 'right' },
-            { id: 'quantity', label: 'الكمية', width: 15, align: 'right' },
-            { id: 'total', label: 'الإجمالي', width: 30, align: 'right' }
-          ] : [
-            { id: 'product_code', label: 'كود الصنف', width: 14, align: 'right' },
-            { id: 'product_name', label: 'الصنف', width: 38, align: 'right' },
-            { id: 'quantity', label: 'الكمية', width: 10, align: 'right' },
-            { id: 'unit', label: 'الوحدة', width: 10, align: 'right' },
-            { id: 'unit_price', label: 'السعر', width: 13, align: 'right' },
-            { id: 'vat_amount', label: 'الضريبة', width: 10, align: 'right' },
-            { id: 'total', label: 'الإجمالي', width: 15, align: 'right' }
-          ];
-
-          
-          drawTable(columns, dto.items || [], null);
-
-          // Modern Invoice Summary Card (ملخص الفاتورة)
-          const cardWidth = isThermal ? 140 : 220;
-          const cardHeight = isThermal 
-            ? (65 + (Number(dto.discount_amount) > 0 ? 12 : 0))
-            : (95 + (Number(dto.discount_amount) > 0 ? 14 : 0));
-          
-          if (!isThermal && (currentY + cardHeight > doc.page.height - 50)) {
-            doc.addPage();
-            currentY = 40;
+          // Correct Title based on Type and Language
+          let title = '';
+          if (isReturn) {
+            title = isSales ? (isEn ? 'Sales Return' : 'مرتجع مبيعات') : (isEn ? 'Purchase Return' : 'مرتجع مشتريات');
+          } else {
+            title = isSales ? (isEn ? 'Sales Invoice' : 'فاتورة مبيعات') : (isEn ? 'Purchase Invoice' : 'فاتورة مشتريات');
           }
 
-          // Position card on left side in RTL mode matching the screenshot
-          const cardX = isRtl ? sideMargin : (doc.page.width - sideMargin - cardWidth);
-          const cardY = currentY + 10;
+          const partyLabel = isSales ? (isEn ? 'Customer:' : 'العميل:') : (isEn ? 'Supplier:' : 'المورد:');
+          const partyName = (isSales ? dto.customer_name : dto.supplier_name) || '-';
+          const partyTaxNum = (isSales ? dto.customer_tax_number : dto.supplier_tax_number) || dto.company?.taxNumber || '';
+          const taxLabel = isEn ? 'Tax Number:' : 'الرقم الضريبي:';
+          const payLabel = isEn ? 'Payment Method:' : 'طريقة الدفع:';
+          let payVal = dto.payment_method || (isEn ? 'Credit' : 'آجل');
+          const isCredit = String(payVal).toLowerCase().includes('credit') || payVal === 'آجل' || payVal === 'تقسيط';
 
-          // Card Outer Container (Soft Gray/Green Fill & Border)
+          if (isCredit && dto.due_date) {
+            payVal += isEn ? `  |  Due Date: ${dto.due_date}` : `  |  تاريخ الاستحقاق: ${dto.due_date}`;
+          }
+
+          const branchLabel = isEn ? 'Branch:' : 'الفرع:';
+          const branchVal = dto.branchName || (isEn ? 'Main Branch' : 'الفرع الرئيسي');
+
+          // Draw Top Header Layout
+          const headerStartY = currentY;
+
+          // 1. TOP LEFT (in RTL) / TOP RIGHT (in LTR): Company Logo & Summary Box
+          const logoSize = isThermal ? 32 : 55;
+          const logoX = isRtl ? sideMargin : (doc.page.width - sideMargin - logoSize);
+          
+          if (logoBuffer) {
+            try {
+              doc.image(logoBuffer, logoX, headerStartY, { width: logoSize, height: logoSize });
+            } catch (e: any) {
+              console.error(`${STEP} Logo render error:`, e.message);
+            }
+          }
+
+          // Modern Invoice Summary Box ("ملخص الفاتورة") directly under Logo
+          const cardWidth = isThermal ? 140 : 210;
+          const hasDiscount = Number(dto.discount_amount) > 0;
+          const cardHeight = isThermal 
+            ? (60 + (hasDiscount ? 12 : 0))
+            : (85 + (hasDiscount ? 14 : 0));
+          
+          const cardX = logoX;
+          const cardY = headerStartY + (logoBuffer ? (logoSize + 8) : 0);
+
+          // Card Container
           doc.fillColor('#f8fafc').roundedRect(cardX, cardY, cardWidth, cardHeight, 6).fill();
           doc.strokeColor('#e2e8f0').lineWidth(0.8).roundedRect(cardX, cardY, cardWidth, cardHeight, 6).stroke();
 
-          // Card Header: "ملخص الفاتورة"
-          let rowY = cardY + (isThermal ? 8 : 10);
-          const headerTitle = 'ملخص الفاتورة';
+          // Card Header: "ملخص الفاتورة" / "Invoice Summary"
+          let rowY = cardY + (isThermal ? 6 : 8);
+          const headerTitle = isEn ? 'Invoice Summary' : 'ملخص الفاتورة';
           doc.fillColor('#059669');
-          renderText(headerTitle, cardX + 10, rowY, { 
-            width: cardWidth - 20, 
+          renderText(headerTitle, cardX + 8, rowY, { 
+            width: cardWidth - 16, 
             align: isRtl ? 'right' : 'left', 
             font: 'ArabicBold', 
-            size: isThermal ? 8.5 : 9.5
+            size: isThermal ? 8 : 9
           });
 
-          rowY += isThermal ? 14 : 18;
+          rowY += isThermal ? 12 : 16;
 
-          // Helper to draw card row (Label & Value)
           const drawCardRow = (label: string, val: any, isTotal = false, customValColor?: string) => {
             const fontName = isTotal ? 'ArabicBold' : 'ArabicRegular';
-            const fontSize = isThermal ? (isTotal ? 8.5 : 7.5) : (isTotal ? 10.0 : 8.5);
+            const fontSize = isThermal ? (isTotal ? 8.5 : 7.5) : (isTotal ? 9.5 : 8.5);
             const valColor = isTotal ? '#059669' : (customValColor || '#1e293b');
             const formattedVal = formatNumberValue(val);
-            const halfWidth = (cardWidth / 2) - 10;
+            const halfWidth = (cardWidth / 2) - 8;
 
             if (isRtl) {
-              // Right: Label, Left: Value
               doc.fillColor('#475569');
               renderText(label, cardX + (cardWidth / 2), rowY, { width: halfWidth, align: 'right', font: fontName, size: fontSize });
               doc.fillColor(valColor);
-              renderText(formattedVal, cardX + 10, rowY, { width: halfWidth, align: 'left', font: fontName, size: fontSize });
+              renderText(formattedVal, cardX + 8, rowY, { width: halfWidth, align: 'left', font: fontName, size: fontSize });
             } else {
-              // Left: Label, Right: Value
               doc.fillColor('#475569');
-              renderText(label, cardX + 10, rowY, { width: halfWidth, align: 'left', font: fontName, size: fontSize });
+              renderText(label, cardX + 8, rowY, { width: halfWidth, align: 'left', font: fontName, size: fontSize });
               doc.fillColor(valColor);
               renderText(formattedVal, cardX + (cardWidth / 2), rowY, { width: halfWidth, align: 'right', font: fontName, size: fontSize });
             }
-            rowY += isThermal ? 11 : 14;
+            rowY += isThermal ? 10 : 13;
           };
 
-
-          // 1. Subtotal Before Discount
+          // Subtotal Row: If no discount, label is "الإجمالي" / "Total" (Without "قبل الخصم")
           const subtotalVal = dto.subtotal || (Number(dto.net_total || 0) - Number(dto.vat_amount || 0) + Number(dto.discount_amount || 0));
-          drawCardRow('الإجمالي قبل الخصم', subtotalVal);
+          const subtotalLabel = hasDiscount 
+            ? (isEn ? 'Subtotal Before Discount' : 'الإجمالي قبل الخصم')
+            : (isEn ? 'Total' : 'الإجمالي');
+          
+          drawCardRow(subtotalLabel, subtotalVal);
 
-          // 2. Discount if present
-          if (Number(dto.discount_amount) > 0) {
-            drawCardRow('الخصم', `-${formatNumberValue(dto.discount_amount)}`, false, '#dc2626');
+          if (hasDiscount) {
+            drawCardRow(isEn ? 'Discount' : 'الخصم', `-${formatNumberValue(dto.discount_amount)}`, false, '#dc2626');
           }
 
-          // 3. VAT (ضريبة القيمة المضافة)
-          drawCardRow('ضريبة القيمة المضافة', dto.vat_amount || 0);
+          // VAT Row
+          drawCardRow(isEn ? 'VAT' : 'ضريبة القيمة المضافة', dto.vat_amount || 0);
 
-          // Thin Divider Line
+          // Divider Line
           rowY += isThermal ? 1 : 2;
-          doc.strokeColor('#cbd5e1').lineWidth(0.5).moveTo(cardX + 10, rowY).lineTo(cardX + cardWidth - 10, rowY).stroke();
-          rowY += isThermal ? 3 : 4;
+          doc.strokeColor('#cbd5e1').lineWidth(0.5).moveTo(cardX + 8, rowY).lineTo(cardX + cardWidth - 8, rowY).stroke();
+          rowY += isThermal ? 2 : 3;
 
-          // 4. Grand Total (الصافي النهائي) in Bold Emerald Green
-          drawCardRow('الصافي النهائي', dto.net_total || 0, true);
+          // Net Total Row
+          drawCardRow(isEn ? 'Net Total' : 'الصافي النهائي', dto.net_total || 0, true);
 
-          currentY += cardHeight + (isThermal ? 15 : 25);
+          // 2. TOP RIGHT (in RTL) / TOP LEFT (in LTR): Document Info Grid
+          const infoX = isRtl ? sideMargin : (cardX + cardWidth + 15);
+          const infoWidth = isThermal ? usableWidth : (usableWidth - cardWidth - 20);
+          let infoY = headerStartY;
 
+          // Row 1: Document Title + Number + Date (e.g. فاتورة مبيعات  INV-2026-07-000007  26/7/2026)
+          const titleLine = `${title}  ${dto.invoice_number || ''}  ${dto.date || ''}`;
+          doc.fillColor('#0f172a');
+          renderText(titleLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 9.5 : 14 });
+          infoY += isThermal ? 14 : 22;
+
+          // Row 2: Customer / Supplier
+          const partyLine = `${partyLabel} ${partyName}`;
+          doc.fillColor('#334155');
+          renderText(partyLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 8 : 10 });
+          infoY += isThermal ? 11 : 16;
+
+          // Row 3: Tax Number
+          if (partyTaxNum) {
+            const taxLine = `${taxLabel} ${partyTaxNum}`;
+            doc.fillColor('#475569');
+            renderText(taxLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
+            infoY += isThermal ? 10 : 15;
+          }
+
+          // Row 4: Payment Method & Due Date
+          const payLine = `${payLabel} ${payVal}`;
+          doc.fillColor('#475569');
+          renderText(payLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
+          infoY += isThermal ? 10 : 15;
+
+          // Row 5: Branch
+          const branchLine = `${branchLabel} ${branchVal}`;
+          doc.fillColor('#64748b');
+          renderText(branchLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9 });
+          infoY += isThermal ? 10 : 15;
+
+          // Advance currentY past header area
+          currentY = Math.max(cardY + cardHeight, infoY) + (isThermal ? 10 : 15);
+
+          // Table Columns
+          const columns: ColumnDef[] = isThermal ? [
+            { id: 'product_name', label: isEn ? 'Item' : 'الصنف', width: 55, align: isRtl ? 'right' : 'left' },
+            { id: 'quantity', label: isEn ? 'Qty' : 'الكمية', width: 15, align: 'right' },
+            { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 30, align: 'right' }
+          ] : [
+            { id: 'product_code', label: isEn ? 'Item Code' : 'كود الصنف', width: 14, align: isRtl ? 'right' : 'left' },
+            { id: 'product_name', label: isEn ? 'Item Name' : 'الصنف', width: 38, align: isRtl ? 'right' : 'left' },
+            { id: 'quantity', label: isEn ? 'Qty' : 'الكمية', width: 10, align: 'right' },
+            { id: 'unit', label: isEn ? 'Unit' : 'الوحدة', width: 10, align: 'center' },
+            { id: 'unit_price', label: isEn ? 'Price' : 'السعر', width: 13, align: 'right' },
+            { id: 'vat_amount', label: isEn ? 'VAT' : 'الضريبة', width: 10, align: 'right' },
+            { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 15, align: 'right' }
+          ];
+
+          drawTable(columns, dto.items || [], null);
 
           // QR Code rendering if present
           if (qrBuffer) {
-            const qrSize = isThermal ? 50 : 65;
+            const qrSize = isThermal ? 50 : 60;
             const qrX = isThermal ? (pageWidth - qrSize) / 2 : sideMargin;
             if (!isThermal && (currentY + qrSize > doc.page.height - 50)) {
               doc.addPage();
@@ -944,10 +1002,9 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           }
 
           // Signatures
-          drawSignatures(
-            isSales ? 'توقيع المحاسب' : 'توقيع المشتريات',
-            isSales ? 'توقيع العميل' : 'اعتماد الإدارة'
-          );
+          const leftSig = isSales ? (isEn ? 'Accountant Signature' : 'توقيع المحاسب') : (isEn ? 'Purchasing Signature' : 'توقيع المشتريات');
+          const rightSig = isSales ? (isEn ? 'Customer Signature' : 'توقيع العميل') : (isEn ? 'Management Approval' : 'اعتماد الإدارة');
+          drawSignatures(leftSig, rightSig);
           break;
         }
 

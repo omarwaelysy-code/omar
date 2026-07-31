@@ -405,9 +405,10 @@ export function UnifiedPrintEngine() {
         company: companyDto,
         invoice_number: normalized.document_number || '',
         date: normalized.date || '',
+        due_date: documentData?.due_date || documentData?.payment_terms_date || '',
         payment_method: normalized.payment_method || '',
         customer_name: normalized.customer_name || '',
-        customer_tax_number: normalized.customer_tax_number,
+        customer_tax_number: normalized.customer_tax_number || documentData?.customer_tax_number || documentData?.tax_number || '',
         customer_phone: normalized.customer_phone,
         items: itemsDto,
         subtotal: String(normalized.subtotal || '0'),
@@ -415,7 +416,9 @@ export function UnifiedPrintEngine() {
         vat_amount: String(normalized.vat_amount || '0'),
         net_total: String(normalized.net_total || '0'),
         userName: normalized.user_name,
-        branchName: normalized.branch_name
+        branchName: normalized.branch_name,
+        operation_type: operationType,
+        language: language
       };
     } else if (operationType === 'purchase_invoices' || operationType === 'purchase_returns' || operationType === 'purchase_orders') {
       templateName = 'PurchaseInvoicePdf';
@@ -423,9 +426,10 @@ export function UnifiedPrintEngine() {
         company: companyDto,
         invoice_number: normalized.document_number || '',
         date: normalized.date || '',
+        due_date: documentData?.due_date || documentData?.payment_terms_date || '',
         payment_method: normalized.payment_method || '',
         supplier_name: normalized.supplier_name || '',
-        supplier_tax_number: normalized.supplier_tax_number,
+        supplier_tax_number: normalized.supplier_tax_number || documentData?.supplier_tax_number || documentData?.tax_number || '',
         supplier_phone: normalized.supplier_phone,
         items: itemsDto,
         subtotal: String(normalized.subtotal || '0'),
@@ -433,7 +437,9 @@ export function UnifiedPrintEngine() {
         vat_amount: String(normalized.vat_amount || '0'),
         net_total: String(normalized.net_total || '0'),
         userName: normalized.user_name,
-        branchName: normalized.branch_name
+        branchName: normalized.branch_name,
+        operation_type: operationType,
+        language: language
       };
     } else if (operationType === 'receipt_vouchers' || operationType === 'payment_vouchers') {
       templateName = 'VoucherPdf';
