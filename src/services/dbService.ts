@@ -334,7 +334,10 @@ export const dbService = {
     onError?: (error: Error) => void
   ) {
     let lastData = '';
+    let isFetching = false;
     const fetchData = async () => {
+      if (isFetching) return;
+      isFetching = true;
       try {
         let pollOptions: any = options;
         if (typeof options === 'string') {
@@ -347,20 +350,23 @@ export const dbService = {
           pollOptions = { _polling: 'true' };
         }
         const result = await dbService.listPaginated<T>(collectionName, pollOptions);
-        // Only stringify the data part to avoid missing updates if only summary changes? No, stringify whole result
         const dataString = JSON.stringify(result);
         if (dataString !== lastData) {
           lastData = dataString;
           callback(result);
         }
       } catch (err: any) {
-        console.error('Polling error:', err);
+        if (!err?.message?.includes('timed out') && !err?.message?.includes('AbortError')) {
+          console.warn('Polling error:', err?.message || err);
+        }
         if (onError) onError(err);
+      } finally {
+        isFetching = false;
       }
     };
 
     fetchData(); // Initial fetch
-    const interval = setInterval(fetchData, 2000); // Poll every 2 seconds
+    const interval = setInterval(fetchData, 10000); // Poll every 10 seconds
     
     const handleRefresh = (e: any) => {
       if (e.detail?.collection === collectionName) {
@@ -377,7 +383,10 @@ export const dbService = {
 
   subscribe<T>(collectionName: string, options: string | { company_id: string; [key: string]: any } | any[], callback: (data: T[]) => void, onError?: (error: Error) => void) {
     let lastData = '';
+    let isFetching = false;
     const fetchData = async () => {
+      if (isFetching) return;
+      isFetching = true;
       try {
         let pollOptions: any = options;
         if (typeof options === 'string') {
@@ -396,13 +405,17 @@ export const dbService = {
           callback(data);
         }
       } catch (err: any) {
-        console.error('Polling error:', err);
+        if (!err?.message?.includes('timed out') && !err?.message?.includes('AbortError')) {
+          console.warn('Polling error:', err?.message || err);
+        }
         if (onError) onError(err);
+      } finally {
+        isFetching = false;
       }
     };
 
     fetchData(); // Initial fetch
-    const interval = setInterval(fetchData, 2000); // Poll every 2 seconds
+    const interval = setInterval(fetchData, 10000); // Poll every 10 seconds
     
     const handleRefresh = (e: any) => {
       if (e.detail?.collection === collectionName) {
@@ -564,7 +577,10 @@ export const dbService = {
 
   listen<T>(collectionName: string, id: string, callback: (data: T | null) => void) {
     let lastData = '';
+    let isFetching = false;
     const fetchData = async () => {
+      if (isFetching) return;
+      isFetching = true;
       try {
         const data = await dbService.get<T>(collectionName, id);
         const dataString = JSON.stringify(data);
@@ -572,13 +588,17 @@ export const dbService = {
           lastData = dataString;
           callback(data);
         }
-      } catch (err) {
-        console.error('Listen polling error:', err);
+      } catch (err: any) {
+        if (!err?.message?.includes('timed out') && !err?.message?.includes('AbortError')) {
+          console.warn('Listen polling error:', err?.message || err);
+        }
+      } finally {
+        isFetching = false;
       }
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 2000);
+    const interval = setInterval(fetchData, 10000);
     
     const handleRefresh = (e: any) => {
       if (e.detail?.collection === collectionName) {
