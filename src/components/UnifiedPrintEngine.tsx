@@ -399,13 +399,24 @@ export function UnifiedPrintEngine() {
     let templateName = 'ReportTemplate';
     let dto: any = {};
 
+    const cleanDateVal = (d: any) => {
+      if (!d) return '';
+      const str = String(d).trim();
+      const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (isoMatch) {
+        const [, y, m, day] = isoMatch;
+        return `${parseInt(day, 10)}/${parseInt(m, 10)}/${y}`;
+      }
+      return str.split('T')[0].split(' ')[0];
+    };
+
     if (operationType === 'invoices' || operationType === 'returns' || operationType === 'sales_orders') {
       templateName = 'SalesInvoicePdf';
       dto = {
         company: companyDto,
         invoice_number: normalized.document_number || '',
-        date: normalized.date || '',
-        due_date: documentData?.due_date || documentData?.payment_terms_date || '',
+        date: cleanDateVal(normalized.date),
+        due_date: cleanDateVal(documentData?.due_date || documentData?.payment_terms_date),
         payment_method: normalized.payment_method || '',
         customer_name: normalized.customer_name || '',
         customer_tax_number: normalized.customer_tax_number || documentData?.customer_tax_number || documentData?.tax_number || '',
@@ -425,8 +436,8 @@ export function UnifiedPrintEngine() {
       dto = {
         company: companyDto,
         invoice_number: normalized.document_number || '',
-        date: normalized.date || '',
-        due_date: documentData?.due_date || documentData?.payment_terms_date || '',
+        date: cleanDateVal(normalized.date),
+        due_date: cleanDateVal(documentData?.due_date || documentData?.payment_terms_date),
         payment_method: normalized.payment_method || '',
         supplier_name: normalized.supplier_name || '',
         supplier_tax_number: normalized.supplier_tax_number || documentData?.supplier_tax_number || documentData?.tax_number || '',

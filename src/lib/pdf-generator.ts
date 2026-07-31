@@ -821,6 +821,21 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           // Language Check: Arabic vs English
           const isEn = dto.language === 'en';
 
+          // Date formatting without time (e.g. 26/7/2026 or 2026-07-26)
+          const cleanDate = (dateVal: any): string => {
+            if (!dateVal) return '';
+            const str = String(dateVal).trim();
+            const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (isoMatch) {
+              const [, y, m, d] = isoMatch;
+              return `${parseInt(d, 10)}/${parseInt(m, 10)}/${y}`;
+            }
+            return str.split('T')[0].split(' ')[0];
+          };
+
+          const invoiceDateStr = cleanDate(dto.date);
+          const dueDateStr = cleanDate(dto.due_date);
+
           // Correct Title based on Type and Language
           let title = '';
           if (isReturn) {
@@ -837,8 +852,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           let payVal = dto.payment_method || (isEn ? 'Credit' : 'آجل');
           const isCredit = String(payVal).toLowerCase().includes('credit') || payVal === 'آجل' || payVal === 'تقسيط';
 
-          if (isCredit && dto.due_date) {
-            payVal += isEn ? `  |  Due Date: ${dto.due_date}` : `  |  تاريخ الاستحقاق: ${dto.due_date}`;
+          if (isCredit && dueDateStr) {
+            payVal += isEn ? `  |  Due Date: ${dueDateStr}` : `  |  تاريخ الاستحقاق: ${dueDateStr}`;
           }
 
           const branchLabel = isEn ? 'Branch:' : 'الفرع:';
@@ -847,8 +862,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           // Draw Top Header Layout
           const headerStartY = currentY;
 
-          // 1. TOP LEFT (in RTL) / TOP RIGHT (in LTR): Company Logo & Summary Box
-          const logoSize = isThermal ? 32 : 55;
+          // 1. LEFT SIDE (in RTL) / RIGHT SIDE (in LTR): Company Logo & Summary Box
+          const logoSize = isThermal ? 32 : 50;
           const logoX = isRtl ? sideMargin : (doc.page.width - sideMargin - logoSize);
           
           if (logoBuffer) {
@@ -859,15 +874,15 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             }
           }
 
-          // Modern Invoice Summary Box ("ملخص الفاتورة") directly under Logo
-          const cardWidth = isThermal ? 140 : 210;
+          // Summary Box ("ملخص الفاتورة") directly under Logo on the left side
+          const cardWidth = isThermal ? 140 : 190;
           const hasDiscount = Number(dto.discount_amount) > 0;
           const cardHeight = isThermal 
             ? (60 + (hasDiscount ? 12 : 0))
-            : (85 + (hasDiscount ? 14 : 0));
+            : (82 + (hasDiscount ? 14 : 0));
           
-          const cardX = logoX;
-          const cardY = headerStartY + (logoBuffer ? (logoSize + 8) : 0);
+          const cardX = isRtl ? sideMargin : (doc.page.width - sideMargin - cardWidth);
+          const cardY = headerStartY + (logoBuffer ? (logoSize + 6) : 0);
 
           // Card Container
           doc.fillColor('#f8fafc').roundedRect(cardX, cardY, cardWidth, cardHeight, 6).fill();
@@ -884,7 +899,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             size: isThermal ? 8 : 9
           });
 
-          rowY += isThermal ? 12 : 16;
+          rowY += isThermal ? 12 : 15;
 
           const drawCardRow = (label: string, val: any, isTotal = false, customValColor?: string) => {
             const fontName = isTotal ? 'ArabicBold' : 'ArabicRegular';
@@ -930,24 +945,41 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           // Net Total Row
           drawCardRow(isEn ? 'Net Total' : 'الصافي النهائي', dto.net_total || 0, true);
 
-          // 2. TOP RIGHT (in RTL) / TOP LEFT (in LTR): Document Info Grid
-          const infoX = isRtl ? sideMargin : (cardX + cardWidth + 15);
-          const infoWidth = isThermal ? usableWidth : (usableWidth - cardWidth - 20);
+          // 2. RIGHT SIDE (in RTL) / LEFT SIDE (in LTR): Document Info Grid
+          // Bounded strictly to prevent ANY overlap with cardX
+          const infoGap = 15;
+          const infoX = isRtl ? (cardX + cardWidth + infoGap) : sideMargin;
+          const infoWidth = isThermal ? usableWidth : (pageWidth - sideMargin - infoX);
           let infoY = headerStartY;
 
-          // Row 1: Document Title + Number + Date (e.g. فاتورة مبيعات  INV-2026-07-000007  26/7/2026)
-          const titleLine = `${title}  ${dto.invoice_number || ''}  ${dto.date || ''}`;
+          // Row 1: Document Title (e.g. فاتورة مبيعات)
           doc.fillColor('#0f172a');
-          renderText(titleLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 9.5 : 14 });
+          renderText(title, infoX, infoY, { 
+            width: infoWidth, 
+            align: isRtl ? 'right' : 'left', 
+            font: 'ArabicBold', 
+            size: isThermal ? 9.5 : 15 
+          });
+
+          // Invoice Number & Date placed cleanly beside/under Title ("صغر رقم الفاتورة مثل الصورة الاولى")
+          const numAndDateText = `${dto.invoice_number || ''}    ${invoiceDateStr}`;
+          doc.fillColor('#334155');
+          renderText(numAndDateText, infoX, infoY + (isThermal ? 13 : 3), { 
+            width: infoWidth - (isThermal ? 50 : 110), 
+            align: isRtl ? 'left' : 'right', 
+            font: 'ArabicBold', 
+            size: isThermal ? 8 : 9.5 
+          });
+
           infoY += isThermal ? 14 : 22;
 
           // Row 2: Customer / Supplier
           const partyLine = `${partyLabel} ${partyName}`;
-          doc.fillColor('#334155');
-          renderText(partyLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 8 : 10 });
+          doc.fillColor('#1e293b');
+          renderText(partyLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 8 : 10.5 });
           infoY += isThermal ? 11 : 16;
 
-          // Row 3: Tax Number
+          // Row 3: Tax Number (if present)
           if (partyTaxNum) {
             const taxLine = `${taxLabel} ${partyTaxNum}`;
             doc.fillColor('#475569');
@@ -967,7 +999,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           renderText(branchLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9 });
           infoY += isThermal ? 10 : 15;
 
-          // Advance currentY past header area
+          // Advance currentY past header area cleanly
           currentY = Math.max(cardY + cardHeight, infoY) + (isThermal ? 10 : 15);
 
           // Table Columns
