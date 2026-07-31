@@ -2469,11 +2469,20 @@ export const Returns: React.FC = () => {
                       {(() => {
                         const isVatEnabled = company?.settings?.vat_enabled || company?.vat_enabled || false;
                         if (!isVatEnabled) return null;
+                        const calculatedVatAmount = items.reduce((sum, i) => {
+                          const qty = Number(i.quantity) || 0;
+                          const price = Number(i.unit_price) || 0;
+                          const rate = Number(i.vat_rate) || 0;
+                          const vAmount = (i.vat_amount !== undefined && i.vat_amount !== null && Number(i.vat_amount) > 0)
+                            ? Number(i.vat_amount)
+                            : (qty * price * (rate / 100));
+                          return sum + vAmount;
+                        }, 0);
                         return (
                           <div className="flex justify-between items-center text-zinc-650 text-[10px] pt-0.5 border-t border-dashed border-zinc-200">
                             <span className="font-medium">{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</span>
                             <span className="font-bold text-[11px]">
-                              +{formatMoney(items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0))}
+                              +{formatMoney(calculatedVatAmount)}
                             </span>
                           </div>
                         );
@@ -2484,7 +2493,12 @@ export const Returns: React.FC = () => {
                           <span className="font-black text-xs tracking-tighter text-left">
                             {formatMoney(
                               items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) + 
-                              ((company?.settings?.vat_enabled || company?.vat_enabled) ? items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0) : 0) - 
+                              ((company?.settings?.vat_enabled || company?.vat_enabled) ? items.reduce((sum, i) => {
+                                const qty = Number(i.quantity) || 0;
+                                const price = Number(i.unit_price) || 0;
+                                const rate = Number(i.vat_rate) || 0;
+                                return sum + ((i.vat_amount !== undefined && i.vat_amount !== null && Number(i.vat_amount) > 0) ? Number(i.vat_amount) : (qty * price * (rate / 100)));
+                              }, 0) : 0) - 
                               discount
                             )} {currentReturnCurrencyCode}
                           </span>
@@ -2555,7 +2569,10 @@ export const Returns: React.FC = () => {
                           <th className="p-1 border-r border-zinc-200 text-center w-16">{language === 'ar' ? 'الكمية' : 'Qty'}</th>
                           <th className="p-1 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'سعر الوحدة' : 'Unit Price'}</th>
                           {((company?.settings?.vat_enabled || company?.vat_enabled) ? true : false) && (
-                            <th className="p-1 border-r border-zinc-200 text-center w-14">{language === 'ar' ? 'ض ق م' : 'VAT %'}</th>
+                            <>
+                              <th className="p-1 border-r border-zinc-200 text-center w-14">{language === 'ar' ? 'ض ق م' : 'VAT %'}</th>
+                              <th className="p-1 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'مبلغ الضريبة' : 'VAT Amount'}</th>
+                            </>
                           )}
                           <th className="p-1 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'الإجمالي' : 'Total'}</th>
                           <th className="p-1 w-10"></th>

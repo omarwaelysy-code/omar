@@ -2730,21 +2730,37 @@ export const PurchaseReturns: React.FC = () => {
                       </div>
                       <span className="font-bold">-{formatMoney(discount)}</span>
                     </div>
-                    {isVatEnabled && (
-                      <div className="flex justify-between items-center text-zinc-650 text-xs pt-1 border-t border-dashed border-zinc-200">
-                        <span className="font-medium">{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</span>
-                        <span className="font-bold">
-                          +{formatMoney(items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0))}
-                        </span>
-                      </div>
-                    )}
+                    {isVatEnabled && (() => {
+                      const calculatedVatAmount = items.reduce((sum, i) => {
+                        const qty = Number(i.quantity) || 0;
+                        const price = Number(i.unit_price) || 0;
+                        const rate = Number(i.vat_rate) || 0;
+                        const vAmount = (i.vat_amount !== undefined && i.vat_amount !== null && Number(i.vat_amount) > 0)
+                          ? Number(i.vat_amount)
+                          : (qty * price * (rate / 100));
+                        return sum + vAmount;
+                      }, 0);
+                      return (
+                        <div className="flex justify-between items-center text-zinc-650 text-xs pt-1 border-t border-dashed border-zinc-200">
+                          <span className="font-medium">{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</span>
+                          <span className="font-bold">
+                            +{formatMoney(calculatedVatAmount)}
+                          </span>
+                        </div>
+                      );
+                    })()}
                     <div className="flex justify-between items-center text-emerald-650 text-xs pt-1.5 border-t border-zinc-200">
                       <span className="font-black text-sm">{language === 'ar' ? 'الصافي النهائي' : 'Net Total'}</span>
                       <div className="flex flex-col items-end">
                         <span className="font-black text-lg tracking-tighter">
                           {formatMoney(
                             items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) + 
-                            (isVatEnabled ? items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0) : 0) - 
+                            (isVatEnabled ? items.reduce((sum, i) => {
+                              const qty = Number(i.quantity) || 0;
+                              const price = Number(i.unit_price) || 0;
+                              const rate = Number(i.vat_rate) || 0;
+                              return sum + ((i.vat_amount !== undefined && i.vat_amount !== null && Number(i.vat_amount) > 0) ? Number(i.vat_amount) : (qty * price * (rate / 100)));
+                            }, 0) : 0) - 
                             discount
                           )} {currentInvoiceCurrencyCode}
                         </span>
@@ -2810,7 +2826,10 @@ export const PurchaseReturns: React.FC = () => {
                         <th className="p-2 border-r border-zinc-200 text-center w-16">الكمية</th>
                         <th className="p-2 border-r border-zinc-200 text-center w-24">السعر</th>
                         {isVatEnabled && (
-                          <th className="p-2 border-r border-zinc-200 text-center w-14">ض ق م %</th>
+                          <>
+                            <th className="p-2 border-r border-zinc-200 text-center w-14">ض ق م %</th>
+                            <th className="p-2 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'مبلغ الضريبة' : 'VAT Amount'}</th>
+                          </>
                         )}
                         <th className="p-2 border-r border-zinc-200 text-center w-24">الإجمالي</th>
                         <th className="p-2 w-10"></th>
@@ -3085,19 +3104,28 @@ export const PurchaseReturns: React.FC = () => {
                             />
                           </td>
                           {isVatEnabled && (
-                            <td className="p-0.5 border-b border-r border-zinc-200 w-14">
-                              <div className="flex items-center justify-center gap-0.5">
-                                <input 
-                                  type="number" 
-                                  min={0}
-                                  max={100}
-                                  className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs"
-                                  value={item.vat_rate !== undefined && item.vat_rate !== null ? Number(item.vat_rate) : 0}
-                                  onChange={(e) => updateItem(index, 'vat_rate', parseFloat(e.target.value) || 0)}
-                                />
-                                <span className="text-sm text-zinc-900 font-black">%</span>
-                              </div>
-                            </td>
+                            <>
+                              <td className="p-0.5 border-b border-r border-zinc-200 w-14">
+                                <div className="flex items-center justify-center gap-0.5">
+                                  <input 
+                                    type="number" 
+                                    min={0}
+                                    max={100}
+                                    className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs"
+                                    value={item.vat_rate !== undefined && item.vat_rate !== null ? Number(item.vat_rate) : 0}
+                                    onChange={(e) => updateItem(index, 'vat_rate', parseFloat(e.target.value) || 0)}
+                                  />
+                                  <span className="text-sm text-zinc-900 font-black">%</span>
+                                </div>
+                              </td>
+                              <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-amber-700 text-xs">
+                                {formatMoney(
+                                  (item.vat_amount !== undefined && item.vat_amount !== null && Number(item.vat_amount) > 0)
+                                    ? Number(item.vat_amount)
+                                    : ((Number(item.quantity) || 0) * (Number(item.unit_price) || 0) * ((Number(item.vat_rate) || 0) / 100))
+                                )}
+                              </td>
+                            </>
                           )}
                           <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-emerald-600 text-xs">
                             {formatMoney(item.total)}
@@ -3115,7 +3143,7 @@ export const PurchaseReturns: React.FC = () => {
                       ))}
                       {items.length === 0 && (
                         <tr>
-                          <td colSpan={isVatEnabled ? 11 : 10} className="px-3 py-6 text-center text-zinc-400 italic text-xs">
+                          <td colSpan={isVatEnabled ? 12 : 10} className="px-3 py-6 text-center text-zinc-400 italic text-xs">
                             لا توجد أصناف حالياً
                           </td>
                         </tr>

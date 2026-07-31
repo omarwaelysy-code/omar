@@ -1793,7 +1793,15 @@ export const PurchaseInvoices: React.FC = () => {
   const calculateTotal = () => {
     const subtotal = items.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
     const vatTotal = isVatEnabled
-      ? items.reduce((sum, item) => sum + (Number((item as any).vat_amount) || 0), 0)
+      ? items.reduce((sum, item) => {
+          const qty = Number(item.quantity) || 0;
+          const price = Number(item.cost_price) || 0;
+          const rate = Number((item as any).vat_rate) || 0;
+          const vAmount = ((item as any).vat_amount !== undefined && (item as any).vat_amount !== null && Number((item as any).vat_amount) > 0)
+            ? Number((item as any).vat_amount)
+            : (qty * price * (rate / 100));
+          return sum + vAmount;
+        }, 0)
       : 0;
     return subtotal + vatTotal - (invoiceData.discount || 0);
   };
@@ -3699,14 +3707,25 @@ export const PurchaseInvoices: React.FC = () => {
                             </div>
                             <span className="font-bold text-[11px]">-{formatMoney(invoiceData.discount)}</span>
                           </div>
-                          {isVatEnabled && (
-                            <div className="flex justify-between items-center text-zinc-650 text-[10px] pt-0.5 border-t border-dashed border-zinc-200">
-                              <span className="font-medium">{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</span>
-                              <span className="font-bold text-[11px]">
-                                +{formatMoney(items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0))}
-                              </span>
-                            </div>
-                          )}
+                          {isVatEnabled && (() => {
+                            const calculatedVatAmount = items.reduce((sum, i) => {
+                              const qty = Number(i.quantity) || 0;
+                              const price = Number(i.cost_price) || 0;
+                              const rate = Number((i as any).vat_rate) || 0;
+                              const vAmount = ((i as any).vat_amount !== undefined && (i as any).vat_amount !== null && Number((i as any).vat_amount) > 0)
+                                ? Number((i as any).vat_amount)
+                                : (qty * price * (rate / 100));
+                              return sum + vAmount;
+                            }, 0);
+                            return (
+                              <div className="flex justify-between items-center text-zinc-650 text-[10px] pt-0.5 border-t border-dashed border-zinc-200">
+                                <span className="font-medium">{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</span>
+                                <span className="font-bold text-[11px]">
+                                  +{formatMoney(calculatedVatAmount)}
+                                </span>
+                              </div>
+                            );
+                          })()}
                           <div className="flex justify-between items-center text-emerald-600 text-[10px] pt-0.5 border-t border-zinc-200">
                             <span className="font-black text-[11px]">{t('pi.grand_total')}</span>
                             <div className="flex flex-col items-end">
@@ -4446,19 +4465,28 @@ export const PurchaseInvoices: React.FC = () => {
 
                                   {/* VAT % */}
                                   {isVatEnabled && (
-                                    <td className="p-0.5 border-b border-r border-zinc-200 w-14">
-                                      <div className="flex items-center justify-center gap-0.5">
-                                        <input 
-                                          type="number" 
-                                          min={0}
-                                          max={100}
-                                          className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs"
-                                          value={(item as any).vat_rate !== undefined && (item as any).vat_rate !== null ? Number((item as any).vat_rate) : 0}
-                                          onChange={(e) => updateItem(index, 'vat_rate', parseFloat(e.target.value) || 0)}
-                                        />
-                                        <span className="text-sm text-zinc-900 font-black">%</span>
-                                      </div>
-                                    </td>
+                                    <>
+                                      <td className="p-0.5 border-b border-r border-zinc-200 w-14">
+                                        <div className="flex items-center justify-center gap-0.5">
+                                          <input 
+                                            type="number" 
+                                            min={0}
+                                            max={100}
+                                            className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs"
+                                            value={(item as any).vat_rate !== undefined && (item as any).vat_rate !== null ? Number((item as any).vat_rate) : 0}
+                                            onChange={(e) => updateItem(index, 'vat_rate', parseFloat(e.target.value) || 0)}
+                                          />
+                                          <span className="text-sm text-zinc-900 font-black">%</span>
+                                        </div>
+                                      </td>
+                                      <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-amber-700 text-xs">
+                                        {formatMoney(
+                                          ((item as any).vat_amount !== undefined && (item as any).vat_amount !== null && Number((item as any).vat_amount) > 0)
+                                            ? Number((item as any).vat_amount)
+                                            : ((Number(item.quantity) || 0) * (Number(item.cost_price) || 0) * ((Number((item as any).vat_rate) || 0) / 100))
+                                        )}
+                                      </td>
+                                    </>
                                   )}
 
                                   {/* Total */}
