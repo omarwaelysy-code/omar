@@ -742,107 +742,109 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           onMouseLeave={() => setActiveDesktopMenu(null)}
           className="flex items-center gap-[1px] xl:gap-0.5 2xl:gap-1 flex-1 min-w-0 py-1"
         >
-          {/* Company Switcher (Replaces Dashboard position next to Logo) */}
-          <div className="relative shrink-0 mr-0.5 ml-0.5">
-            <button
-              type="button"
-              onClick={() => setIsCompanyMenuOpen(!isCompanyMenuOpen)}
-              className="flex items-center gap-1 px-1.5 xl:px-2 py-1 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-900 rounded-lg transition-all border border-emerald-200/80 shadow-xs cursor-pointer text-[10px] xl:text-[11px] 2xl:text-xs font-bold"
-              title={language === 'ar' ? 'تبديل الشركة' : 'Switch Company'}
-            >
-              <Building2 size={13} className="text-emerald-600 shrink-0" />
-              <span className="truncate max-w-[70px] xl:max-w-[110px] 2xl:max-w-[150px]">
-                {activeCompanyName}
-              </span>
-              <ChevronDown size={10} className={`text-emerald-600/70 transition-transform shrink-0 ${isCompanyMenuOpen ? 'rotate-180' : ''}`} />
-            </button>
+          {/* Company Switcher (Only rendered if user has multiple companies or is super_admin) */}
+          {(user?.role === 'super_admin' || (userMemberships && userMemberships.length > 1)) && (
+            <div className="relative shrink-0 mr-0.5 ml-0.5">
+              <button
+                type="button"
+                onClick={() => setIsCompanyMenuOpen(!isCompanyMenuOpen)}
+                className="flex items-center gap-1 px-1.5 xl:px-2 py-1 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-900 rounded-lg transition-all border border-emerald-200/80 shadow-xs cursor-pointer text-[10px] xl:text-[11px] 2xl:text-xs font-bold"
+                title={language === 'ar' ? 'تبديل الشركة' : 'Switch Company'}
+              >
+                <Building2 size={13} className="text-emerald-600 shrink-0" />
+                <span className="truncate max-w-[70px] xl:max-w-[110px] 2xl:max-w-[150px]">
+                  {activeCompanyName}
+                </span>
+                <ChevronDown size={10} className={`text-emerald-600/70 transition-transform shrink-0 ${isCompanyMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
 
-            <AnimatePresence>
-              {isCompanyMenuOpen && (
-                <>
-                  <div 
-                    className="fixed inset-0 z-[180]" 
-                    onClick={() => setIsCompanyMenuOpen(false)}
-                  />
-                  <motion.div
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 5 }}
-                    className={`absolute top-full ${dir === 'rtl' ? 'right-0' : 'left-0'} mt-1.5 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-[220]`}
-                  >
-                    <div className="px-3 py-1.5 border-b border-slate-100 mb-1">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('common.switch_company')}</p>
-                      <p className="text-xs font-bold text-emerald-700 truncate mt-0.5">{activeCompanyName}</p>
-                    </div>
-                    <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar">
-                      {user?.role === 'super_admin' && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (setWorkspaceMode) setWorkspaceMode('super_admin');
-                              setIsCompanyMenuOpen(false);
-                            }}
-                            className={`
-                              w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'} text-xs font-bold
-                              ${workspaceMode === 'super_admin'
-                                ? 'bg-indigo-50 text-indigo-700'
-                                : 'text-indigo-600 hover:bg-indigo-50/50'}
-                            `}
-                          >
-                            <ShieldCheck size={15} className="shrink-0" />
-                            <span className="truncate flex-1">
-                              {language === 'ar' ? 'لوحة تحكم المدير العام' : 'Super Admin Dashboard'}
-                            </span>
-                          </button>
-                          <div className="h-px bg-slate-100 my-1" />
-                        </>
-                      )}
-                      {userMemberships && userMemberships.length > 0 ? (
-                        userMemberships.map((membership) => {
-                          const isSelected = user?.company_id === membership.company_id && workspaceMode !== 'super_admin';
-                          return (
+              <AnimatePresence>
+                {isCompanyMenuOpen && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-[180]" 
+                      onClick={() => setIsCompanyMenuOpen(false)}
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 5 }}
+                      className={`absolute top-full ${dir === 'rtl' ? 'right-0' : 'left-0'} mt-1.5 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-[220]`}
+                    >
+                      <div className="px-3 py-1.5 border-b border-slate-100 mb-1">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('common.switch_company')}</p>
+                        <p className="text-xs font-bold text-emerald-700 truncate mt-0.5">{activeCompanyName}</p>
+                      </div>
+                      <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar">
+                        {user?.role === 'super_admin' && (
+                          <>
                             <button
-                              key={membership.company_id}
                               type="button"
                               onClick={() => {
-                                switchCompany(membership.company_id);
+                                if (setWorkspaceMode) setWorkspaceMode('super_admin');
                                 setIsCompanyMenuOpen(false);
                               }}
                               className={`
-                                w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'} text-xs
-                                ${isSelected 
-                                  ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200/60' 
-                                  : 'text-slate-700 hover:bg-slate-50'}
+                                w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'} text-xs font-bold
+                                ${workspaceMode === 'super_admin'
+                                  ? 'bg-indigo-50 text-indigo-700'
+                                  : 'text-indigo-600 hover:bg-indigo-50/50'}
                               `}
                             >
-                              <Building2 size={15} className={isSelected ? 'text-emerald-600 shrink-0' : 'text-slate-400 shrink-0'} />
-                              <div className="flex-1 min-w-0">
-                                <p className="font-bold truncate">{membership.company_name || activeCompanyName}</p>
-                                <p className="text-[10px] text-slate-400 font-medium">
-                                  {membership.role === 'admin' || user?.role === 'super_admin' || isCompanyAdmin
-                                    ? (language === 'ar' ? 'مدير شركة' : 'Company Admin') 
-                                    : (language === 'ar' ? 'مستخدم' : 'User')}
-                                </p>
-                              </div>
-                              {isSelected && (
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                              )}
+                              <ShieldCheck size={15} className="shrink-0" />
+                              <span className="truncate flex-1">
+                                {language === 'ar' ? 'لوحة تحكم المدير العام' : 'Super Admin Dashboard'}
+                              </span>
                             </button>
-                          );
-                        })
-                      ) : (
-                        <div className="px-3 py-2 text-xs font-bold text-emerald-800 bg-emerald-50 rounded-xl flex items-center gap-2">
-                          <Building2 size={15} className="text-emerald-600 shrink-0" />
-                          <span className="truncate">{activeCompanyName}</span>
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
-          </div>
+                            <div className="h-px bg-slate-100 my-1" />
+                          </>
+                        )}
+                        {userMemberships && userMemberships.length > 0 ? (
+                          userMemberships.map((membership) => {
+                            const isSelected = user?.company_id === membership.company_id && workspaceMode !== 'super_admin';
+                            return (
+                              <button
+                                key={membership.company_id}
+                                type="button"
+                                onClick={() => {
+                                  switchCompany(membership.company_id);
+                                  setIsCompanyMenuOpen(false);
+                                }}
+                                className={`
+                                  w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'} text-xs
+                                  ${isSelected 
+                                    ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200/60' 
+                                    : 'text-slate-700 hover:bg-slate-50'}
+                                `}
+                              >
+                                <Building2 size={15} className={isSelected ? 'text-emerald-600 shrink-0' : 'text-slate-400 shrink-0'} />
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-bold truncate">{membership.company_name || activeCompanyName}</p>
+                                  <p className="text-[10px] text-slate-400 font-medium">
+                                    {membership.role === 'admin' || user?.role === 'super_admin' || isCompanyAdmin
+                                      ? (language === 'ar' ? 'مدير شركة' : 'Company Admin') 
+                                      : (language === 'ar' ? 'مستخدم' : 'User')}
+                                  </p>
+                                </div>
+                                {isSelected && (
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                                )}
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <div className="px-3 py-2 text-xs font-bold text-emerald-800 bg-emerald-50 rounded-xl flex items-center gap-2">
+                            <Building2 size={15} className="text-emerald-600 shrink-0" />
+                            <span className="truncate">{activeCompanyName}</span>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
 
           {filteredNavItems.map((item: any) => {
             const isActive = item.subItems 
