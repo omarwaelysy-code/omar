@@ -4391,8 +4391,44 @@ router.put('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
     const invoiceId = req.params.id;
     const companyId = req.user?.company_id;
     if (!isUUID(invoiceId)) return sendError(res, 400, 'Invalid Invoice ID format');
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
 
     await client.query('BEGIN');
+
+    // Fetch existing invoice to preserve date, invoice_number, warehouse_id if missing
+    const existingInvRes = await client.query('SELECT * FROM invoices WHERE id = $1 AND company_id = $2', [invoiceId, companyId]);
+    if (existingInvRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
+      return sendError(res, 404, 'Invoice not found or permission denied');
+    }
+    const existingInv = existingInvRes.rows[0];
+
+    const { items, id: bodyId, ...rawInvoiceData } = req.body;
+
+    const invoiceNumber = rawInvoiceData.invoice_number || existingInv.invoice_number || `INV-${invoiceId}`;
+    const invoiceDate = rawInvoiceData.date || existingInv.date || new Date().toISOString().slice(0, 10);
+    const warehouseId = rawInvoiceData.warehouse_id || existingInv.warehouse_id || null;
+    const customerId = rawInvoiceData.customer_id || existingInv.customer_id;
+
+    // ─── Accounting Account Validation ───────────────────────────────────────
+    if (customerId) {
+      const custV = await validateCustomerAccountDB(client, companyId, customerId);
+      if (!custV.valid) {
+        await client.query('ROLLBACK');
+        client.release();
+        return sendError(res, 400, `لا يمكن تعديل الفاتورة — العميل "${custV.customerName}" لا يملك حساباً محاسبياً مربوطاً.\nيرجى فتح بيانات العميل وتحديد الحساب المحاسبي قبل المتابعة.`);
+      }
+    }
+
+    if (items && Array.isArray(items) && items.length > 0) {
+      const itemAccountError = await validateInvoiceItemAccounts(client, companyId, items);
+      if (itemAccountError) {
+        await client.query('ROLLBACK');
+        client.release();
+        return sendError(res, 400, itemAccountError);
+      }
+    }
 
     // Reset currently linked sales orders
     await client.query(
@@ -4402,10 +4438,9 @@ router.put('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
       [invoiceId, companyId]
     );
 
-    const { items, id: bodyId, ...rawInvoiceData } = req.body;
-
     // Validate negative stock restrictions
     for (const item of (items || [])) {
+      if (!item.product_id) continue;
       const prodRes = await client.query('SELECT stock, type, name FROM products WHERE id = $1', [item.product_id]);
       if (prodRes.rows.length > 0) {
         const prod = prodRes.rows[0];
@@ -4442,7 +4477,7 @@ router.put('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
         `UPDATE sales_orders 
          SET status = 'converted', invoice_id = $1, invoice_number = $2 
          WHERE id = ANY($3) AND company_id = $4`,
-         [invoiceId, rawInvoiceData.invoice_number || `INV-${invoiceId}`, req.body.order_ids, companyId]
+         [invoiceId, invoiceNumber, req.body.order_ids, companyId]
       );
     }
     rawInvoiceData.source_orders = sourceOrdersStr || null;
@@ -4464,153 +4499,155 @@ router.put('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
     const result = await client.query(query, params);
     if (result.rowCount === 0) {
       await client.query('ROLLBACK');
+      client.release();
       return sendError(res, 404, 'Invoice not found or permission denied');
     }
 
     // Sync Items
     if (items && Array.isArray(items) && items.length > 0) {
-    await client.query('DELETE FROM invoice_items WHERE invoice_id = $1', [invoiceId]);
-        await reverseAndRecalculate(client, companyId || '', invoiceId);
-        await InventoryMovementService.reverseMovement('sales_invoice', invoiceId, client);
-    
-        const invData = invoiceData;
-        const cogsLines: { account_id: string; account_name: string; debit: number; credit: number; description: string }[] = [];
-        const movementLines: any[] = [];
-    
-        for (const item of (items || [])) {
-          const sanitizedItem = sanitizeData('invoice_items', item);
-          const itemId = uuidv4();
-          const itemData = { ...sanitizedItem, id: itemId, invoice_id: invoiceId };
-          if (invData.company_id) itemData.company_id = invData.company_id;
-    
-          // Cost Calculation and Layer satisfying
-          // Fetch product details
-          const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
-          if (prodRes.rows.length > 0) {
-            const prod = prodRes.rows[0];
-            if (prod.type !== 'service' && !prod.is_service) {
-              // Perform recordSale
-              const quantity = parseFloat(item.quantity || '0');
-              if (quantity > 0) {
-                const costInfo = await recordSale(
-                  client,
-                  companyId,
-                  invData.warehouse_id || null,
-                  item.product_id,
-                  quantity,
-                  invoiceId,
-                  invoiceData.invoice_number,
-                  invoiceData.date
-                );
+      await client.query('DELETE FROM invoice_items WHERE invoice_id = $1', [invoiceId]);
+      await reverseAndRecalculate(client, companyId || '', invoiceId);
+      await InventoryMovementService.reverseMovement('sales_invoice', invoiceId, client);
+  
+      const invData = invoiceData;
+      const cogsLines: { account_id: string; account_name: string; debit: number; credit: number; description: string }[] = [];
+      const movementLines: any[] = [];
+  
+      for (const item of items) {
+        if (!item.product_id) continue;
+        const sanitizedItem = sanitizeData('invoice_items', item);
+        const itemId = uuidv4();
+        const itemData = { ...sanitizedItem, id: itemId, invoice_id: invoiceId };
+        if (invData.company_id) itemData.company_id = invData.company_id;
+  
+        // Cost Calculation and Layer satisfying
+        // Fetch product details
+        const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
+        if (prodRes.rows.length > 0) {
+          const prod = prodRes.rows[0];
+          if (prod.type !== 'service' && !prod.is_service) {
+            // Perform recordSale
+            const quantity = parseFloat(item.quantity || '0');
+            if (quantity > 0) {
+              const costInfo = await recordSale(
+                client,
+                companyId,
+                warehouseId,
+                item.product_id,
+                quantity,
+                invoiceId,
+                invoiceNumber,
+                invoiceDate
+              );
+              
+              itemData.unit_cost = costInfo.unitCost;
+              itemData.total_cost = costInfo.totalCost;
+  
+              movementLines.push({
+                product_id: item.product_id,
+                unit_id: item.unit_id || item.unit || 'default',
+                quantity: quantity,
+                direction: 'OUT',
+                unit_cost: costInfo.unitCost,
+                total_cost: costInfo.totalCost,
+                batch_id: item.batch_id || null,
+                serial_number: item.serial_number || null,
+                notes: item.notes || null
+              });
+              itemData.costing_method_used = costInfo.methodUsed;
+  
+              // Prepare perpetual queue / continuous inventory posting
+              if (costInfo.totalCost > 0) {
+                // Find accounts
+                // 1. Cost of Goods Sold (COGS) Account
+                let costAccId = prod.cost_account_id;
+                let costAccName = prod.cost_account_name || 'تكلفة المبيعات';
                 
-                itemData.unit_cost = costInfo.unitCost;
-                itemData.total_cost = costInfo.totalCost;
-    
-                movementLines.push({
-                  product_id: item.product_id,
-                  unit_id: item.unit_id || item.unit || 'default',
-                  quantity: quantity,
-                  direction: 'OUT',
-                  unit_cost: costInfo.unitCost,
-                  total_cost: costInfo.totalCost,
-                  batch_id: item.batch_id || null,
-                  serial_number: item.serial_number || null,
-                  notes: item.notes || null
-                });
-                itemData.costing_method_used = costInfo.methodUsed;
-    
-                // Prepare perpetual queue / continuous inventory posting
-                if (costInfo.totalCost > 0) {
-                  // Find accounts
-                  // 1. Cost of Goods Sold (COGS) Account
-                  let costAccId = prod.cost_account_id;
-                  let costAccName = prod.cost_account_name || 'تكلفة المبيعات';
+                // 2. Inventory Account
+                let invAccId = prod.inventory_account_id;
+                let invAccName = prod.inventory_account_name || 'المخزون';
+  
+                // Fallbacks if not configured on the product specifically
+                if (!costAccId || !invAccId) {
+                  const accountsRes = await client.query('SELECT * FROM accounts WHERE company_id = $1', [companyId]);
+                  const accounts = accountsRes.rows;
                   
-                  // 2. Inventory Account
-                  let invAccId = prod.inventory_account_id;
-                  let invAccName = prod.inventory_account_name || 'المخزون';
-    
-                  // Fallbacks if not configured on the product specifically
-                  if (!costAccId || !invAccId) {
-                    const accountsRes = await client.query('SELECT * FROM accounts WHERE company_id = $1', [companyId]);
-                    const accounts = accountsRes.rows;
-                    
-                    if (!costAccId) {
-                      const fallbackCostAcc = accounts.find((a: any) => a.name.includes('تكلفة المبيعات') || a.name.includes('تكلفة مبيعات') || a.name.includes('تكلفة البضاعة المباعة'));
-                      if (fallbackCostAcc) {
-                        costAccId = fallbackCostAcc.id;
-                        costAccName = fallbackCostAcc.name;
-                      }
-                    }
-                    if (!invAccId) {
-                      const fallbackInvAcc = accounts.find((a: any) => a.name.includes('مخزون') || a.name.includes('مخازن'));
-                      if (fallbackInvAcc) {
-                        invAccId = fallbackInvAcc.id;
-                        invAccName = fallbackInvAcc.name;
-                      }
+                  if (!costAccId) {
+                    const fallbackCostAcc = accounts.find((a: any) => a.name.includes('تكلفة المبيعات') || a.name.includes('تكلفة مبيعات') || a.name.includes('تكلفة البضاعة المباعة'));
+                    if (fallbackCostAcc) {
+                      costAccId = fallbackCostAcc.id;
+                      costAccName = fallbackCostAcc.name;
                     }
                   }
-    
-                  if (costAccId) {
-                    cogsLines.push({
-                      account_id: costAccId,
-                      account_name: costAccName,
-                      debit: costInfo.totalCost,
-                      credit: 0,
-                      description: `تكلفة البضاعة المباعة صنف: ${prod.name} - فاتورة ${invoiceData.invoice_number}`
-                    });
+                  if (!invAccId) {
+                    const fallbackInvAcc = accounts.find((a: any) => a.name.includes('مخزون') || a.name.includes('مخازن'));
+                    if (fallbackInvAcc) {
+                      invAccId = fallbackInvAcc.id;
+                      invAccName = fallbackInvAcc.name;
+                    }
                   }
-                  if (invAccId) {
-                    cogsLines.push({
-                      account_id: invAccId,
-                      account_name: invAccName,
-                      debit: 0,
-                      credit: costInfo.totalCost,
-                      description: `تخفيض المخزون صنف: ${prod.name} - فاتورة ${invoiceData.invoice_number}`
-                    });
-                  }
+                }
+  
+                if (costAccId) {
+                  cogsLines.push({
+                    account_id: costAccId,
+                    account_name: costAccName,
+                    debit: costInfo.totalCost,
+                    credit: 0,
+                    description: `تكلفة البضاعة المباعة صنف: ${prod.name} - فاتورة ${invoiceNumber}`
+                  });
+                }
+                if (invAccId) {
+                  cogsLines.push({
+                    account_id: invAccId,
+                    account_name: invAccName,
+                    debit: 0,
+                    credit: costInfo.totalCost,
+                    description: `تخفيض المخزون صنف: ${prod.name} - فاتورة ${invoiceNumber}`
+                  });
                 }
               }
             }
           }
-    
-          const itemKeys = Object.keys(itemData);
-          const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
-          
-          await client.query(
-            `INSERT INTO "invoice_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
-            Object.values(itemData)
-          );
         }
-    
-        const productIdsToSync = (items || []).filter((i: any) => i.product_id).map((i: any) => i.product_id);
-        if (productIdsToSync.length > 0) {
-          await syncProductsCostAndJEs(client, companyId, productIdsToSync);
-        }
-    
-        // New Inventory Movement Engine integration (Phase 5)
-        if (movementLines.length > 0) {
-          await InventoryMovementService.createMovement({
-            company_id: invoiceData.company_id || companyId,
-            branch_id: invoiceData.branch_id || req.body.branch_id || null,
-            warehouse_id: invoiceData.warehouse_id || null,
-            movement_number: invoiceData.invoice_number || `INV-${invoiceId}`,
-            movement_type: 'sales',
-            source_document_type: 'sales_invoice',
-            source_document_id: invoiceId,
-            movement_date: invoiceData.date,
-            status: 'posted',
-            notes: invoiceData.notes || null,
-            created_by: req.user?.id || invoiceData.created_by || null
-          }, movementLines, client);
-        }
-  }
-  await client.query('COMMIT');
+  
+        const itemKeys = Object.keys(itemData);
+        const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
+        
+        await client.query(
+          `INSERT INTO "invoice_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
+          Object.values(itemData)
+        );
+      }
+  
+      const productIdsToSync = (items || []).filter((i: any) => i.product_id).map((i: any) => i.product_id);
+      if (productIdsToSync.length > 0) {
+        await syncProductsCostAndJEs(client, companyId, productIdsToSync);
+      }
+  
+      // New Inventory Movement Engine integration (Phase 5)
+      if (movementLines.length > 0) {
+        await InventoryMovementService.createMovement({
+          company_id: invoiceData.company_id || companyId,
+          branch_id: invoiceData.branch_id || req.body.branch_id || null,
+          warehouse_id: warehouseId,
+          movement_number: invoiceNumber,
+          movement_type: 'sales',
+          source_document_type: 'sales_invoice',
+          source_document_id: invoiceId,
+          movement_date: invoiceDate,
+          status: 'posted',
+          notes: invoiceData.notes || null,
+          created_by: req.user?.id || invoiceData.created_by || null
+        }, movementLines, client);
+      }
+    }
+    await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
     if (client) await client.query('ROLLBACK');
     console.error('[CRASH PREVENTED] Invoice update error:', error);
-    sendError(res, 500, 'Failed to update invoice', error.message);
+    sendError(res, 400, error.message || 'فشل تعديل الفاتورة', error.message);
   } finally {
     client.release();
   }
