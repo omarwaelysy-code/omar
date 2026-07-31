@@ -68,6 +68,7 @@ export const Suppliers: React.FC = () => {
     name: '',
     mobile: '',
     email: '',
+    tax_number: '',
     address: '',
     opening_balance: 0,
     opening_balance_date: new Date().toISOString().slice(0, 10),
@@ -325,6 +326,7 @@ export const Suppliers: React.FC = () => {
           name: fullData.name,
           mobile: fullData.mobile,
           email: fullData.email || '',
+          tax_number: fullData.tax_number || '',
           address: fullData.address || '',
           opening_balance: fullData.opening_balance,
           opening_balance_date: (fullData.opening_balance_date || new Date().toISOString()).slice(0, 10),
@@ -352,6 +354,7 @@ export const Suppliers: React.FC = () => {
         name: '',
         mobile: '',
         email: '',
+        tax_number: '',
         address: '',
         opening_balance: 0,
         opening_balance_date: new Date().toISOString().slice(0, 10),
@@ -503,7 +506,12 @@ export const Suppliers: React.FC = () => {
                              <div className="flex flex-col">
                                 <span className={`font-black text-slate-900 group-hover:text-emerald-700 transition-colors ${editingSupplier?.id === supplier.id ? 'text-emerald-700' : ''}`}>{supplier.name}</span>
                                 <div className="flex items-center gap-2 mt-1">
-                                  <span className="text-[10px] text-slate-400 font-bold tracking-tight">{supplier.mobile}</span>
+                                   <span className="text-[10px] text-slate-400 font-bold tracking-tight">{supplier.mobile}</span>
+                                   {supplier.tax_number && (
+                                     <span className="text-[9px] font-black px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200/20 dir-ltr font-mono" title={language === 'ar' ? 'الرقم الضريبي' : 'Tax Number'}>
+                                       {language === 'ar' ? 'ضريبي: ' : 'VAT: '}{supplier.tax_number}
+                                     </span>
+                                   )}
                                   {supplier.payment_method && (
                                     <span className="text-[9px] font-black px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded">
                                       {supplier.payment_method === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') :
@@ -689,7 +697,7 @@ export const Suppliers: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="md:col-span-2">
+                      <div className="md:col-span-1">
                         <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_email')}</label>
                         <div className="relative group">
                           <Mail className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
@@ -699,6 +707,20 @@ export const Suppliers: React.FC = () => {
                             className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14"
                             value={formData.email}
                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-1">
+                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_tax_number')}</label>
+                        <div className="relative group">
+                          <FileText className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                          <input
+                            type="text"
+                            placeholder={language === 'ar' ? 'الرقم الضريبي (اختياري)' : 'Tax Number (Optional)'}
+                            className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14 dir-ltr font-mono"
+                            value={formData.tax_number || ''}
+                            onChange={(e) => setFormData({ ...formData, tax_number: e.target.value })}
                           />
                         </div>
                       </div>

@@ -68,6 +68,7 @@ export const Customers: React.FC = () => {
     name: '', 
     mobile: '', 
     email: '', 
+    tax_number: '',
     address: '',
     opening_balance: 0,
     opening_balance_date: new Date().toISOString().slice(0, 10),
@@ -325,6 +326,7 @@ export const Customers: React.FC = () => {
           name: fullData.name, 
           mobile: fullData.mobile,
           email: fullData.email || '',
+          tax_number: fullData.tax_number || '',
           address: fullData.address || '',
           opening_balance: fullData.opening_balance || 0,
           opening_balance_date: (fullData.opening_balance_date || new Date().toISOString()).slice(0, 10),
@@ -352,6 +354,7 @@ export const Customers: React.FC = () => {
         name: '', 
         mobile: '', 
         email: '', 
+        tax_number: '',
         address: '',
         opening_balance: 0,
         opening_balance_date: new Date().toISOString().slice(0, 10),
@@ -520,6 +523,11 @@ export const Customers: React.FC = () => {
                                 <span className={`font-black text-slate-900 group-hover:text-emerald-700 transition-colors ${editingCustomer?.id === customer.id ? 'text-emerald-700' : ''}`}>{customer.name}</span>
                                 <div className="flex items-center gap-2 mt-1">
                                     <span className="text-[10px] text-slate-400 font-bold tracking-tight">{customer.mobile}</span>
+                                    {customer.tax_number && (
+                                      <span className="text-[9px] font-black px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200/20 dir-ltr font-mono" title={language === 'ar' ? 'الرقم الضريبي' : 'Tax Number'}>
+                                        {language === 'ar' ? 'ضريبي: ' : 'VAT: '}{customer.tax_number}
+                                      </span>
+                                    )}
                                     {customer.payment_method && (
                                       <span className="text-[9px] font-black px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded">
                                         {customer.payment_method === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') :
@@ -713,7 +721,7 @@ export const Customers: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="md:col-span-2">
+                      <div className="md:col-span-1">
                         <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_email')}</label>
                         <div className="relative group">
                           <Mail className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />

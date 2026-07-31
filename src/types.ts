@@ -144,6 +144,7 @@ export interface Customer {
   name: string;
   mobile: string;
   email?: string;
+  tax_number?: string;
   address?: string;
   opening_balance: number;
   opening_balance_date?: string;
@@ -165,6 +166,7 @@ export interface Supplier {
   name: string;
   mobile: string;
   email?: string;
+  tax_number?: string;
   address?: string;
   opening_balance: number;
   opening_balance_date?: string;
