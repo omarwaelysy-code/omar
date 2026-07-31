@@ -740,7 +740,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         <nav 
           ref={desktopNavRef} 
           onMouseLeave={() => setActiveDesktopMenu(null)}
-          className="flex items-center gap-0 xl:gap-[1px] 2xl:gap-0.5 flex-1 min-w-0 py-0.5 overflow-x-auto no-scrollbar"
+          className="flex items-center gap-0 xl:gap-[1px] 2xl:gap-0.5 flex-1 min-w-0 py-0.5"
         >
           {/* Company Switcher (Only rendered if user has multiple companies or is super_admin) */}
           {(user?.role === 'super_admin' || (userMemberships && userMemberships.length > 1)) && (
