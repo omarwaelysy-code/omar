@@ -335,8 +335,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             
             const segWidth = doc.widthOfString(seg.text);
             currentSegmentX -= segWidth;
-            // Adjust NotoSans Arabic baseline to align with Helvetica
-            const adjustedY = !useHelvetica ? (y - fontSize * 0.45) : y;
+            // Adjust NotoSans Arabic baseline to align perfectly with Helvetica & digits
+            const adjustedY = !useHelvetica ? (y - fontSize * 0.12) : y;
             doc.text(seg.text, currentSegmentX, adjustedY, { lineBreak: false });
           });
         } else {
@@ -349,8 +349,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               : (isBold ? 'Helvetica-Bold' : 'Helvetica');
             doc.font(segFont).fontSize(fontSize);
             
-            // Adjust NotoSans Arabic baseline to align with Helvetica
-            const adjustedY = !useHelvetica ? (y - fontSize * 0.45) : y;
+            // Adjust NotoSans Arabic baseline to align perfectly with Helvetica & digits
+            const adjustedY = !useHelvetica ? (y - fontSize * 0.12) : y;
             doc.text(seg.text, currentSegmentX, adjustedY, { lineBreak: false });
             currentSegmentX += doc.widthOfString(seg.text);
           });
@@ -593,7 +593,13 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
           // Draw backgrounds and borders
           if (isHeader) {
-            doc.fillColor('#18181b').rect(sideMargin, y, usableWidth, maxCellHeight).fill();
+            doc.fillColor('#f1f5f9').rect(sideMargin, y, usableWidth, maxCellHeight).fill();
+            doc.strokeColor('#cbd5e1').lineWidth(0.8)
+               .moveTo(sideMargin, y)
+               .lineTo(sideMargin + usableWidth, y)
+               .moveTo(sideMargin, y + maxCellHeight)
+               .lineTo(sideMargin + usableWidth, y + maxCellHeight)
+               .stroke();
           } else if (isTotal) {
 
             doc.fillColor('#f3f4f6').rect(sideMargin, y, usableWidth, maxCellHeight).fill();
@@ -609,7 +615,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               currentX -= colWidth;
               const align = columns[colIndex].align || 'right';
               
-              doc.fillColor(isHeader ? '#ffffff' : '#1f2937');
+              doc.fillColor(isHeader ? '#0f172a' : '#1f2937');
 
               lines.forEach((line, lineIndex) => {
                 const textY = y + (isThermal ? 2.5 : 4) + lineIndex * (isThermal ? 9.5 : 11);
@@ -634,7 +640,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               const colWidth = colWidths[colIndex];
               const align = columns[colIndex].align || 'left';
               
-              doc.fillColor(isHeader ? '#ffffff' : '#1f2937');
+              doc.fillColor(isHeader ? '#0f172a' : '#1f2937');
 
               lines.forEach((line, lineIndex) => {
                 const textY = y + (isThermal ? 2.5 : 4) + lineIndex * (isThermal ? 9.5 : 11);
@@ -849,15 +855,26 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           const partyTaxNum = (isSales ? dto.customer_tax_number : dto.supplier_tax_number) || dto.company?.taxNumber || '';
           const taxLabel = isEn ? 'Tax Number:' : 'الرقم الضريبي:';
           const payLabel = isEn ? 'Payment Method:' : 'طريقة الدفع:';
-          let payVal = dto.payment_method || (isEn ? 'Credit' : 'آجل');
+          
+          let rawPayVal = dto.payment_method || (isEn ? 'Credit' : 'آجل');
+          // Clean out any square box / checkbox characters [] or unicode boxes
+          let payVal = String(rawPayVal).replace(/[\u25A0\u25A1\u25A2\u25A3\u25A4\u25A5\u25A6\u25A7\u25A8\u25A9\[\]]/g, '').trim();
           const isCredit = String(payVal).toLowerCase().includes('credit') || payVal === 'آجل' || payVal === 'تقسيط';
 
           if (isCredit && dueDateStr) {
-            payVal += isEn ? `  |  Due Date: ${dueDateStr}` : `  |  تاريخ الاستحقاق: ${dueDateStr}`;
+            payVal += isEn ? `   -   Due Date: ${dueDateStr}` : `   -   تاريخ الاستحقاق: ${dueDateStr}`;
           }
 
           const branchLabel = isEn ? 'Branch:' : 'الفرع:';
           const branchVal = dto.branchName || (isEn ? 'Main Branch' : 'الفرع الرئيسي');
+
+          // Determine VAT Activation status for the company
+          const isVatEnabled = dto.company?.vat_enabled !== false && 
+                               dto.company?.vatEnabled !== false && 
+                               dto.vat_enabled !== false && 
+                               dto.vatEnabled !== false && 
+                               dto.vat_enabled !== 'false' && 
+                               dto.vat_enabled !== 0;
 
           // Draw Top Header Layout
           const headerStartY = currentY;
@@ -878,8 +895,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           const cardWidth = isThermal ? 140 : 190;
           const hasDiscount = Number(dto.discount_amount) > 0;
           const cardHeight = isThermal 
-            ? (60 + (hasDiscount ? 12 : 0))
-            : (82 + (hasDiscount ? 14 : 0));
+            ? (60 + (hasDiscount ? 12 : 0) - (!isVatEnabled ? 10 : 0))
+            : (82 + (hasDiscount ? 14 : 0) - (!isVatEnabled ? 13 : 0));
           
           const cardX = isRtl ? sideMargin : (doc.page.width - sideMargin - cardWidth);
           const cardY = headerStartY + (logoBuffer ? (logoSize + 6) : 0);
@@ -934,8 +951,10 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             drawCardRow(isEn ? 'Discount' : 'الخصم', `-${formatNumberValue(dto.discount_amount)}`, false, '#dc2626');
           }
 
-          // VAT Row
-          drawCardRow(isEn ? 'VAT' : 'ضريبة القيمة المضافة', dto.vat_amount || 0);
+          // VAT Row - Only display if company enables VAT
+          if (isVatEnabled) {
+            drawCardRow(isEn ? 'VAT' : 'ضريبة القيمة المضافة', dto.vat_amount || 0);
+          }
 
           // Divider Line
           rowY += isThermal ? 1 : 2;
@@ -980,7 +999,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           infoY += isThermal ? 11 : 16;
 
           // Row 3: Tax Number (if present)
-          if (partyTaxNum) {
+          if (partyTaxNum && isVatEnabled) {
             const taxLine = `${taxLabel} ${partyTaxNum}`;
             doc.fillColor('#475569');
             renderText(taxLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
@@ -1002,22 +1021,58 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           // Advance currentY past header area cleanly
           currentY = Math.max(cardY + cardHeight, infoY) + (isThermal ? 10 : 15);
 
-          // Table Columns
-          const columns: ColumnDef[] = isThermal ? [
-            { id: 'product_name', label: isEn ? 'Item' : 'الصنف', width: 55, align: isRtl ? 'right' : 'left' },
-            { id: 'quantity', label: isEn ? 'Qty' : 'الكمية', width: 15, align: 'right' },
-            { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 30, align: 'right' }
-          ] : [
-            { id: 'product_code', label: isEn ? 'Item Code' : 'كود الصنف', width: 14, align: isRtl ? 'right' : 'left' },
-            { id: 'product_name', label: isEn ? 'Item Name' : 'الصنف', width: 38, align: isRtl ? 'right' : 'left' },
-            { id: 'quantity', label: isEn ? 'Qty' : 'الكمية', width: 10, align: 'right' },
-            { id: 'unit', label: isEn ? 'Unit' : 'الوحدة', width: 10, align: 'center' },
-            { id: 'unit_price', label: isEn ? 'Price' : 'السعر', width: 13, align: 'right' },
-            { id: 'vat_amount', label: isEn ? 'VAT' : 'الضريبة', width: 10, align: 'right' },
-            { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 15, align: 'right' }
-          ];
+          // Table Columns based on thermal mode and VAT status
+          let columns: ColumnDef[] = [];
+          if (isThermal) {
+            columns = [
+              { id: 'product_name', label: isEn ? 'Item' : 'الصنف', width: 55, align: isRtl ? 'right' : 'left' },
+              { id: 'quantity', label: isEn ? 'Qty' : 'الكمية', width: 15, align: 'right' },
+              { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 30, align: 'right' }
+            ];
+          } else if (isVatEnabled) {
+            // VAT Enabled: Include Tax % and Tax Amount columns
+            columns = [
+              { id: 'product_code', label: isEn ? 'Item Code' : 'كود الصنف', width: 12, align: isRtl ? 'right' : 'left' },
+              { id: 'product_name', label: isEn ? 'Item Name' : 'الصنف', width: 34, align: isRtl ? 'right' : 'left' },
+              { id: 'quantity', label: isEn ? 'Qty' : 'الكمية', width: 9, align: 'right' },
+              { id: 'unit', label: isEn ? 'Unit' : 'الوحدة', width: 8, align: 'center' },
+              { id: 'unit_price', label: isEn ? 'Price' : 'السعر', width: 11, align: 'right' },
+              { id: 'vat_rate_formatted', label: isEn ? 'Tax %' : 'نسبة الضريبة', width: 9, align: 'center' },
+              { id: 'vat_amount', label: isEn ? 'VAT' : 'الضريبة', width: 9, align: 'right' },
+              { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 13, align: 'right' }
+            ];
+          } else {
+            // VAT Disabled: Hide Tax % and Tax Amount columns
+            columns = [
+              { id: 'product_code', label: isEn ? 'Item Code' : 'كود الصنف', width: 14, align: isRtl ? 'right' : 'left' },
+              { id: 'product_name', label: isEn ? 'Item Name' : 'الصنف', width: 42, align: isRtl ? 'right' : 'left' },
+              { id: 'quantity', label: isEn ? 'Qty' : 'الكمية', width: 10, align: 'right' },
+              { id: 'unit', label: isEn ? 'Unit' : 'الوحدة', width: 9, align: 'center' },
+              { id: 'unit_price', label: isEn ? 'Price' : 'السعر', width: 12, align: 'right' },
+              { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 15, align: 'right' }
+            ];
+          }
 
-          drawTable(columns, dto.items || [], null);
+          // Format items with vat_rate_formatted
+          const formattedItems = (dto.items || []).map((item: any) => {
+            let rateStr = '0%';
+            if (item.vat_rate !== undefined && item.vat_rate !== null && item.vat_rate !== '') {
+              rateStr = `${item.vat_rate}%`;
+            } else if (item.tax_rate !== undefined && item.tax_rate !== null && item.tax_rate !== '') {
+              rateStr = `${item.tax_rate}%`;
+            } else if (item.vat_percentage !== undefined && item.vat_percentage !== null) {
+              rateStr = `${item.vat_percentage}%`;
+            } else if (Number(item.vat_amount || 0) > 0 && Number(item.unit_price || 0) > 0 && Number(item.quantity || 0) > 0) {
+              const calcRate = Math.round((Number(item.vat_amount) / (Number(item.quantity) * Number(item.unit_price))) * 100);
+              rateStr = `${calcRate}%`;
+            }
+            return {
+              ...item,
+              vat_rate_formatted: rateStr
+            };
+          });
+
+          drawTable(columns, formattedItems, null);
 
           // QR Code rendering if present
           if (qrBuffer) {
