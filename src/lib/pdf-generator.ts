@@ -862,10 +862,15 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           const branchLabel = isEn ? 'Branch:' : 'الفرع:';
           const branchVal = dto.branchName || (isEn ? 'Main Branch' : 'الفرع الرئيسي');
 
-          // Determine VAT Activation status for the company strictly
+          // Determine VAT Activation status for the invoice / company
           const companyVatFlag = dto.company?.vat_enabled ?? dto.company?.vatEnabled ?? dto.vat_enabled ?? dto.vatEnabled;
-          const isVatEnabled = (companyVatFlag === true || companyVatFlag === 'true' || companyVatFlag === 1) || 
-                               (companyVatFlag !== false && companyVatFlag !== 'false' && companyVatFlag !== 0 && companyVatFlag !== null && companyVatFlag !== undefined && Number(dto.vat_amount || 0) > 0);
+          const hasItemVat = (dto.items || []).some((item: any) => 
+            Number(item.vat_rate || item.tax_rate || item.vat_percentage || 0) > 0 || 
+            Number(item.vat_amount || 0) > 0
+          );
+          // VAT is disabled ONLY if explicitly set to false by company AND no item has VAT rate/amount
+          const isVatDisabled = (companyVatFlag === false || companyVatFlag === 'false' || companyVatFlag === 0) && !hasItemVat;
+          const isVatEnabled = !isVatDisabled;
 
           // Draw Top Header Layout
           const headerStartY = currentY;
