@@ -351,14 +351,14 @@ export class InventoryMovementService {
 
       if (lines.length === 0) continue;
 
-      // 2. Create Reversal Movement Header
+      // 2. Create Reversal Movement Header with unique movement_number
       const reversalMovementId = uuidv4();
       const reversalMovement: InventoryMovementV2 = {
         id: reversalMovementId,
         company_id: originalMovement.company_id,
         branch_id: originalMovement.branch_id || null,
         warehouse_id: originalMovement.warehouse_id || null,
-        movement_number: `${originalMovement.movement_number}-REV`,
+        movement_number: `${originalMovement.movement_number}-REV-${reversalMovementId.substring(0, 8)}`,
         movement_type: originalMovement.movement_type,
         source_document_type: originalMovement.source_document_type || null,
         source_document_id: originalMovement.source_document_id || null,
@@ -369,6 +369,11 @@ export class InventoryMovementService {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
+
+      await client.query(
+        `DELETE FROM "inventory_movements_v2" WHERE "company_id" = $1 AND "movement_number" = $2`,
+        [reversalMovement.company_id, reversalMovement.movement_number]
+      );
 
       await client.query(
         `INSERT INTO "inventory_movements_v2" (
