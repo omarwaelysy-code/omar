@@ -4874,21 +4874,37 @@ export const Invoices: React.FC = () => {
                             </div>
                             <span className="font-bold text-[11px]">-{formatMoney(discount)}</span>
                           </div>
-                          {isVatEnabled && (
-                            <div className="flex justify-between items-center text-zinc-650 text-[10px] pt-0.5 border-t border-dashed border-zinc-200">
-                              <span className="font-medium">{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</span>
-                              <span className="font-bold text-[11px]">
-                                +{formatMoney(items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0))}
-                              </span>
-                            </div>
-                          )}
+                          {isVatEnabled && (() => {
+                            const calculatedVatAmount = items.reduce((sum, i) => {
+                              const qty = Number(i.quantity) || 0;
+                              const price = Number(i.unit_price) || 0;
+                              const rate = Number(i.vat_rate) || 0;
+                              const vAmount = (i.vat_amount !== undefined && i.vat_amount !== null && Number(i.vat_amount) > 0)
+                                ? Number(i.vat_amount)
+                                : (qty * price * (rate / 100));
+                              return sum + vAmount;
+                            }, 0);
+                            return (
+                              <div className="flex justify-between items-center text-zinc-650 text-[10px] pt-0.5 border-t border-dashed border-zinc-200">
+                                <span className="font-medium">{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</span>
+                                <span className="font-bold text-[11px]">
+                                  +{formatMoney(calculatedVatAmount)}
+                                </span>
+                              </div>
+                            );
+                          })()}
                           <div className="flex justify-between items-center text-emerald-600 text-[10px] pt-0.5 border-t border-zinc-200">
                             <span className="font-black text-[11px]">{t('invoices.summary_total')}</span>
                             <div className="flex flex-col items-end">
                               <span className="font-black text-xs tracking-tighter text-left">
                                 {formatMoney(
                                   items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) + 
-                                  (isVatEnabled ? items.reduce((sum, i) => sum + (Number(i.vat_amount) || 0), 0) : 0) - 
+                                  (isVatEnabled ? items.reduce((sum, i) => {
+                                    const qty = Number(i.quantity) || 0;
+                                    const price = Number(i.unit_price) || 0;
+                                    const rate = Number(i.vat_rate) || 0;
+                                    return sum + ((i.vat_amount !== undefined && i.vat_amount !== null && Number(i.vat_amount) > 0) ? Number(i.vat_amount) : (qty * price * (rate / 100)));
+                                  }, 0) : 0) - 
                                   discount
                                 )} {currentInvoiceCurrencyCode}
                               </span>
@@ -4957,7 +4973,10 @@ export const Invoices: React.FC = () => {
                               <th className="p-1 border-r border-zinc-200 text-center w-16">{t('invoices.item_quantity')}</th>
                               <th className="p-1 border-r border-zinc-200 text-center w-24">{t('invoices.item_price')}</th>
                               {isVatEnabled && (
-                                <th className="p-1 border-r border-zinc-200 text-center w-14">{language === 'ar' ? 'ض ق م' : 'VAT %'}</th>
+                                <>
+                                  <th className="p-1 border-r border-zinc-200 text-center w-14">{language === 'ar' ? 'ض ق م' : 'VAT %'}</th>
+                                  <th className="p-1 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'مبلغ الضريبة' : 'VAT Amount'}</th>
+                                </>
                               )}
                               <th className="p-1 border-r border-zinc-200 text-center w-24">{t('invoices.item_total')}</th>
                               <th className="p-1 w-10"></th>
@@ -5228,6 +5247,7 @@ export const Invoices: React.FC = () => {
                                   />
                                 </td>
                                 {isVatEnabled && (
+                                  <>
                                   <td className="p-0.5 border-b border-r border-zinc-200 w-14">
                                     <div className="flex items-center justify-center gap-0.5">
                                       <input 
@@ -5242,7 +5262,15 @@ export const Invoices: React.FC = () => {
                                       <span className="text-sm text-zinc-900 font-black">%</span>
                                     </div>
                                   </td>
-                                )}
+                                  <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-amber-700 text-xs">
+                                    {formatMoney(
+                                      (item.vat_amount !== undefined && item.vat_amount !== null && Number(item.vat_amount) > 0)
+                                        ? Number(item.vat_amount)
+                                        : ((Number(item.quantity) || 0) * (Number(item.unit_price) || 0) * ((Number(item.vat_rate) || 0) / 100))
+                                    )}
+                                  </td>
+                                </>
+                              )}
                                 <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-emerald-600 text-xs">
                                   {formatMoney(item.total)}
                                 </td>
