@@ -2845,7 +2845,7 @@ router.get('/paper-sizes', authenticateToken, async (req: AuthRequest, res) => {
 // =========================================================================
 router.get('/audit_logs', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const isSuperAdmin = req.user?.role === 'super_admin' || req.user?.role === 'admin' ||
+    const isSuperAdmin = req.user?.role === 'super_admin' ||
       ['acc.wael2005@gmail.com', 'omarwaelysy@gmail.com', 'omarwaelsys@gmail.com'].includes((req.user?.email || '').toLowerCase());
     const requestedCompanyId = req.query.company_id as string | undefined;
     const targetCompanyId = requestedCompanyId || (!isSuperAdmin ? req.user?.company_id : undefined);
@@ -2854,13 +2854,17 @@ router.get('/audit_logs', authenticateToken, async (req: AuthRequest, res) => {
     const params: any[] = [];
 
     if (targetCompanyId) {
-      query += ' WHERE (company_id = $1 OR company_id IS NULL)';
+      // SECURITY FIX: Only show records belonging to this company (no NULL company_id leak)
+      query += ' WHERE company_id = $1';
       params.push(targetCompanyId);
+    } else if (!isSuperAdmin) {
+      // If no company_id known and not super_admin, return empty to prevent data leak
+      return res.json([]);
     }
 
     query += ' ORDER BY created_at DESC';
 
-    console.log(`[AUDIT_LOGS] user=${req.user?.email} isSuperAdmin=${isSuperAdmin} targetCompanyId=${targetCompanyId} query=${query}`);
+    console.log(`[AUDIT_LOGS] user=${req.user?.email} isSuperAdmin=${isSuperAdmin} targetCompanyId=${targetCompanyId}`);
     const result = await pool.query(query, params);
     console.log(`[AUDIT_LOGS] returned ${result.rows.length} rows`);
     res.json(result.rows);
@@ -2872,7 +2876,7 @@ router.get('/audit_logs', authenticateToken, async (req: AuthRequest, res) => {
 
 router.get('/activity_logs', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const isSuperAdmin = req.user?.role === 'super_admin' || req.user?.role === 'admin' ||
+    const isSuperAdmin = req.user?.role === 'super_admin' ||
       ['acc.wael2005@gmail.com', 'omarwaelysy@gmail.com', 'omarwaelsys@gmail.com'].includes((req.user?.email || '').toLowerCase());
     const requestedCompanyId = req.query.company_id as string | undefined;
     const targetCompanyId = requestedCompanyId || (!isSuperAdmin ? req.user?.company_id : undefined);
@@ -2881,8 +2885,12 @@ router.get('/activity_logs', authenticateToken, async (req: AuthRequest, res) =>
     const params: any[] = [];
 
     if (targetCompanyId) {
-      query += ' WHERE (company_id = $1 OR company_id IS NULL)';
+      // SECURITY FIX: Only show records belonging to this company (no NULL company_id leak)
+      query += ' WHERE company_id = $1';
       params.push(targetCompanyId);
+    } else if (!isSuperAdmin) {
+      // If no company_id known and not super_admin, return empty to prevent data leak
+      return res.json([]);
     }
 
     query += ' ORDER BY id DESC';
@@ -2965,8 +2973,12 @@ modules.forEach(moduleName => {
         let params: any[] = [];
 
         if (targetCompanyId) {
-          query += ' WHERE (company_id = $1 OR company_id IS NULL)';
+          // SECURITY FIX: Strict company isolation — no NULL company_id leak
+          query += ' WHERE company_id = $1';
           params.push(targetCompanyId);
+        } else if (!isSuperAdminUser) {
+          rows = [];
+          return res.json([]);
         }
 
         const orderBy = 'created_at DESC';
@@ -3604,6 +3616,14 @@ modules.forEach(moduleName => {
           const { id } = req.params;
           const companyId = req.user?.company_id;
 
+          const isSuperAdmin = req.user?.role === 'super_admin' ||
+            ['acc.wael2005@gmail.com', 'omarwaelysy@gmail.com', 'omarwaelsys@gmail.com'].includes((req.user?.email || '').toLowerCase());
+
+          // SECURITY FIX: Non-super-admin users can only modify their own company
+          if (moduleName === 'companies' && !isSuperAdmin && companyId && companyId !== id) {
+            return sendError(res, 403, 'Access Denied: You can only modify your own company settings.');
+          }
+
           if (moduleName === 'companies') {
             const currentRes = await pool.query('SELECT settings FROM companies WHERE id = $1', [id]);
             const currentSettings = currentRes.rows[0]?.settings || {};
@@ -3672,7 +3692,6 @@ modules.forEach(moduleName => {
           let query = `UPDATE "${moduleName}" SET ${setClause}${hasUpdatedAt ? ', updated_at = CURRENT_TIMESTAMP' : ''} WHERE id = $${keys.length + 1}`;
           let params = [...values, id];
 
-          const isSuperAdmin = req.user?.role === 'super_admin';
           if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies' && !isSuperAdmin) {
             query += ` AND company_id = $${keys.length + 2}`;
             params.push(companyId);
