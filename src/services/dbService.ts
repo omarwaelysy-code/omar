@@ -538,7 +538,16 @@ export const dbService = {
   },
 
   async createJournalEntry(entry: any) {
+    if (!entry.entry_number && entry.reference_id) {
+      const preserved = (dbService as any)._recentDeletedJEs?.[entry.reference_id];
+      if (preserved && preserved.entry_number) {
+        entry.entry_number = preserved.entry_number;
+      }
+    }
     const result = await apiRequest('/journal_entries', 'POST', entry);
+    if (entry.reference_id && (dbService as any)._recentDeletedJEs?.[entry.reference_id]) {
+      delete (dbService as any)._recentDeletedJEs[entry.reference_id];
+    }
     window.dispatchEvent(new CustomEvent('db-refresh', { detail: { collection: 'journal_entries' } }));
     return result;
   },

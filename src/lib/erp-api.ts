@@ -2453,6 +2453,20 @@ export async function ensureUniqueSequenceNumber(
   };
 
   const target = tableNames[moduleName];
+  if (proposedNumber && typeof proposedNumber === 'string' && proposedNumber.trim() !== '') {
+    const cleanProp = proposedNumber.trim();
+    if (target) {
+      const res = await client.query(
+        `SELECT 1 FROM "${target.table}" WHERE company_id = $1 AND "${target.field}" = $2 LIMIT 1`,
+        [companyId, cleanProp]
+      );
+      if (res.rows.length === 0) {
+        return cleanProp;
+      }
+    } else {
+      return cleanProp;
+    }
+  }
   if (target) {
     let isUnique = false;
     let attempts = 0;

@@ -1,4 +1,4 @@
-﻿import { dbService } from './dbService';
+import { dbService } from './dbService';
 import { z } from 'zod';
 
 export interface TransactionStep {
@@ -133,7 +133,7 @@ export class TransactionManager {
       journalSchema.parse(testJournalWithRef);
 
       let preserved = (dbService as any)._recentDeletedJEs?.[mainId];
-      if (preserved && preserved.entry_number && preserved.date && String(preserved.date).slice(0, 10) === String(journalData.date).slice(0, 10)) {
+      if (preserved && preserved.entry_number) {
          testJournalWithRef.entry_number = preserved.entry_number;
       }
 
