@@ -1521,7 +1521,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                     <span>{language === 'ar' ? 'تغيير اللغة' : 'Change Language'}</span>
                   </div>
                   <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-lg text-xs font-bold">
-                    {language === 'ar' ? 'العربية (AR)' : 'English (EN)'}
+                    {language === 'ar' ? 'English (EN)' : 'العربية (AR)'}
                   </span>
                 </button>
 
