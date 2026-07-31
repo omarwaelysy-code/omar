@@ -813,6 +813,10 @@ export const PurchaseReturns: React.FC = () => {
       } else {
         (item as any)[field] = value;
         if (field === 'quantity' || field === 'unit_price' || field === 'vat_rate') {
+          if ((item.vat_rate === undefined || item.vat_rate === null || item.vat_rate === 0) && item.product_id) {
+            const p = products.find(prod => prod.id === item.product_id);
+            if (p && p.vat_rate) item.vat_rate = Number(p.vat_rate);
+          }
           const qty = Number(item.quantity) || 0;
           const price = Number(item.unit_price) || 0;
           const vat_rate = Number(item.vat_rate) || 0;
@@ -1582,22 +1586,37 @@ export const PurchaseReturns: React.FC = () => {
       setDescription(fullData.description || '');
       setDiscount(fullData.discount_amount || fullData.discount || 0);
 
-      setItems((fullData.items || []).map((item: any) => ({
-        product_id: item.product_id,
-        product_name: item.product_name || '',
-        product_code: item.product_code || '',
-        product_image_url: item.product_image_url || item.image_url || '',
-        barcode: item.barcode || '',
-        image_url: item.image_url || '',
-        quantity: item.quantity,
-        unit_price: item.unit_price || item.price || 0,
-        total: item.total || (item.quantity * (item.unit_price || item.price || 0)),
-        vat_rate: item.vat_rate || 0,
-        vat_amount: item.vat_amount || 0,
-        operation_id: item.operation_id || null,
-        department_id: item.department_id || null,
-        cost_center_id: item.cost_center_id || null
-      })));
+      setItems((fullData.items || []).map((item: any) => {
+        const qty = Number(item.quantity) || 0;
+        const price = Number(item.unit_price || item.price) || 0;
+        const total = Number(item.total) || (qty * price);
+        const prod = products.find(p => p.id === item.product_id);
+        let vatRate = (item.vat_rate !== undefined && item.vat_rate !== null && Number(item.vat_rate) > 0)
+          ? Number(item.vat_rate)
+          : (item.tax_rate ? Number(item.tax_rate) : (prod?.vat_rate ? Number(prod.vat_rate) : 0));
+        let vatAmount = (item.vat_amount !== undefined && item.vat_amount !== null && Number(item.vat_amount) > 0)
+          ? Number(item.vat_amount)
+          : (item.tax ? Number(item.tax) : Number((total * (vatRate / 100)).toFixed(2)));
+        if (!vatRate && vatAmount > 0 && total > 0) {
+          vatRate = Number(((vatAmount / total) * 100).toFixed(2));
+        }
+        return {
+          product_id: item.product_id,
+          product_name: item.product_name || '',
+          product_code: item.product_code || '',
+          product_image_url: item.product_image_url || item.image_url || '',
+          barcode: item.barcode || '',
+          image_url: item.image_url || '',
+          quantity: qty,
+          unit_price: price,
+          total: total,
+          vat_rate: vatRate,
+          vat_amount: vatAmount,
+          operation_id: item.operation_id || null,
+          department_id: item.department_id || null,
+          cost_center_id: item.cost_center_id || null
+        };
+      }));
       setIsModalOpen(true);
 
     } catch (error: any) {

@@ -1756,6 +1756,10 @@ export const PurchaseInvoices: React.FC = () => {
         }
       }
       
+      if ((!(newItems[index] as any).vat_rate) && newItems[index].product_id) {
+        const prod = products.find(p => p.id === newItems[index].product_id);
+        if (prod && prod.vat_rate) (newItems[index] as any).vat_rate = Number(prod.vat_rate);
+      }
       const qty = Number(newItems[index].quantity) || 0;
       const price = Number(newItems[index].cost_price || (newItems[index] as any).unit_price || 0);
       const vatRate = Number((newItems[index] as any).vat_rate) || 0;
@@ -2852,21 +2856,36 @@ export const PurchaseInvoices: React.FC = () => {
         setExchangeRateType(fullData.exchange_rate_type || 'auto');
         prevExchangeRateRef.current = fullData.exchange_rate || 1;
         setDescription(fullData.description || '');
-        setItems((fullData.items || []).map((item: any) => ({
-          product_id: item.product_id?.toString(),
-          expense_category_id: item.expense_category_id?.toString(),
-          product_name: item.product_name,
-          category_name: item.category_name,
-          quantity: item.quantity,
-          cost_price: item.unit_price || item.cost_price || 0,
-          total: item.total,
-          barcode: item.barcode || '',
-          operation_id: item.operation_id || null,
-          department_id: item.department_id || null,
-          cost_center_id: item.cost_center_id || null,
-          vat_rate: item.vat_rate || 0,
-          vat_amount: item.vat_amount || 0
-        })));
+        setItems((fullData.items || []).map((item: any) => {
+          const qty = Number(item.quantity) || 0;
+          const price = Number(item.unit_price || item.cost_price) || 0;
+          const total = Number(item.total) || (qty * price);
+          const prod = products.find(p => p.id === item.product_id);
+          let vatRate = (item.vat_rate !== undefined && item.vat_rate !== null && Number(item.vat_rate) > 0)
+            ? Number(item.vat_rate)
+            : (item.tax_rate ? Number(item.tax_rate) : (prod?.vat_rate ? Number(prod.vat_rate) : 0));
+          let vatAmount = (item.vat_amount !== undefined && item.vat_amount !== null && Number(item.vat_amount) > 0)
+            ? Number(item.vat_amount)
+            : (item.tax ? Number(item.tax) : Number((total * (vatRate / 100)).toFixed(2)));
+          if (!vatRate && vatAmount > 0 && total > 0) {
+            vatRate = Number(((vatAmount / total) * 100).toFixed(2));
+          }
+          return {
+            product_id: item.product_id?.toString(),
+            expense_category_id: item.expense_category_id?.toString(),
+            product_name: item.product_name,
+            category_name: item.category_name,
+            quantity: qty,
+            cost_price: price,
+            total: total,
+            barcode: item.barcode || '',
+            operation_id: item.operation_id || null,
+            department_id: item.department_id || null,
+            cost_center_id: item.cost_center_id || null,
+            vat_rate: vatRate,
+            vat_amount: vatAmount
+          };
+        }));
         setPaymentTerms(fullData.payment_terms || 'due_on_receipt');
         setPaymentTermsDays(fullData.payment_terms_days || 0);
         setAdvancePercentage(fullData.advance_percentage || 0);
@@ -4174,7 +4193,7 @@ export const PurchaseInvoices: React.FC = () => {
                             <tbody className="divide-y divide-zinc-100">
                               {items.length === 0 ? (
                                 <tr>
-                                  <td colSpan={isVatEnabled ? 11 : 10} className="px-6 py-12 text-center text-slate-400 italic font-medium">{t('pi.no_items_added')}</td>
+                                  <td colSpan={isVatEnabled ? 12 : 10} className="px-6 py-12 text-center text-slate-400 italic font-medium">{t('pi.no_items_added')}</td>
                                 </tr>
                               ) : items.map((item, index) => (
                                 <tr key={index} className="group hover:bg-zinc-50 transition-colors">
