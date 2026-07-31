@@ -841,6 +841,10 @@ export const Returns: React.FC = () => {
       }
       
       if (field === 'quantity' || field === 'unit_price' || field === 'vat_rate') {
+        if ((item.vat_rate === undefined || item.vat_rate === null || item.vat_rate === 0) && item.product_id) {
+          const p = products.find(prod => prod.id === item.product_id);
+          if (p && p.vat_rate) item.vat_rate = Number(p.vat_rate);
+        }
         const total = (Number(item.quantity) || 0) * (Number(item.unit_price) || 0);
         item.total = total;
         item.vat_amount = isVatEnabled ? Number((total * ((item.vat_rate || 0) / 100)).toFixed(2)) : 0;
@@ -1415,7 +1419,30 @@ export const Returns: React.FC = () => {
         setPaymentType(fullData.payment_type);
         setPaymentMethodId(fullData.payment_method_id || '');
         prevExchangeRateRef.current = fullData.exchange_rate || 1;
-        setItems(fullData.items || []);
+        const loadedItems = (fullData.items || []).map((item: any) => {
+          const qty = Number(item.quantity) || 0;
+          const price = Number(item.unit_price || item.price) || 0;
+          const total = Number(item.total) || (qty * price);
+          const prod = products.find(p => p.id === item.product_id);
+          let vatRate = (item.vat_rate !== undefined && item.vat_rate !== null && Number(item.vat_rate) > 0)
+            ? Number(item.vat_rate)
+            : (item.tax_rate ? Number(item.tax_rate) : (prod?.vat_rate ? Number(prod.vat_rate) : 0));
+          let vatAmount = (item.vat_amount !== undefined && item.vat_amount !== null && Number(item.vat_amount) > 0)
+            ? Number(item.vat_amount)
+            : (item.tax ? Number(item.tax) : Number((total * (vatRate / 100)).toFixed(2)));
+          if (!vatRate && vatAmount > 0 && total > 0) {
+            vatRate = Number(((vatAmount / total) * 100).toFixed(2));
+          }
+          return {
+            ...item,
+            quantity: qty,
+            unit_price: price,
+            total: total,
+            vat_rate: vatRate,
+            vat_amount: vatAmount
+          };
+        });
+        setItems(loadedItems);
         setReturnNumber(fullData.return_number);
         setDiscount(fullData.discount || 0);
         setDescription(fullData.description || '');
@@ -2792,7 +2819,8 @@ export const Returns: React.FC = () => {
                               />
                             </td>
                             {((company?.settings?.vat_enabled || company?.vat_enabled) ? true : false) && (
-                              <td className="p-0.5 border-b border-r border-zinc-200 w-14">
+                              <>
+                                <td className="p-0.5 border-b border-r border-zinc-200 w-14">
                                 <div className="flex items-center justify-center gap-0.5">
                                   <input 
                                     type="number" 
@@ -2805,6 +2833,14 @@ export const Returns: React.FC = () => {
                                   <span className="text-sm text-zinc-900 font-black">%</span>
                                 </div>
                               </td>
+                              <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-amber-700 text-xs">
+                                {formatMoney(
+                                  (item.vat_amount !== undefined && item.vat_amount !== null && Number(item.vat_amount) > 0)
+                                    ? Number(item.vat_amount)
+                                    : ((Number(item.quantity) || 0) * (Number(item.unit_price) || 0) * ((Number(item.vat_rate) || 0) / 100))
+                                )}
+                              </td>
+                            </>
                             )}
                             <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-emerald-600 text-xs">
                               {formatMoney(item.total)}
