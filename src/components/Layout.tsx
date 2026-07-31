@@ -399,7 +399,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
     const navItems = [
       ...(isSuperAdmin ? [{ id: 'super_admin_dashboard', label: t('nav.super_admin_dashboard'), icon: Shield, path: '/super-admin@m@r2020' }] : []),
-      { id: 'dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
       { 
         id: 'master_data', 
         label: t('nav.master_data'), 
@@ -547,7 +546,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
     ];
 
     const superAdminNavItems = [
-      { id: 'dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
       { id: 'contact_messages', label: t('nav.contact_messages') || 'رسائل التواصل', icon: Mail, badge: unreadContactMessagesCount },
       { id: 'companies', label: t('nav.companies'), icon: Building2 },
       { id: 'users', label: t('nav.users'), icon: UsersIcon },
@@ -837,16 +835,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         <div className={`flex items-center gap-0.5 xl:gap-1.5 ${dir === 'rtl' ? 'mr-auto' : 'ml-auto'} shrink-0`}>
           <button 
             type="button"
-            onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
-            className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition-all group flex items-center gap-1 cursor-pointer"
-            title={language === 'ar' ? 'English' : 'العربية'}
-          >
-            <Languages size={18} />
-            <span className="text-xs font-bold">{language === 'ar' ? 'EN' : 'AR'}</span>
-          </button>
-
-          <button 
-            type="button"
             onClick={() => setIsCenterOpen(true)}
             className="relative p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition-all group cursor-pointer"
           >
@@ -859,19 +847,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           </button>
 
           {/* Company Switcher */}
-          {(user?.role === 'super_admin' || userMemberships.length > 1) && (
+          {(user?.role === 'super_admin' || userMemberships.length > 0 || user?.company_name) && (
             <div className="relative">
               <button
                 onClick={() => setIsCompanyMenuOpen(!isCompanyMenuOpen)}
-                className="flex items-center gap-1 px-2 py-1 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all border border-slate-200 shadow-sm"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50/70 hover:bg-emerald-100/80 rounded-xl transition-all border border-emerald-200/80 shadow-sm cursor-pointer"
+                title={language === 'ar' ? 'تبديل الشركة' : 'Switch Company'}
               >
-                <Building2 size={16} className="text-emerald-600" />
-                <span className="text-xs font-bold text-slate-600 truncate max-w-[60px] xl:max-w-[120px]">
-                  {workspaceMode === 'super_admin' 
-                    ? (language === 'ar' ? 'المدير العام' : 'Super Admin')
-                    : (user?.company_name || t('common.switch_company'))}
+                <Building2 size={16} className="text-emerald-600 shrink-0" />
+                <span className="text-xs font-bold text-emerald-900 truncate max-w-[90px] xl:max-w-[150px]">
+                  {user?.company_name || company?.name || (language === 'ar' ? 'تبديل الشركة' : 'Switch Company')}
                 </span>
-                <ChevronDown size={14} className={`text-slate-400 transition-transform ${isCompanyMenuOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown size={14} className={`text-emerald-600/70 transition-transform ${isCompanyMenuOpen ? 'rotate-180' : ''}`} />
               </button>
 
               <AnimatePresence>
@@ -1498,6 +1485,23 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                     <span>{language === 'ar' ? 'إعدادات الشركة والحساب' : 'Company & Account Settings'}</span>
                   </button>
                 )}
+
+                {/* Language Switcher */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLanguage(language === 'ar' ? 'en' : 'ar');
+                  }}
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-slate-100/80 transition-all text-right cursor-pointer text-slate-700 font-semibold"
+                >
+                  <div className="flex items-center gap-3">
+                    <Globe size={16} className="text-emerald-600 shrink-0" />
+                    <span>{language === 'ar' ? 'تغيير اللغة' : 'Change Language'}</span>
+                  </div>
+                  <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-lg text-xs font-bold">
+                    {language === 'ar' ? 'العربية (AR)' : 'English (EN)'}
+                  </span>
+                </button>
 
                 <div className="h-px bg-slate-200/80 my-1" />
 
