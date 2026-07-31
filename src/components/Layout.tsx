@@ -740,7 +740,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         <nav 
           ref={desktopNavRef} 
           onMouseLeave={() => setActiveDesktopMenu(null)}
-          className="flex items-center gap-[1px] xl:gap-0.5 2xl:gap-1 flex-1 min-w-0 py-1"
+          className="flex items-center gap-0 xl:gap-[1px] 2xl:gap-0.5 flex-1 min-w-0 py-0.5 overflow-x-auto no-scrollbar"
         >
           {/* Company Switcher (Only rendered if user has multiple companies or is super_admin) */}
           {(user?.role === 'super_admin' || (userMemberships && userMemberships.length > 1)) && (
@@ -748,14 +748,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
               <button
                 type="button"
                 onClick={() => setIsCompanyMenuOpen(!isCompanyMenuOpen)}
-                className="flex items-center gap-1 px-1.5 xl:px-2 py-1 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-900 rounded-lg transition-all border border-emerald-200/80 shadow-xs cursor-pointer text-[10px] xl:text-[11px] 2xl:text-xs font-bold"
+                className="flex items-center gap-0.5 px-1 py-0.5 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-900 rounded-md transition-all border border-emerald-200/80 shadow-2xs cursor-pointer text-[9.5px] xl:text-[10.5px] 2xl:text-[11.5px] font-extrabold tracking-tighter"
                 title={language === 'ar' ? 'تبديل الشركة' : 'Switch Company'}
               >
-                <Building2 size={13} className="text-emerald-600 shrink-0" />
-                <span className="truncate max-w-[70px] xl:max-w-[110px] 2xl:max-w-[150px]">
+                <Building2 size={11} className="text-emerald-600 shrink-0" />
+                <span className="truncate max-w-[65px] xl:max-w-[100px] 2xl:max-w-[140px]">
                   {activeCompanyName}
                 </span>
-                <ChevronDown size={10} className={`text-emerald-600/70 transition-transform shrink-0 ${isCompanyMenuOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown size={8} className={`text-emerald-600/70 transition-transform shrink-0 ${isCompanyMenuOpen ? 'rotate-180' : ''}`} />
               </button>
 
               <AnimatePresence>
@@ -866,13 +866,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                       setActiveDesktopMenu(prev => prev === item.id ? null : item.id);
                     }}
                     className={`
-                      flex items-center gap-0.5 px-0.5 xl:px-1 2xl:px-1.5 py-1 rounded-lg transition-all font-semibold text-[10px] xl:text-[11px] 2xl:text-xs whitespace-nowrap cursor-pointer tracking-tight
-                      ${isActive || isOpen ? 'bg-brand-primary/10 text-brand-primary' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
+                      flex items-center gap-[2px] xl:gap-0.5 px-1 xl:px-1.5 py-0.5 rounded-md transition-all font-bold text-[9.5px] xl:text-[10.5px] 2xl:text-[11.5px] whitespace-nowrap cursor-pointer tracking-tighter
+                      ${isActive || isOpen ? 'bg-brand-primary/10 text-brand-primary' : 'text-slate-600 hover:bg-slate-100/70 hover:text-slate-900'}
                     `}
                   >
-                    <item.icon size={12} className="shrink-0" />
+                    <item.icon size={11} className="shrink-0 opacity-80" />
                     <span>{item.label}</span>
-                    <ChevronDown size={9} className={`opacity-50 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown size={8} className={`opacity-50 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
                   </button>
                   
                   {/* Dropdown Menu */}
@@ -933,11 +933,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                   setActiveDesktopMenu(null);
                 }}
                 className={`
-                  flex items-center gap-0.5 px-0.5 xl:px-1 2xl:px-1.5 py-1 rounded-lg transition-all font-semibold text-[10px] xl:text-[11px] 2xl:text-xs whitespace-nowrap shrink-0 cursor-pointer tracking-tight
-                  ${currentPage === item.id ? 'bg-brand-primary text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
+                  flex items-center gap-[2px] xl:gap-0.5 px-1 xl:px-1.5 py-0.5 rounded-md transition-all font-bold text-[9.5px] xl:text-[10.5px] 2xl:text-[11.5px] whitespace-nowrap shrink-0 cursor-pointer tracking-tighter
+                  ${currentPage === item.id ? 'bg-brand-primary text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100/70 hover:text-slate-900'}
                 `}
               >
-                <item.icon size={12} className="shrink-0" />
+                <item.icon size={11} className="shrink-0 opacity-80" />
                 <span>{item.label}</span>
               </button>
             );
