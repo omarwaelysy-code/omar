@@ -855,15 +855,9 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           const partyTaxNum = (isSales ? dto.customer_tax_number : dto.supplier_tax_number) || dto.company?.taxNumber || '';
           const taxLabel = isEn ? 'Tax Number:' : 'الرقم الضريبي:';
           const payLabel = isEn ? 'Payment Method:' : 'طريقة الدفع:';
-          
           let rawPayVal = dto.payment_method || (isEn ? 'Credit' : 'آجل');
-          // Clean out any square box / checkbox characters [] or unicode boxes
-          let payVal = String(rawPayVal).replace(/[\u25A0\u25A1\u25A2\u25A3\u25A4\u25A5\u25A6\u25A7\u25A8\u25A9\[\]]/g, '').trim();
-          const isCredit = String(payVal).toLowerCase().includes('credit') || payVal === 'آجل' || payVal === 'تقسيط';
-
-          if (isCredit && dueDateStr) {
-            payVal += isEn ? `   -   Due Date: ${dueDateStr}` : `   -   تاريخ الاستحقاق: ${dueDateStr}`;
-          }
+          let cleanPayVal = String(rawPayVal).replace(/[\u25A0\u25A1\u25A2\u25A3\u25A4\u25A5\u25A6\u25A7\u25A8\u25A9\[\]]/g, '').trim();
+          const isCredit = String(cleanPayVal).toLowerCase().includes('credit') || cleanPayVal === 'آجل' || cleanPayVal === 'تقسيط';
 
           const branchLabel = isEn ? 'Branch:' : 'الفرع:';
           const branchVal = dto.branchName || (isEn ? 'Main Branch' : 'الفرع الرئيسي');
