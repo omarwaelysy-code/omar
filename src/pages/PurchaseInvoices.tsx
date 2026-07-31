@@ -3700,64 +3700,8 @@ export const PurchaseInvoices: React.FC = () => {
                         </div>
                       )}
 
-                      {/* Left: Invoice Summary Card Column */}
-                      <div className="flex flex-col justify-center space-y-1 p-0.5" dir={dir}>
-                        <div className="flex items-center gap-1 mb-0.5 text-emerald-600">
-                          <Layers className="w-3.5 h-3.5" />
-                          <h2 className="font-semibold text-zinc-900 text-[10px]">{language === 'ar' ? 'ملخص الفاتورة' : 'Invoice Summary'}</h2>
-                        </div>
-
-                        <div className="bg-zinc-50 rounded-lg p-1.5 border border-zinc-100 space-y-0.5">
-                          <div className="flex justify-between items-center text-zinc-650 text-[10px]">
-                            <span className="font-medium">{t('pi.subtotal')}</span>
-                            <span className="font-bold text-[11px]">
-                              {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center text-emerald-600 text-[10px]">
-                            <div className="flex items-center gap-1">
-                              <span className="font-medium">{t('pi.discount')}</span>
-                              <input 
-                                type="number" 
-                                className="w-11 bg-white border border-zinc-200 rounded px-1 py-0.5 text-center font-bold text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-[10px]"
-                                value={Number(invoiceData.discount)}
-                                onChange={(e) => setInvoiceData({ ...invoiceData, discount: parseFloat(e.target.value) || 0 })}
-                              />
-                            </div>
-                            <span className="font-bold text-[11px]">-{formatMoney(invoiceData.discount)}</span>
-                          </div>
-                          {isVatEnabled && (() => {
-                            const calculatedVatAmount = items.reduce((sum, i) => {
-                              const qty = Number(i.quantity) || 0;
-                              const price = Number(i.cost_price) || 0;
-                              const rate = Number((i as any).vat_rate) || 0;
-                              const vAmount = ((i as any).vat_amount !== undefined && (i as any).vat_amount !== null && Number((i as any).vat_amount) > 0)
-                                ? Number((i as any).vat_amount)
-                                : (qty * price * (rate / 100));
-                              return sum + vAmount;
-                            }, 0);
-                            return (
-                              <div className="flex justify-between items-center text-zinc-650 text-[10px] pt-0.5 border-t border-dashed border-zinc-200">
-                                <span className="font-medium">{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</span>
-                                <span className="font-bold text-[11px]">
-                                  +{formatMoney(calculatedVatAmount)}
-                                </span>
-                              </div>
-                            );
-                          })()}
-                          <div className="flex justify-between items-center text-emerald-600 text-[10px] pt-0.5 border-t border-zinc-200">
-                            <span className="font-black text-[11px]">{t('pi.grand_total')}</span>
-                            <div className="flex flex-col items-end">
-                              <span className="font-black text-xs tracking-tighter text-left">
-                                {formatMoney(calculateTotal())} {currentInvoiceCurrencyCode}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
                       {/* Right: Unified Metadata & Payment Settings Panel Column */}
-                      <div className="lg:col-span-3 space-y-1 relative lg:border-s lg:border-zinc-150 lg:ps-2.5 flex flex-col justify-between" dir={dir}>
+                      <div className="lg:col-span-3 space-y-1 relative flex flex-col justify-between" dir={dir}>
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-1.5">
                           {/* 1. Date */}
                           <div>
@@ -4115,6 +4059,63 @@ export const PurchaseInvoices: React.FC = () => {
                         }
                         return null;
                       })()}
+
+                      {/* Left: Invoice Summary Card Column */}
+                      <div className="flex flex-col justify-center space-y-1 p-0.5 lg:border-s lg:border-zinc-150 lg:ps-2.5" dir={dir}>
+                        <div className="flex items-center gap-1 mb-0.5 text-emerald-600">
+                          <Layers className="w-3.5 h-3.5" />
+                          <h2 className="font-semibold text-zinc-900 text-[10px]">{language === 'ar' ? 'ملخص الفاتورة' : 'Invoice Summary'}</h2>
+                        </div>
+
+                        <div className="bg-zinc-50 rounded-lg p-1.5 border border-zinc-100 space-y-0.5">
+                          <div className="flex justify-between items-center text-zinc-650 text-[10px]">
+                            <span className="font-medium">{t('pi.subtotal')}</span>
+                            <span className="font-bold text-[11px]">
+                              {formatMoney(items.reduce((sum, i) => sum + (Number(i.total) || 0), 0))}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-emerald-600 text-[10px]">
+                            <div className="flex items-center gap-1">
+                              <span className="font-medium">{t('pi.discount')}</span>
+                              <input 
+                                type="number" 
+                                className="w-11 bg-white border border-zinc-200 rounded px-1 py-0.5 text-center font-bold text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-[10px]"
+                                value={Number(invoiceData.discount)}
+                                onChange={(e) => setInvoiceData({ ...invoiceData, discount: parseFloat(e.target.value) || 0 })}
+                              />
+                            </div>
+                            <span className="font-bold text-[11px]">-{formatMoney(invoiceData.discount)}</span>
+                          </div>
+                          {isVatEnabled && (() => {
+                            const calculatedVatAmount = items.reduce((sum, i) => {
+                              const qty = Number(i.quantity) || 0;
+                              const price = Number(i.cost_price) || 0;
+                              const rate = Number((i as any).vat_rate) || 0;
+                              const vAmount = ((i as any).vat_amount !== undefined && (i as any).vat_amount !== null && Number((i as any).vat_amount) > 0)
+                                ? Number((i as any).vat_amount)
+                                : (qty * price * (rate / 100));
+                              return sum + vAmount;
+                            }, 0);
+                            return (
+                              <div className="flex justify-between items-center text-zinc-650 text-[10px] pt-0.5 border-t border-dashed border-zinc-200">
+                                <span className="font-medium">{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</span>
+                                <span className="font-bold text-[11px]">
+                                  +{formatMoney(calculatedVatAmount)}
+                                </span>
+                              </div>
+                            );
+                          })()}
+                          <div className="flex justify-between items-center text-emerald-600 text-[10px] pt-0.5 border-t border-zinc-200">
+                            <span className="font-black text-[11px]">{t('pi.grand_total')}</span>
+                            <div className="flex flex-col items-end">
+                              <span className="font-black text-xs tracking-tighter text-left">
+                                {formatMoney(calculateTotal())} {currentInvoiceCurrencyCode}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
                     </section>
                     
                     {/* Card 3: الأصناف */}
