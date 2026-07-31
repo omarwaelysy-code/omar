@@ -868,13 +868,10 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           const branchLabel = isEn ? 'Branch:' : 'الفرع:';
           const branchVal = dto.branchName || (isEn ? 'Main Branch' : 'الفرع الرئيسي');
 
-          // Determine VAT Activation status for the company
-          const isVatEnabled = dto.company?.vat_enabled !== false && 
-                               dto.company?.vatEnabled !== false && 
-                               dto.vat_enabled !== false && 
-                               dto.vatEnabled !== false && 
-                               dto.vat_enabled !== 'false' && 
-                               dto.vat_enabled !== 0;
+          // Determine VAT Activation status for the company strictly
+          const companyVatFlag = dto.company?.vat_enabled ?? dto.company?.vatEnabled ?? dto.vat_enabled ?? dto.vatEnabled;
+          const isVatEnabled = (companyVatFlag === true || companyVatFlag === 'true' || companyVatFlag === 1) || 
+                               (companyVatFlag !== false && companyVatFlag !== 'false' && companyVatFlag !== 0 && companyVatFlag !== null && companyVatFlag !== undefined && Number(dto.vat_amount || 0) > 0);
 
           // Draw Top Header Layout
           const headerStartY = currentY;
@@ -1006,10 +1003,15 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             infoY += isThermal ? 10 : 15;
           }
 
-          // Row 4: Payment Method & Due Date
-          const payLine = `${payLabel} ${payVal}`;
+          // Row 4: Payment Method & Due Date (Rendered with separate alignment to prevent text overlap / scrambling)
           doc.fillColor('#475569');
-          renderText(payLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
+          if (isCredit && dueDateStr) {
+            const dueLabel = isEn ? 'Due Date:' : 'تاريخ الاستحقاق:';
+            renderText(`${payLabel} ${cleanPayVal}`, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
+            renderText(`${dueLabel} ${dueDateStr}`, infoX, infoY, { width: infoWidth - 140, align: isRtl ? 'left' : 'right', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
+          } else {
+            renderText(`${payLabel} ${cleanPayVal}`, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
+          }
           infoY += isThermal ? 10 : 15;
 
           // Row 5: Branch
@@ -1021,7 +1023,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           // Advance currentY past header area cleanly
           currentY = Math.max(cardY + cardHeight, infoY) + (isThermal ? 10 : 15);
 
-          // Table Columns based on thermal mode and VAT status
+          // Table Columns based on thermal mode and VAT status (Unit column removed)
           let columns: ColumnDef[] = [];
           if (isThermal) {
             columns = [
@@ -1030,26 +1032,24 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 30, align: 'right' }
             ];
           } else if (isVatEnabled) {
-            // VAT Enabled: Include Tax % and Tax Amount columns
-            columns = [
-              { id: 'product_code', label: isEn ? 'Item Code' : 'كود الصنف', width: 12, align: isRtl ? 'right' : 'left' },
-              { id: 'product_name', label: isEn ? 'Item Name' : 'الصنف', width: 34, align: isRtl ? 'right' : 'left' },
-              { id: 'quantity', label: isEn ? 'Qty' : 'الكمية', width: 9, align: 'right' },
-              { id: 'unit', label: isEn ? 'Unit' : 'الوحدة', width: 8, align: 'center' },
-              { id: 'unit_price', label: isEn ? 'Price' : 'السعر', width: 11, align: 'right' },
-              { id: 'vat_rate_formatted', label: isEn ? 'Tax %' : 'نسبة الضريبة', width: 9, align: 'center' },
-              { id: 'vat_amount', label: isEn ? 'VAT' : 'الضريبة', width: 9, align: 'right' },
-              { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 13, align: 'right' }
-            ];
-          } else {
-            // VAT Disabled: Hide Tax % and Tax Amount columns
+            // VAT Enabled: Include Tax % and Tax Amount columns (Unit column removed)
             columns = [
               { id: 'product_code', label: isEn ? 'Item Code' : 'كود الصنف', width: 14, align: isRtl ? 'right' : 'left' },
-              { id: 'product_name', label: isEn ? 'Item Name' : 'الصنف', width: 42, align: isRtl ? 'right' : 'left' },
+              { id: 'product_name', label: isEn ? 'Item Name' : 'الصنف', width: 38, align: isRtl ? 'right' : 'left' },
               { id: 'quantity', label: isEn ? 'Qty' : 'الكمية', width: 10, align: 'right' },
-              { id: 'unit', label: isEn ? 'Unit' : 'الوحدة', width: 9, align: 'center' },
               { id: 'unit_price', label: isEn ? 'Price' : 'السعر', width: 12, align: 'right' },
-              { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 15, align: 'right' }
+              { id: 'vat_rate_formatted', label: isEn ? 'Tax %' : 'نسبة الضريبة', width: 10, align: 'center' },
+              { id: 'vat_amount', label: isEn ? 'VAT' : 'الضريبة', width: 10, align: 'right' },
+              { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 14, align: 'right' }
+            ];
+          } else {
+            // VAT Disabled: Hide Tax %, Tax Amount, and Unit columns
+            columns = [
+              { id: 'product_code', label: isEn ? 'Item Code' : 'كود الصنف', width: 15, align: isRtl ? 'right' : 'left' },
+              { id: 'product_name', label: isEn ? 'Item Name' : 'الصنف', width: 47, align: isRtl ? 'right' : 'left' },
+              { id: 'quantity', label: isEn ? 'Qty' : 'الكمية', width: 11, align: 'right' },
+              { id: 'unit_price', label: isEn ? 'Price' : 'السعر', width: 13, align: 'right' },
+              { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 14, align: 'right' }
             ];
           }
 
