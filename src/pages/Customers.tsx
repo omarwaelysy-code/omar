@@ -735,6 +735,20 @@ export const Customers: React.FC = () => {
                         </div>
                       </div>
 
+                      <div className="md:col-span-1">
+                        <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_tax_number')}</label>
+                        <div className="relative group">
+                          <FileText className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                          <input
+                            type="text"
+                            placeholder={language === 'ar' ? 'الرقم الضريبي (اختياري)' : 'Tax Number (Optional)'}
+                            className="w-full px-8 py-4 bg-white border border-slate-100 rounded-[1.25rem] text-lg font-black text-slate-900 shadow-sm transition-all focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none ps-14 dir-ltr font-mono"
+                            value={formData.tax_number || ''}
+                            onChange={(e) => setFormData({ ...formData, tax_number: e.target.value })}
+                          />
+                        </div>
+                      </div>
+
                       <div className="md:col-span-2">
                         <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.form_address')}</label>
                         <div className="relative group">
