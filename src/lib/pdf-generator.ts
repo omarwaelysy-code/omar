@@ -852,7 +852,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
           const partyLabel = isSales ? (isEn ? 'Customer:' : 'العميل:') : (isEn ? 'Supplier:' : 'المورد:');
           const partyName = (isSales ? dto.customer_name : dto.supplier_name) || '-';
-          const partyTaxNum = (isSales ? (dto.customer_tax_number || dto.customer?.tax_number || dto.customer_tax_num || dto.customerTaxNumber) : (dto.supplier_tax_number || dto.supplier?.tax_number || dto.supplier_tax_num || dto.supplierTaxNumber)) || dto.tax_number || dto.tax_num || '';
+          const partyTaxNum = dto.partyTaxNumber || dto.party_tax_number || (isSales ? (dto.customer_tax_number || dto.customer?.tax_number || dto.customer?.vat_number || dto.customer_tax_num || dto.customerTaxNumber) : (dto.supplier_tax_number || dto.supplier?.tax_number || dto.supplier?.vat_number || dto.supplier_tax_num || dto.supplierTaxNumber)) || dto.vat_number || dto.tax_number || dto.tax_num || '';
           const taxLabel = isEn ? 'Tax Number:' : 'الرقم الضريبي:';
           const payLabel = isEn ? 'Payment Method:' : 'طريقة الدفع:';
           let rawPayVal = dto.payment_method || (isEn ? 'Credit' : 'آجل');
@@ -1017,33 +1017,33 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           // Row 1: Party Name (Right) & Party Tax Number (Left)
           const partyLine = `${partyLabel} ${partyName}`;
           doc.fillColor('#0f172a');
-          renderText(partyLine, infoX, infoY, { width: isThermal ? infoWidth : 150, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 8 : 11 });
+          renderText(partyLine, infoX, infoY, { width: isThermal ? infoWidth : 165, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 8 : 10.5, lineBreak: false });
 
           if (partyTaxNum) {
             const taxLine = `${taxLabel} ${partyTaxNum}`;
-            const taxX = isRtl ? (infoX + (isThermal ? 0 : 155)) : infoX;
+            const taxX = isRtl ? (infoX + (isThermal ? 0 : 170)) : infoX;
             doc.fillColor('#334155');
-            renderText(taxLine, taxX, infoY, { width: isThermal ? infoWidth : (infoWidth - 155), align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 7.5 : 9.5 });
+            renderText(taxLine, taxX, infoY, { width: isThermal ? infoWidth : (infoWidth - 170), align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 7.5 : 9.5, lineBreak: false });
           }
-          infoY += isThermal ? 11 : 20;
+          infoY += isThermal ? 11 : 18;
 
           // Row 2: Payment Method (Right) & Due Date (Left)
           doc.fillColor('#475569');
           const payLine = `${payLabel} ${cleanPayVal}`;
-          renderText(payLine, infoX, infoY, { width: isThermal ? infoWidth : 150, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
+          renderText(payLine, infoX, infoY, { width: isThermal ? infoWidth : 165, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5, lineBreak: false });
 
           if (isCredit && dueDateStr) {
             const dueLabel = isEn ? 'Due Date:' : 'تاريخ الاستحقاق:';
             const dueLine = `${dueLabel} ${dueDateStr}`;
-            const dueX = isRtl ? (infoX + (isThermal ? 0 : 155)) : infoX;
-            renderText(dueLine, dueX, infoY, { width: isThermal ? infoWidth : (infoWidth - 155), align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
+            const dueX = isRtl ? (infoX + (isThermal ? 0 : 170)) : infoX;
+            renderText(dueLine, dueX, infoY, { width: isThermal ? infoWidth : (infoWidth - 170), align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5, lineBreak: false });
           }
           infoY += isThermal ? 10 : 18;
 
           // Row 3: Branch
           const branchLine = `${branchLabel} ${branchVal}`;
           doc.fillColor('#64748b');
-          renderText(branchLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9 });
+          renderText(branchLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9, lineBreak: false });
           infoY += isThermal ? 10 : 16;
           const sectionBottomY = Math.max(cardY + cardHeight, infoY) + 12;
           if (!isThermal) {
