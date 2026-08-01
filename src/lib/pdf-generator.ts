@@ -852,7 +852,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
           const partyLabel = isSales ? (isEn ? 'Customer:' : 'العميل:') : (isEn ? 'Supplier:' : 'المورد:');
           const partyName = (isSales ? dto.customer_name : dto.supplier_name) || '-';
-          const partyTaxNum = dto.partyTaxNumber || dto.party_tax_number || (isSales ? (dto.customer_tax_number || dto.customer?.tax_number || dto.customer?.vat_number || dto.customer_tax_num || dto.customerTaxNumber) : (dto.supplier_tax_number || dto.supplier?.tax_number || dto.supplier?.vat_number || dto.supplier_tax_num || dto.supplierTaxNumber)) || dto.vat_number || dto.tax_number || dto.tax_num || '';
+          const partyTaxNum = dto.partyTaxNumber || dto.party_tax_number || (isSales ? (dto.customer_tax_number || dto.customer?.tax_number || dto.customer?.vat_number || dto.customer_tax_num || dto.customerTaxNumber) : (dto.supplier_tax_number || dto.supplier?.tax_number || dto.supplier?.vat_number || dto.supplier_tax_num || dto.supplierTaxNumber)) || dto.vat_number || dto.tax_number || dto.tax_num || dto.partyTaxNum || '';
           const taxLabel = isEn ? 'Tax Number:' : 'الرقم الضريبي:';
           const payLabel = isEn ? 'Payment Method:' : 'طريقة الدفع:';
           let rawPayVal = dto.payment_method || (isEn ? 'Credit' : 'آجل');
@@ -1014,36 +1014,38 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           const infoWidth = isThermal ? usableWidth : (pageWidth - sideMargin - infoX);
           let infoY = middleY + 2;
 
-          // Row 1: Party Name (Right) & Party Tax Number (Left)
+          // Row 1: Party Name (Customer / Supplier)
           const partyLine = `${partyLabel} ${partyName}`;
           doc.fillColor('#0f172a');
-          renderText(partyLine, infoX, infoY, { width: isThermal ? infoWidth : 165, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 8 : 10.5, lineBreak: false });
-
-          if (partyTaxNum) {
-            const taxLine = `${taxLabel} ${partyTaxNum}`;
-            const taxX = isRtl ? (infoX + (isThermal ? 0 : 170)) : infoX;
-            doc.fillColor('#334155');
-            renderText(taxLine, taxX, infoY, { width: isThermal ? infoWidth : (infoWidth - 170), align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 7.5 : 9.5, lineBreak: false });
-          }
+          renderText(partyLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 8 : 11 });
           infoY += isThermal ? 11 : 18;
 
-          // Row 2: Payment Method (Right) & Due Date (Left)
+          // Row 2: Party Tax Number (if present or fallback to company tax number)
+          const displayTaxNum = partyTaxNum || (dto.company?.taxNumber ? `${dto.company.taxNumber}` : '');
+          if (displayTaxNum) {
+            const taxLine = `${taxLabel} ${displayTaxNum}`;
+            doc.fillColor('#334155');
+            renderText(taxLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 7.5 : 9.5 });
+            infoY += isThermal ? 10 : 16;
+          }
+
+          // Row 3: Payment Method & Due Date
           doc.fillColor('#475569');
           const payLine = `${payLabel} ${cleanPayVal}`;
-          renderText(payLine, infoX, infoY, { width: isThermal ? infoWidth : 165, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5, lineBreak: false });
+          renderText(payLine, infoX, infoY, { width: isThermal ? infoWidth : 130, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
 
           if (isCredit && dueDateStr) {
             const dueLabel = isEn ? 'Due Date:' : 'تاريخ الاستحقاق:';
             const dueLine = `${dueLabel} ${dueDateStr}`;
-            const dueX = isRtl ? (infoX + (isThermal ? 0 : 170)) : infoX;
-            renderText(dueLine, dueX, infoY, { width: isThermal ? infoWidth : (infoWidth - 170), align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5, lineBreak: false });
+            const dueX = isRtl ? infoX : (infoX + 135);
+            renderText(dueLine, dueX, infoY, { width: isThermal ? infoWidth : 130, align: isRtl ? 'left' : 'right', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
           }
-          infoY += isThermal ? 10 : 18;
+          infoY += isThermal ? 10 : 16;
 
-          // Row 3: Branch
+          // Row 4: Branch Name
           const branchLine = `${branchLabel} ${branchVal}`;
           doc.fillColor('#64748b');
-          renderText(branchLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9, lineBreak: false });
+          renderText(branchLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9 });
           infoY += isThermal ? 10 : 16;
           const sectionBottomY = Math.max(cardY + cardHeight, infoY) + 12;
           if (!isThermal) {
