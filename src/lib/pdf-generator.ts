@@ -863,14 +863,26 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           const branchVal = dto.branchName || (isEn ? 'Main Branch' : 'الفرع الرئيسي');
 
           // Determine VAT Activation status for the invoice / company
-          const companyVatFlag = dto.company?.vat_enabled ?? dto.company?.vatEnabled ?? dto.vat_enabled ?? dto.vatEnabled;
-          const hasItemVat = (dto.items || []).some((item: any) => 
-            Number(item.vat_rate || item.tax_rate || item.vat_percentage || 0) > 0 || 
-            Number(item.vat_amount || 0) > 0
-          );
-          // VAT is disabled ONLY if explicitly set to false by company AND no item has VAT rate/amount
-          const isVatDisabled = (companyVatFlag === false || companyVatFlag === 'false' || companyVatFlag === 0) && !hasItemVat;
-          const isVatEnabled = !isVatDisabled;
+          const companyVatFlag = dto.company?.settings?.vat_enabled 
+            ?? dto.company?.vat_enabled 
+            ?? dto.company?.vatEnabled 
+            ?? dto.settings?.vat_enabled 
+            ?? dto.vat_enabled 
+            ?? dto.vatEnabled;
+          
+          let isVatEnabled = true;
+          if (companyVatFlag === false || companyVatFlag === 'false' || companyVatFlag === 0) {
+            isVatEnabled = false;
+          } else if (companyVatFlag === true || companyVatFlag === 'true' || companyVatFlag === 1) {
+            isVatEnabled = true;
+          } else {
+            // Fallback: If company flag is unsupplied, enable VAT only if actual VAT amounts/rates exist (> 0)
+            const hasActualVat = (Number(dto.vat_amount || 0) > 0) || (dto.items || []).some((item: any) => 
+              Number(item.vat_rate || item.tax_rate || item.vat_percentage || 0) > 0 || 
+              Number(item.vat_amount || 0) > 0
+            );
+            isVatEnabled = hasActualVat;
+          }
 
           // Draw Top Header Layout
           const headerStartY = currentY;
