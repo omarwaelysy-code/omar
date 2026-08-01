@@ -912,7 +912,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           // Invoice Number & Date placed directly under Title on the Right (exactly like user's image)
           const numAndDateText = `${dto.invoice_number || ''}    ${invoiceDateStr}`;
           doc.fillColor('#1e293b');
-          renderText(numAndDateText, titleX, headerStartY + (isThermal ? 13 : 24), { 
+          renderText(numAndDateText, titleX, headerStartY + (isThermal ? 13 : 30), { 
             width: titleWidth, 
             align: isRtl ? 'right' : 'left', 
             font: 'ArabicBold', 
@@ -920,7 +920,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           });
 
           // Top Header Height
-          const topHeaderHeight = isThermal ? (Math.max(logoSize, 25) + 6) : (Math.max(logoSize, 45) + 12);
+          const topHeaderHeight = isThermal ? (Math.max(logoSize, 25) + 6) : 66;
           const line1Y = headerStartY + topHeaderHeight;
 
           // ─── HORIZONTAL DIVIDER LINE 1 ───
@@ -1028,14 +1028,16 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             infoY += isThermal ? 10 : 16;
           }
 
-          // Row 3: Payment Method & Due Date (well-spaced)
+          // Row 3: Payment Method & Due Date (well-spaced to prevent collision)
           doc.fillColor('#475569');
+          const payLine = `${payLabel} ${cleanPayVal}`;
+          renderText(payLine, infoX, infoY, { width: isThermal ? infoWidth : 140, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
+
           if (isCredit && dueDateStr) {
             const dueLabel = isEn ? 'Due Date:' : 'تاريخ الاستحقاق:';
-            renderText(`${payLabel} ${cleanPayVal}`, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
-            renderText(`${dueLabel} ${dueDateStr}`, infoX, infoY, { width: infoWidth - 130, align: isRtl ? 'left' : 'right', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
-          } else {
-            renderText(`${payLabel} ${cleanPayVal}`, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
+            const dueLine = `${dueLabel} ${dueDateStr}`;
+            const dueX = isRtl ? (infoX + (isThermal ? 0 : 145)) : infoX;
+            renderText(dueLine, dueX, infoY, { width: isThermal ? infoWidth : (infoWidth - 145), align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
           }
           infoY += isThermal ? 10 : 16;
 
@@ -1068,7 +1070,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               { id: 'product_name', label: isEn ? 'Item Name' : 'الصنف', width: 38, align: isRtl ? 'right' : 'left' },
               { id: 'quantity', label: isEn ? 'Qty' : 'الكمية', width: 10, align: 'right' },
               { id: 'unit_price', label: isEn ? 'Price' : 'السعر', width: 12, align: 'right' },
-              { id: 'vat_rate_formatted', label: isEn ? 'Tax %' : 'نسبة الضريبة', width: 10, align: 'center' },
+              { id: 'vat_rate_formatted', label: isEn ? 'Tax %' : 'نسبة الضريبة', width: 13, align: 'center' },
               { id: 'vat_amount', label: isEn ? 'VAT' : 'الضريبة', width: 10, align: 'right' },
               { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 14, align: 'right' }
             ];
@@ -1084,18 +1086,19 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           }
 
           // Format items with vat_rate_formatted
+          // Format items with vat_rate_formatted (% 14)
           const formattedItems = (dto.items || []).map((item: any) => {
-            let rateStr = '0%';
+            let numRate = 0;
             if (item.vat_rate !== undefined && item.vat_rate !== null && item.vat_rate !== '') {
-              rateStr = `${item.vat_rate}%`;
+              numRate = parseFloat(String(item.vat_rate));
             } else if (item.tax_rate !== undefined && item.tax_rate !== null && item.tax_rate !== '') {
-              rateStr = `${item.tax_rate}%`;
+              numRate = parseFloat(String(item.tax_rate));
             } else if (item.vat_percentage !== undefined && item.vat_percentage !== null) {
-              rateStr = `${item.vat_percentage}%`;
+              numRate = parseFloat(String(item.vat_percentage));
             } else if (Number(item.vat_amount || 0) > 0 && Number(item.unit_price || 0) > 0 && Number(item.quantity || 0) > 0) {
-              const calcRate = Math.round((Number(item.vat_amount) / (Number(item.quantity) * Number(item.unit_price))) * 100);
-              rateStr = `${calcRate}%`;
+              numRate = Math.round((Number(item.vat_amount) / (Number(item.quantity) * Number(item.unit_price))) * 100);
             }
+            const rateStr = numRate > 0 ? `% ${numRate}` : '0%';
             return {
               ...item,
               vat_rate_formatted: rateStr
