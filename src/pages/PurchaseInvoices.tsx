@@ -4945,6 +4945,16 @@ export const PurchaseInvoices: React.FC = () => {
                     <div>
                       <p className="text-xs font-bold text-[#a1a1aa] uppercase tracking-widest mb-1">{t('pi.invoice_from')}</p>
                       <p className="text-xl font-bold text-[#18181b]">{viewInvoice.supplier_name}</p>
+                      {(() => {
+                        const supp = suppliers.find((s: any) => s.id === viewInvoice.supplier_id || s.name === viewInvoice.supplier_name);
+                        const suppTax = (viewInvoice as any).supplier_tax_number || (viewInvoice as any).tax_number || (viewInvoice as any).partyTaxNumber || supp?.tax_number || (supp as any)?.vat_number;
+                        if (!suppTax) return null;
+                        return (
+                          <p className="text-xs text-slate-600 font-bold mt-1">
+                            {language === 'ar' ? 'الرقم الضريبي:' : 'Tax Number:'} <span className="text-slate-900 font-bold font-mono">{suppTax}</span>
+                          </p>
+                        );
+                      })()}
                       {viewInvoice.warehouse_id && (
                         <p className="text-xs text-slate-500 font-medium mt-1">
                           {language === 'ar' ? 'المخزن:' : 'Warehouse:'} <span className="text-emerald-600 font-bold">{warehouses.find((w: any) => w.id?.toString() === viewInvoice.warehouse_id?.toString())?.name || viewInvoice.warehouse_id}</span>

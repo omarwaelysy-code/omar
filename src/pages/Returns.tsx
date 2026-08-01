@@ -3160,6 +3160,16 @@ export const Returns: React.FC = () => {
                     <div className="space-y-1">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{language === 'ar' ? 'مرتجع من العميل' : 'Return From Customer'}</p>
                       <p className="text-2xl font-black text-slate-900 tracking-tight">{viewReturn.customer_name}</p>
+                      {(() => {
+                        const cust = customers.find(c => c.id === viewReturn.customer_id || c.name === viewReturn.customer_name);
+                        const custTax = (viewReturn as any).customer_tax_number || (viewReturn as any).tax_number || (viewReturn as any).partyTaxNumber || cust?.tax_number || (cust as any)?.vat_number;
+                        if (!custTax) return null;
+                        return (
+                          <p className="text-xs text-slate-600 font-bold mt-1">
+                            {language === 'ar' ? 'الرقم الضريبي:' : 'Tax Number:'} <span className="text-slate-900 font-bold font-mono">{custTax}</span>
+                          </p>
+                        );
+                      })()}
                       {viewReturn.customer_id && (
                         <p className="text-xs text-slate-500 font-medium">كود العميل: {viewReturn.customer_id.slice(-6).toUpperCase()}</p>
                       )}

@@ -3465,6 +3465,16 @@ export const PurchaseReturns: React.FC = () => {
                   <div>
                     <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1" style={{ color: '#71717a' }}>المورد</p>
                     <p className="text-lg font-bold text-zinc-900" style={{ color: '#18181b' }}>{viewReturn.supplier_name}</p>
+                    {(() => {
+                      const supp = suppliers.find((s: any) => s.id === viewReturn.supplier_id || s.name === viewReturn.supplier_name);
+                      const suppTax = (viewReturn as any).supplier_tax_number || (viewReturn as any).tax_number || (viewReturn as any).partyTaxNumber || supp?.tax_number || (supp as any)?.vat_number;
+                      if (!suppTax) return null;
+                      return (
+                        <p className="text-xs text-slate-600 font-bold mt-1">
+                          {language === 'ar' ? 'الرقم الضريبي:' : 'Tax Number:'} <span className="text-slate-900 font-bold font-mono">{suppTax}</span>
+                        </p>
+                      );
+                    })()}
                     {viewReturn.warehouse_id && (
                       <p className="text-xs text-slate-505 font-medium mt-1">
                         {language === 'ar' ? 'المخزن:' : 'Warehouse:'} <span className="text-emerald-600 font-bold">{warehouses.find((w: any) => w.id?.toString() === viewReturn.warehouse_id?.toString())?.name || viewReturn.warehouse_id}</span>
