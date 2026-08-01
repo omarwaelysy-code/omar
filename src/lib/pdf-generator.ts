@@ -1020,29 +1020,29 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           renderText(partyLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 8 : 11 });
           infoY += isThermal ? 11 : 18;
 
-          // Row 2: Party Tax Number (if present or fallback to company tax number)
-          const displayTaxNum = partyTaxNum || (dto.company?.taxNumber ? `${dto.company.taxNumber}` : '');
-          if (displayTaxNum) {
-            const taxLine = `${taxLabel} ${displayTaxNum}`;
+          // Row 2: Party Tax Number (if present)
+          if (partyTaxNum) {
+            const taxLine = `${taxLabel} ${partyTaxNum}`;
             doc.fillColor('#334155');
             renderText(taxLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 7.5 : 9.5 });
             infoY += isThermal ? 10 : 16;
           }
 
-          // Row 3: Payment Method & Due Date
+          // Row 3: Payment Method
           doc.fillColor('#475569');
           const payLine = `${payLabel} ${cleanPayVal}`;
-          renderText(payLine, infoX, infoY, { width: isThermal ? infoWidth : 130, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
+          renderText(payLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
+          infoY += isThermal ? 10 : 16;
 
+          // Row 4: Due Date (if Credit)
           if (isCredit && dueDateStr) {
             const dueLabel = isEn ? 'Due Date:' : 'تاريخ الاستحقاق:';
             const dueLine = `${dueLabel} ${dueDateStr}`;
-            const dueX = isRtl ? infoX : (infoX + 135);
-            renderText(dueLine, dueX, infoY, { width: isThermal ? infoWidth : 130, align: isRtl ? 'left' : 'right', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
+            renderText(dueLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
+            infoY += isThermal ? 10 : 16;
           }
-          infoY += isThermal ? 10 : 16;
 
-          // Row 4: Branch Name
+          // Row 5: Branch Name
           const branchLine = `${branchLabel} ${branchVal}`;
           doc.fillColor('#64748b');
           renderText(branchLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9 });
