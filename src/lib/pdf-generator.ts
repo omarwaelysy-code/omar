@@ -295,64 +295,26 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         const fontName = options.font || 'ArabicRegular';
         const fontSize = options.size || (isThermal ? 7.5 : 10);
         const isBold = fontName.includes('Bold');
+        const activeFont = isBold ? 'ArabicBold' : 'ArabicRegular';
         
         // Shape and reorder text using our segment reorderer
         const processed = renderArabic(text);
-        const segments = segmentText(processed);
-        
-        // Measure total width
-        let totalWidth = 0;
-        segments.forEach(seg => {
-          const segFont = seg.isArabic 
-            ? (isBold ? 'ArabicBold' : 'ArabicRegular')
-            : (isBold ? 'Helvetica-Bold' : 'Helvetica');
-          doc.font(segFont).fontSize(fontSize);
-          totalWidth += doc.widthOfString(seg.text);
-        });
 
-        // Determine absolute X starting point
-        let startX = x;
+        // Set font and size on document
+        doc.font(activeFont).fontSize(fontSize);
+
         const maxWidth = options.width;
         const align = options.align || (isRtl ? 'right' : 'left');
-        if (maxWidth !== undefined && maxWidth > 0) {
-          if (align === 'right') {
-            startX = x + maxWidth - totalWidth;
-          } else if (align === 'center') {
-            startX = x + (maxWidth - totalWidth) / 2;
-          }
-        }
 
-        // Render segments
-        if (isRtl) {
-          // Draw segments from right to left (first segment is on the far right)
-          let currentSegmentX = startX + totalWidth;
-          segments.forEach(seg => {
-            const useHelvetica = /[a-zA-Z0-9%\+\/\(\)\.\:\,\-]/.test(seg.text);
-            const segFont = !useHelvetica 
-              ? (isBold ? 'ArabicBold' : 'ArabicRegular')
-              : (isBold ? 'Helvetica-Bold' : 'Helvetica');
-            doc.font(segFont).fontSize(fontSize);
-            
-            const segWidth = doc.widthOfString(seg.text);
-            currentSegmentX -= segWidth;
-            // Adjust Helvetica baseline to align perfectly with NotoSans Arabic
-            const adjustedY = useHelvetica ? (y + fontSize * 0.15) : y;
-            doc.text(seg.text, currentSegmentX, adjustedY, { lineBreak: false });
+        if (maxWidth !== undefined && maxWidth > 0) {
+          doc.text(processed, x, y, {
+            width: maxWidth,
+            align: align,
+            lineBreak: options.lineBreak ?? false
           });
         } else {
-          // Draw segments from left to right (first segment is on the far left)
-          let currentSegmentX = startX;
-          segments.forEach(seg => {
-            const useHelvetica = /[a-zA-Z0-9%\+\/\(\)\.\:\,\-]/.test(seg.text);
-            const segFont = !useHelvetica 
-              ? (isBold ? 'ArabicBold' : 'ArabicRegular')
-              : (isBold ? 'Helvetica-Bold' : 'Helvetica');
-            doc.font(segFont).fontSize(fontSize);
-            
-            // Adjust Helvetica baseline to align perfectly with NotoSans Arabic
-            const adjustedY = useHelvetica ? (y + fontSize * 0.15) : y;
-            doc.text(seg.text, currentSegmentX, adjustedY, { lineBreak: false });
-            currentSegmentX += doc.widthOfString(seg.text);
+          doc.text(processed, x, y, {
+            lineBreak: options.lineBreak ?? false
           });
         }
       };
