@@ -327,7 +327,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           // Draw segments from right to left (first segment is on the far right)
           let currentSegmentX = startX + totalWidth;
           segments.forEach(seg => {
-            const useHelvetica = /[a-zA-Z]|\+|\/|\(|\)/.test(seg.text);
+            const useHelvetica = /[a-zA-Z0-9%\+\/\(\)\.\:\,\-]/.test(seg.text);
             const segFont = !useHelvetica 
               ? (isBold ? 'ArabicBold' : 'ArabicRegular')
               : (isBold ? 'Helvetica-Bold' : 'Helvetica');
@@ -336,21 +336,21 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             const segWidth = doc.widthOfString(seg.text);
             currentSegmentX -= segWidth;
             // Adjust NotoSans Arabic baseline to align perfectly with Helvetica & digits
-            const adjustedY = !useHelvetica ? (y - fontSize * 0.12) : y;
+            const adjustedY = y;
             doc.text(seg.text, currentSegmentX, adjustedY, { lineBreak: false });
           });
         } else {
           // Draw segments from left to right (first segment is on the far left)
           let currentSegmentX = startX;
           segments.forEach(seg => {
-            const useHelvetica = /[a-zA-Z]|\+|\/|\(|\)/.test(seg.text);
+            const useHelvetica = /[a-zA-Z0-9%\+\/\(\)\.\:\,\-]/.test(seg.text);
             const segFont = !useHelvetica 
               ? (isBold ? 'ArabicBold' : 'ArabicRegular')
               : (isBold ? 'Helvetica-Bold' : 'Helvetica');
             doc.font(segFont).fontSize(fontSize);
             
             // Adjust NotoSans Arabic baseline to align perfectly with Helvetica & digits
-            const adjustedY = !useHelvetica ? (y - fontSize * 0.12) : y;
+            const adjustedY = y;
             doc.text(seg.text, currentSegmentX, adjustedY, { lineBreak: false });
             currentSegmentX += doc.widthOfString(seg.text);
           });
@@ -852,7 +852,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
           const partyLabel = isSales ? (isEn ? 'Customer:' : 'العميل:') : (isEn ? 'Supplier:' : 'المورد:');
           const partyName = (isSales ? dto.customer_name : dto.supplier_name) || '-';
-          const partyTaxNum = (isSales ? dto.customer_tax_number : dto.supplier_tax_number) || dto.company?.taxNumber || '';
+          const partyTaxNum = (isSales ? (dto.customer_tax_number || dto.customer?.tax_number || dto.customer_tax_num || dto.customerTaxNumber) : (dto.supplier_tax_number || dto.supplier?.tax_number || dto.supplier_tax_num || dto.supplierTaxNumber)) || dto.tax_number || dto.tax_num || '';
           const taxLabel = isEn ? 'Tax Number:' : 'الرقم الضريبي:';
           const payLabel = isEn ? 'Payment Method:' : 'طريقة الدفع:';
           let rawPayVal = dto.payment_method || (isEn ? 'Credit' : 'آجل');
@@ -1014,40 +1014,37 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           const infoWidth = isThermal ? usableWidth : (pageWidth - sideMargin - infoX);
           let infoY = middleY + 2;
 
-          // Row 1: Party Name (Customer / Supplier)
+          // Row 1: Party Name (Right) & Party Tax Number (Left)
           const partyLine = `${partyLabel} ${partyName}`;
           doc.fillColor('#0f172a');
-          renderText(partyLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 8 : 11.5 });
+          renderText(partyLine, infoX, infoY, { width: isThermal ? infoWidth : 150, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 8 : 11 });
+
+          if (partyTaxNum) {
+            const taxLine = `${taxLabel} ${partyTaxNum}`;
+            const taxX = isRtl ? (infoX + (isThermal ? 0 : 155)) : infoX;
+            doc.fillColor('#334155');
+            renderText(taxLine, taxX, infoY, { width: isThermal ? infoWidth : (infoWidth - 155), align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 7.5 : 9.5 });
+          }
           infoY += isThermal ? 11 : 20;
 
-          // Row 2: Tax Number (if present & enabled)
-          if (partyTaxNum && isVatEnabled) {
-            const taxLine = `${taxLabel} ${partyTaxNum}`;
-            doc.fillColor('#475569');
-            renderText(taxLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
-            infoY += isThermal ? 10 : 16;
-          }
-
-          // Row 3: Payment Method & Due Date (well-spaced to prevent collision)
+          // Row 2: Payment Method (Right) & Due Date (Left)
           doc.fillColor('#475569');
           const payLine = `${payLabel} ${cleanPayVal}`;
-          renderText(payLine, infoX, infoY, { width: isThermal ? infoWidth : 140, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
+          renderText(payLine, infoX, infoY, { width: isThermal ? infoWidth : 150, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
 
           if (isCredit && dueDateStr) {
             const dueLabel = isEn ? 'Due Date:' : 'تاريخ الاستحقاق:';
             const dueLine = `${dueLabel} ${dueDateStr}`;
-            const dueX = isRtl ? (infoX + (isThermal ? 0 : 145)) : infoX;
-            renderText(dueLine, dueX, infoY, { width: isThermal ? infoWidth : (infoWidth - 145), align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
+            const dueX = isRtl ? (infoX + (isThermal ? 0 : 155)) : infoX;
+            renderText(dueLine, dueX, infoY, { width: isThermal ? infoWidth : (infoWidth - 155), align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
           }
-          infoY += isThermal ? 10 : 16;
+          infoY += isThermal ? 10 : 18;
 
-          // Row 4: Branch
+          // Row 3: Branch
           const branchLine = `${branchLabel} ${branchVal}`;
           doc.fillColor('#64748b');
           renderText(branchLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9 });
           infoY += isThermal ? 10 : 16;
-
-          // ─── HORIZONTAL DIVIDER LINE 2 ───
           const sectionBottomY = Math.max(cardY + cardHeight, infoY) + 12;
           if (!isThermal) {
             doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(sideMargin, sectionBottomY).lineTo(pageWidth - sideMargin, sectionBottomY).stroke();
