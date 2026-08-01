@@ -893,7 +893,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             try {
               doc.image(logoBuffer, logoX, headerStartY, { width: logoSize, height: logoSize });
             } catch (e: any) {
-              console.error(${STEP} Logo render error:, e.message);
+              console.error(`${STEP} Logo render error:`, e.message);
             }
           }
 
@@ -910,7 +910,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           });
 
           // Invoice Number & Date placed directly under Title on the Right (exactly like user's image)
-          const numAndDateText = ${dto.invoice_number || ''}    ;
+          const numAndDateText = `${dto.invoice_number || ''}    ${invoiceDateStr}`;
           doc.fillColor('#1e293b');
           renderText(numAndDateText, titleX, headerStartY + (isThermal ? 13 : 24), { 
             width: titleWidth, 
