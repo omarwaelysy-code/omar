@@ -335,8 +335,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             
             const segWidth = doc.widthOfString(seg.text);
             currentSegmentX -= segWidth;
-            // Adjust NotoSans Arabic baseline to align perfectly with Helvetica & digits
-            const adjustedY = y;
+            // Adjust Helvetica baseline to align perfectly with NotoSans Arabic
+            const adjustedY = useHelvetica ? (y + fontSize * 0.15) : y;
             doc.text(seg.text, currentSegmentX, adjustedY, { lineBreak: false });
           });
         } else {
@@ -349,8 +349,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               : (isBold ? 'Helvetica-Bold' : 'Helvetica');
             doc.font(segFont).fontSize(fontSize);
             
-            // Adjust NotoSans Arabic baseline to align perfectly with Helvetica & digits
-            const adjustedY = y;
+            // Adjust Helvetica baseline to align perfectly with NotoSans Arabic
+            const adjustedY = useHelvetica ? (y + fontSize * 0.15) : y;
             doc.text(seg.text, currentSegmentX, adjustedY, { lineBreak: false });
             currentSegmentX += doc.widthOfString(seg.text);
           });
@@ -1020,13 +1020,12 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           renderText(partyLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 8 : 11 });
           infoY += isThermal ? 11 : 18;
 
-          // Row 2: Party Tax Number (if present)
-          if (partyTaxNum) {
-            const taxLine = `${taxLabel} ${partyTaxNum}`;
-            doc.fillColor('#334155');
-            renderText(taxLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 7.5 : 9.5 });
-            infoY += isThermal ? 10 : 16;
-          }
+          // Row 2: Tax Number (Customer/Supplier tax number if present, or company tax number, or '-')
+          const displayTaxNum = partyTaxNum || (dto.company?.taxNumber ? `${dto.company.taxNumber}` : (dto.companyTaxNumber || '-'));
+          const taxLine = `${taxLabel} ${displayTaxNum}`;
+          doc.fillColor('#334155');
+          renderText(taxLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 7.5 : 9.5 });
+          infoY += isThermal ? 10 : 16;
 
           // Row 3: Payment Method
           doc.fillColor('#475569');
