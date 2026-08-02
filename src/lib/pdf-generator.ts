@@ -71,13 +71,6 @@ function shapeText(text: any): string {
     return str;
   }
 
-  const pipeIdx = str.indexOf('|');
-  if (pipeIdx > -1) {
-    const left = str.substring(0, pipeIdx).trim();
-    const right = str.substring(pipeIdx + 1).trim();
-    return `${shapeText(left)}  |  ${shapeText(right)}`;
-  }
-
   const colonIdx = str.indexOf(':');
   if (colonIdx > -1) {
     const label = str.substring(0, colonIdx).trim();
@@ -1332,18 +1325,6 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         
         // Website URL on the left
         renderText("www.obrain.tech", sideMargin, footerY, { align: 'left', font: 'ArabicRegular', size: isThermal ? 6.5 : 8 });
-
-        // Centered bilingual thank-you note (Arabic & English)
-        const thankYouText = "شكراً لتعاملكم معنا | Thank you for your business";
-        const footerCenterWidth = doc.page.width - (sideMargin * 2) - 200;
-        const footerCenterX = (doc.page.width - footerCenterWidth) / 2;
-        doc.fillColor('#64748b');
-        renderText(thankYouText, footerCenterX, footerY, {
-          width: footerCenterWidth,
-          align: 'center',
-          font: 'ArabicBold',
-          size: isThermal ? 6.5 : 8
-        });
 
         if (!isThermal) {
           const pageStr = isRtl 
