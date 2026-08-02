@@ -76,6 +76,12 @@ function shapeText(text: any): string {
     const label = str.substring(0, colonIdx).trim();
     const val = str.substring(colonIdx + 1).trim();
     
+    const isEnglishLabel = /^[a-zA-Z0-9\s]+$/.test(label);
+    if (isEnglishLabel) {
+      const shapedVal = shapeText(val);
+      return `${label}: ${shapedVal}`;
+    }
+
     const shapedLabel = shapeText(label);
     const shapedVal = shapeText(val);
     return `${shapedVal} :${shapedLabel}`;
@@ -282,8 +288,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
     if (pageHeight < 280) pageHeight = 280;
   }
 
-  // Resolve RTL flag
-  const isRtl = dto.isRtl !== false;
+  // Resolve RTL flag (LTR for English invoices, RTL for Arabic)
+  const isRtl = dto.isRtl === true || (dto.isRtl !== false && dto.language !== 'en' && dto.language !== 'English');
 
   return new Promise((resolve, reject) => {
     try {
