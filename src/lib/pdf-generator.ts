@@ -297,9 +297,12 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         const fontSize = options.size || (isThermal ? 7.5 : 10);
         const isBold = fontName.includes('Bold');
         
-        // Shape Arabic portion
+        // Step 1: Shape Arabic chars into contextual forms (initial/medial/final)
+        // Step 2: Apply bidi visual reordering (reverses Arabic runs, places LTR before RTL)
+        // This ensures L-to-R drawing produces correct visual result in PDFKit
         const shaped = shapeText(text);
-        const segments = segmentText(shaped);
+        const processed = isRtl ? processLine(shaped) : shaped;
+        const segments = segmentText(processed);
 
         // Measure total width across all segments
         let totalWidth = 0;

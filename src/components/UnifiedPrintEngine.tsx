@@ -378,6 +378,23 @@ export function UnifiedPrintEngine() {
       return;
     }
 
+    // ── Fetch customer/supplier tax number from DB if not present in invoice ──
+    let resolvedCustomerTaxNumber = normalized.customer_tax_number || documentData?.customer_tax_number || documentData?.tax_number || '';
+    let resolvedSupplierTaxNumber = normalized.supplier_tax_number || documentData?.supplier_tax_number || '';
+
+    if (!resolvedCustomerTaxNumber && documentData?.customer_id) {
+      try {
+        const cust = await dbService.get<any>('customers', documentData.customer_id);
+        resolvedCustomerTaxNumber = cust?.tax_number || cust?.vat_number || '';
+      } catch (_) {}
+    }
+    if (!resolvedSupplierTaxNumber && documentData?.supplier_id) {
+      try {
+        const supp = await dbService.get<any>('suppliers', documentData.supplier_id);
+        resolvedSupplierTaxNumber = supp?.tax_number || supp?.vat_number || '';
+      } catch (_) {}
+    }
+
     const companyDto = {
       name: normalized.company_name || '',
       logoUrl: normalized.company_logo || '',
@@ -419,7 +436,7 @@ export function UnifiedPrintEngine() {
         due_date: cleanDateVal(documentData?.due_date || documentData?.payment_terms_date),
         payment_method: normalized.payment_method || '',
         customer_name: normalized.customer_name || '',
-        customer_tax_number: normalized.customer_tax_number || documentData?.customer_tax_number || documentData?.tax_number || '',
+        customer_tax_number: resolvedCustomerTaxNumber,
         customer_phone: normalized.customer_phone,
         items: itemsDto,
         subtotal: String(normalized.subtotal || '0'),
@@ -438,9 +455,10 @@ export function UnifiedPrintEngine() {
         invoice_number: normalized.document_number || '',
         date: cleanDateVal(normalized.date),
         due_date: cleanDateVal(documentData?.due_date || documentData?.payment_terms_date),
+
         payment_method: normalized.payment_method || '',
         supplier_name: normalized.supplier_name || '',
-        supplier_tax_number: normalized.supplier_tax_number || documentData?.supplier_tax_number || documentData?.tax_number || '',
+        supplier_tax_number: resolvedSupplierTaxNumber,
         supplier_phone: normalized.supplier_phone,
         items: itemsDto,
         subtotal: String(normalized.subtotal || '0'),
