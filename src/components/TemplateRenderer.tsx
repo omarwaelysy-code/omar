@@ -186,7 +186,10 @@ export function normalizeDocumentData(
   } 
   else if (type === 'purchase_invoices') {
     doc.document_number = data.invoice_number;
-    doc.supplier_name = data.supplier_name;
+    doc.supplier_name = data.supplier_name || data.supplier?.name || '';
+    doc.customer_name = doc.supplier_name; // Fallback so customer_name binding resolves supplier name
+    doc.supplier_tax_number = data.supplier_tax_number || data.tax_number || data.supplier?.tax_number || '';
+    doc.customer_tax_number = doc.supplier_tax_number;
     doc.subtotal = Number(data.subtotal || 0);
     doc.discount_amount = Number(data.discount_amount || 0);
     doc.vat_amount = Number(data.tax_amount || 0);
@@ -204,13 +207,16 @@ export function normalizeDocumentData(
       unit_price: Number(itm.unit_price || 0),
       discount: Number(itm.discount || 0),
       vat_amount: Number(itm.vat_amount || 0),
+      vat_rate: itm.vat_rate !== undefined ? `% ${itm.vat_rate}` : (itm.tax_rate !== undefined ? `% ${itm.tax_rate}` : '% 14'),
       total: Number(itm.total || 0)
     }));
   } 
   else if (type === 'returns' || type === 'purchase_returns') {
     doc.document_number = data.return_number;
-    doc.customer_name = data.customer_name || '';
-    doc.supplier_name = data.supplier_name || '';
+    doc.customer_name = data.customer_name || data.supplier_name || '';
+    doc.supplier_name = data.supplier_name || data.customer_name || '';
+    doc.customer_tax_number = data.customer_tax_number || data.supplier_tax_number || data.tax_number || '';
+    doc.supplier_tax_number = data.supplier_tax_number || data.customer_tax_number || data.tax_number || '';
     doc.subtotal = Number(data.total_amount || 0);
     doc.discount_amount = 0;
     doc.vat_amount = 0;

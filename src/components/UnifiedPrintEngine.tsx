@@ -69,7 +69,7 @@ const DEFAULT_TEMPLATE_LAYOUT = {
       width: 90,
       height: 6,
       properties: {
-        text: 'العميل / Customer:',
+        text: 'الطرف / Party:',
         fontSize: 9,
         bold: true,
         align: 'right',

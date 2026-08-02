@@ -842,10 +842,24 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
       switch (templateName) {
         case 'InvoiceTemplate':
         case 'SalesInvoicePdf':
-        case 'PurchaseInvoicePdf': {
-          const docType = dto.operation_type || (templateName.includes('Sales') || templateName === 'InvoiceTemplate' ? 'invoices' : 'purchase_invoices');
-          const isSales = docType === 'invoices' || docType === 'returns' || docType === 'sales_orders' || templateName.includes('Sales') || templateName === 'InvoiceTemplate';
-          const isReturn = docType === 'returns' || docType === 'purchase_returns';
+        case 'PurchaseInvoicePdf':
+        case 'purchase_invoices':
+        case 'purchase_returns':
+        case 'purchase_orders':
+        case 'purchase_invoice':
+        case 'purchase_return':
+        case 'purchase_order':
+        case 'PurchaseInvoice':
+        case 'PurchaseReturn':
+        case 'PurchaseOrder':
+        case 'invoices':
+        case 'returns':
+        case 'sales_orders': {
+          const lowerTemp = (templateName || '').toLowerCase();
+          const docType = dto.operation_type || (lowerTemp.includes('purchase') ? 'purchase_invoices' : (lowerTemp.includes('sales') ? 'invoices' : 'invoices'));
+          const isSales = docType === 'invoices' || docType === 'returns' || docType === 'sales_orders' || lowerTemp.includes('sales') || templateName === 'InvoiceTemplate' || (!lowerTemp.includes('purchase') && !docType.includes('purchase'));
+          const isReturn = docType === 'returns' || docType === 'purchase_returns' || lowerTemp.includes('return');
+          const isOrder = docType === 'sales_orders' || docType === 'purchase_orders' || lowerTemp.includes('order');
 
           // Language Check: Arabic vs English
           const isEn = dto.language === 'en';
