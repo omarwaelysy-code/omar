@@ -368,7 +368,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             : (isBold ? 'Helvetica-Bold' : 'Helvetica');
           doc.font(segFont).fontSize(fontSize);
 
-          const segY = useHelvetica ? (y + fontSize * 0.22) : y;
+          const segY = useHelvetica ? (y + fontSize * 0.40) : y;
           doc.text(seg.text, currentSegmentX, segY, { lineBreak: false });
           currentSegmentX += doc.widthOfString(seg.text);
         });
