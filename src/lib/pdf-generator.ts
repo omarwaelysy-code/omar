@@ -838,8 +838,30 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         currentY += isThermal ? 35 : 55;
       };
 
+      // Auto-promote generic ReportTemplate to dedicated PurchaseInvoicePdf or SalesInvoicePdf
+      let effectiveTemplate = templateName;
+      const lowerReportTitle = String(dto.reportTitle || '').toLowerCase();
+      const lowerOpType = String(dto.operation_type || '').toLowerCase();
+      
+      if (
+        effectiveTemplate === 'ReportTemplate' && (
+          lowerReportTitle.includes('مشتريات') || 
+          lowerReportTitle.includes('purchase') || 
+          lowerReportTitle.includes('pinv') || 
+          lowerReportTitle.includes('مبيعات') || 
+          lowerReportTitle.includes('sales') || 
+          lowerReportTitle.includes('فاتورة') || 
+          lowerOpType.includes('purchase') || 
+          lowerOpType.includes('invoice')
+        )
+      ) {
+        effectiveTemplate = (lowerReportTitle.includes('purchase') || lowerReportTitle.includes('مشتريات') || lowerOpType.includes('purchase')) 
+          ? 'PurchaseInvoicePdf' 
+          : 'SalesInvoicePdf';
+      }
+
       // Switch based on template name
-      switch (templateName) {
+      switch (effectiveTemplate) {
         case 'InvoiceTemplate':
         case 'SalesInvoicePdf':
         case 'PurchaseInvoicePdf':
@@ -855,11 +877,24 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         case 'invoices':
         case 'returns':
         case 'sales_orders': {
-          const lowerTemp = (templateName || '').toLowerCase();
-          const docType = dto.operation_type || (lowerTemp.includes('purchase') ? 'purchase_invoices' : (lowerTemp.includes('sales') ? 'invoices' : 'invoices'));
-          const isSales = docType === 'invoices' || docType === 'returns' || docType === 'sales_orders' || lowerTemp.includes('sales') || templateName === 'InvoiceTemplate' || (!lowerTemp.includes('purchase') && !docType.includes('purchase'));
-          const isReturn = docType === 'returns' || docType === 'purchase_returns' || lowerTemp.includes('return');
-          const isOrder = docType === 'sales_orders' || docType === 'purchase_orders' || lowerTemp.includes('order');
+          const lowerTemp = (effectiveTemplate || '').toLowerCase();
+          const docType = dto.operation_type || (lowerTemp.includes('purchase') || lowerReportTitle.includes('مشتريات') ? 'purchase_invoices' : (lowerTemp.includes('sales') || lowerReportTitle.includes('مبيعات') ? 'invoices' : 'invoices'));
+          const isSales = docType === 'invoices' || docType === 'returns' || docType === 'sales_orders' || lowerTemp.includes('sales') || effectiveTemplate === 'InvoiceTemplate' || (!lowerTemp.includes('purchase') && !docType.includes('purchase') && !lowerReportTitle.includes('مشتريات'));
+          const isReturn = docType === 'returns' || docType === 'purchase_returns' || lowerTemp.includes('return') || lowerReportTitle.includes('مرتجع');
+          const isOrder = docType === 'sales_orders' || docType === 'purchase_orders' || lowerTemp.includes('order') || lowerReportTitle.includes('أمر');
+
+          // If items array is missing but rows exist (e.g. exported HTML table), map rows to items
+          if ((!dto.items || dto.items.length === 0) && dto.rows && dto.rows.length > 0) {
+            dto.items = dto.rows.map((row: any) => ({
+              product_code: row.product_code || row.code || row.col_0 || row.col_1 || row['الكود'] || row['كود الصنف'] || '-',
+              product_name: row.product_name || row.item_name || row.description || row.col_1 || row.col_2 || row['صنف'] || row['الصنف'] || row['البيان'] || '-',
+              quantity: row.quantity || row.qty || row.col_2 || row.col_3 || row['الكمية'] || 1,
+              unit_price: row.unit_price || row.price || row.cost_price || row.col_3 || row.col_4 || row['السعر'] || 0,
+              vat_rate: row.vat_rate || row.tax_rate || row['ض ق م %'] || row['نسبة الضريبة'] || 14,
+              vat_amount: row.vat_amount || row.tax || row['مبلغ الضريبة'] || row['الضريبة'] || 0,
+              total: row.total || row.total_amount || row['الإجمالي'] || 0
+            }));
+          }
 
           // Language Check: Arabic vs English
           const isEn = dto.language === 'en';

@@ -252,6 +252,12 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
     orientation: options.orientation || 'portrait'
   };
 
+  const titleStr = String(options.reportTitle || '').toLowerCase();
+  const fileStr = String(options.filename || '').toLowerCase();
+  const isPurchase = titleStr.includes('مشتريات') || titleStr.includes('purchase') || fileStr.includes('purchase') || fileStr.includes('pinv');
+
+  const templateName = isPurchase ? 'PurchaseInvoicePdf' : 'ReportTemplate';
+
   // 4. Send POST request to backend PDF service
   try {
     const response = await fetch('/api/erp/print/pdf', {
@@ -260,7 +266,7 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        templateName: 'ReportTemplate',
+        templateName,
         dto
       })
     });
