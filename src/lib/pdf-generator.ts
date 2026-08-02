@@ -63,7 +63,30 @@ export function processLine(shapedLine: string): string {
 
 function shapeText(text: any): string {
   if (text === null || text === undefined) return '';
-  const str = String(text);
+  const str = String(text).trim();
+  if (!str) return '';
+
+  const hasArabic = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(str);
+  if (!hasArabic) {
+    return str;
+  }
+
+  const colonIdx = str.indexOf(':');
+  if (colonIdx > -1) {
+    const label = str.substring(0, colonIdx).trim();
+    const val = str.substring(colonIdx + 1).trim();
+    
+    const shapedLabel = shapeText(label);
+    const shapedVal = shapeText(val);
+    return `${shapedVal} :${shapedLabel}`;
+  }
+
+  const words = str.split(/\s+/);
+  if (words.length > 1) {
+    const reversedWords = words.reverse().join(' ');
+    return reshaper.ArabicShaper.convertArabic(reversedWords);
+  }
+
   return reshaper.ArabicShaper.convertArabic(str);
 }
 
