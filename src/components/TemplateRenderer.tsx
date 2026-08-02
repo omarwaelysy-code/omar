@@ -180,6 +180,7 @@ export function normalizeDocumentData(
       unit_price: Number(itm.unit_price || 0),
       discount: Number(itm.discount || 0),
       vat_amount: Number(itm.vat_amount || 0),
+      vat_rate: itm.vat_rate !== undefined ? `% ${itm.vat_rate}` : (itm.tax_rate !== undefined ? `% ${itm.tax_rate}` : '% 14'),
       total: Number(itm.total || 0)
     }));
   } 

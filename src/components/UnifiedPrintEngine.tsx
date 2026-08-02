@@ -8,98 +8,187 @@ import { useNotification } from '../contexts/NotificationContext';
 import { PaperSize, Template, PrintProfile } from '../types';
 
 const DEFAULT_TEMPLATE_LAYOUT = {
-  headerHeight: 70,
-  footerHeight: 50,
+  headerHeight: 65,
+  footerHeight: 35,
   watermarkOpacity: 0.15,
   watermarkRotation: -45,
   header: [
     {
       id: 'title-default',
       type: 'text',
-      x: 75,
-      y: 12,
-      width: 60,
+      x: 100,
+      y: 6,
+      width: 90,
       height: 10,
       properties: {
-        text: 'مستند النظام الافتراضي',
-        fontSize: 18,
-        bold: true,
-        align: 'center',
-        color: '#18181b',
-        fontFamily: 'Cairo'
-      }
-    },
-    {
-      id: 'doc-num-label',
-      type: 'text',
-      x: 10,
-      y: 10,
-      width: 30,
-      height: 6,
-      properties: {
-        text: 'رقم المستند:',
-        fontSize: 10,
+        text: 'فاتورة مبيعات / Sales Invoice',
+        fontSize: 16,
         bold: true,
         align: 'right',
+        color: '#0f172a',
         fontFamily: 'Cairo'
       }
     },
     {
       id: 'doc-num-val',
       type: 'variable',
-      x: 40,
-      y: 10,
-      width: 30,
+      x: 100,
+      y: 18,
+      width: 50,
       height: 6,
       properties: {
-        fontSize: 10,
+        fontSize: 9.5,
+        bold: true,
         align: 'right',
+        color: '#334155',
         fontFamily: 'Cairo'
       },
       binding: 'document_number'
     },
     {
-      id: 'doc-date-label',
-      type: 'text',
-      x: 140,
-      y: 10,
-      width: 30,
+      id: 'doc-date-val',
+      type: 'variable',
+      x: 152,
+      y: 18,
+      width: 38,
       height: 6,
       properties: {
-        text: 'التاريخ:',
-        fontSize: 10,
+        fontSize: 9.5,
         bold: true,
-        align: 'left',
+        align: 'right',
+        color: '#334155',
+        fontFamily: 'Cairo'
+      },
+      binding: 'date'
+    },
+    {
+      id: 'party-info-label',
+      type: 'text',
+      x: 100,
+      y: 28,
+      width: 90,
+      height: 6,
+      properties: {
+        text: 'العميل / Customer:',
+        fontSize: 9,
+        bold: true,
+        align: 'right',
+        color: '#0f172a',
         fontFamily: 'Cairo'
       }
     },
     {
-      id: 'doc-date-val',
+      id: 'party-info-val',
       type: 'variable',
-      x: 170,
-      y: 10,
+      x: 100,
+      y: 34,
+      width: 90,
+      height: 6,
+      properties: {
+        fontSize: 9,
+        bold: true,
+        align: 'right',
+        color: '#0f172a',
+        fontFamily: 'Cairo'
+      },
+      binding: 'customer_name'
+    },
+    {
+      id: 'branch-info-label',
+      type: 'text',
+      x: 100,
+      y: 42,
+      width: 90,
+      height: 6,
+      properties: {
+        text: 'الفرع / Branch:',
+        fontSize: 8.5,
+        bold: false,
+        align: 'right',
+        color: '#475569',
+        fontFamily: 'Cairo'
+      }
+    },
+    {
+      id: 'branch-info-val',
+      type: 'variable',
+      x: 100,
+      y: 48,
+      width: 90,
+      height: 6,
+      properties: {
+        fontSize: 8.5,
+        bold: false,
+        align: 'right',
+        color: '#475569',
+        fontFamily: 'Cairo'
+      },
+      binding: 'branch_name'
+    },
+    {
+      id: 'summary-box-title',
+      type: 'text',
+      x: 10,
+      y: 8,
+      width: 65,
+      height: 6,
+      properties: {
+        text: 'ملخص الفاتورة / Invoice Summary',
+        fontSize: 9,
+        bold: true,
+        align: 'right',
+        color: '#059669',
+        fontFamily: 'Cairo'
+      }
+    },
+    {
+      id: 'total-val-label',
+      type: 'text',
+      x: 10,
+      y: 18,
+      width: 35,
+      height: 6,
+      properties: {
+        text: 'الصافي النهائي / Net Total:',
+        fontSize: 9.5,
+        bold: true,
+        align: 'right',
+        color: '#059669',
+        fontFamily: 'Cairo'
+      }
+    },
+    {
+      id: 'total-val',
+      type: 'variable',
+      x: 45,
+      y: 18,
       width: 30,
       height: 6,
       properties: {
-        fontSize: 10,
+        fontSize: 9.5,
+        bold: true,
         align: 'left',
+        color: '#059669',
         fontFamily: 'Cairo'
       },
-      binding: 'date'
+      binding: 'net_total'
     }
   ],
   details: {
     columns: [
-      { id: 'product_code', label: 'الكود / Code', field: 'product_code', width: 20 },
-      { id: 'product_name', label: 'البيان / Details', field: 'product_name', width: 50 },
-      { id: 'quantity', label: 'الكمية / Qty', field: 'quantity', width: 15 },
-      { id: 'total', label: 'الإجمالي / Total', field: 'total', width: 15 }
+      { id: 'product_code', label: 'كود الصنف / Item Code', field: 'product_code', width: 14 },
+      { id: 'product_name', label: 'الصنف / Item Name', field: 'product_name', width: 38 },
+      { id: 'quantity', label: 'الكمية / Qty', field: 'quantity', width: 10 },
+      { id: 'unit_price', label: 'السعر / Price', field: 'unit_price', width: 12 },
+      { id: 'vat_rate', label: 'نسبة الضريبة / Tax %', field: 'vat_rate', width: 13 },
+      { id: 'vat_amount', label: 'الضريبة / VAT', field: 'vat_amount', width: 10 },
+      { id: 'total', label: 'الإجمالي / Total', field: 'total', width: 14 }
     ],
     properties: {
-      fontSize: 10,
-      borderColor: '#e4e4e7',
+      fontSize: 9,
+      borderColor: '#cbd5e1',
       boldHeader: true,
-      headerBgColor: '#f4f4f5',
+      headerBgColor: '#f1f5f9',
       bodyBgColor: '#ffffff',
       borderWidth: 1,
       paddingX: 2,
@@ -110,34 +199,36 @@ const DEFAULT_TEMPLATE_LAYOUT = {
   },
   footer: [
     {
-      id: 'total-label',
+      id: 'sig-accountant',
       type: 'text',
-      x: 130,
+      x: 20,
       y: 10,
-      width: 35,
+      width: 65,
       height: 6,
       properties: {
-        text: 'الإجمالي النهائي:',
-        fontSize: 11,
+        text: 'توقيع المحاسب / Accountant Signature',
+        fontSize: 8.5,
         bold: true,
-        align: 'left',
+        align: 'center',
+        color: '#1e293b',
         fontFamily: 'Cairo'
       }
     },
     {
-      id: 'total-val',
-      type: 'variable',
-      x: 165,
+      id: 'sig-customer',
+      type: 'text',
+      x: 115,
       y: 10,
-      width: 35,
+      width: 65,
       height: 6,
       properties: {
-        fontSize: 11,
+        text: 'توقيع العميل / Customer Signature',
+        fontSize: 8.5,
         bold: true,
-        align: 'left',
+        align: 'center',
+        color: '#1e293b',
         fontFamily: 'Cairo'
-      },
-      binding: 'net_total'
+      }
     }
   ]
 };
