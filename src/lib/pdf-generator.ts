@@ -292,31 +292,50 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           lineBreak?: boolean;
         } = {}
       ) => {
+        if (!text) return;
         const fontName = options.font || 'ArabicRegular';
         const fontSize = options.size || (isThermal ? 7.5 : 10);
         const isBold = fontName.includes('Bold');
-        const activeFont = isBold ? 'ArabicBold' : 'ArabicRegular';
         
-        // Shape and reorder text using our segment reorderer
-        const processed = renderArabic(text);
+        // Shape Arabic portion
+        const shaped = shapeText(text);
+        const segments = segmentText(shaped);
 
-        // Set font and size on document
-        doc.font(activeFont).fontSize(fontSize);
+        // Measure total width across all segments
+        let totalWidth = 0;
+        segments.forEach(seg => {
+          const useHelvetica = /[a-zA-Z0-9%\+\/\(\)\.\:\,\-]/.test(seg.text);
+          const segFont = !useHelvetica 
+            ? (isBold ? 'ArabicBold' : 'ArabicRegular')
+            : (isBold ? 'Helvetica-Bold' : 'Helvetica');
+          doc.font(segFont).fontSize(fontSize);
+          totalWidth += doc.widthOfString(seg.text);
+        });
 
         const maxWidth = options.width;
         const align = options.align || (isRtl ? 'right' : 'left');
-
+        let startX = x;
         if (maxWidth !== undefined && maxWidth > 0) {
-          doc.text(processed, x, y, {
-            width: maxWidth,
-            align: align,
-            lineBreak: options.lineBreak ?? false
-          });
-        } else {
-          doc.text(processed, x, y, {
-            lineBreak: options.lineBreak ?? false
-          });
+          if (align === 'right') {
+            startX = x + maxWidth - totalWidth;
+          } else if (align === 'center') {
+            startX = x + (maxWidth - totalWidth) / 2;
+          }
         }
+
+        // Draw segments from left to right starting at startX
+        let currentSegmentX = startX;
+        segments.forEach(seg => {
+          const useHelvetica = /[a-zA-Z0-9%\+\/\(\)\.\:\,\-]/.test(seg.text);
+          const segFont = !useHelvetica 
+            ? (isBold ? 'ArabicBold' : 'ArabicRegular')
+            : (isBold ? 'Helvetica-Bold' : 'Helvetica');
+          doc.font(segFont).fontSize(fontSize);
+
+          const segY = useHelvetica ? (y + fontSize * 0.12) : y;
+          doc.text(seg.text, currentSegmentX, segY, { lineBreak: false });
+          currentSegmentX += doc.widthOfString(seg.text);
+        });
       };
 
       // Draw Header Helper
