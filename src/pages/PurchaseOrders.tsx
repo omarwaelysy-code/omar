@@ -5,7 +5,7 @@ import { PurchaseOrder, Supplier, Product, PurchaseOrderItem, Warehouse, Company
 import { 
   Search, Plus, Trash2, X, Eye, Sparkles, FileText, Pencil, Printer, Download, 
   ChevronLeft, ChevronRight, Hash, Calendar, Package, Tag, ArrowUpRight, 
-  Lock, LayoutGrid, List, ChevronDown, ChevronUp, History, Coins, CheckCheck, ExternalLink, Image as ImageIcon, RotateCcw, Save, Copy, Layers
+  Lock, LayoutGrid, List, ChevronDown, ChevronUp, History, Coins, CheckCheck, ExternalLink, Image as ImageIcon, RotateCcw, Save, Copy, Layers, FileSpreadsheet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Barcode from 'react-barcode';
@@ -474,6 +474,27 @@ export const PurchaseOrders: React.FC = () => {
     if (orderRef.current) {
       printElement(orderRef.current);
     }
+  };
+
+  const handleExportPurchaseOrderExcel = (order?: PurchaseOrder | null) => {
+    const targetOrder = order || editingOrder || viewOrder;
+    const rawItems = (targetOrder?.items && targetOrder.items.length > 0) ? targetOrder.items : items;
+    const excelRows = rawItems.map((item: any, idx: number) => {
+      const prod = products.find(p => p.id === item.product_id);
+      return {
+        '#': idx + 1,
+        [language === 'ar' ? 'رقم أمر الشراء' : 'PO Number']: targetOrder?.order_number || orderNumber || '-',
+        [language === 'ar' ? 'رمز الصنف' : 'Product Code']: prod?.code || item.product_code || '-',
+        [language === 'ar' ? 'اسم الصنف' : 'Product Name']: prod?.name || item.product_name || '-',
+        [language === 'ar' ? 'الكمية' : 'Quantity']: item.quantity,
+        [language === 'ar' ? 'السعر' : 'Unit Price']: item.unit_price,
+        [language === 'ar' ? 'نسبة الضريبة' : 'VAT Rate']: `% ${item.vat_rate || 0}`,
+        [language === 'ar' ? 'الضريبة' : 'VAT Amount']: item.vat_amount || 0,
+        [language === 'ar' ? 'الإجمالي' : 'Total']: item.total
+      };
+    });
+
+    exportToExcel(excelRows, `PurchaseOrder_${targetOrder?.order_number || orderNumber || 'Draft'}`);
   };
 
   const handleConvertToInvoice = (e: React.MouseEvent, order: PurchaseOrder) => {
@@ -1161,29 +1182,66 @@ export const PurchaseOrders: React.FC = () => {
                   <button 
                     type="button"
                     onClick={handleCopyOrder} 
-                    className="flex items-center gap-1 px-2 py-0.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-all font-bold text-xs whitespace-nowrap border border-indigo-200 shadow-sm active:scale-95"
+                    title={language === 'ar' ? 'نسخ الأمر كمسودة جديدة' : 'Copy Order'}
                   >
-                    <Copy size={11} />
+                    <Copy size={13} />
                     <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
                   </button>
                 )}
+
+                <button 
+                  type="button"
+                  onClick={() => {
+                    if (editingOrder?.id) printDocument('purchase_orders', editingOrder.id);
+                    else printElement(orderRef.current || document.body, `أمر شراء ${orderNumber}`);
+                  }} 
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all font-bold text-xs whitespace-nowrap border border-blue-200 shadow-sm active:scale-95"
+                  title={language === 'ar' ? 'طباعة مباشرة' : 'Direct Print'}
+                >
+                  <Printer size={13} />
+                  <span>{language === 'ar' ? 'طباعة مباشر' : 'Direct Print'}</span>
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => {
+                    if (editingOrder?.id) printDocument('purchase_orders', editingOrder.id);
+                    else exportToPDFUtil(orderRef.current || document.body, { filename: `PurchaseOrder_${editingOrder?.order_number || orderNumber}`, reportTitle: `أمر شراء ${editingOrder?.order_number || orderNumber}` });
+                  }} 
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all font-bold text-xs whitespace-nowrap border border-rose-200 shadow-sm active:scale-95"
+                  title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+                >
+                  <FileText size={13} />
+                  <span>{language === 'ar' ? 'تصدير PDF' : 'Export PDF'}</span>
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => handleExportPurchaseOrderExcel(editingOrder)} 
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-xs whitespace-nowrap border border-emerald-200 shadow-sm active:scale-95"
+                  title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+                >
+                  <FileSpreadsheet size={13} />
+                  <span>{language === 'ar' ? 'تصدير إكسيل' : 'Export Excel'}</span>
+                </button>
               </div>
               <div className="flex items-center gap-1.5">
                 <button 
                   type="button"
                   onClick={closeModal}
-                  className="w-20 py-1 rounded-lg bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-all flex items-center gap-1 justify-center active:scale-95 border border-zinc-200 shadow-sm text-[11px] whitespace-nowrap font-sans"
+                  className="px-4 py-1.5 rounded-xl bg-zinc-100 text-zinc-700 font-bold hover:bg-zinc-200 transition-all flex items-center gap-1 justify-center active:scale-95 border border-zinc-200 shadow-sm text-xs whitespace-nowrap font-sans"
                 >
-                  <RotateCcw size={12} />
+                  <RotateCcw size={13} />
                   <span>{language === 'ar' ? 'إلغاء' : 'Cancel'}</span>
                 </button>
                 <button 
                   type="submit"
                   form="purchase-order-form"
                   onClick={handleSubmit}
-                  className="w-20 py-1 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-1 justify-center active:scale-95 shadow-sm text-[11px] whitespace-nowrap font-sans"
+                  className="px-5 py-1.5 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-1.5 justify-center active:scale-95 shadow-md text-xs whitespace-nowrap font-sans"
                 >
-                  <Save size={12} />
+                  <Save size={13} />
                   <span>{language === 'ar' ? 'حفظ' : 'Save'}</span>
                 </button>
               </div>

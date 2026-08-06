@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { SalesOrder, Customer, Product, SalesOrderItem, Warehouse, Company, Operation, Department, CostCenter, Currency, ExchangeRate, ActivityLog } from '../types';
 import { 
-  Search, Plus, Trash2, X, Eye, Sparkles, FileText, Pencil, Printer, Copy,
+  Search, Plus, Trash2, X, Eye, Sparkles, FileText, Pencil, Printer, Copy, Save, FileSpreadsheet,
   ChevronLeft, ChevronRight, Hash, Calendar, Package, Tag, ArrowUpRight, 
   Lock, LayoutGrid, List, FileCheck, Layers, ChevronUp, ChevronDown, CheckCheck, History, Download, ExternalLink, Coins, Image as ImageIcon
 } from 'lucide-react';
@@ -18,6 +18,7 @@ import { useViewPreference } from '../hooks/useViewPreference';
 import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
 import { useNavigation } from '../contexts/NavigationContext';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
+import { exportToExcel } from '../utils/excelUtils';
 import { printDocument } from '../utils/printEngine';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { InlineActivityLog } from '../components/InlineActivityLog';
@@ -486,6 +487,27 @@ export const SalesOrders: React.FC = () => {
         orientation: 'portrait'
       });
     }
+  };
+
+  const handleExportOrderExcel = (order?: SalesOrder | null) => {
+    const targetOrder = order || editingOrder || viewOrder;
+    const rawItems = (targetOrder?.items && targetOrder.items.length > 0) ? targetOrder.items : items;
+    const excelRows = rawItems.map((item: any, idx: number) => {
+      const prod = products.find(p => p.id === item.product_id);
+      return {
+        '#': idx + 1,
+        [language === 'ar' ? 'رقم الأمر' : 'Order Number']: targetOrder?.order_number || orderNumber || '-',
+        [language === 'ar' ? 'رمز الصنف' : 'Product Code']: prod?.code || item.product_code || '-',
+        [language === 'ar' ? 'اسم الصنف' : 'Product Name']: prod?.name || item.product_name || '-',
+        [language === 'ar' ? 'الكمية' : 'Quantity']: item.quantity,
+        [language === 'ar' ? 'السعر' : 'Unit Price']: item.unit_price,
+        [language === 'ar' ? 'نسبة الضريبة' : 'VAT Rate']: `% ${item.vat_rate || 0}`,
+        [language === 'ar' ? 'الضريبة' : 'VAT Amount']: item.vat_amount || 0,
+        [language === 'ar' ? 'الإجمالي' : 'Total']: item.total
+      };
+    });
+
+    exportToExcel(excelRows, `SalesOrder_${targetOrder?.order_number || orderNumber || 'Draft'}`);
   };
 
   const handleConvertToInvoice = (e: React.MouseEvent, order: SalesOrder) => {
@@ -1106,29 +1128,69 @@ export const SalesOrders: React.FC = () => {
                 {editingOrder ? ot('edit_order') : ot('add_order')}
               </h2>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+              <button
+                type="submit"
+                className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-md text-xs flex items-center gap-1.5"
+              >
+                <Save size={14} />
+                <span>{language === 'ar' ? 'حفظ الحركات' : 'Save Order'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsFullScreen(!isFullScreen)}
+                className="px-3 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-xs border border-slate-200 shadow-sm hidden md:inline-flex items-center gap-1"
+              >
+                {isFullScreen ? (language === 'ar' ? 'تصغير' : 'Minimize') : (language === 'ar' ? 'ملء الشاشة' : 'Full Screen')}
+              </button>
+
               {editingOrder && (
                 <button 
                   type="button"
                   onClick={handleCopyOrder} 
-                  className="flex items-center gap-1 px-3 py-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-xl transition-all font-bold text-xs whitespace-nowrap border border-emerald-200 shadow-sm"
+                  className="flex items-center gap-1.5 px-3 py-2 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-all font-bold text-xs whitespace-nowrap border border-indigo-200 shadow-sm active:scale-95"
+                  title={language === 'ar' ? 'نسخ الأمر كمسودة جديدة' : 'Copy Order'}
                 >
-                  <Copy size={12} />
+                  <Copy size={13} />
                   <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
                 </button>
               )}
-              <button
+
+              <button 
                 type="button"
-                onClick={() => setIsFullScreen(!isFullScreen)}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm hidden md:inline-block"
+                onClick={() => {
+                  if (editingOrder?.id) printDocument('sales_orders', editingOrder.id);
+                  else printElement(orderRef.current || document.body, `أمر بيع ${orderNumber}`);
+                }} 
+                className="flex items-center gap-1.5 px-3 py-2 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all font-bold text-xs whitespace-nowrap border border-blue-200 shadow-sm active:scale-95"
+                title={language === 'ar' ? 'طباعة مباشرة' : 'Direct Print'}
               >
-                {isFullScreen ? (language === 'ar' ? 'تصغير' : 'Minimize') : (language === 'ar' ? 'ملء الشاشة' : 'Full Screen')}
+                <Printer size={13} />
+                <span>{language === 'ar' ? 'طباعة مباشر' : 'Direct Print'}</span>
               </button>
-              <button
-                type="submit"
-                className="px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
+
+              <button 
+                type="button"
+                onClick={() => {
+                  if (editingOrder?.id) printDocument('sales_orders', editingOrder.id);
+                  else exportToPDFUtil(orderRef.current || document.body, { filename: `SalesOrder_${editingOrder?.order_number || orderNumber}`, reportTitle: `أمر بيع ${editingOrder?.order_number || orderNumber}` });
+                }} 
+                className="flex items-center gap-1.5 px-3 py-2 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all font-bold text-xs whitespace-nowrap border border-rose-200 shadow-sm active:scale-95"
+                title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
               >
-                {language === 'ar' ? 'حفظ الحركات' : 'Save Order'}
+                <FileText size={13} />
+                <span>{language === 'ar' ? 'تصدير PDF' : 'Export PDF'}</span>
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => handleExportOrderExcel(editingOrder)} 
+                className="flex items-center gap-1.5 px-3 py-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-xs whitespace-nowrap border border-emerald-200 shadow-sm active:scale-95"
+                title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+              >
+                <FileSpreadsheet size={13} />
+                <span>{language === 'ar' ? 'تصدير إكسيل' : 'Export Excel'}</span>
               </button>
             </div>
           </div>
