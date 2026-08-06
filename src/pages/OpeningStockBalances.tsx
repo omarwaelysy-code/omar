@@ -4,7 +4,7 @@ import { useNotification } from '../contexts/NotificationContext';
 import { Warehouse, Product, OpeningStockBalance, OpeningStockItem, Account } from '../types';
 import { 
   Search, Plus, Trash2, X, ListPlus, Pencil, 
-  Download, Upload, Eye, FileText, History, Printer, 
+  Download, Upload, Eye, FileText, History, Printer, FileSpreadsheet,
   Calendar, Hash, Layers, Save, ChevronRight, ChevronLeft, LayoutGrid, List
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -498,6 +498,52 @@ export const OpeningStockBalances: React.FC = () => {
     printWindow.document.close();
   };
 
+  const handleExportDocPDF = (doc: OpeningStockBalance) => {
+    const columns = [
+      { id: 'product_code', label: language === 'ar' ? 'رمز الصنف' : 'Code', width: 20 },
+      { id: 'product_name', label: language === 'ar' ? 'اسم الصنف' : 'Product', width: 35 },
+      { id: 'warehouse_name', label: language === 'ar' ? 'المستودع' : 'Warehouse', width: 20 },
+      { id: 'quantity', label: language === 'ar' ? 'الكمية' : 'Qty', width: 10 },
+      { id: 'unit_cost', label: language === 'ar' ? 'تكلفة الوحدة' : 'Unit Cost', width: 15 },
+      { id: 'total_cost', label: language === 'ar' ? 'الإجمالي' : 'Total', width: 15 }
+    ];
+
+    const rows = (doc.items || []).map(item => ({
+      product_code: item.product_code || '-',
+      product_name: item.product_name || '-',
+      warehouse_name: item.warehouse_name || '-',
+      quantity: formatNumber(item.quantity),
+      unit_cost: formatNumber(item.unit_cost),
+      total_cost: formatNumber(item.total_cost)
+    }));
+
+    const totalVal = (doc.items || []).reduce((sum, i) => sum + Number(i.total_cost || 0), 0);
+
+    exportToPDFUtil(tableRef.current || document.body, {
+      filename: `Opening_Stock_${doc.document_number}`,
+      reportTitle: `${language === 'ar' ? 'سند رصيد أول المدة للمخزون' : 'Opening Stock Balance Receipt'} - ${doc.document_number}`,
+      columns,
+      rows,
+      totals: { total_cost: formatNumber(totalVal) }
+    });
+  };
+
+  const handleExportDocExcel = (doc: OpeningStockBalance) => {
+    const items = (doc.items || []).map((item, idx) => ({
+      '#': idx + 1,
+      [language === 'ar' ? 'رقم المستند' : 'Document Number']: doc.document_number,
+      [language === 'ar' ? 'التاريخ' : 'Date']: formatDate(doc.date),
+      [language === 'ar' ? 'رمز الصنف' : 'Product Code']: item.product_code || '-',
+      [language === 'ar' ? 'اسم الصنف' : 'Product Name']: item.product_name || '-',
+      [language === 'ar' ? 'المستودع' : 'Warehouse']: item.warehouse_name || '-',
+      [language === 'ar' ? 'الكمية' : 'Quantity']: item.quantity,
+      [language === 'ar' ? 'تكلفة الوحدة' : 'Unit Cost']: item.unit_cost,
+      [language === 'ar' ? 'الإجمالي' : 'Total']: item.total_cost
+    }));
+
+    exportToExcel(items, `Opening_Stock_${doc.document_number}`);
+  };
+
   return (
     <div className="space-y-6">
       {/* Hidden file input for Excel upload */}
@@ -985,14 +1031,33 @@ export const OpeningStockBalances: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handlePrint(viewDoc)}
-                    className="p-3 bg-white border border-slate-100 hover:bg-slate-50 text-slate-600 rounded-2xl transition-all"
+                    className="p-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-2xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5 font-bold text-xs"
                     title={language === 'ar' ? 'طباعة' : 'Print'}
                   >
                     <Printer size={18} />
                   </button>
+
+                  <button
+                    onClick={() => handleExportDocPDF(viewDoc)}
+                    className="px-3 py-2 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 rounded-2xl transition-all font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95"
+                    title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+                  >
+                    <FileText size={16} />
+                    <span>{language === 'ar' ? 'تصدير PDF' : 'Export PDF'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleExportDocExcel(viewDoc)}
+                    className="px-3 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 rounded-2xl transition-all font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95"
+                    title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+                  >
+                    <FileSpreadsheet size={16} />
+                    <span>{language === 'ar' ? 'تصدير إكسيل' : 'Export Excel'}</span>
+                  </button>
+
                   <button
                     onClick={() => setViewDoc(null)}
-                    className="p-3 bg-white border border-slate-100 rounded-2xl hover:bg-slate-50 transition-all active:scale-95"
+                    className="p-2.5 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 ml-1"
                   >
                     <X size={18} className="text-slate-500" />
                   </button>
