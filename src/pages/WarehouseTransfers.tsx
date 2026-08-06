@@ -4,7 +4,7 @@ import { useNotification } from '../contexts/NotificationContext';
 import { Warehouse, Product, WarehouseTransfer, WarehouseTransferItem } from '../types';
 import { 
   Search, Plus, Trash2, X, ArrowLeftRight, Pencil, 
-  Download, Eye, FileText, History, Printer, 
+  Download, Eye, FileText, History, Printer, FileSpreadsheet, Copy,
   Home, Calendar, Hash, Layers, Save,
   Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, User, LayoutGrid, List
 } from 'lucide-react';
@@ -279,6 +279,63 @@ export const WarehouseTransfers: React.FC = () => {
       setSortOrder('DESC');
     }
     setPage(1);
+  };
+
+  const handleExportDocPDF = (transfer: WarehouseTransfer) => {
+    const columns = [
+      { id: 'product_code', label: language === 'ar' ? 'كود الصنف' : 'Code', width: 25 },
+      { id: 'product_name', label: language === 'ar' ? 'اسم الصنف' : 'Product Name', width: 50 },
+      { id: 'quantity', label: language === 'ar' ? 'الكمية' : 'Qty', width: 25 }
+    ];
+
+    const rows = ((transfer as any).items || []).map((item: any) => ({
+      product_code: item.product_code || '-',
+      product_name: item.product_name || '-',
+      quantity: formatNumber(item.quantity)
+    }));
+
+    exportToPDFUtil(tableRef.current || document.body, {
+      filename: `Warehouse_Transfer_${transfer.transfer_number}`,
+      reportTitle: `${language === 'ar' ? 'سند تحويل مخزني' : 'Warehouse Transfer Document'} - ${transfer.transfer_number}`,
+      columns,
+      rows
+    });
+  };
+
+  const handleExportDocExcel = (transfer: WarehouseTransfer) => {
+    const items = ((transfer as any).items || []).map((item: any, idx: number) => ({
+      '#': idx + 1,
+      [language === 'ar' ? 'رقم التحويل' : 'Transfer Number']: transfer.transfer_number,
+      [language === 'ar' ? 'التاريخ' : 'Date']: formatDate(transfer.date),
+      [language === 'ar' ? 'من مخزن' : 'From Warehouse']: transfer.from_warehouse_name || '-',
+      [language === 'ar' ? 'إلى مخزن' : 'To Warehouse']: transfer.to_warehouse_name || '-',
+      [language === 'ar' ? 'رمز الصنف' : 'Product Code']: item.product_code || '-',
+      [language === 'ar' ? 'اسم الصنف' : 'Product Name']: item.product_name || '-',
+      [language === 'ar' ? 'الكمية' : 'Quantity']: item.quantity
+    }));
+
+    exportToExcel(items, `Warehouse_Transfer_${transfer.transfer_number}`);
+  };
+
+  const handleCopyTransfer = (transfer: WarehouseTransfer) => {
+    setViewTransfer(null);
+    setEditingTransfer(null);
+    const today = new Date().toISOString().slice(0, 10);
+    setFormData({
+      date: today,
+      from_warehouse_id: transfer.from_warehouse_id || '',
+      to_warehouse_id: transfer.to_warehouse_id || '',
+      description: transfer.description ? `${transfer.description} (${language === 'ar' ? 'نسخة' : 'Copy'})` : ''
+    });
+    setItems(((transfer as any).items || []).map((item: any) => ({
+      product_id: item.product_id || '',
+      quantity: item.quantity || 1
+    })));
+    setIsModalOpen(true);
+    showNotification(
+      language === 'ar' ? 'تم نسخ التحويل كمسودة جديدة' : 'Transfer copied as new draft',
+      'success'
+    );
   };
 
   return (
@@ -722,12 +779,49 @@ export const WarehouseTransfers: React.FC = () => {
                     {viewTransfer.transfer_number}
                   </h2>
                 </div>
-                <button
-                  onClick={() => setViewTransfer(null)}
-                  className="p-3 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all"
-                >
-                  <X size={20} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => exportToPDFUtil(tableRef.current || document.body, { filename: `Warehouse_Transfer_${viewTransfer.transfer_number}`, reportTitle: `سند تحويل مخزني ${viewTransfer.transfer_number}` })}
+                    className="p-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-2xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5 font-bold text-xs"
+                    title={language === 'ar' ? 'طباعة' : 'Print'}
+                  >
+                    <Printer size={18} />
+                  </button>
+
+                  <button
+                    onClick={() => handleCopyTransfer(viewTransfer)}
+                    className="px-3 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-2xl transition-all font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95"
+                    title={language === 'ar' ? 'نسخ المستند كمسودة جديدة' : 'Copy Document'}
+                  >
+                    <Copy size={16} />
+                    <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleExportDocPDF(viewTransfer)}
+                    className="px-3 py-2 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 rounded-2xl transition-all font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95"
+                    title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+                  >
+                    <FileText size={16} />
+                    <span>{language === 'ar' ? 'تصدير PDF' : 'Export PDF'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleExportDocExcel(viewTransfer)}
+                    className="px-3 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 rounded-2xl transition-all font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95"
+                    title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+                  >
+                    <FileSpreadsheet size={16} />
+                    <span>{language === 'ar' ? 'تصدير إكسيل' : 'Export Excel'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setViewTransfer(null)}
+                    className="p-2.5 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 ml-1"
+                  >
+                    <X size={18} className="text-slate-500" />
+                  </button>
+                </div>
               </div>
 
               {/* Document Details */}

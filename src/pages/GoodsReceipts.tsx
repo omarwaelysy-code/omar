@@ -5,7 +5,7 @@ import { Supplier, Product, Warehouse, Company, Currency } from '../types';
 import { 
   Search, Plus, Trash2, X, Eye, Sparkles, FileText, Pencil, Printer, Download, 
   ChevronLeft, ChevronRight, Hash, Calendar, Package, Tag, ArrowUpRight, 
-  Lock, LayoutGrid, List, ChevronDown, ChevronUp, History, Coins, CheckCheck, ExternalLink, RotateCcw, Save, Copy, Layers, Filter
+  Lock, LayoutGrid, List, ChevronDown, ChevronUp, History, Coins, CheckCheck, ExternalLink, RotateCcw, Save, Copy, Layers, Filter, FileSpreadsheet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
@@ -18,6 +18,7 @@ import { useViewPreference } from '../hooks/useViewPreference';
 import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
 import { useNavigation } from '../contexts/NavigationContext';
 import { printElement, exportToPDF } from '../utils/pdfUtils';
+import { exportToExcel } from '../utils/excelUtils';
 import { printDocument } from '../utils/printEngine';
 import { exportToExcel } from '../utils/excelUtils';
 
@@ -445,6 +446,44 @@ export const GoodsReceipts: React.FC = () => {
       console.error(err);
       showNotification(err.message || 'Error deleting goods receipt', 'error');
     }
+  const handleCopyReceipt = (gr: any) => {
+    setViewReceipt(null);
+    setEditingReceipt(null);
+    const today = new Date().toISOString().slice(0, 10);
+    setFormData({
+      supplier_id: gr.supplier_id || '',
+      warehouse_id: gr.warehouse_id || '',
+      date: today,
+      notes: gr.notes ? `${gr.notes} (${language === 'ar' ? 'نسخة' : 'Copy'})` : ''
+    });
+    setItems((gr.items || []).map((item: any) => ({
+      product_id: item.product_id || '',
+      product_code: item.product_code || '',
+      product_name: item.product_name || '',
+      quantity: item.quantity || 1,
+      cost_price: item.cost_price || item.unit_price || 0,
+      total: item.total || (item.quantity * (item.cost_price || item.unit_price || 0)) || 0
+    })));
+    setIsModalOpen(true);
+    showNotification(
+      language === 'ar' ? 'تم نسخ المستند كمسودة جديدة' : 'Document copied as new draft',
+      'success'
+    );
+  };
+
+  const handleExportSingleReceiptExcel = (gr: any) => {
+    const items = (gr.items || []).map((item: any, idx: number) => ({
+      '#': idx + 1,
+      [language === 'ar' ? 'رقم الإذن' : 'Receipt Number']: gr.receipt_number,
+      [language === 'ar' ? 'التاريخ' : 'Date']: formatDate(gr.date),
+      [language === 'ar' ? 'رمز الصنف' : 'Product Code']: item.product_code || '-',
+      [language === 'ar' ? 'اسم الصنف' : 'Product Name']: item.product_name || '-',
+      [language === 'ar' ? 'الكمية' : 'Quantity']: item.quantity,
+      [language === 'ar' ? 'التكلفة' : 'Cost Price']: item.cost_price || item.unit_price || 0,
+      [language === 'ar' ? 'الإجمالي' : 'Total']: item.total || (item.quantity * (item.cost_price || item.unit_price || 0)) || 0
+    }));
+
+    exportToExcel(items, `Goods_Receipt_${gr.receipt_number}`);
   };
 
   const handleConvertToInvoice = (receipt: GoodsReceipt) => {
@@ -865,11 +904,38 @@ export const GoodsReceipts: React.FC = () => {
                       </button>
                     )}
                     <button
-                      onClick={() => printElement(receiptPrintRef.current)}
-                      className="p-2 hover:bg-slate-200 text-slate-500 rounded-xl transition-all"
+                      onClick={() => printElement(receiptPrintRef.current, `إذن إضافة ${viewReceipt.receipt_number}`)}
+                      className="p-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-2xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5 font-bold text-xs"
                       title={language === 'ar' ? 'طباعة' : 'Print'}
                     >
                       <Printer size={18} />
+                    </button>
+
+                    <button
+                      onClick={() => handleCopyReceipt(viewReceipt)}
+                      className="px-3 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-2xl transition-all font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95"
+                      title={language === 'ar' ? 'نسخ المستند كمسودة جديدة' : 'Copy Document'}
+                    >
+                      <Copy size={16} />
+                      <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => exportToPDF(receiptPrintRef.current, { filename: `Goods_Receipt_${viewReceipt.receipt_number}`, reportTitle: `إذن إضافة ${viewReceipt.receipt_number}` })}
+                      className="px-3 py-2 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 rounded-2xl transition-all font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95"
+                      title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+                    >
+                      <FileText size={16} />
+                      <span>{language === 'ar' ? 'تصدير PDF' : 'Export PDF'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleExportSingleReceiptExcel(viewReceipt)}
+                      className="px-3 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 rounded-2xl transition-all font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95"
+                      title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+                    >
+                      <FileSpreadsheet size={16} />
+                      <span>{language === 'ar' ? 'تصدير إكسيل' : 'Export Excel'}</span>
                     </button>
                   </div>
                 </div>
