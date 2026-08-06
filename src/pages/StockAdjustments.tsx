@@ -4,7 +4,7 @@ import { useNotification } from '../contexts/NotificationContext';
 import { Warehouse, Product, StockAdjustment, StockAdjustmentItem, Account } from '../types';
 import { 
   Search, Plus, Trash2, X, Sliders, Pencil, 
-  Eye, FileText, History, Printer, Calendar, Hash, Layers, Save, FileSpreadsheet,
+  Eye, FileText, History, Printer, Calendar, Hash, Layers, Save, FileSpreadsheet, Copy,
   ChevronRight, ChevronLeft, LayoutGrid, List
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -396,6 +396,28 @@ export const StockAdjustments: React.FC = () => {
     }));
 
     exportToExcel(items, `Stock_Adjustment_${adj.document_number}`);
+  };
+
+  const handleCopyAdj = (adj: StockAdjustment) => {
+    setViewAdj(null);
+    setEditingAdj(null);
+    const today = new Date().toISOString().slice(0, 10);
+    setFormData({
+      date: today,
+      adjustment_type: adj.adjustment_type || 'quantity_and_cost',
+      description: adj.description ? `${adj.description} (${language === 'ar' ? 'نسخة' : 'Copy'})` : ''
+    });
+    setItems((adj.items || []).map(item => ({
+      product_id: item.product_id || '',
+      warehouse_id: item.warehouse_id || warehouses[0]?.id || '',
+      quantity: item.quantity || 1,
+      unit_cost: item.unit_cost || 0
+    })));
+    setIsModalOpen(true);
+    showNotification(
+      language === 'ar' ? 'تم نسخ المستند كمسودة جديدة' : 'Document copied as new draft',
+      'success'
+    );
   };
 
   return (
@@ -844,6 +866,15 @@ export const StockAdjustments: React.FC = () => {
                     title={language === 'ar' ? 'طباعة' : 'Print'}
                   >
                     <Printer size={18} />
+                  </button>
+
+                  <button
+                    onClick={() => handleCopyAdj(viewAdj)}
+                    className="px-3 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-2xl transition-all font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95"
+                    title={language === 'ar' ? 'نسخ المستند كمسودة جديدة' : 'Copy Document'}
+                  >
+                    <Copy size={16} />
+                    <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
                   </button>
 
                   <button

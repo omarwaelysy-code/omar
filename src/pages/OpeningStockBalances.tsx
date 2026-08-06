@@ -4,7 +4,7 @@ import { useNotification } from '../contexts/NotificationContext';
 import { Warehouse, Product, OpeningStockBalance, OpeningStockItem, Account } from '../types';
 import { 
   Search, Plus, Trash2, X, ListPlus, Pencil, 
-  Download, Upload, Eye, FileText, History, Printer, FileSpreadsheet,
+  Download, Upload, Eye, FileText, History, Printer, FileSpreadsheet, Copy,
   Calendar, Hash, Layers, Save, ChevronRight, ChevronLeft, LayoutGrid, List
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -544,6 +544,29 @@ export const OpeningStockBalances: React.FC = () => {
     exportToExcel(items, `Opening_Stock_${doc.document_number}`);
   };
 
+  const handleCopyDoc = (doc: OpeningStockBalance) => {
+    setViewDoc(null);
+    setEditingDoc(null);
+    const today = new Date().toISOString().slice(0, 10);
+    setFormData({
+      date: today,
+      debit_account_id: doc.debit_account_id || '',
+      credit_account_id: doc.credit_account_id || '',
+      description: doc.description ? `${doc.description} (${language === 'ar' ? 'نسخة' : 'Copy'})` : ''
+    });
+    setItems((doc.items || []).map(item => ({
+      product_id: item.product_id || '',
+      warehouse_id: item.warehouse_id || warehouses[0]?.id || '',
+      quantity: item.quantity || 1,
+      unit_cost: item.unit_cost || 0
+    })));
+    setIsModalOpen(true);
+    showNotification(
+      language === 'ar' ? 'تم نسخ المستند كمسودة جديدة' : 'Document copied as new draft',
+      'success'
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Hidden file input for Excel upload */}
@@ -1035,6 +1058,15 @@ export const OpeningStockBalances: React.FC = () => {
                     title={language === 'ar' ? 'طباعة' : 'Print'}
                   >
                     <Printer size={18} />
+                  </button>
+
+                  <button
+                    onClick={() => handleCopyDoc(viewDoc)}
+                    className="px-3 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-2xl transition-all font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95"
+                    title={language === 'ar' ? 'نسخ المستند كمسودة جديدة' : 'Copy Document'}
+                  >
+                    <Copy size={16} />
+                    <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
                   </button>
 
                   <button
