@@ -8,7 +8,7 @@ import {
   Type, Image, Tag, Columns, Square, Circle, Minus, Table, QrCode, Barcode, 
   ZoomIn, ZoomOut, Save, Undo, Redo, RefreshCw, Lock, Unlock, Eye, EyeOff,
   ChevronUp, ChevronDown, Grid, Sparkles, Check, Layers, Paintbrush, Info,
-  Upload, Download, BookOpen, LayoutDashboard, Sliders, MoveVertical
+  Upload, Download, BookOpen, LayoutDashboard, Sliders, MoveVertical, MoveHorizontal
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNotification } from '../contexts/NotificationContext';
@@ -715,14 +715,15 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
   // Section Height / Margin Interactive Drag Handler
   const [sectionDragState, setSectionDragState] = useState<{
-    target: 'header' | 'footer' | 'margin_top' | 'margin_bottom';
+    target: 'header' | 'footer' | 'margin_top' | 'margin_bottom' | 'margin_left' | 'margin_right';
+    startX: number;
     startY: number;
     initialVal: number;
   } | null>(null);
 
   const handleStartSectionDrag = (
     e: React.MouseEvent, 
-    target: 'header' | 'footer' | 'margin_top' | 'margin_bottom'
+    target: 'header' | 'footer' | 'margin_top' | 'margin_bottom' | 'margin_left' | 'margin_right'
   ) => {
     e.stopPropagation();
     e.preventDefault();
@@ -731,9 +732,12 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
     else if (target === 'footer') initialVal = designerLayout.footerHeight;
     else if (target === 'margin_top') initialVal = margins.top;
     else if (target === 'margin_bottom') initialVal = margins.bottom;
+    else if (target === 'margin_left') initialVal = margins.left;
+    else if (target === 'margin_right') initialVal = margins.right;
 
     setSectionDragState({
       target,
+      startX: e.clientX,
       startY: e.clientY,
       initialVal
     });
@@ -744,7 +748,9 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
     const handleMouseMove = (e: MouseEvent) => {
       const deltaYPixels = e.clientY - sectionDragState.startY;
+      const deltaXPixels = e.clientX - sectionDragState.startX;
       const deltaYMm = Math.round(deltaYPixels / zoomScale);
+      const deltaXMm = Math.round(deltaXPixels / zoomScale);
 
       if (sectionDragState.target === 'header') {
         const newH = Math.max(10, Math.min(250, sectionDragState.initialVal + deltaYMm));
@@ -758,6 +764,12 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       } else if (sectionDragState.target === 'margin_bottom') {
         const newM = Math.max(0, Math.min(60, sectionDragState.initialVal - deltaYMm));
         setFormData(prev => ({ ...prev, margin_bottom: newM }));
+      } else if (sectionDragState.target === 'margin_left') {
+        const newM = Math.max(0, Math.min(60, sectionDragState.initialVal + deltaXMm));
+        setFormData(prev => ({ ...prev, margin_left: newM }));
+      } else if (sectionDragState.target === 'margin_right') {
+        const newM = Math.max(0, Math.min(60, sectionDragState.initialVal - deltaXMm));
+        setFormData(prev => ({ ...prev, margin_right: newM }));
       }
     };
 
@@ -4216,7 +4228,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                   <div
                     className="bg-white border border-zinc-300 shadow-2xl transition-all relative overflow-hidden"
                     style={{
-                      width: `${printableWidth * zoomScale}px`,
+                      width: `${paperWidth * zoomScale}px`,
+                      minHeight: `${paperHeight * zoomScale}px`,
                       paddingTop: `${margins.top * zoomScale}px`,
                       paddingBottom: `${margins.bottom * zoomScale}px`,
                       paddingLeft: `${margins.left * zoomScale}px`,
@@ -4393,7 +4406,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                   <div 
                     className="bg-white border border-zinc-300 shadow-xl relative overflow-hidden transition-all"
                     style={{
-                      width: `${printableWidth * zoomScale}px`,
+                      width: `${paperWidth * zoomScale}px`,
+                      minHeight: `${paperHeight * zoomScale}px`,
                       paddingTop: `${margins.top * zoomScale}px`,
                       paddingBottom: `${margins.bottom * zoomScale}px`,
                       paddingLeft: `${margins.left * zoomScale}px`,
@@ -4407,8 +4421,47 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                       setSelectedSection(null);
                     }}
                   >
-                    {/* INTERACTIVE SECTION & MARGIN RESIZE BOUNDARIES WITH ARROWS ↕ */}
-                    {/* 1. Header Height Resize Handle Line */}
+                    {/* INTERACTIVE SECTION & MARGIN RESIZE BOUNDARIES WITH ARROWS ↕ ↔ */}
+                    {/* 1. Left Margin Drag Line (Vertical ↔) */}
+                    <div 
+                      onMouseDown={(e) => handleStartSectionDrag(e, 'margin_left')}
+                      className="absolute top-0 bottom-0 z-30 cursor-ew-resize group border-r border-dashed border-red-400 hover:border-red-600 transition-colors flex flex-col items-center justify-start pt-2 pointer-events-auto"
+                      style={{ left: `${margins.left * zoomScale}px` }}
+                      title={language === 'ar' ? 'سحب لتغيير الهامش الأيسر ↔' : 'Drag to resize Left Margin ↔'}
+                    >
+                      <div className="bg-red-600 hover:bg-red-700 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow border border-red-300 flex items-center gap-0.5 cursor-ew-resize select-none -translate-x-1/2">
+                        <MoveHorizontal size={9} />
+                        <span>{language === 'ar' ? `الهامش الأيسر: ${margins.left}مم` : `Left: ${margins.left}mm`}</span>
+                      </div>
+                    </div>
+
+                    {/* 2. Right Margin Drag Line (Vertical ↔) */}
+                    <div 
+                      onMouseDown={(e) => handleStartSectionDrag(e, 'margin_right')}
+                      className="absolute top-0 bottom-0 z-30 cursor-ew-resize group border-l border-dashed border-red-400 hover:border-red-600 transition-colors flex flex-col items-center justify-start pt-2 pointer-events-auto"
+                      style={{ left: `${(paperWidth - margins.right) * zoomScale}px` }}
+                      title={language === 'ar' ? 'سحب لتغيير الهامش الأيمن ↔' : 'Drag to resize Right Margin ↔'}
+                    >
+                      <div className="bg-red-600 hover:bg-red-700 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow border border-red-300 flex items-center gap-0.5 cursor-ew-resize select-none -translate-x-1/2">
+                        <MoveHorizontal size={9} />
+                        <span>{language === 'ar' ? `الهامش الأيمن: ${margins.right}مم` : `Right: ${margins.right}mm`}</span>
+                      </div>
+                    </div>
+
+                    {/* 3. Top Margin Drag Line (Horizontal ↕) */}
+                    <div 
+                      onMouseDown={(e) => handleStartSectionDrag(e, 'margin_top')}
+                      className="absolute left-0 right-0 z-30 cursor-ns-resize group border-b border-dashed border-red-400 hover:border-red-600 transition-colors flex items-center justify-start pl-4 pointer-events-auto"
+                      style={{ top: `${margins.top * zoomScale}px` }}
+                      title={language === 'ar' ? 'سحب لتغيير الهامش العلوي ↕' : 'Drag to resize Top Margin ↕'}
+                    >
+                      <div className="bg-red-600 hover:bg-red-700 text-white text-[8.5px] font-bold px-2 py-0.5 rounded-full shadow border border-red-300 flex items-center gap-1 cursor-ns-resize select-none -translate-y-1/2">
+                        <MoveVertical size={9} />
+                        <span>{language === 'ar' ? `الهامش العلوي: ${margins.top}مم` : `Top Margin: ${margins.top}mm`}</span>
+                      </div>
+                    </div>
+
+                    {/* 4. Header Height Resize Handle Line (Horizontal ↕) */}
                     <div 
                       onMouseDown={(e) => handleStartSectionDrag(e, 'header')}
                       className="absolute left-0 right-0 z-30 cursor-ns-resize group border-b-2 border-emerald-500 hover:border-emerald-600 transition-colors flex items-center justify-center pointer-events-auto"
@@ -4422,7 +4475,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                       </div>
                     </div>
 
-                    {/* 2. Footer Height Resize Handle Line */}
+                    {/* 5. Footer Height Resize Handle Line (Horizontal ↕) */}
                     <div 
                       onMouseDown={(e) => handleStartSectionDrag(e, 'footer')}
                       className="absolute left-0 right-0 z-30 cursor-ns-resize group border-t-2 border-blue-500 hover:border-blue-600 transition-colors flex items-center justify-center pointer-events-auto"
@@ -4436,23 +4489,10 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                       </div>
                     </div>
 
-                    {/* 3. Top Margin Drag Line */}
-                    <div 
-                      onMouseDown={(e) => handleStartSectionDrag(e, 'margin_top')}
-                      className="absolute left-0 right-0 z-30 cursor-ns-resize group border-b border-dashed border-red-400 hover:border-red-600 transition-colors flex items-center justify-start pl-2 pointer-events-auto"
-                      style={{ top: `${margins.top * zoomScale}px` }}
-                      title={language === 'ar' ? 'سحب لتغيير الهامش العلوي ↕' : 'Drag to resize Top Margin ↕'}
-                    >
-                      <div className="bg-red-600 hover:bg-red-700 text-white text-[8.5px] font-bold px-2 py-0.5 rounded-full shadow border border-red-300 flex items-center gap-1 cursor-ns-resize select-none -translate-y-1/2">
-                        <MoveVertical size={9} />
-                        <span>{language === 'ar' ? `الهامش العلوي: ${margins.top}مم` : `Top Margin: ${margins.top}mm`}</span>
-                      </div>
-                    </div>
-
-                    {/* 4. Bottom Margin Drag Line */}
+                    {/* 6. Bottom Margin Drag Line (Horizontal ↕) */}
                     <div 
                       onMouseDown={(e) => handleStartSectionDrag(e, 'margin_bottom')}
-                      className="absolute left-0 right-0 z-30 cursor-ns-resize group border-t border-dashed border-red-400 hover:border-red-600 transition-colors flex items-center justify-start pl-2 pointer-events-auto"
+                      className="absolute left-0 right-0 z-30 cursor-ns-resize group border-t border-dashed border-red-400 hover:border-red-600 transition-colors flex items-center justify-start pl-4 pointer-events-auto"
                       style={{ top: `${(paperHeight - margins.bottom) * zoomScale}px` }}
                       title={language === 'ar' ? 'سحب لتغيير الهامش السفلي ↕' : 'Drag to resize Bottom Margin ↕'}
                     >
