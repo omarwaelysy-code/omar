@@ -603,6 +603,15 @@ export function UnifiedPrintEngine() {
       };
     }
 
+    // Attach active selected template layout data for exact custom PDF rendering
+    if (selectedTemplate) {
+      dto.customLayout = selectedTemplate.layout;
+      dto.templateId = selectedTemplate.id;
+      dto.templateName = selectedTemplate.name;
+      dto.paperSize = selectedProfile?.paper_size_id || selectedTemplate.paper_size_id || 'a4';
+      dto.orientation = selectedProfile?.orientation || selectedTemplate.orientation || 'portrait';
+    }
+
     try {
       showNotification(language === 'ar' ? 'جاري تحضير ملف PDF...' : 'Preparing PDF file...', 'info');
       
@@ -703,31 +712,20 @@ export function UnifiedPrintEngine() {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <select
+                  value={selectedTemplate?.id || ''}
+                  onChange={(e) => {
+                    const temp = templates.find(t => t.id === e.target.value) || null;
+                    if (temp) setSelectedTemplate(temp);
+                  }}
+                  className="w-full px-3.5 py-2.5 bg-white border-2 border-emerald-600/30 hover:border-emerald-600 rounded-xl text-xs font-bold text-zinc-900 shadow-sm outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all cursor-pointer"
+                >
                   {templates.map(temp => (
-                    <div
-                      key={temp.id}
-                      onClick={() => setSelectedTemplate(temp)}
-                      className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                        selectedTemplate?.id === temp.id
-                          ? 'bg-emerald-50 border-emerald-300 shadow-sm'
-                          : 'border-zinc-200 hover:bg-zinc-50 bg-white'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-zinc-800">{temp.name}</span>
-                        {temp.is_default && (
-                          <span className="text-[8px] bg-amber-50 text-amber-700 border border-amber-200 px-1 rounded">
-                            {language === 'ar' ? 'افتراضي' : 'Default'}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-zinc-400 mt-1 capitalize">
-                        {temp.paper_size_id} - {temp.orientation === 'portrait' ? (language === 'ar' ? 'طولي' : 'Portrait') : (language === 'ar' ? 'عرضي' : 'Landscape')}
-                      </p>
-                    </div>
+                    <option key={temp.id} value={temp.id}>
+                      {temp.name} {temp.is_default ? (language === 'ar' ? '(الافتراضي)' : '(Default)') : ''}
+                    </option>
                   ))}
-                </div>
+                </select>
               )}
             </div>
 

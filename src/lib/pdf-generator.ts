@@ -1125,9 +1125,18 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
           // Advance currentY past top layout to start the items table
           currentY = sectionBottomY + (isThermal ? 10 : 16);
-          // Table Columns based on thermal mode and VAT status (Unit column removed)
+          // Table Columns based on custom layout, thermal mode and VAT status
           let columns: ColumnDef[] = [];
-          if (isThermal) {
+          if (dto.customLayout && dto.customLayout.details && Array.isArray(dto.customLayout.details.columns) && dto.customLayout.details.columns.length > 0) {
+            const customCols = dto.customLayout.details.columns;
+            const sumW = customCols.reduce((acc: number, c: any) => acc + (Number(c.width) || 15), 0) || 100;
+            columns = customCols.map((c: any) => ({
+              id: c.field === 'vat_rate' ? 'vat_rate_formatted' : (c.field || c.id),
+              label: isEn ? (c.enLabel || c.label || c.field) : (c.arLabel || c.label || c.field),
+              width: Math.round(((Number(c.width) || 15) / sumW) * 100),
+              align: (c.align || (isRtl ? 'right' : 'left')) as any
+            }));
+          } else if (isThermal) {
             columns = [
               { id: 'product_name', label: isEn ? 'Item' : 'الصنف', width: 55, align: isRtl ? 'right' : 'left' },
               { id: 'quantity', label: isEn ? 'Qty' : 'الكمية', width: 15, align: 'right' },
