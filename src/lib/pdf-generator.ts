@@ -71,6 +71,28 @@ function shapeText(text: any): string {
     return str;
   }
 
+  const colonIdx = str.indexOf(':');
+  if (colonIdx > -1) {
+    const label = str.substring(0, colonIdx).trim();
+    const val = str.substring(colonIdx + 1).trim();
+    
+    const isEnglishLabel = /^[a-zA-Z0-9\s]+$/.test(label);
+    if (isEnglishLabel) {
+      const shapedVal = shapeText(val);
+      return `${label}: ${shapedVal}`;
+    }
+
+    const shapedLabel = shapeText(label);
+    const shapedVal = shapeText(val);
+    return `${shapedVal} :${shapedLabel}`;
+  }
+
+  const words = str.split(/\s+/);
+  if (words.length > 1) {
+    const reversedWords = words.reverse().join(' ');
+    return reshaper.ArabicShaper.convertArabic(reversedWords);
+  }
+
   return reshaper.ArabicShaper.convertArabic(str);
 }
 
