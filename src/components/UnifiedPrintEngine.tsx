@@ -616,7 +616,25 @@ export function UnifiedPrintEngine() {
 
     // Attach active selected template layout data for exact custom PDF rendering
     if (selectedTemplate) {
-      dto.customLayout = selectedTemplate.layout;
+      const effectiveMarginTop = selectedProfile?.margin_top ?? selectedTemplate.margin_top ?? 10;
+      const effectiveMarginBottom = selectedProfile?.margin_bottom ?? selectedTemplate.margin_bottom ?? 10;
+      const effectiveMarginLeft = selectedProfile?.margin_left ?? selectedTemplate.margin_left ?? 10;
+      const effectiveMarginRight = selectedProfile?.margin_right ?? selectedTemplate.margin_right ?? 10;
+
+      dto.margin_top = effectiveMarginTop;
+      dto.margin_bottom = effectiveMarginBottom;
+      dto.margin_left = effectiveMarginLeft;
+      dto.margin_right = effectiveMarginRight;
+
+      dto.customLayout = {
+        ...(selectedTemplate.layout || {}),
+        margins: {
+          top: Number(effectiveMarginTop),
+          bottom: Number(effectiveMarginBottom),
+          left: Number(effectiveMarginLeft),
+          right: Number(effectiveMarginRight)
+        }
+      };
       dto.templateId = selectedTemplate.id;
       dto.templateName = selectedTemplate.name;
       dto.paperSize = selectedProfile?.paper_size_id || selectedTemplate.paper_size_id || 'a4';

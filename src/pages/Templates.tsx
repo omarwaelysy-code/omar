@@ -2540,9 +2540,15 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
         margin_bottom: Number(formData.margin_bottom),
         margin_left: Number(formData.margin_left),
         margin_right: Number(formData.margin_right),
-        is_active: formData.is_active,
-        layout: designerLayout, // Stored purely as JSON
-        company_id: user.company_id,
+        layout: {
+          ...designerLayout,
+          margins: {
+            top: Number(formData.margin_top),
+            bottom: Number(formData.margin_bottom),
+            left: Number(formData.margin_left),
+            right: Number(formData.margin_right)
+          }
+        },
         document_type: formData.document_type,
         is_default: formData.is_default,
         print_profile_id: formData.print_profile_id || null
