@@ -2434,8 +2434,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
           is_system: false
         };
 
-        const newId = await dbService.create('templates', copyPayload);
-        savedTemplateId = String(newId);
+        const newId: any = await dbService.create('templates', copyPayload);
+        savedTemplateId = typeof newId === 'string' ? newId : String(newId?.id || newId?.template_id || newId?.data?.id || '');
 
         if (isSystemProtected) {
           toast.success(
@@ -2448,20 +2448,31 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
         }
       }
 
-      // Create version record in database
-      const existingVersions = await dbService.list<TemplateVersion>('template_versions', {
-        where: { template_id: savedTemplateId }
-      });
-      const nextVersionNumber = existingVersions.reduce((max, v) => Math.max(max, v.version_number), 0) + 1;
+      // Create version record in database safely
+      let nextVersionNumber = 1;
+      if (savedTemplateId) {
+        try {
+          const existingVersions = await dbService.list<TemplateVersion>('template_versions', {
+            template_id: savedTemplateId
+          });
+          nextVersionNumber = (existingVersions || []).reduce((max, v) => Math.max(max, v.version_number || 0), 0) + 1;
+        } catch (vErr) {
+          console.warn('Failed to fetch existing template versions:', vErr);
+        }
 
-      await dbService.create('template_versions', {
-        template_id: savedTemplateId,
-        company_id: user.company_id,
-        version_number: nextVersionNumber,
-        layout: designerLayout,
-        change_notes: notes || (language === 'ar' ? `نسخة تلقائية رقم ${nextVersionNumber}` : `Auto-saved version ${nextVersionNumber}`),
-        created_by: user.username
-      });
+        try {
+          await dbService.create('template_versions', {
+            template_id: savedTemplateId,
+            company_id: user.company_id,
+            version_number: nextVersionNumber,
+            layout: designerLayout,
+            change_notes: notes || (language === 'ar' ? `نسخة تلقائية رقم ${nextVersionNumber}` : `Auto-saved version ${nextVersionNumber}`),
+            created_by: user.username
+          });
+        } catch (vCreateErr) {
+          console.warn('Failed to record template version:', vCreateErr);
+        }
+      }
 
       await fetchData();
       if (pendingDocTypeChange) {

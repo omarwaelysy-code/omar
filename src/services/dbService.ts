@@ -292,7 +292,7 @@ export const dbService = {
       } else {
         Object.entries(options).forEach(([key, value]) => {
           if (value !== undefined && value !== null) {
-            params.append(key, value.toString());
+            params.append(key, typeof value === 'object' ? JSON.stringify(value) : value.toString());
           }
         });
       }
@@ -313,7 +313,7 @@ export const dbService = {
       } else {
         Object.entries(options).forEach(([key, value]) => {
           if (value !== undefined && value !== null) {
-            params.append(key, value.toString());
+            params.append(key, typeof value === 'object' ? JSON.stringify(value) : value.toString());
           }
         });
       }
@@ -435,9 +435,13 @@ export const dbService = {
   },
 
   async add<T>(collectionName: string, data: any): Promise<string> {
-    const result = await apiRequest<{ id: string }>(`/${collectionName}`, 'POST', data);
+    const result = await apiRequest<any>(`/${collectionName}`, 'POST', data);
     window.dispatchEvent(new CustomEvent('db-refresh', { detail: { collection: collectionName } }));
-    return result.id;
+    if (typeof result === 'string') return result;
+    if (result && typeof result === 'object') {
+      return String(result.id || result.template_id || result.data?.id || result.template?.id || '');
+    }
+    return String(result || '');
   },
 
   async create<T>(collectionName: string, data: any): Promise<string> {
