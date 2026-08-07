@@ -1697,12 +1697,26 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
     }
   };
 
+  const [mouseDragState, setMouseDragState] = useState<{
+    elementId: string;
+    section: 'header' | 'footer';
+    action: 'move' | 'resize';
+    handleDirection?: string;
+    startX: number;
+    startY: number;
+    startLeft: number;
+    startTop: number;
+    startWidth: number;
+    startHeight: number;
+  } | null>(null);
+
   // Drag and Resize handler
   const handleMouseDown = (
     e: React.MouseEvent, 
     elementId: string, 
     section: 'header' | 'footer', 
-    action: 'move' | 'resize'
+    action: 'move' | 'resize',
+    handleDirection?: string
   ) => {
     e.stopPropagation();
     e.preventDefault();
@@ -1717,6 +1731,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       elementId,
       section,
       action,
+      handleDirection: handleDirection || 'se',
       startX: e.clientX,
       startY: e.clientY,
       startLeft: elem.x,
@@ -1724,6 +1739,35 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       startWidth: elem.width,
       startHeight: elem.height
     });
+  };
+
+  const renderResizeHandles = (elId: string, section: 'header' | 'footer') => {
+    if (selectedElementId !== elId) return null;
+    const targetElem = designerLayout[section].find(el => el.id === elId);
+    if (!targetElem || targetElem.properties.locked) return null;
+
+    const handles = [
+      { dir: 'nw', pos: '-top-1.5 -left-1.5', cursor: 'cursor-nwse-resize' },
+      { dir: 'n', pos: '-top-1.5 left-1/2 -translate-x-1/2', cursor: 'cursor-ns-resize' },
+      { dir: 'ne', pos: '-top-1.5 -right-1.5', cursor: 'cursor-nesw-resize' },
+      { dir: 'e', pos: 'top-1/2 -right-1.5 -translate-y-1/2', cursor: 'cursor-ew-resize' },
+      { dir: 'se', pos: '-bottom-1.5 -right-1.5', cursor: 'cursor-nwse-resize' },
+      { dir: 's', pos: '-bottom-1.5 left-1/2 -translate-x-1/2', cursor: 'cursor-ns-resize' },
+      { dir: 'sw', pos: '-bottom-1.5 -left-1.5', cursor: 'cursor-nesw-resize' },
+      { dir: 'w', pos: 'top-1/2 -left-1.5 -translate-y-1/2', cursor: 'cursor-ew-resize' }
+    ];
+
+    return (
+      <>
+        {handles.map(h => (
+          <div
+            key={h.dir}
+            onMouseDown={(e) => handleMouseDown(e, elId, section, 'resize', h.dir)}
+            className={`absolute ${h.pos} w-3 h-3 bg-emerald-600 border-2 border-white ${h.cursor} z-30 shadow-md rounded-full hover:scale-125 transition-transform`}
+          />
+        ))}
+      </>
+    );
   };
 
   useEffect(() => {
@@ -1849,9 +1893,27 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
           elem.x = Math.round(Math.max(0, Math.min(maxLeft, targetX)));
           elem.y = Math.round(Math.max(0, Math.min(maxTop, targetY)));
         } else {
-          // Resize
-          let targetWidth = startWidth + deltaMM_X;
-          let targetHeight = startHeight + deltaMM_Y;
+          // Multi-direction Interactive Resize
+          const dir = mouseDragState.handleDirection || 'se';
+          let targetWidth = startWidth;
+          let targetHeight = startHeight;
+          let targetX = startLeft;
+          let targetY = startTop;
+
+          if (dir.includes('e')) {
+            targetWidth = startWidth + deltaMM_X;
+          }
+          if (dir.includes('w')) {
+            targetWidth = startWidth - deltaMM_X;
+            targetX = startLeft + deltaMM_X;
+          }
+          if (dir.includes('s')) {
+            targetHeight = startHeight + deltaMM_Y;
+          }
+          if (dir.includes('n')) {
+            targetHeight = startHeight - deltaMM_Y;
+            targetY = startTop + deltaMM_Y;
+          }
 
           if (snapToGrid) {
             targetWidth = Math.round(targetWidth / GRID_STEP) * GRID_STEP;
@@ -1860,6 +1922,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
           elem.width = Math.round(Math.max(5, targetWidth));
           elem.height = Math.round(Math.max(1.5, targetHeight));
+          if (dir.includes('w')) elem.x = Math.round(Math.max(0, targetX));
+          if (dir.includes('n')) elem.y = Math.round(Math.max(0, targetY));
         }
 
         elements[index] = elem;
@@ -3471,24 +3535,27 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                 </div>
 
                 {/* Undo / Redo controls */}
-                <div className="flex items-center bg-zinc-100 p-1 rounded-xl border border-zinc-200">
+                <div className="flex items-center gap-1 bg-amber-50/70 p-1 rounded-xl border border-amber-200/80 shadow-sm">
                   <button
                     type="button"
                     onClick={handleUndo}
                     disabled={historyIndex <= 0}
-                    className="p-1.5 hover:bg-white rounded-lg text-zinc-600 disabled:opacity-40 disabled:hover:bg-transparent transition-all"
-                    title="Undo (Ctrl+Z)"
+                    className="flex items-center gap-1 px-2.5 py-1 hover:bg-white rounded-lg text-amber-900 font-bold text-xs disabled:opacity-30 disabled:hover:bg-transparent transition-all shadow-sm disabled:shadow-none"
+                    title={language === 'ar' ? 'تراجع عن التعديل (Ctrl+Z)' : 'Undo (Ctrl+Z)'}
                   >
-                    <Undo size={16} />
+                    <Undo size={14} className="text-amber-700" />
+                    <span>{language === 'ar' ? 'تراجع' : 'Undo'}</span>
                   </button>
+                  <div className="h-4 w-[1px] bg-amber-200" />
                   <button
                     type="button"
                     onClick={handleRedo}
                     disabled={historyIndex >= history.length - 1}
-                    className="p-1.5 hover:bg-white rounded-lg text-zinc-600 disabled:opacity-40 disabled:hover:bg-transparent transition-all"
-                    title="Redo (Ctrl+Y / Ctrl+Shift+Z)"
+                    className="flex items-center gap-1 px-2.5 py-1 hover:bg-white rounded-lg text-amber-900 font-bold text-xs disabled:opacity-30 disabled:hover:bg-transparent transition-all shadow-sm disabled:shadow-none"
+                    title={language === 'ar' ? 'إعادة التعديل (Ctrl+Y)' : 'Redo (Ctrl+Y)'}
                   >
-                    <Redo size={16} />
+                    <Redo size={14} className="text-amber-700" />
+                    <span>{language === 'ar' ? 'إعادة' : 'Redo'}</span>
                   </button>
                 </div>
 
@@ -4310,13 +4377,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
                           {renderElementInnerContent(el, false)}
 
-                          {/* Resize handles */}
-                          {selectedElementId === el.id && !el.properties.locked && (
-                            <div
-                              onMouseDown={(e) => handleMouseDown(e, el.id, 'header', 'resize')}
-                              className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-600 border border-white cursor-se-resize z-20 shadow-md rounded-full"
-                            />
-                          )}
+                          {/* 8-Direction Interactive Resize handles */}
+                          {renderResizeHandles(el.id, 'header')}
                         </div>
                       ))}
                     </div>
@@ -4473,13 +4535,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
                           {renderElementInnerContent(el, false)}
 
-                          {/* Resize handles */}
-                          {selectedElementId === el.id && !el.properties.locked && (
-                            <div
-                              onMouseDown={(e) => handleMouseDown(e, el.id, 'footer', 'resize')}
-                              className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-600 border border-white cursor-se-resize z-20 shadow-md rounded-full"
-                            />
-                          )}
+                          {/* 8-Direction Interactive Resize handles */}
+                          {renderResizeHandles(el.id, 'footer')}
                         </div>
                       ))}
                     </div>
@@ -4582,14 +4639,18 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                         </div>
                       </div>
 
-                      {/* Content editor */}
-                      {activeElement.type === 'text' && (
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-zinc-600">{language === 'ar' ? 'النص المعروض' : 'Text Content'}</label>
+                      {/* Content editor for Text, Variables, Headers & Fields */}
+                      {['text', 'variable', 'field'].includes(activeElement.type) && (
+                        <div className="space-y-1.5 border-b border-zinc-100 pb-3">
+                          <label className="text-xs font-bold text-zinc-700 flex items-center gap-1">
+                            <Type size={14} className="text-emerald-600" />
+                            <span>{language === 'ar' ? 'تعديل النص المعروض / العنوان' : 'Edit Text Content / Label'}</span>
+                          </label>
                           <textarea
-                            className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-semibold outline-none focus:bg-white focus:border-emerald-600"
-                            rows={3}
-                            value={activeElement.properties.text}
+                            className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-semibold outline-none focus:bg-white focus:border-emerald-600 shadow-sm"
+                            rows={2}
+                            placeholder={language === 'ar' ? 'أدخل النص هنا (مثال: رقم الفاتورة / ملخص / توقيع العميل)' : 'Enter custom text label...'}
+                            value={activeElement.properties.text || ''}
                             onChange={(e) => handleUpdateElementProperty('text', e.target.value)}
                           />
                         </div>
@@ -4686,17 +4747,19 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                         </div>
                       )}
 
-                      {/* Typography editing */}
+                      {/* Typography & Color styling editing */}
                       {['text', 'variable', 'field'].includes(activeElement.type) && (
-                        <div className="space-y-3">
-                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">{language === 'ar' ? 'تنسيق الخط' : 'Typography'}</h4>
+                        <div className="space-y-3 pt-2">
+                          <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">{language === 'ar' ? 'تنسيق الخط والألوان' : 'Text Styling & Colors'}</h4>
                           
                           <div className="grid grid-cols-2 gap-2">
                             <div className="space-y-1">
                               <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'حجم الخط (pt)' : 'Font Size (pt)'}</label>
                               <input
                                 type="number"
-                                className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs"
+                                min="6"
+                                max="72"
+                                className="w-full px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-bold"
                                 value={activeElement.properties.fontSize || 10}
                                 onChange={(e) => handleUpdateElementProperty('fontSize', parseInt(e.target.value) || 10)}
                               />
@@ -4713,6 +4776,50 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                                 <option value="Times New Roman">Times New Roman</option>
                                 <option value="Courier New">Monospace</option>
                               </select>
+                            </div>
+                          </div>
+
+                          {/* Font Weight (Bold vs Regular / عريض أم خفيف) */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'سمك الخط' : 'Font Weight'}</label>
+                            <div className="flex gap-2 bg-zinc-100 p-1 rounded-xl border border-zinc-200">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateElementProperty('bold', false)}
+                                className={`flex-1 py-1.5 rounded-lg text-xs font-normal transition-all ${
+                                  !activeElement.properties.bold ? 'bg-white text-zinc-950 shadow-sm font-semibold' : 'text-zinc-500 hover:text-zinc-800'
+                                }`}
+                              >
+                                {language === 'ar' ? 'خفيف (Regular)' : 'Regular'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateElementProperty('bold', true)}
+                                className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all ${
+                                  activeElement.properties.bold ? 'bg-emerald-600 text-white shadow-sm font-black' : 'text-zinc-500 hover:text-zinc-800'
+                                }`}
+                              >
+                                {language === 'ar' ? 'عريض (Bold)' : 'Bold'}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Text Color Picker */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-zinc-500">{language === 'ar' ? 'لون النص' : 'Text Color'}</label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                className="w-8 h-8 rounded-lg border border-zinc-200 cursor-pointer p-0.5"
+                                value={activeElement.properties.color || '#000000'}
+                                onChange={(e) => handleUpdateElementProperty('color', e.target.value)}
+                              />
+                              <input
+                                type="text"
+                                className="flex-1 px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-mono font-bold"
+                                value={activeElement.properties.color || '#000000'}
+                                onChange={(e) => handleUpdateElementProperty('color', e.target.value)}
+                              />
                             </div>
                           </div>
 
