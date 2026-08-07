@@ -888,28 +888,26 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           const fontColor = el.properties?.color || '#000000';
           const align = (el.properties?.align || (isRtl ? 'right' : 'left')) as any;
 
-          let txt = '';
-          if (el.type === 'text') {
-            txt = el.properties?.text || '';
-          } else if (el.type === 'variable' || el.type === 'field') {
-            const b = (el.binding || '').toLowerCase().trim();
-            if (b === 'document_number' || b === 'invoice_number' || b === 'voucher_number' || b === 'number') {
-              txt = dto.invoice_number || dto.voucher_number || dto.document_number || '';
-            } else if (b === 'date') txt = dto.date || '';
-            else if (b === 'due_date') txt = dto.due_date || '';
-            else if (b === 'time' || b === 'current_time') txt = dto.time || '';
-            else if (b === 'customer_name' || b === 'party_name' || b === 'party') txt = dto.customer_name || dto.supplier_name || dto.party_name || '-';
-            else if (b === 'supplier_name') txt = dto.supplier_name || dto.customer_name || '-';
-            else if (b === 'customer_tax_number' || b === 'supplier_tax_number' || b === 'tax_number') txt = dto.customer_tax_number || dto.supplier_tax_number || dto.company?.taxNumber || '';
-            else if (b === 'payment_method') txt = dto.payment_method || '';
-            else if (b === 'user_name' || b === 'user') txt = dto.userName || dto.user_name || '';
-            else if (b === 'branch_name' || b === 'branch') txt = dto.branchName || dto.branch_name || '';
-            else if (b === 'net_total' || b === 'total') txt = formatNumberValue(dto.net_total);
-            else if (b === 'subtotal') txt = formatNumberValue(dto.subtotal);
-            else if (b === 'vat_amount') txt = formatNumberValue(dto.vat_amount);
-            else if (b === 'discount_amount') txt = formatNumberValue(dto.discount_amount);
-            else txt = dto[el.binding] !== undefined ? String(dto[el.binding]) : (el.properties?.text || '');
-          } else if (el.type === 'image' || el.type === 'logo') {
+          // 1. Draw Element Background Fill if present
+          if (el.properties?.backgroundColor && el.properties.backgroundColor !== 'transparent') {
+            doc.fillColor(el.properties.backgroundColor);
+            doc.roundedRect(elX, elY, elW, elH, el.properties?.borderRadius ?? 4).fill();
+          }
+
+          // 2. Draw Element Border if present
+          if (el.properties?.borderWidth && el.properties.borderWidth > 0) {
+            doc.strokeColor(el.properties?.borderColor || '#cbd5e1')
+               .lineWidth(el.properties.borderWidth)
+               .roundedRect(elX, elY, elW, elH, el.properties?.borderRadius ?? 4)
+               .stroke();
+          } else if (el.type === 'box' || el.type === 'rectangle') {
+            doc.strokeColor(el.properties?.borderColor || '#cbd5e1')
+               .lineWidth(0.8)
+               .roundedRect(elX, elY, elW, elH, el.properties?.borderRadius ?? 4)
+               .stroke();
+          }
+
+          if (el.type === 'image' || el.type === 'logo') {
             if (logoBuffer) {
               try {
                 doc.image(logoBuffer, elX, elY, { width: elW, height: elH });
@@ -923,35 +921,59 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               } catch (_) {}
             }
             return;
-          } else if (el.type === 'box' || el.type === 'rectangle') {
-            if (el.properties?.backgroundColor && el.properties.backgroundColor !== 'transparent') {
-              doc.fillColor(el.properties.backgroundColor);
-              doc.roundedRect(elX, elY, elW, elH, 4).fill();
-            }
-            if (el.properties?.borderWidth) {
-              doc.strokeColor(el.properties?.borderColor || '#cbd5e1').lineWidth(el.properties.borderWidth).roundedRect(elX, elY, elW, elH, 4).stroke();
-            } else {
-              doc.strokeColor('#e2e8f0').lineWidth(0.8).roundedRect(elX, elY, elW, elH, 4).stroke();
-            }
-            if (el.properties?.text) {
-              doc.fillColor(el.properties?.color || '#059669');
-              renderText(el.properties.text, elX + 4, elY + 4, {
-                width: elW - 8,
-                align: align,
-                font: fontName,
-                size: fontSize
-              });
-            }
-            return;
           } else if (el.type === 'line') {
             doc.strokeColor(el.properties?.color || '#cbd5e1').lineWidth(el.properties?.borderWidth || 1).moveTo(elX, elY).lineTo(elX + elW, elY).stroke();
             return;
           }
 
+          // 3. Resolve Text / Variable Content with Label Interpolation
+          let txt = el.properties?.text || '';
+
+          if (el.type === 'variable' || el.type === 'field') {
+            const b = (el.binding || '').toLowerCase().trim();
+            let val = '';
+
+            if (b === 'document_number' || b === 'invoice_number' || b === 'voucher_number' || b === 'number') {
+              val = dto.invoice_number || dto.voucher_number || dto.document_number || '';
+            } else if (b === 'date') val = dto.date || '';
+            else if (b === 'due_date') val = dto.due_date || '';
+            else if (b === 'time' || b === 'current_time') val = dto.time || '';
+            else if (b === 'customer_name' || b === 'party_name' || b === 'party') val = dto.customer_name || dto.supplier_name || dto.party_name || '-';
+            else if (b === 'supplier_name') val = dto.supplier_name || dto.customer_name || '-';
+            else if (b === 'customer_tax_number' || b === 'supplier_tax_number' || b === 'tax_number') val = dto.customer_tax_number || dto.supplier_tax_number || dto.company?.taxNumber || '';
+            else if (b === 'payment_method') val = dto.payment_method || '';
+            else if (b === 'user_name' || b === 'user') val = dto.userName || dto.user_name || '';
+            else if (b === 'branch_name' || b === 'branch') val = dto.branchName || dto.branch_name || '';
+            else if (b === 'net_total' || b === 'total') val = formatNumberValue(dto.net_total);
+            else if (b === 'subtotal') val = formatNumberValue(dto.subtotal);
+            else if (b === 'vat_amount') val = formatNumberValue(dto.vat_amount);
+            else if (b === 'discount_amount') val = formatNumberValue(dto.discount_amount);
+            else val = dto[el.binding] !== undefined ? String(dto[el.binding]) : '';
+
+            if (txt.includes('{')) {
+              txt = txt.replace(/\{invoice_number\}/gi, dto.invoice_number || '')
+                       .replace(/\{document_number\}/gi, dto.invoice_number || '')
+                       .replace(/\{customer_name\}/gi, dto.customer_name || dto.supplier_name || '-')
+                       .replace(/\{supplier_name\}/gi, dto.supplier_name || dto.customer_name || '-')
+                       .replace(/\{customer_tax_number\}/gi, dto.customer_tax_number || dto.company?.taxNumber || '')
+                       .replace(/\{payment_method\}/gi, dto.payment_method || '')
+                       .replace(/\{due_date\}/gi, dto.due_date || '')
+                       .replace(/\{date\}/gi, dto.date || '')
+                       .replace(/\{branch_name\}/gi, dto.branchName || dto.branch_name || '')
+                       .replace(new RegExp(`\\{${b}\\}`, 'gi'), val);
+            } else if (!txt || txt === `{${b}}` || txt.trim() === b) {
+              txt = val;
+            } else if (txt.includes(':') || txt.includes('：')) {
+              txt = `${txt} ${val}`.trim();
+            } else if (val && !txt.includes(val)) {
+              txt = `${txt} ${val}`.trim();
+            }
+          }
+
           if (txt) {
             doc.fillColor(fontColor);
-            renderText(txt, elX, elY, {
-              width: elW,
+            renderText(txt, elX + 2, elY + 2, {
+              width: Math.max(10, elW - 4),
               align: align,
               font: fontName,
               size: fontSize
