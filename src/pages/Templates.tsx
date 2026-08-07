@@ -113,6 +113,7 @@ interface Template {
   updated_at?: string;
   document_type?: string;
   is_default?: boolean;
+  is_system?: boolean;
   print_profile_id?: string;
 }
 
@@ -1247,6 +1248,46 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
     );
   };
 
+  const ensureSystemDefaultTemplates = async (existingTemplates: Template[], companyId: string) => {
+    const requiredTypes = [
+      { type: 'invoices', nameAr: 'فاتورة مبيعات - القالب الافتراضي', nameEn: 'Sales Invoice - System Default' },
+      { type: 'purchase_invoices', nameAr: 'فاتورة مشتريات - القالب الافتراضي', nameEn: 'Purchase Invoice - System Default' },
+      { type: 'returns', nameAr: 'مرتجع مبيعات - القالب الافتراضي', nameEn: 'Sales Return - System Default' },
+      { type: 'purchase_returns', nameAr: 'مرتجع مشتريات - القالب الافتراضي', nameEn: 'Purchase Return - System Default' }
+    ];
+
+    let updatedList = [...existingTemplates];
+    for (const req of requiredTypes) {
+      const hasDefault = updatedList.some(t => t.document_type === req.type && (t.is_default || t.is_system));
+      if (!hasDefault) {
+        const payload = {
+          name: language === 'ar' ? req.nameAr : req.nameEn,
+          description: language === 'ar' ? 'القالب الافتراضي المحمي الخاص بالنظام' : 'Protected System Default Template',
+          paper_size_id: 'a4',
+          orientation: 'portrait' as const,
+          margin_top: 10,
+          margin_bottom: 10,
+          margin_left: 10,
+          margin_right: 10,
+          is_active: true,
+          layout: DEFAULT_LAYOUT,
+          company_id: companyId,
+          document_type: req.type,
+          is_default: true,
+          is_system: true,
+          print_profile_id: null
+        };
+        try {
+          const newId = await dbService.create('templates', payload);
+          updatedList.push({ ...payload, id: String(newId) });
+        } catch (err) {
+          console.error(`Failed to create system default template for ${req.type}`, err);
+        }
+      }
+    }
+    return updatedList;
+  };
+
   // Fetch all categories and paper sizes
   const fetchData = async () => {
     try {
@@ -1258,7 +1299,13 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
         dbService.list<PrintProfile>('print_profiles', user?.company_id || ''),
         user?.company_id ? dbService.get<any>('companies', user.company_id) : Promise.resolve(null)
       ]);
-      setTemplates(allTemplates);
+
+      let loadedTemplates = allTemplates;
+      if (user?.company_id) {
+        loadedTemplates = await ensureSystemDefaultTemplates(allTemplates, user.company_id);
+      }
+
+      setTemplates(loadedTemplates);
       setPaperSizes(allSizes);
       setCategories(allCats.filter(c => (c as any).is_final));
       setCompany(companyData);
@@ -1956,6 +2003,16 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
   };
 
   const handleDelete = async (id: string) => {
+    const target = templates.find(t => t.id === id);
+    if (target?.is_system || target?.id === 'default' || target?.is_default || target?.name.includes('الافتراضي')) {
+      toast.error(
+        language === 'ar' 
+          ? 'عذراً، القالب الافتراضي الخاص بالنظام محمي ولا يمكن حذفه' 
+          : 'System default template is protected and cannot be deleted'
+      );
+      return;
+    }
+
     const confirmMsg = language === 'ar' 
       ? 'هل أنت متأكد من حذف هذا القالب؟' 
       : 'Are you sure you want to delete this template?';
@@ -2177,14 +2234,42 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       };
 
       let savedTemplateId = '';
-      if (view === 'edit' && editingTemplate) {
+      const isSystemProtected = Boolean(
+        editingTemplate?.is_system || 
+        editingTemplate?.id === 'default' || 
+        editingTemplate?.name.includes('الافتراضي') || 
+        editingTemplate?.name.toLowerCase().includes('default')
+      );
+
+      if (view === 'edit' && editingTemplate && !isSystemProtected) {
         await dbService.update('templates', editingTemplate.id, templatePayload);
         savedTemplateId = editingTemplate.id;
         toast.success(language === 'ar' ? 'تم حفظ تعديلات القالب والتصميم بنجاح' : 'Template layout saved successfully');
       } else {
-        const newId = await dbService.create('templates', templatePayload);
+        let newName = formData.name.trim();
+        if (isSystemProtected && (editingTemplate && (newName === editingTemplate.name || !newName.includes('نسخة')))) {
+          newName = `${formData.name} - ${language === 'ar' ? 'نسخة مخصصة' : 'Custom Copy'}`;
+        }
+
+        const copyPayload = {
+          ...templatePayload,
+          name: newName,
+          is_default: false,
+          is_system: false
+        };
+
+        const newId = await dbService.create('templates', copyPayload);
         savedTemplateId = String(newId);
-        toast.success(language === 'ar' ? 'تم إنشاء القالب والتصميم بنجاح' : 'Template layout created successfully');
+
+        if (isSystemProtected) {
+          toast.success(
+            language === 'ar' 
+              ? `القالب الافتراضي للنظام محمي ضد التعديل المباشر. تم حفظ التعديلات في قالب جديد باسم: "${newName}" بنجاح` 
+              : `System default template is protected. Your edits have been saved as a new template named "${newName}".`
+          );
+        } else {
+          toast.success(language === 'ar' ? 'تم إنشاء القالب والتصميم بنجاح' : 'Template layout created successfully');
+        }
       }
 
       // Create version record in database
@@ -3122,6 +3207,12 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                       ? (language === 'ar' ? 'مصمم قوالب جديد' : 'New Template Designer')
                       : (language === 'ar' ? `تعديل القالب: ${formData.name}` : `Edit Designer: ${formData.name}`)}
                   </h1>
+                  {view === 'edit' && (editingTemplate?.is_system || editingTemplate?.is_default || editingTemplate?.id === 'default' || editingTemplate?.name.includes('الافتراضي')) && (
+                    <span className="bg-amber-100 border border-amber-300 text-amber-900 text-[11px] px-2.5 py-0.5 rounded-full font-black flex items-center gap-1 shadow-sm">
+                      <Lock size={12} className="text-amber-700" />
+                      <span>{language === 'ar' ? 'قالب افتراضي محمي (سيتم الحفظ كقالب جديد باسم جديد)' : 'Protected System Default (Saving will copy as a new template)'}</span>
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-4 mt-1">
                   <input
