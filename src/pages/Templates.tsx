@@ -704,6 +704,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
     elementId: string;
     section: 'header' | 'footer';
     action: 'move' | 'resize';
+    handleDirection?: string;
     startX: number;
     startY: number;
     startLeft: number;
@@ -1696,19 +1697,6 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       console.error(err);
     }
   };
-
-  const [mouseDragState, setMouseDragState] = useState<{
-    elementId: string;
-    section: 'header' | 'footer';
-    action: 'move' | 'resize';
-    handleDirection?: string;
-    startX: number;
-    startY: number;
-    startLeft: number;
-    startTop: number;
-    startWidth: number;
-    startHeight: number;
-  } | null>(null);
 
   // Drag and Resize handler
   const handleMouseDown = (
