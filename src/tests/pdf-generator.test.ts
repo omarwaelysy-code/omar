@@ -316,5 +316,44 @@ describe('PDF Engine Architectural Tests', () => {
       expect(buffer.length).toBeGreaterThan(100);
       expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
     });
+
+    it('should generate a valid PDF buffer using custom template layout elements and columns', async () => {
+      const customLayout = {
+        header: [
+          { type: 'text', x: 10, y: 10, width: 100, height: 10, properties: { text: 'عنوان فاتورة مخصص جداً', fontSize: 16, bold: true, color: '#0f766e', align: 'right' } },
+          { type: 'variable', binding: 'customer_name', x: 10, y: 25, width: 90, height: 8, properties: { fontSize: 11, bold: true, color: '#1e293b', align: 'right' } },
+          { type: 'variable', binding: 'invoice_number', x: 110, y: 25, width: 90, height: 8, properties: { fontSize: 11, bold: true, color: '#475569', align: 'left' } }
+        ],
+        details: {
+          columns: [
+            { id: 'col1', field: 'product_code', label: 'رمز المنتج', width: 20 },
+            { id: 'col2', field: 'product_name', label: 'اسم المنتج المخصص', width: 50 },
+            { id: 'col3', field: 'quantity', label: 'الكمية المباعة', width: 15 },
+            { id: 'col4', field: 'total', label: 'المبلغ الإجمالي', width: 15 }
+          ]
+        },
+        footer: [
+          { type: 'text', x: 10, y: 10, width: 190, height: 10, properties: { text: 'شكراً لتعاملكم معنا - ملاحظات خاصة بالفاتورة', fontSize: 9, bold: false, color: '#64748b', align: 'center' } }
+        ]
+      };
+
+      const dto = {
+        company: mockCompany,
+        invoice_number: 'INV-CUSTOM-001',
+        date: '2026-08-07',
+        payment_method: 'نقدي',
+        customer_name: 'شركة العميل المخصص',
+        items: [
+          { product_code: 'PRD-CUST', product_name: 'منتج مخصص مع قالب خاص', quantity: '5', unit_price: '100.00', total: '500.00' }
+        ],
+        net_total: '500.00',
+        customLayout: customLayout
+      };
+
+      const buffer = await generatePDF('SalesInvoicePdf', dto);
+      expect(buffer).toBeInstanceOf(Buffer);
+      expect(buffer.length).toBeGreaterThan(100);
+      expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
+    });
   });
 });
