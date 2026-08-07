@@ -20,7 +20,6 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { printElement, exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { printDocument } from '../utils/printEngine';
-import { exportToExcel } from '../utils/excelUtils';
 
 interface GoodsReceiptItem {
   id?: string;
@@ -446,6 +445,8 @@ export const GoodsReceipts: React.FC = () => {
       console.error(err);
       showNotification(err.message || 'Error deleting goods receipt', 'error');
     }
+  };
+
   const handleCopyReceipt = (gr: any) => {
     setViewReceipt(null);
     setEditingReceipt(null);
