@@ -967,12 +967,11 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
                        .replace(/\{date\}/gi, dto.date || '')
                        .replace(/\{branch_name\}/gi, dto.branchName || dto.branch_name || '')
                        .replace(new RegExp(`\\{${b}\\}`, 'gi'), val);
-            } else if (!txt || txt === `{${b}}` || txt.trim() === b) {
-              txt = val;
             } else if (txt.includes(':') || txt.includes('：')) {
-              txt = `${txt} ${val}`.trim();
-            } else if (val && !txt.includes(val)) {
-              txt = `${txt} ${val}`.trim();
+              const labelPrefix = txt.split(/[:：]/)[0].trim();
+              txt = `${labelPrefix}: ${val}`.trim();
+            } else {
+              txt = val;
             }
           }
 
