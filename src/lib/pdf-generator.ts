@@ -317,9 +317,16 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
       // Set default font
       doc.font('ArabicRegular').fontSize(isThermal ? 7.5 : 10);
 
-      const usableWidth = isThermal ? (pageWidth - 20) : (doc.page.width - 60);
-      const sideMargin = isThermal ? 10 : 30;
-      let currentY = isThermal ? 10 : 40;
+      const paperWidthMm = isThermal ? (dto.customLayout?.paperWidth || 80) : 210;
+      const ptPerMm = isThermal ? (pageWidth / paperWidthMm) : (595.28 / 210);
+
+      const marginLeftMm = Number(dto.customLayout?.margins?.left ?? dto.margin_left ?? (isThermal ? 3.5 : 10.5));
+      const marginRightMm = Number(dto.customLayout?.margins?.right ?? dto.margin_right ?? (isThermal ? 3.5 : 10.5));
+      const marginTopMm = Number(dto.customLayout?.margins?.top ?? dto.margin_top ?? (isThermal ? 3.5 : 15));
+
+      const sideMargin = marginLeftMm * ptPerMm;
+      const usableWidth = (paperWidthMm - marginLeftMm - marginRightMm) * ptPerMm;
+      let currentY = marginTopMm * ptPerMm;
 
       // Custom safe text rendering function that enforces correct font, size, and Arabic shaping
       const renderText = (
@@ -859,8 +866,6 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           ? 'PurchaseInvoicePdf' 
           : 'SalesInvoicePdf';
       }
-
-      const ptPerMm = isThermal ? (pageWidth / (dto.customLayout?.paperWidth || 80)) : (595.28 / 210);
 
       const renderCustomElements = (elements: any[], sectionTopMm: number, marginLeftMm: number = 0): number => {
         let maxElementBottomMm = sectionTopMm;
