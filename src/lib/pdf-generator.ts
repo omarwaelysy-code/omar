@@ -860,20 +860,23 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           : 'SalesInvoicePdf';
       }
 
-      const renderCustomElements = (elements: any[], startY: number): number => {
-        let maxY = startY + 10;
-        const scaleX = usableWidth / 210;
-        const scaleY = scaleX; // Match 1mm to canvas aspect ratio exactly (2.55pt/mm)
+      const ptPerMm = isThermal ? (pageWidth / (dto.customLayout?.paperWidth || 80)) : (595.28 / 210);
+
+      const renderCustomElements = (elements: any[], sectionTopMm: number): number => {
+        let maxElementBottomMm = sectionTopMm;
 
         elements.forEach((el: any) => {
           if (el.properties?.hidden) return;
 
-          const elX = sideMargin + (el.x * scaleX);
-          const elY = startY + (el.y * scaleY);
-          const elW = Math.max(el.width * scaleX, 10);
-          const elH = Math.max(el.height * scaleY, 10);
+          // Direct 1:1 mm-to-points projection (0 to 210mm paper width)
+          const elX = el.x * ptPerMm;
+          const elY = (sectionTopMm + el.y) * ptPerMm;
+          const elW = Math.max(el.width * ptPerMm, 5);
+          const elH = Math.max(el.height * ptPerMm, 5);
 
-          if (elY + elH > maxY) maxY = elY + elH;
+          if (sectionTopMm + el.y + el.height > maxElementBottomMm) {
+            maxElementBottomMm = sectionTopMm + el.y + el.height;
+          }
 
           const fontSize = (el.properties?.fontSize || 9.5) * (isThermal ? 0.75 : 1);
           const fontName = el.properties?.bold ? 'ArabicBold' : 'ArabicRegular';
@@ -904,20 +907,22 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           } else if (el.type === 'image' || el.type === 'logo') {
             if (logoBuffer) {
               try {
-                doc.image(logoBuffer, elX, elY, { width: Math.min(elW, 75), height: Math.min(elH, 75) });
+                doc.image(logoBuffer, elX, elY, { width: elW, height: elH });
               } catch (_) {}
             }
             return;
           } else if (el.type === 'qr') {
             if (qrBuffer) {
               try {
-                doc.image(qrBuffer, elX, elY, { width: Math.min(elW, 65), height: Math.min(elH, 65) });
+                doc.image(qrBuffer, elX, elY, { width: elW, height: elH });
               } catch (_) {}
             }
             return;
           } else if (el.type === 'box' || el.type === 'rectangle') {
-            doc.fillColor(el.properties?.backgroundColor || '#f8fafc');
-            doc.roundedRect(elX, elY, elW, elH, 4).fill();
+            if (el.properties?.backgroundColor && el.properties.backgroundColor !== 'transparent') {
+              doc.fillColor(el.properties.backgroundColor);
+              doc.roundedRect(elX, elY, elW, elH, 4).fill();
+            }
             if (el.properties?.borderWidth) {
               doc.strokeColor(el.properties?.borderColor || '#cbd5e1').lineWidth(el.properties.borderWidth).roundedRect(elX, elY, elW, elH, 4).stroke();
             } else {
@@ -925,11 +930,11 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             }
             if (el.properties?.text) {
               doc.fillColor(el.properties?.color || '#059669');
-              renderText(el.properties.text, elX + 6, elY + 4, {
-                width: elW - 12,
-                align: (el.properties?.align || (isRtl ? 'right' : 'left')) as any,
-                font: el.properties?.bold ? 'ArabicBold' : 'ArabicRegular',
-                size: (el.properties?.fontSize || 9) * (isThermal ? 0.75 : 1)
+              renderText(el.properties.text, elX + 4, elY + 4, {
+                width: elW - 8,
+                align: align,
+                font: fontName,
+                size: fontSize
               });
             }
             return;
@@ -949,7 +954,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           }
         });
 
-        return maxY;
+        return maxElementBottomMm * ptPerMm;
       };
 
       // Switch based on template name
@@ -1051,7 +1056,10 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           let sectionBottomY = currentY + 66;
 
           if (dto.customLayout && Array.isArray(dto.customLayout.header) && dto.customLayout.header.length > 0) {
-            sectionBottomY = renderCustomElements(dto.customLayout.header, currentY);
+            const headerTopMm = Number(dto.customLayout.margins?.top ?? dto.margin_top ?? 15);
+            const headerHeightMm = Number(dto.customLayout.headerHeight ?? 75);
+            renderCustomElements(dto.customLayout.header, headerTopMm);
+            sectionBottomY = (headerTopMm + headerHeightMm) * ptPerMm;
             if (!isThermal) {
               doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(sideMargin, sectionBottomY).lineTo(pageWidth - sideMargin, sectionBottomY).stroke();
             }
@@ -1301,10 +1309,18 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             }
           }
 
-          // Signatures
-          const leftSig = isSales ? (isEn ? 'Accountant Signature' : 'توقيع المحاسب') : (isEn ? 'Purchasing Signature' : 'توقيع المشتريات');
-          const rightSig = isSales ? (isEn ? 'Customer Signature' : 'توقيع العميل') : (isEn ? 'Management Approval' : 'اعتماد الإدارة');
-          drawSignatures(leftSig, rightSig);
+          // Signatures / Custom Footer Rendering
+          if (dto.customLayout && Array.isArray(dto.customLayout.footer) && dto.customLayout.footer.length > 0) {
+            const paperHeightMm = isThermal ? (dto.customLayout.paperHeight || 297) : 297;
+            const marginBottomMm = Number(dto.customLayout.margins?.bottom ?? dto.margin_bottom ?? 15);
+            const footerHeightMm = Number(dto.customLayout.footerHeight ?? 45);
+            const footerTopMm = Math.max((currentY + 15) / ptPerMm, paperHeightMm - marginBottomMm - footerHeightMm);
+            renderCustomElements(dto.customLayout.footer, footerTopMm);
+          } else {
+            const leftSig = isSales ? (isEn ? 'Accountant Signature' : 'توقيع المحاسب') : (isEn ? 'Purchasing Signature' : 'توقيع المشتريات');
+            const rightSig = isSales ? (isEn ? 'Customer Signature' : 'توقيع العميل') : (isEn ? 'Management Approval' : 'اعتماد الإدارة');
+            drawSignatures(leftSig, rightSig);
+          }
           break;
         }
 
