@@ -414,70 +414,16 @@ export function UnifiedPrintEngine() {
     ? `${language === 'ar' ? 'طباعة مستند' : 'Print Document'} - ${documentData.invoice_number || documentData.voucher_number || documentData.entry_number || documentData.order_number || documentData.document_number || documentId}`
     : '';
 
-  const handlePrint = () => {
-    const printArea = document.getElementById('unified-print-capture-area');
-    if (!printArea) return;
-
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute';
-    iframe.style.width = '0px';
-    iframe.style.height = '0px';
-    iframe.style.border = 'none';
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentWindow?.document;
-    if (!doc) return;
-
-    doc.open();
-    doc.write(`
-      <html>
-        <head>
-          <title>${titleText}</title>
-          <style>
-            body {
-              font-family: "Cairo", sans-serif;
-              margin: 0;
-              padding: 0;
-              background: white;
-            }
-            @page {
-              size: ${activePaperSizeId === 'custom' ? `${actualWidthMm}mm ${actualHeightMm}mm` : `${activePaperSizeId} ${activeOrientation}`};
-              margin: 0;
-            }
-            .print-page {
-              box-shadow: none !important;
-              margin: 0 !important;
-            }
-          </style>
-        </head>
-        <body dir="${dir}">
-          ${printArea.innerHTML}
-          <script>
-            setTimeout(function() {
-              window.print();
-              setTimeout(function() {
-                try {
-                  window.parent.document.body.removeChild(window.frameElement);
-                } catch (e) {}
-              }, 100);
-            }, 300);
-          </script>
-        </body>
-      </html>
-    `);
-    doc.close();
-  };
-
-  const handleDownloadPDF = async () => {
+  const handleGeneratePDFBlob = async (): Promise<Blob | null> => {
     if (!documentData) {
       showNotification(language === 'ar' ? 'بيانات المستند غير متوفرة' : 'No document data available', 'error');
-      return;
+      return null;
     }
 
     const normalized = normalizeDocumentData(operationType, documentData, company, user);
     if (!normalized) {
       showNotification(language === 'ar' ? 'فشل معالجة البيانات' : 'Could not normalize document data', 'error');
-      return;
+      return null;
     }
 
     // ── Fetch customer/supplier tax number from DB if not present in invoice ──
@@ -557,7 +503,6 @@ export function UnifiedPrintEngine() {
         invoice_number: normalized.document_number || '',
         date: cleanDateVal(normalized.date),
         due_date: cleanDateVal(documentData?.due_date || documentData?.payment_terms_date),
-
         payment_method: normalized.payment_method || '',
         supplier_name: normalized.supplier_name || '',
         supplier_tax_number: resolvedSupplierTaxNumber,
@@ -614,7 +559,6 @@ export function UnifiedPrintEngine() {
       };
     }
 
-    // Attach active selected template layout data ONLY for user custom templates
     if (selectedTemplate && !selectedTemplate.is_system && selectedTemplate.id !== 'fallback' && !selectedTemplate.id.startsWith('default-')) {
       dto.isCustomTemplate = true;
       const effectiveMarginTop = selectedProfile?.margin_top ?? selectedTemplate.margin_top ?? 10;
@@ -643,8 +587,6 @@ export function UnifiedPrintEngine() {
     }
 
     try {
-      showNotification(language === 'ar' ? 'جاري تحضير ملف PDF...' : 'Preparing PDF file...', 'info');
-      
       const response = await fetch('/api/erp/print/pdf', {
         method: 'POST',
         headers: {
@@ -657,42 +599,62 @@ export function UnifiedPrintEngine() {
       });
 
       if (!response.ok) {
-        let serverErrorMsg = 'Failed to generate PDF on server';
+        let serverErrorMsg = 'Failed to generate PDF';
         try {
-          const errorJson = await response.json();
-          if (errorJson && errorJson.exceptionMessage) {
-            console.error("=================== BACKEND PDF FAILURE DETAILS ===================");
-            console.error(`- Failed File: ${errorJson.failedFile}`);
-            console.error(`- Line Number: ${errorJson.lineNumber}`);
-            console.error(`- Exception Name: ${errorJson.exceptionName}`);
-            console.error(`- Exception Message: ${errorJson.exceptionMessage}`);
-            console.error(`- Stack Trace:\n${errorJson.stackTrace}`);
-            console.error("===================================================================");
-            serverErrorMsg = `Backend PDF Error: ${errorJson.exceptionMessage} (at ${errorJson.failedFile}:${errorJson.lineNumber})`;
-          } else if (errorJson && errorJson.error) {
-            serverErrorMsg = `Backend PDF Error: ${errorJson.error}`;
-          }
-        } catch (e) {
-          // Fallback to generic message if parsing fails
-        }
+          const errJson = await response.json();
+          if (errJson && errJson.error) serverErrorMsg = errJson.error;
+        } catch (_) {}
         throw new Error(serverErrorMsg);
       }
 
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${operationType}_${normalized.document_number || 'doc'}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      
-      showNotification(language === 'ar' ? 'تم تحميل الملف بنجاح' : 'PDF downloaded successfully', 'success');
-    } catch (e) {
-      console.error(e);
-      showNotification(language === 'ar' ? 'فشل تحميل الملف' : 'Failed to download PDF', 'error');
+      return await response.blob();
+    } catch (e: any) {
+      console.error('PDF Generation Error:', e);
+      showNotification(e.message || 'Error generating PDF', 'error');
+      return null;
     }
+  };
+
+  const handlePrint = async () => {
+    showNotification(language === 'ar' ? 'جاري تحضير المستند للطباعة...' : 'Preparing document for print...', 'info');
+    const pdfBlob = await handleGeneratePDFBlob();
+    if (!pdfBlob) return;
+
+    const blobUrl = URL.createObjectURL(pdfBlob);
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.src = blobUrl;
+    document.body.appendChild(iframe);
+
+    iframe.onload = () => {
+      setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      }, 300);
+    };
+  };
+
+  const handleDownloadPDF = async () => {
+    showNotification(language === 'ar' ? 'جاري تحضير ملف PDF...' : 'Preparing PDF file...', 'info');
+    const pdfBlob = await handleGeneratePDFBlob();
+    if (!pdfBlob) return;
+
+    const normalized = normalizeDocumentData(operationType, documentData, company, user);
+    const titleText = normalized?.document_number || 'document';
+    const url = window.URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${titleText}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    showNotification(language === 'ar' ? 'تم تحضير ملف PDF بنجاح' : 'PDF generated successfully', 'success');
   };
 
   const normalized = selectedTemplate && documentData
