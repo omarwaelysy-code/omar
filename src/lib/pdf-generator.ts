@@ -862,14 +862,14 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
       const ptPerMm = isThermal ? (pageWidth / (dto.customLayout?.paperWidth || 80)) : (595.28 / 210);
 
-      const renderCustomElements = (elements: any[], sectionTopMm: number): number => {
+      const renderCustomElements = (elements: any[], sectionTopMm: number, marginLeftMm: number = 0): number => {
         let maxElementBottomMm = sectionTopMm;
 
         elements.forEach((el: any) => {
           if (el.properties?.hidden) return;
 
           // Direct 1:1 mm-to-points projection (0 to 210mm paper width)
-          const elX = el.x * ptPerMm;
+          const elX = (marginLeftMm + el.x) * ptPerMm;
           const elY = (sectionTopMm + el.y) * ptPerMm;
           const elW = Math.max(el.width * ptPerMm, 5);
           const elH = Math.max(el.height * ptPerMm, 5);
@@ -1057,8 +1057,9 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
           if (dto.customLayout && Array.isArray(dto.customLayout.header) && dto.customLayout.header.length > 0) {
             const headerTopMm = Number(dto.customLayout.margins?.top ?? dto.margin_top ?? 15);
+            const marginLeftMm = Number(dto.customLayout.margins?.left ?? dto.margin_left ?? 10);
             const headerHeightMm = Number(dto.customLayout.headerHeight ?? 75);
-            renderCustomElements(dto.customLayout.header, headerTopMm);
+            renderCustomElements(dto.customLayout.header, headerTopMm, marginLeftMm);
             sectionBottomY = (headerTopMm + headerHeightMm) * ptPerMm;
             if (!isThermal) {
               doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(sideMargin, sectionBottomY).lineTo(pageWidth - sideMargin, sectionBottomY).stroke();
@@ -1313,9 +1314,10 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           if (dto.customLayout && Array.isArray(dto.customLayout.footer) && dto.customLayout.footer.length > 0) {
             const paperHeightMm = isThermal ? (dto.customLayout.paperHeight || 297) : 297;
             const marginBottomMm = Number(dto.customLayout.margins?.bottom ?? dto.margin_bottom ?? 15);
+            const marginLeftMm = Number(dto.customLayout.margins?.left ?? dto.margin_left ?? 10);
             const footerHeightMm = Number(dto.customLayout.footerHeight ?? 45);
             const footerTopMm = Math.max((currentY + 15) / ptPerMm, paperHeightMm - marginBottomMm - footerHeightMm);
-            renderCustomElements(dto.customLayout.footer, footerTopMm);
+            renderCustomElements(dto.customLayout.footer, footerTopMm, marginLeftMm);
           } else {
             const leftSig = isSales ? (isEn ? 'Accountant Signature' : 'توقيع المحاسب') : (isEn ? 'Purchasing Signature' : 'توقيع المشتريات');
             const rightSig = isSales ? (isEn ? 'Customer Signature' : 'توقيع العميل') : (isEn ? 'Management Approval' : 'اعتماد الإدارة');

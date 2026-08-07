@@ -282,8 +282,16 @@ export function UnifiedPrintEngine() {
         setPaperSizes(allSizes);
         setCompany(companyData);
 
+        // Helper for fuzzy document_type matching
+        const normalizeType = (t: string) => (t || '').toLowerCase().replace(/s$/, '').replace(/_s$/, '');
+        const opNorm = normalizeType(opType);
+
         // Filter templates by document type & status
-        const matchedTemplates = allTemplates.filter(t => t.document_type === opType && t.is_active);
+        const matchedTemplates = allTemplates.filter(t => {
+          if (!t.is_active) return false;
+          const tNorm = normalizeType(t.document_type);
+          return t.document_type === opType || tNorm === opNorm || (opNorm.includes('invoice') && tNorm.includes('invoice'));
+        });
         setTemplates(matchedTemplates);
         setPrintProfiles(allProfiles);
 
