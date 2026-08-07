@@ -451,12 +451,10 @@ export const GoodsReceipts: React.FC = () => {
     setViewReceipt(null);
     setEditingReceipt(null);
     const today = new Date().toISOString().slice(0, 10);
-    setFormData({
-      supplier_id: gr.supplier_id || '',
-      warehouse_id: gr.warehouse_id || '',
-      date: today,
-      notes: gr.notes ? `${gr.notes} (${language === 'ar' ? 'نسخة' : 'Copy'})` : ''
-    });
+    setSupplierId(gr.supplier_id || '');
+    setWarehouseId(gr.warehouse_id || '');
+    setReceiptDate(today);
+    setNotes(gr.notes ? `${gr.notes} (${language === 'ar' ? 'نسخة' : 'Copy'})` : '');
     setItems((gr.items || []).map((item: any) => ({
       product_id: item.product_id || '',
       product_code: item.product_code || '',

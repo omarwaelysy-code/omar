@@ -1,8 +1,12 @@
-interface PDFOptions {
+export interface PDFOptions {
   filename: string;
   margin?: number;
   orientation?: 'portrait' | 'landscape';
   reportTitle?: string;
+  columns?: any[];
+  rows?: any[];
+  totals?: Record<string, any>;
+  templateName?: string;
 }
 
 /**

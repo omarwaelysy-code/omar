@@ -376,8 +376,8 @@ export const StockAdjustments: React.FC = () => {
     }));
 
     exportToPDFUtil(tableRef.current || document.body, {
-      filename: `Stock_Adjustment_${adj.document_number}`,
-      reportTitle: `${language === 'ar' ? 'تسوية كميات وأسعار المخزون' : 'Stock Adjustment'} - ${adj.document_number}`,
+      filename: `Stock_Adjustment_${adj.adjustment_number}`,
+      reportTitle: `${language === 'ar' ? 'تسوية كميات وأسعار المخزون' : 'Stock Adjustment'} - ${adj.adjustment_number}`,
       columns,
       rows
     });
@@ -386,7 +386,7 @@ export const StockAdjustments: React.FC = () => {
   const handleExportDocExcel = (adj: StockAdjustment) => {
     const items = (adj.items || []).map((item, idx) => ({
       '#': idx + 1,
-      [language === 'ar' ? 'رقم المستند' : 'Document Number']: adj.document_number,
+      [language === 'ar' ? 'رقم المستند' : 'Document Number']: adj.adjustment_number,
       [language === 'ar' ? 'التاريخ' : 'Date']: formatDate(adj.date),
       [language === 'ar' ? 'رمز الصنف' : 'Product Code']: item.product_code || '-',
       [language === 'ar' ? 'اسم الصنف' : 'Product Name']: item.product_name || '-',
@@ -395,7 +395,7 @@ export const StockAdjustments: React.FC = () => {
       [language === 'ar' ? 'تكلفة الوحدة' : 'Unit Cost']: item.unit_cost
     }));
 
-    exportToExcel(items, `Stock_Adjustment_${adj.document_number}`);
+    exportToExcel(items, `Stock_Adjustment_${adj.adjustment_number}`);
   };
 
   const handleCopyAdj = (adj: StockAdjustment) => {
@@ -404,7 +404,7 @@ export const StockAdjustments: React.FC = () => {
     const today = new Date().toISOString().slice(0, 10);
     setFormData({
       date: today,
-      adjustment_type: adj.adjustment_type || 'quantity_and_cost',
+      account_id: adj.account_id || '',
       description: adj.description ? `${adj.description} (${language === 'ar' ? 'نسخة' : 'Copy'})` : ''
     });
     setItems((adj.items || []).map(item => ({

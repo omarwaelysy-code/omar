@@ -4198,44 +4198,36 @@ export const Invoices: React.FC = () => {
               </button>
               
               {editingInvoice && (
-                <>
-                  <button 
-                    type="button"
-                    onClick={handleCopyInvoice} 
-                    className="flex items-center gap-1 px-2 py-1 text-emerald-600 hover:text-emerald-800 bg-white hover:bg-emerald-50 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
-                  >
-                    <Copy size={11} />
-                    <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => handlePrint(editingInvoice)} 
-                    className="flex items-center gap-1 px-2 py-1 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-blue-200 shadow-sm"
-                    title={language === 'ar' ? 'طباعة الفاتورة' : 'Print Invoice'}
-                  >
-                    <Printer size={11} />
-                    <span>{language === 'ar' ? 'طباعة' : 'Print'}</span>
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => handleExportInvoicePDF(editingInvoice)} 
-                    className="flex items-center gap-1 px-2 py-1 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-rose-200 shadow-sm"
-                    title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
-                  >
-                    <FileText size={11} />
-                    <span>PDF</span>
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => handleExportSingleInvoiceExcel(editingInvoice)} 
-                    className="flex items-center gap-1 px-2 py-1 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm"
-                    title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
-                  >
-                    <FileSpreadsheet size={11} />
-                    <span>Excel</span>
-                  </button>
-                </>
+                <button 
+                  type="button"
+                  onClick={handleCopyInvoice} 
+                  className="flex items-center gap-1.5 px-2.5 py-1 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-indigo-200 shadow-sm active:scale-95"
+                  title={language === 'ar' ? 'نسخ الفاتورة كمسودة جديدة' : 'Copy Invoice'}
+                >
+                  <Copy size={12} />
+                  <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+                </button>
               )}
+
+              <button 
+                type="button"
+                onClick={() => handleExportInvoicePDF(editingInvoice)} 
+                className="flex items-center gap-1.5 px-2.5 py-1 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-rose-200 shadow-sm active:scale-95"
+                title={language === 'ar' ? 'طباعة / تصدير PDF' : 'Print / Export PDF'}
+              >
+                <Printer size={12} />
+                <span>{language === 'ar' ? 'طباعة PDF' : 'Print PDF'}</span>
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => handleExportSingleInvoiceExcel(editingInvoice)} 
+                className="flex items-center gap-1.5 px-2.5 py-1 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-[11px] whitespace-nowrap border border-emerald-200 shadow-sm active:scale-95"
+                title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+              >
+                <FileSpreadsheet size={12} />
+                <span>{language === 'ar' ? 'تصدير إكسيل' : 'Export Excel'}</span>
+              </button>
 
               <button 
                 type="submit"

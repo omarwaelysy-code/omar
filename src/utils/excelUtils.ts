@@ -134,8 +134,9 @@ export const sanitizeForExcel = (data: any[]): any[] => {
   });
 };
 
-export const exportToExcel = (data: any[], options: ExcelOptions) => {
-  const { filename, sheetName = 'Sheet1' } = options;
+export const exportToExcel = (data: any[], options: string | ExcelOptions) => {
+  const opts: ExcelOptions = typeof options === 'string' ? { filename: options } : options;
+  const { filename, sheetName = 'Sheet1' } = opts;
   
   if (!data || data.length === 0) {
     console.warn('No data to export to Excel');
