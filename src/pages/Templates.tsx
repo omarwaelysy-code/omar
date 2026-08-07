@@ -1399,6 +1399,21 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
     return updatedList;
   };
 
+  const isProtectedSystemTemplate = (template?: Template | null) => {
+    if (!template) return false;
+    if (template.is_system || template.id === 'default' || template.id.startsWith('default-')) {
+      return true;
+    }
+    const nameLower = template.name.toLowerCase();
+    const hasDefaultWord = nameLower.includes('الافتراضي') || nameLower.includes('default');
+    const hasCopyWord = nameLower.includes('نسخة') || nameLower.includes('copy');
+
+    if (template.is_default && !hasCopyWord) return true;
+    if (hasDefaultWord && !hasCopyWord) return true;
+
+    return false;
+  };
+
   // Fetch all categories and paper sizes
   const fetchData = async () => {
     try {
@@ -2232,7 +2247,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
   const handleDelete = async (id: string) => {
     const target = templates.find(t => t.id === id);
-    if (target?.is_system || target?.id === 'default' || target?.is_default || target?.name.includes('الافتراضي')) {
+    if (isProtectedSystemTemplate(target)) {
       toast.error(
         language === 'ar' 
           ? 'عذراً، القالب الافتراضي الخاص بالنظام محمي ولا يمكن حذفه' 
@@ -2462,12 +2477,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       };
 
       let savedTemplateId = '';
-      const isSystemProtected = Boolean(
-        editingTemplate?.is_system || 
-        editingTemplate?.id === 'default' || 
-        editingTemplate?.name.includes('الافتراضي') || 
-        editingTemplate?.name.toLowerCase().includes('default')
-      );
+      const isSystemProtected = isProtectedSystemTemplate(editingTemplate);
 
       if (view === 'edit' && editingTemplate && !isSystemProtected) {
         await dbService.update('templates', editingTemplate.id, templatePayload);
@@ -3156,7 +3166,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                                     >
                                       <Copy size={16} />
                                     </button>
-                                    <button
+                                    {!isProtectedSystemTemplate(template) && (
+                                       <button
                                       type="button"
                                       onClick={() => handleDelete(template.id)}
                                       className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -3164,6 +3175,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                                     >
                                       <Trash2 size={16} />
                                     </button>
+                                     )}
                                   </div>
                                 </td>
                               </tr>
@@ -3446,7 +3458,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                       ? (language === 'ar' ? 'مصمم قوالب جديد' : 'New Template Designer')
                       : (language === 'ar' ? `تعديل القالب: ${formData.name}` : `Edit Designer: ${formData.name}`)}
                   </h1>
-                  {view === 'edit' && (editingTemplate?.is_system || editingTemplate?.is_default || editingTemplate?.id === 'default' || editingTemplate?.name.includes('الافتراضي')) && (
+                  {view === 'edit' && isProtectedSystemTemplate(editingTemplate) && (
                     <span className="bg-amber-100 border border-amber-300 text-amber-900 text-[11px] px-2.5 py-0.5 rounded-full font-black flex items-center gap-1 shadow-sm">
                       <Lock size={12} className="text-amber-700" />
                       <span>{language === 'ar' ? 'قالب افتراضي محمي (سيتم الحفظ كقالب جديد باسم جديد)' : 'Protected System Default (Saving will copy as a new template)'}</span>
