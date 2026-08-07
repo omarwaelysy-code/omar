@@ -1096,6 +1096,7 @@ export interface Template {
   layout?: any;
   document_type?: string;
   is_default?: boolean;
+  is_system?: boolean;
   print_profile_id?: string;
   created_at?: string;
   updated_at?: string;
