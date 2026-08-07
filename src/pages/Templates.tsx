@@ -5597,7 +5597,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                     </div>
 
                     {/* Footer */}
-                    <div className="p-5 border-t border-zinc-100 bg-zinc-50 flex items-center justify-end gap-3">
+                    <div className="p-5 border-t border-zinc-100 bg-zinc-50 flex items-center justify-between gap-3">
                       <button
                         type="button"
                         onClick={() => setIsValidationModalOpen(false)}
@@ -5606,18 +5606,19 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                         {language === 'ar' ? 'إلغاء والعودة للتعديل' : 'Go Back & Edit'}
                       </button>
 
-                      {!validationErrors.some((e) => e.type === 'error') && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsValidationModalOpen(false);
-                            setIsVersionModalOpen(true);
-                          }}
-                          className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-600/10 hover:shadow-emerald-600/25"
-                        >
-                          {language === 'ar' ? 'متابعة وحفظ القالب' : 'Proceed and Save'}
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsValidationModalOpen(false);
+                          setIsVersionModalOpen(true);
+                        }}
+                        className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-black transition-all shadow-lg shadow-emerald-600/20 hover:shadow-emerald-600/35"
+                      >
+                        <Save size={15} />
+                        <span>
+                          {language === 'ar' ? 'حفظ مع الأخطاء والمتابعة' : 'Save Design With Errors'}
+                        </span>
+                      </button>
                     </div>
                   </motion.div>
                 </div>
