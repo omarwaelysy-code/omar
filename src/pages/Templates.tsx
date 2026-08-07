@@ -8,7 +8,8 @@ import {
   Type, Image, Tag, Columns, Square, Circle, Minus, Table, QrCode, Barcode, 
   ZoomIn, ZoomOut, Save, Undo, Redo, RefreshCw, Lock, Unlock, Eye, EyeOff,
   ChevronUp, ChevronDown, Grid, Sparkles, Check, Layers, Paintbrush, Info,
-  Upload, Download, BookOpen, LayoutDashboard, Sliders, MoveVertical, MoveHorizontal
+  Upload, Download, BookOpen, LayoutDashboard, Sliders, MoveVertical, MoveHorizontal,
+  AlignLeft, AlignCenter, AlignRight, AlignJustify, CopyPlus, ClipboardPaste as Paste
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNotification } from '../contexts/NotificationContext';
@@ -666,6 +667,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
     return 'templates';
   });
   const [designerMountKey, setDesignerMountKey] = useState<number>(0);
+  const [addTextToolActive, setAddTextToolActive] = useState<boolean>(false);
   const [editingProfile, setEditingProfile] = useState<PrintProfile | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [profileFormData, setProfileFormData] = useState({
@@ -1026,6 +1028,34 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         handleDeleteElement();
+      }
+
+      // Arrow Keys navigation and nudging (1mm normal, 5mm with Shift)
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        if (selectedElementId && selectedSection && selectedSection !== 'details') {
+          e.preventDefault();
+          const step = e.shiftKey ? 5 : 1;
+          let dx = 0;
+          let dy = 0;
+          if (e.key === 'ArrowUp') dy = -step;
+          if (e.key === 'ArrowDown') dy = step;
+          if (e.key === 'ArrowLeft') dx = -step;
+          if (e.key === 'ArrowRight') dx = step;
+
+          const elements = designerLayout[selectedSection];
+          const targetEl = elements.find(el => el.id === selectedElementId);
+          if (targetEl && !targetEl.properties?.locked) {
+            const secHeight = selectedSection === 'header' ? designerLayout.headerHeight : designerLayout.footerHeight;
+            const newX = Math.max(0, Math.min(printableWidth - targetEl.width, targetEl.x + dx));
+            const newY = Math.max(0, Math.min(secHeight - targetEl.height, targetEl.y + dy));
+
+            const updated = {
+              ...designerLayout,
+              [selectedSection]: elements.map(el => el.id === selectedElementId ? { ...el, x: newX, y: newY } : el)
+            };
+            updateLayoutWithHistory(updated);
+          }
+        }
       }
     };
 
@@ -2142,25 +2172,58 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
     const source = designerLayout[selectedSection].find(el => el.id === selectedElementId);
     if (source) {
       setClipboard(JSON.parse(JSON.stringify(source)));
-      toast.success(language === 'ar' ? 'تم نسخ العنصر' : 'Element copied');
+      toast.success(language === 'ar' ? 'تم نسخ العنصر (Ctrl+C)' : 'Element copied (Ctrl+C)');
     }
   };
 
   // Paste element
   const handlePasteElement = () => {
-    if (!clipboard || !selectedSection || selectedSection === 'details') return;
+    if (!clipboard) return;
+    const targetSec = (selectedSection && selectedSection !== 'details') ? selectedSection : 'header';
     const clone: TemplateElement = JSON.parse(JSON.stringify(clipboard));
     clone.id = `${clone.type}-${Date.now()}`;
-    clone.x = Math.min(printableWidth - clone.width, clone.x + 5);
-    clone.y = clone.y + 5;
+    clone.x = Math.min(printableWidth - clone.width, clone.x + 4);
+    clone.y = clone.y + 4;
 
     const updated = {
       ...designerLayout,
-      [selectedSection]: [...designerLayout[selectedSection], clone]
+      [targetSec]: [...designerLayout[targetSec], clone]
     };
     updateLayoutWithHistory(updated);
     setSelectedElementId(clone.id);
-    toast.success(language === 'ar' ? 'تم لصق العنصر' : 'Element pasted');
+    setSelectedSection(targetSec);
+    toast.success(language === 'ar' ? 'تم لصق العنصر (Ctrl+V)' : 'Element pasted (Ctrl+V)');
+  };
+
+  // Create text box at clicked canvas position
+  const handleCreateTextAt = (x: number, y: number, section: 'header' | 'footer') => {
+    const secHeight = section === 'header' ? designerLayout.headerHeight : designerLayout.footerHeight;
+    const id = `text-${Date.now()}`;
+    const newEl: TemplateElement = {
+      id,
+      type: 'text',
+      x: Math.max(0, Math.min(printableWidth - 50, x)),
+      y: Math.max(0, Math.min(secHeight - 10, y)),
+      width: 50,
+      height: 10,
+      properties: {
+        text: language === 'ar' ? 'نص جديد' : 'New Text Box',
+        fontFamily: 'Cairo',
+        fontSize: 11,
+        bold: false,
+        align: dir === 'rtl' ? 'right' : 'left',
+        color: '#000000'
+      }
+    };
+
+    const updated = {
+      ...designerLayout,
+      [section]: [...designerLayout[section], newEl]
+    };
+    updateLayoutWithHistory(updated);
+    setSelectedElementId(id);
+    setSelectedSection(section);
+    toast.success(language === 'ar' ? 'تمت إضافة مربع النص بنجاح' : 'Text box added successfully');
   };
 
   // Depth ordering
@@ -3684,6 +3747,269 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
               </div>
             </div>
 
+            {/* ─── MS OFFICE WORD / EXCEL STYLE FORMATTING RIBBON BAR ─── */}
+            <div className="bg-white border-b border-zinc-200 px-4 py-2 flex items-center justify-between gap-3 shadow-sm font-sans select-none overflow-x-auto">
+              <div className="flex items-center gap-2 flex-wrap">
+                
+                {/* Group 1: Add Text Tool & Clipboard */}
+                <div className="flex items-center gap-1 bg-zinc-50 p-1 rounded-xl border border-zinc-200">
+                  <button
+                    type="button"
+                    onClick={() => setAddTextToolActive(prev => !prev)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      addTextToolActive 
+                        ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400' 
+                        : 'bg-white text-zinc-700 hover:bg-zinc-100 border border-zinc-200'
+                    }`}
+                    title={language === 'ar' ? 'النقر بالماوس لإضافة مربع نص جديد' : 'Click canvas to add text box'}
+                  >
+                    <Type size={14} />
+                    <span>{language === 'ar' ? '+ مربع نص' : '+ Text Box'}</span>
+                  </button>
+
+                  <div className="h-4 w-[1px] bg-zinc-300 mx-0.5" />
+
+                  <button
+                    type="button"
+                    onClick={handleCopyElement}
+                    disabled={!selectedElementId}
+                    className="p-1.5 text-zinc-600 hover:bg-white hover:text-zinc-900 rounded-lg disabled:opacity-30 transition-all"
+                    title={language === 'ar' ? 'نسخ (Ctrl+C)' : 'Copy (Ctrl+C)'}
+                  >
+                    <Copy size={15} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handlePasteElement}
+                    disabled={!clipboard}
+                    className="p-1.5 text-zinc-600 hover:bg-white hover:text-zinc-900 rounded-lg disabled:opacity-30 transition-all"
+                    title={language === 'ar' ? 'لصق (Ctrl+V)' : 'Paste (Ctrl+V)'}
+                  >
+                    <Paste size={15} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDuplicateElement}
+                    disabled={!selectedElementId}
+                    className="p-1.5 text-zinc-600 hover:bg-white hover:text-zinc-900 rounded-lg disabled:opacity-30 transition-all"
+                    title={language === 'ar' ? 'تكرار العنصر (Ctrl+D)' : 'Duplicate (Ctrl+D)'}
+                  >
+                    <CopyPlus size={15} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDeleteElement}
+                    disabled={!selectedElementId}
+                    className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg disabled:opacity-30 transition-all"
+                    title={language === 'ar' ? 'حذف العنصر (Delete)' : 'Delete (Delete)'}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+
+                <div className="h-6 w-[1px] bg-zinc-200" />
+
+                {/* Group 2: Font Family & Font Size (Word/Excel Ribbon style) */}
+                <div className="flex items-center gap-1.5 bg-zinc-50 p-1 rounded-xl border border-zinc-200">
+                  {/* Font Family Selector */}
+                  <select
+                    className="bg-white border border-zinc-200 px-2.5 py-1 rounded-lg text-xs font-semibold text-zinc-800 outline-none hover:border-zinc-300 focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                    value={activeElement?.properties?.fontFamily || 'Cairo'}
+                    onChange={(e) => handleUpdateElementProperty('fontFamily', e.target.value)}
+                  >
+                    <option value="Cairo">Cairo (الافتراضي)</option>
+                    <option value="Tajawal">Tajawal (تجوال)</option>
+                    <option value="Almarai">Almarai (المراعي)</option>
+                    <option value="Changa">Changa (شانجا)</option>
+                    <option value="Amiri">Amiri (أميري)</option>
+                    <option value="Arial">Arial (Body CS)</option>
+                    <option value="Courier New">Courier New</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Inter">Inter</option>
+                    <option value="Roboto">Roboto</option>
+                  </select>
+
+                  {/* Font Size Selector */}
+                  <select
+                    className="bg-white border border-zinc-200 px-2 py-1 rounded-lg text-xs font-semibold text-zinc-800 outline-none hover:border-zinc-300 focus:ring-1 focus:ring-emerald-500 cursor-pointer w-14"
+                    value={activeElement?.properties?.fontSize || 10}
+                    onChange={(e) => handleUpdateElementProperty('fontSize', parseInt(e.target.value) || 10)}
+                  >
+                    {[6, 7, 8, 9, 9.5, 10, 11, 12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 48].map(sz => (
+                      <option key={sz} value={sz}>{sz}</option>
+                    ))}
+                  </select>
+
+                  {/* Increase Font Size (A^) */}
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateElementProperty('fontSize', (activeElement?.properties?.fontSize || 10) + 1)}
+                    className="px-2 py-1 bg-white hover:bg-zinc-100 border border-zinc-200 rounded-lg text-xs font-extrabold text-zinc-700 transition-all flex items-center gap-0.5"
+                    title={language === 'ar' ? 'تكبير الخط' : 'Increase Font Size'}
+                  >
+                    <span>A</span><span className="text-[9px]">▲</span>
+                  </button>
+
+                  {/* Decrease Font Size (A v) */}
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateElementProperty('fontSize', Math.max(6, (activeElement?.properties?.fontSize || 10) - 1))}
+                    className="px-2 py-1 bg-white hover:bg-zinc-100 border border-zinc-200 rounded-lg text-xs font-bold text-zinc-700 transition-all flex items-center gap-0.5"
+                    title={language === 'ar' ? 'تصغير الخط' : 'Decrease Font Size'}
+                  >
+                    <span>A</span><span className="text-[9px]">▼</span>
+                  </button>
+                </div>
+
+                <div className="h-6 w-[1px] bg-zinc-200" />
+
+                {/* Group 3: Font Styles (Bold B, Italic I, Underline U, Strikethrough ab) */}
+                <div className="flex items-center gap-1 bg-zinc-50 p-1 rounded-xl border border-zinc-200">
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateElementProperty('bold', !activeElement?.properties?.bold)}
+                    className={`w-7 h-7 flex items-center justify-center font-black text-sm rounded-lg transition-all ${
+                      activeElement?.properties?.bold 
+                        ? 'bg-zinc-900 text-white shadow-sm' 
+                        : 'bg-white text-zinc-700 hover:bg-zinc-100 border border-zinc-200'
+                    }`}
+                    title={language === 'ar' ? 'خط عريض (Bold)' : 'Bold'}
+                  >
+                    B
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateElementProperty('italic', !activeElement?.properties?.italic)}
+                    className={`w-7 h-7 flex items-center justify-center italic font-serif font-bold text-sm rounded-lg transition-all ${
+                      activeElement?.properties?.italic 
+                        ? 'bg-zinc-900 text-white shadow-sm' 
+                        : 'bg-white text-zinc-700 hover:bg-zinc-100 border border-zinc-200'
+                    }`}
+                    title={language === 'ar' ? 'خط مائل (Italic)' : 'Italic'}
+                  >
+                    I
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateElementProperty('underline', !activeElement?.properties?.underline)}
+                    className={`w-7 h-7 flex items-center justify-center underline font-bold text-sm rounded-lg transition-all ${
+                      activeElement?.properties?.underline 
+                        ? 'bg-zinc-900 text-white shadow-sm' 
+                        : 'bg-white text-zinc-700 hover:bg-zinc-100 border border-zinc-200'
+                    }`}
+                    title={language === 'ar' ? 'تسطير (Underline)' : 'Underline'}
+                  >
+                    U
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateElementProperty('strikethrough', !activeElement?.properties?.strikethrough)}
+                    className={`w-7 h-7 flex items-center justify-center line-through text-xs font-extrabold rounded-lg transition-all ${
+                      activeElement?.properties?.strikethrough 
+                        ? 'bg-zinc-900 text-white shadow-sm' 
+                        : 'bg-white text-zinc-700 hover:bg-zinc-100 border border-zinc-200'
+                    }`}
+                    title={language === 'ar' ? 'يتوسطه خط (Strikethrough)' : 'Strikethrough'}
+                  >
+                    ab
+                  </button>
+                </div>
+
+                <div className="h-6 w-[1px] bg-zinc-200" />
+
+                {/* Group 4: Text & Fill Colors */}
+                <div className="flex items-center gap-1.5 bg-zinc-50 p-1 rounded-xl border border-zinc-200">
+                  {/* Font Color Picker */}
+                  <label className="flex items-center gap-1 bg-white hover:bg-zinc-100 border border-zinc-200 px-2 py-1 rounded-lg cursor-pointer transition-all" title={language === 'ar' ? 'لون النص' : 'Font Color'}>
+                    <div className="flex flex-col items-center">
+                      <span className="font-extrabold text-xs leading-none" style={{ color: activeElement?.properties?.color || '#000000' }}>A</span>
+                      <div className="w-3.5 h-1 rounded-full mt-0.5" style={{ backgroundColor: activeElement?.properties?.color || '#000000' }} />
+                    </div>
+                    <input
+                      type="color"
+                      className="w-0 h-0 opacity-0 overflow-hidden"
+                      value={activeElement?.properties?.color || '#000000'}
+                      onChange={(e) => handleUpdateElementProperty('color', e.target.value)}
+                    />
+                  </label>
+
+                  {/* Fill/Background Color Picker */}
+                  <label className="flex items-center gap-1 bg-white hover:bg-zinc-100 border border-zinc-200 px-2 py-1 rounded-lg cursor-pointer transition-all" title={language === 'ar' ? 'لون التعبئة / الخلفية' : 'Background Fill'}>
+                    <Paintbrush size={13} className="text-zinc-600" />
+                    <div className="w-3.5 h-3.5 rounded border border-zinc-300 shadow-inner" style={{ backgroundColor: activeElement?.properties?.backgroundColor || '#ffffff' }} />
+                    <input
+                      type="color"
+                      className="w-0 h-0 opacity-0 overflow-hidden"
+                      value={activeElement?.properties?.backgroundColor || '#ffffff'}
+                      onChange={(e) => handleUpdateElementProperty('backgroundColor', e.target.value)}
+                    />
+                  </label>
+                </div>
+
+                <div className="h-6 w-[1px] bg-zinc-200" />
+
+                {/* Group 5: Alignments */}
+                <div className="flex items-center gap-1 bg-zinc-50 p-1 rounded-xl border border-zinc-200">
+                  {[
+                    { id: 'right', icon: AlignRight, label: 'محاذاة لليمين' },
+                    { id: 'center', icon: AlignCenter, label: 'محاذاة للوسط' },
+                    { id: 'left', icon: AlignLeft, label: 'محاذاة لليسار' },
+                    { id: 'justify', icon: AlignJustify, label: 'محاذاة ضبط' }
+                  ].map(al => (
+                    <button
+                      key={al.id}
+                      type="button"
+                      onClick={() => handleUpdateElementProperty('align', al.id)}
+                      className={`p-1.5 rounded-lg transition-all ${
+                        (activeElement?.properties?.align || 'right') === al.id
+                          ? 'bg-zinc-900 text-white shadow-sm'
+                          : 'bg-white text-zinc-600 hover:bg-zinc-100 border border-zinc-200'
+                      }`}
+                      title={al.label}
+                    >
+                      <al.icon size={14} />
+                    </button>
+                  ))}
+                </div>
+
+                <div className="h-6 w-[1px] bg-zinc-200" />
+
+                {/* Group 6: Z-index / Depth & Nudge Help */}
+                <div className="flex items-center gap-1 bg-zinc-50 p-1 rounded-xl border border-zinc-200">
+                  <button
+                    type="button"
+                    onClick={() => handleMoveDepth('up')}
+                    disabled={!selectedElementId}
+                    className="p-1.5 text-zinc-600 hover:bg-white rounded-lg disabled:opacity-30 transition-all"
+                    title={language === 'ar' ? 'إحضار للأمام' : 'Bring Forward'}
+                  >
+                    <ChevronUp size={14} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleMoveDepth('down')}
+                    disabled={!selectedElementId}
+                    className="p-1.5 text-zinc-600 hover:bg-white rounded-lg disabled:opacity-30 transition-all"
+                    title={language === 'ar' ? 'إرسال للخلف' : 'Send Backward'}
+                  >
+                    <ChevronDown size={14} />
+                  </button>
+
+                  <div className="px-2 py-0.5 text-[10px] font-bold text-zinc-500 bg-white border border-zinc-200 rounded-md">
+                    {language === 'ar' ? 'الأسهم ◄▲▼► لتحريك العناصر' : 'Use Arrows ←↑↓→ to move'}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
             {/* THREE COLUMN DESIGN WORKSPACE */}
             <div className="flex-1 flex overflow-hidden gap-4 h-full">
               
@@ -4577,6 +4903,14 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                       onDrop={(e) => handleCanvasDrop(e, 'header')}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (addTextToolActive && headerCanvasRef.current) {
+                          const rect = headerCanvasRef.current.getBoundingClientRect();
+                          const clickX = Math.round((e.clientX - rect.left) / zoomScale);
+                          const clickY = Math.round((e.clientY - rect.top) / zoomScale);
+                          handleCreateTextAt(clickX, clickY, 'header');
+                          setAddTextToolActive(false);
+                          return;
+                        }
                         setSelectedSection('header');
                         setSelectedElementId(null);
                       }}
@@ -4735,6 +5069,14 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                       onDrop={(e) => handleCanvasDrop(e, 'footer')}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (addTextToolActive && footerCanvasRef.current) {
+                          const rect = footerCanvasRef.current.getBoundingClientRect();
+                          const clickX = Math.round((e.clientX - rect.left) / zoomScale);
+                          const clickY = Math.round((e.clientY - rect.top) / zoomScale);
+                          handleCreateTextAt(clickX, clickY, 'footer');
+                          setAddTextToolActive(false);
+                          return;
+                        }
                         setSelectedSection('footer');
                         setSelectedElementId(null);
                       }}
