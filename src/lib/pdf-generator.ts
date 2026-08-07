@@ -828,7 +828,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
       // Helper to draw signatures
       const drawSignatures = (leftTitle: string, rightTitle: string) => {
-        if (!isThermal && (currentY + 60 > doc.page.height - 50)) {
+        if (!isThermal && (currentY + 45 > doc.page.height - 45)) {
           doc.addPage();
           currentY = 40;
         }
@@ -836,21 +836,21 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
         const leftX = sideMargin + (usableWidth / 4) - (boxWidth / 2);
         doc.strokeColor('#cbd5e1').lineWidth(isThermal ? 0.5 : 0.8)
-           .moveTo(leftX, currentY + (isThermal ? 20 : 25))
-           .lineTo(leftX + boxWidth, currentY + (isThermal ? 20 : 25))
+           .moveTo(leftX, currentY + (isThermal ? 10 : 15))
+           .lineTo(leftX + boxWidth, currentY + (isThermal ? 10 : 15))
            .stroke();
         doc.fillColor('#0f172a');
-        renderText(leftTitle, leftX, currentY + (isThermal ? 24 : 32), { width: boxWidth, align: 'center', font: 'ArabicBold', size: isThermal ? 7 : 10 });
+        renderText(leftTitle, leftX, currentY + (isThermal ? 14 : 22), { width: boxWidth, align: 'center', font: 'ArabicBold', size: isThermal ? 7 : 10 });
 
         const rightX = sideMargin + (3 * usableWidth / 4) - (boxWidth / 2);
         doc.strokeColor('#cbd5e1').lineWidth(isThermal ? 0.5 : 0.8)
-           .moveTo(rightX, currentY + (isThermal ? 20 : 25))
-           .lineTo(rightX + boxWidth, currentY + (isThermal ? 20 : 25))
+           .moveTo(rightX, currentY + (isThermal ? 10 : 15))
+           .lineTo(rightX + boxWidth, currentY + (isThermal ? 10 : 15))
            .stroke();
         doc.fillColor('#0f172a');
-        renderText(rightTitle, rightX, currentY + (isThermal ? 24 : 32), { width: boxWidth, align: 'center', font: 'ArabicBold', size: isThermal ? 7 : 10 });
+        renderText(rightTitle, rightX, currentY + (isThermal ? 14 : 22), { width: boxWidth, align: 'center', font: 'ArabicBold', size: isThermal ? 7 : 10 });
 
-        currentY += isThermal ? 35 : 55;
+        currentY += isThermal ? 25 : 35;
       };
 
       // Auto-promote generic ReportTemplate to dedicated PurchaseInvoicePdf or SalesInvoicePdf
