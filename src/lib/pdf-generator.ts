@@ -860,6 +860,81 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           : 'SalesInvoicePdf';
       }
 
+      const renderCustomElements = (elements: any[], startY: number): number => {
+        let maxY = startY + 10;
+        const scaleX = usableWidth / 210;
+        const scaleY = 0.85;
+
+        elements.forEach((el: any) => {
+          if (el.properties?.hidden) return;
+
+          const elX = sideMargin + (el.x * scaleX);
+          const elY = startY + (el.y * scaleY);
+          const elW = Math.max(el.width * scaleX, 10);
+          const elH = Math.max(el.height * scaleY, 10);
+
+          if (elY + elH > maxY) maxY = elY + elH;
+
+          const fontSize = (el.properties?.fontSize || 9.5) * (isThermal ? 0.75 : 0.95);
+          const fontName = el.properties?.bold ? 'ArabicBold' : 'ArabicRegular';
+          const fontColor = el.properties?.color || '#000000';
+          const align = (el.properties?.align || (isRtl ? 'right' : 'left')) as any;
+
+          let txt = '';
+          if (el.type === 'text') {
+            txt = el.properties?.text || '';
+          } else if (el.type === 'variable' || el.type === 'field') {
+            const b = el.binding || '';
+            if (b === 'document_number' || b === 'invoice_number' || b === 'voucher_number') txt = dto.invoice_number || dto.voucher_number || '';
+            else if (b === 'date') txt = dto.date || '';
+            else if (b === 'due_date') txt = dto.due_date || '';
+            else if (b === 'customer_name' || b === 'party_name') txt = dto.customer_name || dto.party_name || '-';
+            else if (b === 'supplier_name') txt = dto.supplier_name || dto.customer_name || '-';
+            else if (b === 'customer_tax_number' || b === 'supplier_tax_number' || b === 'tax_number') txt = dto.customer_tax_number || dto.supplier_tax_number || dto.company?.taxNumber || '';
+            else if (b === 'payment_method') txt = dto.payment_method || '';
+            else if (b === 'user_name' || b === 'user') txt = dto.userName || '';
+            else if (b === 'branch_name' || b === 'branch') txt = dto.branchName || '';
+            else if (b === 'net_total') txt = formatNumberValue(dto.net_total);
+            else if (b === 'subtotal') txt = formatNumberValue(dto.subtotal);
+            else if (b === 'vat_amount') txt = formatNumberValue(dto.vat_amount);
+            else if (b === 'discount_amount') txt = formatNumberValue(dto.discount_amount);
+            else txt = dto[b] || el.properties?.text || '';
+          } else if (el.type === 'image' && logoBuffer) {
+            try {
+              doc.image(logoBuffer, elX, elY, { width: Math.min(elW, 70), height: Math.min(elH, 70) });
+            } catch (_) {}
+            return;
+          } else if (el.type === 'qr' && qrBuffer) {
+            try {
+              doc.image(qrBuffer, elX, elY, { width: Math.min(elW, 60), height: Math.min(elH, 60) });
+            } catch (_) {}
+            return;
+          } else if (el.type === 'box') {
+            doc.fillColor(el.properties?.backgroundColor || '#f8fafc');
+            doc.roundedRect(elX, elY, elW, elH, 4).fill();
+            if (el.properties?.borderWidth) {
+              doc.strokeColor(el.properties?.borderColor || '#cbd5e1').lineWidth(el.properties.borderWidth).roundedRect(elX, elY, elW, elH, 4).stroke();
+            }
+            return;
+          } else if (el.type === 'line') {
+            doc.strokeColor(el.properties?.color || '#cbd5e1').lineWidth(el.properties?.borderWidth || 1).moveTo(elX, elY).lineTo(elX + elW, elY).stroke();
+            return;
+          }
+
+          if (txt) {
+            doc.fillColor(fontColor);
+            renderText(txt, elX, elY, {
+              width: elW,
+              align: align,
+              font: fontName,
+              size: fontSize
+            });
+          }
+        });
+
+        return maxY;
+      };
+
       // Switch based on template name
       switch (effectiveTemplate) {
         case 'InvoiceTemplate':
@@ -956,171 +1031,180 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             isVatEnabled = hasActualVat;
           }
 
-          // ─── 1. TOP HEADER SECTION (Logo on Left, Title + Number + Date on Right) ───
-          const headerStartY = currentY;
-          const logoSize = isThermal ? 32 : 52;
-          const logoX = isRtl ? sideMargin : (doc.page.width - sideMargin - logoSize);
+          let sectionBottomY = currentY + 66;
 
-          if (logoBuffer) {
-            try {
-              doc.image(logoBuffer, logoX, headerStartY, { width: logoSize, height: logoSize });
-            } catch (e: any) {
-              console.error(`${STEP} Logo render error:`, e.message);
+          if (dto.customLayout && Array.isArray(dto.customLayout.header) && dto.customLayout.header.length > 0) {
+            sectionBottomY = renderCustomElements(dto.customLayout.header, currentY);
+            if (!isThermal) {
+              doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(sideMargin, sectionBottomY).lineTo(pageWidth - sideMargin, sectionBottomY).stroke();
             }
-          }
+          } else {
+            // ─── 1. TOP HEADER SECTION (Logo on Left, Title + Number + Date on Right) ───
+            const headerStartY = currentY;
+            const logoSize = isThermal ? 32 : 52;
+            const logoX = isRtl ? sideMargin : (doc.page.width - sideMargin - logoSize);
 
-          // Document Title on Top Right (in RTL)
-          const titleX = isRtl ? (sideMargin + (isThermal ? 40 : 70)) : sideMargin;
-          const titleWidth = isThermal ? usableWidth : (pageWidth - sideMargin - titleX);
-          
-          doc.fillColor('#0f172a');
-          renderText(title, titleX, headerStartY, { 
-            width: titleWidth, 
-            align: isRtl ? 'right' : 'left', 
-            font: 'ArabicBold', 
-            size: isThermal ? 9.5 : 18 
-          });
-
-          // Invoice Number & Date placed directly under Title on the Right (exactly like user's image)
-          const numAndDateText = `${dto.invoice_number || ''}    ${invoiceDateStr}`;
-          doc.fillColor('#1e293b');
-          renderText(numAndDateText, titleX, headerStartY + (isThermal ? 13 : 30), { 
-            width: titleWidth, 
-            align: isRtl ? 'right' : 'left', 
-            font: 'ArabicBold', 
-            size: isThermal ? 8 : 10.5 
-          });
-
-          // Top Header Height
-          const topHeaderHeight = isThermal ? (Math.max(logoSize, 25) + 6) : 66;
-          const line1Y = headerStartY + topHeaderHeight;
-
-          // ─── HORIZONTAL DIVIDER LINE 1 ───
-          if (!isThermal) {
-            doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(sideMargin, line1Y).lineTo(pageWidth - sideMargin, line1Y).stroke();
-          }
-
-          // ─── 2. MIDDLE METADATA & SUMMARY SECTION ───
-          const middleY = isThermal ? (headerStartY + topHeaderHeight + 4) : (line1Y + 12);
-
-          // Summary Box ("ملخص الفاتورة") on LEFT (in RTL)
-          const cardWidth = isThermal ? 140 : 190;
-          const hasDiscount = Number(dto.discount_amount) > 0;
-          const cardHeight = isThermal 
-            ? (60 + (hasDiscount ? 12 : 0) - (!isVatEnabled ? 10 : 0))
-            : (80 + (hasDiscount ? 14 : 0) - (!isVatEnabled ? 13 : 0));
-
-          const cardX = isRtl ? sideMargin : (doc.page.width - sideMargin - cardWidth);
-          const cardY = middleY;
-
-          // Draw Card Container
-          doc.fillColor('#f8fafc').roundedRect(cardX, cardY, cardWidth, cardHeight, 6).fill();
-          doc.strokeColor('#e2e8f0').lineWidth(0.8).roundedRect(cardX, cardY, cardWidth, cardHeight, 6).stroke();
-
-          // Card Header: "ملخص الفاتورة" / "Invoice Summary"
-          let rowY = cardY + (isThermal ? 6 : 8);
-          const headerTitle = isEn ? 'Invoice Summary' : 'ملخص الفاتورة';
-          doc.fillColor('#059669');
-          renderText(headerTitle, cardX + 8, rowY, { 
-            width: cardWidth - 16, 
-            align: isRtl ? 'right' : 'left', 
-            font: 'ArabicBold', 
-            size: isThermal ? 8 : 9
-          });
-
-          rowY += isThermal ? 12 : 15;
-
-          const drawCardRow = (label: string, val: any, isTotal = false, customValColor?: string) => {
-            const fontName = isTotal ? 'ArabicBold' : 'ArabicRegular';
-            const fontSize = isThermal ? (isTotal ? 8.5 : 7.5) : (isTotal ? 9.5 : 8.5);
-            const valColor = isTotal ? '#059669' : (customValColor || '#1e293b');
-            const formattedVal = formatNumberValue(val);
-            const halfWidth = (cardWidth / 2) - 8;
-
-            if (isRtl) {
-              doc.fillColor('#475569');
-              renderText(label, cardX + (cardWidth / 2), rowY, { width: halfWidth, align: 'right', font: fontName, size: fontSize });
-              doc.fillColor(valColor);
-              renderText(formattedVal, cardX + 8, rowY, { width: halfWidth, align: 'left', font: fontName, size: fontSize });
-            } else {
-              doc.fillColor('#475569');
-              renderText(label, cardX + 8, rowY, { width: halfWidth, align: 'left', font: fontName, size: fontSize });
-              doc.fillColor(valColor);
-              renderText(formattedVal, cardX + (cardWidth / 2), rowY, { width: halfWidth, align: 'right', font: fontName, size: fontSize });
+            if (logoBuffer) {
+              try {
+                doc.image(logoBuffer, logoX, headerStartY, { width: logoSize, height: logoSize });
+              } catch (e: any) {
+                console.error(`${STEP} Logo render error:`, e.message);
+              }
             }
-            rowY += isThermal ? 10 : 13;
-          };
 
-          // Subtotal Row
-          const subtotalVal = dto.subtotal || (Number(dto.net_total || 0) - Number(dto.vat_amount || 0) + Number(dto.discount_amount || 0));
-          const subtotalLabel = hasDiscount 
-            ? (isEn ? 'Subtotal Before Discount' : 'الإجمالي قبل الخصم')
-            : (isEn ? 'Total' : 'الإجمالي');
-          
-          drawCardRow(subtotalLabel, subtotalVal);
+            // Document Title on Top Right (in RTL)
+            const titleX = isRtl ? (sideMargin + (isThermal ? 40 : 70)) : sideMargin;
+            const titleWidth = isThermal ? usableWidth : (pageWidth - sideMargin - titleX);
+            
+            doc.fillColor('#0f172a');
+            renderText(title, titleX, headerStartY, { 
+              width: titleWidth, 
+              align: isRtl ? 'right' : 'left', 
+              font: 'ArabicBold', 
+              size: isThermal ? 9.5 : 18 
+            });
 
-          if (hasDiscount) {
-            drawCardRow(isEn ? 'Discount' : 'الخصم', `-${formatNumberValue(dto.discount_amount)}`, false, '#dc2626');
-          }
+            // Invoice Number & Date placed directly under Title on the Right (exactly like user's image)
+            const numAndDateText = `${dto.invoice_number || ''}    ${invoiceDateStr}`;
+            doc.fillColor('#1e293b');
+            renderText(numAndDateText, titleX, headerStartY + (isThermal ? 13 : 30), { 
+              width: titleWidth, 
+              align: isRtl ? 'right' : 'left', 
+              font: 'ArabicBold', 
+              size: isThermal ? 8 : 10.5 
+            });
 
-          if (isVatEnabled) {
-            drawCardRow(isEn ? 'VAT' : 'ضريبة القيمة المضافة', dto.vat_amount || 0);
-          }
+            // Top Header Height
+            const topHeaderHeight = isThermal ? (Math.max(logoSize, 25) + 6) : 66;
+            const line1Y = headerStartY + topHeaderHeight;
 
-          // Card Divider Line
-          rowY += isThermal ? 1 : 2;
-          doc.strokeColor('#cbd5e1').lineWidth(0.5).moveTo(cardX + 8, rowY).lineTo(cardX + cardWidth - 8, rowY).stroke();
-          rowY += isThermal ? 2 : 3;
+            // ─── HORIZONTAL DIVIDER LINE 1 ───
+            if (!isThermal) {
+              doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(sideMargin, line1Y).lineTo(pageWidth - sideMargin, line1Y).stroke();
+            }
 
-          // Net Total Row
-          drawCardRow(isEn ? 'Net Total' : 'الصافي النهائي', dto.net_total || 0, true);
+            // ─── 2. MIDDLE METADATA & SUMMARY SECTION ───
+            const middleY = isThermal ? (headerStartY + topHeaderHeight + 4) : (line1Y + 12);
 
-          // ─── LIGHT VERTICAL DIVIDER LINE between Summary Box & Customer Details ───
-          const vertX = isRtl ? (cardX + cardWidth + 14) : (cardX - 14);
-          if (!isThermal) {
-            doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(vertX, middleY).lineTo(vertX, middleY + cardHeight).stroke();
-          }
+            // Summary Box ("ملخص الفاتورة") on LEFT (in RTL)
+            const cardWidth = isThermal ? 140 : 190;
+            const hasDiscount = Number(dto.discount_amount) > 0;
+            const cardHeight = isThermal 
+              ? (60 + (hasDiscount ? 12 : 0) - (!isVatEnabled ? 10 : 0))
+              : (80 + (hasDiscount ? 14 : 0) - (!isVatEnabled ? 13 : 0));
 
-          // Customer Details & Document Meta on RIGHT SIDE (in RTL)
-          const infoX = isRtl ? (vertX + 16) : sideMargin;
-          const infoWidth = isThermal ? usableWidth : (pageWidth - sideMargin - infoX);
-          let infoY = middleY + 2;
+            const cardX = isRtl ? sideMargin : (doc.page.width - sideMargin - cardWidth);
+            const cardY = middleY;
 
-          // Row 1: Party Name (Customer / Supplier)
-          const partyLine = `${partyLabel} ${partyName}`;
-          doc.fillColor('#0f172a');
-          renderText(partyLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 8 : 11 });
-          infoY += isThermal ? 11 : 18;
+            // Draw Card Container
+            doc.fillColor('#f8fafc').roundedRect(cardX, cardY, cardWidth, cardHeight, 6).fill();
+            doc.strokeColor('#e2e8f0').lineWidth(0.8).roundedRect(cardX, cardY, cardWidth, cardHeight, 6).stroke();
 
-          // Row 2: Tax Number (Customer/Supplier tax number if present, or company tax number, or '-')
-          const displayTaxNum = partyTaxNum || (dto.company?.taxNumber ? `${dto.company.taxNumber}` : (dto.companyTaxNumber || '-'));
-          const taxLine = `${taxLabel} ${displayTaxNum}`;
-          doc.fillColor('#334155');
-          renderText(taxLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 7.5 : 9.5 });
-          infoY += isThermal ? 10 : 16;
+            // Card Header: "ملخص الفاتورة" / "Invoice Summary"
+            let rowY = cardY + (isThermal ? 6 : 8);
+            const headerTitle = isEn ? 'Invoice Summary' : 'ملخص الفاتورة';
+            doc.fillColor('#059669');
+            renderText(headerTitle, cardX + 8, rowY, { 
+              width: cardWidth - 16, 
+              align: isRtl ? 'right' : 'left', 
+              font: 'ArabicBold', 
+              size: isThermal ? 8 : 9
+            });
 
-          // Row 3: Payment Method
-          doc.fillColor('#475569');
-          const payLine = `${payLabel} ${cleanPayVal}`;
-          renderText(payLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
-          infoY += isThermal ? 10 : 16;
+            rowY += isThermal ? 12 : 15;
 
-          // Row 4: Due Date (if Credit)
-          if (isCredit && dueDateStr) {
-            const dueLabel = isEn ? 'Due Date:' : 'تاريخ الاستحقاق:';
-            const dueLine = `${dueLabel} ${dueDateStr}`;
-            renderText(dueLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
+            const drawCardRow = (label: string, val: any, isTotal = false, customValColor?: string) => {
+              const fontName = isTotal ? 'ArabicBold' : 'ArabicRegular';
+              const fontSize = isThermal ? (isTotal ? 8.5 : 7.5) : (isTotal ? 9.5 : 8.5);
+              const valColor = isTotal ? '#059669' : (customValColor || '#1e293b');
+              const formattedVal = formatNumberValue(val);
+              const halfWidth = (cardWidth / 2) - 8;
+
+              if (isRtl) {
+                doc.fillColor('#475569');
+                renderText(label, cardX + (cardWidth / 2), rowY, { width: halfWidth, align: 'right', font: fontName, size: fontSize });
+                doc.fillColor(valColor);
+                renderText(formattedVal, cardX + 8, rowY, { width: halfWidth, align: 'left', font: fontName, size: fontSize });
+              } else {
+                doc.fillColor('#475569');
+                renderText(label, cardX + 8, rowY, { width: halfWidth, align: 'left', font: fontName, size: fontSize });
+                doc.fillColor(valColor);
+                renderText(formattedVal, cardX + (cardWidth / 2), rowY, { width: halfWidth, align: 'right', font: fontName, size: fontSize });
+              }
+              rowY += isThermal ? 10 : 13;
+            };
+
+            // Subtotal Row
+            const subtotalVal = dto.subtotal || (Number(dto.net_total || 0) - Number(dto.vat_amount || 0) + Number(dto.discount_amount || 0));
+            const subtotalLabel = hasDiscount 
+              ? (isEn ? 'Subtotal Before Discount' : 'الإجمالي قبل الخصم')
+              : (isEn ? 'Total' : 'الإجمالي');
+            
+            drawCardRow(subtotalLabel, subtotalVal);
+
+            if (hasDiscount) {
+              drawCardRow(isEn ? 'Discount' : 'الخصم', `-${formatNumberValue(dto.discount_amount)}`, false, '#dc2626');
+            }
+
+            if (isVatEnabled) {
+              drawCardRow(isEn ? 'VAT' : 'ضريبة القيمة المضافة', dto.vat_amount || 0);
+            }
+
+            // Card Divider Line
+            rowY += isThermal ? 1 : 2;
+            doc.strokeColor('#cbd5e1').lineWidth(0.5).moveTo(cardX + 8, rowY).lineTo(cardX + cardWidth - 8, rowY).stroke();
+            rowY += isThermal ? 2 : 3;
+
+            // Net Total Row
+            drawCardRow(isEn ? 'Net Total' : 'الصافي النهائي', dto.net_total || 0, true);
+
+            // ─── LIGHT VERTICAL DIVIDER LINE between Summary Box & Customer Details ───
+            const vertX = isRtl ? (cardX + cardWidth + 14) : (cardX - 14);
+            if (!isThermal) {
+              doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(vertX, middleY).lineTo(vertX, middleY + cardHeight).stroke();
+            }
+
+            // Customer Details & Document Meta on RIGHT SIDE (in RTL)
+            const infoX = isRtl ? (vertX + 16) : sideMargin;
+            const infoWidth = isThermal ? usableWidth : (pageWidth - sideMargin - infoX);
+            let infoY = middleY + 2;
+
+            // Row 1: Party Name (Customer / Supplier)
+            const partyLine = `${partyLabel} ${partyName}`;
+            doc.fillColor('#0f172a');
+            renderText(partyLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 8 : 11 });
+            infoY += isThermal ? 11 : 18;
+
+            // Row 2: Tax Number (Customer/Supplier tax number if present, or company tax number, or '-')
+            const displayTaxNum = partyTaxNum || (dto.company?.taxNumber ? `${dto.company.taxNumber}` : (dto.companyTaxNumber || '-'));
+            const taxLine = `${taxLabel} ${displayTaxNum}`;
+            doc.fillColor('#334155');
+            renderText(taxLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 7.5 : 9.5 });
             infoY += isThermal ? 10 : 16;
-          }
 
-          // Row 5: Branch Name
-          const branchLine = `${branchLabel} ${branchVal}`;
-          doc.fillColor('#64748b');
-          renderText(branchLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9 });
-          infoY += isThermal ? 10 : 16;
-          const sectionBottomY = Math.max(cardY + cardHeight, infoY) + 12;
-          if (!isThermal) {
-            doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(sideMargin, sectionBottomY).lineTo(pageWidth - sideMargin, sectionBottomY).stroke();
+            // Row 3: Payment Method
+            doc.fillColor('#475569');
+            const payLine = `${payLabel} ${cleanPayVal}`;
+            renderText(payLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
+            infoY += isThermal ? 10 : 16;
+
+            // Row 4: Due Date (if Credit)
+            if (isCredit && dueDateStr) {
+              const dueLabel = isEn ? 'Due Date:' : 'تاريخ الاستحقاق:';
+              const dueLine = `${dueLabel} ${dueDateStr}`;
+              renderText(dueLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9.5 });
+              infoY += isThermal ? 10 : 16;
+            }
+
+            // Row 5: Branch Name
+            const branchLine = `${branchLabel} ${branchVal}`;
+            doc.fillColor('#64748b');
+            renderText(branchLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9 });
+            infoY += isThermal ? 10 : 16;
+            sectionBottomY = Math.max(cardY + cardHeight, infoY) + 12;
+            if (!isThermal) {
+              doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(sideMargin, sectionBottomY).lineTo(pageWidth - sideMargin, sectionBottomY).stroke();
+            }
           }
 
           // Advance currentY past top layout to start the items table
