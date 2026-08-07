@@ -713,6 +713,66 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
     startHeight: number;
   } | null>(null);
 
+  // Section Height / Margin Interactive Drag Handler
+  const [sectionDragState, setSectionDragState] = useState<{
+    target: 'header' | 'footer' | 'margin_top' | 'margin_bottom';
+    startY: number;
+    initialVal: number;
+  } | null>(null);
+
+  const handleStartSectionDrag = (
+    e: React.MouseEvent, 
+    target: 'header' | 'footer' | 'margin_top' | 'margin_bottom'
+  ) => {
+    e.stopPropagation();
+    e.preventDefault();
+    let initialVal = 0;
+    if (target === 'header') initialVal = designerLayout.headerHeight;
+    else if (target === 'footer') initialVal = designerLayout.footerHeight;
+    else if (target === 'margin_top') initialVal = margins.top;
+    else if (target === 'margin_bottom') initialVal = margins.bottom;
+
+    setSectionDragState({
+      target,
+      startY: e.clientY,
+      initialVal
+    });
+  };
+
+  useEffect(() => {
+    if (!sectionDragState) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaYPixels = e.clientY - sectionDragState.startY;
+      const deltaYMm = Math.round(deltaYPixels / zoomScale);
+
+      if (sectionDragState.target === 'header') {
+        const newH = Math.max(10, Math.min(250, sectionDragState.initialVal + deltaYMm));
+        setDesignerLayout(prev => ({ ...prev, headerHeight: newH }));
+      } else if (sectionDragState.target === 'footer') {
+        const newH = Math.max(10, Math.min(200, sectionDragState.initialVal - deltaYMm));
+        setDesignerLayout(prev => ({ ...prev, footerHeight: newH }));
+      } else if (sectionDragState.target === 'margin_top') {
+        const newM = Math.max(0, Math.min(60, sectionDragState.initialVal + deltaYMm));
+        setFormData(prev => ({ ...prev, margin_top: newM }));
+      } else if (sectionDragState.target === 'margin_bottom') {
+        const newM = Math.max(0, Math.min(60, sectionDragState.initialVal - deltaYMm));
+        setFormData(prev => ({ ...prev, margin_bottom: newM }));
+      }
+    };
+
+    const handleMouseUp = () => {
+      setSectionDragState(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [sectionDragState, zoomScale]);
+
   // Sync view prop
   useEffect(() => {
     setView(initialView);
@@ -1579,7 +1639,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
     };
   };
 
-  const { width: paperWidth } = getPaperBounds();
+  const { width: paperWidth, height: paperHeight } = getPaperBounds();
   const margins = getEffectiveMargins();
   const printableWidth = paperWidth - margins.left - margins.right;
 
@@ -4150,329 +4210,474 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                       })}
                     </div>
 
-                    {/* PAPER CANVAS CONTAINER */}
+                    {/* CANVAS CONTAINER */}
                     {previewMode ? (
-                      /* LIVE PREVIEW CONTAINER */
+                  /* LIVE PREVIEW CONTAINER */
+                  <div
+                    className="bg-white border border-zinc-300 shadow-2xl transition-all relative overflow-hidden"
+                    style={{
+                      width: `${printableWidth * zoomScale}px`,
+                      paddingTop: `${margins.top * zoomScale}px`,
+                      paddingBottom: `${margins.bottom * zoomScale}px`,
+                      paddingLeft: `${margins.left * zoomScale}px`,
+                      paddingRight: `${margins.right * zoomScale}px`,
+                      backgroundImage: designerLayout.bgImage ? `url(${designerLayout.bgImage})` : 'none',
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                    }}
+                  >
+                    {/* Watermark */}
+                    {designerLayout.watermarkText && (
                       <div
-                        className="bg-white border border-zinc-300 shadow-2xl transition-all relative overflow-hidden"
+                        className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0"
                         style={{
-                          width: `${printableWidth * zoomScale}px`,
-                          paddingTop: `${margins.top * zoomScale}px`,
-                          paddingBottom: `${margins.bottom * zoomScale}px`,
-                          paddingLeft: `${margins.left * zoomScale}px`,
-                          paddingRight: `${margins.right * zoomScale}px`,
-                          backgroundImage: designerLayout.bgImage ? `url(${designerLayout.bgImage})` : 'none',
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center',
+                          opacity: designerLayout.watermarkOpacity ?? 0.15,
+                          transform: `rotate(${designerLayout.watermarkRotation ?? -45}deg)`,
+                          fontSize: '5vw',
+                          fontWeight: 'bold',
+                          color: '#000000',
                         }}
                       >
-                        {/* Watermark */}
-                        {designerLayout.watermarkText && (
-                          <div
-                            className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0"
+                        {designerLayout.watermarkText}
+                      </div>
+                    )}
+                    {designerLayout.watermarkImage && (
+                      <div
+                        className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0"
+                        style={{
+                          opacity: designerLayout.watermarkOpacity ?? 0.15,
+                        }}
+                      >
+                        <img
+                          src={designerLayout.watermarkImage}
+                          alt="watermark"
+                          style={{
+                            transform: `rotate(${designerLayout.watermarkRotation ?? -45}deg)`,
+                            maxWidth: '40%',
+                            maxHeight: '40%'
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {/* Header */}
+                    <div style={{ height: `${designerLayout.headerHeight * zoomScale}px`, width: '100%' }} className="relative">
+                      {designerLayout.header.filter(el => !el.properties.hidden).map(el => (
+                        <div
+                          key={el.id}
+                          className="absolute flex items-center"
+                          style={{
+                            left: `${el.x * zoomScale}px`,
+                            top: `${el.y * zoomScale}px`,
+                            width: `${el.width * zoomScale}px`,
+                            height: `${el.height * zoomScale}px`,
+                            fontFamily: el.properties.fontFamily || 'Cairo',
+                            fontSize: `${(el.properties.fontSize || 10) * (zoomScale / 3.5)}pt`,
+                            fontWeight: el.properties.bold ? 'bold' : 'normal',
+                            fontStyle: el.properties.italic ? 'italic' : 'normal',
+                            textDecoration: el.properties.underline ? 'underline' : 'none',
+                            color: el.properties.color || '#000000',
+                            backgroundColor: el.properties.backgroundColor || 'transparent',
+                            border: el.properties.borderWidth ? `${el.properties.borderWidth}px solid ${el.properties.borderColor || '#000'}` : 'none',
+                            borderRadius: el.type === 'circle' ? '9999px' : el.properties.borderRadius ? `${el.properties.borderRadius}px` : '0px',
+                            textAlign: el.properties.align || 'left',
+                            opacity: el.properties.opacity ?? 1,
+                            transform: `rotate(${el.properties.rotation || 0}deg)`,
+                            justifyContent: el.properties.align === 'center' ? 'center' : el.properties.align === 'right' ? 'flex-end' : 'flex-start',
+                            padding: `${(el.properties.padding || 0) * zoomScale}px`
+                          }}
+                        >
+                          {renderElementInnerContent(el, true)}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Details Table */}
+                    <div className="my-5 relative z-10">
+                      <table
+                        className="w-full border-collapse"
+                        style={{
+                          fontSize: `${(designerLayout.details.properties.fontSize || 10) * (zoomScale / 3.5)}pt`,
+                          fontFamily: designerLayout.details.properties.fontFamily || 'Cairo',
+                          borderColor: designerLayout.details.properties.borderColor || '#e4e4e7'
+                        }}
+                      >
+                        <thead>
+                          <tr
                             style={{
-                              opacity: designerLayout.watermarkOpacity ?? 0.15,
-                              transform: `rotate(${designerLayout.watermarkRotation ?? -45}deg)`,
+                              backgroundColor: designerLayout.details.properties.headerBgColor || '#f4f4f5',
+                              borderColor: designerLayout.details.properties.borderColor || '#e4e4e7'
+                            }}
+                            className="border-b"
+                          >
+                            {designerLayout.details.columns.map(col => (
+                              <th
+                                key={col.id}
+                                className={`border border-zinc-200 p-2 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
+                                style={{
+                                  width: `${col.width}%`,
+                                  borderColor: designerLayout.details.properties.borderColor || '#e4e4e7',
+                                  fontWeight: designerLayout.details.properties.boldHeader ? 'bold' : 'normal',
+                                  padding: `${designerLayout.details.properties.paddingY ?? 2}px ${designerLayout.details.properties.paddingX ?? 2}px`
+                                }}
+                              >
+                                {col.label}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {previewDocData.items.map((item, rowIdx) => (
+                            <tr
+                              key={rowIdx}
+                              style={{
+                                backgroundColor: designerLayout.details.properties.bodyBgColor || '#ffffff',
+                                borderColor: designerLayout.details.properties.borderColor || '#e4e4e7',
+                                height: `${(designerLayout.details.properties.rowHeight || 8) * zoomScale}px`
+                              }}
+                              className="border-b"
+                            >
+                              {designerLayout.details.columns.map(col => (
+                                <td
+                                  key={col.id}
+                                  className="border p-2 text-zinc-700"
+                                  style={{
+                                    borderColor: designerLayout.details.properties.borderColor || '#e4e4e7',
+                                    padding: `${designerLayout.details.properties.paddingY ?? 2}px ${designerLayout.details.properties.paddingX ?? 2}px`
+                                  }}
+                                >
+                                  {item[col.field as keyof typeof item] ?? `[${col.label}]`}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Footer */}
+                    <div style={{ height: `${designerLayout.footerHeight * zoomScale}px`, width: '100%' }} className="relative">
+                      {designerLayout.footer.filter(el => !el.properties.hidden).map(el => (
+                        <div
+                          key={el.id}
+                          className="absolute flex items-center"
+                          style={{
+                            left: `${el.x * zoomScale}px`,
+                            top: `${el.y * zoomScale}px`,
+                            width: `${el.width * zoomScale}px`,
+                            height: `${el.height * zoomScale}px`,
+                            fontFamily: el.properties.fontFamily || 'Cairo',
+                            fontSize: `${(el.properties.fontSize || 10) * (zoomScale / 3.5)}pt`,
+                            fontWeight: el.properties.bold ? 'bold' : 'normal',
+                            fontStyle: el.properties.italic ? 'italic' : 'normal',
+                            textDecoration: el.properties.underline ? 'underline' : 'none',
+                            color: el.properties.color || '#000000',
+                            backgroundColor: el.properties.backgroundColor || 'transparent',
+                            border: el.properties.borderWidth ? `${el.properties.borderWidth}px solid ${el.properties.borderColor || '#000'}` : 'none',
+                            borderRadius: el.type === 'circle' ? '9999px' : el.properties.borderRadius ? `${el.properties.borderRadius}px` : '0px',
+                            textAlign: el.properties.align || 'left',
+                            opacity: el.properties.opacity ?? 1,
+                            transform: `rotate(${el.properties.rotation || 0}deg)`,
+                            justifyContent: el.properties.align === 'center' ? 'center' : el.properties.align === 'right' ? 'flex-end' : 'flex-start',
+                            padding: `${(el.properties.padding || 0) * zoomScale}px`
+                          }}
+                        >
+                          {renderElementInnerContent(el, true)}
+                        </div>
+                      ))}
+                    </div>
+
+                  </div>
+                ) : (
+                  /* VISUAL DESIGN EDIT MODE */
+                  <div 
+                    className="bg-white border border-zinc-300 shadow-xl relative overflow-hidden transition-all"
+                    style={{
+                      width: `${printableWidth * zoomScale}px`,
+                      paddingTop: `${margins.top * zoomScale}px`,
+                      paddingBottom: `${margins.bottom * zoomScale}px`,
+                      paddingLeft: `${margins.left * zoomScale}px`,
+                      paddingRight: `${margins.right * zoomScale}px`,
+                      backgroundImage: designerLayout.bgImage ? `url(${designerLayout.bgImage})` : 'none',
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                    }}
+                    onClick={() => {
+                      setSelectedElementId(null);
+                      setSelectedSection(null);
+                    }}
+                  >
+                    {/* INTERACTIVE SECTION & MARGIN RESIZE BOUNDARIES WITH ARROWS ↕ */}
+                    {/* 1. Header Height Resize Handle Line */}
+                    <div 
+                      onMouseDown={(e) => handleStartSectionDrag(e, 'header')}
+                      className="absolute left-0 right-0 z-30 cursor-ns-resize group border-b-2 border-emerald-500 hover:border-emerald-600 transition-colors flex items-center justify-center pointer-events-auto"
+                      style={{ top: `${(margins.top + designerLayout.headerHeight) * zoomScale}px` }}
+                      title={language === 'ar' ? 'سحب لتغيير ارتفاع الهيدر ↕' : 'Drag to resize Header height ↕'}
+                    >
+                      <div className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold px-3 py-0.5 rounded-full shadow-md border border-emerald-300 flex items-center gap-1 cursor-ns-resize transition-all transform group-hover:scale-105 select-none -translate-y-1/2">
+                        <MoveVertical size={11} className="animate-pulse" />
+                        <span>{language === 'ar' ? `ارتفاع الهيدر: ${designerLayout.headerHeight}مم` : `Header: ${designerLayout.headerHeight}mm`}</span>
+                        <MoveVertical size={11} className="animate-pulse" />
+                      </div>
+                    </div>
+
+                    {/* 2. Footer Height Resize Handle Line */}
+                    <div 
+                      onMouseDown={(e) => handleStartSectionDrag(e, 'footer')}
+                      className="absolute left-0 right-0 z-30 cursor-ns-resize group border-t-2 border-blue-500 hover:border-blue-600 transition-colors flex items-center justify-center pointer-events-auto"
+                      style={{ top: `${(paperHeight - margins.bottom - designerLayout.footerHeight) * zoomScale}px` }}
+                      title={language === 'ar' ? 'سحب لتغيير ارتفاع الفوتر ↕' : 'Drag to resize Footer height ↕'}
+                    >
+                      <div className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-extrabold px-3 py-0.5 rounded-full shadow-md border border-blue-300 flex items-center gap-1 cursor-ns-resize transition-all transform group-hover:scale-105 select-none -translate-y-1/2">
+                        <MoveVertical size={11} className="animate-pulse" />
+                        <span>{language === 'ar' ? `ارتفاع الفوتر: ${designerLayout.footerHeight}مم` : `Footer: ${designerLayout.footerHeight}mm`}</span>
+                        <MoveVertical size={11} className="animate-pulse" />
+                      </div>
+                    </div>
+
+                    {/* 3. Top Margin Drag Line */}
+                    <div 
+                      onMouseDown={(e) => handleStartSectionDrag(e, 'margin_top')}
+                      className="absolute left-0 right-0 z-30 cursor-ns-resize group border-b border-dashed border-red-400 hover:border-red-600 transition-colors flex items-center justify-start pl-2 pointer-events-auto"
+                      style={{ top: `${margins.top * zoomScale}px` }}
+                      title={language === 'ar' ? 'سحب لتغيير الهامش العلوي ↕' : 'Drag to resize Top Margin ↕'}
+                    >
+                      <div className="bg-red-600 hover:bg-red-700 text-white text-[8.5px] font-bold px-2 py-0.5 rounded-full shadow border border-red-300 flex items-center gap-1 cursor-ns-resize select-none -translate-y-1/2">
+                        <MoveVertical size={9} />
+                        <span>{language === 'ar' ? `الهامش العلوي: ${margins.top}مم` : `Top Margin: ${margins.top}mm`}</span>
+                      </div>
+                    </div>
+
+                    {/* 4. Bottom Margin Drag Line */}
+                    <div 
+                      onMouseDown={(e) => handleStartSectionDrag(e, 'margin_bottom')}
+                      className="absolute left-0 right-0 z-30 cursor-ns-resize group border-t border-dashed border-red-400 hover:border-red-600 transition-colors flex items-center justify-start pl-2 pointer-events-auto"
+                      style={{ top: `${(paperHeight - margins.bottom) * zoomScale}px` }}
+                      title={language === 'ar' ? 'سحب لتغيير الهامش السفلي ↕' : 'Drag to resize Bottom Margin ↕'}
+                    >
+                      <div className="bg-red-600 hover:bg-red-700 text-white text-[8.5px] font-bold px-2 py-0.5 rounded-full shadow border border-red-300 flex items-center gap-1 cursor-ns-resize select-none -translate-y-1/2">
+                        <MoveVertical size={9} />
+                        <span>{language === 'ar' ? `الهامش السفلي: ${margins.bottom}مم` : `Bottom Margin: ${margins.bottom}mm`}</span>
+                      </div>
+                    </div>
+
+                    {/* Grid Lines Renderer */}
+                    {showGrid && (
+                      <div 
+                        className="absolute inset-0 pointer-events-none z-0" 
+                        style={{
+                          backgroundImage: `radial-gradient(circle, #e4e4e7 1px, transparent 1px)`,
+                          backgroundSize: `${GRID_STEP * zoomScale}px ${GRID_STEP * zoomScale}px`
+                        }}
+                      />
+                    )}
+
+                    {/* Watermark Mock Renderer */}
+                    {(designerLayout.watermarkText || designerLayout.watermarkImage) && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0 border border-dashed border-zinc-200">
+                        {designerLayout.watermarkText && (
+                          <span
+                            className="font-bold"
+                            style={{
                               fontSize: '5vw',
-                              fontWeight: 'bold',
-                              color: '#000000',
+                              opacity: (designerLayout.watermarkOpacity ?? 0.15) * 1.5,
+                              transform: `rotate(${designerLayout.watermarkRotation ?? -45}deg)`,
+                              color: '#d4d4d8'
                             }}
                           >
                             {designerLayout.watermarkText}
-                          </div>
+                          </span>
                         )}
                         {designerLayout.watermarkImage && (
-                          <div
-                            className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0"
+                          <img
+                            src={designerLayout.watermarkImage}
+                            alt="watermark_mock"
                             style={{
-                              opacity: designerLayout.watermarkOpacity ?? 0.15,
-                            }}
-                          >
-                            <img
-                              src={designerLayout.watermarkImage}
-                              alt="watermark"
-                              style={{
-                                transform: `rotate(${designerLayout.watermarkRotation ?? -45}deg)`,
-                                maxWidth: '40%',
-                                maxHeight: '40%'
-                              }}
-                            />
-                          </div>
-                        )}
-
-                        {/* Header */}
-                        <div style={{ height: `${designerLayout.headerHeight * zoomScale}px`, width: '100%' }} className="relative">
-                          {designerLayout.header.filter(el => !el.properties.hidden).map(el => (
-                            <div
-                              key={el.id}
-                              className="absolute flex items-center"
-                              style={{
-                                left: `${el.x * zoomScale}px`,
-                                top: `${el.y * zoomScale}px`,
-                                width: `${el.width * zoomScale}px`,
-                                height: `${el.height * zoomScale}px`,
-                                fontFamily: el.properties.fontFamily || 'Cairo',
-                                fontSize: `${(el.properties.fontSize || 10) * (zoomScale / 3.5)}pt`,
-                                fontWeight: el.properties.bold ? 'bold' : 'normal',
-                                fontStyle: el.properties.italic ? 'italic' : 'normal',
-                                textDecoration: el.properties.underline ? 'underline' : 'none',
-                                color: el.properties.color || '#000000',
-                                backgroundColor: el.properties.backgroundColor || 'transparent',
-                                border: el.properties.borderWidth ? `${el.properties.borderWidth}px solid ${el.properties.borderColor || '#000'}` : 'none',
-                                borderRadius: el.type === 'circle' ? '9999px' : el.properties.borderRadius ? `${el.properties.borderRadius}px` : '0px',
-                                textAlign: el.properties.align || 'left',
-                                opacity: el.properties.opacity ?? 1,
-                                transform: `rotate(${el.properties.rotation || 0}deg)`,
-                                justifyContent: el.properties.align === 'center' ? 'center' : el.properties.align === 'right' ? 'flex-end' : 'flex-start',
-                                padding: `${(el.properties.padding || 0) * zoomScale}px`
-                              }}
-                            >
-                              {renderElementInnerContent(el, true)}
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Details Table */}
-                        <div className="my-5 relative z-10">
-                          <table
-                            className="w-full border-collapse"
-                            style={{
-                              fontSize: `${(designerLayout.details.properties.fontSize || 10) * (zoomScale / 3.5)}pt`,
-                              fontFamily: designerLayout.details.properties.fontFamily || 'Cairo',
-                              borderColor: designerLayout.details.properties.borderColor || '#e4e4e7'
-                            }}
-                          >
-                            <thead>
-                              <tr
-                                style={{
-                                  backgroundColor: designerLayout.details.properties.headerBgColor || '#f4f4f5',
-                                  borderColor: designerLayout.details.properties.borderColor || '#e4e4e7'
-                                }}
-                                className="border-b"
-                              >
-                                {designerLayout.details.columns.map(col => (
-                                  <th
-                                    key={col.id}
-                                    className={`border border-zinc-200 p-2 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                                    style={{
-                                      width: `${col.width}%`,
-                                      borderColor: designerLayout.details.properties.borderColor || '#e4e4e7',
-                                      fontWeight: designerLayout.details.properties.boldHeader ? 'bold' : 'normal',
-                                      padding: `${designerLayout.details.properties.paddingY ?? 2}px ${designerLayout.details.properties.paddingX ?? 2}px`
-                                    }}
-                                  >
-                                    {col.label}
-                                  </th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {previewDocData.items.map((item, rowIdx) => (
-                                <tr
-                                  key={rowIdx}
-                                  style={{
-                                    backgroundColor: designerLayout.details.properties.bodyBgColor || '#ffffff',
-                                    borderColor: designerLayout.details.properties.borderColor || '#e4e4e7',
-                                    height: `${(designerLayout.details.properties.rowHeight || 8) * zoomScale}px`
-                                  }}
-                                  className="border-b"
-                                >
-                                  {designerLayout.details.columns.map(col => (
-                                    <td
-                                      key={col.id}
-                                      className="border p-2 text-zinc-700"
-                                      style={{
-                                        borderColor: designerLayout.details.properties.borderColor || '#e4e4e7',
-                                        padding: `${designerLayout.details.properties.paddingY ?? 2}px ${designerLayout.details.properties.paddingX ?? 2}px`
-                                      }}
-                                    >
-                                      {item[col.field as keyof typeof item] ?? `[${col.label}]`}
-                                    </td>
-                                  ))}
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-
-                        {/* Footer */}
-                        <div style={{ height: `${designerLayout.footerHeight * zoomScale}px`, width: '100%' }} className="relative">
-                          {designerLayout.footer.filter(el => !el.properties.hidden).map(el => (
-                            <div
-                              key={el.id}
-                              className="absolute flex items-center"
-                              style={{
-                                left: `${el.x * zoomScale}px`,
-                                top: `${el.y * zoomScale}px`,
-                                width: `${el.width * zoomScale}px`,
-                                height: `${el.height * zoomScale}px`,
-                                fontFamily: el.properties.fontFamily || 'Cairo',
-                                fontSize: `${(el.properties.fontSize || 10) * (zoomScale / 3.5)}pt`,
-                                fontWeight: el.properties.bold ? 'bold' : 'normal',
-                                fontStyle: el.properties.italic ? 'italic' : 'normal',
-                                textDecoration: el.properties.underline ? 'underline' : 'none',
-                                color: el.properties.color || '#000000',
-                                backgroundColor: el.properties.backgroundColor || 'transparent',
-                                border: el.properties.borderWidth ? `${el.properties.borderWidth}px solid ${el.properties.borderColor || '#000'}` : 'none',
-                                borderRadius: el.type === 'circle' ? '9999px' : el.properties.borderRadius ? `${el.properties.borderRadius}px` : '0px',
-                                textAlign: el.properties.align || 'left',
-                                opacity: el.properties.opacity ?? 1,
-                                transform: `rotate(${el.properties.rotation || 0}deg)`,
-                                justifyContent: el.properties.align === 'center' ? 'center' : el.properties.align === 'right' ? 'flex-end' : 'flex-start',
-                                padding: `${(el.properties.padding || 0) * zoomScale}px`
-                              }}
-                            >
-                              {renderElementInnerContent(el, true)}
-                            </div>
-                          ))}
-                        </div>
-
-                      </div>
-                    ) : (
-                      /* VISUAL DESIGN EDIT MODE */
-                      <div 
-                        className="bg-white border border-zinc-300 shadow-xl relative overflow-hidden transition-all"
-                        style={{
-                          width: `${printableWidth * zoomScale}px`,
-                          paddingTop: `${margins.top * zoomScale}px`,
-                          paddingBottom: `${margins.bottom * zoomScale}px`,
-                          paddingLeft: `${margins.left * zoomScale}px`,
-                          paddingRight: `${margins.right * zoomScale}px`,
-                          backgroundImage: designerLayout.bgImage ? `url(${designerLayout.bgImage})` : 'none',
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center',
-                        }}
-                        onClick={() => {
-                          setSelectedElementId(null);
-                          setSelectedSection(null);
-                        }}
-                      >
-                        
-                        {/* INTERACTIVE SECTION & MARGIN RESIZE BOUNDARIES WITH ARROWS ↕ */}
-                        {/* 1. Header Height Resize Handle Line */}
-                        <div 
-                          onMouseDown={(e) => handleStartSectionDrag(e, 'header')}
-                          className="absolute left-0 right-0 z-30 cursor-ns-resize group border-b-2 border-emerald-500 hover:border-emerald-600 transition-colors flex items-center justify-center pointer-events-auto"
-                          style={{ top: `${(margins.top + designerLayout.headerHeight) * zoomScale}px` }}
-                          title={language === 'ar' ? 'سحب لتغيير ارتفاع الهيدر ↕' : 'Drag to resize Header height ↕'}
-                        >
-                          <div className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold px-3 py-0.5 rounded-full shadow-md border border-emerald-300 flex items-center gap-1 cursor-ns-resize transition-all transform group-hover:scale-105 select-none -translate-y-1/2">
-                            <MoveVertical size={11} className="animate-pulse" />
-                            <span>{language === 'ar' ? `ارتفاع الهيدر: ${designerLayout.headerHeight}مم` : `Header: ${designerLayout.headerHeight}mm`}</span>
-                            <MoveVertical size={11} className="animate-pulse" />
-                          </div>
-                        </div>
-
-                        {/* 2. Footer Height Resize Handle Line */}
-                        <div 
-                          onMouseDown={(e) => handleStartSectionDrag(e, 'footer')}
-                          className="absolute left-0 right-0 z-30 cursor-ns-resize group border-t-2 border-blue-500 hover:border-blue-600 transition-colors flex items-center justify-center pointer-events-auto"
-                          style={{ top: `${(paperHeight - margins.bottom - designerLayout.footerHeight) * zoomScale}px` }}
-                          title={language === 'ar' ? 'سحب لتغيير ارتفاع الفوتر ↕' : 'Drag to resize Footer height ↕'}
-                        >
-                          <div className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-extrabold px-3 py-0.5 rounded-full shadow-md border border-blue-300 flex items-center gap-1 cursor-ns-resize transition-all transform group-hover:scale-105 select-none -translate-y-1/2">
-                            <MoveVertical size={11} className="animate-pulse" />
-                            <span>{language === 'ar' ? `ارتفاع الفوتر: ${designerLayout.footerHeight}مم` : `Footer: ${designerLayout.footerHeight}mm`}</span>
-                            <MoveVertical size={11} className="animate-pulse" />
-                          </div>
-                        </div>
-
-                        {/* 3. Top Margin Drag Line */}
-                        <div 
-                          onMouseDown={(e) => handleStartSectionDrag(e, 'margin_top')}
-                          className="absolute left-0 right-0 z-30 cursor-ns-resize group border-b border-dashed border-red-400 hover:border-red-600 transition-colors flex items-center justify-start pl-2 pointer-events-auto"
-                          style={{ top: `${margins.top * zoomScale}px` }}
-                          title={language === 'ar' ? 'سحب لتغيير الهامش العلوي ↕' : 'Drag to resize Top Margin ↕'}
-                        >
-                          <div className="bg-red-600 hover:bg-red-700 text-white text-[8.5px] font-bold px-2 py-0.5 rounded-full shadow border border-red-300 flex items-center gap-1 cursor-ns-resize select-none -translate-y-1/2">
-                            <MoveVertical size={9} />
-                            <span>{language === 'ar' ? `الهامش العلوي: ${margins.top}مم` : `Top Margin: ${margins.top}mm`}</span>
-                          </div>
-                        </div>
-
-                        {/* 4. Bottom Margin Drag Line */}
-                        <div 
-                          onMouseDown={(e) => handleStartSectionDrag(e, 'margin_bottom')}
-                          className="absolute left-0 right-0 z-30 cursor-ns-resize group border-t border-dashed border-red-400 hover:border-red-600 transition-colors flex items-center justify-start pl-2 pointer-events-auto"
-                          style={{ top: `${(paperHeight - margins.bottom) * zoomScale}px` }}
-                          title={language === 'ar' ? 'سحب لتغيير الهامش السفلي ↕' : 'Drag to resize Bottom Margin ↕'}
-                        >
-                          <div className="bg-red-600 hover:bg-red-700 text-white text-[8.5px] font-bold px-2 py-0.5 rounded-full shadow border border-red-300 flex items-center gap-1 cursor-ns-resize select-none -translate-y-1/2">
-                            <MoveVertical size={9} />
-                            <span>{language === 'ar' ? `الهامش السفلي: ${margins.bottom}مم` : `Bottom Margin: ${margins.bottom}mm`}</span>
-                          </div>
-                        </div>
-
-                        {/* Grid Lines Renderer */}
-                        {showGrid && (
-                          <div 
-                            className="absolute inset-0 pointer-events-none z-0" 
-                            style={{
-                              backgroundImage: `radial-gradient(circle, #e4e4e7 1px, transparent 1px)`,
-                              backgroundSize: `${GRID_STEP * zoomScale}px ${GRID_STEP * zoomScale}px`
+                              transform: `rotate(${designerLayout.watermarkRotation ?? -45}deg)`,
+                              opacity: (designerLayout.watermarkOpacity ?? 0.15) * 1.5,
+                              maxWidth: '30%',
+                              maxHeight: '30%'
                             }}
                           />
                         )}
+                      </div>
+                    )}
 
-                        {/* Watermark Mock Renderer */}
-                        {(designerLayout.watermarkText || designerLayout.watermarkImage) && (
-                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0 border border-dashed border-zinc-200">
-                            {designerLayout.watermarkText && (
-                              <span
-                                className="font-bold"
-                                style={{
-                                  fontSize: '5vw',
-                                  opacity: (designerLayout.watermarkOpacity ?? 0.15) * 1.5,
-                                  transform: `rotate(${designerLayout.watermarkRotation ?? -45}deg)`,
-                                  color: '#d4d4d8'
-                                }}
-                              >
-                                {designerLayout.watermarkText}
-                              </span>
-                            )}
-                            {designerLayout.watermarkImage && (
-                              <img
-                                src={designerLayout.watermarkImage}
-                                alt="watermark_mock"
-                                style={{
-                                  transform: `rotate(${designerLayout.watermarkRotation ?? -45}deg)`,
-                                  opacity: (designerLayout.watermarkOpacity ?? 0.15) * 1.5,
-                                  maxWidth: '30%',
-                                  maxHeight: '30%'
-                                }}
-                              />
-                            )}
-                          </div>
-                        )}
+                    {/* Snap Guide Lines Visualizer */}
+                    {snapGuides && (
+                      <div className="absolute inset-0 pointer-events-none z-20">
+                        {snapGuides.x.map((xVal, index) => (
+                          <div 
+                            key={`x-${index}`} 
+                            className="absolute top-0 bottom-0 border-l border-dashed border-red-500" 
+                            style={{ left: `${(xVal + margins.left) * zoomScale}px` }} 
+                          />
+                        ))}
+                        {snapGuides.y.map((yVal, index) => (
+                          <div 
+                            key={`y-${index}`} 
+                            className="absolute left-0 right-0 border-t border-dashed border-red-500" 
+                            style={{ top: `${(yVal + margins.top) * zoomScale}px` }} 
+                          />
+                        ))}
+                      </div>
+                    )}
 
-                        {/* Snap Guide Lines Visualizer */}
-                        {snapGuides && (
-                          <div className="absolute inset-0 pointer-events-none z-20">
-                            {snapGuides.x.map((xVal, index) => (
-                              <div 
-                                key={`x-${index}`} 
-                                className="absolute top-0 bottom-0 border-l border-dashed border-red-500" 
-                                style={{ left: `${(xVal + margins.left) * zoomScale}px` }} 
-                              />
-                            ))}
-                            {snapGuides.y.map((yVal, index) => (
-                              <div 
-                                key={`y-${index}`} 
-                                className="absolute left-0 right-0 border-t border-dashed border-red-500" 
-                                style={{ top: `${(yVal + margins.top) * zoomScale}px` }} 
-                              />
-                            ))}
-                          </div>
-                        )}
+                    {/* SECTION 1: HEADER CANVAS */}
+                    <div 
+                      ref={headerCanvasRef}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => handleCanvasDrop(e, 'header')}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedSection('header');
+                        setSelectedElementId(null);
+                      }}
+                      className={`border border-dashed transition-all relative select-none z-10 ${
+                        selectedSection === 'header' && !selectedElementId 
+                          ? 'border-emerald-500 bg-emerald-50/10' 
+                          : 'border-zinc-200 hover:border-zinc-300'
+                      }`}
+                      style={{
+                        height: `${designerLayout.headerHeight * zoomScale}px`,
+                        width: '100%'
+                      }}
+                    >
+                      <div className="absolute top-1 right-2 text-[9px] font-bold text-zinc-400 uppercase pointer-events-none select-none">
+                        Header / الهيدر ({designerLayout.headerHeight}mm)
+                      </div>
 
-                        {/* SECTION 1: HEADER CANVAS */}
-                        <div 
-                          ref={headerCanvasRef}
-                          onDragOver={(e) => e.preventDefault()}
-                          onDrop={(e) => handleCanvasDrop(e, 'header')}
+                      {designerLayout.header.map(el => (
+                        <div
+                          key={el.id}
+                          onMouseDown={(e) => handleMouseDown(e, el.id, 'header', 'move')}
                           onClick={(e) => {
                             e.stopPropagation();
+                            setSelectedElementId(el.id);
                             setSelectedSection('header');
+                          }}
+                          className={`absolute group cursor-move select-none ${
+                            selectedElementId === el.id 
+                              ? 'ring-2 ring-emerald-500 ring-offset-1 bg-emerald-50/20' 
+                              : 'hover:ring-1 hover:ring-zinc-300'
+                          } ${el.properties.hidden ? 'opacity-30' : ''}`}
+                          style={{
+                            left: `${el.x * zoomScale}px`,
+                            top: `${el.y * zoomScale}px`,
+                            width: `${el.width * zoomScale}px`,
+                            height: `${el.height * zoomScale}px`,
+                            fontFamily: el.properties.fontFamily || 'Cairo',
+                            fontSize: `${(el.properties.fontSize || 10) * (zoomScale / 3.5)}pt`,
+                            fontWeight: el.properties.bold ? 'bold' : 'normal',
+                            fontStyle: el.properties.italic ? 'italic' : 'normal',
+                            textDecoration: el.properties.underline ? 'underline' : 'none',
+                            color: el.properties.color || '#000000',
+                            backgroundColor: el.properties.backgroundColor || 'transparent',
+                            border: el.properties.borderWidth ? `${el.properties.borderWidth}px solid ${el.properties.borderColor || '#000'}` : 'none',
+                            borderRadius: el.type === 'circle' ? '9999px' : el.properties.borderRadius ? `${el.properties.borderRadius}px` : '0px',
+                            textAlign: el.properties.align || 'left',
+                            opacity: el.properties.opacity ?? 1,
+                            transform: `rotate(${el.properties.rotation || 0}deg)`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: el.properties.align === 'center' ? 'center' : el.properties.align === 'right' ? 'flex-end' : 'flex-start',
+                            padding: `${(el.properties.padding || 0) * zoomScale}px`
+                          }}
+                        >
+                          {el.properties.locked && (
+                            <div className="absolute top-0.5 right-0.5 p-0.5 bg-amber-500 text-white rounded pointer-events-none">
+                              <Lock size={8} />
+                            </div>
+                          )}
+
+                          {renderElementInnerContent(el, false)}
+
+                          {/* 8-Direction Interactive Resize handles */}
+                          {renderResizeHandles(el.id, 'header')}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* SECTION 2: DETAILS TABLE CANVAS */}
+                    <div 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedSection('details');
+                        setSelectedElementId(null);
+                      }}
+                      className={`border transition-all my-4 relative select-none z-10 ${
+                        selectedSection === 'details' 
+                          ? 'border-emerald-500 bg-emerald-50/10' 
+                          : 'border-zinc-200 hover:border-zinc-300'
+                      }`}
+                    >
+                      <div className="absolute -top-4 right-2 text-[9px] font-bold text-zinc-400 uppercase pointer-events-none select-none">
+                        Details Table / جدول التفاصيل
+                      </div>
+
+                      <table 
+                        className="w-full border-collapse"
+                        style={{
+                          fontSize: `${(designerLayout.details.properties.fontSize || 10) * (zoomScale / 3.5)}pt`,
+                          fontFamily: designerLayout.details.properties.fontFamily || 'Cairo',
+                          borderColor: designerLayout.details.properties.borderColor || '#e4e4e7'
+                        }}
+                      >
+                        <thead>
+                          <tr 
+                            style={{
+                              backgroundColor: designerLayout.details.properties.headerBgColor || '#f4f4f5',
+                              borderColor: designerLayout.details.properties.borderColor || '#e4e4e7'
+                            }}
+                            className="border-b"
+                          >
+                            {designerLayout.details.columns.map(col => (
+                              <th 
+                                key={col.id} 
+                                className={`border border-zinc-200 p-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
+                                style={{
+                                  width: `${col.width}%`,
+                                  borderColor: designerLayout.details.properties.borderColor || '#e4e4e7',
+                                  fontWeight: designerLayout.details.properties.boldHeader ? 'bold' : 'normal',
+                                  padding: `${designerLayout.details.properties.paddingY ?? 2}px ${designerLayout.details.properties.paddingX ?? 2}px`
+                                }}
+                              >
+                                {col.label}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[1, 2].map(rowIdx => (
+                            <tr 
+                              key={rowIdx} 
+                              style={{
+                                backgroundColor: designerLayout.details.properties.bodyBgColor || '#ffffff',
+                                borderColor: designerLayout.details.properties.borderColor || '#e4e4e7',
+                                height: `${(designerLayout.details.properties.rowHeight || 8) * zoomScale}px`
+                              }}
+                              className="border-b"
+                            >
+                              {designerLayout.details.columns.map(col => (
+                                <td 
+                                  key={col.id} 
+                                  className="border p-2 text-zinc-400"
+                                  style={{
+                                    borderColor: designerLayout.details.properties.borderColor || '#e4e4e7',
+                                    padding: `${designerLayout.details.properties.paddingY ?? 2}px ${designerLayout.details.properties.paddingX ?? 2}px`
+                                  }}
+                                >
+                                  {col.field === 'product_name' && `صنف تجريبي رقم ${rowIdx}`}
+                                  {col.field === 'product_code' && `PRD-00${rowIdx}`}
+                                  {col.field === 'quantity' && `${rowIdx * 2}`}
+                                  {col.field === 'unit_price' && `${rowIdx * 100}`}
+                                  {col.field === 'total' && `${rowIdx * 200}`}
+                                  {!['product_name', 'product_code', 'quantity', 'unit_price', 'total'].includes(col.field) && `[${col.label}]`}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
@@ -4554,8 +4759,10 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
                   </div>
                 )}
-
               </div>
+            </div>
+
+          </div>
 
               {/* 3. RIGHT SIDEBAR: PROPERTIES PANEL */}
               <div className="w-80 bg-white border border-zinc-200 rounded-2xl flex flex-col overflow-hidden shadow-sm h-full">
