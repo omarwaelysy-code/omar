@@ -320,13 +320,19 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
       const paperWidthMm = isThermal ? (dto.customLayout?.paperWidth || 80) : 210;
       const ptPerMm = isThermal ? (pageWidth / paperWidthMm) : (595.28 / 210);
 
-      const marginLeftMm = Number(dto.customLayout?.margins?.left ?? dto.margin_left ?? (isThermal ? 3.5 : 10.5));
-      const marginRightMm = Number(dto.customLayout?.margins?.right ?? dto.margin_right ?? (isThermal ? 3.5 : 10.5));
-      const marginTopMm = Number(dto.customLayout?.margins?.top ?? dto.margin_top ?? (isThermal ? 3.5 : 15));
+      const hasCustomLayout = Boolean(dto.customLayout && Array.isArray(dto.customLayout.header) && dto.customLayout.header.length > 0);
 
-      const sideMargin = marginLeftMm * ptPerMm;
-      const usableWidth = (paperWidthMm - marginLeftMm - marginRightMm) * ptPerMm;
-      let currentY = marginTopMm * ptPerMm;
+      const sideMargin = hasCustomLayout 
+        ? (Number(dto.customLayout?.margins?.left ?? dto.margin_left ?? 10) * ptPerMm)
+        : (isThermal ? 10 : 30);
+
+      const usableWidth = hasCustomLayout
+        ? ((paperWidthMm - Number(dto.customLayout?.margins?.left ?? dto.margin_left ?? 10) - Number(dto.customLayout?.margins?.right ?? dto.margin_right ?? 10)) * ptPerMm)
+        : (isThermal ? (pageWidth - 20) : (doc.page.width - 60));
+
+      let currentY = hasCustomLayout
+        ? (Number(dto.customLayout?.margins?.top ?? dto.margin_top ?? 15) * ptPerMm)
+        : (isThermal ? 10 : 40);
 
       // Custom safe text rendering function that enforces correct font, size, and Arabic shaping
       const renderText = (
