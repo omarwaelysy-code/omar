@@ -295,13 +295,16 @@ export function UnifiedPrintEngine() {
         setTemplates(matchedTemplates);
         setPrintProfiles(allProfiles);
 
-        // 1. Resolve Template
+        // 1. Resolve Template (Prioritize active user-customized templates over protected system defaults)
         let activeTemplate: Template | null = null;
         if (templateId) {
           activeTemplate = matchedTemplates.find(t => t.id === templateId) || null;
         }
         if (!activeTemplate && matchedTemplates.length > 0) {
-          activeTemplate = matchedTemplates.find(t => t.is_default) || matchedTemplates[0];
+          activeTemplate = matchedTemplates.find(t => t.is_default && !t.is_system)
+                        || matchedTemplates.find(t => !t.is_system)
+                        || matchedTemplates.find(t => t.is_default)
+                        || matchedTemplates[0];
         }
 
         // Fallback Template if none exists
