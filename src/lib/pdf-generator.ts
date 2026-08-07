@@ -1088,7 +1088,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
           let sectionBottomY = currentY + 66;
 
-          if (dto.customLayout && Array.isArray(dto.customLayout.header) && dto.customLayout.header.length > 0) {
+          if (dto.isCustomTemplate === true && dto.customLayout && Array.isArray(dto.customLayout.header) && dto.customLayout.header.length > 0) {
             const headerTopMm = Number(dto.customLayout.margins?.top ?? dto.margin_top ?? 15);
             const marginLeftMm = Number(dto.customLayout.margins?.left ?? dto.margin_left ?? 10);
             const headerHeightMm = Number(dto.customLayout.headerHeight ?? 75);

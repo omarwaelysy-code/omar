@@ -616,6 +616,7 @@ export function UnifiedPrintEngine() {
 
     // Attach active selected template layout data ONLY for user custom templates
     if (selectedTemplate && !selectedTemplate.is_system && selectedTemplate.id !== 'fallback' && !selectedTemplate.id.startsWith('default-')) {
+      dto.isCustomTemplate = true;
       const effectiveMarginTop = selectedProfile?.margin_top ?? selectedTemplate.margin_top ?? 10;
       const effectiveMarginBottom = selectedProfile?.margin_bottom ?? selectedTemplate.margin_bottom ?? 10;
       const effectiveMarginLeft = selectedProfile?.margin_left ?? selectedTemplate.margin_left ?? 10;
