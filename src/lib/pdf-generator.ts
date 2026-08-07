@@ -863,7 +863,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
       const renderCustomElements = (elements: any[], startY: number): number => {
         let maxY = startY + 10;
         const scaleX = usableWidth / 210;
-        const scaleY = 0.85;
+        const scaleY = scaleX; // Match 1mm to canvas aspect ratio exactly (2.55pt/mm)
 
         elements.forEach((el: any) => {
           if (el.properties?.hidden) return;
@@ -875,7 +875,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
           if (elY + elH > maxY) maxY = elY + elH;
 
-          const fontSize = (el.properties?.fontSize || 9.5) * (isThermal ? 0.75 : 0.95);
+          const fontSize = (el.properties?.fontSize || 9.5) * (isThermal ? 0.75 : 1);
           const fontName = el.properties?.bold ? 'ArabicBold' : 'ArabicRegular';
           const fontColor = el.properties?.color || '#000000';
           const align = (el.properties?.align || (isRtl ? 'right' : 'left')) as any;
@@ -884,36 +884,53 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           if (el.type === 'text') {
             txt = el.properties?.text || '';
           } else if (el.type === 'variable' || el.type === 'field') {
-            const b = el.binding || '';
-            if (b === 'document_number' || b === 'invoice_number' || b === 'voucher_number') txt = dto.invoice_number || dto.voucher_number || '';
-            else if (b === 'date') txt = dto.date || '';
+            const b = (el.binding || '').toLowerCase().trim();
+            if (b === 'document_number' || b === 'invoice_number' || b === 'voucher_number' || b === 'number') {
+              txt = dto.invoice_number || dto.voucher_number || dto.document_number || '';
+            } else if (b === 'date') txt = dto.date || '';
             else if (b === 'due_date') txt = dto.due_date || '';
-            else if (b === 'customer_name' || b === 'party_name') txt = dto.customer_name || dto.party_name || '-';
+            else if (b === 'time' || b === 'current_time') txt = dto.time || '';
+            else if (b === 'customer_name' || b === 'party_name' || b === 'party') txt = dto.customer_name || dto.supplier_name || dto.party_name || '-';
             else if (b === 'supplier_name') txt = dto.supplier_name || dto.customer_name || '-';
             else if (b === 'customer_tax_number' || b === 'supplier_tax_number' || b === 'tax_number') txt = dto.customer_tax_number || dto.supplier_tax_number || dto.company?.taxNumber || '';
             else if (b === 'payment_method') txt = dto.payment_method || '';
-            else if (b === 'user_name' || b === 'user') txt = dto.userName || '';
-            else if (b === 'branch_name' || b === 'branch') txt = dto.branchName || '';
-            else if (b === 'net_total') txt = formatNumberValue(dto.net_total);
+            else if (b === 'user_name' || b === 'user') txt = dto.userName || dto.user_name || '';
+            else if (b === 'branch_name' || b === 'branch') txt = dto.branchName || dto.branch_name || '';
+            else if (b === 'net_total' || b === 'total') txt = formatNumberValue(dto.net_total);
             else if (b === 'subtotal') txt = formatNumberValue(dto.subtotal);
             else if (b === 'vat_amount') txt = formatNumberValue(dto.vat_amount);
             else if (b === 'discount_amount') txt = formatNumberValue(dto.discount_amount);
-            else txt = dto[b] || el.properties?.text || '';
-          } else if (el.type === 'image' && logoBuffer) {
-            try {
-              doc.image(logoBuffer, elX, elY, { width: Math.min(elW, 70), height: Math.min(elH, 70) });
-            } catch (_) {}
+            else txt = dto[el.binding] !== undefined ? String(dto[el.binding]) : (el.properties?.text || '');
+          } else if (el.type === 'image' || el.type === 'logo') {
+            if (logoBuffer) {
+              try {
+                doc.image(logoBuffer, elX, elY, { width: Math.min(elW, 75), height: Math.min(elH, 75) });
+              } catch (_) {}
+            }
             return;
-          } else if (el.type === 'qr' && qrBuffer) {
-            try {
-              doc.image(qrBuffer, elX, elY, { width: Math.min(elW, 60), height: Math.min(elH, 60) });
-            } catch (_) {}
+          } else if (el.type === 'qr') {
+            if (qrBuffer) {
+              try {
+                doc.image(qrBuffer, elX, elY, { width: Math.min(elW, 65), height: Math.min(elH, 65) });
+              } catch (_) {}
+            }
             return;
-          } else if (el.type === 'box') {
+          } else if (el.type === 'box' || el.type === 'rectangle') {
             doc.fillColor(el.properties?.backgroundColor || '#f8fafc');
             doc.roundedRect(elX, elY, elW, elH, 4).fill();
             if (el.properties?.borderWidth) {
               doc.strokeColor(el.properties?.borderColor || '#cbd5e1').lineWidth(el.properties.borderWidth).roundedRect(elX, elY, elW, elH, 4).stroke();
+            } else {
+              doc.strokeColor('#e2e8f0').lineWidth(0.8).roundedRect(elX, elY, elW, elH, 4).stroke();
+            }
+            if (el.properties?.text) {
+              doc.fillColor(el.properties?.color || '#059669');
+              renderText(el.properties.text, elX + 6, elY + 4, {
+                width: elW - 12,
+                align: (el.properties?.align || (isRtl ? 'right' : 'left')) as any,
+                font: el.properties?.bold ? 'ArabicBold' : 'ArabicRegular',
+                size: (el.properties?.fontSize || 9) * (isThermal ? 0.75 : 1)
+              });
             }
             return;
           } else if (el.type === 'line') {
