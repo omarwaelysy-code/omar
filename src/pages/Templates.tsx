@@ -178,8 +178,8 @@ const DOCUMENT_TYPES = [
 ];
 
 const DEFAULT_LAYOUT: TemplateLayout = {
-  headerHeight: 70,
-  footerHeight: 50,
+  headerHeight: 75,
+  footerHeight: 45,
   watermarkOpacity: 0.15,
   watermarkRotation: -45,
   header: [
@@ -187,7 +187,7 @@ const DEFAULT_LAYOUT: TemplateLayout = {
       id: 'logo-default',
       type: 'logo',
       x: 10,
-      y: 10,
+      y: 6,
       width: 40,
       height: 20,
       properties: {
@@ -197,132 +197,246 @@ const DEFAULT_LAYOUT: TemplateLayout = {
     {
       id: 'title-default',
       type: 'text',
-      x: 75,
-      y: 12,
-      width: 60,
+      x: 110,
+      y: 6,
+      width: 80,
       height: 10,
       properties: {
         text: 'فاتورة مبيعات',
-        fontSize: 18,
+        fontSize: 20,
         bold: true,
-        align: 'center',
-        color: '#18181b',
+        align: 'right',
+        color: '#0f172a',
         fontFamily: 'Cairo'
       }
     },
     {
-      id: 'inv-num-label',
-      type: 'text',
-      x: 140,
-      y: 10,
-      width: 25,
-      height: 6,
-      properties: {
-        text: 'رقم الفاتورة:',
-        fontSize: 10,
-        bold: true,
-        align: 'left',
-        fontFamily: 'Cairo'
-      }
-    },
-    {
-      id: 'inv-num-val',
+      id: 'inv-num-date-val',
       type: 'variable',
-      x: 165,
-      y: 10,
-      width: 35,
+      x: 100,
+      y: 17,
+      width: 90,
       height: 6,
       properties: {
+        text: 'INV-2026-07-000007   26/7/2026',
         fontSize: 10,
-        align: 'left',
+        bold: true,
+        align: 'right',
+        color: '#1e293b',
         fontFamily: 'Cairo'
       },
-      binding: 'document_number'
+      binding: 'invoice_number'
     },
     {
-      id: 'inv-date-label',
-      type: 'text',
-      x: 140,
-      y: 18,
-      width: 25,
-      height: 6,
-      properties: {
-        text: 'تاريخ الفاتورة:',
-        fontSize: 10,
-        bold: true,
-        align: 'left',
-        fontFamily: 'Cairo'
-      }
-    },
-    {
-      id: 'inv-date-val',
-      type: 'variable',
-      x: 165,
-      y: 18,
-      width: 35,
-      height: 6,
-      properties: {
-        fontSize: 10,
-        align: 'left',
-        fontFamily: 'Cairo'
-      },
-      binding: 'date'
-    },
-    {
-      id: 'customer-label',
-      type: 'text',
+      id: 'line-div-top',
+      type: 'line',
       x: 10,
-      y: 40,
-      width: 25,
-      height: 6,
+      y: 26,
+      width: 190,
+      height: 1,
       properties: {
-        text: 'العميل الموقر:',
+        borderWidth: 0.8,
+        borderColor: '#e2e8f0'
+      }
+    },
+    {
+      id: 'summary-rect',
+      type: 'rectangle',
+      x: 10,
+      y: 30,
+      width: 75,
+      height: 38,
+      properties: {
+        backgroundColor: '#f8fafc',
+        borderColor: '#e2e8f0',
+        borderWidth: 1,
+        borderRadius: 6
+      }
+    },
+    {
+      id: 'summary-title',
+      type: 'text',
+      x: 14,
+      y: 33,
+      width: 67,
+      height: 5,
+      properties: {
+        text: 'ملخص الفاتورة',
         fontSize: 10,
         bold: true,
         align: 'right',
+        color: '#059669',
         fontFamily: 'Cairo'
       }
     },
     {
-      id: 'customer-val',
-      type: 'variable',
-      x: 35,
+      id: 'subtotal-row',
+      type: 'text',
+      x: 14,
       y: 40,
-      width: 80,
+      width: 67,
+      height: 5,
+      properties: {
+        text: 'الإجمالي:  30,492.23',
+        fontSize: 8.5,
+        align: 'right',
+        color: '#475569',
+        fontFamily: 'Cairo'
+      }
+    },
+    {
+      id: 'vat-row',
+      type: 'text',
+      x: 14,
+      y: 46,
+      width: 67,
+      height: 5,
+      properties: {
+        text: 'ضريبة القيمة المضافة:  4,268.90',
+        fontSize: 8.5,
+        align: 'right',
+        color: '#475569',
+        fontFamily: 'Cairo'
+      }
+    },
+    {
+      id: 'card-line-div',
+      type: 'line',
+      x: 14,
+      y: 52,
+      width: 67,
+      height: 1,
+      properties: {
+        borderWidth: 0.5,
+        borderColor: '#cbd5e1'
+      }
+    },
+    {
+      id: 'nettotal-row',
+      type: 'text',
+      x: 14,
+      y: 54,
+      width: 67,
       height: 6,
       properties: {
+        text: 'الصافي النهائي:  34,761.13',
         fontSize: 10,
+        bold: true,
         align: 'right',
+        color: '#059669',
+        fontFamily: 'Cairo'
+      }
+    },
+    {
+      id: 'customer-row',
+      type: 'variable',
+      x: 95,
+      y: 31,
+      width: 95,
+      height: 6,
+      properties: {
+        text: 'العميل: ABC',
+        fontSize: 11,
+        bold: true,
+        align: 'right',
+        color: '#0f172a',
         fontFamily: 'Cairo'
       },
       binding: 'customer_name'
     },
     {
-      id: 'line-separator',
+      id: 'tax-row',
+      type: 'variable',
+      x: 95,
+      y: 39,
+      width: 95,
+      height: 5,
+      properties: {
+        text: 'الرقم الضريبي: 999000777',
+        fontSize: 9.5,
+        bold: true,
+        align: 'right',
+        color: '#334155',
+        fontFamily: 'Cairo'
+      },
+      binding: 'customer_tax_number'
+    },
+    {
+      id: 'payment-row',
+      type: 'variable',
+      x: 95,
+      y: 46,
+      width: 95,
+      height: 5,
+      properties: {
+        text: 'طريقة الدفع: credit',
+        fontSize: 9,
+        align: 'right',
+        color: '#334155',
+        fontFamily: 'Cairo'
+      },
+      binding: 'payment_method'
+    },
+    {
+      id: 'due-row',
+      type: 'variable',
+      x: 95,
+      y: 53,
+      width: 95,
+      height: 5,
+      properties: {
+        text: 'تاريخ الاستحقاق: 2/8/2026',
+        fontSize: 9,
+        align: 'right',
+        color: '#334155',
+        fontFamily: 'Cairo'
+      },
+      binding: 'due_date'
+    },
+    {
+      id: 'branch-row',
+      type: 'variable',
+      x: 95,
+      y: 60,
+      width: 95,
+      height: 5,
+      properties: {
+        text: 'الفرع: الفرع الرئيسي',
+        fontSize: 9,
+        align: 'right',
+        color: '#64748b',
+        fontFamily: 'Cairo'
+      },
+      binding: 'branch_name'
+    },
+    {
+      id: 'line-div-bottom',
       type: 'line',
       x: 10,
-      y: 55,
+      y: 71,
       width: 190,
       height: 1,
       properties: {
-        borderWidth: 1,
-        borderColor: '#e4e4e7'
+        borderWidth: 0.8,
+        borderColor: '#cbd5e1'
       }
     }
   ],
   details: {
     columns: [
-      { id: 'product_code', label: 'كود الصنف / Code', field: 'product_code', width: 15 },
-      { id: 'product_name', label: 'اسم الصنف / Item', field: 'product_name', width: 45 },
-      { id: 'quantity', label: 'الكمية / Qty', field: 'quantity', width: 10 },
-      { id: 'unit_price', label: 'السعر / Price', field: 'unit_price', width: 15 },
-      { id: 'total', label: 'الإجمالي / Total', field: 'total', width: 15 }
+      { id: 'product_code', label: 'كود الصنف', field: 'product_code', width: 12 },
+      { id: 'product_name', label: 'الصنف', field: 'product_name', width: 34 },
+      { id: 'quantity', label: 'الكمية', field: 'quantity', width: 10 },
+      { id: 'unit_price', label: 'السعر', field: 'unit_price', width: 14 },
+      { id: 'vat_rate', label: 'نسبة الضريبة', field: 'vat_rate', width: 10 },
+      { id: 'vat_amount', label: 'الضريبة', field: 'vat_amount', width: 10 },
+      { id: 'total', label: 'الإجمالي', field: 'total', width: 10 }
     ],
     properties: {
-      fontSize: 10,
-      borderColor: '#e4e4e7',
+      fontSize: 9.5,
+      borderColor: '#e2e8f0',
       boldHeader: true,
-      headerBgColor: '#f4f4f5',
+      headerBgColor: '#f1f5f9',
       bodyBgColor: '#ffffff',
       borderWidth: 1,
       paddingX: 2,
@@ -333,63 +447,59 @@ const DEFAULT_LAYOUT: TemplateLayout = {
   },
   footer: [
     {
-      id: 'total-label',
+      id: 'cust-sig-line',
+      type: 'line',
+      x: 120,
+      y: 20,
+      width: 60,
+      height: 1,
+      properties: {
+        borderWidth: 1,
+        borderColor: '#94a3b8'
+      }
+    },
+    {
+      id: 'cust-sig-text',
       type: 'text',
-      x: 130,
-      y: 10,
-      width: 35,
+      x: 120,
+      y: 23,
+      width: 60,
       height: 6,
       properties: {
-        text: 'إجمالي المستند:',
+        text: 'توقيع العميل',
         fontSize: 11,
         bold: true,
-        align: 'left',
+        align: 'center',
+        color: '#0f172a',
         fontFamily: 'Cairo'
       }
     },
     {
-      id: 'total-val',
-      type: 'variable',
-      x: 165,
-      y: 10,
-      width: 35,
-      height: 6,
+      id: 'acc-sig-line',
+      type: 'line',
+      x: 20,
+      y: 20,
+      width: 60,
+      height: 1,
       properties: {
-        fontSize: 11,
-        bold: true,
-        align: 'left',
-        fontFamily: 'Cairo'
-      },
-      binding: 'net_total'
-    },
-    {
-      id: 'notes-title',
-      type: 'text',
-      x: 10,
-      y: 10,
-      width: 30,
-      height: 6,
-      properties: {
-        text: 'الشروط والأحكام:',
-        fontSize: 9,
-        bold: true,
-        align: 'right',
-        fontFamily: 'Cairo'
+        borderWidth: 1,
+        borderColor: '#94a3b8'
       }
     },
     {
-      id: 'notes-val',
+      id: 'acc-sig-text',
       type: 'text',
-      x: 10,
-      y: 18,
-      width: 100,
-      height: 20,
+      x: 20,
+      y: 23,
+      width: 60,
+      height: 6,
       properties: {
-        text: 'تخضع هذه الفاتورة للشروط والأحكام العامة للبيع والضمان المعمول به.',
-        fontSize: 8,
-        align: 'right',
-        fontFamily: 'Cairo',
-        color: '#71717a'
+        text: 'توقيع المحاسب',
+        fontSize: 11,
+        bold: true,
+        align: 'center',
+        color: '#0f172a',
+        fontFamily: 'Cairo'
       }
     }
   ]
