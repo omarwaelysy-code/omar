@@ -1746,11 +1746,44 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
         
         if (action === 'move') {
           const maxLeft = printableWidth - elem.width;
-          const sectionHeight = section === 'header' ? prev.headerHeight : prev.footerHeight;
-          const maxTop = sectionHeight - elem.height;
-
           let targetX = startLeft + deltaMM_X;
           let targetY = startTop + deltaMM_Y;
+
+          // Cross-section drag transfers (Header <-> Footer)
+          if (section === 'header' && targetY > prev.headerHeight + 5) {
+            const headerElems = prev.header.filter(el => el.id !== elementId);
+            const footerElems = [...prev.footer];
+            elem.y = Math.max(0, Math.round(targetY - prev.headerHeight - 15));
+            elem.x = Math.round(Math.max(0, Math.min(maxLeft, targetX)));
+            footerElems.push(elem);
+
+            setMouseDragState(ds => ds ? { ...ds, section: 'footer', startTop: elem.y, startY: e.clientY } : null);
+            setSelectedSection('footer');
+
+            return {
+              ...prev,
+              header: headerElems,
+              footer: footerElems
+            };
+          } else if (section === 'footer' && targetY < -5) {
+            const footerElems = prev.footer.filter(el => el.id !== elementId);
+            const headerElems = [...prev.header];
+            elem.y = Math.max(0, Math.round(prev.headerHeight - elem.height - 5));
+            elem.x = Math.round(Math.max(0, Math.min(maxLeft, targetX)));
+            headerElems.push(elem);
+
+            setMouseDragState(ds => ds ? { ...ds, section: 'header', startTop: elem.y, startY: e.clientY } : null);
+            setSelectedSection('header');
+
+            return {
+              ...prev,
+              header: headerElems,
+              footer: footerElems
+            };
+          }
+
+          const sectionHeight = section === 'header' ? prev.headerHeight : prev.footerHeight;
+          const maxTop = sectionHeight - elem.height;
 
           // Object snapping guidelines
           const guideLinesX: number[] = [];
@@ -1929,6 +1962,39 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
     updateLayoutWithHistory(updated);
     setSelectedElementId(id);
     toast.success(language === 'ar' ? 'تم تكرار العنصر' : 'Element duplicated');
+  };
+
+  const handleMoveElementToSection = (elementId: string, targetSection: 'header' | 'footer') => {
+    if (!selectedSection || selectedSection === targetSection || selectedSection === 'details') return;
+    const currentSection = selectedSection;
+
+    setDesignerLayout(prev => {
+      const sourceList = [...prev[currentSection]];
+      const targetList = [...prev[targetSection]];
+
+      const index = sourceList.findIndex(el => el.id === elementId);
+      if (index === -1) return prev;
+
+      const [movedElement] = sourceList.splice(index, 1);
+      const newElem = { ...movedElement, y: 10 };
+      targetList.push(newElem);
+
+      const updated = {
+        ...prev,
+        [currentSection]: sourceList,
+        [targetSection]: targetList
+      };
+
+      updateLayoutWithHistory(updated);
+      return updated;
+    });
+
+    setSelectedSection(targetSection);
+    toast.success(
+      language === 'ar' 
+        ? `تم نقل الحقل إلى منطقة ${targetSection === 'header' ? 'الترويسة (Header)' : 'التذييل (Footer)'} بنجاح` 
+        : `Field moved to ${targetSection} successfully`
+    );
   };
 
   // Copy element
@@ -4487,6 +4553,20 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                               value={convertFromMM(activeElement.height, activeUnit)}
                               onChange={(e) => handleUpdateElementProperty('height', convertToMM(parseFloat(e.target.value) || 0, activeUnit))}
                             />
+                          </div>
+                          <div className="col-span-2 space-y-1 pt-1">
+                            <label className="text-[10px] font-bold text-emerald-700 flex items-center gap-1">
+                              <Move size={12} />
+                              <span>{language === 'ar' ? 'منطقة الحقل (نقل من مكان لمكان)' : 'Field Section (Move Location)'}</span>
+                            </label>
+                            <select
+                              className="w-full px-2.5 py-1.5 bg-emerald-50 border border-emerald-300 rounded-lg text-xs font-black text-emerald-950 outline-none focus:border-emerald-600 focus:bg-white transition-all shadow-sm"
+                              value={selectedSection || 'header'}
+                              onChange={(e) => handleMoveElementToSection(activeElement.id, e.target.value as 'header' | 'footer')}
+                            >
+                              <option value="header">{language === 'ar' ? 'الترويسة العلوية (Header)' : 'Header Section'}</option>
+                              <option value="footer">{language === 'ar' ? 'التذييل السفلي (Footer)' : 'Footer Section'}</option>
+                            </select>
                           </div>
                         </div>
                       </div>
