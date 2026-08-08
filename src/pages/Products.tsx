@@ -178,7 +178,7 @@ export const Products: React.FC = () => {
   const [filterPartner, setFilterPartner] = useState('');
   
   const tableRef = useRef<HTMLTableElement>(null);
-  const isVatEnabled = company?.settings?.vat_enabled || company?.vat_enabled || false;
+  const isVatEnabled = company?.settings?.vat_enabled !== false && company?.vat_enabled !== false;
   const isReadOnly = editingProduct ? !canEdit : !canCreate;
 
   // Barcode Systems States

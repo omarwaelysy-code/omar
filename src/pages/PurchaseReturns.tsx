@@ -308,7 +308,7 @@ export const PurchaseReturns: React.FC = () => {
     }
   }, [user, page, limit, sortBy, sortOrder, searchTerm]);
 
-  const isVatEnabled = company?.settings?.vat_enabled || company?.vat_enabled || false;
+  const isVatEnabled = company?.settings?.vat_enabled !== false && company?.vat_enabled !== false;
   const isMultiCurrencyEnabled = company?.settings?.enable_multi_currency || (company as any)?.enable_multi_currency || false;
 
   const prevExchangeRateRef = useRef<number>(1);
@@ -446,7 +446,7 @@ export const PurchaseReturns: React.FC = () => {
     }
 
     const generatePreview = () => {
-      const isVatEnabled = company?.settings?.vat_enabled || company?.vat_enabled || false;
+      const isVatEnabled = company?.settings?.vat_enabled !== false && company?.vat_enabled !== false;
       const subtotalVal = (items || []).reduce((sum, item) => sum + ((Number(item.quantity) || 0) * (Number(item.unit_price) || 0)), 0);
       const vatTotal = isVatEnabled
         ? (items || []).reduce((sum, item) => sum + (Number(item.vat_amount) || 0), 0)

@@ -374,7 +374,7 @@ export const Invoices: React.FC = () => {
     );
   };
 
-  const isVatEnabled = companyData?.settings?.vat_enabled || companyData?.vat_enabled || false;
+  const isVatEnabled = companyData?.settings?.vat_enabled !== false && companyData?.vat_enabled !== false;
   const isMultiCurrencyEnabled = companyData?.settings?.enable_multi_currency || (companyData as any)?.enable_multi_currency || false;
 
   const prevExchangeRateRef = useRef<number>(1);

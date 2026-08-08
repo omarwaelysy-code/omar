@@ -164,7 +164,7 @@ export const PurchaseOrders: React.FC = () => {
   const orderRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
-  const isVatEnabled = companyData?.settings?.vat_enabled || companyData?.vat_enabled || false;
+  const isVatEnabled = companyData?.settings?.vat_enabled !== false && companyData?.vat_enabled !== false;
 
   useEffect(() => {
     if (user) {

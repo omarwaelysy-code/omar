@@ -99,7 +99,7 @@ export const Returns: React.FC = () => {
     const oldRate = prevExchangeRateRef.current || 1;
     const newRate = exchangeRate || 1;
     if (oldRate !== newRate) {
-      const isVatEnabled = company?.settings?.vat_enabled || company?.vat_enabled || false;
+      const isVatEnabled = company?.settings?.vat_enabled !== false && company?.vat_enabled !== false;
       setItems(prev => prev.map(item => {
         let basePrice = 0;
         if (item.product_id) {
@@ -366,7 +366,7 @@ export const Returns: React.FC = () => {
     }
 
     const generatePreview = () => {
-      const isVatEnabled = company?.settings?.vat_enabled || company?.vat_enabled || false;
+      const isVatEnabled = company?.settings?.vat_enabled !== false && company?.vat_enabled !== false;
       const subtotalVal = (items || []).reduce((sum, item) => sum + (Number(item.total) || 0), 0);
       const vatTotal = isVatEnabled ? (items || []).reduce((sum, item) => sum + (Number(item.vat_amount) || 0), 0) : 0;
       const discountVal = Number(discount) || 0;
@@ -814,7 +814,7 @@ export const Returns: React.FC = () => {
     setItems(prev => {
       const newItems = [...prev];
       const item = { ...newItems[index], [field]: value };
-      const isVatEnabled = company?.settings?.vat_enabled || company?.vat_enabled || false;
+      const isVatEnabled = company?.settings?.vat_enabled !== false && company?.vat_enabled !== false;
       
       if (field === 'product_id') {
         const product = products.find(p => p.id === value);
@@ -880,7 +880,7 @@ export const Returns: React.FC = () => {
       return;
     }
 
-    const isVatEnabled = company?.settings?.vat_enabled || company?.vat_enabled || false;
+    const isVatEnabled = company?.settings?.vat_enabled !== false && company?.vat_enabled !== false;
 
     setIsSaving(true);
     try {
@@ -2494,7 +2494,7 @@ export const Returns: React.FC = () => {
                         <span className="font-bold text-[11px]">-{formatMoney(discount)}</span>
                       </div>
                       {(() => {
-                        const isVatEnabled = company?.settings?.vat_enabled || company?.vat_enabled || false;
+                        const isVatEnabled = company?.settings?.vat_enabled !== false && company?.vat_enabled !== false;
                         if (!isVatEnabled) return null;
                         const calculatedVatAmount = items.reduce((sum, i) => {
                           const qty = Number(i.quantity) || 0;
