@@ -213,7 +213,7 @@ export function normalizeDocumentData(
     }));
   } 
   else if (type === 'returns' || type === 'purchase_returns') {
-    doc.document_number = data.return_number;
+    doc.document_number = data.return_number || data.document_number || data.id || '';
     doc.customer_name = data.customer_name || data.supplier_name || '';
     doc.supplier_name = data.supplier_name || data.customer_name || '';
     doc.customer_tax_number = data.customer_tax_number || data.supplier_tax_number || data.tax_number || '';
@@ -222,26 +222,31 @@ export function normalizeDocumentData(
     const itemsRaw = data.return_items || data.purchase_return_items || data.items || [];
     doc.items = itemsRaw.map((itm: any) => {
       const qty = Number(itm.quantity || 0);
-      const price = Number(itm.unit_price || itm.price || 0);
+      const price = Number(itm.unit_price || itm.price || itm.cost_price || 0);
       const total = Number(itm.total || (qty * price) || 0);
       
-      const rawRateStr = String(itm.vat_rate ?? itm.tax_rate ?? itm.vat_percentage ?? '');
+      const rawRateStr = String(itm.vat_rate ?? itm.tax_rate ?? itm.vat_percentage ?? itm.tax_percentage ?? itm.vat_percent ?? itm.tax_percent ?? '');
       const cleanDigits = rawRateStr.replace(/[^0-9.]/g, '');
       let vatRateNum = cleanDigits !== '' ? parseFloat(cleanDigits) : 0;
-      if (!vatRateNum && Number(itm.vat_amount || 0) > 0 && total > 0) {
-        vatRateNum = Math.round((Number(itm.vat_amount) / total) * 100);
+      
+      const rawItemVat = Number(itm.vat_amount ?? itm.tax_amount ?? itm.tax ?? itm.vat_val ?? itm.vat ?? 0);
+      
+      if (!vatRateNum && rawItemVat > 0 && total > 0) {
+        vatRateNum = Math.round((rawItemVat / total) * 100);
       }
-      if (!vatRateNum && (data.tax_amount > 0 || data.tax > 0)) {
+      
+      const parentTax = Number(data.tax_amount ?? data.tax ?? data.vat_amount ?? data.vat_total ?? data.total_vat ?? data.tax_total ?? 0);
+      if (!vatRateNum && parentTax > 0) {
         vatRateNum = 14;
       }
       
-      const vatAmt = Number((itm.vat_amount !== undefined && itm.vat_amount !== null && Number(itm.vat_amount) > 0) 
-        ? itm.vat_amount 
+      const vatAmt = Number(rawItemVat > 0 
+        ? rawItemVat 
         : ((total * vatRateNum) / 100));
 
       return {
-        product_code: itm.product_code || itm.product_id || '-',
-        product_name: itm.product_name || itm.description || '-',
+        product_code: itm.product_code || itm.product_id || itm.code || '-',
+        product_name: itm.product_name || itm.description || itm.name || '-',
         barcode: itm.barcode || '-',
         quantity: qty,
         unit: itm.unit || 'حبة',
@@ -255,10 +260,11 @@ export function normalizeDocumentData(
 
     const itemsSubtotalSum = doc.items.reduce((sum, item) => sum + (item.total || 0), 0);
     const itemsVatSum = doc.items.reduce((sum, item) => sum + (item.vat_amount || 0), 0);
+    const parentTaxVal = Number(data.tax_amount ?? data.tax ?? data.vat_amount ?? data.vat_total ?? data.total_vat ?? data.tax_total ?? 0);
 
-    doc.subtotal = Number(data.subtotal || itemsSubtotalSum || data.total_amount || 0);
+    doc.subtotal = Number(data.subtotal || data.sub_total || itemsSubtotalSum || 0);
     doc.discount_amount = Number(data.discount_amount || data.discount || 0);
-    doc.vat_amount = Number(data.tax_amount || data.tax || data.vat_amount || itemsVatSum || 0);
+    doc.vat_amount = Number(parentTaxVal || itemsVatSum || 0);
     doc.net_total = Number((doc.subtotal + doc.vat_amount - doc.discount_amount).toFixed(2));
     doc.paid_amount = doc.net_total;
     doc.remaining_amount = 0;

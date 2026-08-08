@@ -1073,10 +1073,13 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             ?? dto.vat_enabled 
             ?? dto.vatEnabled;
           
-          const hasActualVat = (Number(dto.vat_amount || 0) > 0) || (dto.items || []).some((item: any) => 
-            Number(item.vat_rate || item.tax_rate || item.vat_percentage || 0) > 0 || 
-            Number(item.vat_amount || 0) > 0
-          );
+          const dtoVatAmount = Number(dto.vat_amount ?? dto.tax_amount ?? dto.tax ?? dto.vat_total ?? dto.total_vat ?? 0);
+          const hasActualVat = (dtoVatAmount > 0) || (dto.items || []).some((item: any) => {
+            const cleanDigits = String(item.vat_rate ?? item.tax_rate ?? item.vat_percentage ?? '').replace(/[^0-9.]/g, '');
+            const r = cleanDigits !== '' ? parseFloat(cleanDigits) : 0;
+            const v = Number(item.vat_amount ?? item.tax_amount ?? item.tax ?? item.vat_val ?? item.vat ?? 0);
+            return r > 0 || v > 0;
+          });
 
           let isVatEnabled = true;
           if (hasActualVat) {
@@ -1318,23 +1321,36 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             ];
           }
 
-          // Format items with vat_rate_formatted (% 14)
+          // Format items with vat_rate_formatted (% 14) and auto-computed item vat_amount
           const formattedItems = (dto.items || []).map((item: any) => {
             let numRate = 0;
-            const rawRateStr = String(item.vat_rate ?? item.tax_rate ?? item.vat_percentage ?? '');
+            const rawRateStr = String(item.vat_rate ?? item.tax_rate ?? item.vat_percentage ?? item.tax_percentage ?? '');
             const cleanDigits = rawRateStr.replace(/[^0-9.]/g, '');
             if (cleanDigits !== '') {
               numRate = parseFloat(cleanDigits);
             }
-            if (!numRate && Number(item.vat_amount || 0) > 0 && Number(item.unit_price || 0) > 0 && Number(item.quantity || 0) > 0) {
-              numRate = Math.round((Number(item.vat_amount) / (Number(item.quantity) * Number(item.unit_price))) * 100);
+            
+            let itemVatVal = Number(item.vat_amount ?? item.tax_amount ?? item.tax ?? item.vat_val ?? item.vat ?? 0);
+            const itemTotal = Number(item.total || (Number(item.quantity || 0) * Number(item.unit_price || 0)) || 0);
+
+            if (!numRate && itemVatVal > 0 && itemTotal > 0) {
+              numRate = Math.round((itemVatVal / itemTotal) * 100);
             }
             if (!numRate && Number(dto.vat_amount || 0) > 0 && Number(dto.subtotal || 0) > 0) {
               numRate = Math.round((Number(dto.vat_amount) / Number(dto.subtotal)) * 100);
             }
+            if (!numRate && (Number(dto.vat_amount || 0) > 0 || isVatEnabled)) {
+              numRate = 14;
+            }
+
+            if (itemVatVal <= 0 && numRate > 0 && itemTotal > 0) {
+              itemVatVal = Number(((itemTotal * numRate) / 100).toFixed(2));
+            }
+
             const rateStr = numRate > 0 ? `% ${numRate}` : '0%';
             return {
               ...item,
+              vat_amount: itemVatVal,
               vat_rate_formatted: rateStr
             };
           });
