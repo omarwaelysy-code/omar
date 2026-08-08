@@ -162,13 +162,24 @@ export function normalizeDocumentData(
   };
 
   const resolveCode = (itm: any): string => {
-    const list = [itm.product_code, itm.code, itm.sku, itm.item_code, itm.barcode, itm.product_sku, itm.product_id];
+    const list = [itm.product_code, itm.code, itm.sku, itm.item_code, itm.barcode, itm.product_sku];
     for (const val of list) {
       if (val !== undefined && val !== null) {
         const str = String(val).trim();
         if (str !== '' && str !== '-') {
           return str;
         }
+      }
+    }
+    const productsCache = typeof window !== 'undefined' ? (window as any).__PRODUCTS_CACHE__ : null;
+    if (Array.isArray(productsCache) && productsCache.length > 0) {
+      const matched = productsCache.find((p: any) =>
+        (p.id && itm.product_id && String(p.id) === String(itm.product_id)) ||
+        (p.name && (itm.product_name || itm.description) && String(p.name).trim() === String(itm.product_name || itm.description).trim())
+      );
+      if (matched) {
+        const c = matched.code || matched.barcode || matched.sku || matched.product_code;
+        if (c && String(c).trim() !== '') return String(c).trim();
       }
     }
     return '-';

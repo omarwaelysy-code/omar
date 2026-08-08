@@ -443,8 +443,14 @@ export const Products: React.FC = () => {
         return;
       }
       
+      let resolvedCode = (formData.code || '').trim();
+      if (!resolvedCode) {
+        resolvedCode = `PRD-${Date.now().toString().slice(-6)}`;
+      }
+
       const dataToSave = {
         ...formData,
+        code: resolvedCode,
         item_group_name: itemGroupObj?.name || '',
         revenue_account_name: revenueAccount?.name || '',
         cost_account_name: costAccount?.name || '',

@@ -521,13 +521,19 @@ export function UnifiedPrintEngine() {
     let dbProducts: any[] = [];
     try {
       dbProducts = await dbService.listAll<any>('products');
+      if (typeof window !== 'undefined') {
+        (window as any).__PRODUCTS_CACHE__ = dbProducts;
+      }
     } catch (_) {}
 
     const resolveItemCode = (itm: any): string => {
       const candidates = [(itm as any).product_code, (itm as any).code, (itm as any).sku, (itm as any).item_code, (itm as any).barcode, (itm as any).product_sku];
       for (const c of candidates) {
-        if (c && typeof c === 'string' && c.trim() !== '' && c.trim() !== '-') {
-          return c.trim();
+        if (c !== undefined && c !== null) {
+          const str = String(c).trim();
+          if (str !== '' && str !== '-') {
+            return str;
+          }
         }
       }
       if (dbProducts && dbProducts.length > 0) {
@@ -538,7 +544,7 @@ export function UnifiedPrintEngine() {
         );
         if (matched) {
           const matchedCode = matched.code || matched.barcode || matched.sku || matched.product_code;
-          if (matchedCode && String(matchedCode).trim() !== '') {
+          if (matchedCode !== undefined && matchedCode !== null && String(matchedCode).trim() !== '') {
             return String(matchedCode).trim();
           }
         }
@@ -591,6 +597,7 @@ export function UnifiedPrintEngine() {
         customer_tax_number: resolvedCustomerTaxNumber,
         customer_phone: normalized.customer_phone,
         items: itemsDto,
+        products: dbProducts,
         subtotal: String(normalized.subtotal || '0'),
         discount_amount: String(normalized.discount_amount || '0'),
         vat_amount: String(normalized.vat_amount || '0'),
@@ -613,6 +620,7 @@ export function UnifiedPrintEngine() {
         supplier_tax_number: resolvedSupplierTaxNumber,
         supplier_phone: normalized.supplier_phone,
         items: itemsDto,
+        products: dbProducts,
         subtotal: String(normalized.subtotal || '0'),
         discount_amount: String(normalized.discount_amount || '0'),
         vat_amount: String(normalized.vat_amount || '0'),

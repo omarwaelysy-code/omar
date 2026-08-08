@@ -1913,8 +1913,14 @@ export const PurchaseInvoices: React.FC = () => {
       const revenueAccount = accounts.find(a => a.id === productFormData.revenue_account_id);
       const costAccount = accounts.find(a => a.id === productFormData.cost_account_id);
       
+      let code = (productFormData.code || '').trim();
+      if (!code) {
+        code = `PRD-${Date.now().toString().slice(-6)}`;
+      }
+
       const newProduct = {
         ...productFormData,
+        code,
         revenue_account_name: revenueAccount?.name || '',
         cost_account_name: costAccount?.name || '',
         company_id: user.company_id

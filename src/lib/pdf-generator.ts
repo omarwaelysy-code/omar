@@ -1098,9 +1098,6 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
                 }
               }
             }
-            if (itm.product_id && typeof itm.product_id === 'string' && itm.product_id.trim() !== '' && !itm.product_id.includes('-')) {
-              return itm.product_id.trim();
-            }
             return '-';
           };
 
