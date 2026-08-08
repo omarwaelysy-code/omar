@@ -2488,7 +2488,7 @@ export async function ensureUniqueSequenceNumber(
   return generatedNumber;
 }
 
-export async function generateNextSequence(client: any, companyId: string, moduleName: string, dateStr: string): Promise<string> {
+export async function generateNextSequence(client: any, companyId: string, moduleName: string, dateStr: string | Date | any): Promise<string> {
   // For preview purposes (GET /utils/next-sequence), use the atomic method too
   // but without actually incrementing - we just show what the next would be
   let prefix = 'INV';
