@@ -1075,7 +1075,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           
           // Pre-format items with vat_rate_formatted (% 14) and computed vat_amount FIRST
           const resolveCode = (itm: any): string => {
-            const list = [itm.product_code, itm.code, itm.sku, itm.item_code, itm.barcode, itm.product_sku, itm.product_id];
+            const list = [itm.product_code, itm.code, itm.sku, itm.item_code, itm.barcode, itm.product_sku];
             for (const val of list) {
               if (val !== undefined && val !== null) {
                 const str = String(val).trim();
@@ -1083,6 +1083,23 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
                   return str;
                 }
               }
+            }
+            const productsList = dto.products || (typeof window !== 'undefined' ? (window as any)?.__PRODUCTS_CACHE__ : []) || [];
+            if (Array.isArray(productsList) && productsList.length > 0) {
+              const matched = productsList.find((p: any) =>
+                (p.id && itm.product_id && String(p.id) === String(itm.product_id)) ||
+                (p.name && (itm.product_name || itm.description) && String(p.name).trim() === String(itm.product_name || itm.description).trim()) ||
+                (p.title && (itm.product_name || itm.description) && String(p.title).trim() === String(itm.product_name || itm.description).trim())
+              );
+              if (matched) {
+                const matchedCode = matched.code || matched.barcode || matched.sku || matched.product_code;
+                if (matchedCode && String(matchedCode).trim() !== '') {
+                  return String(matchedCode).trim();
+                }
+              }
+            }
+            if (itm.product_id && typeof itm.product_id === 'string' && itm.product_id.trim() !== '' && !itm.product_id.includes('-')) {
+              return itm.product_id.trim();
             }
             return '-';
           };

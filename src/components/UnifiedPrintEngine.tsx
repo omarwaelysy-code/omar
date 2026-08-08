@@ -501,7 +501,7 @@ export function UnifiedPrintEngine() {
       return null;
     }
 
-    // ── Fetch customer/supplier tax number from DB if not present in invoice ──
+    // ── Fetch customer/supplier tax number & products from DB if not present in invoice ──
     let resolvedCustomerTaxNumber = normalized.customer_tax_number || documentData?.customer_tax_number || documentData?.tax_number || '';
     let resolvedSupplierTaxNumber = normalized.supplier_tax_number || documentData?.supplier_tax_number || '';
 
@@ -518,6 +518,34 @@ export function UnifiedPrintEngine() {
       } catch (_) {}
     }
 
+    let dbProducts: any[] = [];
+    try {
+      dbProducts = await dbService.getAll<any>('products');
+    } catch (_) {}
+
+    const resolveItemCode = (itm: any): string => {
+      const candidates = [(itm as any).product_code, (itm as any).code, (itm as any).sku, (itm as any).item_code, (itm as any).barcode, (itm as any).product_sku];
+      for (const c of candidates) {
+        if (c && typeof c === 'string' && c.trim() !== '' && c.trim() !== '-') {
+          return c.trim();
+        }
+      }
+      if (dbProducts && dbProducts.length > 0) {
+        const matched = dbProducts.find((p: any) =>
+          (p.id && (itm as any).product_id && String(p.id) === String((itm as any).product_id)) ||
+          (p.name && itm.product_name && String(p.name).trim() === String(itm.product_name).trim()) ||
+          (p.title && itm.product_name && String(p.title).trim() === String(itm.product_name).trim())
+        );
+        if (matched) {
+          const matchedCode = matched.code || matched.barcode || matched.sku || matched.product_code;
+          if (matchedCode && String(matchedCode).trim() !== '') {
+            return String(matchedCode).trim();
+          }
+        }
+      }
+      return '-';
+    };
+
     const companyDto = {
       name: normalized.company_name || '',
       logoUrl: normalized.company_logo || '',
@@ -526,7 +554,7 @@ export function UnifiedPrintEngine() {
     };
 
     const itemsDto = (normalized.items || []).map(itm => ({
-      product_code: String(itm.product_code || '-'),
+      product_code: resolveItemCode(itm),
       product_name: String(itm.product_name || '-'),
       quantity: String(itm.quantity || '0'),
       unit: String(itm.unit || 'حبة'),
