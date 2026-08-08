@@ -353,17 +353,34 @@ export function UnifiedPrintEngine() {
         setTemplates(matchedTemplates);
         setPrintProfiles(allProfiles);
 
-        // 1. Resolve Template (Always prioritize the locked pristine System Default Template)
+        // 1. Resolve Template (Always force pristine System Default Template)
         let activeTemplate: Template | null = null;
-        if (templateId) {
-          activeTemplate = matchedTemplates.find(t => t.id === templateId) || null;
+        if (templateId && templateId !== 'default' && templateId !== 'system') {
+          activeTemplate = matchedTemplates.find(t => t.id === templateId && !t.is_system) || null;
         }
-        if (!activeTemplate && matchedTemplates.length > 0) {
-          activeTemplate = matchedTemplates.find(t => t.is_system)
-                        || matchedTemplates.find(t => t.is_default && t.is_system)
-                        || matchedTemplates.find(t => t.is_default)
-                        || matchedTemplates[0];
+
+        if (!activeTemplate) {
+          activeTemplate = matchedTemplates.find(t => t.is_system) || {
+            id: 'default-system-invoice',
+            company_id: user?.company_id || '',
+            name: language === 'ar' ? 'قالب النظام الافتراضي' : 'Default System Template',
+            description: 'Pristine original system invoice layout',
+            paper_size_id: 'a4',
+            orientation: 'portrait',
+            margin_top: 10,
+            margin_bottom: 10,
+            margin_left: 10,
+            margin_right: 10,
+            is_default: true,
+            is_system: true,
+            is_active: true,
+            document_type: opType,
+            layout: DEFAULT_TEMPLATE_LAYOUT,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
         }
+        setSelectedTemplate(activeTemplate);
 
         // Fallback Template if none exists
         if (!activeTemplate) {
