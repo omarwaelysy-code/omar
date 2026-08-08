@@ -3252,10 +3252,10 @@ export const Returns: React.FC = () => {
                             <td className="px-6 py-3 text-red-600 text-base">-{formatMoney(viewReturn.discount)} {viewReturnCurrency}</td>
                           </tr>
                         )}
-                        {Number(viewReturn.tax) > 0 && (
+                        {(Number(viewReturn.tax || viewReturn.tax_amount || 0) > 0 || (viewReturn.items || []).some((i: any) => Number(i.vat_amount || 0) > 0)) && (
                           <tr>
                             <td colSpan={4} className={`px-6 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-zinc-600 font-bold text-[10px] uppercase tracking-wider`}>{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</td>
-                            <td className="px-6 py-3 text-zinc-750 text-base">+{formatMoney(viewReturn.tax)} {viewReturnCurrency}</td>
+                            <td className="px-6 py-3 text-zinc-750 text-base">+{formatMoney(viewReturn.tax || viewReturn.tax_amount || viewReturn.items?.reduce((sum: number, i: any) => sum + (Number(i.vat_amount) || 0), 0))} {viewReturnCurrency}</td>
                           </tr>
                         )}
                         <tr className="bg-slate-900 text-white">
