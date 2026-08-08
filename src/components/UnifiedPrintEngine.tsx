@@ -692,7 +692,7 @@ export function UnifiedPrintEngine() {
       };
     }
 
-    if (selectedTemplate && !selectedTemplate.is_system && selectedTemplate.id !== 'fallback' && !selectedTemplate.id.startsWith('default-')) {
+    if (selectedTemplate && selectedTemplate.id !== 'fallback') {
       dto.isCustomTemplate = true;
       dto.forceDesignerPreview = true;
       const effectiveMarginTop = selectedProfile?.margin_top ?? selectedTemplate.margin_top ?? 10;
@@ -706,7 +706,7 @@ export function UnifiedPrintEngine() {
       dto.margin_right = effectiveMarginRight;
 
       dto.customLayout = {
-        ...(selectedTemplate.layout || {}),
+        ...(selectedTemplate.layout || DEFAULT_TEMPLATE_LAYOUT),
         margins: {
           top: Number(effectiveMarginTop),
           bottom: Number(effectiveMarginBottom),
