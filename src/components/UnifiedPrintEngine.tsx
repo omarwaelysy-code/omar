@@ -520,7 +520,7 @@ export function UnifiedPrintEngine() {
 
     let dbProducts: any[] = [];
     try {
-      dbProducts = await dbService.getAll<any>('products');
+      dbProducts = await dbService.listAll<any>('products');
     } catch (_) {}
 
     const resolveItemCode = (itm: any): string => {
