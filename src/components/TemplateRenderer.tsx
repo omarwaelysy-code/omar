@@ -161,6 +161,19 @@ export function normalizeDocumentData(
     employee_name: data.employee_name || data.created_by || 'المشرف'
   };
 
+  const resolveCode = (itm: any): string => {
+    const list = [itm.product_code, itm.code, itm.sku, itm.item_code, itm.barcode, itm.product_sku, itm.product_id];
+    for (const val of list) {
+      if (val !== undefined && val !== null) {
+        const str = String(val).trim();
+        if (str !== '' && str !== '-') {
+          return str;
+        }
+      }
+    }
+    return '-';
+  };
+
   if (type === 'invoices') {
     doc.document_number = data.invoice_number;
     doc.customer_name = data.customer_name;
@@ -173,7 +186,7 @@ export function normalizeDocumentData(
 
     const itemsRaw = data.invoice_items || data.items || [];
     doc.items = itemsRaw.map((itm: any) => ({
-      product_code: itm.product_code || itm.product_id || '-',
+      product_code: resolveCode(itm),
       product_name: itm.product_name || itm.description || '-',
       barcode: itm.barcode || '-',
       quantity: Number(itm.quantity || 0),
@@ -200,7 +213,7 @@ export function normalizeDocumentData(
 
     const itemsRaw = data.purchase_invoice_items || data.items || [];
     doc.items = itemsRaw.map((itm: any) => ({
-      product_code: itm.product_code || itm.product_id || '-',
+      product_code: resolveCode(itm),
       product_name: itm.product_name || itm.description || '-',
       barcode: itm.barcode || '-',
       quantity: Number(itm.quantity || 0),
@@ -245,7 +258,7 @@ export function normalizeDocumentData(
         : ((total * vatRateNum) / 100));
 
       return {
-        product_code: itm.product_code || itm.product_id || itm.code || '-',
+        product_code: resolveCode(itm),
         product_name: itm.product_name || itm.description || itm.name || '-',
         barcode: itm.barcode || '-',
         quantity: qty,
@@ -260,7 +273,7 @@ export function normalizeDocumentData(
 
     const itemsSubtotalSum = doc.items.reduce((sum, item) => sum + (item.total || 0), 0);
     const itemsVatSum = doc.items.reduce((sum, item) => sum + (item.vat_amount || 0), 0);
-    const parentTaxVal = Number(data.tax_amount ?? data.tax ?? data.vat_amount ?? data.vat_total ?? data.total_vat ?? data.tax_total ?? 0);
+    const parentTaxVal = Number(data.tax_amount ?? data.tax ?? data.vat_amount ?? data.tax_total ?? data.vat_total ?? data.total_vat ?? 0);
 
     doc.subtotal = Number(data.subtotal || data.sub_total || itemsSubtotalSum || 0);
     doc.discount_amount = Number(data.discount_amount || data.discount || 0);
@@ -282,7 +295,7 @@ export function normalizeDocumentData(
 
     const itemsRaw = data.sales_order_items || data.purchase_order_items || data.items || [];
     doc.items = itemsRaw.map((itm: any) => ({
-      product_code: itm.product_code || '-',
+      product_code: resolveCode(itm),
       product_name: itm.product_name || itm.description || '-',
       barcode: itm.barcode || '-',
       quantity: Number(itm.quantity || 0),

@@ -1074,6 +1074,19 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             ?? dto.vatEnabled;
           
           // Pre-format items with vat_rate_formatted (% 14) and computed vat_amount FIRST
+          const resolveCode = (itm: any): string => {
+            const list = [itm.product_code, itm.code, itm.sku, itm.item_code, itm.barcode, itm.product_sku, itm.product_id];
+            for (const val of list) {
+              if (val !== undefined && val !== null) {
+                const str = String(val).trim();
+                if (str !== '' && str !== '-') {
+                  return str;
+                }
+              }
+            }
+            return '-';
+          };
+
           const formattedItems = (dto.items || []).map((item: any) => {
             let numRate = 0;
             const rawRateStr = String(item.vat_rate ?? item.tax_rate ?? item.vat_percentage ?? item.tax_percentage ?? '');
@@ -1102,6 +1115,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             const rateStr = numRate > 0 ? `% ${numRate}` : '0%';
             return {
               ...item,
+              product_code: resolveCode(item),
               vat_amount: itemVatVal,
               vat_rate_formatted: rateStr
             };
