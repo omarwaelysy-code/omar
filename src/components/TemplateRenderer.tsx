@@ -122,6 +122,7 @@ export interface NormalizedDocument {
     unit_price: number;
     discount: number;
     vat_amount: number;
+    vat_rate?: string;
     total: number;
   }>;
   dynamicFields?: { [key: string]: string };
