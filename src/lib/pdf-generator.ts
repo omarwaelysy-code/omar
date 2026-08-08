@@ -1073,18 +1073,18 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             ?? dto.vat_enabled 
             ?? dto.vatEnabled;
           
+          const hasActualVat = (Number(dto.vat_amount || 0) > 0) || (dto.items || []).some((item: any) => 
+            Number(item.vat_rate || item.tax_rate || item.vat_percentage || 0) > 0 || 
+            Number(item.vat_amount || 0) > 0
+          );
+
           let isVatEnabled = true;
-          if (companyVatFlag === false || companyVatFlag === 'false' || companyVatFlag === 0) {
-            isVatEnabled = false;
-          } else if (companyVatFlag === true || companyVatFlag === 'true' || companyVatFlag === 1) {
+          if (hasActualVat) {
             isVatEnabled = true;
+          } else if (companyVatFlag === false || companyVatFlag === 'false' || companyVatFlag === 0) {
+            isVatEnabled = false;
           } else {
-            // Fallback: If company flag is unsupplied, enable VAT only if actual VAT amounts/rates exist (> 0)
-            const hasActualVat = (Number(dto.vat_amount || 0) > 0) || (dto.items || []).some((item: any) => 
-              Number(item.vat_rate || item.tax_rate || item.vat_percentage || 0) > 0 || 
-              Number(item.vat_amount || 0) > 0
-            );
-            isVatEnabled = hasActualVat;
+            isVatEnabled = true;
           }
 
           let sectionBottomY = currentY + 66;

@@ -532,6 +532,7 @@ export function UnifiedPrintEngine() {
       unit: String(itm.unit || 'حبة'),
       unit_price: String(itm.unit_price || '0'),
       discount: String(itm.discount || '0'),
+      vat_rate: String((itm as any).vat_rate || '0'),
       vat_amount: String(itm.vat_amount || '0'),
       total: String(itm.total || '0')
     }));

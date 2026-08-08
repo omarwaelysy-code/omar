@@ -217,25 +217,45 @@ export function normalizeDocumentData(
     doc.supplier_name = data.supplier_name || data.customer_name || '';
     doc.customer_tax_number = data.customer_tax_number || data.supplier_tax_number || data.tax_number || '';
     doc.supplier_tax_number = data.supplier_tax_number || data.customer_tax_number || data.tax_number || '';
-    doc.subtotal = Number(data.total_amount || 0);
-    doc.discount_amount = 0;
-    doc.vat_amount = 0;
-    doc.net_total = Number(data.total_amount || 0);
-    doc.paid_amount = Number(data.total_amount || 0);
+    
+    doc.subtotal = Number(data.subtotal || 0);
+    doc.discount_amount = Number(data.discount_amount || data.discount || 0);
+    doc.vat_amount = Number(data.tax_amount || data.tax || data.vat_amount || 0);
+    doc.net_total = Number(data.total_amount || (doc.subtotal + doc.vat_amount - doc.discount_amount) || 0);
+    doc.paid_amount = doc.net_total;
     doc.remaining_amount = 0;
 
     const itemsRaw = data.return_items || data.purchase_return_items || data.items || [];
-    doc.items = itemsRaw.map((itm: any) => ({
-      product_code: itm.product_code || '-',
-      product_name: itm.product_name || itm.description || '-',
-      barcode: itm.barcode || '-',
-      quantity: Number(itm.quantity || 0),
-      unit: itm.unit || 'حبة',
-      unit_price: Number(itm.unit_price || 0),
-      discount: 0,
-      vat_amount: 0,
-      total: Number(itm.total || 0)
-    }));
+    doc.items = itemsRaw.map((itm: any) => {
+      const qty = Number(itm.quantity || 0);
+      const price = Number(itm.unit_price || itm.price || 0);
+      const total = Number(itm.total || (qty * price) || 0);
+      const vatRateNum = Number(itm.vat_rate !== undefined && itm.vat_rate !== null ? itm.vat_rate : (itm.tax_rate !== undefined ? itm.tax_rate : 14));
+      const vatAmt = Number((itm.vat_amount !== undefined && itm.vat_amount !== null && Number(itm.vat_amount) > 0) ? itm.vat_amount : ((total * vatRateNum) / 100));
+
+      return {
+        product_code: itm.product_code || itm.product_id || '-',
+        product_name: itm.product_name || itm.description || '-',
+        barcode: itm.barcode || '-',
+        quantity: qty,
+        unit: itm.unit || 'حبة',
+        unit_price: price,
+        discount: Number(itm.discount || 0),
+        vat_amount: vatAmt,
+        vat_rate: `% ${vatRateNum}`,
+        total: total
+      };
+    });
+
+    if (!doc.vat_amount && doc.items.length > 0) {
+      doc.vat_amount = doc.items.reduce((sum, item) => sum + (item.vat_amount || 0), 0);
+    }
+    if (!doc.subtotal && doc.items.length > 0) {
+      doc.subtotal = doc.items.reduce((sum, item) => sum + (item.total || 0), 0);
+    }
+    if (doc.net_total === doc.subtotal && doc.vat_amount > 0) {
+      doc.net_total = doc.subtotal + doc.vat_amount - doc.discount_amount;
+    }
   } 
   else if (type === 'sales_orders' || type === 'purchase_orders') {
     doc.document_number = data.order_number;
