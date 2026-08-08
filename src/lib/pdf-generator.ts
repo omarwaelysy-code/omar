@@ -1147,7 +1147,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             const middleY = isThermal ? (headerStartY + topHeaderHeight + 4) : (line1Y + 12);
 
             // Summary Box ("ملخص الفاتورة") on LEFT (in RTL)
-            const cardWidth = isThermal ? 140 : 190;
+            const cardWidth = isThermal ? 140 : 215;
             const hasDiscount = Number(dto.discount_amount) > 0;
             const cardHeight = isThermal 
               ? (60 + (hasDiscount ? 12 : 0) - (!isVatEnabled ? 10 : 0))
@@ -1177,25 +1177,26 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               const fontName = isTotal ? 'ArabicBold' : 'ArabicRegular';
               const fontSize = isThermal ? (isTotal ? 8.5 : 7.5) : (isTotal ? 9.5 : 8.5);
               const valColor = isTotal ? '#059669' : (customValColor || '#1e293b');
-              const formattedVal = formatNumberValue(val);
-              const halfWidth = (cardWidth / 2) - 8;
+              const formattedVal = typeof val === 'string' && (val.includes(' ') || val.includes('%')) ? val : formatNumberValue(val);
+              const labelWidth = Math.floor(cardWidth * 0.48) - 6;
+              const valWidth = Math.floor(cardWidth * 0.52) - 6;
 
               if (isRtl) {
                 doc.fillColor('#475569');
-                renderText(label, cardX + (cardWidth / 2), rowY, { width: halfWidth, align: 'right', font: fontName, size: fontSize });
+                renderText(label, cardX + valWidth + 4, rowY, { width: labelWidth, align: 'right', font: fontName, size: fontSize });
                 doc.fillColor(valColor);
-                renderText(formattedVal, cardX + 8, rowY, { width: halfWidth, align: 'left', font: fontName, size: fontSize });
+                renderText(formattedVal, cardX + 6, rowY, { width: valWidth, align: 'left', font: fontName, size: fontSize });
               } else {
                 doc.fillColor('#475569');
-                renderText(label, cardX + 8, rowY, { width: halfWidth, align: 'left', font: fontName, size: fontSize });
+                renderText(label, cardX + 6, rowY, { width: labelWidth, align: 'left', font: fontName, size: fontSize });
                 doc.fillColor(valColor);
-                renderText(formattedVal, cardX + (cardWidth / 2), rowY, { width: halfWidth, align: 'right', font: fontName, size: fontSize });
+                renderText(formattedVal, cardX + labelWidth + 4, rowY, { width: valWidth, align: 'right', font: fontName, size: fontSize });
               }
               rowY += isThermal ? 10 : 13;
             };
 
             // Subtotal Row
-            const subtotalVal = dto.subtotal || (Number(dto.net_total || 0) - Number(dto.vat_amount || 0) + Number(dto.discount_amount || 0));
+            const subtotalVal = Number(dto.subtotal || (Number(dto.net_total || 0) - Number(dto.vat_amount || 0) + Number(dto.discount_amount || 0)));
             const subtotalLabel = hasDiscount 
               ? (isEn ? 'Subtotal Before Discount' : 'الإجمالي قبل الخصم')
               : (isEn ? 'Total' : 'الإجمالي');
@@ -1215,8 +1216,17 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             doc.strokeColor('#cbd5e1').lineWidth(0.5).moveTo(cardX + 8, rowY).lineTo(cardX + cardWidth - 8, rowY).stroke();
             rowY += isThermal ? 2 : 3;
 
-            // Net Total Row
-            drawCardRow(isEn ? 'Net Total' : 'الصافي النهائي', dto.net_total || 0, true);
+            // Calculate Net Total accurately: Subtotal + VAT - Discount
+            const rawVatAmt = isVatEnabled ? Number(dto.vat_amount || 0) : 0;
+            const rawDiscAmt = Number(dto.discount_amount || 0);
+            let calcNetTotal = Number((subtotalVal + rawVatAmt - rawDiscAmt).toFixed(2));
+            if (calcNetTotal <= 0) calcNetTotal = Number(dto.net_total || 0);
+            
+            const currencyCode = dto.currency_code || dto.currency || dto.company?.currency || 'AED';
+            const formattedNetTotalStr = `${formatNumberValue(calcNetTotal)} ${currencyCode}`;
+
+            // Net Total Row with Currency Code
+            drawCardRow(isEn ? 'Net Total' : 'الصافي النهائي', formattedNetTotalStr, true);
 
             // ─── LIGHT VERTICAL DIVIDER LINE between Summary Box & Customer Details ───
             const vertX = isRtl ? (cardX + cardWidth + 14) : (cardX - 14);
@@ -1287,14 +1297,14 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 30, align: 'right' }
             ];
           } else if (isVatEnabled) {
-            // VAT Enabled: Include Tax % and Tax Amount columns (Unit column removed)
+            // VAT Enabled: Include Tax % and Tax Amount columns with optimized wide widths so numbers never wrap
             columns = [
-              { id: 'product_code', label: isEn ? 'Item Code' : 'كود الصنف', width: 14, align: isRtl ? 'right' : 'left' },
-              { id: 'product_name', label: isEn ? 'Item Name' : 'الصنف', width: 38, align: isRtl ? 'right' : 'left' },
-              { id: 'quantity', label: isEn ? 'Qty' : 'الكمية', width: 10, align: 'right' },
-              { id: 'unit_price', label: isEn ? 'Price' : 'السعر', width: 12, align: 'right' },
-              { id: 'vat_rate_formatted', label: isEn ? 'Tax %' : 'نسبة الضريبة', width: 13, align: 'center' },
-              { id: 'vat_amount', label: isEn ? 'VAT' : 'الضريبة', width: 10, align: 'right' },
+              { id: 'product_code', label: isEn ? 'Item Code' : 'كود الصنف', width: 11, align: isRtl ? 'right' : 'left' },
+              { id: 'product_name', label: isEn ? 'Item Name' : 'الصنف', width: 29, align: isRtl ? 'right' : 'left' },
+              { id: 'quantity', label: isEn ? 'Qty' : 'الكمية', width: 8, align: 'right' },
+              { id: 'unit_price', label: isEn ? 'Price' : 'السعر', width: 14, align: 'right' },
+              { id: 'vat_rate_formatted', label: isEn ? 'Tax %' : 'نسبة الضريبة', width: 10, align: 'center' },
+              { id: 'vat_amount', label: isEn ? 'VAT' : 'الضريبة', width: 14, align: 'right' },
               { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 14, align: 'right' }
             ];
           } else {
@@ -1308,18 +1318,19 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             ];
           }
 
-          // Format items with vat_rate_formatted
           // Format items with vat_rate_formatted (% 14)
           const formattedItems = (dto.items || []).map((item: any) => {
             let numRate = 0;
-            if (item.vat_rate !== undefined && item.vat_rate !== null && item.vat_rate !== '') {
-              numRate = parseFloat(String(item.vat_rate));
-            } else if (item.tax_rate !== undefined && item.tax_rate !== null && item.tax_rate !== '') {
-              numRate = parseFloat(String(item.tax_rate));
-            } else if (item.vat_percentage !== undefined && item.vat_percentage !== null) {
-              numRate = parseFloat(String(item.vat_percentage));
-            } else if (Number(item.vat_amount || 0) > 0 && Number(item.unit_price || 0) > 0 && Number(item.quantity || 0) > 0) {
+            const rawRateStr = String(item.vat_rate ?? item.tax_rate ?? item.vat_percentage ?? '');
+            const cleanDigits = rawRateStr.replace(/[^0-9.]/g, '');
+            if (cleanDigits !== '') {
+              numRate = parseFloat(cleanDigits);
+            }
+            if (!numRate && Number(item.vat_amount || 0) > 0 && Number(item.unit_price || 0) > 0 && Number(item.quantity || 0) > 0) {
               numRate = Math.round((Number(item.vat_amount) / (Number(item.quantity) * Number(item.unit_price))) * 100);
+            }
+            if (!numRate && Number(dto.vat_amount || 0) > 0 && Number(dto.subtotal || 0) > 0) {
+              numRate = Math.round((Number(dto.vat_amount) / Number(dto.subtotal)) * 100);
             }
             const rateStr = numRate > 0 ? `% ${numRate}` : '0%';
             return {
