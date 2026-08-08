@@ -2513,7 +2513,8 @@ export async function generateNextSequence(client: any, companyId: string, modul
     default: prefix = 'DOC';
   }
 
-  const safeDateStr = (dateStr || new Date().toISOString()).slice(0, 10);
+  const rawDate = dateStr instanceof Date ? dateStr.toISOString() : (typeof dateStr === 'string' && dateStr ? dateStr : new Date().toISOString());
+  const safeDateStr = rawDate.slice(0, 10);
   const parts = safeDateStr.split('-');
   const year = parts[0] || new Date().getFullYear().toString();
   const month = (parts[1] || '01').padStart(2, '0');
