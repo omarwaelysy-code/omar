@@ -2520,7 +2520,7 @@ export const Returns: React.FC = () => {
                           <span className="font-black text-xs tracking-tighter text-left">
                             {formatMoney(
                               items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) + 
-                              ((company?.settings?.vat_enabled || company?.vat_enabled) ? items.reduce((sum, i) => {
+                              ((company?.settings?.vat_enabled !== false && company?.vat_enabled !== false) ? items.reduce((sum, i) => {
                                 const qty = Number(i.quantity) || 0;
                                 const price = Number(i.unit_price) || 0;
                                 const rate = Number(i.vat_rate) || 0;
@@ -2595,7 +2595,7 @@ export const Returns: React.FC = () => {
                           <th className="p-1 border-r border-zinc-200 text-center w-28">{language === 'ar' ? 'مركز التكلفة' : 'Cost Center'}</th>
                           <th className="p-1 border-r border-zinc-200 text-center w-16">{language === 'ar' ? 'الكمية' : 'Qty'}</th>
                           <th className="p-1 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'سعر الوحدة' : 'Unit Price'}</th>
-                          {((company?.settings?.vat_enabled || company?.vat_enabled) ? true : false) && (
+                          {((company?.settings?.vat_enabled !== false && company?.vat_enabled !== false) ? true : false) && (
                             <>
                               <th className="p-1 border-r border-zinc-200 text-center w-14">{language === 'ar' ? 'ض ق م' : 'VAT %'}</th>
                               <th className="p-1 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'مبلغ الضريبة' : 'VAT Amount'}</th>
@@ -2818,7 +2818,7 @@ export const Returns: React.FC = () => {
                                 onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
                               />
                             </td>
-                            {((company?.settings?.vat_enabled || company?.vat_enabled) ? true : false) && (
+                            {((company?.settings?.vat_enabled !== false && company?.vat_enabled !== false) ? true : false) && (
                               <>
                                 <td className="p-0.5 border-b border-r border-zinc-200 w-14">
                                 <div className="flex items-center justify-center gap-0.5">
@@ -2858,7 +2858,7 @@ export const Returns: React.FC = () => {
                         ))}
                         {items.length === 0 && (
                           <tr>
-                            <td colSpan={((company?.settings?.vat_enabled || company?.vat_enabled) ? 11 : 10)} className="px-3 py-6 text-center text-zinc-400 italic text-xs font-sans">
+                            <td colSpan={((company?.settings?.vat_enabled !== false && company?.vat_enabled !== false) ? 11 : 10)} className="px-3 py-6 text-center text-zinc-400 italic text-xs font-sans">
                               {language === 'ar' ? 'لا توجد أصناف مضافة.' : 'No items added.'}
                             </td>
                           </tr>
