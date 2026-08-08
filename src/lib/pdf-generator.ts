@@ -1152,7 +1152,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
           let sectionBottomY = currentY + 66;
 
-          if (dto.forceDesignerPreview === true && dto.customLayout && Array.isArray(dto.customLayout.header) && dto.customLayout.header.length > 0) {
+          if ((dto.forceDesignerPreview === true || dto.isCustomTemplate === true) && dto.customLayout && Array.isArray(dto.customLayout.header) && dto.customLayout.header.length > 0) {
             const headerTopMm = Number(dto.customLayout.margins?.top ?? dto.margin_top ?? 15);
             const marginLeftMm = Number(dto.customLayout.margins?.left ?? dto.margin_left ?? 10);
             const headerHeightMm = Number(dto.customLayout.headerHeight ?? 75);
@@ -1397,7 +1397,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           }
 
           // Signatures / Custom Footer Rendering
-          if (dto.forceDesignerPreview === true && dto.customLayout && Array.isArray(dto.customLayout.footer) && dto.customLayout.footer.length > 0) {
+          if ((dto.forceDesignerPreview === true || dto.isCustomTemplate === true) && dto.customLayout && Array.isArray(dto.customLayout.footer) && dto.customLayout.footer.length > 0) {
             const paperHeightMm = isThermal ? (dto.customLayout.paperHeight || 297) : 297;
             const marginBottomMm = Number(dto.customLayout.margins?.bottom ?? dto.margin_bottom ?? 15);
             const marginLeftMm = Number(dto.customLayout.margins?.left ?? dto.margin_left ?? 10);
