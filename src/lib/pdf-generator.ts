@@ -1073,27 +1073,45 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             ?? dto.vat_enabled 
             ?? dto.vatEnabled;
           
-          const itemsVatSum = (dto.items || []).reduce((sum: number, item: any) => {
-            const itemVat = Number(item.vat_amount ?? item.tax_amount ?? item.tax ?? item.vat_val ?? item.vat ?? 0);
-            if (itemVat > 0) return sum + itemVat;
-            const itemTotal = Number(item.total || (Number(item.quantity || 0) * Number(item.unit_price || 0)) || 0);
-            const cleanDigits = String(item.vat_rate ?? item.tax_rate ?? item.vat_percentage ?? '').replace(/[^0-9.]/g, '');
-            const r = cleanDigits !== '' ? parseFloat(cleanDigits) : 0;
-            if (r > 0 && itemTotal > 0) {
-              return sum + Number(((itemTotal * r) / 100).toFixed(2));
+          // Pre-format items with vat_rate_formatted (% 14) and computed vat_amount FIRST
+          const formattedItems = (dto.items || []).map((item: any) => {
+            let numRate = 0;
+            const rawRateStr = String(item.vat_rate ?? item.tax_rate ?? item.vat_percentage ?? item.tax_percentage ?? '');
+            const cleanDigits = rawRateStr.replace(/[^0-9.]/g, '');
+            if (cleanDigits !== '') {
+              numRate = parseFloat(cleanDigits);
             }
-            return sum;
-          }, 0);
+            
+            let itemVatVal = Number(item.vat_amount ?? item.tax_amount ?? item.tax ?? item.vat_val ?? item.vat ?? 0);
+            const itemTotal = Number(item.total || (Number(item.quantity || 0) * Number(item.unit_price || 0)) || 0);
 
+            if (!numRate && itemVatVal > 0 && itemTotal > 0) {
+              numRate = Math.round((itemVatVal / itemTotal) * 100);
+            }
+            if (!numRate && Number(dto.vat_amount || 0) > 0 && Number(dto.subtotal || 0) > 0) {
+              numRate = Math.round((Number(dto.vat_amount) / Number(dto.subtotal)) * 100);
+            }
+            if (!numRate) {
+              numRate = 14;
+            }
+
+            if (itemVatVal <= 0 && numRate > 0 && itemTotal > 0) {
+              itemVatVal = Number(((itemTotal * numRate) / 100).toFixed(2));
+            }
+
+            const rateStr = numRate > 0 ? `% ${numRate}` : '0%';
+            return {
+              ...item,
+              vat_amount: itemVatVal,
+              vat_rate_formatted: rateStr
+            };
+          });
+
+          const itemsVatSum = formattedItems.reduce((sum: number, item: any) => sum + Number(item.vat_amount || 0), 0);
           const dtoVatAmount = Number(dto.vat_amount ?? dto.tax_amount ?? dto.tax ?? dto.vat_total ?? dto.total_vat ?? 0);
           const effectiveVatAmount = dtoVatAmount > 0 ? dtoVatAmount : itemsVatSum;
 
-          const hasActualVat = (effectiveVatAmount > 0) || (dto.items || []).some((item: any) => {
-            const cleanDigits = String(item.vat_rate ?? item.tax_rate ?? item.vat_percentage ?? '').replace(/[^0-9.]/g, '');
-            const r = cleanDigits !== '' ? parseFloat(cleanDigits) : 0;
-            const v = Number(item.vat_amount ?? item.tax_amount ?? item.tax ?? item.vat_val ?? item.vat ?? 0);
-            return r > 0 || v > 0;
-          });
+          const hasActualVat = (effectiveVatAmount > 0) || formattedItems.some((item: any) => Number(item.vat_amount || 0) > 0);
 
           let isVatEnabled = true;
           if (hasActualVat) {
@@ -1331,43 +1349,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               { id: 'product_name', label: isEn ? 'Item Name' : 'الصنف', width: 47, align: isRtl ? 'right' : 'left' },
               { id: 'quantity', label: isEn ? 'Qty' : 'الكمية', width: 11, align: 'right' },
               { id: 'unit_price', label: isEn ? 'Price' : 'السعر', width: 13, align: 'right' },
-              { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 14, align: 'right' }
             ];
           }
-
-          // Format items with vat_rate_formatted (% 14) and auto-computed item vat_amount
-          const formattedItems = (dto.items || []).map((item: any) => {
-            let numRate = 0;
-            const rawRateStr = String(item.vat_rate ?? item.tax_rate ?? item.vat_percentage ?? item.tax_percentage ?? '');
-            const cleanDigits = rawRateStr.replace(/[^0-9.]/g, '');
-            if (cleanDigits !== '') {
-              numRate = parseFloat(cleanDigits);
-            }
-            
-            let itemVatVal = Number(item.vat_amount ?? item.tax_amount ?? item.tax ?? item.vat_val ?? item.vat ?? 0);
-            const itemTotal = Number(item.total || (Number(item.quantity || 0) * Number(item.unit_price || 0)) || 0);
-
-            if (!numRate && itemVatVal > 0 && itemTotal > 0) {
-              numRate = Math.round((itemVatVal / itemTotal) * 100);
-            }
-            if (!numRate && Number(dto.vat_amount || 0) > 0 && Number(dto.subtotal || 0) > 0) {
-              numRate = Math.round((Number(dto.vat_amount) / Number(dto.subtotal)) * 100);
-            }
-            if (!numRate && (Number(dto.vat_amount || 0) > 0 || isVatEnabled)) {
-              numRate = 14;
-            }
-
-            if (itemVatVal <= 0 && numRate > 0 && itemTotal > 0) {
-              itemVatVal = Number(((itemTotal * numRate) / 100).toFixed(2));
-            }
-
-            const rateStr = numRate > 0 ? `% ${numRate}` : '0%';
-            return {
-              ...item,
-              vat_amount: itemVatVal,
-              vat_rate_formatted: rateStr
-            };
-          });
 
           drawTable(columns, formattedItems, null);
 
