@@ -340,46 +340,27 @@ export function UnifiedPrintEngine() {
         setPaperSizes(allSizes);
         setCompany(companyData);
 
-        // Helper for strict document_type matching
-        const isMatchingDocType = (tType: string, currentOp: string) => {
-          const t = (tType || '').toLowerCase().trim();
-          const op = (currentOp || '').toLowerCase().trim();
+        // Helper for fuzzy document_type matching
+        const normalizeType = (t: string) => (t || '').toLowerCase().replace(/s$/, '').replace(/_s$/, '');
+        const opNorm = normalizeType(opType);
 
-          if (t === op) return true;
-
-          const isSalesInv = (str: string) => str === 'invoices' || str === 'sales_invoices' || str === 'invoice' || str === 'sales_invoice';
-          const isPurchaseInv = (str: string) => str === 'purchase_invoices' || str === 'purchase_invoice' || str === 'pi';
-          const isSalesReturn = (str: string) => str === 'returns' || str === 'sales_returns' || str === 'return' || str === 'sales_return';
-          const isPurchaseReturn = (str: string) => str === 'purchase_returns' || str === 'purchase_return' || str === 'pr';
-          const isSalesOrder = (str: string) => str === 'sales_orders' || str === 'sales_order' || str === 'so';
-          const isPurchaseOrder = (str: string) => str === 'purchase_orders' || str === 'purchase_order' || str === 'po';
-
-          if (isSalesInv(op) && isSalesInv(t)) return true;
-          if (isPurchaseInv(op) && isPurchaseInv(t)) return true;
-          if (isSalesReturn(op) && isSalesReturn(t)) return true;
-          if (isPurchaseReturn(op) && isPurchaseReturn(t)) return true;
-          if (isSalesOrder(op) && isSalesOrder(t)) return true;
-          if (isPurchaseOrder(op) && isPurchaseOrder(t)) return true;
-
-          return false;
-        };
-
-        // Filter templates strictly by document type & status
+        // Filter templates by document type & status
         const matchedTemplates = allTemplates.filter(t => {
           if (!t.is_active) return false;
-          return isMatchingDocType(t.document_type, opType);
+          const tNorm = normalizeType(t.document_type);
+          return t.document_type === opType || tNorm === opNorm || (opNorm.includes('invoice') && tNorm.includes('invoice'));
         });
         setTemplates(matchedTemplates);
         setPrintProfiles(allProfiles);
 
-        // 1. Resolve Template (Prioritize requested template -> user default -> system default)
+        // 1. Resolve Template (Always force pristine System Default Template)
         let activeTemplate: Template | null = null;
         if (templateId && templateId !== 'default' && templateId !== 'system') {
-          activeTemplate = matchedTemplates.find(t => t.id === templateId) || null;
+          activeTemplate = matchedTemplates.find(t => t.id === templateId && !t.is_system) || null;
         }
 
         if (!activeTemplate) {
-          activeTemplate = matchedTemplates.find(t => t.is_default) || matchedTemplates.find(t => t.is_system) || {
+          activeTemplate = matchedTemplates.find(t => t.is_system) || {
             id: 'default-system-invoice',
             company_id: user?.company_id || '',
             name: language === 'ar' ? 'قالب النظام الافتراضي' : 'Default System Template',
@@ -692,9 +673,8 @@ export function UnifiedPrintEngine() {
       };
     }
 
-    if (selectedTemplate && selectedTemplate.id !== 'fallback') {
+    if (selectedTemplate && !selectedTemplate.is_system && selectedTemplate.id !== 'fallback' && !selectedTemplate.id.startsWith('default-')) {
       dto.isCustomTemplate = true;
-      dto.forceDesignerPreview = true;
       const effectiveMarginTop = selectedProfile?.margin_top ?? selectedTemplate.margin_top ?? 10;
       const effectiveMarginBottom = selectedProfile?.margin_bottom ?? selectedTemplate.margin_bottom ?? 10;
       const effectiveMarginLeft = selectedProfile?.margin_left ?? selectedTemplate.margin_left ?? 10;
@@ -706,7 +686,7 @@ export function UnifiedPrintEngine() {
       dto.margin_right = effectiveMarginRight;
 
       dto.customLayout = {
-        ...(selectedTemplate.layout || DEFAULT_TEMPLATE_LAYOUT),
+        ...(selectedTemplate.layout || {}),
         margins: {
           top: Number(effectiveMarginTop),
           bottom: Number(effectiveMarginBottom),
