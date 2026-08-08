@@ -2844,12 +2844,8 @@ export const PurchaseReturns: React.FC = () => {
                         <th className="p-2 border-r border-zinc-200 text-center w-28">مركز التكلفة</th>
                         <th className="p-2 border-r border-zinc-200 text-center w-16">الكمية</th>
                         <th className="p-2 border-r border-zinc-200 text-center w-24">السعر</th>
-                        {isVatEnabled && (
-                          <>
-                            <th className="p-2 border-r border-zinc-200 text-center w-14">ض ق م %</th>
-                            <th className="p-2 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'مبلغ الضريبة' : 'VAT Amount'}</th>
-                          </>
-                        )}
+                        <th className="p-2 border-r border-zinc-200 text-center w-14">ض ق م %</th>
+                        <th className="p-2 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'مبلغ الضريبة' : 'VAT Amount'}</th>
                         <th className="p-2 border-r border-zinc-200 text-center w-24">الإجمالي</th>
                         <th className="p-2 w-10"></th>
                       </tr>
@@ -3122,8 +3118,6 @@ export const PurchaseReturns: React.FC = () => {
                               }}
                             />
                           </td>
-                          {isVatEnabled && (
-                            <>
                               <td className="p-0.5 border-b border-r border-zinc-200 w-14">
                                 <div className="flex items-center justify-center gap-0.5">
                                   <input 
@@ -3144,8 +3138,6 @@ export const PurchaseReturns: React.FC = () => {
                                     : ((Number(item.quantity) || 0) * (Number(item.unit_price) || 0) * ((Number(item.vat_rate) || 0) / 100))
                                 )}
                               </td>
-                            </>
-                          )}
                           <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-emerald-600 text-xs">
                             {formatMoney(item.total)}
                           </td>
@@ -3162,7 +3154,7 @@ export const PurchaseReturns: React.FC = () => {
                       ))}
                       {items.length === 0 && (
                         <tr>
-                          <td colSpan={isVatEnabled ? 12 : 10} className="px-3 py-6 text-center text-zinc-400 italic text-xs">
+                          <td colSpan={12} className="px-3 py-6 text-center text-zinc-400 italic text-xs">
                             لا توجد أصناف حالياً
                           </td>
                         </tr>
