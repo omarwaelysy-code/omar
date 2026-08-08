@@ -143,7 +143,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUserMemberships(memberships);
 
       if (memberships.length > 0) {
-        const isSuperAdminEmail = email === 'omarwaelysy@gmail.com' || email === 'omarwaelsys@gmail.com' || email === 'acc.wael2005@gmail.com';
         const preferredCompanyId = localStorage.getItem(`preferred_company_${userId}`);
         
         let selectedMembership: User | null = null;
@@ -184,27 +183,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
         }
 
-        // Force super_admin role if email matches
-        if (isSuperAdminEmail) {
-          setUser({ 
-            ...activeMembership, 
-            role: 'super_admin',
-            must_change_password: activeMembership.must_change_password || false
-          });
-        } else {
-          setUser({ 
-            ...activeMembership, 
-            must_change_password: activeMembership.must_change_password || false
-          });
-        }
+        setUser({ 
+          ...activeMembership, 
+          must_change_password: activeMembership.must_change_password || false
+        });
       } else {
         // Fallback for super admin
-        const isSuperAdminEmail = email === 'omarwaelysy@gmail.com' || email === 'omarwaelsys@gmail.com' || email === 'acc.wael2005@gmail.com';
         setUser({ 
           id: userId, 
           username: email.split('@')[0], 
-          role: isSuperAdminEmail ? 'super_admin' : 'user', 
-          company_id: isSuperAdminEmail ? 'system' : '',
+          role: 'user', 
+          company_id: '',
           status: 'active',
           created_at: new Date().toISOString()
         });
@@ -247,24 +236,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     try {
       setLoading(true);
-      const isSuperAdminEmail = user.email === 'omarwaelysy@gmail.com' || user.email === 'omarwaelsys@gmail.com' || user.email === 'acc.wael2005@gmail.com';
-      
-      const expiryCheck = await checkCompanyExpiry(companyId);
-      setSubscriptionExpiredDetails({
-        expired: expiryCheck.isExpired,
-        expiryDate: expiryCheck.endDateStr,
-        companyName: expiryCheck.companyName,
-        reason: expiryCheck.reason
-      });
-
       const membership = userMemberships.find(m => m.company_id === companyId);
       if (membership) {
-        if (isSuperAdminEmail) {
+        if (user.role === 'super_admin') {
           setWorkspaceMode('company');
         }
         const updatedUser = {
           ...membership,
-          role: isSuperAdminEmail ? 'super_admin' : membership.role,
           must_change_password: membership.must_change_password || false
         };
         setUser(updatedUser);

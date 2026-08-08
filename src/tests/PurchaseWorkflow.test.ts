@@ -49,7 +49,10 @@ describe('Purchase Workflow Mode & Goods Receipts Integration', () => {
           return { rows: [{ id: 'comp-abc', purchase_workflow_mode: 'Simple' }] };
         }
         if (textClean.includes('from products')) {
-          return { rows: [{ id: params[0], name: 'Product 123', code: 'P123', type: 'product', is_service: false }] };
+          return { rows: [{ id: params[0], name: 'Product 123', code: 'P123', type: 'product', is_service: false, revenue_account_id: 'acc-rev', cost_account_id: 'acc-cost', inventory_account_id: 'acc-inv' }] };
+        }
+        if (textClean.includes('from customers') || textClean.includes('from suppliers') || textClean.includes('from payment_methods')) {
+          return { rows: [{ id: params[0], name: 'Mock Entity', account_id: 'acc-123' }], rowCount: 1 };
         }
         if (textClean.includes('select cost_price') || textClean.includes('select unit_cost')) {
           return { rows: [{ cost_price: 10, stock: 5 }] };
@@ -142,7 +145,10 @@ describe('Purchase Workflow Mode & Goods Receipts Integration', () => {
         return { rows: [{ id: 'comp-abc', purchase_workflow_mode: 'Enterprise Strict' }] };
       }
       if (textClean.includes('from products')) {
-        return { rows: [{ id: params[0], name: 'Product 123', code: 'P123', type: 'product', is_service: false }] };
+        return { rows: [{ id: params[0], name: 'Product 123', code: 'P123', type: 'product', is_service: false, revenue_account_id: 'acc-rev', cost_account_id: 'acc-cost', inventory_account_id: 'acc-inv' }] };
+      }
+      if (textClean.includes('from customers') || textClean.includes('from suppliers') || textClean.includes('from payment_methods')) {
+        return { rows: [{ id: params[0], name: 'Mock Entity', account_id: 'acc-123' }], rowCount: 1 };
       }
       if (textClean.includes('document_sequences')) {
         return { rows: [{ last_seq: 1 }], rowCount: 1 };
@@ -184,7 +190,10 @@ describe('Purchase Workflow Mode & Goods Receipts Integration', () => {
         return { rows: [{ id: 'comp-abc', purchase_workflow_mode: 'Enterprise Flexible' }] };
       }
       if (textClean.includes('from products')) {
-        return { rows: [{ id: params[0], name: 'Product 123', code: 'P123', type: 'product', is_service: false }] };
+        return { rows: [{ id: params[0], name: 'Product 123', code: 'P123', type: 'product', is_service: false, revenue_account_id: 'acc-rev', cost_account_id: 'acc-cost', inventory_account_id: 'acc-inv' }] };
+      }
+      if (textClean.includes('from customers') || textClean.includes('from suppliers') || textClean.includes('from payment_methods')) {
+        return { rows: [{ id: params[0], name: 'Mock Entity', account_id: 'acc-123' }], rowCount: 1 };
       }
       if (textClean.includes('document_sequences')) {
         return { rows: [{ last_seq: 1 }], rowCount: 1 };

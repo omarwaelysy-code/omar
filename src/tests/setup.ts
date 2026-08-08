@@ -2,6 +2,8 @@ import '@testing-library/jest-dom';
 import React from 'react';
 import { vi } from 'vitest';
 
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-for-vitest';
+
 // Global top-level module mocks
 vi.mock('react-barcode', () => ({
   default: () => null

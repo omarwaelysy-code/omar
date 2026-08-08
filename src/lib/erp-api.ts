@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AsyncLocalStorage } from 'async_hooks';
 import pool from './postgres';
+import { getJwtSecret } from './env';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -569,8 +570,6 @@ router.use((req, res, next) => {
   next();
 });
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-
 // Helper to get remote IP safely
 function getIp(req: any): string {
   if (!req || !req.headers) return 'unknown';
@@ -1061,8 +1060,7 @@ async function checkPeriodClosingMiddleware(req: AuthRequest, res: any, next: an
     const token = authHeader && authHeader.split(' ')[1];
     if (token) {
       try {
-        const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        const decoded = jwt.verify(token, getJwtSecret()) as any;
         req.user = decoded;
       } catch (e) {
         // Let authenticateToken catch it later
@@ -1946,7 +1944,7 @@ router.post('/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'حدث خطأ في البيانات المدخلة، يرجى التأكد من البريد الإلكتروني وكلمة المرور' });
     }
 
-    const isSuperAdminUser = validUser.role === 'super_admin' || ['omarwaelysy@gmail.com', 'omarwaelsys@gmail.com', 'acc.wael2005@gmail.com'].includes(cleanEmail);
+    const isSuperAdminUser = validUser.role === 'super_admin';
 
     // Subscription Expiration Check: Prevent login for regular users if company subscription has expired
     if (!isSuperAdminUser && validUser.company_id && validUser.company_id !== 'SYSTEM') {
@@ -2057,7 +2055,7 @@ router.post('/auth/login', async (req, res) => {
         username: validUser.username || validUser.name || validUser.email,
         session_token: sessionToken
       },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: '24h' }
     );
 
@@ -2859,8 +2857,7 @@ router.get('/paper-sizes', authenticateToken, async (req: AuthRequest, res) => {
 // =========================================================================
 router.get('/audit_logs', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const isSuperAdmin = req.user?.role === 'super_admin' ||
-      ['acc.wael2005@gmail.com', 'omarwaelysy@gmail.com', 'omarwaelsys@gmail.com'].includes((req.user?.email || '').toLowerCase());
+    const isSuperAdmin = req.user?.role === 'super_admin';
     const requestedCompanyId = req.query.company_id as string | undefined;
     const targetCompanyId = requestedCompanyId || (!isSuperAdmin ? req.user?.company_id : undefined);
 
@@ -2890,8 +2887,7 @@ router.get('/audit_logs', authenticateToken, async (req: AuthRequest, res) => {
 
 router.get('/activity_logs', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const isSuperAdmin = req.user?.role === 'super_admin' ||
-      ['acc.wael2005@gmail.com', 'omarwaelysy@gmail.com', 'omarwaelsys@gmail.com'].includes((req.user?.email || '').toLowerCase());
+    const isSuperAdmin = req.user?.role === 'super_admin';
     const requestedCompanyId = req.query.company_id as string | undefined;
     const targetCompanyId = requestedCompanyId || (!isSuperAdmin ? req.user?.company_id : undefined);
 
@@ -2960,7 +2956,7 @@ modules.forEach(moduleName => {
         }
 
         let rows;
-      const isSuperAdminUser = req.user?.role === 'super_admin' || ['acc.wael2005@gmail.com', 'omarwaelysy@gmail.com', 'omarwaelsys@gmail.com'].includes((req.user?.email || '').toLowerCase());
+      const isSuperAdminUser = req.user?.role === 'super_admin';
 
       if (moduleName === 'activity_logs') {
         const targetCompanyId = req.query.company_id || (!isSuperAdminUser ? req.user?.company_id : undefined);
@@ -3630,8 +3626,7 @@ modules.forEach(moduleName => {
           const { id } = req.params;
           const companyId = req.user?.company_id;
 
-          const isSuperAdmin = req.user?.role === 'super_admin' ||
-            ['acc.wael2005@gmail.com', 'omarwaelysy@gmail.com', 'omarwaelsys@gmail.com'].includes((req.user?.email || '').toLowerCase());
+          const isSuperAdmin = req.user?.role === 'super_admin';
 
           // SECURITY FIX: Non-super-admin users can only modify their own company
           if (moduleName === 'companies' && !isSuperAdmin && companyId && companyId !== id) {

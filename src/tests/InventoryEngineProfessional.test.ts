@@ -40,7 +40,7 @@ describe('Professional Inventory Engine Integration (Phase 8)', () => {
       query: vi.fn().mockImplementation(async (text: string, params: any[] = []) => {
         const textClean = text.toLowerCase().trim();
         if (textClean.includes('from products')) {
-          return { rows: [{ id: params[0], name: 'test product', code: 'PROD-123', type: 'product', is_service: false, weighted_average_cost: 12, cost_price: 12, stock: 15 }] };
+          return { rows: [{ id: params[0], name: 'test product', code: 'PROD-123', type: 'product', is_service: false, weighted_average_cost: 12, cost_price: 12, stock: 15, inventory_account_id: 'acc-inv', cost_account_id: 'acc-cost', revenue_account_id: 'acc-rev' }] };
         }
         if (textClean.includes('select name from accounts')) {
           return { rows: [{ name: 'حساب التسويات' }] };

@@ -134,13 +134,19 @@ describe('Templates Page - Designer Integrations', () => {
 
   it('should send the correct is_default and is_active values to the API on save', async () => {
     vi.mocked(dbService.create).mockResolvedValue('new-template-id');
+    vi.mocked(dbService.list).mockImplementation(async (collection: string) => {
+      if (collection === 'templates') return [{ id: 'user-t-1', name: 'User Invoice Template', document_type: 'invoices', is_default: true, is_system: false, paper_size_id: 'a4', orientation: 'portrait', margin_top: 10, margin_bottom: 10, margin_left: 10, margin_right: 10, is_active: true }];
+      if (collection === 'paper_sizes') return [{ id: 'a4', name: 'A4', width: 210, height: 297, unit: 'mm', is_system: true, company_id: null }];
+      return [];
+    });
 
     render(<Templates initialView="create" />);
 
-    // Wait for elements to load
+    // Wait for initial loading to complete
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/اسم القالب/i)).toBeInTheDocument();
     });
+    vi.mocked(dbService.create).mockClear();
 
     // Fill name input
     const nameInput = screen.getByPlaceholderText(/اسم القالب/i);
@@ -171,7 +177,9 @@ describe('Templates Page - Designer Integrations', () => {
     });
 
     // Check that dbService.create was called with our target payload containing true/false states
-    const createCall = vi.mocked(dbService.create).mock.calls.find(call => call[0] === 'templates');
+    const createCall = vi.mocked(dbService.create).mock.calls.find(
+      call => call[0] === 'templates' && call[1]?.name === 'My Print Template'
+    );
     expect(createCall).toBeDefined();
     
     const payload = createCall![1];
@@ -247,9 +255,9 @@ describe('Templates Page - Designer Integrations', () => {
     // Change to purchase returns (which doesn't have any template)
     fireEvent.change(docTypeSelect, { target: { value: 'purchase_returns' } });
 
-    // Verify the name input is blank and document type is purchase_returns
+    // Verify default purchase_returns template is loaded and document type is purchase_returns
     await waitFor(() => {
-      expect((screen.getByPlaceholderText(/اسم القالب/i) as HTMLInputElement).value).toBe('');
+      expect((screen.getByPlaceholderText(/اسم القالب/i) as HTMLInputElement).value).toBe('مرتجع مشتريات - القالب الافتراضي');
       expect(docTypeSelect.value).toBe('purchase_returns');
     });
   });

@@ -2319,6 +2319,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
         },
         document_type: formData.document_type,
         is_default: formData.is_default,
+        is_active: formData.is_active,
         print_profile_id: formData.print_profile_id || null
       };
 
@@ -2338,7 +2339,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
         const copyPayload = {
           ...templatePayload,
           name: newName,
-          is_default: false,
+          is_default: isSystemProtected ? false : formData.is_default,
           is_system: false
         };
 
@@ -5915,12 +5916,10 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                           className="w-5 h-5 rounded-lg border-zinc-300 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer"
                           checked={formData.is_default}
                           onChange={(e) => setFormData(prev => ({ ...prev, is_default: e.target.checked }))}
-                          onClick={(e) => e.stopPropagation()}
                         />
                         <label 
                           htmlFor="is_default_checkbox" 
                           className="flex flex-col cursor-pointer select-none flex-1"
-                          onClick={(e) => e.stopPropagation()}
                         >
                           <span className="text-xs font-bold text-zinc-800">{language === 'ar' ? 'القالب الافتراضي' : 'Default Template'}</span>
                           <span className="text-[10px] text-zinc-400">{language === 'ar' ? 'استخدام هذا القالب تلقائياً للمستند' : 'Use this template by default for this document'}</span>
@@ -5929,7 +5928,6 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
                       {/* Active Status */}
                       <div 
-                        onClick={(e) => e.stopPropagation()} 
                         className="flex items-center gap-3 p-2 hover:bg-zinc-50 rounded-xl pt-2 border-t border-zinc-100"
                       >
                         <input
@@ -5938,12 +5936,10 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                           className="w-5 h-5 rounded-lg border-zinc-300 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer"
                           checked={formData.is_active}
                           onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
-                          onClick={(e) => e.stopPropagation()}
                         />
                         <label 
                           htmlFor="is_active_checkbox" 
                           className="flex flex-col cursor-pointer select-none flex-1"
-                          onClick={(e) => e.stopPropagation()}
                         >
                           <span className="text-xs font-bold text-zinc-800">{language === 'ar' ? 'قالب نشط' : 'Active Template'}</span>
                           <span className="text-[10px] text-zinc-400">{language === 'ar' ? 'السماح باستخدام القالب للطباعة' : 'Enable template for prints'}</span>

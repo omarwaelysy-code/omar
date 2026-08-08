@@ -1,5 +1,6 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
+import { getDatabasePassword } from './env';
 
 dotenv.config();
 
@@ -8,7 +9,7 @@ const { Pool } = pg;
 const dbConfig = {
   host: process.env.DB_HOST,
   user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || '',
+  password: getDatabasePassword(),
   database: process.env.DB_NAME || 'cloud_erp_system',
   port: parseInt(process.env.DB_PORT || '5432'),
 };

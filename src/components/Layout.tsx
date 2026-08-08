@@ -1470,7 +1470,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 </h3>
 
                 <p className="text-xs font-semibold text-slate-700 dir-ltr font-mono">
-                  {user?.email || `${user?.username || 'acc.wael2005'}@gmail.com`}
+                  {user?.email || user?.username || ''}
                 </p>
 
                 <div className="mt-1 px-3 py-1 bg-[#233527]/10 text-[#233527] border border-[#233527]/20 font-bold text-[11px] rounded-full">

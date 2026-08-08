@@ -3,8 +3,7 @@ import jwt from 'jsonwebtoken';
 import { LicensingMiddleware } from './subscription/middlewares/LicensingMiddleware';
 import { FeatureFlagMiddleware } from './subscription/middlewares/FeatureFlagMiddleware';
 import pool from './postgres';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+import { getJwtSecret } from './env';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -25,7 +24,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(token, getJwtSecret()) as any;
     req.user = decoded;
 
     // ================================================================
@@ -58,14 +57,14 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     // Resolve company_id from 'x-company-id' header if present to support seamless workspace switching
     const requestedCompanyId = req.headers['x-company-id'] as string;
     if (requestedCompanyId && requestedCompanyId !== decoded.company_id) {
-      const isSuperAdminEmail = decoded.email === 'omarwaelysy@gmail.com' || decoded.email === 'omarwaelsys@gmail.com' || decoded.email === 'acc.wael2005@gmail.com';
+      const isSuperAdminRole = decoded.role === 'super_admin';
       
       try {
         const userRes = await pool.query('SELECT role FROM users WHERE email = $1 AND company_id = $2', [decoded.email, requestedCompanyId]);
         if (userRes.rows.length > 0) {
           req.user.company_id = requestedCompanyId;
-          req.user.role = isSuperAdminEmail ? 'super_admin' : userRes.rows[0].role;
-        } else if (isSuperAdminEmail) {
+          req.user.role = isSuperAdminRole ? 'super_admin' : userRes.rows[0].role;
+        } else if (isSuperAdminRole) {
           req.user.company_id = requestedCompanyId;
           req.user.role = 'super_admin';
         }

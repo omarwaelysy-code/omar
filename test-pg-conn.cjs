@@ -14,11 +14,9 @@ async function tryConnect(config) {
 }
 
 async function run() {
+  const dbPassword = process.env.DB_PASSWORD || process.env.POSTGRES_PASSWORD;
   const configs = [
-    { host: 'localhost', port: 5432, user: 'postgres', password: 'erp_password', database: 'cloud_erp_system' },
-    { host: 'localhost', port: 5432, user: 'postgres', password: '', database: 'cloud_erp_system' },
-    { host: '127.0.0.1', port: 5432, user: 'postgres', password: 'erp_password', database: 'cloud_erp_system' },
-    { host: '127.0.0.1', port: 5432, user: 'postgres', password: '', database: 'cloud_erp_system' }
+    { host: process.env.DB_HOST || 'localhost', port: parseInt(process.env.DB_PORT || '5432'), user: process.env.DB_USER || 'postgres', password: dbPassword, database: process.env.DB_NAME || 'cloud_erp_system' }
   ];
 
   let activePool = null;
