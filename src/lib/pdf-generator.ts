@@ -1073,8 +1073,22 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             ?? dto.vat_enabled 
             ?? dto.vatEnabled;
           
+          const itemsVatSum = (dto.items || []).reduce((sum: number, item: any) => {
+            const itemVat = Number(item.vat_amount ?? item.tax_amount ?? item.tax ?? item.vat_val ?? item.vat ?? 0);
+            if (itemVat > 0) return sum + itemVat;
+            const itemTotal = Number(item.total || (Number(item.quantity || 0) * Number(item.unit_price || 0)) || 0);
+            const cleanDigits = String(item.vat_rate ?? item.tax_rate ?? item.vat_percentage ?? '').replace(/[^0-9.]/g, '');
+            const r = cleanDigits !== '' ? parseFloat(cleanDigits) : 0;
+            if (r > 0 && itemTotal > 0) {
+              return sum + Number(((itemTotal * r) / 100).toFixed(2));
+            }
+            return sum;
+          }, 0);
+
           const dtoVatAmount = Number(dto.vat_amount ?? dto.tax_amount ?? dto.tax ?? dto.vat_total ?? dto.total_vat ?? 0);
-          const hasActualVat = (dtoVatAmount > 0) || (dto.items || []).some((item: any) => {
+          const effectiveVatAmount = dtoVatAmount > 0 ? dtoVatAmount : itemsVatSum;
+
+          const hasActualVat = (effectiveVatAmount > 0) || (dto.items || []).some((item: any) => {
             const cleanDigits = String(item.vat_rate ?? item.tax_rate ?? item.vat_percentage ?? '').replace(/[^0-9.]/g, '');
             const r = cleanDigits !== '' ? parseFloat(cleanDigits) : 0;
             const v = Number(item.vat_amount ?? item.tax_amount ?? item.tax ?? item.vat_val ?? item.vat ?? 0);
@@ -1199,7 +1213,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             };
 
             // Subtotal Row
-            const subtotalVal = Number(dto.subtotal || (Number(dto.net_total || 0) - Number(dto.vat_amount || 0) + Number(dto.discount_amount || 0)));
+            const subtotalVal = Number(dto.subtotal || (Number(dto.net_total || 0) - Number(effectiveVatAmount || 0) + Number(dto.discount_amount || 0)));
             const subtotalLabel = hasDiscount 
               ? (isEn ? 'Subtotal Before Discount' : 'الإجمالي قبل الخصم')
               : (isEn ? 'Total' : 'الإجمالي');
@@ -1211,7 +1225,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             }
 
             if (isVatEnabled) {
-              drawCardRow(isEn ? 'VAT' : 'ضريبة القيمة المضافة', dto.vat_amount || 0);
+              drawCardRow(isEn ? 'VAT' : 'ضريبة القيمة المضافة', effectiveVatAmount);
             }
 
             // Card Divider Line
@@ -1220,7 +1234,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             rowY += isThermal ? 2 : 3;
 
             // Calculate Net Total accurately: Subtotal + VAT - Discount
-            const rawVatAmt = isVatEnabled ? Number(dto.vat_amount || 0) : 0;
+            const rawVatAmt = isVatEnabled ? effectiveVatAmount : 0;
             const rawDiscAmt = Number(dto.discount_amount || 0);
             let calcNetTotal = Number((subtotalVal + rawVatAmt - rawDiscAmt).toFixed(2));
             if (calcNetTotal <= 0) calcNetTotal = Number(dto.net_total || 0);
