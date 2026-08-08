@@ -2323,37 +2323,22 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       };
 
       let savedTemplateId = '';
-      const isSystemProtected = isProtectedSystemTemplate(editingTemplate);
 
-      if (view === 'edit' && editingTemplate && !isSystemProtected) {
+      if (view === 'edit' && editingTemplate) {
         await dbService.update('templates', editingTemplate.id, templatePayload);
         savedTemplateId = editingTemplate.id;
         toast.success(language === 'ar' ? 'تم حفظ تعديلات القالب والتصميم بنجاح' : 'Template layout saved successfully');
       } else {
         let newName = formData.name.trim();
-        if (isSystemProtected && (editingTemplate && (newName === editingTemplate.name || !newName.includes('نسخة')))) {
-          newName = `${formData.name} - ${language === 'ar' ? 'نسخة مخصصة' : 'Custom Copy'}`;
-        }
 
         const copyPayload = {
           ...templatePayload,
-          name: newName,
-          is_default: false,
-          is_system: false
+          name: newName
         };
 
         const newId: any = await dbService.create('templates', copyPayload);
         savedTemplateId = typeof newId === 'string' ? newId : String(newId?.id || newId?.template_id || newId?.data?.id || '');
-
-        if (isSystemProtected) {
-          toast.success(
-            language === 'ar' 
-              ? `القالب الافتراضي للنظام محمي ضد التعديل المباشر. تم حفظ التعديلات في قالب جديد باسم: "${newName}" بنجاح` 
-              : `System default template is protected. Your edits have been saved as a new template named "${newName}".`
-          );
-        } else {
-          toast.success(language === 'ar' ? 'تم إنشاء القالب والتصميم بنجاح' : 'Template layout created successfully');
-        }
+        toast.success(language === 'ar' ? 'تم إنشاء القالب والتصميم بنجاح' : 'Template layout created successfully');
       }
 
       // Create version record in database safely
