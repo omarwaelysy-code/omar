@@ -822,6 +822,7 @@ export const Returns: React.FC = () => {
           const rate = Number(exchangeRate) || 1;
           const foreignPrice = Number((Number(product.sale_price) / rate).toFixed(4));
           item.product_name = product.name;
+          item.product_code = product.code || (product as any).sku || (product as any).barcode || '';
           item.product_image_url = product.image_url;
           item.unit_price = foreignPrice;
           item.barcode = product.barcode || '';
@@ -831,6 +832,7 @@ export const Returns: React.FC = () => {
           item.vat_amount = isVatEnabled ? Number((total * ((item.vat_rate || 0) / 100)).toFixed(2)) : 0;
         } else {
           item.product_name = '';
+          item.product_code = '';
           item.product_image_url = '';
           item.unit_price = 0;
           item.barcode = '';
@@ -891,21 +893,25 @@ export const Returns: React.FC = () => {
       const subtotal = validItems.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
       const vatTotal = isVatEnabled ? validItems.reduce((sum, item) => sum + (Number(item.vat_amount) || 0), 0) : 0;
       const total_amount = Number((subtotal + vatTotal - discount).toFixed(2)) || 0;
-      
-      const sanitizedItems = validItems.map(i => ({
-        product_id: i.product_id,
-        product_name: i.product_name,
-        quantity: Number(i.quantity) || 0,
-        unit_price: Number(i.unit_price) || 0,
-        total: Number((Number(i.quantity) || 0) * (Number(i.unit_price) || 0)) || 0,
-        barcode: i.barcode || '',
-        image_url: i.image_url || i.product_image_url || '',
-        operation_id: i.operation_id || null,
-        department_id: i.department_id || null,
-        cost_center_id: i.cost_center_id || null,
-        vat_rate: i.vat_rate || 0,
-        vat_amount: i.vat_amount || 0
-      }));
+      const sanitizedItems = validItems.map(i => {
+        const prod = products.find(p => p.id === i.product_id);
+        const resolvedCode = i.product_code || prod?.code || (prod as any)?.sku || prod?.barcode || '';
+        return {
+          product_id: i.product_id,
+          product_name: i.product_name,
+          product_code: resolvedCode,
+          quantity: Number(i.quantity) || 0,
+          unit_price: Number(i.unit_price) || 0,
+          total: Number((Number(i.quantity) || 0) * (Number(i.unit_price) || 0)) || 0,
+          barcode: i.barcode || prod?.barcode || '',
+          image_url: i.image_url || i.product_image_url || '',
+          operation_id: i.operation_id || null,
+          department_id: i.department_id || null,
+          cost_center_id: i.cost_center_id || null,
+          vat_rate: i.vat_rate || 0,
+          vat_amount: i.vat_amount || 0
+        };
+      });
 
       const returnData = { 
         return_number,

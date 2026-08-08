@@ -1739,6 +1739,7 @@ export const Invoices: React.FC = () => {
           const rate = Number(exchangeRate) || 1;
           const foreignPrice = Number((product.sale_price / rate).toFixed(4));
           item.product_name = product.name;
+          item.product_code = product.code || (product as any).sku || (product as any).barcode || '';
           item.product_image_url = product.image_url;
           item.unit_price = foreignPrice;
           item.vat_rate = product.vat_rate || 0;
@@ -1748,6 +1749,7 @@ export const Invoices: React.FC = () => {
           item.image_url = product.image_url || '';
         } else {
           item.product_name = '';
+          item.product_code = '';
           item.product_image_url = '';
           item.unit_price = 0;
           item.vat_rate = 0;
@@ -1814,10 +1816,11 @@ export const Invoices: React.FC = () => {
         const rate = i.vat_rate !== undefined ? i.vat_rate : (prod?.vat_rate || 0);
         const total = Number((Number(i.quantity) || 0) * (Number(i.unit_price) || 0)) || 0;
         const vat_amount = isVatEnabled ? Number((total * (rate / 100)).toFixed(2)) : 0;
+        const resolvedCode = i.product_code || prod?.code || (prod as any)?.sku || prod?.barcode || '';
         return {
           product_id: i.product_id,
           product_name: i.product_name,
-          product_code: i.product_code || '',
+          product_code: resolvedCode,
           product_image_url: i.product_image_url || i.image_url || '',
           quantity: Number(i.quantity) || 0,
           unit_price: Number(i.unit_price) || 0,
