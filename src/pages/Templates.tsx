@@ -4071,17 +4071,6 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                                     type="button"
                                     onClick={() => handleToggleLayerLock(el.id, 'footer')}
                                     className={`p-1 rounded hover:bg-zinc-100 ${el.properties.locked ? 'text-amber-500' : 'text-zinc-400 hover:text-zinc-600'}`}
-                                  >
-                                    {el.properties.locked ? <Lock size={12} /> : <Unlock size={12} />}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => { setSelectedElementId(el.id); setSelectedSection('footer'); handleMoveDepth('up'); }}
-                                    className="p-0.5 rounded hover:bg-zinc-100 text-zinc-400"
-                                    title="Move Up (Z-index)"
-                                  >
-                                    <ChevronUp size={12} />
-                                  </button>
                                   <button
                                     type="button"
                                     onClick={() => { setSelectedElementId(el.id); setSelectedSection('footer'); handleMoveDepth('down'); }}
@@ -4159,11 +4148,11 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
               {/* 2. CENTER WORKSPACE: PAPER SHEET RENDERING */}
               <div className="flex-1 bg-zinc-100 border border-zinc-200 rounded-2xl overflow-auto p-8 flex items-center justify-center relative shadow-inner h-full">
                 
-                {/* RULERS & CANVAS WRAPPER */}
-                <div className="relative flex flex-col items-start justify-center inline-block">
+                {/* RULERS & CANVAS WRAPPER (ENFORCING GEOMETRIC LTR COORDINATES) */}
+                <div className="relative flex flex-col items-start justify-center inline-block ltr" dir="ltr">
                   
                   {/* ── TOP RULER ROW (CORNER SPACER + HORIZONTAL RULER) ── */}
-                  <div className="flex items-center mb-1.5">
+                  <div className="flex items-center mb-1.5 ltr" dir="ltr">
                     {/* Top-Left Ruler Corner Spacer */}
                     <div 
                       className="bg-white border border-zinc-300 rounded-tl-lg mr-1.5 flex items-center justify-center text-[9px] font-mono font-bold text-zinc-400 select-none shadow-xs shrink-0"
@@ -4174,7 +4163,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
 
                     {/* ── TOP HORIZONTAL RULER ── */}
                     <div 
-                      className="bg-white border border-zinc-300 rounded-tr-lg relative overflow-hidden select-none shadow-sm text-[9px] font-mono text-zinc-500 shrink-0"
+                      className="bg-white border border-zinc-300 rounded-tr-lg relative overflow-hidden select-none shadow-sm text-[9px] font-mono text-zinc-500 shrink-0 ltr"
+                      dir="ltr"
                       style={{
                         width: `${paperWidth * zoomScale}px`,
                         height: '24px'
@@ -4216,10 +4206,11 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                     </div>
                   </div>
 
-                  <div className="flex items-start">
+                  <div className="flex items-start ltr" dir="ltr">
                     {/* ── LEFT VERTICAL RULER ── */}
                     <div 
-                      className="bg-white border border-zinc-300 rounded-l-lg relative overflow-hidden select-none mr-1.5 shadow-sm text-[9px] font-mono text-zinc-500"
+                      className="bg-white border border-zinc-300 rounded-l-lg relative overflow-hidden select-none mr-1.5 shadow-sm text-[9px] font-mono text-zinc-500 shrink-0 ltr"
+                      dir="ltr"
                       style={{
                         width: '24px',
                         height: `${paperHeight * zoomScale}px`
@@ -4275,7 +4266,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                     {previewMode ? (
                   /* LIVE PREVIEW CONTAINER */
                   <div
-                    className="bg-white border border-zinc-300 shadow-2xl transition-all relative overflow-hidden"
+                    className="bg-white border border-zinc-300 shadow-2xl transition-all relative overflow-hidden ltr"
+                    dir="ltr"
                     style={{
                       width: `${paperWidth * zoomScale}px`,
                       minHeight: `${paperHeight * zoomScale}px`,
@@ -4461,7 +4453,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                 ) : (
                   /* VISUAL DESIGN EDIT MODE */
                   <div 
-                    className="bg-white border border-zinc-300 shadow-xl relative overflow-hidden transition-all"
+                    className="bg-white border border-zinc-300 shadow-xl relative overflow-hidden transition-all ltr"
+                    dir="ltr"
                     style={{
                       width: `${paperWidth * zoomScale}px`,
                       minHeight: `${paperHeight * zoomScale}px`,
