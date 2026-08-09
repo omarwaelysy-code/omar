@@ -4482,11 +4482,11 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                     {/* 1. Left Margin Drag Line (Vertical ↔) */}
                     <div 
                       onMouseDown={(e) => handleStartSectionDrag(e, 'margin_left')}
-                      className="absolute top-0 bottom-0 z-30 cursor-ew-resize group border-r border-dashed border-red-400 hover:border-red-600 transition-colors flex flex-col items-center justify-start pt-2 pointer-events-auto"
+                      className="absolute top-0 bottom-0 z-30 cursor-ew-resize group w-0 border-l border-dashed border-red-400 hover:border-red-600 transition-colors flex flex-col items-center justify-start pt-2 pointer-events-auto overflow-visible"
                       style={{ left: `${margins.left * zoomScale}px` }}
                       title={language === 'ar' ? 'سحب لتغيير الهامش الأيسر ↔' : 'Drag to resize Left Margin ↔'}
                     >
-                      <div className="bg-red-600 hover:bg-red-700 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow border border-red-300 flex items-center gap-0.5 cursor-ew-resize select-none -translate-x-1/2">
+                      <div className="bg-red-600 hover:bg-red-700 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow border border-red-300 flex items-center gap-0.5 cursor-ew-resize select-none -translate-x-1/2 whitespace-nowrap">
                         <MoveHorizontal size={9} />
                         <span>{language === 'ar' ? `الهامش الأيسر: ${margins.left}مم` : `Left: ${margins.left}mm`}</span>
                       </div>
@@ -4495,11 +4495,11 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                     {/* 2. Right Margin Drag Line (Vertical ↔) */}
                     <div 
                       onMouseDown={(e) => handleStartSectionDrag(e, 'margin_right')}
-                      className="absolute top-0 bottom-0 z-30 cursor-ew-resize group border-l border-dashed border-red-400 hover:border-red-600 transition-colors flex flex-col items-center justify-start pt-2 pointer-events-auto"
+                      className="absolute top-0 bottom-0 z-30 cursor-ew-resize group w-0 border-l border-dashed border-red-400 hover:border-red-600 transition-colors flex flex-col items-center justify-start pt-2 pointer-events-auto overflow-visible"
                       style={{ left: `${(paperWidth - margins.right) * zoomScale}px` }}
                       title={language === 'ar' ? 'سحب لتغيير الهامش الأيمن ↔' : 'Drag to resize Right Margin ↔'}
                     >
-                      <div className="bg-red-600 hover:bg-red-700 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow border border-red-300 flex items-center gap-0.5 cursor-ew-resize select-none -translate-x-1/2">
+                      <div className="bg-red-600 hover:bg-red-700 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow border border-red-300 flex items-center gap-0.5 cursor-ew-resize select-none -translate-x-1/2 whitespace-nowrap">
                         <MoveHorizontal size={9} />
                         <span>{language === 'ar' ? `الهامش الأيمن: ${margins.right}مم` : `Right: ${margins.right}mm`}</span>
                       </div>
@@ -4508,11 +4508,11 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                     {/* 3. Top Margin Drag Line (Horizontal ↕) */}
                     <div 
                       onMouseDown={(e) => handleStartSectionDrag(e, 'margin_top')}
-                      className="absolute left-0 right-0 z-30 cursor-ns-resize group border-b border-dashed border-red-400 hover:border-red-600 transition-colors flex items-center justify-start pl-4 pointer-events-auto"
+                      className="absolute left-0 right-0 z-30 cursor-ns-resize group h-0 border-t border-dashed border-red-400 hover:border-red-600 transition-colors flex items-center justify-start pl-4 pointer-events-auto overflow-visible"
                       style={{ top: `${margins.top * zoomScale}px` }}
                       title={language === 'ar' ? 'سحب لتغيير الهامش العلوي ↕' : 'Drag to resize Top Margin ↕'}
                     >
-                      <div className="bg-red-600 hover:bg-red-700 text-white text-[8.5px] font-bold px-2 py-0.5 rounded-full shadow border border-red-300 flex items-center gap-1 cursor-ns-resize select-none -translate-y-1/2">
+                      <div className="bg-red-600 hover:bg-red-700 text-white text-[8.5px] font-bold px-2 py-0.5 rounded-full shadow border border-red-300 flex items-center gap-1 cursor-ns-resize select-none -translate-y-1/2 whitespace-nowrap">
                         <MoveVertical size={9} />
                         <span>{language === 'ar' ? `الهامش العلوي: ${margins.top}مم` : `Top Margin: ${margins.top}mm`}</span>
                       </div>
@@ -4521,11 +4521,11 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                     {/* 4. Header Height Resize Handle Line (Horizontal ↕) */}
                     <div 
                       onMouseDown={(e) => handleStartSectionDrag(e, 'header')}
-                      className="absolute left-0 right-0 z-30 cursor-ns-resize group border-b-2 border-emerald-500 hover:border-emerald-600 transition-colors flex items-center justify-center pointer-events-auto"
+                      className="absolute left-0 right-0 z-30 cursor-ns-resize group h-0 border-b-2 border-emerald-500 hover:border-emerald-600 transition-colors flex items-center justify-center pointer-events-auto overflow-visible"
                       style={{ top: `${(margins.top + designerLayout.headerHeight) * zoomScale}px` }}
                       title={language === 'ar' ? 'سحب لتغيير ارتفاع الهيدر ↕' : 'Drag to resize Header height ↕'}
                     >
-                      <div className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold px-3 py-0.5 rounded-full shadow-md border border-emerald-300 flex items-center gap-1 cursor-ns-resize transition-all transform group-hover:scale-105 select-none -translate-y-1/2">
+                      <div className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold px-3 py-0.5 rounded-full shadow-md border border-emerald-300 flex items-center gap-1 cursor-ns-resize transition-all transform group-hover:scale-105 select-none -translate-y-1/2 whitespace-nowrap">
                         <MoveVertical size={11} className="animate-pulse" />
                         <span>{language === 'ar' ? `ارتفاع الهيدر: ${designerLayout.headerHeight}مم` : `Header: ${designerLayout.headerHeight}mm`}</span>
                         <MoveVertical size={11} className="animate-pulse" />
@@ -4535,11 +4535,11 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                     {/* 5. Footer Height Resize Handle Line (Horizontal ↕) */}
                     <div 
                       onMouseDown={(e) => handleStartSectionDrag(e, 'footer')}
-                      className="absolute left-0 right-0 z-30 cursor-ns-resize group border-t-2 border-blue-500 hover:border-blue-600 transition-colors flex items-center justify-center pointer-events-auto"
+                      className="absolute left-0 right-0 z-30 cursor-ns-resize group h-0 border-t-2 border-blue-500 hover:border-blue-600 transition-colors flex items-center justify-center pointer-events-auto overflow-visible"
                       style={{ top: `${(paperHeight - margins.bottom - designerLayout.footerHeight) * zoomScale}px` }}
                       title={language === 'ar' ? 'سحب لتغيير ارتفاع الفوتر ↕' : 'Drag to resize Footer height ↕'}
                     >
-                      <div className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-extrabold px-3 py-0.5 rounded-full shadow-md border border-blue-300 flex items-center gap-1 cursor-ns-resize transition-all transform group-hover:scale-105 select-none -translate-y-1/2">
+                      <div className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-extrabold px-3 py-0.5 rounded-full shadow-md border border-blue-300 flex items-center gap-1 cursor-ns-resize transition-all transform group-hover:scale-105 select-none -translate-y-1/2 whitespace-nowrap">
                         <MoveVertical size={11} className="animate-pulse" />
                         <span>{language === 'ar' ? `ارتفاع الفوتر: ${designerLayout.footerHeight}مم` : `Footer: ${designerLayout.footerHeight}mm`}</span>
                         <MoveVertical size={11} className="animate-pulse" />
@@ -4549,11 +4549,11 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                     {/* 6. Bottom Margin Drag Line (Horizontal ↕) */}
                     <div 
                       onMouseDown={(e) => handleStartSectionDrag(e, 'margin_bottom')}
-                      className="absolute left-0 right-0 z-30 cursor-ns-resize group border-t border-dashed border-red-400 hover:border-red-600 transition-colors flex items-center justify-start pl-4 pointer-events-auto"
+                      className="absolute left-0 right-0 z-30 cursor-ns-resize group h-0 border-t border-dashed border-red-400 hover:border-red-600 transition-colors flex items-center justify-start pl-4 pointer-events-auto overflow-visible"
                       style={{ top: `${(paperHeight - margins.bottom) * zoomScale}px` }}
                       title={language === 'ar' ? 'سحب لتغيير الهامش السفلي ↕' : 'Drag to resize Bottom Margin ↕'}
                     >
-                      <div className="bg-red-600 hover:bg-red-700 text-white text-[8.5px] font-bold px-2 py-0.5 rounded-full shadow border border-red-300 flex items-center gap-1 cursor-ns-resize select-none -translate-y-1/2">
+                      <div className="bg-red-600 hover:bg-red-700 text-white text-[8.5px] font-bold px-2 py-0.5 rounded-full shadow border border-red-300 flex items-center gap-1 cursor-ns-resize select-none -translate-y-1/2 whitespace-nowrap">
                         <MoveVertical size={9} />
                         <span>{language === 'ar' ? `الهامش السفلي: ${margins.bottom}مم` : `Bottom Margin: ${margins.bottom}mm`}</span>
                       </div>
