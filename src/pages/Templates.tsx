@@ -4160,49 +4160,60 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
               <div className="flex-1 bg-zinc-100 border border-zinc-200 rounded-2xl overflow-auto p-8 flex items-center justify-center relative shadow-inner h-full">
                 
                 {/* RULERS & CANVAS WRAPPER */}
-                <div className="relative flex flex-col items-center justify-center inline-block">
+                <div className="relative flex flex-col items-start justify-center inline-block">
                   
-                  {/* ── TOP HORIZONTAL RULER ── */}
-                  <div 
-                    className="bg-white border border-zinc-300 rounded-t-lg relative overflow-hidden select-none mb-1.5 shadow-sm text-[9px] font-mono text-zinc-500"
-                    style={{
-                      width: `${paperWidth * zoomScale}px`,
-                      height: '24px'
-                    }}
-                  >
-                    {/* Left Margin Shading */}
+                  {/* ── TOP RULER ROW (CORNER SPACER + HORIZONTAL RULER) ── */}
+                  <div className="flex items-center mb-1.5">
+                    {/* Top-Left Ruler Corner Spacer */}
                     <div 
-                      className="absolute top-0 bottom-0 left-0 bg-red-500/15 border-r border-red-500/40 flex items-center justify-center text-[8px] font-extrabold text-red-600"
-                      style={{ width: `${margins.left * zoomScale}px` }}
-                      title={`الهامش الأيسر: ${margins.left}مم`}
-                    />
+                      className="bg-white border border-zinc-300 rounded-tl-lg mr-1.5 flex items-center justify-center text-[9px] font-mono font-bold text-zinc-400 select-none shadow-xs shrink-0"
+                      style={{ width: '24px', height: '24px' }}
+                    >
+                      mm
+                    </div>
 
-                    {/* Right Margin Shading */}
+                    {/* ── TOP HORIZONTAL RULER ── */}
                     <div 
-                      className="absolute top-0 bottom-0 right-0 bg-red-500/15 border-l border-red-500/40 flex items-center justify-center text-[8px] font-extrabold text-red-600"
-                      style={{ width: `${margins.right * zoomScale}px` }}
-                      title={`الهامش الأيمن: ${margins.right}مم`}
-                    />
+                      className="bg-white border border-zinc-300 rounded-tr-lg relative overflow-hidden select-none shadow-sm text-[9px] font-mono text-zinc-500 shrink-0"
+                      style={{
+                        width: `${paperWidth * zoomScale}px`,
+                        height: '24px'
+                      }}
+                    >
+                      {/* Left Margin Shading */}
+                      <div 
+                        className="absolute top-0 bottom-0 left-0 bg-red-500/15 border-r border-red-500/40 flex items-center justify-center text-[8px] font-extrabold text-red-600"
+                        style={{ width: `${margins.left * zoomScale}px` }}
+                        title={`الهامش الأيسر: ${margins.left}مم`}
+                      />
 
-                    {/* Major Centimeter Ticks (every 10mm / 1cm) */}
-                    {Array.from({ length: Math.floor(paperWidth / 10) + 1 }).map((_, cmIdx) => {
-                      const xPx = cmIdx * 10 * zoomScale;
-                      return (
-                        <div key={cmIdx} className="absolute top-0 bottom-0 flex flex-col items-center" style={{ left: `${xPx}px` }}>
-                          <div className="h-3 w-[1px] bg-zinc-400" />
-                          <span className="text-[8px] text-zinc-600 font-extrabold -ml-1 mt-0.5">{cmIdx}</span>
-                        </div>
-                      );
-                    })}
+                      {/* Right Margin Shading */}
+                      <div 
+                        className="absolute top-0 bottom-0 right-0 bg-red-500/15 border-l border-red-500/40 flex items-center justify-center text-[8px] font-extrabold text-red-600"
+                        style={{ width: `${margins.right * zoomScale}px` }}
+                        title={`الهامش الأيمن: ${margins.right}مم`}
+                      />
 
-                    {/* Minor Ticks (every 5mm) */}
-                    {Array.from({ length: Math.floor(paperWidth / 5) + 1 }).map((_, mm5Idx) => {
-                      if (mm5Idx % 2 === 0) return null;
-                      const xPx = mm5Idx * 5 * zoomScale;
-                      return (
-                        <div key={`sub-${mm5Idx}`} className="absolute top-0 h-2 w-[1px] bg-zinc-300" style={{ left: `${xPx}px` }} />
-                      );
-                    })}
+                      {/* Major Centimeter Ticks (every 10mm / 1cm) */}
+                      {Array.from({ length: Math.floor(paperWidth / 10) + 1 }).map((_, cmIdx) => {
+                        const xPx = cmIdx * 10 * zoomScale;
+                        return (
+                          <div key={cmIdx} className="absolute top-0 bottom-0 flex flex-col items-center" style={{ left: `${xPx}px` }}>
+                            <div className="h-3 w-[1px] bg-zinc-400" />
+                            <span className="text-[8px] text-zinc-600 font-extrabold -ml-1 mt-0.5">{cmIdx}</span>
+                          </div>
+                        );
+                      })}
+
+                      {/* Minor Ticks (every 5mm) */}
+                      {Array.from({ length: Math.floor(paperWidth / 5) + 1 }).map((_, mm5Idx) => {
+                        if (mm5Idx % 2 === 0) return null;
+                        const xPx = mm5Idx * 5 * zoomScale;
+                        return (
+                          <div key={`sub-${mm5Idx}`} className="absolute top-0 h-2 w-[1px] bg-zinc-300" style={{ left: `${xPx}px` }} />
+                        );
+                      })}
+                    </div>
                   </div>
 
                   <div className="flex items-start">
