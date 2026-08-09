@@ -4590,12 +4590,16 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                       </div>
                     </div>
 
-                    {/* Grid Lines Renderer */}
+                    {/* Grid Lines & Dots Renderer */}
                     {showGrid && (
                       <div 
                         className="absolute inset-0 pointer-events-none z-0" 
                         style={{
-                          backgroundImage: `radial-gradient(circle, #e4e4e7 1px, transparent 1px)`,
+                          backgroundImage: `
+                            linear-gradient(to right, rgba(226, 232, 240, 0.75) 1px, transparent 1px),
+                            linear-gradient(to bottom, rgba(226, 232, 240, 0.75) 1px, transparent 1px),
+                            radial-gradient(circle, #94a3b8 1.2px, transparent 1.2px)
+                          `,
                           backgroundSize: `${GRID_STEP * zoomScale}px ${GRID_STEP * zoomScale}px`
                         }}
                       />
