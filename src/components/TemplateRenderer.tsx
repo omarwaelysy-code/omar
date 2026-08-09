@@ -388,8 +388,44 @@ interface TemplateRendererProps {
   dir?: 'ltr' | 'rtl';
 }
 
+export function parseTemplateLayout(rawLayout: any): TemplateLayout {
+  if (!rawLayout) {
+    return { headerHeight: 75, footerHeight: 45, header: [], details: { columns: [] }, footer: [] };
+  }
+  let layoutObj = rawLayout;
+  if (typeof layoutObj === 'string') {
+    try {
+      layoutObj = JSON.parse(layoutObj);
+    } catch (_) {
+      return { headerHeight: 75, footerHeight: 45, header: [], details: { columns: [] }, footer: [] };
+    }
+  }
+  if (typeof layoutObj?.header === 'string') {
+    try { layoutObj.header = JSON.parse(layoutObj.header); } catch (_) {}
+  }
+  if (typeof layoutObj?.footer === 'string') {
+    try { layoutObj.footer = JSON.parse(layoutObj.footer); } catch (_) {}
+  }
+  if (typeof layoutObj?.details === 'string') {
+    try { layoutObj.details = JSON.parse(layoutObj.details); } catch (_) {}
+  }
+
+  return {
+    headerHeight: Number(layoutObj?.headerHeight ?? 75),
+    footerHeight: Number(layoutObj?.footerHeight ?? 45),
+    bgImage: layoutObj?.bgImage,
+    watermarkText: layoutObj?.watermarkText,
+    watermarkImage: layoutObj?.watermarkImage,
+    watermarkOpacity: layoutObj?.watermarkOpacity,
+    watermarkRotation: layoutObj?.watermarkRotation,
+    header: Array.isArray(layoutObj?.header) ? layoutObj.header : [],
+    details: layoutObj?.details || { columns: [] },
+    footer: Array.isArray(layoutObj?.footer) ? layoutObj.footer : []
+  };
+}
+
 export function TemplateRenderer({
-  layout,
+  layout: rawLayout,
   data,
   scale = 3.5,
   margin = { top: 10, bottom: 10, left: 10, right: 10 },
@@ -397,6 +433,7 @@ export function TemplateRenderer({
   height = 297,
   dir = 'rtl'
 }: TemplateRendererProps) {
+  const layout = parseTemplateLayout(rawLayout);
   const printableWidth = width - margin.left - margin.right;
   const printableHeight = height - margin.top - margin.bottom;
 

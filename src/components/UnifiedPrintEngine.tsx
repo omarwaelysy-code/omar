@@ -3,7 +3,7 @@ import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { X, Printer, Download, FileText, Settings, Sliders } from 'lucide-react';
-import { TemplateRenderer, normalizeDocumentData } from './TemplateRenderer';
+import { TemplateRenderer, normalizeDocumentData, parseTemplateLayout } from './TemplateRenderer';
 import { useNotification } from '../contexts/NotificationContext';
 import { PaperSize, Template, PrintProfile } from '../types';
 
@@ -340,15 +340,37 @@ export function UnifiedPrintEngine() {
         setPaperSizes(allSizes);
         setCompany(companyData);
 
-        // Helper for fuzzy document_type matching
-        const normalizeType = (t: string) => (t || '').toLowerCase().replace(/s$/, '').replace(/_s$/, '');
-        const opNorm = normalizeType(opType);
+        // Strict document_type matching function to prevent mixing sales vs purchase templates
+        const isSameDocumentType = (op: string, tDoc: string) => {
+          if (!op || !tDoc) return false;
+          if (op === tDoc) return true;
+          
+          const norm = (s: string) => (s || '').toLowerCase().replace(/s$/, '').replace(/_s$/, '');
+          const nOp = norm(op);
+          const nT = norm(tDoc);
+          if (nOp === nT) return true;
 
-        // Filter templates by document type & status
+          const isSalesInv = (s: string) => s === 'invoices' || s === 'invoice' || s === 'sales_invoices' || s === 'sales_invoice';
+          const isPurchInv = (s: string) => s === 'purchase_invoices' || s === 'purchase_invoice';
+          const isSalesOrd = (s: string) => s === 'sales_orders' || s === 'sales_order';
+          const isPurchOrd = (s: string) => s === 'purchase_orders' || s === 'purchase_order';
+          const isSalesRet = (s: string) => s === 'returns' || s === 'return' || s === 'sales_returns' || s === 'sales_return';
+          const isPurchRet = (s: string) => s === 'purchase_returns' || s === 'purchase_return';
+
+          if (isSalesInv(op) && isSalesInv(tDoc)) return true;
+          if (isPurchInv(op) && isPurchInv(tDoc)) return true;
+          if (isSalesOrd(op) && isSalesOrd(tDoc)) return true;
+          if (isPurchOrd(op) && isPurchOrd(tDoc)) return true;
+          if (isSalesRet(op) && isSalesRet(tDoc)) return true;
+          if (isPurchRet(op) && isPurchRet(tDoc)) return true;
+
+          return false;
+        };
+
+        // Filter templates by strict document type & status
         const matchedTemplates = allTemplates.filter(t => {
           if (!t.is_active) return false;
-          const tNorm = normalizeType(t.document_type);
-          return t.document_type === opType || tNorm === opNorm || (opNorm.includes('invoice') && tNorm.includes('invoice'));
+          return isSameDocumentType(opType, t.document_type);
         });
         setTemplates(matchedTemplates);
         setPrintProfiles(allProfiles);
@@ -685,8 +707,9 @@ export function UnifiedPrintEngine() {
       dto.margin_left = effectiveMarginLeft;
       dto.margin_right = effectiveMarginRight;
 
+      const parsedLayout = parseTemplateLayout(selectedTemplate.layout);
       dto.customLayout = {
-        ...(selectedTemplate.layout || {}),
+        ...parsedLayout,
         margins: {
           top: Number(effectiveMarginTop),
           bottom: Number(effectiveMarginBottom),

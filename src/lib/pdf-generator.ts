@@ -317,8 +317,20 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
       // Set default font
       doc.font('ArabicRegular').fontSize(isThermal ? 7.5 : 10);
 
-      const paperWidthMm = isThermal ? (dto.customLayout?.paperWidth || 80) : 210;
-      const ptPerMm = isThermal ? (pageWidth / paperWidthMm) : (595.28 / 210);
+      if (dto.customLayout) {
+        if (typeof dto.customLayout === 'string') {
+          try { dto.customLayout = JSON.parse(dto.customLayout); } catch (_) {}
+        }
+        if (typeof dto.customLayout?.header === 'string') {
+          try { dto.customLayout.header = JSON.parse(dto.customLayout.header); } catch (_) {}
+        }
+        if (typeof dto.customLayout?.footer === 'string') {
+          try { dto.customLayout.footer = JSON.parse(dto.customLayout.footer); } catch (_) {}
+        }
+        if (typeof dto.customLayout?.details === 'string') {
+          try { dto.customLayout.details = JSON.parse(dto.customLayout.details); } catch (_) {}
+        }
+      }
 
       const hasCustomLayout = Boolean(dto.customLayout && Array.isArray(dto.customLayout.header) && dto.customLayout.header.length > 0);
 
