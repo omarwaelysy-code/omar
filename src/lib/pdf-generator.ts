@@ -332,6 +332,9 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         }
       }
 
+      const paperWidthMm = isThermal ? (dto.customLayout?.paperWidth || 80) : 210;
+      const ptPerMm = isThermal ? (pageWidth / paperWidthMm) : (595.28 / 210);
+
       const hasCustomLayout = Boolean(dto.customLayout && Array.isArray(dto.customLayout.header) && dto.customLayout.header.length > 0);
 
       const sideMargin = hasCustomLayout 

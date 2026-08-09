@@ -389,15 +389,31 @@ interface TemplateRendererProps {
 }
 
 export function parseTemplateLayout(rawLayout: any): TemplateLayout {
+  const defaultDetails = {
+    columns: [],
+    properties: {
+      fontSize: 9.5,
+      borderColor: '#cbd5e1',
+      boldHeader: true,
+      headerBgColor: '#f8fafc',
+      bodyBgColor: '#ffffff',
+      borderWidth: 1,
+      paddingX: 2,
+      paddingY: 2,
+      rowHeight: 8,
+      fontFamily: 'Cairo'
+    }
+  };
+
   if (!rawLayout) {
-    return { headerHeight: 75, footerHeight: 45, header: [], details: { columns: [] }, footer: [] };
+    return { headerHeight: 75, footerHeight: 45, header: [], details: defaultDetails, footer: [] };
   }
   let layoutObj = rawLayout;
   if (typeof layoutObj === 'string') {
     try {
       layoutObj = JSON.parse(layoutObj);
     } catch (_) {
-      return { headerHeight: 75, footerHeight: 45, header: [], details: { columns: [] }, footer: [] };
+      return { headerHeight: 75, footerHeight: 45, header: [], details: defaultDetails, footer: [] };
     }
   }
   if (typeof layoutObj?.header === 'string') {
@@ -410,6 +426,8 @@ export function parseTemplateLayout(rawLayout: any): TemplateLayout {
     try { layoutObj.details = JSON.parse(layoutObj.details); } catch (_) {}
   }
 
+  const detailsObj = layoutObj?.details || defaultDetails;
+
   return {
     headerHeight: Number(layoutObj?.headerHeight ?? 75),
     footerHeight: Number(layoutObj?.footerHeight ?? 45),
@@ -419,7 +437,10 @@ export function parseTemplateLayout(rawLayout: any): TemplateLayout {
     watermarkOpacity: layoutObj?.watermarkOpacity,
     watermarkRotation: layoutObj?.watermarkRotation,
     header: Array.isArray(layoutObj?.header) ? layoutObj.header : [],
-    details: layoutObj?.details || { columns: [] },
+    details: {
+      columns: Array.isArray(detailsObj.columns) ? detailsObj.columns : [],
+      properties: detailsObj.properties || defaultDetails.properties
+    },
     footer: Array.isArray(layoutObj?.footer) ? layoutObj.footer : []
   };
 }
