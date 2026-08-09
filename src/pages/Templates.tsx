@@ -4268,10 +4268,6 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                     style={{
                       width: `${paperWidth * zoomScale}px`,
                       minHeight: `${paperHeight * zoomScale}px`,
-                      paddingTop: `${margins.top * zoomScale}px`,
-                      paddingBottom: `${margins.bottom * zoomScale}px`,
-                      paddingLeft: `${margins.left * zoomScale}px`,
-                      paddingRight: `${margins.right * zoomScale}px`,
                       backgroundImage: designerLayout.bgImage ? `url(${designerLayout.bgImage})` : 'none',
                       backgroundSize: 'cover',
                       backgroundPosition: 'center',
@@ -4311,131 +4307,143 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                       </div>
                     )}
 
-                    {/* Header */}
-                    <div style={{ height: `${designerLayout.headerHeight * zoomScale}px`, width: '100%' }} className="relative">
-                      {designerLayout.header.filter(el => !el.properties.hidden).map(el => (
-                        <div
-                          key={el.id}
-                          className="absolute flex items-center"
+                    {/* PRINTABLE SECTIONS WRAPPER WITH PADDING */}
+                    <div
+                      className="w-full min-h-full relative z-10 flex flex-col justify-between"
+                      style={{
+                        paddingTop: `${margins.top * zoomScale}px`,
+                        paddingBottom: `${margins.bottom * zoomScale}px`,
+                        paddingLeft: `${margins.left * zoomScale}px`,
+                        paddingRight: `${margins.right * zoomScale}px`,
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      {/* Header */}
+                      <div style={{ height: `${designerLayout.headerHeight * zoomScale}px`, width: '100%' }} className="relative">
+                        {designerLayout.header.filter(el => !el.properties.hidden).map(el => (
+                          <div
+                            key={el.id}
+                            className="absolute flex items-center"
+                            style={{
+                              left: `${el.x * zoomScale}px`,
+                              top: `${el.y * zoomScale}px`,
+                              width: `${el.width * zoomScale}px`,
+                              height: `${el.height * zoomScale}px`,
+                              fontFamily: el.properties.fontFamily || 'Cairo',
+                              fontSize: `${(el.properties.fontSize || 10) * (zoomScale / 3.5)}pt`,
+                              fontWeight: el.properties.bold ? 'bold' : 'normal',
+                              fontStyle: el.properties.italic ? 'italic' : 'normal',
+                              textDecoration: el.properties.underline ? 'underline' : 'none',
+                              color: el.properties.color || '#000000',
+                              backgroundColor: el.properties.backgroundColor || 'transparent',
+                              border: el.properties.borderWidth ? `${el.properties.borderWidth}px solid ${el.properties.borderColor || '#000'}` : 'none',
+                              borderRadius: el.type === 'circle' ? '9999px' : el.properties.borderRadius ? `${el.properties.borderRadius}px` : '0px',
+                              textAlign: el.properties.align || 'left',
+                              opacity: el.properties.opacity ?? 1,
+                              transform: `rotate(${el.properties.rotation || 0}deg)`,
+                              justifyContent: el.properties.align === 'center' ? 'center' : el.properties.align === 'right' ? 'flex-end' : 'flex-start',
+                              padding: `${(el.properties.padding || 0) * zoomScale}px`
+                            }}
+                          >
+                            {renderElementInnerContent(el, true)}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Details Table */}
+                      <div className="my-5 relative z-10">
+                        <table
+                          className="w-full border-collapse"
                           style={{
-                            left: `${el.x * zoomScale}px`,
-                            top: `${el.y * zoomScale}px`,
-                            width: `${el.width * zoomScale}px`,
-                            height: `${el.height * zoomScale}px`,
-                            fontFamily: el.properties.fontFamily || 'Cairo',
-                            fontSize: `${(el.properties.fontSize || 10) * (zoomScale / 3.5)}pt`,
-                            fontWeight: el.properties.bold ? 'bold' : 'normal',
-                            fontStyle: el.properties.italic ? 'italic' : 'normal',
-                            textDecoration: el.properties.underline ? 'underline' : 'none',
-                            color: el.properties.color || '#000000',
-                            backgroundColor: el.properties.backgroundColor || 'transparent',
-                            border: el.properties.borderWidth ? `${el.properties.borderWidth}px solid ${el.properties.borderColor || '#000'}` : 'none',
-                            borderRadius: el.type === 'circle' ? '9999px' : el.properties.borderRadius ? `${el.properties.borderRadius}px` : '0px',
-                            textAlign: el.properties.align || 'left',
-                            opacity: el.properties.opacity ?? 1,
-                            transform: `rotate(${el.properties.rotation || 0}deg)`,
-                            justifyContent: el.properties.align === 'center' ? 'center' : el.properties.align === 'right' ? 'flex-end' : 'flex-start',
-                            padding: `${(el.properties.padding || 0) * zoomScale}px`
+                            fontSize: `${(designerLayout.details.properties.fontSize || 10) * (zoomScale / 3.5)}pt`,
+                            fontFamily: designerLayout.details.properties.fontFamily || 'Cairo',
+                            borderColor: designerLayout.details.properties.borderColor || '#e4e4e7'
                           }}
                         >
-                          {renderElementInnerContent(el, true)}
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Details Table */}
-                    <div className="my-5 relative z-10">
-                      <table
-                        className="w-full border-collapse"
-                        style={{
-                          fontSize: `${(designerLayout.details.properties.fontSize || 10) * (zoomScale / 3.5)}pt`,
-                          fontFamily: designerLayout.details.properties.fontFamily || 'Cairo',
-                          borderColor: designerLayout.details.properties.borderColor || '#e4e4e7'
-                        }}
-                      >
-                        <thead>
-                          <tr
-                            style={{
-                              backgroundColor: designerLayout.details.properties.headerBgColor || '#f4f4f5',
-                              borderColor: designerLayout.details.properties.borderColor || '#e4e4e7'
-                            }}
-                            className="border-b"
-                          >
-                            {designerLayout.details.columns.map(col => (
-                              <th
-                                key={col.id}
-                                className={`border border-zinc-200 p-2 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
-                                style={{
-                                  width: `${col.width}%`,
-                                  borderColor: designerLayout.details.properties.borderColor || '#e4e4e7',
-                                  fontWeight: designerLayout.details.properties.boldHeader ? 'bold' : 'normal',
-                                  padding: `${designerLayout.details.properties.paddingY ?? 2}px ${designerLayout.details.properties.paddingX ?? 2}px`
-                                }}
-                              >
-                                {col.label}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {previewDocData.items.map((item, rowIdx) => (
+                          <thead>
                             <tr
-                              key={rowIdx}
                               style={{
-                                backgroundColor: designerLayout.details.properties.bodyBgColor || '#ffffff',
-                                borderColor: designerLayout.details.properties.borderColor || '#e4e4e7',
-                                height: `${(designerLayout.details.properties.rowHeight || 8) * zoomScale}px`
+                                backgroundColor: designerLayout.details.properties.headerBgColor || '#f4f4f5',
+                                borderColor: designerLayout.details.properties.borderColor || '#e4e4e7'
                               }}
                               className="border-b"
                             >
                               {designerLayout.details.columns.map(col => (
-                                <td
+                                <th
                                   key={col.id}
-                                  className="border p-2 text-zinc-700"
+                                  className={`border border-zinc-200 p-2 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
                                   style={{
+                                    width: `${col.width}%`,
                                     borderColor: designerLayout.details.properties.borderColor || '#e4e4e7',
+                                    fontWeight: designerLayout.details.properties.boldHeader ? 'bold' : 'normal',
                                     padding: `${designerLayout.details.properties.paddingY ?? 2}px ${designerLayout.details.properties.paddingX ?? 2}px`
                                   }}
                                 >
-                                  {item[col.field as keyof typeof item] ?? `[${col.label}]`}
-                                </td>
+                                  {col.label}
+                                </th>
                               ))}
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                          </thead>
+                          <tbody>
+                            {previewDocData.items.map((item, rowIdx) => (
+                              <tr
+                                key={rowIdx}
+                                style={{
+                                  backgroundColor: designerLayout.details.properties.bodyBgColor || '#ffffff',
+                                  borderColor: designerLayout.details.properties.borderColor || '#e4e4e7',
+                                  height: `${(designerLayout.details.properties.rowHeight || 8) * zoomScale}px`
+                                }}
+                                className="border-b"
+                              >
+                                {designerLayout.details.columns.map(col => (
+                                  <td
+                                    key={col.id}
+                                    className="border p-2 text-zinc-700"
+                                    style={{
+                                      borderColor: designerLayout.details.properties.borderColor || '#e4e4e7',
+                                      padding: `${designerLayout.details.properties.paddingY ?? 2}px ${designerLayout.details.properties.paddingX ?? 2}px`
+                                    }}
+                                  >
+                                    {item[col.field as keyof typeof item] ?? `[${col.label}]`}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
 
-                    {/* Footer */}
-                    <div style={{ height: `${designerLayout.footerHeight * zoomScale}px`, width: '100%' }} className="relative">
-                      {designerLayout.footer.filter(el => !el.properties.hidden).map(el => (
-                        <div
-                          key={el.id}
-                          className="absolute flex items-center"
-                          style={{
-                            left: `${el.x * zoomScale}px`,
-                            top: `${el.y * zoomScale}px`,
-                            width: `${el.width * zoomScale}px`,
-                            height: `${el.height * zoomScale}px`,
-                            fontFamily: el.properties.fontFamily || 'Cairo',
-                            fontSize: `${(el.properties.fontSize || 10) * (zoomScale / 3.5)}pt`,
-                            fontWeight: el.properties.bold ? 'bold' : 'normal',
-                            fontStyle: el.properties.italic ? 'italic' : 'normal',
-                            textDecoration: el.properties.underline ? 'underline' : 'none',
-                            color: el.properties.color || '#000000',
-                            backgroundColor: el.properties.backgroundColor || 'transparent',
-                            border: el.properties.borderWidth ? `${el.properties.borderWidth}px solid ${el.properties.borderColor || '#000'}` : 'none',
-                            borderRadius: el.type === 'circle' ? '9999px' : el.properties.borderRadius ? `${el.properties.borderRadius}px` : '0px',
-                            textAlign: el.properties.align || 'left',
-                            opacity: el.properties.opacity ?? 1,
-                            transform: `rotate(${el.properties.rotation || 0}deg)`,
-                            justifyContent: el.properties.align === 'center' ? 'center' : el.properties.align === 'right' ? 'flex-end' : 'flex-start',
-                            padding: `${(el.properties.padding || 0) * zoomScale}px`
-                          }}
-                        >
-                          {renderElementInnerContent(el, true)}
-                        </div>
-                      ))}
+                      {/* Footer */}
+                      <div style={{ height: `${designerLayout.footerHeight * zoomScale}px`, width: '100%' }} className="relative">
+                        {designerLayout.footer.filter(el => !el.properties.hidden).map(el => (
+                          <div
+                            key={el.id}
+                            className="absolute flex items-center"
+                            style={{
+                              left: `${el.x * zoomScale}px`,
+                              top: `${el.y * zoomScale}px`,
+                              width: `${el.width * zoomScale}px`,
+                              height: `${el.height * zoomScale}px`,
+                              fontFamily: el.properties.fontFamily || 'Cairo',
+                              fontSize: `${(el.properties.fontSize || 10) * (zoomScale / 3.5)}pt`,
+                              fontWeight: el.properties.bold ? 'bold' : 'normal',
+                              fontStyle: el.properties.italic ? 'italic' : 'normal',
+                              textDecoration: el.properties.underline ? 'underline' : 'none',
+                              color: el.properties.color || '#000000',
+                              backgroundColor: el.properties.backgroundColor || 'transparent',
+                              border: el.properties.borderWidth ? `${el.properties.borderWidth}px solid ${el.properties.borderColor || '#000'}` : 'none',
+                              borderRadius: el.type === 'circle' ? '9999px' : el.properties.borderRadius ? `${el.properties.borderRadius}px` : '0px',
+                              textAlign: el.properties.align || 'left',
+                              opacity: el.properties.opacity ?? 1,
+                              transform: `rotate(${el.properties.rotation || 0}deg)`,
+                              justifyContent: el.properties.align === 'center' ? 'center' : el.properties.align === 'right' ? 'flex-end' : 'flex-start',
+                              padding: `${(el.properties.padding || 0) * zoomScale}px`
+                            }}
+                          >
+                            {renderElementInnerContent(el, true)}
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
                   </div>
@@ -4446,10 +4454,6 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                     style={{
                       width: `${paperWidth * zoomScale}px`,
                       minHeight: `${paperHeight * zoomScale}px`,
-                      paddingTop: `${margins.top * zoomScale}px`,
-                      paddingBottom: `${margins.bottom * zoomScale}px`,
-                      paddingLeft: `${margins.left * zoomScale}px`,
-                      paddingRight: `${margins.right * zoomScale}px`,
                       backgroundImage: designerLayout.bgImage ? `url(${designerLayout.bgImage})` : 'none',
                       backgroundSize: 'cover',
                       backgroundPosition: 'center',
@@ -4601,6 +4605,18 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                         ))}
                       </div>
                     )}
+
+                    {/* PRINTABLE SECTIONS WRAPPER WITH PADDING */}
+                    <div
+                      className="w-full min-h-full relative z-10 flex flex-col justify-between"
+                      style={{
+                        paddingTop: `${margins.top * zoomScale}px`,
+                        paddingBottom: `${margins.bottom * zoomScale}px`,
+                        paddingLeft: `${margins.left * zoomScale}px`,
+                        paddingRight: `${margins.right * zoomScale}px`,
+                        boxSizing: 'border-box'
+                      }}
+                    >
 
                     {/* SECTION 1: HEADER CANVAS */}
                     <div 
@@ -4850,6 +4866,8 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                         </div>
                       ))}
                     </div>
+
+                    </div> {/* END PRINTABLE SECTIONS WRAPPER */}
 
                   </div>
                 )}
