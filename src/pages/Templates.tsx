@@ -1390,6 +1390,37 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
   const margins = getEffectiveMargins();
   const printableWidth = paperWidth - margins.left - margins.right;
 
+  // Auto-clamp elements within printable boundaries whenever margins or paper size change
+  useEffect(() => {
+    if (!printableWidth || printableWidth <= 0) return;
+    setDesignerLayout(prev => {
+      let changed = false;
+      const clampElements = (elems: TemplateElement[]) => {
+        return elems.map(el => {
+          const validWidth = Math.min(el.width, printableWidth);
+          const maxX = Math.max(0, printableWidth - validWidth);
+          const newX = Math.min(Math.max(0, el.x), maxX);
+          
+          if (newX !== el.x || validWidth !== el.width) {
+            changed = true;
+            return { ...el, x: newX, width: validWidth };
+          }
+          return el;
+        });
+      };
+
+      const newHeader = clampElements(prev.header);
+      const newFooter = clampElements(prev.footer);
+
+      if (!changed) return prev;
+      return {
+        ...prev,
+        header: newHeader,
+        footer: newFooter
+      };
+    });
+  }, [printableWidth]);
+
   // Add Element to Canvas
   const handleAddElement = (type: TemplateElement['type'], binding?: string, label?: string) => {
     const section = selectedSection === 'footer' ? 'footer' : 'header';
