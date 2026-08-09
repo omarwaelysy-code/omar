@@ -2276,7 +2276,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
       setValidationErrors(errors);
       setIsValidationModalOpen(true);
     } else {
-      setIsVersionModalOpen(true);
+      handleSubmit('');
     }
   };
 
@@ -6099,7 +6099,7 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                         type="button"
                         onClick={() => {
                           setIsValidationModalOpen(false);
-                          setIsVersionModalOpen(true);
+                          handleSubmit('');
                         }}
                         className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-black transition-all shadow-lg shadow-emerald-600/20 hover:shadow-emerald-600/35"
                       >
@@ -6107,64 +6107,6 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                         <span>
                           {language === 'ar' ? 'حفظ مع الأخطاء والمتابعة' : 'Save Design With Errors'}
                         </span>
-                      </button>
-                    </div>
-                  </motion.div>
-                </div>
-              )}
-            </AnimatePresence>
-
-            {/* Version Change Notes Modal */}
-            <AnimatePresence>
-              {isVersionModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] flex items-center justify-center p-4">
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                    className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-zinc-100 p-6 space-y-4 font-bold Cairo"
-                  >
-                    <div className="flex items-center gap-2.5 text-zinc-900 border-b border-zinc-100 pb-3">
-                      <Info className="text-emerald-600" size={20} />
-                      <h3 className="text-base font-black">
-                        {language === 'ar' ? 'ملاحظات الإصدار الجديد' : 'Version Change Notes'}
-                      </h3>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-zinc-600 font-bold">
-                        {language === 'ar' ? 'ما هي التغييرات التي أجريتها؟' : 'What changes did you make?'}
-                      </label>
-                      <textarea
-                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl text-xs outline-none focus:bg-white focus:border-emerald-600 transition-all font-semibold"
-                        rows={4}
-                        placeholder={
-                          language === 'ar'
-                            ? 'مثال: تعديل مقاسات الهوامش وإضافة كود الصنف للجدول...'
-                            : 'e.g., Adjusted margins and added item code to the table...'
-                        }
-                        value={changeNotes}
-                        onChange={(e) => setChangeNotes(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-end gap-3 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsVersionModalOpen(false);
-                          setChangeNotes('');
-                        }}
-                        className="px-4 py-2 border border-zinc-200 hover:bg-zinc-100 text-zinc-700 rounded-xl text-xs font-bold transition-all"
-                      >
-                        {language === 'ar' ? 'إلغاء' : 'Cancel'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSubmit(changeNotes)}
-                        className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-600/10 hover:shadow-emerald-600/25"
-                      >
-                        {language === 'ar' ? 'حفظ الإصدار والتصميم' : 'Save Version & Design'}
                       </button>
                     </div>
                   </motion.div>
