@@ -460,26 +460,26 @@ export function CompanySettings() {
       </div>
 
       <form onSubmit={handleSave} className="space-y-8">
-        {/* Card 1: Logo Section */}
+        {/* Card 1: Logo & Basic Info */}
         <div className="bg-white p-8 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-6">
           <div className="flex items-center gap-2 text-indigo-600 justify-end">
-            <span className="font-bold text-lg">{t('company_settings.logo')}</span>
-            <ImageIcon className="w-5 h-5" />
+            <span className="font-bold text-lg">{language === 'ar' ? 'المعلومات الأساسية والشعار' : 'Basic Information & Logo'}</span>
+            <FileText className="w-5 h-5" />
           </div>
 
-          <div className="flex flex-col md:flex-row-reverse items-center gap-6 justify-between">
+          <div className="flex flex-col md:flex-row-reverse items-center gap-6 justify-between border-b border-slate-100 pb-6">
             {/* Logo box */}
-            <div className="w-32 h-32 bg-slate-50 border border-slate-100 rounded-3xl flex items-center justify-center relative overflow-hidden flex-shrink-0">
+            <div className="w-28 h-28 bg-slate-50 border border-slate-100 rounded-3xl flex items-center justify-center relative overflow-hidden flex-shrink-0">
               {data.logo_url ? (
                 <img src={data.logo_url} alt="Logo" className="w-full h-full object-contain p-2" referrerPolicy="no-referrer" />
               ) : (
-                <Building2 className="w-12 h-12 text-slate-300" />
+                <Building2 className="w-10 h-10 text-slate-300" />
               )}
               <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
             </div>
 
             {/* Helper text */}
-            <p className="text-slate-400 text-sm font-medium flex-1 text-center md:text-right leading-relaxed">
+            <p className="text-slate-400 text-xs font-medium flex-1 text-center md:text-right leading-relaxed">
               {language === 'ar' 
                 ? 'يفضّل استخدام صورة مربعة بحجم 512x512 بيكسل على الأقل' 
                 : 'Prefer a square image, 512x512px at least'}
@@ -491,7 +491,7 @@ export function CompanySettings() {
                 <button
                   type="button"
                   onClick={() => setData(prev => ({ ...prev, logo_url: '' }))}
-                  className="px-4 py-2 bg-transparent text-rose-500 hover:text-rose-600 font-bold text-sm transition-colors rounded-xl"
+                  className="px-4 py-2 bg-transparent text-rose-500 hover:text-rose-600 font-bold text-xs transition-colors rounded-xl"
                 >
                   {t('common.delete')}
                 </button>
@@ -499,23 +499,15 @@ export function CompanySettings() {
               <button
                 type="button"
                 onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
-                className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100/80 text-indigo-600 px-5 py-2.5 rounded-2xl font-bold text-sm transition-all shadow-sm"
+                className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100/80 text-indigo-600 px-5 py-2.5 rounded-2xl font-bold text-xs transition-all shadow-sm"
               >
-                <Upload size={16} />
-                <span>{data.logo_url ? (language === 'ar' ? 'تغيير' : 'Change') : (language === 'ar' ? 'إضافة' : 'Add')}</span>
+                <Upload size={14} />
+                <span>{data.logo_url ? (language === 'ar' ? 'تغيير الشعار' : 'Change Logo') : (language === 'ar' ? 'إضافة شعار' : 'Add Logo')}</span>
               </button>
             </div>
           </div>
-        </div>
 
-        {/* Card 2: Basic Info */}
-        <div className="bg-white p-8 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-6">
-          <div className="flex items-center gap-2 text-indigo-600 justify-end">
-            <span className="font-bold text-lg">{language === 'ar' ? 'المعلومات الأساسية' : 'Basic Information'}</span>
-            <FileText className="w-5 h-5" />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
             <div>
               <label className="block text-sm font-semibold text-slate-500 mb-2">
                 {t('company_settings.name')}
@@ -524,7 +516,7 @@ export function CompanySettings() {
                 type="text"
                 value={data.name}
                 onChange={(e) => setData({ ...data, name: e.target.value })}
-                className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-slate-800 font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
+                className="w-full px-5 py-3 bg-white border border-slate-200 rounded-2xl text-slate-800 font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all text-sm"
               />
             </div>
 
@@ -536,7 +528,7 @@ export function CompanySettings() {
                 type="text"
                 value={data.commercial_register}
                 onChange={(e) => setData({ ...data, commercial_register: e.target.value })}
-                className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-slate-800 font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
+                className="w-full px-5 py-3 bg-white border border-slate-200 rounded-2xl text-slate-800 font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all text-sm"
               />
             </div>
 
@@ -548,7 +540,7 @@ export function CompanySettings() {
                 type="text"
                 value={data.tax_number}
                 onChange={(e) => setData({ ...data, tax_number: e.target.value })}
-                className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-slate-800 font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
+                className="w-full px-5 py-3 bg-white border border-slate-200 rounded-2xl text-slate-800 font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all text-sm"
               />
             </div>
 
@@ -564,7 +556,7 @@ export function CompanySettings() {
                 renderOption={(o) => (
                   <div className="flex items-center gap-3 whitespace-nowrap">
                     <span className="text-xl">{o.flag}</span>
-                    <span className="font-semibold text-base">{language === 'ar' ? o.nameAr : o.name}</span>
+                    <span className="font-semibold text-sm">{language === 'ar' ? o.nameAr : o.name}</span>
                   </div>
                 )}
                 filterFn={(o, q) => 
@@ -580,72 +572,77 @@ export function CompanySettings() {
                 {t('company_settings.address')}
               </label>
               <div className="relative group">
-                <MapPin className={`absolute ${dir === 'rtl' ? 'right-5' : 'left-5'} top-4 w-5 h-5 text-slate-300 group-focus-within:text-indigo-500 transition-colors pointer-events-none`} />
+                <MapPin className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-slate-300 group-focus-within:text-indigo-500 transition-colors pointer-events-none`} />
                 <textarea
                   value={data.address}
                   onChange={(e) => setData({ ...data, address: e.target.value })}
-                  rows={3}
-                  className={`w-full ${dir === 'rtl' ? 'pr-12 pl-5' : 'pl-12 pr-5'} py-3.5 bg-white border border-slate-200 rounded-2xl text-slate-800 font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all min-h-[100px]`}
+                  rows={2}
+                  className={`w-full ${dir === 'rtl' ? 'pr-11 pl-4' : 'pl-11 pr-4'} py-3 bg-white border border-slate-200 rounded-2xl text-slate-800 font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all text-sm min-h-[70px]`}
                 />
               </div>
             </div>
 
-            {/* VAT Toggle inside Card 2 */}
-            <div className="md:col-span-2 pt-6 border-t border-slate-100 flex items-center justify-between cursor-pointer select-none"
-              onClick={() => setData(prev => ({ ...prev, vat_enabled: !prev.vat_enabled }))}
-            >
-              <div className="flex flex-col gap-0.5">
-                <span className="font-bold text-slate-800 text-base">
-                  {t('company_settings.vat_enabled')}
-                </span>
-                <span className="text-xs font-semibold text-slate-400">
-                  {t('company_settings.vat_enabled_desc')}
-                </span>
-              </div>
+            {/* VAT & WHT Toggles side-by-side in grid */}
+            <div className="md:col-span-2 pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* VAT Toggle */}
               <div 
-                className={`relative w-14 h-8 rounded-full transition-all duration-300 shadow-inner ${data.vat_enabled ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                className="flex items-center justify-between cursor-pointer select-none p-3.5 rounded-2xl border border-slate-100 hover:bg-slate-50/80 transition-colors"
+                onClick={() => setData(prev => ({ ...prev, vat_enabled: !prev.vat_enabled }))}
               >
-                <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
-                  dir === 'rtl'
-                    ? (data.vat_enabled ? 'translate-x-[-120%]' : 'translate-x-[-10%]')
-                    : (data.vat_enabled ? 'translate-x-[120%]' : 'translate-x-[10%]')
-                }`} />
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-bold text-slate-800 text-sm">
+                    {t('company_settings.vat_enabled')}
+                  </span>
+                  <span className="text-[11px] font-medium text-slate-400">
+                    {t('company_settings.vat_enabled_desc')}
+                  </span>
+                </div>
+                <div 
+                  className={`relative w-12 h-7 rounded-full transition-all duration-300 shadow-inner ms-3 flex-shrink-0 ${data.vat_enabled ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                >
+                  <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
+                    dir === 'rtl'
+                      ? (data.vat_enabled ? 'translate-x-[-110%]' : 'translate-x-[-5%]')
+                      : (data.vat_enabled ? 'translate-x-[110%]' : 'translate-x-[5%]')
+                  }`} />
+                </div>
               </div>
-            </div>
 
-            {/* WHT Toggle inside Card 2 */}
-            <div className="md:col-span-2 pt-6 border-t border-slate-100 flex items-center justify-between cursor-pointer select-none"
-              onClick={() => setData(prev => ({ ...prev, wht_enabled: !prev.wht_enabled }))}
-            >
-              <div className="flex flex-col gap-0.5">
-                <span className="font-bold text-slate-800 text-base">
-                  {t('company_settings.wht_enabled')}
-                </span>
-                <span className="text-xs font-semibold text-slate-400">
-                  {t('company_settings.wht_enabled_desc')}
-                </span>
-              </div>
+              {/* WHT Toggle */}
               <div 
-                className={`relative w-14 h-8 rounded-full transition-all duration-300 shadow-inner ${data.wht_enabled ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                className="flex items-center justify-between cursor-pointer select-none p-3.5 rounded-2xl border border-slate-100 hover:bg-slate-50/80 transition-colors"
+                onClick={() => setData(prev => ({ ...prev, wht_enabled: !prev.wht_enabled }))}
               >
-                <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
-                  dir === 'rtl'
-                    ? (data.wht_enabled ? 'translate-x-[-120%]' : 'translate-x-[-10%]')
-                    : (data.wht_enabled ? 'translate-x-[120%]' : 'translate-x-[10%]')
-                }`} />
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-bold text-slate-800 text-sm">
+                    {t('company_settings.wht_enabled')}
+                  </span>
+                  <span className="text-[11px] font-medium text-slate-400">
+                    {t('company_settings.wht_enabled_desc')}
+                  </span>
+                </div>
+                <div 
+                  className={`relative w-12 h-7 rounded-full transition-all duration-300 shadow-inner ms-3 flex-shrink-0 ${data.wht_enabled ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                >
+                  <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
+                    dir === 'rtl'
+                      ? (data.wht_enabled ? 'translate-x-[-110%]' : 'translate-x-[-5%]')
+                      : (data.wht_enabled ? 'translate-x-[110%]' : 'translate-x-[5%]')
+                  }`} />
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Card 3: Financial Settings */}
-        <div className="bg-white p-8 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-8">
+        {/* Card 2: Financial, Currency & Exchange Rates Section (ALL Currency settings unified in ONE place) */}
+        <div className="bg-white p-8 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-6">
           <div className="flex items-center gap-2 text-indigo-600 justify-end">
-            <span className="font-bold text-lg">{language === 'ar' ? 'الإعدادات المالية' : 'Financial Settings'}</span>
+            <span className="font-bold text-lg">{language === 'ar' ? 'إعدادات العملات وأسعار الصرف' : 'Currency & Exchange Rate Settings'}</span>
             <Coins className="w-5 h-5" />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
             <div>
               <SearchableSelect
                 label={t('company_settings.currency')}
@@ -672,11 +669,11 @@ export function CompanySettings() {
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <label className="block text-sm font-semibold text-slate-500 mb-2">
                 {t('company_settings.fiscal_year_end')}*
               </label>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="relative group">
                   <select
                     value={data.fiscal_year_month}
@@ -689,7 +686,7 @@ export function CompanySettings() {
                             fiscal_year_day: data.fiscal_year_day > maxDays ? maxDays : data.fiscal_year_day
                         });
                     }}
-                    className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-slate-800 font-semibold hover:border-indigo-500 hover:ring-2 hover:ring-indigo-500/5 outline-none appearance-none cursor-pointer transition-all"
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-slate-800 text-sm font-semibold hover:border-indigo-500 hover:ring-2 hover:ring-indigo-500/5 outline-none appearance-none cursor-pointer transition-all"
                   >
                     {MONTHS.map(m => (
                       <option key={m.value} value={m.value} className="text-slate-900">
@@ -697,30 +694,33 @@ export function CompanySettings() {
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform group-focus-within:rotate-180`} />
+                  <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform group-focus-within:rotate-180`} />
                 </div>
                 <div className="relative group">
                   <select
                     value={data.fiscal_year_day}
                     onChange={(e) => setData({ ...data, fiscal_year_day: parseInt(e.target.value) })}
-                    className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-slate-800 font-semibold hover:border-indigo-500 hover:ring-2 hover:ring-indigo-500/5 outline-none appearance-none cursor-pointer transition-all"
+                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-slate-800 text-sm font-semibold hover:border-indigo-500 hover:ring-2 hover:ring-indigo-500/5 outline-none appearance-none cursor-pointer transition-all"
                   >
                     {Array.from({ length: daysInMonth(data.fiscal_year_month) }, (_, i) => i + 1).map(d => (
                       <option key={d} value={d} className="text-slate-900">{d}</option>
                     ))}
                   </select>
-                  <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform group-focus-within:rotate-180`} />
+                  <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform group-focus-within:rotate-180`} />
                 </div>
               </div>
-              <p className="text-[10px] font-bold text-slate-450 text-slate-400 text-center leading-relaxed mt-2 uppercase tracking-wide">
+              <p className="text-[10px] font-bold text-slate-400 text-center leading-relaxed mt-1">
                 * {language === 'ar' 
                   ? 'سيتم تعيين السنة المالية لتنتهي في هذا التاريخ من كل عام.' 
                   : 'Fiscal year will close automatically on this day annually.'}
               </p>
             </div>
+          </div>
 
-            {/* Multi-Currency Toggle inside Card 3 */}
-            <div className={`md:col-span-2 pt-6 border-t border-slate-100 flex items-center justify-between cursor-pointer select-none`}
+          {/* Multi-Currency Toggle Section */}
+          <div className="pt-5 border-t border-slate-100 space-y-4">
+            <div 
+              className="flex items-center justify-between cursor-pointer select-none p-4 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors"
               onClick={() => setData(prev => ({ ...prev, enable_multi_currency: !prev.enable_multi_currency }))}
             >
               <div className="flex flex-col gap-0.5">
@@ -734,7 +734,7 @@ export function CompanySettings() {
                 </span>
               </div>
               <div 
-                className={`relative w-14 h-8 rounded-full transition-all duration-300 shadow-inner ${data.enable_multi_currency ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                className={`relative w-14 h-8 rounded-full transition-all duration-300 shadow-inner ms-4 flex-shrink-0 ${data.enable_multi_currency ? 'bg-indigo-600' : 'bg-slate-200'}`}
               >
                 <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
                   dir === 'rtl'
@@ -744,9 +744,9 @@ export function CompanySettings() {
               </div>
             </div>
 
-            {/* Method selection (Manual vs Auto) */}
+            {/* Method Selection (Manual vs Automatic) */}
             {data.enable_multi_currency && (
-              <div className="md:col-span-2 pt-6 border-t border-slate-100 space-y-3">
+              <div className="pt-3 space-y-4">
                 <label className="block text-sm font-semibold text-slate-500">
                   {language === 'ar' ? 'طريقة تحديث أسعار الصرف' : 'Exchange Rate Update Method'}
                 </label>
@@ -756,7 +756,7 @@ export function CompanySettings() {
                     onClick={() => setData(prev => ({ ...prev, exchange_rate_update_method: 'manual' }))}
                     className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                       data.exchange_rate_update_method === 'manual'
-                        ? 'border-indigo-600 bg-indigo-50/20'
+                        ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
                         : 'border-slate-100 bg-white hover:border-slate-200'
                     }`}
                   >
@@ -778,7 +778,7 @@ export function CompanySettings() {
                     onClick={() => setData(prev => ({ ...prev, exchange_rate_update_method: 'auto' }))}
                     className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                       data.exchange_rate_update_method === 'auto'
-                        ? 'border-indigo-600 bg-indigo-50/20'
+                        ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
                         : 'border-slate-100 bg-white hover:border-slate-200'
                     }`}
                   >
@@ -795,28 +795,174 @@ export function CompanySettings() {
                     </span>
                   </div>
                 </div>
+
+                {/* Automatic Exchange Rate Settings Block embedded directly HERE in ONE place */}
+                {data.exchange_rate_update_method === 'auto' && (
+                  <div className="p-6 bg-slate-50/80 rounded-2xl border border-slate-200/70 space-y-5 mt-4" dir="rtl">
+                    <div className="flex items-center gap-2 text-indigo-600 justify-between">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4" />
+                        <span className="font-bold text-base text-slate-800">إعدادات أسعار الصرف التلقائية</span>
+                      </div>
+                    </div>
+
+                    {/* Provider info row */}
+                    <div className="flex flex-wrap items-center justify-between bg-white rounded-xl p-4 border border-slate-200/80 gap-3">
+                      <div className="flex items-center gap-3">
+                        {erConnStatus === 'ok'  && <Wifi    className="w-5 h-5 text-emerald-500" />}
+                        {erConnStatus === 'error' && <WifiOff className="w-5 h-5 text-rose-500" />}
+                        {erConnStatus === 'idle'  && <Wifi    className="w-5 h-5 text-slate-300" />}
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">حالة الاتصال (Connection Status)</span>
+                          <span className={`text-xs font-bold ${
+                            erConnStatus === 'ok'    ? 'text-emerald-600'
+                            : erConnStatus === 'error' ? 'text-rose-600'
+                            : 'text-slate-400'
+                          }`}>
+                            {erConnStatus === 'ok'    ? 'متصل (Connected)' : erConnStatus === 'error' ? 'فشل الاتصال (Failed)' : 'لم يختبر بعد'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">اسم مزود الأسعار</span>
+                        <span className="text-xs font-bold text-slate-700 block">ExchangeRate.host</span>
+                        <a 
+                          href="https://exchangerate.host" 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="text-[11px] text-indigo-600 hover:underline font-semibold block"
+                        >
+                          https://exchangerate.host
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Last update row */}
+                    <div className="flex items-center gap-2 px-1">
+                      <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                      <div>
+                        <span className="text-xs font-bold text-slate-400">آخر مزامنة ناجحة: </span>
+                        <span className="text-xs font-semibold text-slate-700">
+                          {erLastUpdate ?? 'لم يتم التحديث بعد'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Action buttons row */}
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        id="er-update-now-btn"
+                        onClick={handleErUpdate}
+                        disabled={erIsUpdating}
+                        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white px-4 py-2 rounded-xl font-bold text-xs transition-all shadow-sm shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${erIsUpdating ? 'animate-spin' : ''}`} />
+                        {erIsUpdating ? 'جاري التحديث...' : 'تحديث أسعار الصرف الآن (Sync Now)'}
+                      </button>
+
+                      <button
+                        type="button"
+                        id="er-test-conn-btn"
+                        onClick={handleErTest}
+                        disabled={erIsTesting}
+                        className="flex items-center gap-2 bg-white hover:bg-slate-100 active:scale-95 text-slate-700 border border-slate-200 px-4 py-2 rounded-xl font-bold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {erIsTesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                        {erIsTesting ? 'جاري الاختبار...' : 'اختبار الاتصال (Test)'}
+                      </button>
+                    </div>
+
+                    {/* Last sync result */}
+                    {erLastResult && (
+                      <div className={`flex items-start gap-2.5 rounded-xl p-3 border ${
+                        erConnStatus === 'ok'
+                          ? 'bg-emerald-50 border-emerald-100'
+                          : 'bg-rose-50 border-rose-100'
+                      }`}>
+                        {erConnStatus === 'ok'
+                          ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                          : <XCircle      className="w-4 h-4 text-rose-500    shrink-0 mt-0.5" />}
+                        <span className={`text-xs font-semibold ${
+                          erConnStatus === 'ok' ? 'text-emerald-700' : 'text-rose-700'
+                        }`}>
+                          {erLastResult}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="border-t border-slate-200/60 pt-3" />
+
+                    {/* Automatic Update toggle */}
+                    <div
+                      className="flex items-center justify-between cursor-pointer select-none"
+                      onClick={() => setErAutoUpdate(p => !p)}
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-bold text-slate-800 text-sm">تحديث تلقائي (Auto Update)</span>
+                        <span className="text-xs text-slate-400">تحديث أسعار الصرف تلقائياً وفق الجدول المحدد</span>
+                      </div>
+                      <div className={`relative w-12 h-7 rounded-full transition-all duration-300 shadow-inner ${erAutoUpdate ? 'bg-indigo-600' : 'bg-slate-200'}`}>
+                        <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
+                          erAutoUpdate ? 'translate-x-[-110%]' : 'translate-x-[-5%]'
+                        }`} />
+                      </div>
+                    </div>
+
+                    {/* Update Frequency */}
+                    <AnimatePresence>
+                      {erAutoUpdate && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="pt-2">
+                            <label className="block text-xs font-semibold text-slate-500 mb-2">تكرار التحديث (Frequency)</label>
+                            <div className="flex gap-3">
+                              {(['daily', 'weekly'] as const).map(freq => (
+                                <button
+                                  key={freq}
+                                  type="button"
+                                  onClick={() => setErFrequency(freq)}
+                                  className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${
+                                    erFrequency === freq
+                                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                      : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400'
+                                  }`}
+                                >
+                                  {freq === 'daily' ? 'يومي (Once Daily)' : 'أسبوعي (Once Weekly)'}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
               </div>
             )}
-
           </div>
         </div>
 
-        {/* Card 3.5: Inventory Settings — إعدادات المخازن والمشتريات */}
+        {/* Card 3: Inventory & Purchase Settings & Negative Stock (Compact layout) */}
         <div className="bg-white p-8 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-6">
           <div className="flex items-center gap-2 text-indigo-600 justify-end">
             <span className="font-bold text-lg">{language === 'ar' ? 'إعدادات المخازن والمشتريات' : 'Inventory & Purchase Settings'}</span>
             <TrendingUp className="w-5 h-5" />
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <label className="block text-sm font-semibold text-slate-500">
               {language === 'ar' ? 'نمط سير عمل المشتريات (Purchase Workflow Mode)' : 'Purchase Workflow Mode'}
             </label>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* Simple Mode */}
               <div
                 onClick={() => setData(prev => ({ ...prev, purchase_workflow_mode: 'Simple' }))}
-                className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                   data.purchase_workflow_mode === 'Simple' || !data.purchase_workflow_mode
                     ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
                     : 'border-slate-100 bg-white hover:border-slate-200'
@@ -824,19 +970,19 @@ export function CompanySettings() {
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-800 text-sm">
+                    <span className="font-bold text-slate-800 text-xs">
                       {language === 'ar' ? 'مبسط (Simple)' : 'Simple'}
                     </span>
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
                       data.purchase_workflow_mode === 'Simple' || !data.purchase_workflow_mode ? 'border-indigo-600' : 'border-slate-300'
                     }`}>
-                      {(data.purchase_workflow_mode === 'Simple' || !data.purchase_workflow_mode) && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
+                      {(data.purchase_workflow_mode === 'Simple' || !data.purchase_workflow_mode) && <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />}
                     </div>
                   </div>
-                  <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                  <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
                     {language === 'ar' 
-                      ? 'تحديث المخزن من الفاتورة مباشرة دون الحاجة لـ Goods Receipt.'
-                      : 'Update inventory directly from the purchase invoice without Goods Receipt.'}
+                      ? 'تحديث المخزن من الفاتورة مباشرة.'
+                      : 'Update inventory directly from invoice.'}
                   </p>
                 </div>
               </div>
@@ -844,7 +990,7 @@ export function CompanySettings() {
               {/* Enterprise Flexible Mode */}
               <div
                 onClick={() => setData(prev => ({ ...prev, purchase_workflow_mode: 'Enterprise Flexible' }))}
-                className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                   data.purchase_workflow_mode === 'Enterprise Flexible'
                     ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
                     : 'border-slate-100 bg-white hover:border-slate-200'
@@ -852,19 +998,19 @@ export function CompanySettings() {
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-800 text-sm">
+                    <span className="font-bold text-slate-800 text-xs">
                       {language === 'ar' ? 'مرن (Enterprise Flexible)' : 'Enterprise Flexible'}
                     </span>
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
                       data.purchase_workflow_mode === 'Enterprise Flexible' ? 'border-indigo-600' : 'border-slate-300'
                     }`}>
-                      {data.purchase_workflow_mode === 'Enterprise Flexible' && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
+                      {data.purchase_workflow_mode === 'Enterprise Flexible' && <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />}
                     </div>
                   </div>
-                  <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                  <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
                     {language === 'ar' 
-                      ? 'يسمح بإنشاء فاتورة مباشرة، مع خيار توليد Goods Receipt تلقائياً.'
-                      : 'Allows creating invoices directly, with option to auto-generate Goods Receipt.'}
+                      ? 'فاتورة مباشرة، مع خيار Goods Receipt تلقائياً.'
+                      : 'Invoice directly, option to auto-generate Goods Receipt.'}
                   </p>
                 </div>
               </div>
@@ -872,7 +1018,7 @@ export function CompanySettings() {
               {/* Enterprise Strict Mode */}
               <div
                 onClick={() => setData(prev => ({ ...prev, purchase_workflow_mode: 'Enterprise Strict' }))}
-                className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                   data.purchase_workflow_mode === 'Enterprise Strict'
                     ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
                     : 'border-slate-100 bg-white hover:border-slate-200'
@@ -880,37 +1026,34 @@ export function CompanySettings() {
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-800 text-sm">
+                    <span className="font-bold text-slate-800 text-xs">
                       {language === 'ar' ? 'صارم (Enterprise Strict)' : 'Enterprise Strict'}
                     </span>
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
                       data.purchase_workflow_mode === 'Enterprise Strict' ? 'border-indigo-600' : 'border-slate-300'
                     }`}>
-                      {data.purchase_workflow_mode === 'Enterprise Strict' && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
+                      {data.purchase_workflow_mode === 'Enterprise Strict' && <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />}
                     </div>
                   </div>
-                  <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                  <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
                     {language === 'ar' 
-                      ? 'يمنع إنشاء فاتورة مباشرة، يجب استلام البضائع أولاً وربط الفاتورة بالاستلام.'
-                      : 'Blocks direct invoices. Goods must be received first and linked to the invoice.'}
+                      ? 'يجب استلام البضائع أولاً وربط الفاتورة بالاستلام.'
+                      : 'Goods must be received first and linked.'}
                   </p>
                 </div>
               </div>
-
             </div>
           </div>
 
-          <hr className="border-slate-100" />
-
-          <div className="space-y-4">
+          <div className="space-y-3 pt-3 border-t border-slate-100">
             <label className="block text-sm font-semibold text-slate-500">
-              {language === 'ar' ? 'نمط مطابقة إذن الاستلام بفاتورة المشتريات (Goods Receipt Matching Mode)' : 'Goods Receipt Matching Mode'}
+              {language === 'ar' ? 'نمط مطابقة إذن الاستلام بالفاتورة (Goods Receipt Matching Mode)' : 'Goods Receipt Matching Mode'}
             </label>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               {/* Supplier + Product */}
               <div
                 onClick={() => setData(prev => ({ ...prev, goods_receipt_matching_mode: 'SupplierProduct' }))}
-                className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                   data.goods_receipt_matching_mode === 'SupplierProduct'
                     ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
                     : 'border-slate-100 bg-white hover:border-slate-200'
@@ -918,19 +1061,17 @@ export function CompanySettings() {
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-800 text-sm">
+                    <span className="font-bold text-slate-800 text-xs">
                       {language === 'ar' ? 'المورد + الصنف' : 'Supplier + Product'}
                     </span>
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
                       data.goods_receipt_matching_mode === 'SupplierProduct' ? 'border-indigo-600' : 'border-slate-300'
                     }`}>
-                      {data.goods_receipt_matching_mode === 'SupplierProduct' && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
+                      {data.goods_receipt_matching_mode === 'SupplierProduct' && <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />}
                     </div>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
-                    {language === 'ar' 
-                      ? 'تتم المطابقة بواسطة المورد والصنف المستلم.'
-                      : 'Matches by Supplier and received Product.'}
+                  <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                    {language === 'ar' ? 'المورد والصنف' : 'Supplier & Product'}
                   </p>
                 </div>
               </div>
@@ -938,7 +1079,7 @@ export function CompanySettings() {
               {/* Product Only */}
               <div
                 onClick={() => setData(prev => ({ ...prev, goods_receipt_matching_mode: 'ProductOnly' }))}
-                className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                   data.goods_receipt_matching_mode === 'ProductOnly'
                     ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
                     : 'border-slate-100 bg-white hover:border-slate-200'
@@ -946,19 +1087,17 @@ export function CompanySettings() {
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-800 text-sm">
+                    <span className="font-bold text-slate-800 text-xs">
                       {language === 'ar' ? 'الصنف فقط' : 'Product Only'}
                     </span>
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
                       data.goods_receipt_matching_mode === 'ProductOnly' ? 'border-indigo-600' : 'border-slate-300'
                     }`}>
-                      {data.goods_receipt_matching_mode === 'ProductOnly' && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
+                      {data.goods_receipt_matching_mode === 'ProductOnly' && <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />}
                     </div>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
-                    {language === 'ar' 
-                      ? 'تتم المطابقة بواسطة الصنف فقط، متجاهلاً المورد.'
-                      : 'Matches by Product only, ignoring the Supplier.'}
+                  <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                    {language === 'ar' ? 'الصنف فقط' : 'Product only'}
                   </p>
                 </div>
               </div>
@@ -966,7 +1105,7 @@ export function CompanySettings() {
               {/* Supplier + Product + Warehouse */}
               <div
                 onClick={() => setData(prev => ({ ...prev, goods_receipt_matching_mode: 'SupplierProductWarehouse' }))}
-                className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                   data.goods_receipt_matching_mode === 'SupplierProductWarehouse'
                     ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
                     : 'border-slate-100 bg-white hover:border-slate-200'
@@ -974,19 +1113,17 @@ export function CompanySettings() {
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-800 text-sm">
-                      {language === 'ar' ? 'المورد + الصنف + المخزن' : 'Supplier + Product + Warehouse'}
+                    <span className="font-bold text-slate-800 text-xs">
+                      {language === 'ar' ? 'مورد + صنف + مخزن' : 'Supplier + Product + Warehouse'}
                     </span>
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
                       data.goods_receipt_matching_mode === 'SupplierProductWarehouse' ? 'border-indigo-600' : 'border-slate-300'
                     }`}>
-                      {data.goods_receipt_matching_mode === 'SupplierProductWarehouse' && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
+                      {data.goods_receipt_matching_mode === 'SupplierProductWarehouse' && <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />}
                     </div>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
-                    {language === 'ar' 
-                      ? 'تتم المطابقة بواسطة المورد، الصنف، والمخزن المستلم.'
-                      : 'Matches by Supplier, Product, and Warehouse.'}
+                  <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                    {language === 'ar' ? 'مورد، صنف ومخزن' : 'Supplier, product & warehouse'}
                   </p>
                 </div>
               </div>
@@ -994,7 +1131,7 @@ export function CompanySettings() {
               {/* Smart Matching */}
               <div
                 onClick={() => setData(prev => ({ ...prev, goods_receipt_matching_mode: 'SmartMatching' }))}
-                className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                   data.goods_receipt_matching_mode === 'SmartMatching' || !data.goods_receipt_matching_mode
                     ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
                     : 'border-slate-100 bg-white hover:border-slate-200'
@@ -1002,57 +1139,49 @@ export function CompanySettings() {
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-800 text-sm">
+                    <span className="font-bold text-slate-800 text-xs">
                       {language === 'ar' ? 'مطابقة ذكية (Smart)' : 'Smart Matching'}
                     </span>
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
                       data.goods_receipt_matching_mode === 'SmartMatching' || !data.goods_receipt_matching_mode ? 'border-indigo-600' : 'border-slate-300'
                     }`}>
-                      {(data.goods_receipt_matching_mode === 'SmartMatching' || !data.goods_receipt_matching_mode) && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
+                      {(data.goods_receipt_matching_mode === 'SmartMatching' || !data.goods_receipt_matching_mode) && <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />}
                     </div>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
-                    {language === 'ar' 
-                      ? 'المطابقة تلقائياً بالصنف والمورد والمخزن والكمية المستلمة.'
-                      : 'Automatically matches by supplier, product, warehouse, and remaining quantity.'}
+                  <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                    {language === 'ar' ? 'مطابقة تلقائية متكاملة' : 'Integrated auto matching'}
                   </p>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Card 3.5.5: Allow Negative Stock Setting */}
-        <div className="bg-white p-8 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-6">
-          <div className="flex items-center gap-2 text-indigo-600 justify-end">
-            <span className="font-bold text-lg">{language === 'ar' ? 'السحب على المكشوف' : 'Negative Stock'}</span>
-            <TrendingUp className="w-5 h-5" />
-          </div>
-          <div className="space-y-4">
+          {/* Allow Negative Stock Balance Toggle (Embedded inside Card 3 to eliminate extra card height!) */}
+          <div className="pt-3 border-t border-slate-100">
             <div
-              className="flex items-center justify-between cursor-pointer select-none p-4 rounded-2xl border border-slate-100 hover:bg-slate-50 transition-colors"
+              className="flex items-center justify-between cursor-pointer select-none p-3.5 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors"
               onClick={() => setData((prev) => ({ ...prev, allow_negative_stock: !prev.allow_negative_stock }))}
             >
               <div className="flex flex-col gap-0.5 flex-1">
                 <span className="font-bold text-slate-800 text-sm">
                   {language === 'ar' ? 'السماح بصرف رصيد بالسالب (تخطي رصيد المخزون)' : 'Allow Negative Stock Balance'}
                 </span>
-                <span className="text-xs text-slate-400 font-medium leading-relaxed mt-1">
+                <span className="text-[11px] text-slate-400 font-medium leading-relaxed">
                   {language === 'ar' 
                     ? 'يسمح بعمليات الصرف أو البيع حتى لو كان رصيد الصنف في المخزن أقل من الصفر (غير متوفر).'
                     : 'Allows dispensing or selling items even if the stock balance is below zero (out of stock).'}
                 </span>
               </div>
               <div
-                className={`relative w-14 h-8 rounded-full transition-all duration-300 shadow-inner ms-4 flex-shrink-0 ${
+                className={`relative w-12 h-7 rounded-full transition-all duration-300 shadow-inner ms-3 flex-shrink-0 ${
                   data.allow_negative_stock ? 'bg-indigo-600' : 'bg-slate-200'
                 }`}
               >
                 <div
-                  className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
+                  className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
                     dir === 'rtl'
-                      ? data.allow_negative_stock ? 'translate-x-[-120%]' : 'translate-x-[-10%]'
-                      : data.allow_negative_stock ? 'translate-x-[120%]' : 'translate-x-[10%]'
+                      ? data.allow_negative_stock ? 'translate-x-[-110%]' : 'translate-x-[-5%]'
+                      : data.allow_negative_stock ? 'translate-x-[110%]' : 'translate-x-[5%]'
                   }`}
                 />
               </div>
@@ -1060,7 +1189,7 @@ export function CompanySettings() {
           </div>
         </div>
 
-        {/* Card 3.6: Barcode Scanner Settings — إعدادات قراءة الباركود */}
+        {/* Card 4: Barcode Scanner Settings (Optimized into 2 columns grid to cut height by 50%!) */}
         <div className="bg-white p-8 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-6">
           <div className="flex items-center gap-2 text-indigo-600 justify-end">
             <span className="font-bold text-lg">
@@ -1069,83 +1198,83 @@ export function CompanySettings() {
             <ScanLine className="w-5 h-5" />
           </div>
 
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
             {([
               {
                 key: 'enable_camera_scanner',
                 labelAr: 'تفعيل استخدام كاميرا الباركود',
                 labelEn: 'Enable Camera Barcode Scanner',
                 descAr: 'يسمح بفتح الكاميرا لمسح الباركود داخل الفواتير.',
-                descEn: 'Allow opening the camera to scan barcodes in invoices.',
+                descEn: 'Allow opening camera to scan barcodes.',
               },
               {
                 key: 'enable_hid_scanner',
                 labelAr: 'تفعيل Barcode Scanner (USB / Bluetooth)',
-                labelEn: 'Enable USB / Bluetooth Barcode Scanner',
+                labelEn: 'Enable USB / Bluetooth Scanner',
                 descAr: 'يدعم القارئات المتصلة عبر USB أو Bluetooth تلقائياً.',
-                descEn: 'Auto-detect USB and Bluetooth barcode readers.',
+                descEn: 'Auto-detect USB and Bluetooth readers.',
               },
               {
                 key: 'enable_continuous_mode',
                 labelAr: 'تفعيل وضع القراءة المستمرة',
                 labelEn: 'Enable Continuous Scan Mode',
                 descAr: 'تبقى الكاميرا مفتوحة لمسح أكثر من صنف متتالياً.',
-                descEn: 'Keep the camera open to scan multiple items in sequence.',
+                descEn: 'Keep camera open for sequential scanning.',
               },
               {
                 key: 'play_sound_on_success',
                 labelAr: 'تشغيل صوت عند نجاح القراءة',
                 labelEn: 'Play Sound on Successful Scan',
                 descAr: 'يصدر صوت Beep قصير عند كل قراءة ناجحة.',
-                descEn: 'Plays a short beep on every successful scan.',
+                descEn: 'Plays a short beep on successful scan.',
               },
               {
                 key: 'prevent_unknown_items',
                 labelAr: 'منع إضافة أصناف غير معروفة',
                 labelEn: 'Block Unknown Barcodes',
-                descAr: 'لا يضيف أي صنف إذا لم يعثر على الباركود في قاعدة البيانات.',
-                descEn: 'Block adding items when barcode is not found in database.',
+                descAr: 'لا يضيف أي صنف إذا لم يعثر على الباركود بالنظام.',
+                descEn: 'Block adding items when barcode is not found.',
               },
               {
                 key: 'auto_increase_quantity',
                 labelAr: 'زيادة الكمية تلقائياً عند تكرار القراءة',
-                labelEn: 'Auto-Increase Quantity on Duplicate Scan',
-                descAr: 'إذا كان الصنف موجوداً بالفاتورة تزداد كميته بدلاً من إضافة سطر جديد.',
-                descEn: 'If item already in invoice, increase its quantity instead of adding a new line.',
+                labelEn: 'Auto-Increase Qty on Duplicate Scan',
+                descAr: 'إذا كان الصنف موجوداً تزاد كميته بدلاً من تكراره.',
+                descEn: 'Increase quantity instead of adding a new line.',
               },
               {
                 key: 'show_success_message',
                 labelAr: 'إظهار رسالة نجاح بعد القراءة',
                 labelEn: 'Show Success Notification After Scan',
                 descAr: 'يعرض إشعار مؤقت بعد إضافة الصنف بنجاح.',
-                descEn: 'Shows a brief toast notification after successfully adding an item.',
+                descEn: 'Shows brief toast notification after scan.',
               },
             ] as const).map(({ key, labelAr, labelEn, descAr, descEn }) => (
               <div
                 key={key}
-                className="flex items-center justify-between cursor-pointer select-none p-4 rounded-2xl border border-slate-100 hover:bg-slate-50 transition-colors"
+                className="flex items-center justify-between cursor-pointer select-none p-3.5 rounded-2xl border border-slate-100 hover:bg-slate-50 transition-colors"
                 onClick={() =>
                   setBarcodeSettings((prev) => ({ ...prev, [key]: !prev[key] }))
                 }
               >
-                <div className="flex flex-col gap-0.5 flex-1">
-                  <span className="font-bold text-slate-800 text-sm">
+                <div className="flex flex-col gap-0.5 flex-1 me-2">
+                  <span className="font-bold text-slate-800 text-xs">
                     {language === 'ar' ? labelAr : labelEn}
                   </span>
-                  <span className="text-xs text-slate-400 font-medium">
+                  <span className="text-[10.5px] text-slate-400 font-medium leading-normal">
                     {language === 'ar' ? descAr : descEn}
                   </span>
                 </div>
                 <div
-                  className={`relative w-14 h-8 rounded-full transition-all duration-300 shadow-inner ms-4 flex-shrink-0 ${
+                  className={`relative w-12 h-7 rounded-full transition-all duration-300 shadow-inner flex-shrink-0 ${
                     barcodeSettings[key] ? 'bg-indigo-600' : 'bg-slate-200'
                   }`}
                 >
                   <div
-                    className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
+                    className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
                       dir === 'rtl'
-                        ? barcodeSettings[key] ? 'translate-x-[-120%]' : 'translate-x-[-10%]'
-                        : barcodeSettings[key] ? 'translate-x-[120%]' : 'translate-x-[10%]'
+                        ? barcodeSettings[key] ? 'translate-x-[-110%]' : 'translate-x-[-5%]'
+                        : barcodeSettings[key] ? 'translate-x-[110%]' : 'translate-x-[5%]'
                     }`}
                   />
                 </div>
@@ -1153,155 +1282,6 @@ export function CompanySettings() {
             ))}
           </div>
         </div>
-
-        {/* Card 4: Exchange Rate Settings — إعدادات أسعار الصرف */}
-        {data.enable_multi_currency && data.exchange_rate_update_method === 'auto' && (
-          <div className="bg-white p-8 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-6" dir="rtl">
-            {/* Card header */}
-            <div className="flex items-center gap-2 text-indigo-600 justify-end">
-              <span className="font-bold text-lg">إعدادات أسعار الصرف التلقائية</span>
-              <TrendingUp className="w-5 h-5" />
-            </div>
-
-            {/* Provider info row */}
-            <div className="flex items-center justify-between bg-slate-50 rounded-2xl px-5 py-4 border border-slate-100">
-              <div className="flex items-center gap-3">
-                {erConnStatus === 'ok'  && <Wifi    className="w-5 h-5 text-emerald-500" />}
-                {erConnStatus === 'error' && <WifiOff className="w-5 h-5 text-rose-500" />}
-                {erConnStatus === 'idle'  && <Wifi    className="w-5 h-5 text-slate-300" />}
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">حالة الاتصال (Connection Status)</span>
-                  <span className={`text-sm font-bold ${
-                    erConnStatus === 'ok'    ? 'text-emerald-600'
-                    : erConnStatus === 'error' ? 'text-rose-600'
-                    : 'text-slate-400'
-                  }`}>
-                    {erConnStatus === 'ok'    ? 'متصل (Connected)' : erConnStatus === 'error' ? 'فشل الاتصال (Failed)' : 'لم يختبر بعد'}
-                  </span>
-                </div>
-              </div>
-              <div className="text-right">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">اسم مزود الأسعار</span>
-                <span className="text-sm font-bold text-slate-700 block">ExchangeRate.host</span>
-                <a 
-                  href="https://exchangerate.host" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="text-xs text-indigo-600 hover:underline font-semibold block mt-0.5"
-                >
-                  https://exchangerate.host
-                </a>
-              </div>
-            </div>
-
-            {/* Last update row */}
-            <div className="flex items-center gap-3 px-1">
-              <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-              <div>
-                <span className="text-xs font-bold text-slate-400">آخر مزامنة ناجحة (Last Successful Sync): </span>
-                <span className="text-xs font-semibold text-slate-600">
-                  {erLastUpdate ?? 'لم يتم التحديث بعد'}
-                </span>
-              </div>
-            </div>
-
-            {/* Action buttons row */}
-            <div className="flex flex-wrap gap-3">
-              {/* Update Now */}
-              <button
-                type="button"
-                id="er-update-now-btn"
-                onClick={handleErUpdate}
-                disabled={erIsUpdating}
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white px-5 py-2.5 rounded-2xl font-bold text-sm transition-all shadow-sm shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <RefreshCw className={`w-4 h-4 ${erIsUpdating ? 'animate-spin' : ''}`} />
-                {erIsUpdating ? 'جاري التحديث...' : 'تحديث أسعار الصرف الآن (Sync Now)'}
-              </button>
-
-              {/* Test Connection */}
-              <button
-                type="button"
-                id="er-test-conn-btn"
-                onClick={handleErTest}
-                disabled={erIsTesting}
-                className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 px-5 py-2.5 rounded-2xl font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {erIsTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-                {erIsTesting ? 'جاري الاختبار...' : 'اختبار الاتصال (Test)'}
-              </button>
-            </div>
-
-            {/* Last sync result */}
-            {erLastResult && (
-              <div className={`flex items-start gap-3 rounded-2xl px-4 py-3 border ${
-                erConnStatus === 'ok'
-                  ? 'bg-emerald-50 border-emerald-100'
-                  : 'bg-rose-50 border-rose-100'
-              }`}>
-                {erConnStatus === 'ok'
-                  ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                  : <XCircle      className="w-4 h-4 text-rose-500    shrink-0 mt-0.5" />}
-                <span className={`text-xs font-semibold ${
-                  erConnStatus === 'ok' ? 'text-emerald-700' : 'text-rose-700'
-                }`}>
-                  {erLastResult}
-                </span>
-              </div>
-            )}
-
-            {/* Divider */}
-            <div className="border-t border-slate-100" />
-
-            {/* Automatic Update toggle */}
-            <div
-              className="flex items-center justify-between cursor-pointer select-none"
-              onClick={() => setErAutoUpdate(p => !p)}
-            >
-              <div className="flex flex-col gap-0.5">
-                <span className="font-bold text-slate-800 text-base">تحديث تلقائي (Auto Update)</span>
-                <span className="text-xs font-semibold text-slate-400">تحديث أسعار الصرف تلقائياً وفق الجدول المحدد</span>
-              </div>
-              <div className={`relative w-14 h-8 rounded-full transition-all duration-300 shadow-inner ${erAutoUpdate ? 'bg-indigo-600' : 'bg-slate-200'}`}>
-                <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
-                  erAutoUpdate ? 'translate-x-[-120%]' : 'translate-x-[-10%]'
-                }`} />
-              </div>
-            </div>
-
-            {/* Update Frequency — only shown when auto update is on */}
-            <AnimatePresence>
-              {erAutoUpdate && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="pt-2">
-                    <label className="block text-sm font-semibold text-slate-500 mb-3">تكرار التحديث (Frequency)</label>
-                    <div className="flex gap-3">
-                      {(['daily', 'weekly'] as const).map(freq => (
-                        <button
-                          key={freq}
-                          type="button"
-                          onClick={() => setErFrequency(freq)}
-                          className={`flex-1 py-2.5 rounded-2xl text-sm font-bold border transition-all ${
-                            erFrequency === freq
-                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-500/20'
-                              : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400'
-                          }`}
-                        >
-                          {freq === 'daily' ? 'يومي (Once Daily)' : 'أسبوعي (Once Weekly)'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        )}
 
         {/* Submit Action */}
         <div className="pt-4 flex justify-start pb-20">
