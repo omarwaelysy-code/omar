@@ -4071,6 +4071,17 @@ export function Templates({ initialView = 'list' }: TemplatesProps) {
                                     type="button"
                                     onClick={() => handleToggleLayerLock(el.id, 'footer')}
                                     className={`p-1 rounded hover:bg-zinc-100 ${el.properties.locked ? 'text-amber-500' : 'text-zinc-400 hover:text-zinc-600'}`}
+                                  >
+                                    {el.properties.locked ? <Lock size={12} /> : <Unlock size={12} />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => { setSelectedElementId(el.id); setSelectedSection('footer'); handleMoveDepth('up'); }}
+                                    className="p-0.5 rounded hover:bg-zinc-100 text-zinc-400"
+                                    title="Move Up (Z-index)"
+                                  >
+                                    <ChevronUp size={12} />
+                                  </button>
                                   <button
                                     type="button"
                                     onClick={() => { setSelectedElementId(el.id); setSelectedSection('footer'); handleMoveDepth('down'); }}
