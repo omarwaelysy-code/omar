@@ -695,7 +695,7 @@ export function UnifiedPrintEngine() {
       };
     }
 
-    if (selectedTemplate && !selectedTemplate.is_system && selectedTemplate.id !== 'fallback' && !selectedTemplate.id.startsWith('default-')) {
+    if (selectedTemplate && !selectedTemplate.is_system && !selectedTemplate.is_default && selectedTemplate.id !== 'fallback' && !selectedTemplate.id.startsWith('default-')) {
       dto.isCustomTemplate = true;
       const effectiveMarginTop = selectedProfile?.margin_top ?? selectedTemplate.margin_top ?? 10;
       const effectiveMarginBottom = selectedProfile?.margin_bottom ?? selectedTemplate.margin_bottom ?? 10;
@@ -925,7 +925,7 @@ export function UnifiedPrintEngine() {
             ) : selectedTemplate && normalized ? (
               <div id="unified-print-capture-area" className="bg-white shadow-xl">
                 <TemplateRenderer
-                  layout={selectedTemplate.layout || DEFAULT_TEMPLATE_LAYOUT}
+                  layout={(selectedTemplate.is_default || selectedTemplate.is_system) ? DEFAULT_TEMPLATE_LAYOUT : (selectedTemplate.layout || DEFAULT_TEMPLATE_LAYOUT)}
                   data={normalized}
                   scale={2.2} // Stable preview scale
                   margin={activeMargins}
