@@ -449,7 +449,7 @@ export function CompanySettings() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-8 animate-in fade-in duration-700" dir={dir}>
+    <div className="w-full max-w-[98%] 2xl:max-w-[1600px] mx-auto p-4 md:p-8 space-y-8 animate-in fade-in duration-700" dir={dir}>
       <div className="flex flex-col gap-2 pb-4 border-b border-slate-100">
         <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-1">
           {t('company_settings.title')}
@@ -507,7 +507,7 @@ export function CompanySettings() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <div>
               <label className="block text-sm font-semibold text-slate-500 mb-2">
                 {t('company_settings.name')}
@@ -567,7 +567,7 @@ export function CompanySettings() {
               />
             </div>
 
-            <div className="md:col-span-2">
+            <div className="sm:col-span-2 lg:col-span-4">
               <label className="block text-sm font-semibold text-slate-500 mb-2">
                 {t('company_settings.address')}
               </label>
@@ -583,7 +583,7 @@ export function CompanySettings() {
             </div>
 
             {/* VAT & WHT Toggles side-by-side in grid */}
-            <div className="md:col-span-2 pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="sm:col-span-2 lg:col-span-4 pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* VAT Toggle */}
               <div 
                 className="flex items-center justify-between cursor-pointer select-none p-3.5 rounded-2xl border border-slate-100 hover:bg-slate-50/80 transition-colors"
@@ -642,7 +642,7 @@ export function CompanySettings() {
             <Coins className="w-5 h-5" />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <div>
               <SearchableSelect
                 label={t('company_settings.currency')}
@@ -1198,7 +1198,7 @@ export function CompanySettings() {
             <ScanLine className="w-5 h-5" />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {([
               {
                 key: 'enable_camera_scanner',
