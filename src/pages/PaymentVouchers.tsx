@@ -1718,7 +1718,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">
-            {pageTitle || (isSupplierOnly ? (language === 'ar' ? 'سندات صرف الموردين' : 'Supplier Payment Vouchers') : t('payments.title'))}
+            {pageTitle || (isSupplierOnly ? (language === 'ar' ? 'سند صرف مورد' : 'Supplier Payment Voucher') : t('payments.title'))}
           </h2>
           <p className="text-zinc-500">
             {isSupplierOnly ? (language === 'ar' ? 'إدارة وإنشاء سندات الصرف الخاصة بالموردين وتسوياتها' : 'Manage and create supplier payment vouchers') : t('payments.subtitle')}
@@ -2218,7 +2218,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                 </div>
               )}
               <h3 className="text-xl md:text-2xl font-black text-zinc-900 tracking-tight">
-                {editingVoucher ? (language === 'ar' ? 'تعديل سند الصرف' : t('payments.edit')) : (language === 'ar' ? 'إضافة سند صرف جديد' : t('payments.add'))}
+                {editingVoucher ? (isSupplierOnly ? (language === 'ar' ? 'تعديل سند صرف مورد' : 'Edit Supplier Voucher') : (language === 'ar' ? 'تعديل سند الصرف' : t('payments.edit'))) : (isSupplierOnly ? (language === 'ar' ? 'سند صرف مورد' : 'Supplier Payment Voucher') : (language === 'ar' ? 'إضافة سند صرف جديد' : t('payments.add')))}
               </h3>
             </div>
           </div>
@@ -2370,13 +2370,17 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                   <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
                     <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
                       <Layers className="w-4 h-4" />
-<div className="flex items-center justify-between border-b border-zinc-100 pb-2">
+                      <span className="text-xs font-bold">{language === 'ar' ? 'بنود الصرف' : 'Payment Items'}</span>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-zinc-100 pb-2">
                         <h4 className="font-bold text-zinc-900 italic tracking-tight uppercase text-sm">{language === 'ar' ? 'تفاصيل البنود' : 'Item Details'}</h4>
                         <button 
                           type="button"
                           onClick={() => setVoucherData({
                             ...voucherData,
-                            items: [...voucherData.items, { type: isSupplierOnly ? 'supplier' : 'supplier', entity_id: '', amount: 0, description: '' }]
+                            items: [...voucherData.items, { type: 'supplier', entity_id: '', amount: 0, description: '' }]
                           })}
                           className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-black border border-emerald-100 hover:bg-emerald-100 transition-all shadow-sm"
                         >
