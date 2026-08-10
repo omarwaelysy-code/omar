@@ -150,7 +150,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUserMemberships(memberships);
 
       if (memberships.length > 0) {
-        const preferredCompanyId = localStorage.getItem(`preferred_company_${userId}`);
+        const emailKey = (email || '').toLowerCase().trim();
+        const preferredCompanyId = (emailKey ? localStorage.getItem(`preferred_company_${emailKey}`) : null) || localStorage.getItem(`preferred_company_${userId}`);
         
         let selectedMembership: User | null = null;
         
@@ -172,6 +173,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               const check = await checkCompanyExpiry(m.company_id);
               if (!check.isExpired) {
                 selectedMembership = m;
+                if (emailKey) localStorage.setItem(`preferred_company_${emailKey}`, m.company_id);
                 localStorage.setItem(`preferred_company_${userId}`, m.company_id);
                 break;
               }
@@ -284,6 +286,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         setUser(updatedUser);
         localStorage.setItem('auth_user', JSON.stringify(updatedUser));
+        if (updatedUser.email) {
+          localStorage.setItem(`preferred_company_${updatedUser.email.toLowerCase().trim()}`, companyId);
+        }
         localStorage.setItem(`preferred_company_${user.id}`, companyId);
       }
     } finally {

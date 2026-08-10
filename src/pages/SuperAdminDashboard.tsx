@@ -51,7 +51,7 @@ interface SuperAdminDashboardProps {
 
 const isSuperAdminUser = (u: User): boolean => {
   if (!u) return false;
-  return u.role === 'super_admin';
+  return u.role === 'super_admin' || u.company_id === 'system' || u.company_id === 'SYSTEM';
 };
 
 export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initialTab }) => {
@@ -534,14 +534,32 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
   );
 
   // Group and deduplicate Super Admins by email so each Super Admin appears exactly once
-  const uniqueSuperAdminMap = new Map<string, User>();
-  users.filter(u => isSuperAdminUser(u)).forEach(u => {
-    const emailKey = (u.email || '').trim().toLowerCase();
-    if (!emailKey) return;
-    if (!uniqueSuperAdminMap.has(emailKey) || (u.created_at && new Date(u.created_at) > new Date(uniqueSuperAdminMap.get(emailKey)!.created_at || 0))) {
-      uniqueSuperAdminMap.set(emailKey, u);
+  const superAdminEmails = new Set<string>();
+  users.forEach(u => {
+    if (isSuperAdminUser(u) && u.email) {
+      superAdminEmails.add(u.email.trim().toLowerCase());
     }
   });
+  if (user?.email && (user.role === 'super_admin' || isSuperAdmin)) {
+    superAdminEmails.add(user.email.trim().toLowerCase());
+  }
+
+  const uniqueSuperAdminMap = new Map<string, User>();
+  users.forEach(u => {
+    const emailKey = (u.email || '').trim().toLowerCase();
+    if (!emailKey) return;
+    if (superAdminEmails.has(emailKey)) {
+      if (!uniqueSuperAdminMap.has(emailKey) || (u.created_at && new Date(u.created_at) > new Date(uniqueSuperAdminMap.get(emailKey)!.created_at || 0))) {
+        uniqueSuperAdminMap.set(emailKey, { ...u, role: 'super_admin' });
+      }
+    }
+  });
+  if (user?.email && (user.role === 'super_admin' || isSuperAdmin)) {
+    const emailKey = user.email.trim().toLowerCase();
+    if (!uniqueSuperAdminMap.has(emailKey)) {
+      uniqueSuperAdminMap.set(emailKey, { ...user, role: 'super_admin' });
+    }
+  }
 
   const superAdminsList = Array.from(uniqueSuperAdminMap.values());
 
@@ -550,11 +568,15 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
     (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredCompanyUsers = users.filter(u => !isSuperAdminUser(u) && (
-    (u.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (u.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (u.company_id && clientCompanies.find(c => c.id === u.company_id)?.name.toLowerCase().includes(searchTerm.toLowerCase()))
-  ));
+  const filteredCompanyUsers = users.filter(u => {
+    const emailKey = (u.email || '').trim().toLowerCase();
+    const isSuperAdminEmail = superAdminEmails.has(emailKey);
+    return !isSuperAdminUser(u) && !isSuperAdminEmail && (
+      (u.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (u.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (u.company_id && clientCompanies.find(c => c.id === u.company_id)?.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  });
 
   if (loading) {
     return (

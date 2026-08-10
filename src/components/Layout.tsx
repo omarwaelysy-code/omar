@@ -178,12 +178,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
   const [unreadContactMessagesCount, setUnreadContactMessagesCount] = useState(0);
 
   const activeCompanyName = React.useMemo(() => {
+    if (workspaceMode === 'super_admin' || isSuperAdmin) {
+      return language === 'ar' ? 'لوحة تحكم المدير العام' : 'Super Admin Dashboard';
+    }
     const matchedMem = userMemberships?.find(m => m.company_id === user?.company_id);
     if (matchedMem?.company_name) return matchedMem.company_name;
     if (user?.company_name) return user.company_name;
     if (company?.name) return company.name;
     return language === 'ar' ? 'شركة واعل' : 'Wael Company';
-  }, [userMemberships, user?.company_id, user?.company_name, company?.name, language]);
+  }, [workspaceMode, isSuperAdmin, userMemberships, user?.company_id, user?.company_name, company?.name, language]);
 
   const [isProfileModalOpen, setIsProfileModalOpen] = React.useState(false);
   const [avatarUrl, setAvatarUrl] = React.useState<string | null>(() => {
