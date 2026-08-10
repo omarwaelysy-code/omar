@@ -3,7 +3,7 @@ import { LogOut, ArrowRight, Building2, Calendar, Lock, ShieldAlert } from 'luci
 import { useAuth } from '../contexts/AuthContext';
 
 export const SubscriptionExpiredScreen: React.FC = () => {
-  const { logout, user, isSuperAdmin, subscriptionExpiredDetails, setWorkspaceMode } = useAuth();
+  const { logout, user, isSuperAdmin, isSuperAdminAccount, subscriptionExpiredDetails, setWorkspaceMode } = useAuth();
 
   const companyName = subscriptionExpiredDetails?.companyName || user?.company_name || user?.company_id || 'الشركة';
   const expiryDate = subscriptionExpiredDetails?.expiryDate || '';
@@ -54,13 +54,13 @@ export const SubscriptionExpiredScreen: React.FC = () => {
 
         {/* Action Buttons */}
         <div className="space-y-3 pt-2">
-          {isSuperAdmin && (
+          {(isSuperAdmin || isSuperAdminAccount) && (
             <button
               onClick={() => {
                 if (setWorkspaceMode) setWorkspaceMode('super_admin');
                 window.location.href = '/super-admin@m@r2020';
               }}
-              className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2"
+              className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
             >
               <ArrowRight className="w-5 h-5" />
               <span>العودة لإدارة النظام وتجديد الاشتراك</span>

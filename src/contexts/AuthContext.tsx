@@ -12,6 +12,7 @@ interface AuthContextType {
   switchCompany: (companyId: string) => Promise<void>;
   isAuthenticated: boolean;
   isSuperAdmin: boolean;
+  isSuperAdminAccount: boolean;
   isCompanyAdmin: boolean;
   isManager: boolean;
   isStandardUser: boolean;
@@ -115,10 +116,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const memberships: User[] = [];
+      let hasSuperAdminRole = false;
+
       for (const userData of membershipsData) {
         let companyName = 'شركة غير معروفة';
         let effectivePerms = userData.permissions || {};
         
+        if (userData.role === 'super_admin' || userData.company_id === 'system' || userData.company_id === 'SYSTEM') {
+          hasSuperAdminRole = true;
+        }
+
         if (userData.company_id) {
           const company = await dbService.get<any>('companies', userData.company_id);
           if (company) {
@@ -147,7 +154,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         let selectedMembership: User | null = null;
         
-        // Check preferred company first if set
+        // 1. Check preferred company first if set
         if (preferredCompanyId) {
           const pref = memberships.find(m => m.company_id === preferredCompanyId);
           if (pref && pref.company_id) {
@@ -158,19 +165,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
 
-        // If preferred company is expired or not set, find first non-expired active company
+        // 2. If preferred company is expired or not set, find first non-expired active company
         if (!selectedMembership) {
           for (const m of memberships) {
             if (m.company_id) {
               const check = await checkCompanyExpiry(m.company_id);
               if (!check.isExpired) {
                 selectedMembership = m;
+                localStorage.setItem(`preferred_company_${userId}`, m.company_id);
                 break;
               }
             }
           }
         }
         
+        // 3. If ALL companies are expired:
+        if (!selectedMembership) {
+          if (hasSuperAdminRole) {
+            // If user is a super admin, switch automatically to super_admin workspace mode
+            setWorkspaceMode('super_admin');
+            const superAdminMem = memberships.find(m => m.role === 'super_admin' || m.company_id === 'system' || m.company_id === 'SYSTEM') || memberships[0];
+            setUser({
+              ...superAdminMem,
+              must_change_password: superAdminMem.must_change_password || false
+            });
+            setSubscriptionExpiredDetails({
+              expired: false,
+              expiryDate: '',
+              companyName: '',
+              reason: ''
+            });
+            return;
+          } else {
+            selectedMembership = memberships[0];
+          }
+        }
+
         const activeMembership = selectedMembership || memberships[0];
         
         if (activeMembership && activeMembership.company_id) {
@@ -192,11 +222,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser({ 
           id: userId, 
           username: email.split('@')[0], 
-          role: 'user', 
+          role: 'super_admin', 
           company_id: '',
           status: 'active',
           created_at: new Date().toISOString()
         });
+        if (hasSuperAdminRole) {
+          setWorkspaceMode('super_admin');
+        }
       }
     } catch (error) {
       console.error('AuthContext: Error fetching profile:', error);
@@ -231,6 +264,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const isSuperAdminAccount = React.useMemo(() => {
+    return userMemberships.some(m => m.role === 'super_admin' || m.company_id === 'system' || m.company_id === 'SYSTEM') || user?.role === 'super_admin';
+  }, [userMemberships, user?.role]);
+
   const switchCompany = async (companyId: string) => {
     if (!user) return;
     
@@ -238,7 +275,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       const membership = userMemberships.find(m => m.company_id === companyId);
       if (membership) {
-        if (user.role === 'super_admin') {
+        if (isSuperAdminAccount) {
           setWorkspaceMode('company');
         }
         const updatedUser = {
@@ -297,16 +334,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user_email');
     localStorage.removeItem('user_id');
-    // Clear company preference to avoid state leakage
-    Object.keys(localStorage).forEach(key => {
-      if (key.includes('preferred_company_')) localStorage.removeItem(key);
-    });
+    // Preserve preferred_company_ on logout so last opened company is remembered upon re-login
     setUser(null);
     setUserMemberships([]);
     window.location.href = '/login';
   };
 
-  const isSuperAdmin = user?.role === 'super_admin' && workspaceMode === 'super_admin';
+  const isSuperAdmin = isSuperAdminAccount && workspaceMode === 'super_admin';
   const isCompanyAdmin = user?.role === 'admin' && user?.company_id !== 'system';
   const isManager = user?.role === 'manager';
   const isStandardUser = user?.role === 'user';
@@ -337,6 +371,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     switchCompany,
     isAuthenticated,
     isSuperAdmin,
+    isSuperAdminAccount,
     isCompanyAdmin,
     isManager,
     isStandardUser,
@@ -346,7 +381,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetchProfile,
     workspaceMode,
     setWorkspaceMode
-  }), [user, userMemberships, loading, isAuthenticated, isSuperAdmin, isCompanyAdmin, isManager, isStandardUser, subscriptionExpiredDetails, hasPermission, workspaceMode]);
+  }), [user, userMemberships, loading, isAuthenticated, isSuperAdmin, isSuperAdminAccount, isCompanyAdmin, isManager, isStandardUser, subscriptionExpiredDetails, hasPermission, workspaceMode]);
   return (
     <AuthContext.Provider value={value}>
       {children}

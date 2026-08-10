@@ -164,7 +164,7 @@ const getTabIcon = (id: string) => {
 
 export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPage }) => {
   const { language, setLanguage, t, dir } = useLanguage();
-  const { logout, user, userMemberships, switchCompany, isSuperAdmin, isCompanyAdmin, isManager, isStandardUser, hasPermission, workspaceMode, setWorkspaceMode } = useAuth();
+  const { logout, user, userMemberships, switchCompany, isSuperAdmin, isSuperAdminAccount, isCompanyAdmin, isManager, isStandardUser, hasPermission, workspaceMode, setWorkspaceMode } = useAuth();
   const { unreadCount, setIsCenterOpen, addPersistentNotification, showNotification } = useNotification();
   const { openTabs, activeTabId, openTab, closeTab, setActiveTab } = useNavigation();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(true);
@@ -743,7 +743,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           className="flex items-center gap-0 xl:gap-[1px] 2xl:gap-0.5 flex-1 min-w-0 py-0.5"
         >
           {/* Company Switcher (Only rendered if user has multiple companies or is super_admin) */}
-          {(user?.role === 'super_admin' || (userMemberships && userMemberships.length > 1)) && (
+          {(isSuperAdminAccount || (userMemberships && userMemberships.length > 1)) && (
             <div className="relative shrink-0 mr-0.5 ml-0.5">
               <button
                 type="button"
@@ -776,7 +776,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                         <p className="text-xs font-bold text-emerald-700 truncate mt-0.5">{activeCompanyName}</p>
                       </div>
                       <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar">
-                        {user?.role === 'super_admin' && (
+                        {isSuperAdminAccount && (
                           <>
                             <button
                               type="button"
@@ -1331,11 +1331,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
                   <div className="p-6 border-t border-slate-100 bg-slate-50">
                     {/* Mobile Company Switcher */}
-                    {(user?.role === 'super_admin' || userMemberships.length > 1) && (
+                    {(isSuperAdminAccount || userMemberships.length > 1) && (
                       <div className="mb-6 space-y-2">
                         <p className="text-[10px] font-black text-slate-400 px-1 uppercase tracking-widest">{t('common.switch_company')}</p>
                         <div className="flex flex-col gap-2">
-                          {user?.role === 'super_admin' && (
+                          {isSuperAdminAccount && (
                             <button
                               onClick={() => {
                                 if (setWorkspaceMode) setWorkspaceMode('super_admin');
@@ -1474,7 +1474,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 </p>
 
                 <div className="mt-1 px-3 py-1 bg-[#233527]/10 text-[#233527] border border-[#233527]/20 font-bold text-[11px] rounded-full">
-                  {user?.role === 'super_admin'
+                  {isSuperAdminAccount
                     ? (language === 'ar' ? 'المشرف العام' : 'Super Admin')
                     : isCompanyAdmin
                     ? (language === 'ar' ? 'مدير الشركة' : 'Company Admin')
@@ -1494,7 +1494,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 </label>
 
                 {/* 2. Company Settings */}
-                {(isCompanyAdmin || isSuperAdmin) && (
+                {(isCompanyAdmin || isSuperAdminAccount) && (
                   <button
                     type="button"
                     onClick={() => {
