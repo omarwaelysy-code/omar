@@ -28,7 +28,15 @@ import { useViewPreference } from '../hooks/useViewPreference';
 import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
 import { useNavigation } from '../contexts/NavigationContext';
 
-export const PaymentVouchers: React.FC = () => {
+export interface PaymentVouchersProps {
+  isSupplierOnly?: boolean;
+  pageTitle?: string;
+}
+
+export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
+  isSupplierOnly = false,
+  pageTitle
+}) => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
@@ -1705,8 +1713,12 @@ export const PaymentVouchers: React.FC = () => {
         <>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('payments.title')}</h2>
-          <p className="text-zinc-500">{t('payments.subtitle')}</p>
+          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">
+            {pageTitle || (isSupplierOnly ? (language === 'ar' ? 'سندات صرف الموردين' : 'Supplier Payment Vouchers') : t('payments.title'))}
+          </h2>
+          <p className="text-zinc-500">
+            {isSupplierOnly ? (language === 'ar' ? 'إدارة وإنشاء سندات الصرف الخاصة بالموردين وتسوياتها' : 'Manage and create supplier payment vouchers') : t('payments.subtitle')}
+          </p>
           {serverSummary.total_amount !== undefined && (
             <div className="mt-2 flex items-center gap-4 text-sm">
                <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
@@ -1730,11 +1742,19 @@ export const PaymentVouchers: React.FC = () => {
             onPrint={() => printElement(tableRef.current, 'سندات الصرف')}
           />
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => {
+              if (isSupplierOnly && (!voucherData.items || voucherData.items.length === 0)) {
+                setVoucherData(prev => ({
+                  ...prev,
+                  items: [{ type: 'supplier', entity_id: '', amount: 0, description: '' }]
+                }));
+              }
+              setIsModalOpen(true);
+            }}
             className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
           >
             <Plus size={20} />
-            {t('payments.add')}
+            {isSupplierOnly ? (language === 'ar' ? 'إضافة سند صرف مورد' : 'Add Supplier Voucher') : t('payments.add')}
           </button>
         </div>
       </div>

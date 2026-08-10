@@ -43,6 +43,7 @@ export const pageLabels: { [key: string]: string } = {
   'purchase_orders': 'أوامر شراء',
   'receipts': 'سندات القبض',
   'payment_vouchers': 'سندات الصرف',
+  'supplier_payment_vouchers': 'سند صرف مورد',
   'returns': 'مرتجع مبيعات',
   'purchase_returns': 'مرتجع مشتريات',
   'customer_discounts': 'خصم عملاء',

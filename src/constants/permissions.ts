@@ -246,6 +246,7 @@ export const MODULE_PERMISSIONS_META: { [moduleId: string]: { labelAr: string; l
   // Cash & Banks
   receipts: { labelAr: 'سندات القبض', labelEn: 'Receipt Vouchers', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved'] },
   payment_vouchers: { labelAr: 'سندات الصرف', labelEn: 'Payment Vouchers', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved'] },
+  supplier_payment_vouchers: { labelAr: 'سند صرف مورد', labelEn: 'Supplier Payment Vouchers', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved'] },
   cash_transfers: { labelAr: 'حوالات الخزينة', labelEn: 'Cash Transfers', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'edit_approved', 'delete_approved'] },
   cash_balances: { labelAr: 'أرصدة النقدية والخزائن', labelEn: 'Cash Balances', hasCrud: true },
   // GL

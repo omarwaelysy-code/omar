@@ -178,6 +178,7 @@ export const en = {
   'nav.supplier_discounts': 'Supplier Discounts',
   'nav.receipts': 'Receipt Vouchers',
   'nav.payment_vouchers': 'Payment Vouchers',
+  'nav.supplier_payment_vouchers': 'Supplier Payment Voucher',
   'nav.cash_transfers': 'Cash Transfers',
   'nav.warehouses_menu': 'Warehouses',
   'nav.warehouse_transfers': 'Warehouse Transfers',

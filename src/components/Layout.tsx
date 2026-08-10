@@ -458,6 +458,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           ...(company?.purchase_workflow_mode && company.purchase_workflow_mode !== 'Simple' ? [
             { id: 'goods_receipts', label: t('nav.goods_receipts') || (language === 'ar' ? 'استلام البضائع' : 'Goods Receipts'), icon: PackageCheck }
           ] : []),
+          { id: 'supplier_payment_vouchers', label: t('nav.supplier_payment_vouchers') || (language === 'ar' ? 'سند صرف مورد' : 'Supplier Payment Voucher'), icon: CreditCard },
           { id: 'purchase_orders', label: t('nav.purchase_orders'), icon: FileText },
           { id: 'purchase_returns', label: t('nav.purchase_returns'), icon: RotateCcw },
           { id: 'supplier_discounts', label: t('nav.supplier_discounts'), icon: Tags },

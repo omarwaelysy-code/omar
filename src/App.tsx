@@ -52,6 +52,7 @@ const Invoices = React.lazy(() => import('./pages/Invoices').then(m => ({ defaul
 const PurchaseInvoices = React.lazy(() => import('./pages/PurchaseInvoices').then(m => ({ default: m.PurchaseInvoices })));
 const Receipts = React.lazy(() => import('./pages/Receipts').then(m => ({ default: m.Receipts })));
 const PaymentVouchers = React.lazy(() => import('./pages/PaymentVouchers').then(m => ({ default: m.PaymentVouchers })));
+const SupplierPaymentVouchers = React.lazy(() => import('./pages/SupplierPaymentVouchers').then(m => ({ default: m.SupplierPaymentVouchers })));
 const Returns = React.lazy(() => import('./pages/Returns').then(m => ({ default: m.Returns })));
 const PurchaseReturns = React.lazy(() => import('./pages/PurchaseReturns').then(m => ({ default: m.PurchaseReturns })));
 const GeneralStockMovementsReport = React.lazy(() => import('./pages/GeneralStockMovementsReport').then(m => ({ default: m.GeneralStockMovementsReport })));
@@ -223,6 +224,7 @@ export default function App() {
       case 'purchase_orders': return <PurchaseOrders />;
       case 'receipts': return <Receipts />;
       case 'payment_vouchers': return <PaymentVouchers />;
+      case 'supplier_payment_vouchers': return <SupplierPaymentVouchers />;
       case 'returns': return <Returns />;
       case 'purchase_returns': return <PurchaseReturns />;
       case 'customer_discounts': return <CustomerDiscounts />;

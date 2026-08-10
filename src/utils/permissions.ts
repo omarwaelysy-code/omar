@@ -1,4 +1,4 @@
-﻿import { MODULE_PERMISSIONS_META, SPECIAL_PERMISSIONS_DESC } from '../constants/permissions';
+import { MODULE_PERMISSIONS_META, SPECIAL_PERMISSIONS_DESC } from '../constants/permissions';
 
 export function getInitialPermissionsState() {
   const perms: any = {};
@@ -37,7 +37,7 @@ export function getDefaultRolePermissions(roleName: string): any {
     Object.keys(perms).forEach(modId => {
       const isFin = [
         'account_types', 'accounts', 'chart_of_accounts', 'create_journal_entry', 
-        'journal_entries', 'detailed_journal_entries', 'receipts', 'payment_vouchers', 
+        'journal_entries', 'detailed_journal_entries', 'receipts', 'payment_vouchers', 'supplier_payment_vouchers', 
         'cash_transfers', 'cash_balances', 'customer_statement', 'supplier_statement', 
         'customer_balances', 'supplier_balances', 'sales_report', 'expenses_report', 
         'cash_report', 'general_ledger_report', 'trial_balance', 'income_statement', 
@@ -61,7 +61,7 @@ export function getDefaultRolePermissions(roleName: string): any {
     Object.keys(perms).forEach(modId => {
       const isAcc = [
         'account_types', 'accounts', 'chart_of_accounts', 'create_journal_entry', 
-        'journal_entries', 'detailed_journal_entries', 'receipts', 'payment_vouchers', 
+        'journal_entries', 'detailed_journal_entries', 'receipts', 'payment_vouchers', 'supplier_payment_vouchers', 
         'cash_transfers', 'cash_balances'
       ].includes(modId);
       

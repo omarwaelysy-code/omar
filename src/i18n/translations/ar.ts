@@ -178,6 +178,7 @@ export const ar = {
   'nav.supplier_discounts': 'خصم موردين',
   'nav.receipts': 'سندات القبض',
   'nav.payment_vouchers': 'سندات الصرف',
+  'nav.supplier_payment_vouchers': 'سند صرف مورد',
   'nav.cash_transfers': 'التحويل بين الخزائن',
   'nav.warehouses_menu': 'المخازن',
   'nav.warehouse_transfers': 'تحويل بين المخازن',
