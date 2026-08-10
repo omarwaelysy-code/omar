@@ -12,6 +12,7 @@ export interface AuthRequest extends Request {
     username?: string;
     company_id?: string;
     role: string;
+    is_super_admin?: boolean;
   };
 }
 
@@ -26,6 +27,20 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
   try {
     const decoded = jwt.verify(token, getJwtSecret()) as any;
     req.user = decoded;
+
+    if (decoded?.email) {
+      try {
+        const superCheck = await pool.query(
+          "SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND (role = 'super_admin' OR company_id = 'system' OR company_id = 'SYSTEM') LIMIT 1",
+          [decoded.email]
+        );
+        if (superCheck.rows.length > 0 || decoded.role === 'super_admin') {
+          (req.user as any).is_super_admin = true;
+        }
+      } catch (e) {
+        // silent catch
+      }
+    }
 
     // ================================================================
     // SESSION VALIDATION: Ensure this token's session_token still matches
@@ -57,7 +72,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     // Resolve company_id from 'x-company-id' header if present to support seamless workspace switching
     const requestedCompanyId = req.headers['x-company-id'] as string;
     if (requestedCompanyId && requestedCompanyId !== decoded.company_id) {
-      const isSuperAdminRole = decoded.role === 'super_admin';
+      const isSuperAdminRole = decoded.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
       
       try {
         const userRes = await pool.query('SELECT role FROM users WHERE email = $1 AND company_id = $2', [decoded.email, requestedCompanyId]);
@@ -88,7 +103,8 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
 
 export const authorizeRoles = (...roles: string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    const isSuperAdminAccount = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
+    if (!req.user || (!roles.includes(req.user.role) && !(roles.includes('super_admin') && isSuperAdminAccount))) {
       return res.status(403).json({ error: 'Access denied. Insufficient permissions.' });
     }
     next();

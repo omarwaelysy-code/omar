@@ -2999,7 +2999,7 @@ modules.forEach(moduleName => {
       } else {
         // For other tables, we apply company_id filter by default if present in schema
         const queryFilters = { ...req.query } as any;
-        const isSuperAdmin = req.user?.role === 'super_admin';
+        const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
         const isOwnEmailQuery = moduleName === 'users' && (
           queryFilters.email === req.user?.email || 
           (typeof queryFilters.email === 'string' && typeof req.user?.email === 'string' && queryFilters.email.toLowerCase() === req.user.email.toLowerCase())

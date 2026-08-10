@@ -55,7 +55,7 @@ const isSuperAdminUser = (u: User): boolean => {
 };
 
 export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initialTab }) => {
-  const { user, isSuperAdmin } = useAuth();
+  const { user, isSuperAdmin, isSuperAdminAccount } = useAuth();
   const { showNotification } = useNotification();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -540,7 +540,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
       superAdminEmails.add(u.email.trim().toLowerCase());
     }
   });
-  if (user?.email && (user.role === 'super_admin' || isSuperAdmin)) {
+  if (user?.email && (user.role === 'super_admin' || isSuperAdmin || isSuperAdminAccount)) {
     superAdminEmails.add(user.email.trim().toLowerCase());
   }
 
@@ -554,7 +554,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
       }
     }
   });
-  if (user?.email && (user.role === 'super_admin' || isSuperAdmin)) {
+  if (user?.email && (user.role === 'super_admin' || isSuperAdmin || isSuperAdminAccount)) {
     const emailKey = user.email.trim().toLowerCase();
     if (!uniqueSuperAdminMap.has(emailKey)) {
       uniqueSuperAdminMap.set(emailKey, { ...user, role: 'super_admin' });
