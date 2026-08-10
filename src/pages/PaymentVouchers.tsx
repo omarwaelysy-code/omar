@@ -1695,6 +1695,10 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
   });
 
   const filteredVouchers = sortedVouchers.filter(v => {
+    if (isSupplierOnly) {
+      const isSupplierVoucher = v.supplier_id || v.type === 'supplier' || (v.items && Array.isArray(v.items) && v.items.some((i: any) => i.type === 'supplier' || i.supplier_id));
+      if (!isSupplierVoucher) return false;
+    }
     const searchLow = searchTerm.toLowerCase();
     return (
       (v.voucher_number || '').toLowerCase().includes(searchLow) ||
@@ -2366,17 +2370,13 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                   <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
                     <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
                       <Layers className="w-4 h-4" />
-                      <span className="text-xs font-bold">{language === 'ar' ? 'بنود الصرف' : 'Payment Items'}</span>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between border-b border-zinc-100 pb-2">
+<div className="flex items-center justify-between border-b border-zinc-100 pb-2">
                         <h4 className="font-bold text-zinc-900 italic tracking-tight uppercase text-sm">{language === 'ar' ? 'تفاصيل البنود' : 'Item Details'}</h4>
                         <button 
                           type="button"
                           onClick={() => setVoucherData({
                             ...voucherData,
-                            items: [...voucherData.items, { type: 'supplier', entity_id: '', amount: 0, description: '' }]
+                            items: [...voucherData.items, { type: isSupplierOnly ? 'supplier' : 'supplier', entity_id: '', amount: 0, description: '' }]
                           })}
                           className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-black border border-emerald-100 hover:bg-emerald-100 transition-all shadow-sm"
                         >
@@ -2403,7 +2403,8 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                                   <td className="px-1 py-1 relative">
                                     <select 
                                       className="w-full px-2 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] font-bold outline-none appearance-none"
-                                      value={item.type}
+                                      disabled={isSupplierOnly}
+                                      value={isSupplierOnly ? 'supplier' : item.type}
                                       onChange={(e) => {
                                         const newItems = [...voucherData.items];
                                         newItems[idx].type = e.target.value;
@@ -2414,9 +2415,9 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                                       }}
                                     >
                                       <option value="supplier">{t('discounts.column_supplier')}</option>
-                                      <option value="customer">{t('discounts.column_customer')}</option>
-                                      <option value="expense">بند مصروف</option>
-                                      <option value="account">{language === 'ar' ? 'حساب عام' : 'General Ledger'}</option>
+                                      {!isSupplierOnly && <option value="customer">{t('discounts.column_customer')}</option>}
+                                      {!isSupplierOnly && <option value="expense">بند مصروف</option>}
+                                      {!isSupplierOnly && <option value="account">{language === 'ar' ? 'حساب عام' : 'General Ledger'}</option>}
                                     </select>
                                     <ChevronDown size={12} className="absolute right-3 top-4 text-zinc-400 pointer-events-none" />
                                   </td>
