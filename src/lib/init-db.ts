@@ -1,6 +1,7 @@
 import pool from './postgres';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
+import { ensureUniqueSequenceNumber } from './erp-api';
 
 /**
  * ERP V2 Database Initialization (Strict Dependency Ordered)
@@ -954,6 +955,81 @@ export async function initDatabase() {
     await safeQuery('CREATE INDEX IF NOT EXISTS "idx_warehouse_transfer_items_transfer_id" ON "warehouse_transfer_items"("transfer_id");', 'idx_warehouse_transfer_items_transfer_id');
     await safeQuery('CREATE INDEX IF NOT EXISTS "idx_opening_stock_items_opening_stock_id" ON "opening_stock_items"("opening_stock_id");', 'idx_opening_stock_items_opening_stock_id');
     await safeQuery('CREATE INDEX IF NOT EXISTS "idx_stock_adjustment_items_adjustment_id" ON "stock_adjustment_items"("adjustment_id");', 'idx_stock_adjustment_items_adjustment_id');
+
+    // -------------------------------------------------------------------------
+    // Automatic Duplicate Number Cleanup & Enforce UNIQUE Constraints
+    // Guaranteed to fix existing duplicate entry/voucher numbers & prevent new ones
+    // -------------------------------------------------------------------------
+    const cleanupTables = [
+      { table: 'journal_entries', field: 'entry_number', module: 'journal_entries' },
+      { table: 'payment_vouchers', field: 'voucher_number', module: 'payment_vouchers' },
+      { table: 'receipt_vouchers', field: 'voucher_number', module: 'receipt_vouchers' },
+      { table: 'invoices', field: 'invoice_number', module: 'invoices' },
+      { table: 'purchase_invoices', field: 'invoice_number', module: 'purchase_invoices' },
+      { table: 'returns', field: 'return_number', module: 'returns' },
+      { table: 'purchase_returns', field: 'return_number', module: 'purchase_returns' }
+    ];
+
+    for (const item of cleanupTables) {
+      try {
+        const dups = await client.query(`
+          SELECT company_id, "${item.field}", COUNT(*) as cnt
+          FROM "${item.table}"
+          WHERE "${item.field}" IS NOT NULL AND "${item.field}" != ''
+          GROUP BY company_id, "${item.field}"
+          HAVING COUNT(*) > 1
+        `);
+
+        for (const row of dups.rows) {
+          const companyId = row.company_id;
+          const dupNum = row[item.field];
+
+          const records = await client.query(`
+            SELECT id, date, created_at
+            FROM "${item.table}"
+            WHERE company_id = $1 AND "${item.field}" = $2
+            ORDER BY created_at ASC, id ASC
+          `, [companyId, dupNum]);
+
+          for (let i = 1; i < records.rows.length; i++) {
+            const record = records.rows[i];
+            const dateVal = record.date ? (typeof record.date === 'string' ? record.date.slice(0, 10) : record.date.toISOString().slice(0, 10)) : new Date().toISOString().slice(0, 10);
+            const newNumber = await ensureUniqueSequenceNumber(
+              client,
+              companyId,
+              item.module,
+              dateVal
+            );
+
+            await client.query(`
+              UPDATE "${item.table}"
+              SET "${item.field}" = $1
+              WHERE id = $2
+            `, [newNumber, record.id]);
+
+            if (item.table === 'payment_vouchers' || item.table === 'receipt_vouchers' || item.table === 'invoices' || item.table === 'purchase_invoices') {
+              await client.query(`
+                UPDATE "journal_entries"
+                SET reference_number = $1
+                WHERE reference_id = $2
+              `, [newNumber, record.id]);
+            }
+            console.log(`✅ [CLEANUP] Fixed duplicate ${item.field} in ${item.table}: ${dupNum} -> ${newNumber}`);
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[CLEANUP] Warning for ${item.table}:`, err.message);
+      }
+    }
+
+    // Enforce UNIQUE Indexes across document sequence numbers
+    await safeQuery('CREATE UNIQUE INDEX IF NOT EXISTS "idx_uniq_journal_entries_num" ON "journal_entries"("company_id", "entry_number") WHERE "entry_number" IS NOT NULL AND "entry_number" != \'\';', 'idx_uniq_journal_entries_num');
+    await safeQuery('CREATE UNIQUE INDEX IF NOT EXISTS "idx_uniq_payment_vouchers_num" ON "payment_vouchers"("company_id", "voucher_number") WHERE "voucher_number" IS NOT NULL AND "voucher_number" != \'\';', 'idx_uniq_payment_vouchers_num');
+    await safeQuery('CREATE UNIQUE INDEX IF NOT EXISTS "idx_uniq_receipt_vouchers_num" ON "receipt_vouchers"("company_id", "voucher_number") WHERE "voucher_number" IS NOT NULL AND "voucher_number" != \'\';', 'idx_uniq_receipt_vouchers_num');
+    await safeQuery('CREATE UNIQUE INDEX IF NOT EXISTS "idx_uniq_invoices_num" ON "invoices"("company_id", "invoice_number") WHERE "invoice_number" IS NOT NULL AND "invoice_number" != \'\';', 'idx_uniq_invoices_num');
+    await safeQuery('CREATE UNIQUE INDEX IF NOT EXISTS "idx_uniq_purchase_invoices_num" ON "purchase_invoices"("company_id", "invoice_number") WHERE "invoice_number" IS NOT NULL AND "invoice_number" != \'\';', 'idx_uniq_purchase_invoices_num');
+    await safeQuery('CREATE UNIQUE INDEX IF NOT EXISTS "idx_uniq_returns_num" ON "returns"("company_id", "return_number") WHERE "return_number" IS NOT NULL AND "return_number" != \'\';', 'idx_uniq_returns_num');
+    await safeQuery('CREATE UNIQUE INDEX IF NOT EXISTS "idx_uniq_purchase_returns_num" ON "purchase_returns"("company_id", "return_number") WHERE "return_number" IS NOT NULL AND "return_number" != \'\';', 'idx_uniq_purchase_returns_num');
 
     // Add item_group_id and item_group_name column safeguards if they do not exist
     if (!(await checkColumnExists('products', 'item_group_id'))) {

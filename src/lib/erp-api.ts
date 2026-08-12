@@ -2461,6 +2461,7 @@ export async function ensureUniqueSequenceNumber(
       if (res.rows.length === 0) {
         return cleanProp;
       }
+      console.warn(`[ensureUniqueSequenceNumber] Proposed number "${cleanProp}" for ${moduleName} already exists in company ${companyId}. Generating new sequence number...`);
     } else {
       return cleanProp;
     }
