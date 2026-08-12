@@ -2361,6 +2361,21 @@ function incrementDocumentNumber(docNum: string): string {
 // ATOMIC SEQUENCE GENERATOR - uses document_sequences table
 // guarantees no duplicates under any concurrent load
 // ============================================================
+export const SEQUENCE_MODULE_CONFIG: Record<string, { table: string; field: string; prefix: string; padLength: number; periodType: 'day' | 'month' }> = {
+  'invoices': { table: 'invoices', field: 'invoice_number', prefix: 'INV', padLength: 6, periodType: 'month' },
+  'purchase_invoices': { table: 'purchase_invoices', field: 'invoice_number', prefix: 'PINV', padLength: 6, periodType: 'month' },
+  'returns': { table: 'returns', field: 'return_number', prefix: 'RET', padLength: 6, periodType: 'month' },
+  'purchase_returns': { table: 'purchase_returns', field: 'return_number', prefix: 'PRET', padLength: 6, periodType: 'month' },
+  'payment_vouchers': { table: 'payment_vouchers', field: 'voucher_number', prefix: 'PV', padLength: 6, periodType: 'month' },
+  'receipt_vouchers': { table: 'receipt_vouchers', field: 'voucher_number', prefix: 'RV', padLength: 6, periodType: 'month' },
+  'journal_entries': { table: 'journal_entries', field: 'entry_number', prefix: 'JE', padLength: 5, periodType: 'day' },
+  'sales_orders': { table: 'sales_orders', field: 'order_number', prefix: 'SO', padLength: 6, periodType: 'month' },
+  'purchase_orders': { table: 'purchase_orders', field: 'order_number', prefix: 'PO', padLength: 6, periodType: 'month' },
+  'goods_receipts': { table: 'goods_receipts', field: 'receipt_number', prefix: 'GR', padLength: 6, periodType: 'month' },
+  'employees': { table: 'employees', field: 'employee_code', prefix: 'EMP', padLength: 5, periodType: 'month' },
+  'cash_transfers': { table: 'cash_transfers', field: 'transfer_number', prefix: 'CT', padLength: 6, periodType: 'month' }
+};
+
 export async function getNextAtomicSequence(
   _ignoredClient: any,
   companyId: string,
@@ -2434,22 +2449,7 @@ export async function ensureUniqueSequenceNumber(
   proposedNumber?: string,
   currentRecordId?: string
 ): Promise<string> {
-  const tableNames: Record<string, { table: string; field: string; prefix: string; padLength: number; periodType: 'day' | 'month' }> = {
-    'invoices': { table: 'invoices', field: 'invoice_number', prefix: 'INV', padLength: 6, periodType: 'month' },
-    'purchase_invoices': { table: 'purchase_invoices', field: 'invoice_number', prefix: 'PINV', padLength: 6, periodType: 'month' },
-    'returns': { table: 'returns', field: 'return_number', prefix: 'RET', padLength: 6, periodType: 'month' },
-    'purchase_returns': { table: 'purchase_returns', field: 'return_number', prefix: 'PRET', padLength: 6, periodType: 'month' },
-    'payment_vouchers': { table: 'payment_vouchers', field: 'voucher_number', prefix: 'PV', padLength: 6, periodType: 'month' },
-    'receipt_vouchers': { table: 'receipt_vouchers', field: 'voucher_number', prefix: 'RV', padLength: 6, periodType: 'month' },
-    'journal_entries': { table: 'journal_entries', field: 'entry_number', prefix: 'JE', padLength: 5, periodType: 'day' },
-    'sales_orders': { table: 'sales_orders', field: 'order_number', prefix: 'SO', padLength: 6, periodType: 'month' },
-    'purchase_orders': { table: 'purchase_orders', field: 'order_number', prefix: 'PO', padLength: 6, periodType: 'month' },
-    'goods_receipts': { table: 'goods_receipts', field: 'receipt_number', prefix: 'GR', padLength: 6, periodType: 'month' },
-    'employees': { table: 'employees', field: 'employee_code', prefix: 'EMP', padLength: 5, periodType: 'month' },
-    'cash_transfers': { table: 'cash_transfers', field: 'transfer_number', prefix: 'CT', padLength: 6, periodType: 'month' }
-  };
-
-  const target = tableNames[moduleName];
+  const target = SEQUENCE_MODULE_CONFIG[moduleName];
   if (!target) return proposedNumber || '';
 
   const safeDateStr = (dateStr || new Date().toISOString()).slice(0, 10);
@@ -3624,7 +3624,7 @@ modules.forEach(moduleName => {
           } catch (insertError: any) {
             if (insertError.code === '23505' && ['payment_vouchers', 'receipt_vouchers', 'cash_transfers', 'employees'].includes(moduleName)) {
               console.warn(`[RETRY RECOVERY] Unique constraint violation code 23505 for ${moduleName}. Forcing new atomic sequence...`);
-              const target = tableNames[moduleName];
+              const target = SEQUENCE_MODULE_CONFIG[moduleName];
               const safeDateStr = (dateStr || new Date().toISOString()).slice(0, 10);
               const parts = safeDateStr.split('-');
               const year = parts[0] || new Date().getFullYear().toString();
