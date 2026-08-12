@@ -2601,7 +2601,11 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                               value={voucherData.currency_id}
                               onChange={(e) => handleCurrencyChange(e.target.value)}
                             >
-                              <option value="">{language === 'ar' ? 'عملة الشركة (افتراضي)' : 'Company Currency (Default)'}</option>
+                              <option value="">
+                                {language === 'ar' 
+                                  ? `عملة الشركة الافتراضية (${(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()})` 
+                                  : `Company Base Currency (${(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()})`}
+                              </option>
                               {companyCurrencies.map(curr => (
                                 <option key={curr.id} value={curr.id}>{curr.code} - {language === 'ar' ? curr.name_ar : curr.name_en}</option>
                               ))}
