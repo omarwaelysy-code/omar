@@ -2384,31 +2384,26 @@ export async function ensureUniqueSequenceNumber(
   companyId: string,
   moduleName: string,
   dateStr: string,
-  proposedNumber?: string
+  proposedNumber?: string,
+  currentRecordId?: string
 ): Promise<string> {
-  // Determine prefix and period based on module
-  let prefix = 'DOC';
-  let period = '';
-  let padLength = 6;
-  
-  switch (moduleName) {
-    case 'invoices': prefix = 'INV'; break;
-    case 'purchase_invoices': prefix = 'PINV'; break;
-    case 'returns': prefix = 'RET'; break;
-    case 'purchase_returns': prefix = 'PRET'; break;
-    case 'payment_vouchers': prefix = 'PV'; break;
-    case 'receipt_vouchers': prefix = 'RV'; break;
-    case 'journal_entries': prefix = 'JE'; padLength = 5; break;
-    case 'sales_orders': prefix = 'SO'; break;
-    case 'purchase_orders': prefix = 'PO'; break;
-    case 'employees': prefix = 'EMP'; break;
-    case 'warehouse_transfers': prefix = 'TR'; break;
-    case 'opening_stock_balances': prefix = 'OPB'; break;
-    case 'stock_adjustments': prefix = 'ADJ'; break;
-    case 'cash_transfers': prefix = 'CT'; break;
-    case 'goods_receipts': prefix = 'GR'; break;
-    default: return proposedNumber || '';
-  }
+  const tableNames: Record<string, { table: string; field: string; prefix: string; padLength: number; periodType: 'day' | 'month' }> = {
+    'invoices': { table: 'invoices', field: 'invoice_number', prefix: 'INV', padLength: 6, periodType: 'month' },
+    'purchase_invoices': { table: 'purchase_invoices', field: 'invoice_number', prefix: 'PINV', padLength: 6, periodType: 'month' },
+    'returns': { table: 'returns', field: 'return_number', prefix: 'RET', padLength: 6, periodType: 'month' },
+    'purchase_returns': { table: 'purchase_returns', field: 'return_number', prefix: 'PRET', padLength: 6, periodType: 'month' },
+    'payment_vouchers': { table: 'payment_vouchers', field: 'voucher_number', prefix: 'PV', padLength: 6, periodType: 'month' },
+    'receipt_vouchers': { table: 'receipt_vouchers', field: 'voucher_number', prefix: 'RV', padLength: 6, periodType: 'month' },
+    'journal_entries': { table: 'journal_entries', field: 'entry_number', prefix: 'JE', padLength: 5, periodType: 'day' },
+    'sales_orders': { table: 'sales_orders', field: 'order_number', prefix: 'SO', padLength: 6, periodType: 'month' },
+    'purchase_orders': { table: 'purchase_orders', field: 'order_number', prefix: 'PO', padLength: 6, periodType: 'month' },
+    'goods_receipts': { table: 'goods_receipts', field: 'receipt_number', prefix: 'GR', padLength: 6, periodType: 'month' },
+    'employees': { table: 'employees', field: 'employee_code', prefix: 'EMP', padLength: 5, periodType: 'month' },
+    'cash_transfers': { table: 'cash_transfers', field: 'transfer_number', prefix: 'CT', padLength: 6, periodType: 'month' }
+  };
+
+  const target = tableNames[moduleName];
+  if (!target) return proposedNumber || '';
 
   const safeDateStr = (dateStr || new Date().toISOString()).slice(0, 10);
   const parts = safeDateStr.split('-');
@@ -2416,77 +2411,65 @@ export async function ensureUniqueSequenceNumber(
   const month = (parts[1] || '01').padStart(2, '0');
   const day = (parts[2] || '01').padStart(2, '0');
 
-  if (moduleName === 'journal_entries') {
-    period = `${year}-${month}-${day}`;
-  } else {
-    period = `${year}-${month}`;
-  }
+  const period = target.periodType === 'day' ? `${year}-${month}-${day}` : `${year}-${month}`;
 
-  // Get atomic next sequence number from DB - guaranteed unique
-  let seq = await getNextAtomicSequence(client, companyId, moduleName, period);
-  let seqStr = String(seq).padStart(padLength, '0');
-  
-  const generateString = () => {
-    if (moduleName === 'journal_entries') {
-      return `JE-${year}-${month}-${day}-${seqStr}`;
-    } else if (moduleName === 'employees') {
-      return `EMP-${seqStr}`;
-    } else {
-      return `${prefix}-${year}-${month}-${seqStr}`;
-    }
-  };
-  let generatedNumber = generateString();
-
-  const tableNames: any = {
-    'invoices': { table: 'invoices', field: 'invoice_number' },
-    'purchase_invoices': { table: 'purchase_invoices', field: 'invoice_number' },
-    'returns': { table: 'returns', field: 'return_number' },
-    'purchase_returns': { table: 'purchase_returns', field: 'return_number' },
-    'payment_vouchers': { table: 'payment_vouchers', field: 'voucher_number' },
-    'receipt_vouchers': { table: 'receipt_vouchers', field: 'voucher_number' },
-    'journal_entries': { table: 'journal_entries', field: 'entry_number' },
-    'sales_orders': { table: 'sales_orders', field: 'order_number' },
-    'purchase_orders': { table: 'purchase_orders', field: 'order_number' },
-    'goods_receipts': { table: 'goods_receipts', field: 'receipt_number' }
-  };
-
-  const target = tableNames[moduleName];
+  // 1. If proposedNumber is provided, verify whether it's unique
   if (proposedNumber && typeof proposedNumber === 'string' && proposedNumber.trim() !== '') {
     const cleanProp = proposedNumber.trim();
-    if (target) {
-      const res = await client.query(
-        `SELECT 1 FROM "${target.table}" WHERE company_id = $1 AND "${target.field}" = $2 LIMIT 1`,
-        [companyId, cleanProp]
-      );
+    let query = `SELECT 1 FROM "${target.table}" WHERE company_id = $1 AND "${target.field}" = $2`;
+    const params: any[] = [companyId, cleanProp];
+    if (currentRecordId) {
+      query += ` AND id != $3`;
+      params.push(currentRecordId);
+    }
+    query += ` LIMIT 1`;
+
+    try {
+      const res = await client.query(query, params);
       if (res.rows.length === 0) {
-        return cleanProp;
+        return cleanProp; // Unique!
       }
       console.warn(`[ensureUniqueSequenceNumber] Proposed number "${cleanProp}" for ${moduleName} already exists in company ${companyId}. Generating new sequence number...`);
-    } else {
+    } catch (e) {
       return cleanProp;
     }
   }
-  if (target) {
-    let isUnique = false;
-    let attempts = 0;
-    while (!isUnique && attempts < 100) {
-      attempts++;
-      try {
-        const res = await client.query(`SELECT 1 FROM "${target.table}" WHERE company_id = $1 AND "${target.field}" = $2 LIMIT 1`, [companyId, generatedNumber]);
-        if (res.rows.length === 0) {
-          isUnique = true;
-        } else {
-          seq = await getNextAtomicSequence(client, companyId, moduleName, period);
-          seqStr = String(seq).padStart(padLength, '0');
-          generatedNumber = generateString();
-        }
-      } catch (e) {
-        break; // If table/column doesn't exist, ignore and return
+
+  // 2. Generate a new sequence number using atomic counters & DB check
+  let attempts = 0;
+  while (attempts < 100) {
+    attempts++;
+    const seq = await getNextAtomicSequence(client, companyId, moduleName, period);
+    const seqStr = String(seq).padStart(target.padLength, '0');
+    
+    let generatedNumber = '';
+    if (moduleName === 'journal_entries') {
+      generatedNumber = `JE-${year}-${month}-${day}-${seqStr}`;
+    } else if (moduleName === 'employees') {
+      generatedNumber = `EMP-${seqStr}`;
+    } else {
+      generatedNumber = `${target.prefix}-${year}-${month}-${seqStr}`;
+    }
+
+    let checkQuery = `SELECT 1 FROM "${target.table}" WHERE company_id = $1 AND "${target.field}" = $2`;
+    const checkParams: any[] = [companyId, generatedNumber];
+    if (currentRecordId) {
+      checkQuery += ` AND id != $3`;
+      checkParams.push(currentRecordId);
+    }
+    checkQuery += ` LIMIT 1`;
+
+    try {
+      const res = await client.query(checkQuery, checkParams);
+      if (res.rows.length === 0) {
+        return generatedNumber; // Unique number confirmed!
       }
+    } catch (e) {
+      return generatedNumber;
     }
   }
 
-  return generatedNumber;
+  return `${target.prefix}-${Date.now()}`;
 }
 
 export async function generateNextSequence(client: any, companyId: string, moduleName: string, dateStr: string | Date | any): Promise<string> {
@@ -3679,6 +3662,15 @@ modules.forEach(moduleName => {
               const err = validateEntityAccountsData(moduleName, merged);
               if (err) return sendError(res, 400, err);
             }
+          }
+
+          const dateStr = req.body.date || new Date().toISOString().slice(0, 10);
+          if (moduleName === 'payment_vouchers' && req.body.voucher_number) {
+            req.body.voucher_number = await ensureUniqueSequenceNumber(pool, companyId || '', 'payment_vouchers', dateStr, req.body.voucher_number, id);
+          } else if (moduleName === 'receipt_vouchers' && req.body.voucher_number) {
+            req.body.voucher_number = await ensureUniqueSequenceNumber(pool, companyId || '', 'receipt_vouchers', dateStr, req.body.voucher_number, id);
+          } else if (moduleName === 'journal_entries' && req.body.entry_number) {
+            req.body.entry_number = await ensureUniqueSequenceNumber(pool, companyId || '', 'journal_entries', dateStr, req.body.entry_number, id);
           }
 
           const sanitizedData = sanitizeData(moduleName, req.body);

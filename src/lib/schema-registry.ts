@@ -114,12 +114,14 @@ export const EXPECTED_SCHEMA: TableSchema = {
   receipt_vouchers: [
     'id', 'company_id', 'customer_id', 'customer_name', 'voucher_number', 'date', 'amount', 'description', 
     'payment_method_id', 'payment_method_name', 'account_id', 'created_at',
-    'items', 'internal_reference', 'manual_reference', 'voucher_type', 'supplier_id', 'supplier_name'
+    'items', 'internal_reference', 'manual_reference', 'voucher_type', 'supplier_id', 'supplier_name',
+    'currency_id', 'exchange_rate'
   ],
   payment_vouchers: [
     'id', 'company_id', 'supplier_id', 'supplier_name', 'expense_category_id', 'category_name', 'date', 'amount', 
     'description', 'payment_method_id', 'payment_method_name', 'account_id', 'created_at',
-    'items', 'internal_reference', 'manual_reference', 'voucher_type', 'customer_id', 'customer_name', 'voucher_number'
+    'items', 'internal_reference', 'manual_reference', 'voucher_type', 'customer_id', 'customer_name', 'voucher_number',
+    'paid_to_type', 'paid_to_employee_id', 'paid_to_external_name', 'currency_id', 'exchange_rate'
   ],
   customer_discounts: [
     'id', 'company_id', 'customer_id', 'customer_name', 'date', 'amount', 'description'
