@@ -2362,14 +2362,16 @@ function incrementDocumentNumber(docNum: string): string {
 // guarantees no duplicates under any concurrent load
 // ============================================================
 export async function getNextAtomicSequence(
-  client: any,
+  _ignoredClient: any,
   companyId: string,
   module: string,
   period: string
 ): Promise<number> {
+  // CRITICAL FIX: Use an INDEPENDENT pool connection (NOT the transaction client)
+  // This ensures the sequence increment is committed immediately and visible
+  // to ALL concurrent transactions, preventing duplicate numbers.
   const id = `${companyId}:${module}:${period}`;
-  // INSERT row if not exists, then atomically increment and return new value
-  const result = await client.query(`
+  const result = await pool.query(`
     INSERT INTO "document_sequences" (id, company_id, module, period, last_seq, updated_at)
     VALUES ($1, $2, $3, $4, 1, NOW())
     ON CONFLICT (company_id, module, period)
@@ -3510,13 +3512,13 @@ modules.forEach(moduleName => {
 
           const dateStr = req.body.date || new Date().toISOString().slice(0, 10);
           if (moduleName === 'employees') {
-            req.body.employee_code = await ensureUniqueSequenceNumber(client, companyId, 'employees', '', req.body.employee_code);
+            req.body.employee_code = await ensureUniqueSequenceNumber(pool, companyId, 'employees', '', req.body.employee_code);
           } else if (moduleName === 'cash_transfers') {
-            req.body.transfer_number = await ensureUniqueSequenceNumber(client, companyId, 'cash_transfers', dateStr, req.body.transfer_number);
+            req.body.transfer_number = await ensureUniqueSequenceNumber(pool, companyId, 'cash_transfers', dateStr, req.body.transfer_number);
           } else if (moduleName === 'payment_vouchers') {
-            req.body.voucher_number = await ensureUniqueSequenceNumber(client, companyId, 'payment_vouchers', dateStr, req.body.voucher_number);
+            req.body.voucher_number = await ensureUniqueSequenceNumber(pool, companyId, 'payment_vouchers', dateStr, req.body.voucher_number);
           } else if (moduleName === 'receipt_vouchers') {
-            req.body.voucher_number = await ensureUniqueSequenceNumber(client, companyId, 'receipt_vouchers', dateStr, req.body.voucher_number);
+            req.body.voucher_number = await ensureUniqueSequenceNumber(pool, companyId, 'receipt_vouchers', dateStr, req.body.voucher_number);
           }
 
           const sanitizedData = sanitizeData(moduleName, req.body);
