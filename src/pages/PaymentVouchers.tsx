@@ -13,7 +13,7 @@ import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils'
 import { exportToExcel, exportSingleDocumentToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { tafqeet } from '../utils/tafqeet';
 
-import { dbService } from '../services/dbService';
+import { dbService, apiRequest } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
@@ -45,6 +45,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
   const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [companyCurrencies, setCompanyCurrencies] = useState<Currency[]>([]);
+  const [exchangeRateType, setExchangeRateType] = useState<'manual' | 'auto'>('manual');
   const [showAiInput, setShowAiInput] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
@@ -150,38 +151,63 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
   });
 
   const handleCurrencyChange = async (currencyId: string) => {
-    if (!currencyId) {
+    if (!currencyId || !user) {
       setVoucherData(prev => ({ ...prev, currency_id: '', exchange_rate: 1 }));
+      setExchangeRateType('manual');
       return;
     }
 
     setVoucherData(prev => ({ ...prev, currency_id: currencyId }));
+    const updateMethod = companyData?.settings?.exchange_rate_update_method || 'manual';
 
-    try {
-      if (user) {
-        const manualRates = await dbService.list<any>('exchange_rates', {
-          currency_id: currencyId,
-          company_id: user.company_id,
-          _limit: 1,
-          _sort: 'rate_date',
-          _order: 'desc'
-        });
-        if (manualRates && manualRates.length > 0 && Number(manualRates[0].exchange_rate) > 0) {
-          setVoucherData(prev => ({ ...prev, currency_id: currencyId, exchange_rate: Number(manualRates[0].exchange_rate) }));
+    if (updateMethod === 'auto') {
+      try {
+        const latestAutoRates = await apiRequest<Array<{
+          currency_id: string;
+          rate: number | null;
+          rate_date: string | null;
+        }>>(`/currency-rates/latest?company_id=${user.company_id}`);
+        
+        const rateObj = latestAutoRates.find(r => r.currency_id === currencyId);
+        if (rateObj && rateObj.rate !== null && Number(rateObj.rate) > 0) {
+          const autoRate = Number(rateObj.rate);
+          setVoucherData(prev => ({ ...prev, currency_id: currencyId, exchange_rate: autoRate }));
+          setExchangeRateType('auto');
           return;
         }
+      } catch (error) {
+        console.error('Error fetching auto currency rate in PaymentVouchers:', error);
+      }
+    }
+
+    // Manual update method or fallback
+    try {
+      const manualRates = await dbService.list<any>('exchange_rates', {
+        currency_id: currencyId,
+        company_id: user.company_id,
+        _limit: 1,
+        _sort: 'rate_date',
+        _order: 'desc'
+      });
+      if (manualRates && manualRates.length > 0 && Number(manualRates[0].exchange_rate) > 0) {
+        setVoucherData(prev => ({ ...prev, currency_id: currencyId, exchange_rate: Number(manualRates[0].exchange_rate) }));
+        setExchangeRateType('manual');
+        return;
       }
 
       const curr = companyCurrencies.find(c => c.id === currencyId);
       if (curr && (curr as any).exchange_rate && Number((curr as any).exchange_rate) > 0) {
         setVoucherData(prev => ({ ...prev, currency_id: currencyId, exchange_rate: Number((curr as any).exchange_rate) }));
+        setExchangeRateType('manual');
         return;
       }
 
       setVoucherData(prev => ({ ...prev, currency_id: currencyId, exchange_rate: 1 }));
+      setExchangeRateType('manual');
     } catch (e) {
-      console.error('Error fetching exchange rate:', e);
+      console.error('Error fetching exchange rate in PaymentVouchers:', e);
       setVoucherData(prev => ({ ...prev, currency_id: currencyId, exchange_rate: 1 }));
+      setExchangeRateType('manual');
     }
   };
 
@@ -2555,7 +2581,18 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
 
                       {/* Currency & Exchange Rate Selection */}
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'العملة وسعر الصرف' : 'Currency & Exchange Rate'}</label>
+                        <div className="flex items-center justify-between mb-2 px-2">
+                          <label className="block text-xs font-bold text-zinc-400 tracking-tighter uppercase">
+                            {language === 'ar' ? 'العملة وسعر الصرف' : 'Currency & Exchange Rate'}
+                          </label>
+                          {voucherData.currency_id && (
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${exchangeRateType === 'auto' ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
+                              {exchangeRateType === 'auto' 
+                                ? (language === 'ar' ? 'سعر تلقائي' : 'Auto Rate') 
+                                : (language === 'ar' ? 'سعر يدوي' : 'Manual Rate')}
+                            </span>
+                          )}
+                        </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div className="relative">
                             <Coins className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-3.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
@@ -2579,7 +2616,10 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                               placeholder={language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}
                               className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs`}
                               value={voucherData.exchange_rate}
-                              onChange={(e) => setVoucherData({ ...voucherData, exchange_rate: Number(e.target.value) || 1 })}
+                              onChange={(e) => {
+                                setVoucherData({ ...voucherData, exchange_rate: Number(e.target.value) || 1 });
+                                setExchangeRateType('manual');
+                              }}
                             />
                           </div>
                         </div>
