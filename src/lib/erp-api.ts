@@ -2367,10 +2367,9 @@ export async function getNextAtomicSequence(
   module: string,
   period: string
 ): Promise<number> {
-  // CRITICAL FIX: Use an INDEPENDENT pool connection (NOT the transaction client)
-  // This ensures the sequence increment is committed immediately and visible
-  // to ALL concurrent transactions, preventing duplicate numbers.
   const id = `${companyId}:${module}:${period}`;
+  
+  // 1. Get current sequence from document_sequences table or insert if missing
   const result = await pool.query(`
     INSERT INTO "document_sequences" (id, company_id, module, period, last_seq, updated_at)
     VALUES ($1, $2, $3, $4, 1, NOW())
@@ -2378,7 +2377,53 @@ export async function getNextAtomicSequence(
     DO UPDATE SET last_seq = document_sequences.last_seq + 1, updated_at = NOW()
     RETURNING last_seq
   `, [id, companyId, module, period]);
-  return result.rows[0].last_seq;
+
+  let seq = result.rows[0].last_seq;
+
+  // 2. Double-check actual maximum sequence in the underlying table to prevent overlaps
+  const tableNames: Record<string, { table: string; field: string; prefix: string }> = {
+    'invoices': { table: 'invoices', field: 'invoice_number', prefix: 'INV' },
+    'purchase_invoices': { table: 'purchase_invoices', field: 'invoice_number', prefix: 'PINV' },
+    'returns': { table: 'returns', field: 'return_number', prefix: 'RET' },
+    'purchase_returns': { table: 'purchase_returns', field: 'return_number', prefix: 'PRET' },
+    'payment_vouchers': { table: 'payment_vouchers', field: 'voucher_number', prefix: 'PV' },
+    'receipt_vouchers': { table: 'receipt_vouchers', field: 'voucher_number', prefix: 'RV' },
+    'journal_entries': { table: 'journal_entries', field: 'entry_number', prefix: 'JE' },
+    'sales_orders': { table: 'sales_orders', field: 'order_number', prefix: 'SO' },
+    'purchase_orders': { table: 'purchase_orders', field: 'order_number', prefix: 'PO' },
+    'goods_receipts': { table: 'goods_receipts', field: 'receipt_number', prefix: 'GR' },
+    'employees': { table: 'employees', field: 'employee_code', prefix: 'EMP' },
+    'cash_transfers': { table: 'cash_transfers', field: 'transfer_number', prefix: 'CT' }
+  };
+
+  const target = tableNames[module];
+  if (target) {
+    try {
+      const prefixPattern = `${target.prefix}-${period}-%`;
+      const maxRes = await pool.query(
+        `SELECT "${target.field}" FROM "${target.table}" WHERE company_id = $1 AND "${target.field}" LIKE $2 ORDER BY length("${target.field}") DESC, "${target.field}" DESC LIMIT 1`,
+        [companyId, prefixPattern]
+      );
+      if (maxRes.rows.length > 0) {
+        const val = maxRes.rows[0][target.field] || '';
+        const parts = val.split('-');
+        const lastPart = parts[parts.length - 1];
+        const numVal = parseInt(lastPart, 10);
+        if (!isNaN(numVal) && numVal >= seq) {
+          seq = numVal + 1;
+          // Synchronize sequence table to the true max
+          await pool.query(
+            `UPDATE "document_sequences" SET last_seq = $1, updated_at = NOW() WHERE company_id = $2 AND module = $3 AND period = $4`,
+            [seq, companyId, module, period]
+          );
+        }
+      }
+    } catch (e) {
+      // Ignore query failure if column doesn't match format
+    }
+  }
+
+  return seq;
 }
 
 export async function ensureUniqueSequenceNumber(
@@ -2519,7 +2564,42 @@ export async function generateNextSequence(client: any, companyId: string, modul
       `SELECT last_seq FROM "document_sequences" WHERE company_id = $1 AND module = $2 AND period = $3`,
       [companyId, moduleName, period]
     );
-    const currentSeq = result.rows.length > 0 ? result.rows[0].last_seq : 0;
+    let currentSeq = result.rows.length > 0 ? result.rows[0].last_seq : 0;
+
+    // Double-check real table max sequence to avoid returning a lower sequence for preview
+    const tableNames: Record<string, { table: string; field: string; prefix: string }> = {
+      'invoices': { table: 'invoices', field: 'invoice_number', prefix: 'INV' },
+      'purchase_invoices': { table: 'purchase_invoices', field: 'invoice_number', prefix: 'PINV' },
+      'returns': { table: 'returns', field: 'return_number', prefix: 'RET' },
+      'purchase_returns': { table: 'purchase_returns', field: 'return_number', prefix: 'PRET' },
+      'payment_vouchers': { table: 'payment_vouchers', field: 'voucher_number', prefix: 'PV' },
+      'receipt_vouchers': { table: 'receipt_vouchers', field: 'voucher_number', prefix: 'RV' },
+      'journal_entries': { table: 'journal_entries', field: 'entry_number', prefix: 'JE' },
+      'sales_orders': { table: 'sales_orders', field: 'order_number', prefix: 'SO' },
+      'purchase_orders': { table: 'purchase_orders', field: 'order_number', prefix: 'PO' },
+      'goods_receipts': { table: 'goods_receipts', field: 'receipt_number', prefix: 'GR' },
+      'employees': { table: 'employees', field: 'employee_code', prefix: 'EMP' },
+      'cash_transfers': { table: 'cash_transfers', field: 'transfer_number', prefix: 'CT' }
+    };
+
+    const target = tableNames[moduleName];
+    if (target) {
+      const prefixPattern = `${target.prefix}-${period}-%`;
+      const maxRes = await client.query(
+        `SELECT "${target.field}" FROM "${target.table}" WHERE company_id = $1 AND "${target.field}" LIKE $2 ORDER BY length("${target.field}") DESC, "${target.field}" DESC LIMIT 1`,
+        [companyId, prefixPattern]
+      );
+      if (maxRes.rows.length > 0) {
+        const val = maxRes.rows[0][target.field] || '';
+        const parts = val.split('-');
+        const lastPart = parts[parts.length - 1];
+        const numVal = parseInt(lastPart, 10);
+        if (!isNaN(numVal) && numVal > currentSeq) {
+          currentSeq = numVal;
+        }
+      }
+    }
+
     const nextSeq = String(currentSeq + 1).padStart(padLength, '0');
     
     if (moduleName === 'journal_entries') {
@@ -3939,6 +4019,22 @@ modules.forEach(moduleName => {
           }
 
           await InventoryMovementService.reverseMovement('goods_receipt', id, client);
+        }
+
+        if (moduleName === 'payment_vouchers' || moduleName === 'receipt_vouchers') {
+          // Cascade delete related journal entries & items
+          const voucherRes = await client.query(`SELECT voucher_number FROM "${moduleName}" WHERE id = $1`, [id]);
+          const vNum = voucherRes.rows[0]?.voucher_number;
+
+          const jeRes = await client.query(
+            `SELECT id FROM journal_entries WHERE reference_id = $1 OR (reference_number = $2 AND reference_type IN ('payment', 'receipt'))`,
+            [id, vNum || '___NONE___']
+          );
+          const jeIds = jeRes.rows.map((r: any) => r.id);
+          if (jeIds.length > 0) {
+            await client.query(`DELETE FROM journal_entry_items WHERE journal_entry_id = ANY($1::uuid[])`, [jeIds]);
+            await client.query(`DELETE FROM journal_entries WHERE id = ANY($1::uuid[])`, [jeIds]);
+          }
         }
 
         if (transactionalModules.includes(moduleName)) {
