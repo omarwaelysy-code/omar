@@ -1158,6 +1158,31 @@ export async function initDatabase() {
     await safeQuery('CREATE INDEX IF NOT EXISTS "idx_payroll_company" ON "payroll"("company_id");', 'idx_payroll_company');
     await safeQuery('CREATE INDEX IF NOT EXISTS "idx_assets_company" ON "assets"("company_id");', 'idx_assets_company');
 
+    // -------------------------------------------------------------------------
+    // Migration: Add new columns to payment_vouchers & receipt_vouchers
+    // -------------------------------------------------------------------------
+    await safeQuery(`ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "voucher_number" VARCHAR(100);`, 'add voucher_number to payment_vouchers');
+    await safeQuery(`ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "voucher_type" VARCHAR(50);`, 'add voucher_type to payment_vouchers');
+    await safeQuery(`ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "paid_to_type" VARCHAR(50);`, 'add paid_to_type to payment_vouchers');
+    await safeQuery(`ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "paid_to_employee_id" VARCHAR(36);`, 'add paid_to_employee_id to payment_vouchers');
+    await safeQuery(`ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "paid_to_external_name" VARCHAR(255);`, 'add paid_to_external_name to payment_vouchers');
+    await safeQuery(`ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "currency_id" VARCHAR(36);`, 'add currency_id to payment_vouchers');
+    await safeQuery(`ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "exchange_rate" DECIMAL(18, 6) DEFAULT 1;`, 'add exchange_rate to payment_vouchers');
+    await safeQuery(`ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "notes" TEXT;`, 'add notes to payment_vouchers');
+    await safeQuery(`ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "items" JSONB DEFAULT '[]';`, 'add items to payment_vouchers');
+    await safeQuery(`ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`, 'add updated_at to payment_vouchers');
+
+    await safeQuery(`ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "voucher_number" VARCHAR(100);`, 'add voucher_number to receipt_vouchers');
+    await safeQuery(`ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "voucher_type" VARCHAR(50);`, 'add voucher_type to receipt_vouchers');
+    await safeQuery(`ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "paid_to_type" VARCHAR(50);`, 'add paid_to_type to receipt_vouchers');
+    await safeQuery(`ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "paid_to_employee_id" VARCHAR(36);`, 'add paid_to_employee_id to receipt_vouchers');
+    await safeQuery(`ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "paid_to_external_name" VARCHAR(255);`, 'add paid_to_external_name to receipt_vouchers');
+    await safeQuery(`ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "currency_id" VARCHAR(36);`, 'add currency_id to receipt_vouchers');
+    await safeQuery(`ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "exchange_rate" DECIMAL(18, 6) DEFAULT 1;`, 'add exchange_rate to receipt_vouchers');
+    await safeQuery(`ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "notes" TEXT;`, 'add notes to receipt_vouchers');
+    await safeQuery(`ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "items" JSONB DEFAULT '[]';`, 'add items to receipt_vouchers');
+    await safeQuery(`ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`, 'add updated_at to receipt_vouchers');
+
     // Seeding
     await seedDatabase(client);
 
