@@ -5,11 +5,13 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { 
   Search, Plus, Trash2, X, Wallet, User, CreditCard, Calendar, 
   Hash, FileText, FileSpreadsheet, Save, Pencil, Eye, Download, History, Printer, 
-  Phone, Mail, MapPin, Layers, LayoutGrid, List, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, ChevronDown
+  Phone, Mail, MapPin, Layers, LayoutGrid, List, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, ChevronDown,
+  Copy, Sparkles, DollarSign, Coins, Globe
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
 import { exportToExcel, exportSingleDocumentToExcel, formatDataForExcel } from '../utils/excelUtils';
+import { tafqeet } from '../utils/tafqeet';
 
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
@@ -21,7 +23,7 @@ import { ExportButtons } from '../components/ExportButtons';
 import { printDocument } from '../utils/printEngine';
 import { TransactionManager } from '../services/TransactionManager';
 import { VoucherSchema, JournalEntrySchema } from '../lib/schemas';
-import { ActivityLog, Supplier, ExpenseCategory, PaymentMethod, JournalEntry, JournalEntryItem, Account, Company } from '../types';
+import { ActivityLog, Supplier, ExpenseCategory, PaymentMethod, JournalEntry, JournalEntryItem, Account, Company, Currency, Employee } from '../types';
 import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { PaginationControls } from '../components/PaginationControls';
 import { useViewPreference } from '../hooks/useViewPreference';
@@ -41,6 +43,9 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
   const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [companyCurrencies, setCompanyCurrencies] = useState<Currency[]>([]);
+  const [showAiInput, setShowAiInput] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -136,7 +141,12 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
     amount: 0,
     payment_method_id: '',
     date: new Date().toISOString().slice(0, 10),
-    notes: ''
+    notes: '',
+    paid_to_type: 'employee' as 'employee' | 'external',
+    paid_to_employee_id: '',
+    paid_to_external_name: '',
+    currency_id: '',
+    exchange_rate: 1
   });
 
   const generateInternalRef = async (selectedDate: string) => {
@@ -576,6 +586,8 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
       const unsubPM = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setPaymentMethods);
       const unsubAccounts = dbService.subscribe<any>('accounts', user.company_id, setAccounts);
       const unsubCustomers = dbService.subscribe<any>('customers', user.company_id, setCustomers);
+      const unsubEmployees = dbService.subscribe<Employee>('employees', user.company_id, setEmployees);
+      const unsubCurrencies = dbService.subscribe<Currency>('currencies', user.company_id, setCompanyCurrencies);
       const unsubInvoices = dbService.subscribe<any>('invoices', user.company_id, setAllInvoices);
       const unsubPurchaseInvoices = dbService.subscribe<any>('purchase_invoices', user.company_id, setAllPurchaseInvoices);
       const unsubReceipts = dbService.subscribe<any>('receipt_vouchers', user.company_id, setAllReceipts);
@@ -602,6 +614,8 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
         unsubPM();
         unsubAccounts();
         unsubCustomers();
+        unsubEmployees();
+        unsubCurrencies();
         unsubInvoices();
         unsubPurchaseInvoices();
         unsubReceipts();
@@ -1020,7 +1034,12 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
         company_id: user.company_id,
         created_at: editingVoucher?.created_at || new Date().toISOString(),
         created_by: editingVoucher?.created_by || user.id,
-        voucher_type: voucherData.type // 'supplier', 'expense', 'multi'
+        voucher_type: voucherData.type, // 'supplier', 'expense', 'multi'
+        paid_to_type: voucherData.paid_to_type,
+        paid_to_employee_id: voucherData.paid_to_employee_id,
+        paid_to_external_name: voucherData.paid_to_external_name,
+        currency_id: voucherData.currency_id || null,
+        exchange_rate: voucherData.exchange_rate || 1
       };
 
       const journalItems: any[] = [];
@@ -1297,7 +1316,12 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
         amount: 0,
         payment_method_id: '',
         date: new Date().toISOString().slice(0, 10),
-        notes: ''
+        notes: '',
+        paid_to_type: 'employee',
+        paid_to_employee_id: '',
+        paid_to_external_name: '',
+        currency_id: '',
+        exchange_rate: 1
       });
       setIsModalOpen(false);
       setEditingVoucher(null);
@@ -1465,8 +1489,30 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
       amount: 0,
       payment_method_id: '',
       date: new Date().toISOString().slice(0, 10),
-      notes: ''
+      notes: '',
+      paid_to_type: 'employee',
+      paid_to_employee_id: '',
+      paid_to_external_name: '',
+      currency_id: '',
+      exchange_rate: 1
     });
+  };
+
+  const handleCopyVoucher = async () => {
+    const newRef = await generateInternalRef(voucherData.date);
+    setEditingVoucher(null);
+    setInternalRef(newRef);
+    setVoucherData(prev => ({
+      ...prev,
+      internal_reference: newRef,
+      manual_reference: '',
+    }));
+    showNotification(
+      language === 'ar' 
+        ? 'تم نسخ بيانات السند، يمكنك التعديل والحفظ كسند جديد' 
+        : 'Voucher data copied, edit and save as a new voucher',
+      'info'
+    );
   };
 
   const handlePrevVoucher = () => {
@@ -1630,7 +1676,12 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
         amount: fullData.amount || 0,
         payment_method_id: fullData.payment_method_id?.toString() || '',
         date: fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
-        notes: fullData.description || fullData.notes || ''
+        notes: fullData.description || fullData.notes || '',
+        paid_to_type: fullData.paid_to_type || 'employee',
+        paid_to_employee_id: fullData.paid_to_employee_id || '',
+        paid_to_external_name: fullData.paid_to_external_name || '',
+        currency_id: fullData.currency_id || '',
+        exchange_rate: fullData.exchange_rate || 1
       });
       const datesDict: Record<string, string> = {};
       if (mergedItems && Array.isArray(mergedItems)) {
@@ -2084,25 +2135,61 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
   ) : (
     <div ref={editModalRef} className="bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
           {/* Form Header */}
-          <div className="p-4 md:p-6 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70]">
-            <div className="flex items-center gap-3">
+          <div className="p-4 md:p-6 border-b border-zinc-100 flex flex-wrap items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-[70] gap-3">
+            <div className="flex items-center gap-2">
               <button 
+                type="button"
                 onClick={closeModal} 
-                className="flex items-center gap-2 px-4 py-2 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all font-black text-sm"
+                className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-zinc-200 shadow-xs"
+                title={language === 'ar' ? 'إلغاء (إغلاق)' : 'Cancel (Close)'}
               >
-                {dir === 'rtl' ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+                <X size={20} />
+              </button>
+
+              <button 
+                type="button"
+                onClick={closeModal} 
+                className="flex items-center gap-2 px-3.5 py-2 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all font-bold text-xs border border-zinc-200"
+              >
+                {dir === 'rtl' ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
                 <span>{language === 'ar' ? 'العودة للقائمة' : 'Back to list'}</span>
               </button>
             </div>
 
-            <div className="flex-1 flex justify-center items-center gap-2">
+            <div className="flex-1 flex flex-wrap justify-center items-center gap-2">
+              {/* Save Button Top */}
+              <button 
+                type="submit"
+                form="voucher-form"
+                disabled={isSubmitting || voucherData.items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0) <= 0}
+                className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-xs hover:bg-emerald-700 disabled:opacity-50 transition-all shadow-md shadow-emerald-600/20 active:scale-95 cursor-pointer"
+              >
+                {isSubmitting ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Save size={16} />
+                )}
+                <span>{editingVoucher ? (language === 'ar' ? 'حفظ التعديلات' : 'Save Changes') : (language === 'ar' ? 'حفظ السند' : 'Save Voucher')}</span>
+              </button>
+
+              {/* Copy Button */}
+              <button 
+                type="button"
+                onClick={handleCopyVoucher}
+                className="flex items-center gap-1.5 px-3.5 py-2 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-all font-bold text-xs border border-indigo-200 shadow-xs"
+                title={language === 'ar' ? 'نسخ السند' : 'Copy Voucher'}
+              >
+                <Copy size={15} />
+                <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+              </button>
+
               <button 
                 type="button"
                 onClick={() => setShowSidePanel(!showSidePanel)}
-                className={`flex items-center gap-3 px-6 py-2.5 rounded-2xl text-sm font-black transition-all border shadow-sm ${showSidePanel ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'}`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border shadow-xs ${showSidePanel ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'}`}
               >
-                <History size={18} />
-                <span>{language === 'ar' ? 'قيد اليومية \\ سجل التعديلات' : 'Journal Entry / Activity Log'}</span>
+                <History size={16} />
+                <span>{language === 'ar' ? 'قيد اليومية \\ سجل التعديلات' : 'Journal / Activity Log'}</span>
               </button>
 
               {/* Print, PDF, Excel Buttons */}
@@ -2113,12 +2200,13 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                   if (el) printElement(el, 'سند صرف');
                   else window.print();
                 }}
-                className="flex items-center gap-1.5 px-3 py-2 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all font-bold text-xs border border-blue-200 shadow-sm"
+                className="flex items-center gap-1.5 px-3 py-2 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all font-bold text-xs border border-blue-200 shadow-xs"
                 title={language === 'ar' ? 'طباعة' : 'Print'}
               >
                 <Printer size={14} />
                 <span>{language === 'ar' ? 'طباعة' : 'Print'}</span>
               </button>
+
               <button 
                 type="button"
                 onClick={() => {
@@ -2131,12 +2219,13 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                     });
                   }
                 }}
-                className="flex items-center gap-1.5 px-3 py-2 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all font-bold text-xs border border-rose-200 shadow-sm"
+                className="flex items-center gap-1.5 px-3 py-2 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all font-bold text-xs border border-rose-200 shadow-xs"
                 title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
               >
                 <FileText size={14} />
                 <span>PDF</span>
               </button>
+
               <button 
                 type="button"
                 onClick={() => {
@@ -2186,7 +2275,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                     ]
                   });
                 }}
-                className="flex items-center gap-1.5 px-3 py-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-xs border border-emerald-200 shadow-sm"
+                className="flex items-center gap-1.5 px-3 py-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-all font-bold text-xs border border-emerald-200 shadow-xs"
                 title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
               >
                 <FileSpreadsheet size={14} />
@@ -2254,26 +2343,56 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
               )}
             </AnimatePresence>
 
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32 md:pb-8">
-              <SmartAIInput 
-                onDataExtracted={(data) => {
-                  if (data.supplierName) {
-                    const supplier = suppliers.find(s => s.name.includes(data.supplierName!) || data.supplierName!.includes(s.name));
-                    if (supplier) {
-                      setVoucherData(prev => ({ ...prev, supplier_id: supplier.id, type: 'supplier' }));
-                    }
-                  }
-                  if (data.amount) setVoucherData(prev => ({ ...prev, amount: data.amount! }));
-                  if (data.date) setVoucherData(prev => ({ ...prev, date: data.date! }));
-                  if (data.description || data.notes) setVoucherData(prev => ({ ...prev, notes: data.description || data.notes || '' }));
-                  if (data.paymentMethod) {
-                    const pm = paymentMethods.find(p => p.name.includes(data.paymentMethod!) || data.paymentMethod!.includes(p.name));
-                    if (pm) setVoucherData(prev => ({ ...prev, payment_method_id: pm.id }));
-                  }
-                }}
-                transactionType="payment_voucher"
-              />
-              
+            {/* Floating button on the side to toggle AI Smart Creation */}
+            <button
+              type="button"
+              onClick={() => setShowAiInput(!showAiInput)}
+              className={`absolute ${dir === 'rtl' ? 'left-0 rounded-r-xl border-l-0' : 'right-0 rounded-l-xl border-r-0'} top-1/4 z-[60] flex items-center gap-2 px-2 py-3 bg-indigo-600 text-white font-black text-[10px] shadow-lg hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all [writing-mode:vertical-lr] border border-indigo-500 ${showAiInput ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+              style={{ direction: 'ltr' }}
+            >
+              <Sparkles size={12} className="animate-bounce mb-1" />
+              <span>{language === 'ar' ? 'الإنشاء الذكي بالذكاء الاصطناعي' : 'Smart AI Creation'}</span>
+            </button>
+
+            {/* AI Drawer (Smart Creation) sliding from the side */}
+            <AnimatePresence>
+              {showAiInput && (
+                <motion.div 
+                  initial={{ x: dir === 'rtl' ? '-100%' : '100%' }}
+                  animate={{ x: 0 }}
+                  exit={{ x: dir === 'rtl' ? '-100%' : '100%' }}
+                  transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                  className={`absolute inset-y-0 ${dir === 'rtl' ? 'left-0' : 'right-0'} z-50 w-full lg:w-[480px] shadow-2xl border-l border-slate-100 bg-white flex flex-col`}
+                >
+                  <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-indigo-600 font-bold">
+                      <Sparkles size={20} className="animate-pulse" />
+                      <span className="text-sm font-black">{language === 'ar' ? 'الإنشاء الذكي بالذكاء الاصطناعي' : 'Smart AI Creation'}</span>
+                    </div>
+                    <button onClick={() => setShowAiInput(false)} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50 transition-all">
+                      <X size={20} />
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50">
+                    <SmartAIInput 
+                      onDataExtracted={(data) => {
+                        if (data.amount) setVoucherData(prev => ({ ...prev, amount: data.amount! }));
+                        if (data.date) setVoucherData(prev => ({ ...prev, date: data.date! }));
+                        if (data.description || data.notes) setVoucherData(prev => ({ ...prev, notes: data.description || data.notes || '' }));
+                        if (data.paymentMethod) {
+                          const pm = paymentMethods.find(p => p.name.includes(data.paymentMethod!) || data.paymentMethod!.includes(p.name));
+                          if (pm) setVoucherData(prev => ({ ...prev, payment_method_id: pm.id }));
+                        }
+                        setShowAiInput(false);
+                      }}
+                      transactionType="payment_voucher"
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <form id="voucher-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32 md:pb-8">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-3 space-y-6">
                   {/* Card 1: Basic Info */}
@@ -2282,6 +2401,39 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                       <FileText className="w-4 h-4" />
                       <span className="text-xs font-bold">{language === 'ar' ? 'البيانات الأساسية' : 'Basic Info'}</span>
                     </div>
+
+                    {/* Total Amount & Tafqeet Banner */}
+                    {(() => {
+                      const totalAmount = voucherData.items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+                      const currencyCode = (companyCurrencies.find(c => c.id === voucherData.currency_id)?.code || companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase();
+                      const tafqeetText = tafqeet(totalAmount, currencyCode, language === 'ar' ? 'ar' : 'en');
+
+                      return (
+                        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 p-4 rounded-2xl border border-emerald-100/80 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xs">
+                          <div className="flex items-center gap-3">
+                            <div className="p-3 bg-emerald-600 text-white rounded-xl shadow-md">
+                              <Wallet className="w-6 h-6" />
+                            </div>
+                            <div>
+                              <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">{language === 'ar' ? 'إجمالي مبلغ السند' : 'Total Amount'}</span>
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-2xl md:text-3xl font-black text-emerald-700 font-mono tracking-tight">
+                                  {formatNumber(totalAmount)}
+                                </span>
+                                <span className="text-sm font-black text-emerald-800 bg-white px-2.5 py-0.5 rounded-lg border border-emerald-200 shadow-xs">
+                                  {currencyCode}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right bg-white/90 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-emerald-100/80 shadow-xs flex-1 max-w-lg">
+                            <span className="text-[11px] font-bold text-zinc-400 block mb-0.5 uppercase">{language === 'ar' ? 'المبلغ بالحروف (التفقيط)' : 'Amount in Words'}</span>
+                            <span className="text-xs font-black text-emerald-900 italic">{tafqeetText}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                     
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div>
@@ -2298,7 +2450,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercaseTracking tracking-tighter uppercase mb-2 px-2 uppercase">{language === 'ar' ? 'مرجع يدوي / آخر' : 'Manual / Other Ref'}</label>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'مرجع يدوي / آخر' : 'Manual / Other Ref'}</label>
                         <div className="relative group">
                           <FileText className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <input 
@@ -2339,29 +2491,131 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                           </div>
                         </div>
                       )}
-                    </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase">{language === 'ar' ? 'طريقة الصرف (من خزينة/بنك)' : 'Payment Method (From Safe/Bank)'}</label>
-                      <div className="relative group">
-                        <CreditCard className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
-                        <select 
-                          required
-                          className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
-                          value={voucherData.payment_method_id}
-                          onChange={(e) => {
-                            if (e.target.value === 'new_payment_method') {
-                              setIsPaymentMethodModalOpen(true);
-                            } else {
-                              setVoucherData({...voucherData, payment_method_id: e.target.value});
-                            }
-                          }}
-                        >
-                          <option value="">{t('discount_settings.select_account')}</option>
-                          {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
-                          <option value="new_payment_method" className="font-bold text-emerald-600">+ {language === 'ar' ? 'إضافة طريقة دفع جديدة...' : 'Add New Payment Method...'}</option>
-                        </select>
-                        <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                      {/* Payment Method */}
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'طريقة الصرف (من خزينة/بنك)' : 'Payment Method (From Safe/Bank)'}</label>
+                        <div className="relative group">
+                          <CreditCard className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <select 
+                            required
+                            className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
+                            value={voucherData.payment_method_id}
+                            onChange={(e) => {
+                              if (e.target.value === 'new_payment_method') {
+                                setIsPaymentMethodModalOpen(true);
+                              } else {
+                                setVoucherData({...voucherData, payment_method_id: e.target.value});
+                              }
+                            }}
+                          >
+                            <option value="">{t('discount_settings.select_account')}</option>
+                            {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
+                            <option value="new_payment_method" className="font-bold text-emerald-600">+ {language === 'ar' ? 'إضافة طريقة دفع جديدة...' : 'Add New Payment Method...'}</option>
+                          </select>
+                          <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                        </div>
+                      </div>
+
+                      {/* Currency & Exchange Rate Selection */}
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'العملة وسعر الصرف' : 'Currency & Exchange Rate'}</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="relative">
+                            <Coins className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                            <select 
+                              className={`w-full ${dir === 'rtl' ? 'ps-8 pe-8' : 'pe-8 ps-8'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs appearance-none cursor-pointer`}
+                              value={voucherData.currency_id}
+                              onChange={(e) => setVoucherData({ ...voucherData, currency_id: e.target.value })}
+                            >
+                              <option value="">{language === 'ar' ? 'عملة الشركة (افتراضي)' : 'Company Currency (Default)'}</option>
+                              {companyCurrencies.map(curr => (
+                                <option key={curr.id} value={curr.id}>{curr.code} - {language === 'ar' ? curr.name_ar : curr.name_en}</option>
+                              ))}
+                            </select>
+                            <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                          </div>
+                          <div className="relative">
+                            <input 
+                              type="number"
+                              step="any"
+                              placeholder={language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}
+                              className="w-full px-3 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs text-center"
+                              value={voucherData.exchange_rate}
+                              onChange={(e) => setVoucherData({ ...voucherData, exchange_rate: Number(e.target.value) || 1 })}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Paid To (يصرف إلى): Employee / External Party Selection */}
+                      <div className="md:col-span-3 bg-zinc-50/70 p-4 rounded-2xl border border-zinc-200/80 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-zinc-700 uppercase tracking-wider flex items-center gap-2">
+                            <User className="w-4 h-4 text-emerald-600" />
+                            <span>{language === 'ar' ? 'يصرف إلى:' : 'Paid To:'}</span>
+                          </label>
+
+                          <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-zinc-200">
+                            <button
+                              type="button"
+                              onClick={() => setVoucherData({ ...voucherData, paid_to_type: 'employee', paid_to_external_name: '' })}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${voucherData.paid_to_type === 'employee' ? 'bg-emerald-600 text-white shadow-xs' : 'text-zinc-600 hover:bg-zinc-100'}`}
+                            >
+                              {language === 'ar' ? 'موظف' : 'Employee'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setVoucherData({ ...voucherData, paid_to_type: 'external', paid_to_employee_id: '' })}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${voucherData.paid_to_type === 'external' ? 'bg-emerald-600 text-white shadow-xs' : 'text-zinc-600 hover:bg-zinc-100'}`}
+                            >
+                              {language === 'ar' ? 'جهة خارجية' : 'External Party'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {voucherData.paid_to_type === 'employee' ? (
+                          <div className="relative">
+                            <User className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                            <select
+                              className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-white border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm appearance-none cursor-pointer`}
+                              value={voucherData.paid_to_employee_id}
+                              onChange={(e) => setVoucherData({ ...voucherData, paid_to_employee_id: e.target.value })}
+                            >
+                              <option value="">{language === 'ar' ? 'اختر الموظف من قائمة الموظفين...' : 'Select employee from employees list...'}</option>
+                              {employees.map(emp => (
+                                <option key={emp.id} value={emp.id}>
+                                  {emp.name} ({emp.employee_code || emp.id.slice(0, 6)})
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <Globe className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                            <input
+                              type="text"
+                              required={voucherData.paid_to_type === 'external'}
+                              placeholder={language === 'ar' ? 'كتابة اسم الجهة الخارجية...' : 'Write external party name...'}
+                              className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-white border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                              value={voucherData.paid_to_external_name}
+                              onChange={(e) => setVoucherData({ ...voucherData, paid_to_external_name: e.target.value })}
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* General Description / Additional Notes Relocated to Basic Info */}
+                      <div className="md:col-span-3">
+                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'البيان العام / ملاحظات إضافية' : 'General Description / Additional Notes'}</label>
+                        <textarea 
+                          rows={3}
+                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-3xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none font-bold text-sm text-zinc-800"
+                          placeholder={language === 'ar' ? "اكتب بيان/ملاحظات السند هنا..." : "Write voucher notes/description here..."}
+                          value={voucherData.notes}
+                          onChange={(e) => setVoucherData({...voucherData, notes: e.target.value})}
+                        />
                       </div>
                     </div>
                   </section>
@@ -2380,7 +2634,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                           type="button"
                           onClick={() => setVoucherData({
                             ...voucherData,
-                            items: [...voucherData.items, { type: 'supplier', entity_id: '', amount: 0, description: '' }]
+                            items: [...voucherData.items, { type: isSupplierOnly ? 'supplier' : 'expense', entity_id: '', amount: 0, description: '' }]
                           })}
                           className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-black border border-emerald-100 hover:bg-emerald-100 transition-all shadow-sm"
                         >
@@ -2418,10 +2672,15 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                                         setVoucherData({...voucherData, items: newItems});
                                       }}
                                     >
-                                      <option value="supplier">{t('discounts.column_supplier')}</option>
-                                      {!isSupplierOnly && <option value="customer">{t('discounts.column_customer')}</option>}
-                                      {!isSupplierOnly && <option value="expense">بند مصروف</option>}
-                                      {!isSupplierOnly && <option value="account">{language === 'ar' ? 'حساب عام' : 'General Ledger'}</option>}
+                                      {isSupplierOnly ? (
+                                        <option value="supplier">{t('discounts.column_supplier')}</option>
+                                      ) : (
+                                        <>
+                                          <option value="customer">{t('discounts.column_customer')}</option>
+                                          <option value="expense">{language === 'ar' ? 'بند مصروف' : 'Expense Item'}</option>
+                                          <option value="account">{language === 'ar' ? 'حساب عام' : 'General Ledger Account'}</option>
+                                        </>
+                                      )}
                                     </select>
                                     <ChevronDown size={12} className="absolute right-3 top-4 text-zinc-400 pointer-events-none" />
                                   </td>
@@ -2729,17 +2988,6 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                           </tfoot>
                         </table>
                       </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase">البيان العام / ملاحظات إضافية</label>
-                      <textarea 
-                        rows={3}
-                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-3xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none font-bold text-sm text-zinc-800"
-                        placeholder="اكتب ملاحظات السند هنا..."
-                        value={voucherData.notes}
-                        onChange={(e) => setVoucherData({...voucherData, notes: e.target.value})}
-                      />
                     </div>
                   </section>
                 </div>
