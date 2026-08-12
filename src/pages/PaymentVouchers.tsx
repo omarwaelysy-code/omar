@@ -149,6 +149,42 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
     exchange_rate: 1
   });
 
+  const handleCurrencyChange = async (currencyId: string) => {
+    if (!currencyId) {
+      setVoucherData(prev => ({ ...prev, currency_id: '', exchange_rate: 1 }));
+      return;
+    }
+
+    setVoucherData(prev => ({ ...prev, currency_id: currencyId }));
+
+    try {
+      if (user) {
+        const manualRates = await dbService.list<any>('exchange_rates', {
+          currency_id: currencyId,
+          company_id: user.company_id,
+          _limit: 1,
+          _sort: 'rate_date',
+          _order: 'desc'
+        });
+        if (manualRates && manualRates.length > 0 && Number(manualRates[0].exchange_rate) > 0) {
+          setVoucherData(prev => ({ ...prev, currency_id: currencyId, exchange_rate: Number(manualRates[0].exchange_rate) }));
+          return;
+        }
+      }
+
+      const curr = companyCurrencies.find(c => c.id === currencyId);
+      if (curr && (curr as any).exchange_rate && Number((curr as any).exchange_rate) > 0) {
+        setVoucherData(prev => ({ ...prev, currency_id: currencyId, exchange_rate: Number((curr as any).exchange_rate) }));
+        return;
+      }
+
+      setVoucherData(prev => ({ ...prev, currency_id: currencyId, exchange_rate: 1 }));
+    } catch (e) {
+      console.error('Error fetching exchange rate:', e);
+      setVoucherData(prev => ({ ...prev, currency_id: currencyId, exchange_rate: 1 }));
+    }
+  };
+
   const generateInternalRef = async (selectedDate: string) => {
     return await dbService.getNextSequence('payment_vouchers', selectedDate);
   };
@@ -2443,7 +2479,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                           <input 
                             readOnly
                             type="text" 
-                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-100 border border-zinc-200 cursor-not-allowed rounded-2xl font-bold text-zinc-500 text-sm outline-none font-mono`}
+                            className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-zinc-100 border border-zinc-200 cursor-not-allowed rounded-2xl font-bold text-zinc-500 text-sm outline-none font-mono`}
                             value={editingVoucher ? voucherData.internal_reference : (internalRef || voucherData.internal_reference)}
                           />
                         </div>
@@ -2456,7 +2492,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                           <input 
                             type="text" 
                             placeholder={language === 'ar' ? 'ادخل رقم المرجع اليدوي...' : 'Enter manual reference...'}
-                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                            className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
                             value={voucherData.manual_reference}
                             onChange={(e) => setVoucherData({...voucherData, manual_reference: e.target.value})}
                           />
@@ -2470,7 +2506,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                           <input 
                             required
                             type="date"
-                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                            className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
                             value={voucherData.date}
                             onChange={(e) => setVoucherData({...voucherData, date: e.target.value})}
                           />
@@ -2485,7 +2521,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                             <input 
                               readOnly
                               type="text"
-                              className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-emerald-50 border border-emerald-200 rounded-2xl outline-none transition-all font-bold text-emerald-800 text-sm`}
+                              className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-emerald-50 border border-emerald-200 rounded-2xl outline-none transition-all font-bold text-emerald-800 text-sm`}
                               value={editingVoucher.entry_number}
                             />
                           </div>
@@ -2499,7 +2535,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                           <CreditCard className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <select 
                             required
-                            className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
+                            className={`w-full ${dir === 'rtl' ? 'pr-12 pl-10' : 'pl-12 pr-10'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
                             value={voucherData.payment_method_id}
                             onChange={(e) => {
                               if (e.target.value === 'new_payment_method') {
@@ -2520,13 +2556,13 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                       {/* Currency & Exchange Rate Selection */}
                       <div>
                         <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'العملة وسعر الصرف' : 'Currency & Exchange Rate'}</label>
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div className="relative">
-                            <Coins className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                            <Coins className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-3.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                             <select 
-                              className={`w-full ${dir === 'rtl' ? 'ps-8 pe-8' : 'pe-8 ps-8'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs appearance-none cursor-pointer`}
+                              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-8' : 'pl-10 pr-8'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs appearance-none cursor-pointer`}
                               value={voucherData.currency_id}
-                              onChange={(e) => setVoucherData({ ...voucherData, currency_id: e.target.value })}
+                              onChange={(e) => handleCurrencyChange(e.target.value)}
                             >
                               <option value="">{language === 'ar' ? 'عملة الشركة (افتراضي)' : 'Company Currency (Default)'}</option>
                               {companyCurrencies.map(curr => (
@@ -2536,11 +2572,12 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                             <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                           </div>
                           <div className="relative">
+                            <DollarSign className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-3.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                             <input 
                               type="number"
                               step="any"
                               placeholder={language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}
-                              className="w-full px-3 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs text-center"
+                              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs`}
                               value={voucherData.exchange_rate}
                               onChange={(e) => setVoucherData({ ...voucherData, exchange_rate: Number(e.target.value) || 1 })}
                             />
@@ -2578,7 +2615,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                           <div className="relative">
                             <User className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                             <select
-                              className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-white border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm appearance-none cursor-pointer`}
+                              className={`w-full ${dir === 'rtl' ? 'pr-12 pl-10' : 'pl-12 pr-10'} py-3 bg-white border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm appearance-none cursor-pointer`}
                               value={voucherData.paid_to_employee_id}
                               onChange={(e) => setVoucherData({ ...voucherData, paid_to_employee_id: e.target.value })}
                             >
@@ -2598,7 +2635,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                               type="text"
                               required={voucherData.paid_to_type === 'external'}
                               placeholder={language === 'ar' ? 'كتابة اسم الجهة الخارجية...' : 'Write external party name...'}
-                              className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-white border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                              className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-white border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
                               value={voucherData.paid_to_external_name}
                               onChange={(e) => setVoucherData({ ...voucherData, paid_to_external_name: e.target.value })}
                             />
