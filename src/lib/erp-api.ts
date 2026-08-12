@@ -2478,7 +2478,8 @@ export async function ensureUniqueSequenceNumber(
       }
       console.warn(`[ensureUniqueSequenceNumber] Proposed number "${cleanProp}" for ${moduleName} already exists in company ${companyId}. Generating new sequence number...`);
     } catch (e) {
-      return cleanProp;
+      console.warn(`[ensureUniqueSequenceNumber] Error checking proposed number uniqueness:`, e);
+      // Fallthrough to step 2 atomic generation to guarantee safety
     }
   }
 
@@ -3611,14 +3612,50 @@ modules.forEach(moduleName => {
             data.id = uuidv4();
           }
           
-          const keys = Object.keys(data);
-          const values = Object.values(data);
-          const placeholders = keys.map((_, index) => `$${index + 1}`).join(', ');
-          
-          const result = await client.query(
-            `INSERT INTO "${moduleName}" ("${keys.join('", "')}") VALUES (${placeholders}) RETURNING *`,
-            values
-          );
+          let result;
+          try {
+            const keys = Object.keys(data);
+            const values = Object.values(data);
+            const placeholders = keys.map((_, index) => `$${index + 1}`).join(', ');
+            result = await client.query(
+              `INSERT INTO "${moduleName}" ("${keys.join('", "')}") VALUES (${placeholders}) RETURNING *`,
+              values
+            );
+          } catch (insertError: any) {
+            if (insertError.code === '23505' && ['payment_vouchers', 'receipt_vouchers', 'cash_transfers', 'employees'].includes(moduleName)) {
+              console.warn(`[RETRY RECOVERY] Unique constraint violation code 23505 for ${moduleName}. Forcing new atomic sequence...`);
+              const target = tableNames[moduleName];
+              const safeDateStr = (dateStr || new Date().toISOString()).slice(0, 10);
+              const parts = safeDateStr.split('-');
+              const year = parts[0] || new Date().getFullYear().toString();
+              const month = (parts[1] || '01').padStart(2, '0');
+              const period = `${year}-${month}`;
+              
+              const freshSeq = await getNextAtomicSequence(pool, companyId, moduleName, period);
+              const seqStr = String(freshSeq).padStart(target?.padLength || 6, '0');
+              const newSeqNum = `${target?.prefix || 'DOC'}-${year}-${month}-${seqStr}`;
+              
+              const fieldMap: Record<string, string> = {
+                'payment_vouchers': 'voucher_number',
+                'receipt_vouchers': 'voucher_number',
+                'cash_transfers': 'transfer_number',
+                'employees': 'employee_code'
+              };
+              const seqField = fieldMap[moduleName];
+              if (seqField) {
+                data[seqField] = newSeqNum;
+              }
+              const keys = Object.keys(data);
+              const values = Object.values(data);
+              const placeholders = keys.map((_, index) => `$${index + 1}`).join(', ');
+              result = await client.query(
+                `INSERT INTO "${moduleName}" ("${keys.join('", "')}") VALUES (${placeholders}) RETURNING *`,
+                values
+              );
+            } else {
+              throw insertError;
+            }
+          }
 
           if (moduleName === 'companies') {
             const newCompanyId = result.rows[0].id;
