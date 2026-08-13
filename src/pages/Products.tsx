@@ -220,6 +220,8 @@ export const Products: React.FC = () => {
     barcode: '',
     stock: 0,
     min_stock: 0, 
+    allow_issue_fraction: false,
+    allow_receipt_fraction: false,
     allow_issue_fraction_pct: 0,
     allow_receipt_fraction_pct: 0,
     revenue_account_id: '',
@@ -486,6 +488,8 @@ export const Products: React.FC = () => {
       code: '', name: '', type: 'finished_good', category: '', unit: 'قطعة',
       sale_price: 0, cost_price: 0, description: '', image_url: '', 
       barcode: '', stock: 0, min_stock: 0, 
+      allow_issue_fraction: false,
+      allow_receipt_fraction: false,
       allow_issue_fraction_pct: 0,
       allow_receipt_fraction_pct: 0,
       revenue_account_id: defaultRevenue?.id || '', 
@@ -514,6 +518,8 @@ export const Products: React.FC = () => {
         description: product.description || '',
         image_url: product.image_url || '',
         barcode: product.barcode || '',
+        allow_issue_fraction: Boolean(product.allow_issue_fraction || (product.allow_issue_fraction_pct && product.allow_issue_fraction_pct > 0)),
+        allow_receipt_fraction: Boolean(product.allow_receipt_fraction || (product.allow_receipt_fraction_pct && product.allow_receipt_fraction_pct > 0)),
         allow_issue_fraction_pct: product.allow_issue_fraction_pct || 0,
         allow_receipt_fraction_pct: product.allow_receipt_fraction_pct || 0,
         revenue_account_id: product.revenue_account_id || '',
@@ -1315,21 +1321,116 @@ export const Products: React.FC = () => {
                                <div className="space-y-4">
                                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('products.form_min_stock')}</label>
                                   <FormattedNumberInput className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-lg font-black outline-none focus:bg-white focus:ring-8 focus:ring-rose-500/5 transition-all shadow-inner" value={formData.min_stock || 0} onChange={(val) => setFormData({ ...formData, min_stock: val })} />
-                               </div>
-                               <div className="space-y-4">
-                                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('products.form_allow_issue_fraction_pct')}</label>
-                                  <div className="relative group">
-                                    <Percent className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300`} size={24} />
-                                    <FormattedNumberInput className="w-full pr-16 pl-6 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-lg font-black outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner" value={formData.allow_issue_fraction_pct || 0} onChange={(val) => setFormData({ ...formData, allow_issue_fraction_pct: val })} />
+                                </div>
+
+                                {/* Fractional Allowance Settings Card */}
+                                <div className="md:col-span-2 p-8 bg-slate-50/70 rounded-[2.5rem] border border-slate-100 space-y-6 shadow-inner">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center">
+                                      <Percent size={20} />
+                                    </div>
+                                    <div>
+                                      <h3 className="text-base font-black text-slate-900 leading-none">
+                                        {t('products.fraction_settings_title')}
+                                      </h3>
+                                      <p className="text-[11px] text-slate-400 font-bold mt-1">
+                                        {t('products.fraction_settings_desc')}
+                                      </p>
+                                    </div>
                                   </div>
-                               </div>
-                               <div className="space-y-4">
-                                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('products.form_allow_receipt_fraction_pct')}</label>
-                                  <div className="relative group">
-                                    <Percent className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300`} size={24} />
-                                    <FormattedNumberInput className="w-full pr-16 pl-6 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-lg font-black outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner" value={formData.allow_receipt_fraction_pct || 0} onChange={(val) => setFormData({ ...formData, allow_receipt_fraction_pct: val })} />
+
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-200/60">
+                                    {/* Issue Fraction Toggle & Input */}
+                                    <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm space-y-4">
+                                      <div className="flex items-center justify-between">
+                                        <div>
+                                          <h4 className="text-sm font-black text-slate-900 leading-none mb-1">
+                                            {t('products.allow_issue_fraction')}
+                                          </h4>
+                                          <p className="text-[10px] text-slate-400 font-bold">
+                                            {t('products.allow_issue_fraction_desc')}
+                                          </p>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const nextVal = !formData.allow_issue_fraction;
+                                            setFormData({ 
+                                              ...formData, 
+                                              allow_issue_fraction: nextVal,
+                                              allow_issue_fraction_pct: nextVal ? (formData.allow_issue_fraction_pct || 0) : 0
+                                            });
+                                          }}
+                                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.allow_issue_fraction ? 'bg-emerald-600' : 'bg-slate-200'}`}
+                                        >
+                                          <span
+                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.allow_issue_fraction ? (dir === 'rtl' ? '-translate-x-6' : 'translate-x-6') : (dir === 'rtl' ? '-translate-x-1' : 'translate-x-1')}`}
+                                          />
+                                        </button>
+                                      </div>
+                                      {formData.allow_issue_fraction && (
+                                        <div className="pt-3 border-t border-slate-50 space-y-2 animate-in fade-in duration-300">
+                                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                                            {t('products.form_allow_issue_fraction_pct')}
+                                          </label>
+                                          <div className="relative group">
+                                            <Percent className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-4 text-emerald-500`} size={20} />
+                                            <FormattedNumberInput 
+                                              className="w-full pr-16 pl-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-base font-black outline-none focus:bg-white focus:ring-4 focus:ring-emerald-500/10 transition-all shadow-inner" 
+                                              value={formData.allow_issue_fraction_pct || 0} 
+                                              onChange={(val) => setFormData({ ...formData, allow_issue_fraction_pct: val })} 
+                                            />
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Receipt Fraction Toggle & Input */}
+                                    <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm space-y-4">
+                                      <div className="flex items-center justify-between">
+                                        <div>
+                                          <h4 className="text-sm font-black text-slate-900 leading-none mb-1">
+                                            {t('products.allow_receipt_fraction')}
+                                          </h4>
+                                          <p className="text-[10px] text-slate-400 font-bold">
+                                            {t('products.allow_receipt_fraction_desc')}
+                                          </p>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const nextVal = !formData.allow_receipt_fraction;
+                                            setFormData({ 
+                                              ...formData, 
+                                              allow_receipt_fraction: nextVal,
+                                              allow_receipt_fraction_pct: nextVal ? (formData.allow_receipt_fraction_pct || 0) : 0
+                                            });
+                                          }}
+                                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.allow_receipt_fraction ? 'bg-emerald-600' : 'bg-slate-200'}`}
+                                        >
+                                          <span
+                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.allow_receipt_fraction ? (dir === 'rtl' ? '-translate-x-6' : 'translate-x-6') : (dir === 'rtl' ? '-translate-x-1' : 'translate-x-1')}`}
+                                          />
+                                        </button>
+                                      </div>
+                                      {formData.allow_receipt_fraction && (
+                                        <div className="pt-3 border-t border-slate-50 space-y-2 animate-in fade-in duration-300">
+                                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                                            {t('products.form_allow_receipt_fraction_pct')}
+                                          </label>
+                                          <div className="relative group">
+                                            <Percent className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-4 text-emerald-500`} size={20} />
+                                            <FormattedNumberInput 
+                                              className="w-full pr-16 pl-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-base font-black outline-none focus:bg-white focus:ring-4 focus:ring-emerald-500/10 transition-all shadow-inner" 
+                                              value={formData.allow_receipt_fraction_pct || 0} 
+                                              onChange={(val) => setFormData({ ...formData, allow_receipt_fraction_pct: val })} 
+                                            />
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
-                               </div>
+                                </div>
                              </>
                            )}
                         </div>

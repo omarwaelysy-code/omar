@@ -121,6 +121,8 @@ CREATE TABLE IF NOT EXISTS products (
     current_stock DECIMAL(18, 4) DEFAULT 0,
     is_service BOOLEAN DEFAULT FALSE,
     counter_account_id VARCHAR(36),
+    allow_issue_fraction BOOLEAN DEFAULT FALSE,
+    allow_receipt_fraction BOOLEAN DEFAULT FALSE,
     allow_issue_fraction_pct DECIMAL(10, 2) DEFAULT 0,
     allow_receipt_fraction_pct DECIMAL(10, 2) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

@@ -302,6 +302,8 @@ export interface Product {
   item_group_name?: string;
   company_id: string;
   barcode_settings?: any;
+  allow_issue_fraction?: boolean;
+  allow_receipt_fraction?: boolean;
   allow_issue_fraction_pct?: number;
   allow_receipt_fraction_pct?: number;
   is_active?: boolean;
