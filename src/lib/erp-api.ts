@@ -3818,7 +3818,7 @@ modules.forEach(moduleName => {
           let params = [...values, id];
 
           if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies' && !isSuperAdmin) {
-            query += ` AND company_id = $${keys.length + 2}`;
+            query += ` AND (company_id = $${keys.length + 2} OR company_id IS NULL)`;
             params.push(companyId);
           }
 
@@ -4061,6 +4061,10 @@ modules.forEach(moduleName => {
           await InventoryMovementService.reverseMovement('goods_receipt', id, client);
         }
 
+        if (moduleName === 'journal_entries') {
+          await client.query(`DELETE FROM journal_entry_lines WHERE journal_entry_id = $1`, [id]);
+        }
+
         if (moduleName === 'payment_vouchers' || moduleName === 'receipt_vouchers') {
           // Cascade delete related journal entries & items
           const voucherRes = await client.query(`SELECT voucher_number FROM "${moduleName}" WHERE id = $1`, [id]);
@@ -4072,8 +4076,8 @@ modules.forEach(moduleName => {
           );
           const jeIds = jeRes.rows.map((r: any) => r.id);
           if (jeIds.length > 0) {
-            await client.query(`DELETE FROM journal_entry_lines WHERE journal_entry_id = ANY($1::uuid[])`, [jeIds]);
-            await client.query(`DELETE FROM journal_entries WHERE id = ANY($1::uuid[])`, [jeIds]);
+            await client.query(`DELETE FROM journal_entry_lines WHERE journal_entry_id = ANY($1::varchar[])`, [jeIds]);
+            await client.query(`DELETE FROM journal_entries WHERE id = ANY($1::varchar[])`, [jeIds]);
           }
         }
 
@@ -4086,7 +4090,7 @@ modules.forEach(moduleName => {
 
         const isSuperAdmin = req.user?.role === 'super_admin';
         if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies' && !isSuperAdmin) {
-          query += ` AND company_id = $2`;
+          query += ` AND (company_id = $2 OR company_id IS NULL)`;
           params.push(companyId);
         }
 
