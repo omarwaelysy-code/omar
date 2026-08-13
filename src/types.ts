@@ -275,7 +275,7 @@ export interface Product {
   id: string;
   code: string;
   name: string;
-  type: 'service' | 'finished_good' | 'raw_material' | 'commodity' | 'consumable';
+  type: 'service' | 'finished_good' | 'raw_material' | 'commodity' | 'consumable' | 'packaging';
   sale_price: number;
   cost_price: number;
   description?: string;
@@ -302,6 +302,8 @@ export interface Product {
   item_group_name?: string;
   company_id: string;
   barcode_settings?: any;
+  allow_issue_fraction_pct?: number;
+  allow_receipt_fraction_pct?: number;
   is_active?: boolean;
 }
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Plus, Trash2, X, Package, History, ChevronRight, ChevronLeft, 
   Wallet, Layers, Hash, User, Calendar, Paperclip, LayoutGrid, List,
-  Lock, Camera, Printer, Download, FileText, RefreshCw, AlertCircle, Settings, FileUp
+  Lock, Camera, Printer, Download, FileText, RefreshCw, AlertCircle, Settings, FileUp, Percent
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Barcode from 'react-barcode';
@@ -210,7 +210,7 @@ export const Products: React.FC = () => {
   const [formData, setFormData] = useState({ 
     code: '', 
     name: '', 
-    type: 'finished_good' as 'service' | 'finished_good' | 'raw_material' | 'commodity' | 'consumable',
+    type: 'finished_good' as 'service' | 'finished_good' | 'raw_material' | 'commodity' | 'consumable' | 'packaging',
     category: '',
     unit: 'قطعة',
     sale_price: 0, 
@@ -219,7 +219,9 @@ export const Products: React.FC = () => {
     image_url: '',
     barcode: '',
     stock: 0,
-    min_stock: 0,
+    min_stock: 0, 
+    allow_issue_fraction_pct: 0,
+    allow_receipt_fraction_pct: 0,
     revenue_account_id: '',
     cost_account_id: '',
     inventory_account_id: '',
@@ -267,7 +269,8 @@ export const Products: React.FC = () => {
         'finished_good': 'FG',
         'raw_material': 'RM',
         'commodity': 'CMD',
-        'consumable': 'CON'
+        'consumable': 'CON',
+        'packaging': 'PKG'
       };
       
       const prefix = prefixMap[formData.type] || 'PRD';
@@ -407,7 +410,7 @@ export const Products: React.FC = () => {
         return;
       }
 
-      const isPhysicalProduct = ['finished_good', 'raw_material', 'commodity', 'consumable'].includes(formData.type);
+      const isPhysicalProduct = ['finished_good', 'raw_material', 'commodity', 'consumable', 'packaging'].includes(formData.type);
       if (isPhysicalProduct && !formData.inventory_account_id) {
         showNotification(language === 'ar' ? 'الرجاء اختيار حساب المخزون للصنف' : 'Please select the inventory account for the product', 'error');
         return;
@@ -483,6 +486,8 @@ export const Products: React.FC = () => {
       code: '', name: '', type: 'finished_good', category: '', unit: 'قطعة',
       sale_price: 0, cost_price: 0, description: '', image_url: '', 
       barcode: '', stock: 0, min_stock: 0, 
+      allow_issue_fraction_pct: 0,
+      allow_receipt_fraction_pct: 0,
       revenue_account_id: defaultRevenue?.id || '', 
       cost_account_id: defaultCost?.id || '', 
       inventory_account_id: defaultInventory?.id || '', 
@@ -509,6 +514,8 @@ export const Products: React.FC = () => {
         description: product.description || '',
         image_url: product.image_url || '',
         barcode: product.barcode || '',
+        allow_issue_fraction_pct: product.allow_issue_fraction_pct || 0,
+        allow_receipt_fraction_pct: product.allow_receipt_fraction_pct || 0,
         revenue_account_id: product.revenue_account_id || '',
         cost_account_id: product.cost_account_id || '',
         inventory_account_id: product.inventory_account_id || '',
@@ -1250,6 +1257,7 @@ export const Products: React.FC = () => {
                                   <option value="raw_material">{t('products.type_raw_material')}</option>
                                   <option value="commodity">{t('products.type_commodity')}</option>
                                   <option value="consumable">{t('products.type_consumable')}</option>
+                                  <option value="packaging">{t('products.type_packaging')}</option>
                                 </select>
                               </div>
                            </div>
@@ -1308,6 +1316,20 @@ export const Products: React.FC = () => {
                                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('products.form_min_stock')}</label>
                                   <FormattedNumberInput className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-lg font-black outline-none focus:bg-white focus:ring-8 focus:ring-rose-500/5 transition-all shadow-inner" value={formData.min_stock || 0} onChange={(val) => setFormData({ ...formData, min_stock: val })} />
                                </div>
+                               <div className="space-y-4">
+                                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('products.form_allow_issue_fraction_pct')}</label>
+                                  <div className="relative group">
+                                    <Percent className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300`} size={24} />
+                                    <FormattedNumberInput className="w-full pr-16 pl-6 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-lg font-black outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner" value={formData.allow_issue_fraction_pct || 0} onChange={(val) => setFormData({ ...formData, allow_issue_fraction_pct: val })} />
+                                  </div>
+                               </div>
+                               <div className="space-y-4">
+                                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{t('products.form_allow_receipt_fraction_pct')}</label>
+                                  <div className="relative group">
+                                    <Percent className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300`} size={24} />
+                                    <FormattedNumberInput className="w-full pr-16 pl-6 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-lg font-black outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner" value={formData.allow_receipt_fraction_pct || 0} onChange={(val) => setFormData({ ...formData, allow_receipt_fraction_pct: val })} />
+                                  </div>
+                               </div>
                              </>
                            )}
                         </div>
@@ -1349,173 +1371,7 @@ export const Products: React.FC = () => {
                       {/* Hidden old modal content block to preserve syntax integrity with minimal edits */}
                       {false && editingProduct && formData.type !== 'service' && (
                         <div className="hidden">
-
-                          {/* Filters Area */}
-                          <div className="p-8 bg-slate-50/50 rounded-[2.5rem] border border-slate-100 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 text-right">
-                            {/* Date From */}
-                            <div className="space-y-2 text-right">
-                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                                {language === 'ar' ? 'من تاريخ' : 'Date From'}
-                              </label>
-                              <input 
-                                type="date" 
-                                className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 outline-none focus:ring-4 focus:ring-emerald-500/5 transition-all text-right"
-                                value={dateFrom}
-                                onChange={(e) => setDateFrom(e.target.value)}
-                              />
-                            </div>
-
-                            {/* Date To */}
-                            <div className="space-y-2 text-right">
-                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                                {language === 'ar' ? 'إلى تاريخ' : 'Date To'}
-                              </label>
-                              <input 
-                                type="date" 
-                                className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 outline-none focus:ring-4 focus:ring-emerald-500/5 transition-all text-right"
-                                value={dateTo}
-                                onChange={(e) => setDateTo(e.target.value)}
-                              />
-                            </div>
-
-                            {/* Movement Type filter */}
-                            <div className="space-y-2 text-right bg-transparent relative">
-                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                                {language === 'ar' ? 'نوع الحركة' : 'Movement Type'}
-                              </label>
-                              <select 
-                                className="w-full px-5 py-3.5 bg-white border border-slate-200 text-sm font-bold text-slate-800 outline-none focus:ring-4 focus:ring-emerald-500/5 transition-all text-right appearance-none"
-                                value={filterType}
-                                onChange={(e) => setFilterType(e.target.value)}
-                              >
-                                <option value="">{language === 'ar' ? 'الكل' : 'All'}</option>
-                                <option value="purchase">{language === 'ar' ? 'فاتورة شراء' : 'Purchase Invoice'}</option>
-                                <option value="sale">{language === 'ar' ? 'فاتورة بيع' : 'Sales Invoice'}</option>
-                                <option value="sales_return">{language === 'ar' ? 'مردود مبيعات' : 'Sales Return'}</option>
-                                <option value="purchase_return">{language === 'ar' ? 'مردود مشتريات' : 'Purchase Return'}</option>
-                              </select>
-                            </div>
-
-                            {/* Movement Number Filter */}
-                            <div className="space-y-2 text-right">
-                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                                {language === 'ar' ? 'رقم الحركة' : 'Movement Number'}
-                              </label>
-                              <input 
-                                type="text" 
-                                placeholder={language === 'ar' ? 'البحث بالرقم...' : 'Search by number...'}
-                                className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder:text-slate-300 outline-none focus:ring-4 focus:ring-emerald-500/5 transition-all text-right"
-                                value={filterRefNum}
-                                onChange={(e) => setFilterRefNum(e.target.value)}
-                              />
-                            </div>
-
-                            {/* Customer / Supplier Filter */}
-                            <div className="space-y-2 text-right">
-                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                                {language === 'ar' ? 'العميل / المورد' : 'Customer / Supplier'}
-                              </label>
-                              <input 
-                                type="text" 
-                                placeholder={language === 'ar' ? 'اسم العميل أو المورد...' : 'Partner name...'}
-                                className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 placeholder:text-slate-300 outline-none focus:ring-4 focus:ring-emerald-500/5 transition-all text-right"
-                                value={filterPartner}
-                                onChange={(e) => setFilterPartner(e.target.value)}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Ledger Table */}
-                          {loadingMovements ? (
-                            <div className="py-20 text-center">
-                              <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                            </div>
-                          ) : filteredMovements.length === 0 ? (
-                            <div className="p-16 text-center border-2 border-dashed border-slate-100 rounded-[2.5rem] bg-slate-50/20">
-                              <p className="text-slate-400 font-bold">{language === 'ar' ? 'لا توجد حركات مسجلة لهذا الصنف تطابق الفلاتر المحددة' : 'No recorded movements matching the filters for this product'}</p>
-                            </div>
-                          ) : (
-                            <div className="overflow-x-auto rounded-[2.5rem] border border-slate-200 shadow-md">
-                              <table className="w-full min-w-[1250px] border-collapse bg-white">
-                                <thead className="bg-slate-50 text-[10px] uppercase font-black tracking-widest text-slate-400 border-b border-slate-200 text-center">
-                                  <tr>
-                                    <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
-                                    <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'رقم الحركة' : 'Movement No.'}</th>
-                                    <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'نوع الحركة' : 'Movement Type'}</th>
-                                    <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'المخزن' : 'Warehouse'}</th>
-                                    <th rowSpan={2} className="px-5 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'العميل / المورد' : 'Customer/Supplier'}</th>
-                                    <th rowSpan={2} className="px-5 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'الوصف' : 'Description'}</th>
-                                    <th colSpan={3} className="px-1.5 py-1.5 border-r border-b border-slate-200 bg-emerald-50/30 text-emerald-800 font-bold">{language === 'ar' ? 'الكمية' : 'Quantity'}</th>
-                                    {canViewCost && (
-                                      <>
-                                        <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'سياسة التكلفة' : 'Cost Policy'}</th>
-                                        <th rowSpan={2} className="px-4 py-3 border-r border-slate-200 whitespace-nowrap">{language === 'ar' ? 'سعر التكلفة' : 'Unit Cost'}</th>
-                                        <th colSpan={3} className="px-1.5 py-1.5 border-b border-slate-200 bg-sky-50/30 text-sky-800 font-bold">{language === 'ar' ? 'القيم المالية للمخزون' : 'Financial Value'}</th>
-                                      </>
-                                    )}
-                                  </tr>
-                                  <tr>
-                                    {/* Quantities columns */}
-                                    <th className="px-3 py-1.5 border-r border-slate-200 bg-emerald-50/10 text-emerald-600 font-bold whitespace-nowrap">{language === 'ar' ? 'الوارد (+)' : 'In (+)'}</th>
-                                    <th className="px-3 py-1.5 border-r border-slate-200 bg-rose-50/10 text-rose-600 font-bold whitespace-nowrap">{language === 'ar' ? 'المصرف (-)' : 'Out (-)'}</th>
-                                    <th className="px-3 py-1.5 border-r border-slate-200 bg-emerald-100/30 text-emerald-800 font-black whitespace-nowrap">{language === 'ar' ? 'الرصيد' : 'Balance'}</th>
-                                    
-                                    {/* Values columns */}
-                                    {canViewCost && (
-                                      <>
-                                        <th className="px-3 py-1.5 border-r border-slate-200 bg-sky-50/10 text-sky-600 font-bold whitespace-nowrap">{language === 'ar' ? 'قيمة مدين (+)' : 'Debit Value'}</th>
-                                        <th className="px-3 py-1.5 border-r border-slate-200 bg-rose-50/10 text-rose-600 font-bold whitespace-nowrap">{language === 'ar' ? 'قيمة دائن (-)' : 'Credit Value'}</th>
-                                        <th className="px-4 py-1.5 bg-blue-100/30 text-blue-800 font-black whitespace-nowrap">{language === 'ar' ? 'الرصيد' : 'Balance Value'}</th>
-                                      </>
-                                    )}
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 text-xs font-bold text-slate-700 text-center">
-                                  {filteredMovements.map((m, index) => (
-                                    <tr key={m.id || index} className="hover:bg-slate-50 transition-colors">
-                                      <td className="px-4 py-4 border-r border-slate-200 font-mono whitespace-nowrap">{m.date.slice(0, 10)}</td>
-                                      <td className="px-4 py-4 border-r border-slate-200 font-mono whitespace-nowrap text-slate-500">{m.reference_number}</td>
-                                      <td className="px-4 py-4 border-r border-slate-200 whitespace-nowrap">
-                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                                          m.movement_type === 'purchase' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                                          m.movement_type === 'sale' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
-                                          m.movement_type === 'sales_return' ? 'bg-teal-50 text-teal-700 border border-teal-100' :
-                                          'bg-amber-50 text-amber-700 border border-amber-100'
-                                        }`}>
-                                          {getMovementTypeLabel(m.movement_type)}
-                                        </span>
-                                      </td>
-                                      <td className="px-4 py-4 border-r border-slate-200 whitespace-nowrap text-slate-600">{m.warehouseName}</td>
-                                      <td className="px-5 py-4 border-r border-slate-200 whitespace-nowrap text-slate-800 font-black">{m.partner || '-'}</td>
-                                      <td className="px-5 py-4 border-r border-slate-200 text-right text-slate-500 whitespace-normal max-w-[200px] truncate" title={m.description}>{m.description || '-'}</td>
-                                      
-                                      {/* Quantities */}
-                                      <td className="px-3 py-4 border-r border-slate-200 bg-emerald-50/5 font-mono text-slate-800">{m.qtyIn > 0 ? formatNumber(m.qtyIn) : '-'}</td>
-                                      <td className="px-3 py-4 border-r border-slate-200 bg-rose-50/5 font-mono text-slate-800">{m.qtyOut > 0 ? formatNumber(m.qtyOut) : '-'}</td>
-                                      <td className="px-3 py-4 border-r border-slate-200 bg-emerald-50/20 font-black font-mono text-emerald-700">{formatNumber(m.runningQty)}</td>
-                                      
-                                      {/* Cost Policy & Cost Price */}
-                                      {canViewCost && (
-                                        <>
-                                          <td className="px-4 py-4 border-r border-slate-200 text-[10px] font-bold text-zinc-500 whitespace-nowrap">{getCostMethodLabel(formData.inventory_cost_method)}</td>
-                                          <td className="px-4 py-4 border-r border-slate-200 font-mono text-slate-800">{formatNumber(m.unit_cost)}</td>
-                                        </>
-                                      )}
-                                      
-                                      {/* Values */}
-                                      {canViewCost && (
-                                        <>
-                                          <td className="px-3 py-4 border-r border-slate-200 bg-sky-50/5 font-mono text-slate-800">{m.debitVal > 0 ? formatNumber(m.debitVal) : '-'}</td>
-                                          <td className="px-3 py-4 border-r border-slate-205 bg-rose-50/5 font-mono text-slate-800">{m.creditVal > 0 ? formatNumber(m.creditVal) : '-'}</td>
-                                          <td className="px-4 py-4 bg-blue-50/20 font-black font-mono text-blue-700">{formatNumber(m.runningValue)}</td>
-                                        </>
-                                      )}
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
+                          {/* (Existing internal ledger logic hidden) */}
                         </div>
                       )}
 
@@ -1619,7 +1475,7 @@ export const Products: React.FC = () => {
                            </div>
                            <h2 className="text-2xl font-black text-slate-900 leading-none tracking-tight uppercase">
                               {language === 'ar' ? 'الإعدادات المحاسبية' : 'Accounting Setup'}
-</h2>
+                           </h2>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-right">
                            <div className="space-y-4">

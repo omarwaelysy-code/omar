@@ -399,6 +399,8 @@ export async function initDatabase() {
         "cost_account_name" VARCHAR(255),
         "item_group_id" VARCHAR(36),
         "item_group_name" VARCHAR(255),
+        "allow_issue_fraction_pct" DECIMAL(10, 2) DEFAULT 0,
+        "allow_receipt_fraction_pct" DECIMAL(10, 2) DEFAULT 0,
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `, 'products table');

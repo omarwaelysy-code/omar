@@ -159,7 +159,7 @@ export const PurchaseInvoices: React.FC = () => {
   const [productFormData, setProductFormData] = useState({
     code: '',
     name: '',
-    type: 'finished_good' as 'service' | 'finished_good' | 'raw_material' | 'commodity' | 'consumable',
+    type: 'finished_good' as 'service' | 'finished_good' | 'raw_material' | 'commodity' | 'consumable' | 'packaging',
     sale_price: 0,
     cost_price: 0,
     description: '',
@@ -420,7 +420,8 @@ export const PurchaseInvoices: React.FC = () => {
         'finished_good': 'FG',
         'raw_material': 'RM',
         'commodity': 'CMD',
-        'consumable': 'CON'
+        'consumable': 'CON',
+        'packaging': 'PKG'
       };
       
       const prefix = prefixMap[productFormData.type] || 'PRD';
@@ -5439,6 +5440,7 @@ export const PurchaseInvoices: React.FC = () => {
                       <option value="raw_material">{t('products.type_raw_material')}</option>
                       <option value="commodity">{t('products.type_commodity')}</option>
                       <option value="consumable">{t('products.type_consumable')}</option>
+                      <option value="packaging">{t('products.type_packaging')}</option>
                     </select>
                   </div>
                 </div>

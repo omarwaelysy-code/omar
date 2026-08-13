@@ -198,6 +198,7 @@ export const GeneralStockMovementsReport: React.FC = () => {
       case 'raw_material': return language === 'ar' ? 'مواد خام' : 'Raw Material';
       case 'commodity': return language === 'ar' ? 'بضاعة تجارية' : 'Commodity';
       case 'consumable': return language === 'ar' ? 'مواد استهلاكية' : 'Consumable';
+      case 'packaging': return language === 'ar' ? 'مواد تعبئة وتغليف' : 'Packaging Material';
       default: return type;
     }
   };
@@ -856,6 +857,7 @@ export const GeneralStockMovementsReport: React.FC = () => {
                 <option value="raw_material">{getProductTypeLabel('raw_material')}</option>
                 <option value="commodity">{getProductTypeLabel('commodity')}</option>
                 <option value="consumable">{getProductTypeLabel('consumable')}</option>
+                <option value="packaging">{getProductTypeLabel('packaging')}</option>
               </select>
             </div>
           </div>
