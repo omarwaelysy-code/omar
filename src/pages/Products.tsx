@@ -1340,7 +1340,7 @@ export const Products: React.FC = () => {
                                   </div>
 
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-200/60">
-                                    {/* Issue Fraction Toggle & Inline Input */}
+                                    {/* Issue Fraction Toggle */}
                                     <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between gap-4">
                                       <div className="flex-1 min-w-0">
                                         <h4 className="text-sm font-black text-slate-900 leading-none mb-1">
@@ -1351,29 +1351,9 @@ export const Products: React.FC = () => {
                                         </p>
                                       </div>
 
-                                      {formData.allow_issue_fraction && (
-                                        <div className="relative flex items-center w-28 shrink-0 animate-in fade-in zoom-in-95 duration-200">
-                                          <FormattedNumberInput 
-                                            className="w-full text-center py-2.5 px-2 pe-7 bg-slate-50 border border-emerald-200 rounded-2xl text-base font-black text-emerald-700 outline-none focus:bg-white focus:ring-4 focus:ring-emerald-500/10 shadow-inner" 
-                                            value={formData.allow_issue_fraction_pct || 0} 
-                                            onChange={(val) => setFormData({ ...formData, allow_issue_fraction_pct: val })} 
-                                          />
-                                          <span className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} text-sm font-black text-emerald-600 pointer-events-none`}>
-                                            %
-                                          </span>
-                                        </div>
-                                      )}
-
                                       <button
                                         type="button"
-                                        onClick={() => {
-                                          const nextVal = !formData.allow_issue_fraction;
-                                          setFormData({ 
-                                            ...formData, 
-                                            allow_issue_fraction: nextVal,
-                                            allow_issue_fraction_pct: nextVal ? (formData.allow_issue_fraction_pct || 0) : 0
-                                          });
-                                        }}
+                                        onClick={() => setFormData({ ...formData, allow_issue_fraction: !formData.allow_issue_fraction })}
                                         className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${formData.allow_issue_fraction ? 'bg-emerald-600' : 'bg-slate-200'}`}
                                       >
                                         <span
@@ -1382,7 +1362,7 @@ export const Products: React.FC = () => {
                                       </button>
                                     </div>
 
-                                    {/* Receipt Fraction Toggle & Inline Input */}
+                                    {/* Receipt Fraction Toggle */}
                                     <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between gap-4">
                                       <div className="flex-1 min-w-0">
                                         <h4 className="text-sm font-black text-slate-900 leading-none mb-1">
@@ -1393,29 +1373,9 @@ export const Products: React.FC = () => {
                                         </p>
                                       </div>
 
-                                      {formData.allow_receipt_fraction && (
-                                        <div className="relative flex items-center w-28 shrink-0 animate-in fade-in zoom-in-95 duration-200">
-                                          <FormattedNumberInput 
-                                            className="w-full text-center py-2.5 px-2 pe-7 bg-slate-50 border border-emerald-200 rounded-2xl text-base font-black text-emerald-700 outline-none focus:bg-white focus:ring-4 focus:ring-emerald-500/10 shadow-inner" 
-                                            value={formData.allow_receipt_fraction_pct || 0} 
-                                            onChange={(val) => setFormData({ ...formData, allow_receipt_fraction_pct: val })} 
-                                          />
-                                          <span className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} text-sm font-black text-emerald-600 pointer-events-none`}>
-                                            %
-                                          </span>
-                                        </div>
-                                      )}
-
                                       <button
                                         type="button"
-                                        onClick={() => {
-                                          const nextVal = !formData.allow_receipt_fraction;
-                                          setFormData({ 
-                                            ...formData, 
-                                            allow_receipt_fraction: nextVal,
-                                            allow_receipt_fraction_pct: nextVal ? (formData.allow_receipt_fraction_pct || 0) : 0
-                                          });
-                                        }}
+                                        onClick={() => setFormData({ ...formData, allow_receipt_fraction: !formData.allow_receipt_fraction })}
                                         className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${formData.allow_receipt_fraction ? 'bg-emerald-600' : 'bg-slate-200'}`}
                                       >
                                         <span
