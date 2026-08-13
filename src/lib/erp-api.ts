@@ -3725,15 +3725,15 @@ modules.forEach(moduleName => {
     // Update
     routeNames.forEach(rn => {
       router.put(`/${rn}/:id`, authenticateToken, async (req: AuthRequest, res) => {
+        const { id } = req.params;
+        const companyId = req.user?.company_id;
+        const isSuperAdmin = req.user?.role === 'super_admin' || req.user?.role === 'مدير النظام' || (req.user as any)?.is_super_admin === true;
+
         try {
           const targetModule = getEffectiveModule(moduleName);
           if (!await checkPermission(req, targetModule, 'edit')) {
             return res.status(403).json({ error: 'Access Denied: No Edit Permission' });
           }
-          const { id } = req.params;
-          const companyId = req.user?.company_id;
-
-          const isSuperAdmin = req.user?.role === 'super_admin' || req.user?.role === 'مدير النظام' || (req.user as any)?.is_super_admin === true;
 
           // SECURITY FIX: Non-super-admin users can only modify their own company
           if (moduleName === 'companies' && !isSuperAdmin && companyId && companyId !== id) {
