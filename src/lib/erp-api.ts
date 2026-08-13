@@ -3857,11 +3857,22 @@ modules.forEach(moduleName => {
               };
               const seqField = fieldMap[moduleName];
               if (seqField) {
-                sanitizedData[seqField] = freshNum;
-                const retryKeys = Object.keys(sanitizedData);
-                const retryValues = Object.values(sanitizedData);
+                const retrySanitized = sanitizeData(moduleName, req.body);
+                delete (retrySanitized as any).id;
+                if (moduleName !== 'companies') delete (retrySanitized as any).company_id;
+                retrySanitized[seqField] = freshNum;
+
+                const retryKeys = Object.keys(retrySanitized);
+                const retryValues = Object.values(retrySanitized);
                 const retrySetClause = retryKeys.map((k, idx) => `"${k}" = $${idx + 1}`).join(', ');
-                let retryQuery = `UPDATE "${moduleName}" SET ${retrySetClause}${hasUpdatedAt ? ', updated_at = CURRENT_TIMESTAMP' : ''} WHERE id = $${retryKeys.length + 1}`;
+                
+                const colCheck = await pool.query(`
+                  SELECT 1 FROM information_schema.columns 
+                  WHERE table_schema = 'public' AND table_name = $1 AND column_name = 'updated_at'
+                `, [moduleName]);
+                const retryHasUpdatedAt = colCheck.rows.length > 0;
+
+                let retryQuery = `UPDATE "${moduleName}" SET ${retrySetClause}${retryHasUpdatedAt ? ', updated_at = CURRENT_TIMESTAMP' : ''} WHERE id = $${retryKeys.length + 1}`;
                 let retryParams = [...retryValues, id];
                 if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies' && !isSuperAdmin) {
                   retryQuery += ` AND (company_id = $${retryKeys.length + 2} OR company_id IS NULL OR company_id = '')`;
