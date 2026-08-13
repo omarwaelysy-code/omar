@@ -3287,7 +3287,7 @@ modules.forEach(moduleName => {
                 UNION ALL
                 SELECT company_id, pg_column_size(t.*) AS sz FROM journal_entries t WHERE company_id IS NOT NULL
                 UNION ALL
-                SELECT company_id, pg_column_size(t.*) AS sz FROM journal_entry_items t WHERE company_id IS NOT NULL
+                SELECT company_id, pg_column_size(t.*) AS sz FROM journal_entry_lines t WHERE company_id IS NOT NULL
                 UNION ALL
                 SELECT company_id, pg_column_size(t.*) AS sz FROM products t WHERE company_id IS NOT NULL
                 UNION ALL
@@ -3614,6 +3614,7 @@ modules.forEach(moduleName => {
           
           let result;
           try {
+            await client.query('SAVEPOINT insert_sp');
             const keys = Object.keys(data);
             const values = Object.values(data);
             const placeholders = keys.map((_, index) => `$${index + 1}`).join(', ');
@@ -3621,7 +3622,9 @@ modules.forEach(moduleName => {
               `INSERT INTO "${moduleName}" ("${keys.join('", "')}") VALUES (${placeholders}) RETURNING *`,
               values
             );
+            await client.query('RELEASE SAVEPOINT insert_sp').catch(() => {});
           } catch (insertError: any) {
+            await client.query('ROLLBACK TO SAVEPOINT insert_sp').catch(() => {});
             if (insertError.code === '23505' && ['payment_vouchers', 'receipt_vouchers', 'cash_transfers', 'employees'].includes(moduleName)) {
               console.warn(`[RETRY RECOVERY] Unique constraint violation code 23505 for ${moduleName}. Forcing new atomic sequence...`);
               const target = SEQUENCE_MODULE_CONFIG[moduleName];
@@ -3877,7 +3880,7 @@ modules.forEach(moduleName => {
         if (moduleName === 'accounts') {
           // 1. Check if there are journal entry lines linked to this account
           const jeCheck = await client.query(
-            'SELECT COUNT(*) FROM journal_entry_items WHERE account_id = $1',
+            'SELECT COUNT(*) FROM journal_entry_lines WHERE account_id = $1',
             [id]
           );
           if (parseInt(jeCheck.rows[0]?.count || '0', 10) > 0) {
@@ -3955,7 +3958,7 @@ modules.forEach(moduleName => {
 
         if (moduleName === 'companies') {
           const tablesToDelete = [
-            'company_subscriptions', 'users', 'roles', 'journal_entry_items', 'journal_entries',
+            'company_subscriptions', 'users', 'roles', 'journal_entry_lines', 'journal_entries',
             'invoice_items', 'invoices', 'purchase_invoice_items', 'purchase_invoices',
             'sales_order_items', 'sales_orders', 'purchase_order_items', 'purchase_orders',
             'return_items', 'returns', 'purchase_return_items', 'purchase_returns',
@@ -4069,7 +4072,7 @@ modules.forEach(moduleName => {
           );
           const jeIds = jeRes.rows.map((r: any) => r.id);
           if (jeIds.length > 0) {
-            await client.query(`DELETE FROM journal_entry_items WHERE journal_entry_id = ANY($1::uuid[])`, [jeIds]);
+            await client.query(`DELETE FROM journal_entry_lines WHERE journal_entry_id = ANY($1::uuid[])`, [jeIds]);
             await client.query(`DELETE FROM journal_entries WHERE id = ANY($1::uuid[])`, [jeIds]);
           }
         }
