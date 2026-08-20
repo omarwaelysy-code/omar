@@ -5,8 +5,6 @@ import {
   Radio, 
   RefreshCw, 
   Search, 
-  CheckCircle2, 
-  XCircle, 
   Clock, 
   MapPin, 
   Copy, 
@@ -14,10 +12,10 @@ import {
   ExternalLink,
   Plus,
   Building2,
-  Activity,
   Wifi,
   WifiOff,
-  AlertCircle
+  AlertCircle,
+  Coffee
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -143,352 +141,352 @@ export function PosConnectedBranches() {
   });
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6" dir={dir}>
-      {/* Header Banner */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gradient-to-r from-emerald-950/40 via-gray-900 to-gray-900 p-6 rounded-2xl border border-emerald-900/30 shadow-xl">
-        <div className="flex items-center gap-4">
-          <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
-            <Laptop className="w-8 h-8" />
-          </div>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-white tracking-tight">
-                {language === 'ar' ? 'نقاط البيع - الفروع المتصلة' : 'POS - Connected Branches'}
-              </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                {language === 'ar' ? 'متابعة حية' : 'Live Heartbeat'}
-              </span>
+    <div className="min-h-full bg-slate-50/70 p-6 md:p-8 space-y-6" dir={dir}>
+      <div className="max-w-7xl mx-auto space-y-6">
+        
+        {/* Header Card */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
+          <div className="flex items-center gap-4">
+            <div className="p-3.5 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-600 shadow-sm flex-shrink-0">
+              <Laptop className="w-7 h-7" />
             </div>
-            <p className="text-gray-400 text-sm mt-1">
-              {language === 'ar' 
-                ? 'مراقبة ومتابعة حالة اتصال فروع Cafe POS المربوطة بنظام Obrain ERP لحظياً.' 
-                : 'Monitor real-time connection status of Cafe POS branches linked with Obrain ERP.'}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <button
-            onClick={() => fetchConnectedBranches(true)}
-            disabled={refreshing}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700/60 font-medium transition-all shadow-sm active:scale-95 disabled:opacity-50"
-            title="تحديث البيانات"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-emerald-400' : ''}`} />
-            <span>{language === 'ar' ? 'تحديث الآن' : 'Refresh'}</span>
-          </button>
-
-          <button
-            onClick={() => openTab('pos_branch_linking', language === 'ar' ? 'ربط الفرع' : 'Branch Linking')}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium shadow-lg shadow-emerald-900/20 transition-all active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{language === 'ar' ? 'ربط فرع جديد' : 'Link New Branch'}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* POS Inactive Warning (if not enabled) */}
-      {!isPosEnabled && !loading && (
-        <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <AlertCircle className="w-6 h-6 text-amber-400 flex-shrink-0" />
             <div>
-              <p className="text-amber-300 font-semibold text-sm">
-                {language === 'ar' ? 'نظام نقاط البيع (POS) غير مفعل' : 'POS System is currently disabled'}
-              </p>
-              <p className="text-amber-200/70 text-xs mt-0.5">
-                {language === 'ar' 
-                  ? 'يمكنك تفعيل ميزة نقاط البيع من صفحة إعدادات الشركة لبدء استقبال اتصال الفروع.' 
-                  : 'Enable POS feature from Company Settings to start receiving branch connections.'}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => openTab('company_settings', language === 'ar' ? 'إعدادات الشركة' : 'Company Settings')}
-            className="px-3.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg text-xs font-semibold border border-amber-500/30 transition-all flex items-center gap-1.5"
-          >
-            <span>{language === 'ar' ? 'إعدادات الشركة' : 'Settings'}</span>
-            <ExternalLink className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
-
-      {/* Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {/* Total Branches */}
-        <div className="bg-gray-900/60 border border-gray-800 p-5 rounded-2xl relative overflow-hidden backdrop-blur-sm">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">
-                {language === 'ar' ? 'إجمالي الفروع المربوطة' : 'Total Linked Branches'}
-              </p>
-              <h3 className="text-3xl font-bold text-white mt-2 font-mono">{totalBranches}</h3>
-              <p className="text-xs text-gray-500 mt-1">
-                {language === 'ar' ? 'فروع مسجلة بنجاح' : 'Registered branches'}
-              </p>
-            </div>
-            <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-400">
-              <Building2 className="w-6 h-6" />
-            </div>
-          </div>
-        </div>
-
-        {/* Online Branches */}
-        <div className="bg-gradient-to-br from-emerald-950/30 to-gray-900/60 border border-emerald-900/30 p-5 rounded-2xl relative overflow-hidden backdrop-blur-sm">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-emerald-400 text-xs font-semibold uppercase tracking-wider">
-                {language === 'ar' ? 'الفروع المتصلة الآن' : 'Online Branches'}
-              </p>
-              <div className="flex items-baseline gap-2 mt-2">
-                <h3 className="text-3xl font-bold text-emerald-400 font-mono">{onlineBranches}</h3>
-                <span className="text-xs text-emerald-500/80 font-medium">
-                  ({totalBranches > 0 ? Math.round((onlineBranches / totalBranches) * 100) : 0}%)
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                  {language === 'ar' ? 'نقاط البيع - الفروع المتصلة' : 'POS - Connected Branches'}
+                </h1>
+                <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  {language === 'ar' ? 'متابعة حية' : 'Live Heartbeat'}
                 </span>
               </div>
-              <p className="text-xs text-emerald-400/60 mt-1 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                {language === 'ar' ? 'Heartbeat نشط خلال 3 دقائق' : 'Active heartbeat < 3m'}
+              <p className="text-slate-500 text-sm mt-1">
+                {language === 'ar' 
+                  ? 'متابعة حالة اتصال فروع Cafe POS بنظام Obrain ERP لحظيًا.' 
+                  : 'Monitor real-time connection status of Cafe POS branches linked with Obrain ERP.'}
               </p>
             </div>
-            <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
-              <Wifi className="w-6 h-6" />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            <button
+              onClick={() => fetchConnectedBranches(true)}
+              disabled={refreshing}
+              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium transition-all shadow-sm active:scale-95 disabled:opacity-50 text-sm"
+              title="تحديث البيانات"
+            >
+              <RefreshCw className={`w-4 h-4 text-slate-600 ${refreshing ? 'animate-spin text-emerald-600' : ''}`} />
+              <span>{language === 'ar' ? 'تحديث الآن' : 'Refresh'}</span>
+            </button>
+
+            <button
+              onClick={() => openTab('pos_branch_linking', language === 'ar' ? 'ربط الفرع' : 'Branch Linking')}
+              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm transition-all active:scale-95 text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              <span>{language === 'ar' ? 'ربط فرع جديد' : 'Link New Branch'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* POS Inactive Warning (if not enabled) */}
+        {!isPosEnabled && !loading && (
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+              <div>
+                <p className="text-amber-900 font-semibold text-sm">
+                  {language === 'ar' ? 'نظام نقاط البيع (POS) غير مفعل' : 'POS System is currently disabled'}
+                </p>
+                <p className="text-amber-700 text-xs mt-0.5">
+                  {language === 'ar' 
+                    ? 'يمكنك تفعيل ميزة نقاط البيع من صفحة إعدادات الشركة لبدء استقبال اتصال الفروع.' 
+                    : 'Enable POS feature from Company Settings to start receiving branch connections.'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => openTab('company_settings', language === 'ar' ? 'إعدادات الشركة' : 'Company Settings')}
+              className="px-3.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-xl text-xs font-semibold border border-amber-300 transition-all flex items-center gap-1.5"
+            >
+              <span>{language === 'ar' ? 'إعدادات الشركة' : 'Settings'}</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* Metric Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {/* Total Branches */}
+          <div className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-sm hover:border-slate-300 transition-all">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">
+                  {language === 'ar' ? 'إجمالي الفروع المربوطة' : 'Total Linked Branches'}
+                </p>
+                <h3 className="text-3xl font-bold text-slate-900 mt-2 font-mono">{totalBranches}</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  {language === 'ar' ? 'فروع مسجلة بالنظام' : 'Registered branches'}
+                </p>
+              </div>
+              <div className="p-3 bg-blue-50 border border-blue-100 rounded-2xl text-blue-600">
+                <Building2 className="w-6 h-6" />
+              </div>
+            </div>
+          </div>
+
+          {/* Online Branches */}
+          <div className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-sm hover:border-emerald-200 transition-all">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-emerald-700 text-xs font-semibold uppercase tracking-wider">
+                  {language === 'ar' ? 'متصل الآن' : 'Online Branches'}
+                </p>
+                <div className="flex items-baseline gap-2 mt-2">
+                  <h3 className="text-3xl font-bold text-emerald-600 font-mono">{onlineBranches}</h3>
+                  <span className="text-xs text-emerald-700 font-medium">
+                    ({totalBranches > 0 ? Math.round((onlineBranches / totalBranches) * 100) : 0}%)
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  {language === 'ar' ? 'Heartbeat نشط خلال 3 دقائق' : 'Active heartbeat < 3m'}
+                </p>
+              </div>
+              <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-600">
+                <Wifi className="w-6 h-6" />
+              </div>
+            </div>
+          </div>
+
+          {/* Offline Branches */}
+          <div className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-sm hover:border-rose-200 transition-all">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-rose-700 text-xs font-semibold uppercase tracking-wider">
+                  {language === 'ar' ? 'غير متصل' : 'Offline Branches'}
+                </p>
+                <h3 className="text-3xl font-bold text-rose-600 mt-2 font-mono">{offlineBranches}</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  {language === 'ar' ? 'في انتظار وصول Heartbeat' : 'No recent heartbeat'}
+                </p>
+              </div>
+              <div className="p-3 bg-rose-50 border border-rose-100 rounded-2xl text-rose-600">
+                <WifiOff className="w-6 h-6" />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Offline Branches */}
-        <div className="bg-gray-900/60 border border-gray-800 p-5 rounded-2xl relative overflow-hidden backdrop-blur-sm">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-rose-400 text-xs font-semibold uppercase tracking-wider">
-                {language === 'ar' ? 'الفروع غير المتصلة' : 'Offline Branches'}
-              </p>
-              <h3 className="text-3xl font-bold text-rose-400 mt-2 font-mono">{offlineBranches}</h3>
-              <p className="text-xs text-rose-400/60 mt-1">
-                {language === 'ar' ? 'في انتظار وصول Heartbeat' : 'No recent heartbeat'}
-              </p>
+        {/* Main Table Section */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          {/* Filters & Search Header */}
+          <div className="p-4 md:p-5 border-b border-slate-100 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 bg-white">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y/1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={language === 'ar' ? 'ابحث باسم الفرع أو كود الربط أو العنوان...' : 'Search by branch name, code, or address...'}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pr-10 pl-4 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+              />
             </div>
-            <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400">
-              <WifiOff className="w-6 h-6" />
+
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={() => setStatusFilter('all')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                  statusFilter === 'all' 
+                    ? 'bg-slate-900 text-white shadow-sm' 
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {language === 'ar' ? 'الكل' : 'All'} ({totalBranches})
+              </button>
+              <button
+                onClick={() => setStatusFilter('online')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  statusFilter === 'online' 
+                    ? 'bg-emerald-600 text-white shadow-sm' 
+                    : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                {language === 'ar' ? 'متصل الآن' : 'Online'} ({onlineBranches})
+              </button>
+              <button
+                onClick={() => setStatusFilter('offline')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  statusFilter === 'offline' 
+                    ? 'bg-rose-600 text-white shadow-sm' 
+                    : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                {language === 'ar' ? 'غير متصل' : 'Offline'} ({offlineBranches})
+              </button>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Filters & Search */}
-      <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 bg-gray-900/60 p-4 rounded-xl border border-gray-800">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y/1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={language === 'ar' ? 'البحث باسم الفرع أو كود الربط أو العنوان...' : 'Search by branch name, code, or address...'}
-            className="w-full bg-gray-950/80 border border-gray-800 rounded-xl pr-10 pl-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition-colors"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setStatusFilter('all')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
-              statusFilter === 'all' 
-                ? 'bg-emerald-500 text-gray-950 shadow-md shadow-emerald-500/20' 
-                : 'bg-gray-800 text-gray-400 hover:text-white'
-            }`}
-          >
-            {language === 'ar' ? 'الكل' : 'All'} ({totalBranches})
-          </button>
-          <button
-            onClick={() => setStatusFilter('online')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
-              statusFilter === 'online' 
-                ? 'bg-emerald-500 text-gray-950 shadow-md shadow-emerald-500/20' 
-                : 'bg-gray-800 text-gray-400 hover:text-emerald-400'
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-            {language === 'ar' ? 'متصل الآن' : 'Online'} ({onlineBranches})
-          </button>
-          <button
-            onClick={() => setStatusFilter('offline')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
-              statusFilter === 'offline' 
-                ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20' 
-                : 'bg-gray-800 text-gray-400 hover:text-rose-400'
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-rose-400"></span>
-            {language === 'ar' ? 'غير متصل' : 'Offline'} ({offlineBranches})
-          </button>
-        </div>
-      </div>
-
-      {/* Main Table */}
-      <div className="bg-gray-900/60 rounded-2xl border border-gray-800 overflow-hidden shadow-xl backdrop-blur-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-right text-sm">
-            <thead className="bg-gray-950/80 text-gray-400 text-xs font-semibold uppercase border-b border-gray-800">
-              <tr>
-                <th className="px-6 py-4">{language === 'ar' ? 'اسم الفرع' : 'Branch Name'}</th>
-                <th className="px-6 py-4">{language === 'ar' ? 'كود ربط الفرع' : 'Branch Linking Code'}</th>
-                <th className="px-6 py-4">{language === 'ar' ? 'حالة الاتصال' : 'Connection Status'}</th>
-                <th className="px-6 py-4">{language === 'ar' ? 'آخر اتصال' : 'Last Connection'}</th>
-                <th className="px-6 py-4">{language === 'ar' ? 'عنوان الفرع' : 'Branch Address'}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-800/60">
-              {loading ? (
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-sm">
+              <thead className="bg-slate-50/80 text-slate-600 text-xs font-semibold uppercase tracking-wider border-b border-slate-200">
                 <tr>
-                  <td colSpan={5} className="text-center py-16">
-                    <div className="flex flex-col items-center justify-center gap-3">
-                      <div className="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                      <p className="text-gray-400 text-xs">{language === 'ar' ? 'جاري تحميل الفروع المتصلة...' : 'Loading connected branches...'}</p>
-                    </div>
-                  </td>
+                  <th className="px-6 py-3.5">{language === 'ar' ? 'اسم الفرع' : 'Branch Name'}</th>
+                  <th className="px-6 py-3.5">{language === 'ar' ? 'كود ربط الفرع' : 'Branch Linking Code'}</th>
+                  <th className="px-6 py-3.5">{language === 'ar' ? 'حالة الاتصال' : 'Connection Status'}</th>
+                  <th className="px-6 py-3.5">{language === 'ar' ? 'آخر اتصال' : 'Last Connection'}</th>
+                  <th className="px-6 py-3.5">{language === 'ar' ? 'عنوان الفرع' : 'Branch Address'}</th>
                 </tr>
-              ) : filteredBranches.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="text-center py-16">
-                    <div className="flex flex-col items-center justify-center gap-3 text-gray-400">
-                      <Radio className="w-12 h-12 text-gray-600 stroke-[1.5]" />
-                      <p className="font-medium text-gray-300">
-                        {searchQuery 
-                          ? (language === 'ar' ? 'لا توجد نتائج تطابق معايير البحث' : 'No branches match your search')
-                          : (language === 'ar' ? 'لا توجد فروع Cafe POS متصلة بعد' : 'No connected Cafe POS branches yet')}
-                      </p>
-                      <p className="text-xs text-gray-500 max-w-md">
-                        {language === 'ar' 
-                          ? 'قم بتوليد رمز ربط من شاشة "ربط الفرع" وإدخاله في إعدادات Cafe POS للبدء في ربط ومتابعة الفروع.' 
-                          : 'Generate a linking code from "Branch Linking" and enter it in Cafe POS settings.'}
-                      </p>
-                      <button
-                        onClick={() => openTab('pos_branch_linking', language === 'ar' ? 'ربط الفرع' : 'Branch Linking')}
-                        className="mt-2 px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded-xl text-xs font-semibold border border-emerald-500/30 transition-all flex items-center gap-1.5"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>{language === 'ar' ? 'توليد رمز ربط جديد' : 'Generate Linking Code'}</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                filteredBranches.map((branch) => (
-                  <tr 
-                    key={branch.id} 
-                    className="hover:bg-gray-800/30 transition-colors group"
-                  >
-                    {/* 1. Branch Name */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2.5 rounded-xl border flex-shrink-0 ${
-                          branch.is_online 
-                            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
-                            : 'bg-gray-800 border-gray-700 text-gray-400'
-                        }`}>
-                          <Laptop className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="font-semibold text-white group-hover:text-emerald-300 transition-colors">
-                            {branch.branch_name || branch.department_name || 'الفرع الرئيسي'}
-                          </div>
-                          <div className="text-xs text-gray-400 flex items-center gap-2 mt-0.5">
-                            {branch.department_name && (
-                              <span>{branch.department_name}</span>
-                            )}
-                            {branch.pos_version && (
-                              <span className="px-1.5 py-0.2 bg-gray-800 text-gray-400 rounded text-[10px] font-mono border border-gray-700">
-                                v{branch.pos_version}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* 2. Branch Linking Code */}
-                    <td className="px-6 py-4">
-                      <div className="inline-flex items-center gap-2 bg-gray-950/80 px-3 py-1.5 rounded-lg border border-gray-800 font-mono text-xs text-emerald-400">
-                        <span>{branch.code}</span>
-                        <button
-                          onClick={() => handleCopyCode(branch.code)}
-                          className="text-gray-400 hover:text-white transition-colors"
-                          title="نسخ الرمز"
-                        >
-                          {copiedCode === branch.code ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          ) : (
-                            <Copy className="w-3.5 h-3.5" />
-                          )}
-                        </button>
-                      </div>
-                    </td>
-
-                    {/* 3. Connection Status */}
-                    <td className="px-6 py-4">
-                      {branch.is_online ? (
-                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm">
-                          <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                          </span>
-                          <span>{language === 'ar' ? '🟢 متصل الآن' : '🟢 Online'}</span>
-                        </div>
-                      ) : (
-                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                          <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                          <span>{language === 'ar' ? '🔴 غير متصل' : '🔴 Offline'}</span>
-                        </div>
-                      )}
-                    </td>
-
-                    {/* 4. Last Connection */}
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className={`text-xs font-medium ${branch.is_online ? 'text-emerald-400' : 'text-gray-300'}`}>
-                          {formatTimeAgo(branch.last_seen_at)}
-                        </span>
-                        <span className="text-[11px] text-gray-500 mt-0.5 font-mono">
-                          {formatFullDate(branch.last_seen_at)}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* 5. Branch Address */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5 text-xs text-gray-300">
-                        <MapPin className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-                        <span className="truncate max-w-xs" title={branch.branch_address || '—'}>
-                          {branch.branch_address || '—'}
-                        </span>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="text-center py-16">
+                      <div className="flex flex-col items-center justify-center gap-3">
+                        <div className="w-7 h-7 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-slate-400 text-xs">{language === 'ar' ? 'جاري تحميل الفروع المتصلة...' : 'Loading connected branches...'}</p>
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : filteredBranches.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="text-center py-16">
+                      <div className="flex flex-col items-center justify-center gap-3 text-slate-400">
+                        <div className="p-4 bg-slate-50 rounded-2xl text-slate-400 border border-slate-200">
+                          <Laptop className="w-8 h-8 stroke-[1.5]" />
+                        </div>
+                        <p className="font-semibold text-slate-700 text-base">
+                          {searchQuery 
+                            ? (language === 'ar' ? 'لا توجد نتائج تطابق معايير البحث' : 'No branches match your search')
+                            : (language === 'ar' ? 'لا توجد فروع متصلة بعد' : 'No connected branches yet')}
+                        </p>
+                        <p className="text-xs text-slate-400 max-w-md">
+                          {language === 'ar' 
+                            ? 'قم بتوليد رمز ربط من شاشة "ربط الفرع" وإدخاله في إعدادات Cafe POS للبدء في ربط ومتابعة الفروع.' 
+                            : 'Generate a linking code from "Branch Linking" and enter it in Cafe POS settings.'}
+                        </p>
+                        <button
+                          onClick={() => openTab('pos_branch_linking', language === 'ar' ? 'ربط الفرع' : 'Branch Linking')}
+                          className="mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>{language === 'ar' ? 'ربط فرع جديد' : 'Link New Branch'}</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredBranches.map((branch) => (
+                    <tr 
+                      key={branch.id} 
+                      className="hover:bg-slate-50/80 transition-colors group"
+                    >
+                      {/* 1. Branch Name */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2.5 bg-slate-100 text-slate-700 border border-slate-200/60 rounded-xl flex-shrink-0">
+                            <Coffee className="w-4 h-4 text-emerald-600" />
+                          </div>
+                          <div>
+                            <div className="font-semibold text-slate-900 group-hover:text-emerald-700 transition-colors">
+                              {branch.branch_name || branch.department_name || 'كافيه مودرنو'}
+                            </div>
+                            <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+                              {branch.department_name && (
+                                <span>{branch.department_name}</span>
+                              )}
+                              {branch.pos_version && (
+                                <span className="px-1.5 py-0.2 bg-slate-100 text-slate-500 rounded text-[10px] font-mono border border-slate-200">
+                                  v{branch.pos_version}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* 2. Branch Linking Code */}
+                      <td className="px-6 py-4">
+                        <div className="inline-flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 font-mono text-xs text-emerald-700 font-medium">
+                          <span>{branch.code}</span>
+                          <button
+                            onClick={() => handleCopyCode(branch.code)}
+                            className="text-slate-400 hover:text-slate-600 transition-colors"
+                            title="نسخ الرمز"
+                          >
+                            {copiedCode === branch.code ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+
+                      {/* 3. Connection Status */}
+                      <td className="px-6 py-4">
+                        {branch.is_online ? (
+                          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span>{language === 'ar' ? '🟢 متصل الآن' : '🟢 Online'}</span>
+                          </div>
+                        ) : (
+                          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                            <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                            <span>{language === 'ar' ? '🔴 غير متصل' : '🔴 Offline'}</span>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* 4. Last Connection */}
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className={`text-xs font-medium ${branch.is_online ? 'text-emerald-700' : 'text-slate-700'}`}>
+                            {formatTimeAgo(branch.last_seen_at)}
+                          </span>
+                          <span className="text-[11px] text-slate-400 mt-0.5 font-mono">
+                            {formatFullDate(branch.last_seen_at)}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* 5. Branch Address */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                          <span className="truncate max-w-xs" title={branch.branch_address || '—'}>
+                            {branch.branch_address || '—'}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer Bar */}
+          <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-2 text-xs text-slate-500">
+            <div>
+              {language === 'ar' 
+                ? `عرض ${filteredBranches.length} من إجمالي ${totalBranches} فرع مربوط` 
+                : `Showing ${filteredBranches.length} of ${totalBranches} linked branches`}
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-400">
+              <Clock className="w-3.5 h-3.5" />
+              <span>
+                {language === 'ar' 
+                  ? `آخر تحديث للقائمة: ${lastUpdated.toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US')}` 
+                  : `Last list update: ${lastUpdated.toLocaleTimeString()}`}
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* Footer info bar */}
-        <div className="px-6 py-3.5 bg-gray-950/60 border-t border-gray-800/80 flex flex-col sm:flex-row justify-between items-center gap-2 text-xs text-gray-400">
-          <div>
-            {language === 'ar' 
-              ? `عرض ${filteredBranches.length} من إجمالي ${totalBranches} فرع مربوط` 
-              : `Showing ${filteredBranches.length} of ${totalBranches} linked branches`}
-          </div>
-          <div className="flex items-center gap-2 text-gray-400">
-            <Clock className="w-3.5 h-3.5" />
-            <span>
-              {language === 'ar' 
-                ? `آخر تحديث للقائمة: ${lastUpdated.toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US')}` 
-                : `Last list update: ${lastUpdated.toLocaleTimeString()}`}
-            </span>
-          </div>
-        </div>
       </div>
     </div>
   );
