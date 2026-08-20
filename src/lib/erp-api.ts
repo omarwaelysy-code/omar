@@ -9755,6 +9755,9 @@ router.delete('/contact-messages/:id', authenticateToken, authorizeRoles('super_
   } catch (error: any) {
     console.error('Error deleting contact message:', error);
     res.status(500).json({ error: 'Failed to delete message.' });
+  }
+});
+
 // ==========================================
 // POS Feature & Branch Linking Endpoints (Phase 1)
 // ==========================================
