@@ -1069,14 +1069,14 @@ async function checkPeriodClosingMiddleware(req: AuthRequest, res: any, next: an
   }
 
   const id = req.params.id || pathParts[1];
-  const companyId = req.user?.company_id;
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
   if (!companyId) return next();
 
   const effectiveModule = getEffectiveModule(moduleName);
   const excludedModules = [
     'users', 'roles', 'companies', 'activity_logs', 'audit_logs', 
     'system_config', 'period_closings', 'migrations', 'paper_sizes', 
-    'settings', 'print_profiles', 'template_versions'
+    'settings', 'print_profiles', 'template_versions', 'pos', 'pos_branch_linking_codes'
   ];
   if (excludedModules.includes(effectiveModule)) {
     return next();
@@ -9764,11 +9764,11 @@ router.delete('/contact-messages/:id', authenticateToken, authorizeRoles('super_
 
 // Helper middleware to check if POS is enabled for company
 async function ensurePosEnabled(req: AuthRequest, res: any, next: any) {
-  const companyId = req.user?.company_id;
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
   if (!companyId) {
     return res.status(400).json({ error: 'Company ID is required' });
   }
-  if (req.user?.role === 'super_admin') {
+  if (req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true) {
     return next();
   }
   try {
@@ -9779,7 +9779,7 @@ async function ensurePosEnabled(req: AuthRequest, res: any, next: any) {
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Company not found' });
     }
-    const isPosEnabled = rows[0].pos_enabled === true || rows[0].settings?.pos_enabled === true;
+    const isPosEnabled = rows[0].pos_enabled === true || rows[0].pos_enabled === ('true' as any) || rows[0].settings?.pos_enabled === true || rows[0].settings?.pos_enabled === 'true';
     if (!isPosEnabled) {
       return res.status(403).json({
         error: 'نظام نقاط البيع غير مفعل لهذه الشركة.',
@@ -9795,7 +9795,7 @@ async function ensurePosEnabled(req: AuthRequest, res: any, next: any) {
 
 // GET /api/erp/pos/branch-linking-codes
 router.get('/pos/branch-linking-codes', authenticateToken, ensurePosEnabled, async (req: AuthRequest, res) => {
-  const companyId = req.user?.company_id;
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
   try {
     // Auto-update expired pending codes
     await pool.query(
@@ -9827,7 +9827,7 @@ router.get('/pos/branch-linking-codes', authenticateToken, ensurePosEnabled, asy
 
 // POST /api/erp/pos/branch-linking-codes/generate
 router.post('/pos/branch-linking-codes/generate', authenticateToken, ensurePosEnabled, async (req: AuthRequest, res) => {
-  const companyId = req.user?.company_id;
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
   const { departmentId, warehouseId, validityHours = 24 } = req.body;
   const userId = req.user?.id;
 
@@ -9871,7 +9871,7 @@ router.post('/pos/branch-linking-codes/generate', authenticateToken, ensurePosEn
 
 // PUT /api/erp/pos/branch-linking-codes/:id/revoke
 router.put('/pos/branch-linking-codes/:id/revoke', authenticateToken, ensurePosEnabled, async (req: AuthRequest, res) => {
-  const companyId = req.user?.company_id;
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
   const { id } = req.params;
 
   try {
