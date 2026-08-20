@@ -615,12 +615,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
     return filteredByFeatures.map(item => {
       // Check if top-level item should be visible
-      const canView = hasPermission(item.id, 'view') || item.id === 'currencies' || item.id === 'templates_menu';
+      const canView = hasPermission(item.id, 'view') || item.id === 'currencies' || item.id === 'templates_menu' || item.id === 'pos_menu';
       
       if (item.subItems) {
         const visibleSubItems = (item.subItems as any[]).filter((sub: any) => {
           if (sub.isDivider || sub.isHeader) return true;
-          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages') return true;
+          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking') return true;
           return hasPermission(sub.id, 'view');
         });
         

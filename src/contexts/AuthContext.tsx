@@ -346,7 +346,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const isSuperAdmin = isSuperAdminAccount && workspaceMode === 'super_admin';
-  const isCompanyAdmin = user?.role === 'admin' && user?.company_id !== 'system';
+  const isCompanyAdmin = (user?.role === 'admin' || user?.role === 'super_admin') && user?.company_id !== 'system';
   const isManager = user?.role === 'manager';
   const isStandardUser = user?.role === 'user';
 
