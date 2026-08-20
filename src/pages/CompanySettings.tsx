@@ -47,6 +47,7 @@ interface CompanyData {
   inventory_cost_method_level?: 'company' | 'item';
   vat_enabled: boolean;
   wht_enabled: boolean;
+  pos_enabled: boolean;
   purchase_workflow_mode?: 'Simple' | 'Enterprise Strict' | 'Enterprise Flexible';
   goods_receipt_matching_mode?: 'SupplierProduct' | 'ProductOnly' | 'SupplierProductWarehouse' | 'SmartMatching';
   allow_negative_stock?: boolean;
@@ -333,6 +334,7 @@ export function CompanySettings() {
             inventory_cost_method_level: 'item',
             vat_enabled: settings.vat_enabled || company.vat_enabled || false,
             wht_enabled: settings.wht_enabled || company.wht_enabled || false,
+            pos_enabled: settings.pos_enabled === true || company.pos_enabled === true,
             purchase_workflow_mode: company.purchase_workflow_mode || settings.purchase_workflow_mode || 'Simple',
             goods_receipt_matching_mode: company.goods_receipt_matching_mode || 'SmartMatching',
             allow_negative_stock: settings.allow_negative_stock || false
@@ -392,6 +394,7 @@ export function CompanySettings() {
         inventory_cost_method: data.inventory_cost_method || 'wac',
         vat_enabled: data.vat_enabled,
         wht_enabled: data.wht_enabled,
+        pos_enabled: data.pos_enabled,
         purchase_workflow_mode: data.purchase_workflow_mode || 'Simple',
         goods_receipt_matching_mode: data.goods_receipt_matching_mode || 'SmartMatching',
         allow_negative_stock: data.allow_negative_stock || false,
@@ -408,6 +411,7 @@ export function CompanySettings() {
         fiscal_year_end: fiscalYearEnd,
         vat_enabled: data.vat_enabled,
         wht_enabled: data.wht_enabled,
+        pos_enabled: data.pos_enabled,
         purchase_workflow_mode: data.purchase_workflow_mode || 'Simple',
         goods_receipt_matching_mode: data.goods_receipt_matching_mode || 'SmartMatching',
         settings: newSettings
@@ -628,6 +632,44 @@ export function CompanySettings() {
                     dir === 'rtl'
                       ? (data.wht_enabled ? 'translate-x-[-110%]' : 'translate-x-[-5%]')
                       : (data.wht_enabled ? 'translate-x-[110%]' : 'translate-x-[5%]')
+                  }`} />
+                </div>
+              </div>
+
+              {/* POS System Toggle */}
+              <div 
+                id="pos-system-toggle"
+                className={`flex items-center justify-between cursor-pointer select-none p-3.5 rounded-2xl border transition-all md:col-span-2 ${
+                  data.pos_enabled 
+                    ? 'border-emerald-200 bg-emerald-50/30 shadow-sm' 
+                    : 'border-slate-100 hover:bg-slate-50/80'
+                }`}
+                onClick={() => setData(prev => ({ ...prev, pos_enabled: !prev.pos_enabled }))}
+              >
+                <div className="flex flex-col gap-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-800 text-sm">
+                      {language === 'ar' ? 'نظام نقاط البيع (POS)' : 'Point of Sale (POS) System'}
+                    </span>
+                    {data.pos_enabled && (
+                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-extrabold rounded-full">
+                        {language === 'ar' ? 'مفعل' : 'Active'}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[11px] font-medium text-slate-400">
+                    {language === 'ar' 
+                      ? 'تفعيل نظام نقاط البيع للشركة يتيح إدارة نقاط البيع وربط الفروع والأجهزة الخارجية.' 
+                      : 'Enabling POS allows company POS management and linking of branch terminals.'}
+                  </span>
+                </div>
+                <div 
+                  className={`relative w-12 h-7 rounded-full transition-all duration-300 shadow-inner ms-3 flex-shrink-0 ${data.pos_enabled ? 'bg-emerald-600' : 'bg-slate-200'}`}
+                >
+                  <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
+                    dir === 'rtl'
+                      ? (data.pos_enabled ? 'translate-x-[-110%]' : 'translate-x-[-5%]')
+                      : (data.pos_enabled ? 'translate-x-[110%]' : 'translate-x-[5%]')
                   }`} />
                 </div>
               </div>

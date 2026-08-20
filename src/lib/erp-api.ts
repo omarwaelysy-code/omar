@@ -9755,6 +9755,139 @@ router.delete('/contact-messages/:id', authenticateToken, authorizeRoles('super_
   } catch (error: any) {
     console.error('Error deleting contact message:', error);
     res.status(500).json({ error: 'Failed to delete message.' });
+// ==========================================
+// POS Feature & Branch Linking Endpoints (Phase 1)
+// ==========================================
+
+// Helper middleware to check if POS is enabled for company
+async function ensurePosEnabled(req: AuthRequest, res: any, next: any) {
+  const companyId = req.user?.company_id;
+  if (!companyId) {
+    return res.status(400).json({ error: 'Company ID is required' });
+  }
+  if (req.user?.role === 'super_admin') {
+    return next();
+  }
+  try {
+    const { rows } = await pool.query(
+      `SELECT pos_enabled, settings FROM companies WHERE id = $1`,
+      [companyId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+    const isPosEnabled = rows[0].pos_enabled === true || rows[0].settings?.pos_enabled === true;
+    if (!isPosEnabled) {
+      return res.status(403).json({
+        error: 'نظام نقاط البيع غير مفعل لهذه الشركة.',
+        code: 'POS_DISABLED'
+      });
+    }
+    next();
+  } catch (err: any) {
+    console.error('ensurePosEnabled error:', err);
+    res.status(500).json({ error: 'Failed to verify POS status' });
+  }
+}
+
+// GET /api/erp/pos/branch-linking-codes
+router.get('/pos/branch-linking-codes', authenticateToken, ensurePosEnabled, async (req: AuthRequest, res) => {
+  const companyId = req.user?.company_id;
+  try {
+    // Auto-update expired pending codes
+    await pool.query(
+      `UPDATE pos_branch_linking_codes 
+       SET status = 'expired' 
+       WHERE company_id = $1 AND status = 'pending' AND expires_at < NOW()`,
+      [companyId]
+    );
+
+    const { rows } = await pool.query(
+      `SELECT 
+        c.id, c.company_id, c.department_id, c.warehouse_id, c.code, c.status,
+        c.expires_at, c.created_by, c.created_at, c.used_at, c.used_by_device,
+        d.name as department_name,
+        w.name as warehouse_name
+       FROM pos_branch_linking_codes c
+       LEFT JOIN departments d ON c.department_id = d.id
+       LEFT JOIN warehouses w ON c.warehouse_id = w.id
+       WHERE c.company_id = $1
+       ORDER BY c.created_at DESC`,
+      [companyId]
+    );
+    res.json(rows);
+  } catch (err: any) {
+    console.error('Error fetching POS branch linking codes:', err);
+    res.status(500).json({ error: 'Failed to fetch branch linking codes' });
+  }
+});
+
+// POST /api/erp/pos/branch-linking-codes/generate
+router.post('/pos/branch-linking-codes/generate', authenticateToken, ensurePosEnabled, async (req: AuthRequest, res) => {
+  const companyId = req.user?.company_id;
+  const { departmentId, warehouseId, validityHours = 24 } = req.body;
+  const userId = req.user?.id;
+
+  try {
+    // Determine branch code prefix
+    let branchPrefix = 'POS';
+    if (departmentId) {
+      const deptRes = await pool.query('SELECT code, name FROM departments WHERE id = $1 AND company_id = $2', [departmentId, companyId]);
+      if (deptRes.rows.length > 0) {
+        const cleanCode = (deptRes.rows[0].code || deptRes.rows[0].name || 'BR')
+          .replace(/[^a-zA-Z0-9]/g, '')
+          .toUpperCase()
+          .slice(0, 6);
+        if (cleanCode) branchPrefix = `POS-${cleanCode}`;
+      }
+    }
+
+    // Generate cryptographic random string (6 alphanumeric characters)
+    const crypto = await import('crypto');
+    const randomSuffix = crypto.randomBytes(4).toString('hex').toUpperCase().slice(0, 6);
+    const linkingCode = `${branchPrefix}-${randomSuffix}`;
+    const id = crypto.randomUUID();
+
+    const hours = Math.max(1, Math.min(168, Number(validityHours) || 24)); // 1 hour to 7 days
+    const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000);
+
+    const insertRes = await pool.query(
+      `INSERT INTO pos_branch_linking_codes 
+        (id, company_id, department_id, warehouse_id, code, status, expires_at, created_by)
+       VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7)
+       RETURNING *`,
+      [id, companyId, departmentId || null, warehouseId || null, linkingCode, expiresAt, userId]
+    );
+
+    res.status(201).json(insertRes.rows[0]);
+  } catch (err: any) {
+    console.error('Error generating POS branch linking code:', err);
+    res.status(500).json({ error: 'Failed to generate branch linking code' });
+  }
+});
+
+// PUT /api/erp/pos/branch-linking-codes/:id/revoke
+router.put('/pos/branch-linking-codes/:id/revoke', authenticateToken, ensurePosEnabled, async (req: AuthRequest, res) => {
+  const companyId = req.user?.company_id;
+  const { id } = req.params;
+
+  try {
+    const updateRes = await pool.query(
+      `UPDATE pos_branch_linking_codes 
+       SET status = 'revoked' 
+       WHERE id = $1 AND company_id = $2 AND status = 'pending'
+       RETURNING *`,
+      [id, companyId]
+    );
+
+    if (updateRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Code not found or not in pending state' });
+    }
+
+    res.json(updateRes.rows[0]);
+  } catch (err: any) {
+    console.error('Error revoking POS branch linking code:', err);
+    res.status(500).json({ error: 'Failed to revoke linking code' });
   }
 });
 

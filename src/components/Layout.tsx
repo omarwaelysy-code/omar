@@ -52,7 +52,8 @@ import {
   Globe,
   Activity,
   Mail,
-  Camera
+  Camera,
+  Radio
 } from 'lucide-react';
 
 import { useAuth } from '../contexts/AuthContext';
@@ -100,6 +101,7 @@ const getTabIcon = (id: string) => {
       return <ArrowLeftRight {...iconProps} />;
     case 'opening_stock_balances': return <ListPlus {...iconProps} />;
     case 'stock_adjustments': return <Sliders {...iconProps} />;
+    case 'pos_branch_linking': return <Radio {...iconProps} />;
     case 'invoices': return <ArrowUpFromLine {...iconProps} />;
     case 'sales_orders':
     case 'purchase_orders':
@@ -541,6 +543,20 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'balance_sheet', label: t('nav.balance_sheet'), icon: Shield }
         ]
       },
+      ...(company?.pos_enabled === true || (company?.settings as any)?.pos_enabled === true ? [
+        {
+          id: 'pos_menu',
+          label: language === 'ar' ? 'نقاط البيع' : 'Point of Sale (POS)',
+          icon: Radio,
+          subItems: [
+            { 
+              id: 'pos_branch_linking', 
+              label: language === 'ar' ? 'ربط الفرع' : 'Branch Linking', 
+              icon: Radio 
+            }
+          ]
+        }
+      ] : []),
       {
         id: 'admin',
         label: t('nav.admin'),

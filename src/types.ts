@@ -92,6 +92,7 @@ export interface Company {
   created_at: string;
   vat_enabled?: boolean;
   wht_enabled?: boolean;
+  pos_enabled?: boolean;
   settings: {
     currency: string;
     timezone: string;
@@ -108,11 +109,28 @@ export interface Company {
     inventory_cost_method_level?: 'company' | 'item';
     vat_enabled?: boolean;
     wht_enabled?: boolean;
+    pos_enabled?: boolean;
     purchase_workflow_mode?: 'Simple' | 'Enterprise Strict' | 'Enterprise Flexible';
     barcode_scanner?: any;
   };
   purchase_workflow_mode?: 'Simple' | 'Enterprise Strict' | 'Enterprise Flexible';
   goods_receipt_matching_mode?: 'SupplierProduct' | 'ProductOnly' | 'SupplierProductWarehouse' | 'SmartMatching';
+}
+
+export interface PosBranchLinkingCode {
+  id: string;
+  company_id: string;
+  department_id?: string;
+  department_name?: string;
+  warehouse_id?: string;
+  warehouse_name?: string;
+  code: string;
+  status: 'pending' | 'used' | 'expired' | 'revoked';
+  expires_at: string;
+  created_by?: string;
+  created_at: string;
+  used_at?: string;
+  used_by_device?: string;
 }
 
 export interface Currency {

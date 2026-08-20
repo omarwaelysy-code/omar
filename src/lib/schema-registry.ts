@@ -11,7 +11,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'logo_url', 'website', 'country', 'currency', 'fiscal_year_end',
     'subscription_status', 'subscription_plan', 'subscription_start',
     'subscription_end', 'subscription_expiry', 'subscription_days', 'users_limit', 
-    'transactions_limit', 'company_status', 'features', 'settings', 'vat_enabled', 'wht_enabled', 'purchase_workflow_mode', 'goods_receipt_matching_mode', 'created_at', 'updated_at'
+    'transactions_limit', 'company_status', 'features', 'settings', 'vat_enabled', 'wht_enabled', 'pos_enabled', 'purchase_workflow_mode', 'goods_receipt_matching_mode', 'created_at', 'updated_at'
   ],
   users: [
     'id', 'username', 'name', 'email', 'password_hash', 'mobile', 'role', 'company_id',
@@ -264,6 +264,9 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   purchase_invoice_goods_receipts: [
     'id', 'purchase_invoice_id', 'goods_receipt_id', 'created_at'
+  ],
+  pos_branch_linking_codes: [
+    'id', 'company_id', 'department_id', 'warehouse_id', 'code', 'status', 'expires_at', 'created_by', 'created_at', 'used_at', 'used_by_device'
   ]
 };
 
