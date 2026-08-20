@@ -25,6 +25,7 @@ import { WarehousesLimitMiddleware } from './subscription/middlewares/limits/War
 import { DevicesLimitMiddleware } from './subscription/middlewares/limits/DevicesLimitMiddleware';
 import { TransactionsLimitMiddleware } from './subscription/middlewares/limits/TransactionsLimitMiddleware';
 import { subscriptionService } from './subscription/SubscriptionService';
+import { isCompanyPosEnabled } from './subscription/FeatureService';
 
 export function getEffectiveModule(moduleName: string): string {
   const mapping: { [key: string]: string } = {
@@ -9772,14 +9773,7 @@ async function ensurePosEnabled(req: AuthRequest, res: any, next: any) {
     return next();
   }
   try {
-    const { rows } = await pool.query(
-      `SELECT pos_enabled, settings FROM companies WHERE id = $1`,
-      [companyId]
-    );
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Company not found' });
-    }
-    const isPosEnabled = rows[0].pos_enabled === true || rows[0].pos_enabled === ('true' as any) || rows[0].settings?.pos_enabled === true || rows[0].settings?.pos_enabled === 'true';
+    const isPosEnabled = await isCompanyPosEnabled(companyId, pool);
     if (!isPosEnabled) {
       return res.status(403).json({
         error: 'نظام نقاط البيع غير مفعل لهذه الشركة.',
@@ -9942,7 +9936,7 @@ async function authenticatePosTerminal(req: any, res: any, next: any) {
       });
     }
 
-    const isPosEnabled = linkingRow.pos_enabled === true || linkingRow.company_settings?.pos_enabled === true;
+    const isPosEnabled = await isCompanyPosEnabled(linkingRow.company_id, pool);
     if (!isPosEnabled) {
       return res.status(403).json({ 
         error: 'نظام نقاط البيع (POS) معطل للشركة الحالية.', 
@@ -10023,7 +10017,7 @@ router.post('/pos/pair', async (req, res) => {
       return res.status(400).json({ error: 'رمز ربط الفرع منتهي الصلاحية.', code: 'EXPIRED_CODE' });
     }
 
-    const isPosEnabled = codeRow.pos_enabled === true || codeRow.company_settings?.pos_enabled === true;
+    const isPosEnabled = await isCompanyPosEnabled(codeRow.company_id, client);
     if (!isPosEnabled) {
       await client.query('ROLLBACK');
       return res.status(403).json({ error: 'نظام نقاط البيع (POS) غير مفعل للشركة.', code: 'POS_DISABLED' });
