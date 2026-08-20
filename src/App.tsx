@@ -90,7 +90,6 @@ import { AnimatePresence } from 'framer-motion';
 
 import { SubscriptionExpiredScreen } from './components/SubscriptionExpiredScreen';
 import { ContactMessages } from './pages/ContactMessages';
-import { PosBranchLinking } from './pages/PosBranchLinking';
 
 export default function App() {
   const { t, dir } = useLanguage();

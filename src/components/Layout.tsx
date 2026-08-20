@@ -53,7 +53,8 @@ import {
   Activity,
   Mail,
   Camera,
-  Radio
+  Radio,
+  Laptop
 } from 'lucide-react';
 
 import { useAuth } from '../contexts/AuthContext';

@@ -180,7 +180,7 @@ export function PosConnectedBranches() {
           </button>
 
           <button
-            onClick={() => openTab('pos_branch_linking')}
+            onClick={() => openTab('pos_branch_linking', language === 'ar' ? 'ربط الفرع' : 'Branch Linking')}
             className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium shadow-lg shadow-emerald-900/20 transition-all active:scale-95"
           >
             <Plus className="w-4 h-4" />
@@ -206,7 +206,7 @@ export function PosConnectedBranches() {
             </div>
           </div>
           <button
-            onClick={() => openTab('company_settings')}
+            onClick={() => openTab('company_settings', language === 'ar' ? 'إعدادات الشركة' : 'Company Settings')}
             className="px-3.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg text-xs font-semibold border border-amber-500/30 transition-all flex items-center gap-1.5"
           >
             <span>{language === 'ar' ? 'إعدادات الشركة' : 'Settings'}</span>
@@ -366,7 +366,7 @@ export function PosConnectedBranches() {
                           : 'Generate a linking code from "Branch Linking" and enter it in Cafe POS settings.'}
                       </p>
                       <button
-                        onClick={() => openTab('pos_branch_linking')}
+                        onClick={() => openTab('pos_branch_linking', language === 'ar' ? 'ربط الفرع' : 'Branch Linking')}
                         className="mt-2 px-4 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 rounded-xl text-xs font-semibold border border-emerald-500/30 transition-all flex items-center gap-1.5"
                       >
                         <Plus className="w-3.5 h-3.5" />

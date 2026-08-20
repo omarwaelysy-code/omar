@@ -11,7 +11,7 @@ interface NavigationContextType {
   setCurrentPage: (page: string) => void;
   openTabs: Tab[];
   activeTabId: string;
-  openTab: (id: string, label: string) => void;
+  openTab: (id: string, label?: string) => void;
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   resetNavigation: () => void;
@@ -108,10 +108,11 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [pendingLedgerParams, setPendingLedgerParams] = useState<{ accountId: string; startDate: string; endDate: string } | null>(null);
   const [pendingAccountTypeEditId, setPendingAccountTypeEditId] = useState<string | null>(null);
 
-  const openTab = (id: string, label: string) => {
+  const openTab = (id: string, label?: string) => {
+    const tabLabel = label || pageLabels[id] || id;
     setOpenTabs(prev => {
       if (prev.find(tab => tab.id === id)) return prev;
-      return [...prev, { id, label }];
+      return [...prev, { id, label: tabLabel }];
     });
     setActiveTabId(id);
     setCurrentPage(id);
