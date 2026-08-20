@@ -95,6 +95,8 @@ export const pageLabels: { [key: string]: string } = {
   'cost_centers': 'مراكز التكلفة',
   'company_settings': 'إعدادات الشركة',
   'quotations': 'عروض الأسعار',
+  'pos_connected_branches': 'الفروع المتصلة',
+  'pos_branch_linking': 'ربط الفرع',
 };
 
 export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

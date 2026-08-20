@@ -550,6 +550,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           icon: Radio,
           subItems: [
             { 
+              id: 'pos_connected_branches', 
+              label: language === 'ar' ? 'الفروع المتصلة' : 'Connected Branches', 
+              icon: Laptop 
+            },
+            { 
               id: 'pos_branch_linking', 
               label: language === 'ar' ? 'ربط الفرع' : 'Branch Linking', 
               icon: Radio 
@@ -620,7 +625,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       if (item.subItems) {
         const visibleSubItems = (item.subItems as any[]).filter((sub: any) => {
           if (sub.isDivider || sub.isHeader) return true;
-          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking') return true;
+          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking' || sub.id === 'pos_connected_branches') return true;
           return hasPermission(sub.id, 'view');
         });
         

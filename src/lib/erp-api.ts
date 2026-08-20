@@ -9894,4 +9894,138 @@ router.put('/pos/branch-linking-codes/:id/revoke', authenticateToken, ensurePosE
   }
 });
 
+// POST /api/erp/pos/heartbeat (POS periodic heartbeat & connection verification)
+router.post('/pos/heartbeat', async (req, res) => {
+  const { linking_code, linkingCode, branch_name, branchName, branch_address, branchAddress, pos_version, posVersion, timestamp } = req.body;
+  const code = (linking_code || linkingCode || '').trim();
+
+  if (!code) {
+    return res.status(400).json({ error: 'رمز ربط الفرع مطلوب (linking_code is required)', code: 'MISSING_CODE' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT c.*, d.name as department_name, d.description as department_desc, w.name as warehouse_name
+       FROM pos_branch_linking_codes c
+       LEFT JOIN departments d ON c.department_id = d.id
+       LEFT JOIN warehouses w ON c.warehouse_id = w.id
+       WHERE c.code = $1 AND c.status IN ('pending', 'used')`,
+      [code]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'رمز ربط الفرع غير صالح أو تم إلغاؤه.', code: 'INVALID_CODE' });
+    }
+
+    const codeRow = rows[0];
+
+    // Check expiry if it was still pending
+    if (codeRow.status === 'pending' && new Date(codeRow.expires_at) < new Date()) {
+      await pool.query("UPDATE pos_branch_linking_codes SET status = 'expired' WHERE id = $1", [codeRow.id]);
+      return res.status(400).json({ error: 'رمز ربط الفرع منتهي الصلاحية.', code: 'EXPIRED_CODE' });
+    }
+
+    const bName = (branch_name || branchName || codeRow.department_name || '').trim();
+    const bAddress = (branch_address || branchAddress || codeRow.department_desc || '').trim();
+    const pVersion = (pos_version || posVersion || '1.2.0').trim();
+
+    const deviceMetadata = JSON.stringify({
+      branch_name: bName,
+      branch_address: bAddress,
+      pos_version: pVersion,
+      last_heartbeat: timestamp || new Date().toISOString()
+    });
+
+    // Update linking code record to 'used' and refresh used_at (last_seen_at)
+    await pool.query(
+      `UPDATE pos_branch_linking_codes 
+       SET status = 'used', used_at = CURRENT_TIMESTAMP, used_by_device = $1 
+       WHERE id = $2`,
+      [deviceMetadata, codeRow.id]
+    );
+
+    // Fetch company name for convenience
+    const compRes = await pool.query('SELECT name FROM companies WHERE id = $1', [codeRow.company_id]);
+    const companyName = compRes.rows[0]?.name || '';
+
+    res.json({
+      success: true,
+      company_id: codeRow.company_id,
+      company_name: companyName,
+      department_id: codeRow.department_id,
+      department_name: codeRow.department_name || bName,
+      warehouse_id: codeRow.warehouse_id,
+      warehouse_name: codeRow.warehouse_name,
+      server_time: new Date().toISOString()
+    });
+  } catch (err: any) {
+    console.error('Error processing POS heartbeat:', err);
+    res.status(500).json({ error: 'Failed to process POS heartbeat' });
+  }
+});
+
+// GET /api/erp/pos/connected-branches
+router.get('/pos/connected-branches', authenticateToken, ensurePosEnabled, async (req: AuthRequest, res) => {
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT 
+        c.id, c.company_id, c.department_id, c.warehouse_id, c.code, c.status,
+        c.expires_at, c.created_by, c.created_at, c.used_at as last_seen_at, c.used_by_device,
+        d.name as department_name, d.description as department_address,
+        w.name as warehouse_name
+       FROM pos_branch_linking_codes c
+       LEFT JOIN departments d ON c.department_id = d.id
+       LEFT JOIN warehouses w ON c.warehouse_id = w.id
+       WHERE c.company_id = $1 AND c.status = 'used'
+       ORDER BY c.used_at DESC NULLS LAST`,
+      [companyId]
+    );
+
+    const now = Date.now();
+    // Threshold: 3 minutes for online status
+    const ONLINE_THRESHOLD_MS = 3 * 60 * 1000;
+
+    const formattedBranches = rows.map((r: any) => {
+      let meta: any = {};
+      if (r.used_by_device) {
+        try {
+          meta = typeof r.used_by_device === 'string' && r.used_by_device.startsWith('{')
+            ? JSON.parse(r.used_by_device)
+            : { branch_name: r.used_by_device };
+        } catch {
+          meta = { branch_name: r.used_by_device };
+        }
+      }
+
+      const lastSeenTime = r.last_seen_at ? new Date(r.last_seen_at).getTime() : 0;
+      const isOnline = lastSeenTime > 0 && (now - lastSeenTime) <= ONLINE_THRESHOLD_MS;
+
+      return {
+        id: r.id,
+        company_id: r.company_id,
+        department_id: r.department_id,
+        department_name: r.department_name,
+        warehouse_id: r.warehouse_id,
+        warehouse_name: r.warehouse_name,
+        code: r.code,
+        status: r.status,
+        expires_at: r.expires_at,
+        created_at: r.created_at,
+        last_seen_at: r.last_seen_at,
+        branch_name: meta.branch_name || r.department_name || 'الفرع الرئيسي',
+        branch_address: meta.branch_address || r.department_address || '—',
+        pos_version: meta.pos_version || '1.2.0',
+        is_online: isOnline
+      };
+    });
+
+    res.json(formattedBranches);
+  } catch (err: any) {
+    console.error('Error fetching connected POS branches:', err);
+    res.status(500).json({ error: 'Failed to fetch connected POS branches' });
+  }
+});
+
 export default router;

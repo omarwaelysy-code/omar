@@ -64,6 +64,8 @@ const GeneralLedger = React.lazy(() => import('./pages/GeneralLedger').then(m =>
 const TrialBalance = React.lazy(() => import('./pages/TrialBalance').then(m => ({ default: m.TrialBalance })));
 const IncomeStatement = React.lazy(() => import('./pages/IncomeStatement').then(m => ({ default: m.IncomeStatement })));
 const BalanceSheet = React.lazy(() => import('./pages/BalanceSheet').then(m => ({ default: m.BalanceSheet })));
+const PosBranchLinking = React.lazy(() => import('./pages/PosBranchLinking').then(m => ({ default: m.PosBranchLinking })));
+const PosConnectedBranches = React.lazy(() => import('./pages/PosConnectedBranches').then(m => ({ default: m.PosConnectedBranches })));
 
 import { useNavigation } from './contexts/NavigationContext';
 import { useLanguage } from './contexts/LanguageContext';
@@ -273,6 +275,7 @@ export default function App() {
       case 'system_check': return <SystemCheck />;
       case 'templates': return <Templates initialView="list" />;
       case 'create_template': return <Templates initialView="create" />;
+      case 'pos_connected_branches': return <PosConnectedBranches />;
       case 'pos_branch_linking': return <PosBranchLinking />;
       default: return <Dashboard />;
     }

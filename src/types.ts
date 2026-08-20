@@ -133,6 +133,24 @@ export interface PosBranchLinkingCode {
   used_by_device?: string;
 }
 
+export interface PosConnectedBranch {
+  id: string;
+  company_id: string;
+  department_id?: string;
+  department_name?: string;
+  warehouse_id?: string;
+  warehouse_name?: string;
+  code: string;
+  status: 'pending' | 'used' | 'expired' | 'revoked';
+  expires_at: string;
+  created_at: string;
+  last_seen_at?: string | null;
+  branch_name: string;
+  branch_address: string;
+  pos_version: string;
+  is_online: boolean;
+}
+
 export interface Currency {
   id: string;
   code: string;
