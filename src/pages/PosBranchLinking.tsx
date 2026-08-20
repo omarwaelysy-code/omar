@@ -76,7 +76,7 @@ export function PosBranchLinking() {
       const isEnabled = compData?.pos_enabled === true || compData?.settings?.pos_enabled === true;
       if (isEnabled) {
         // Fetch existing linking codes
-        const codes = await apiRequest<PosBranchLinkingCode[]>('/api/erp/pos/branch-linking-codes', 'GET');
+        const codes = await apiRequest<PosBranchLinkingCode[]>('/pos/branch-linking-codes', 'GET');
         setLinkingCodes(codes || []);
       }
     } catch (err: any) {
@@ -104,7 +104,7 @@ export function PosBranchLinking() {
     try {
       setGenerating(true);
       const newCode = await apiRequest<PosBranchLinkingCode>(
-        '/api/erp/pos/branch-linking-codes/generate',
+        '/pos/branch-linking-codes/generate',
         'POST',
         {
           departmentId: selectedDept,
@@ -139,7 +139,7 @@ export function PosBranchLinking() {
       return;
     }
     try {
-      await apiRequest(`/api/erp/pos/branch-linking-codes/${id}/revoke`, 'PUT');
+      await apiRequest(`/pos/branch-linking-codes/${id}/revoke`, 'PUT');
       showNotification(language === 'ar' ? 'تم إلغاء الرمز' : 'Code revoked', 'success');
       if (latestCode?.id === id) {
         setLatestCode(null);
