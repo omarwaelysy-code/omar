@@ -9894,73 +9894,257 @@ router.put('/pos/branch-linking-codes/:id/revoke', authenticateToken, ensurePosE
   }
 });
 
-// POST /api/erp/pos/heartbeat (POS periodic heartbeat & connection verification)
-router.post('/pos/heartbeat', async (req, res) => {
-  const { linking_code, linkingCode, branch_name, branchName, branch_address, branchAddress, pos_version, posVersion, timestamp } = req.body;
+// Middleware: Authenticate POS Terminal with revocable terminal_token
+async function authenticatePosTerminal(req: any, res: any, next: any) {
+  const authHeader = req.headers['authorization'];
+  const customHeader = req.headers['x-terminal-token'];
+  let token = customHeader || (authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null);
+
+  if (!token) {
+    return res.status(401).json({ error: 'رمز تعريف الجهاز مطلوب (Terminal Token required)', code: 'UNAUTHORIZED' });
+  }
+
+  try {
+    const decoded: any = jwt.verify(token, getJwtSecret());
+
+    if (decoded.token_type !== 'pos_terminal' || !decoded.linking_code_id) {
+      return res.status(401).json({ error: 'رمز تعريف الجهاز غير صالح (Invalid terminal token)', code: 'INVALID_TOKEN' });
+    }
+
+    // Check DB status for real-time revocation support
+    const { rows } = await pool.query(
+      `SELECT c.id, c.company_id, c.department_id, c.warehouse_id, c.status,
+              co.pos_enabled, co.settings as company_settings
+       FROM pos_branch_linking_codes c
+       JOIN companies co ON c.company_id = co.id
+       WHERE c.id = $1`,
+      [decoded.linking_code_id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(401).json({ error: 'سجل ربط الجهاز غير موجود أو تم حذفه.', code: 'TERMINAL_NOT_FOUND' });
+    }
+
+    const linkingRow = rows[0];
+
+    // Revocation check
+    if (linkingRow.status === 'revoked') {
+      return res.status(403).json({ 
+        error: 'تم إلغاء صلاحية هذا الجهاز أو تم فصله من قبل إدارة النظام.', 
+        code: 'TERMINAL_REVOKED' 
+      });
+    }
+
+    if (linkingRow.status !== 'used') {
+      return res.status(403).json({ 
+        error: 'حالة ربط الجهاز غير نشطة.', 
+        code: 'TERMINAL_INACTIVE' 
+      });
+    }
+
+    const isPosEnabled = linkingRow.pos_enabled === true || linkingRow.company_settings?.pos_enabled === true;
+    if (!isPosEnabled) {
+      return res.status(403).json({ 
+        error: 'نظام نقاط البيع (POS) معطل للشركة الحالية.', 
+        code: 'POS_DISABLED' 
+      });
+    }
+
+    req.posTerminal = {
+      linking_code_id: linkingRow.id,
+      company_id: linkingRow.company_id,
+      department_id: linkingRow.department_id,
+      warehouse_id: linkingRow.warehouse_id,
+      device_id: decoded.device_id || 'unknown'
+    };
+
+    next();
+  } catch (err: any) {
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'انتهت صلاحية رمز تعريف الجهاز.', code: 'TOKEN_EXPIRED' });
+    }
+    return res.status(401).json({ error: 'فشل التحقق من هوية الجهاز.', code: 'INVALID_TOKEN' });
+  }
+}
+
+// POST /api/erp/pos/pair (Pairing POS Terminal with linking code -> issues revocable terminal_token)
+router.post('/pos/pair', async (req, res) => {
+  const { linking_code, linkingCode, device_id, deviceId, terminal_name, terminalName, pos_version, posVersion } = req.body;
   const code = (linking_code || linkingCode || '').trim();
+  const dId = (device_id || deviceId || 'default_terminal').trim();
+  const tName = (terminal_name || terminalName || 'كاشير').trim();
+  const pVersion = (pos_version || posVersion || '1.2.0').trim();
 
   if (!code) {
     return res.status(400).json({ error: 'رمز ربط الفرع مطلوب (linking_code is required)', code: 'MISSING_CODE' });
   }
 
+  const client = await pool.connect();
+
   try {
-    const { rows } = await pool.query(
-      `SELECT c.*, d.name as department_name, d.description as department_desc, w.name as warehouse_name
+    await client.query('BEGIN');
+
+    // Concurrency protection: Lock the row using SELECT ... FOR UPDATE
+    const { rows } = await client.query(
+      `SELECT c.*, d.name as department_name, d.description as department_desc, 
+              w.name as warehouse_name, co.name as company_name, co.pos_enabled, co.settings as company_settings
        FROM pos_branch_linking_codes c
        LEFT JOIN departments d ON c.department_id = d.id
        LEFT JOIN warehouses w ON c.warehouse_id = w.id
-       WHERE c.code = $1 AND c.status IN ('pending', 'used')`,
+       LEFT JOIN companies co ON c.company_id = co.id
+       WHERE c.code = $1
+       FOR UPDATE OF c`,
       [code]
     );
 
     if (rows.length === 0) {
-      return res.status(404).json({ error: 'رمز ربط الفرع غير صالح أو تم إلغاؤه.', code: 'INVALID_CODE' });
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'رمز ربط الفرع غير صالح.', code: 'INVALID_CODE' });
     }
 
     const codeRow = rows[0];
 
-    // Check expiry if it was still pending
-    if (codeRow.status === 'pending' && new Date(codeRow.expires_at) < new Date()) {
-      await pool.query("UPDATE pos_branch_linking_codes SET status = 'expired' WHERE id = $1", [codeRow.id]);
+    // Strict single-use check: status MUST be pending
+    if (codeRow.status !== 'pending') {
+      await client.query('ROLLBACK');
+      if (codeRow.status === 'revoked') {
+        return res.status(403).json({ error: 'تم إلغاء رمز الربط هذا من قبل إدارة النظام.', code: 'CODE_REVOKED' });
+      }
+      if (codeRow.status === 'used') {
+        return res.status(409).json({ error: 'تم استخدام رمز ربط الفرع هذا مسبقاً ولا يمكن إعادة استخدامه.', code: 'CODE_ALREADY_USED' });
+      }
+      return res.status(400).json({ error: 'حالة رمز ربط الفرع غير صالحة للاستخدام.', code: 'INVALID_STATUS' });
+    }
+
+    // Expiry check
+    if (new Date(codeRow.expires_at) < new Date()) {
+      await client.query("UPDATE pos_branch_linking_codes SET status = 'expired' WHERE id = $1", [codeRow.id]);
+      await client.query('COMMIT');
       return res.status(400).json({ error: 'رمز ربط الفرع منتهي الصلاحية.', code: 'EXPIRED_CODE' });
     }
 
-    const bName = (branch_name || branchName || codeRow.department_name || '').trim();
-    const bAddress = (branch_address || branchAddress || codeRow.department_desc || '').trim();
-    const pVersion = (pos_version || posVersion || '1.2.0').trim();
+    const isPosEnabled = codeRow.pos_enabled === true || codeRow.company_settings?.pos_enabled === true;
+    if (!isPosEnabled) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'نظام نقاط البيع (POS) غير مفعل للشركة.', code: 'POS_DISABLED' });
+    }
 
     const deviceMetadata = JSON.stringify({
-      branch_name: bName,
-      branch_address: bAddress,
+      device_id: dId,
+      terminal_name: tName,
+      branch_name: codeRow.department_name || tName,
+      branch_address: codeRow.department_desc || '—',
       pos_version: pVersion,
-      last_heartbeat: timestamp || new Date().toISOString()
+      paired_at: new Date().toISOString()
     });
 
-    // Update linking code record to 'used' and refresh used_at (last_seen_at)
-    await pool.query(
+    // Single-use transition: status = 'used', set used_at and last_seen_at
+    await client.query(
       `UPDATE pos_branch_linking_codes 
-       SET status = 'used', used_at = CURRENT_TIMESTAMP, used_by_device = $1 
+       SET status = 'used', 
+           used_at = CURRENT_TIMESTAMP, 
+           last_seen_at = CURRENT_TIMESTAMP, 
+           used_by_device = $1 
        WHERE id = $2`,
       [deviceMetadata, codeRow.id]
     );
 
-    // Fetch company name for convenience
-    const compRes = await pool.query('SELECT name FROM companies WHERE id = $1', [codeRow.company_id]);
-    const companyName = compRes.rows[0]?.name || '';
+    // Issue revocable terminal_token (bound to linking_code_id for revocation support)
+    const terminalToken = jwt.sign(
+      {
+        token_type: 'pos_terminal',
+        linking_code_id: codeRow.id,
+        company_id: codeRow.company_id,
+        department_id: codeRow.department_id,
+        warehouse_id: codeRow.warehouse_id,
+        code: codeRow.code,
+        device_id: dId
+      },
+      getJwtSecret()
+    );
+
+    await client.query('COMMIT');
 
     res.json({
       success: true,
+      terminal_token: terminalToken,
       company_id: codeRow.company_id,
-      company_name: companyName,
+      company_name: codeRow.company_name,
       department_id: codeRow.department_id,
-      department_name: codeRow.department_name || bName,
+      department_name: codeRow.department_name || tName,
       warehouse_id: codeRow.warehouse_id,
       warehouse_name: codeRow.warehouse_name,
       server_time: new Date().toISOString()
     });
   } catch (err: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Error pairing POS terminal:', err);
+    res.status(500).json({ error: 'فشل إتمام ربط نقطة البيع' });
+  } finally {
+    client.release();
+  }
+});
+
+// POST /api/erp/pos/heartbeat (POS periodic heartbeat: updates last_seen_at only)
+router.post('/pos/heartbeat', authenticatePosTerminal, async (req: any, res) => {
+  const terminal = req.posTerminal;
+
+  try {
+    // Update ONLY last_seen_at (preserving original used_at and used_by_device unchanged)
+    await pool.query(
+      `UPDATE pos_branch_linking_codes 
+       SET last_seen_at = CURRENT_TIMESTAMP 
+       WHERE id = $1`,
+      [terminal.linking_code_id]
+    );
+
+    res.json({
+      success: true,
+      server_time: new Date().toISOString()
+    });
+  } catch (err: any) {
     console.error('Error processing POS heartbeat:', err);
     res.status(500).json({ error: 'Failed to process POS heartbeat' });
+  }
+});
+
+// GET /api/erp/pos/accounts (Fetch Obrain chart of accounts for POS mapping)
+router.get('/pos/accounts', authenticatePosTerminal, async (req: any, res) => {
+  const companyId = req.posTerminal.company_id;
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, code, name, type_id, parent_id, account_usage 
+       FROM accounts 
+       WHERE company_id = $1 AND (is_active = true OR is_active IS NULL) 
+       ORDER BY code ASC`,
+      [companyId]
+    );
+
+    res.json(rows);
+  } catch (err: any) {
+    console.error('Error fetching accounts for POS:', err);
+    res.status(500).json({ error: 'Failed to fetch accounts' });
+  }
+});
+
+// GET /api/erp/pos/inventory-items (Fetch Obrain inventory items / raw materials for Recipe mapping)
+router.get('/pos/inventory-items', authenticatePosTerminal, async (req: any, res) => {
+  const companyId = req.posTerminal.company_id;
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, code, name, barcode, unit, cost_price, sale_price, category 
+       FROM products 
+       WHERE company_id = $1 AND (is_active = true OR is_active IS NULL) AND (is_service = false OR is_service IS NULL) 
+       ORDER BY name ASC`,
+      [companyId]
+    );
+
+    res.json(rows);
+  } catch (err: any) {
+    console.error('Error fetching inventory items for POS:', err);
+    res.status(500).json({ error: 'Failed to fetch inventory items' });
   }
 });
 
@@ -9972,14 +10156,16 @@ router.get('/pos/connected-branches', authenticateToken, ensurePosEnabled, async
     const { rows } = await pool.query(
       `SELECT 
         c.id, c.company_id, c.department_id, c.warehouse_id, c.code, c.status,
-        c.expires_at, c.created_by, c.created_at, c.used_at as last_seen_at, c.used_by_device,
+        c.expires_at, c.created_by, c.created_at, c.used_at,
+        COALESCE(c.last_seen_at, c.used_at) as last_seen_at, 
+        c.used_by_device,
         d.name as department_name, d.description as department_address,
         w.name as warehouse_name
        FROM pos_branch_linking_codes c
        LEFT JOIN departments d ON c.department_id = d.id
        LEFT JOIN warehouses w ON c.warehouse_id = w.id
        WHERE c.company_id = $1 AND c.status = 'used'
-       ORDER BY c.used_at DESC NULLS LAST`,
+       ORDER BY COALESCE(c.last_seen_at, c.used_at) DESC NULLS LAST`,
       [companyId]
     );
 
@@ -10013,6 +10199,7 @@ router.get('/pos/connected-branches', authenticateToken, ensurePosEnabled, async
         status: r.status,
         expires_at: r.expires_at,
         created_at: r.created_at,
+        used_at: r.used_at,
         last_seen_at: r.last_seen_at,
         branch_name: meta.branch_name || r.department_name || 'الفرع الرئيسي',
         branch_address: meta.branch_address || r.department_address || '—',
