@@ -180,6 +180,7 @@ export function CompanySettings() {
     inventory_cost_method_level: 'item',
     vat_enabled: false,
     wht_enabled: false,
+    pos_enabled: false,
     purchase_workflow_mode: 'Simple',
     goods_receipt_matching_mode: 'SmartMatching'
   });

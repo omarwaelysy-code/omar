@@ -92,7 +92,7 @@ import { PosBranchLinking } from './pages/PosBranchLinking';
 
 export default function App() {
   const { t, dir } = useLanguage();
-  const { isAuthenticated, loading: authLoading, isSuperAdmin, user, company, isSubscriptionExpired } = useAuth();
+  const { isAuthenticated, loading: authLoading, isSuperAdmin, user, isSubscriptionExpired } = useAuth();
   const { currentPage, setCurrentPage, openTabs, activeTabId } = useNavigation();
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(true);
@@ -273,11 +273,7 @@ export default function App() {
       case 'system_check': return <SystemCheck />;
       case 'templates': return <Templates initialView="list" />;
       case 'create_template': return <Templates initialView="create" />;
-      case 'pos_branch_linking': {
-        const isPosEnabled = company?.pos_enabled === true || (company?.settings as any)?.pos_enabled === true;
-        if (!isPosEnabled) return <NotFound />;
-        return <PosBranchLinking />;
-      }
+      case 'pos_branch_linking': return <PosBranchLinking />;
       default: return <Dashboard />;
     }
   }

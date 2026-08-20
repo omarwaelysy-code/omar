@@ -38,10 +38,11 @@ interface Warehouse {
 
 export function PosBranchLinking() {
   const { t, dir, language } = useLanguage();
-  const { user, company } = useAuth();
+  const { user } = useAuth();
   const { showNotification } = useNotification();
 
-  const isPosEnabled = company?.pos_enabled === true || (company?.settings as any)?.pos_enabled === true;
+  const [company, setCompany] = useState<any>(null);
+  const isPosEnabled = company?.pos_enabled === true || company?.settings?.pos_enabled === true;
 
   const [loading, setLoading] = useState(true);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -57,22 +58,27 @@ export function PosBranchLinking() {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const fetchData = async () => {
-    if (!user?.company_id || !isPosEnabled) {
+    if (!user?.company_id) {
       setLoading(false);
       return;
     }
     try {
       setLoading(true);
-      const [deptsData, whData] = await Promise.all([
+      const [compData, deptsData, whData] = await Promise.all([
+        dbService.get('companies', user.company_id),
         dbService.list<Department>('departments', user.company_id),
         dbService.list<Warehouse>('warehouses', user.company_id)
       ]);
+      setCompany(compData);
       setDepartments(deptsData || []);
       setWarehouses(whData || []);
 
-      // Fetch existing linking codes
-      const codes = await apiRequest<PosBranchLinkingCode[]>('/api/erp/pos/branch-linking-codes', 'GET');
-      setLinkingCodes(codes || []);
+      const isEnabled = compData?.pos_enabled === true || compData?.settings?.pos_enabled === true;
+      if (isEnabled) {
+        // Fetch existing linking codes
+        const codes = await apiRequest<PosBranchLinkingCode[]>('/api/erp/pos/branch-linking-codes', 'GET');
+        setLinkingCodes(codes || []);
+      }
     } catch (err: any) {
       console.error('Error loading POS branch linking data:', err);
       showNotification(err.message || 'Failed to load POS data', 'error');
@@ -83,7 +89,7 @@ export function PosBranchLinking() {
 
   useEffect(() => {
     fetchData();
-  }, [user?.company_id, isPosEnabled]);
+  }, [user?.company_id]);
 
   const handleGenerateCode = async (e: React.FormEvent) => {
     e.preventDefault();
