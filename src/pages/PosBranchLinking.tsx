@@ -22,7 +22,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { dbService, apiRequest } from '../services/dbService';
-import { PosBranchLinkingCode } from '../types';
+import { PosBranchLinkingCode, Company } from '../types';
 
 interface Department {
   id: string;
@@ -41,7 +41,7 @@ export function PosBranchLinking() {
   const { user } = useAuth();
   const { showNotification } = useNotification();
 
-  const [company, setCompany] = useState<any>(null);
+  const [company, setCompany] = useState<Company | null>(null);
   const isPosEnabled = company?.pos_enabled === true || company?.settings?.pos_enabled === true;
 
   const [loading, setLoading] = useState(true);
@@ -65,7 +65,7 @@ export function PosBranchLinking() {
     try {
       setLoading(true);
       const [compData, deptsData, whData] = await Promise.all([
-        dbService.get('companies', user.company_id),
+        dbService.get<Company>('companies', user.company_id),
         dbService.list<Department>('departments', user.company_id),
         dbService.list<Warehouse>('warehouses', user.company_id)
       ]);
