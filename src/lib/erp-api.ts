@@ -10128,7 +10128,7 @@ router.get('/pos/inventory-items', authenticatePosTerminal, async (req: any, res
 
   try {
     const { rows } = await pool.query(
-      `SELECT id, code, name, barcode, unit, cost_price, sale_price, category 
+      `SELECT id, code, name, barcode, unit, cost_price, sale_price, category, allow_issue_fraction, allow_issue_fraction_pct, allow_receipt_fraction 
        FROM products 
        WHERE company_id = $1 AND (is_active = true OR is_active IS NULL) AND (is_service = false OR is_service IS NULL) 
        ORDER BY name ASC`,
@@ -10139,6 +10139,46 @@ router.get('/pos/inventory-items', authenticatePosTerminal, async (req: any, res
   } catch (err: any) {
     console.error('Error fetching inventory items for POS:', err);
     res.status(500).json({ error: 'Failed to fetch inventory items' });
+  }
+});
+
+// GET /api/erp/pos/expense-categories (Fetch Obrain expense categories / بنود المصروفات for POS Payments)
+router.get('/pos/expense-categories', authenticatePosTerminal, async (req: any, res) => {
+  const companyId = req.posTerminal.company_id;
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, code, name, description, account_id 
+       FROM expense_categories 
+       WHERE company_id = $1 
+       ORDER BY name ASC`,
+      [companyId]
+    );
+
+    res.json(rows);
+  } catch (err: any) {
+    console.error('Error fetching expense categories for POS:', err);
+    res.status(500).json({ error: 'Failed to fetch expense categories' });
+  }
+});
+
+// GET /api/erp/pos/suppliers (Fetch Obrain suppliers for POS Payments)
+router.get('/pos/suppliers', authenticatePosTerminal, async (req: any, res) => {
+  const companyId = req.posTerminal.company_id;
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, code, name, mobile, address, tax_number, account_id 
+       FROM suppliers 
+       WHERE company_id = $1 
+       ORDER BY name ASC`,
+      [companyId]
+    );
+
+    res.json(rows);
+  } catch (err: any) {
+    console.error('Error fetching suppliers for POS:', err);
+    res.status(500).json({ error: 'Failed to fetch suppliers' });
   }
 });
 
