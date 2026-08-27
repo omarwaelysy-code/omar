@@ -26,6 +26,7 @@ import { DevicesLimitMiddleware } from './subscription/middlewares/limits/Device
 import { TransactionsLimitMiddleware } from './subscription/middlewares/limits/TransactionsLimitMiddleware';
 import { subscriptionService } from './subscription/SubscriptionService';
 import { isCompanyPosEnabled } from './subscription/FeatureService';
+import { EtaAuthService } from '../services/eta/EtaAuthService';
 
 export function getEffectiveModule(moduleName: string): string {
   const mapping: { [key: string]: string } = {
@@ -10420,6 +10421,74 @@ router.post(['/company/eta-settings', '/eta/settings'], authenticateToken, async
   } catch (err: any) {
     console.error('Error saving ETA settings:', err);
     sendError(res, 500, 'تعذر حفظ إعدادات الفاتورة الإلكترونية', err.message);
+  }
+});
+
+// POST /api/erp/company/eta-settings/test-connection or /api/erp/eta/test-connection
+router.post(['/company/eta-settings/test-connection', '/eta/test-connection'], authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  if (!companyId) {
+    return sendError(res, 401, 'Unauthorized');
+  }
+
+  const {
+    environment: requestedEnv,
+    client_id: requestedClientId,
+    client_secret: requestedSecret
+  } = req.body || {};
+
+  try {
+    // 1. Fetch current settings from DB
+    const dbRes = await pool.query(
+      'SELECT environment, client_id, client_secret FROM eta_settings WHERE company_id = $1',
+      [companyId]
+    );
+    const dbRow = dbRes.rows[0] || null;
+
+    // 2. Resolve credentials (prefer explicit input if provided and not empty/masked, otherwise fall back to DB)
+    const environment: 'preprod' | 'production' = (requestedEnv === 'production' || (!requestedEnv && dbRow?.environment === 'production'))
+      ? 'production'
+      : 'preprod';
+
+    const clientId = (typeof requestedClientId === 'string' && requestedClientId.trim() !== '')
+      ? requestedClientId.trim()
+      : (dbRow?.client_id || '');
+
+    let clientSecret = dbRow?.client_secret || '';
+    if (typeof requestedSecret === 'string' && requestedSecret.trim() !== '' && !requestedSecret.includes('••••')) {
+      clientSecret = requestedSecret.trim();
+    }
+
+    // 3. Call EtaAuthService to perform official OAuth 2.0 authentication test
+    const result = await EtaAuthService.testConnection({
+      companyId,
+      environment,
+      clientId,
+      clientSecret
+    });
+
+    // 4. Log audit without secret/token
+    logAudit({
+      company_id: companyId,
+      user_id: req.user?.id,
+      username: (req.user as any)?.username || req.user?.email,
+      user_email: req.user?.email,
+      action: 'ETA_CONNECTION_TEST',
+      module: 'ETA_SETTINGS',
+      details: `اختبار الاتصال بمنظومة ETA (${environment}): ${result.connected ? 'ناجح' : 'فشل - ' + (result.code || 'ERROR')}`,
+      entity_type: 'eta_settings',
+      metadata: {
+        environment,
+        connected: result.connected,
+        code: result.code || null
+      }
+    });
+
+    // 5. Return safe response (NEVER include client_secret or access_token)
+    res.json(result);
+  } catch (err: any) {
+    console.error('Error testing ETA connection:', err);
+    sendError(res, 500, 'تعذر اختبار الاتصال بمنظومة ETA', err.message);
   }
 });
 

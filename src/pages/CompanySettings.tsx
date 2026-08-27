@@ -242,6 +242,14 @@ export function CompanySettings() {
     is_configured: false
   });
   const [etaSaving, setEtaSaving] = useState(false);
+  const [etaTesting, setEtaTesting] = useState(false);
+  const [etaTestResult, setEtaTestResult] = useState<{
+    connected: boolean;
+    message: string;
+    code?: string;
+    environment?: 'preprod' | 'production';
+    tested_at?: string;
+  } | null>(null);
   const [showClientSecret, setShowClientSecret] = useState(false);
 
   const formatSyncDateTime = () => {
@@ -466,6 +474,59 @@ export function CompanySettings() {
       );
     } finally {
       setEtaSaving(false);
+    }
+  };
+
+  const handleTestEtaConnection = async () => {
+    setEtaTesting(true);
+    setEtaTestResult(null);
+    try {
+      const res = await apiRequest<{
+        success: boolean;
+        connected: boolean;
+        environment: 'preprod' | 'production';
+        code?: string;
+        message: string;
+        tested_at: string;
+      }>('/company/eta-settings/test-connection', 'POST', {
+        environment: etaSettings.environment,
+        client_id: etaSettings.client_id,
+        client_secret: etaSettings.client_secret
+      });
+
+      setEtaTestResult({
+        connected: Boolean(res.connected),
+        message: res.message,
+        code: res.code,
+        environment: res.environment,
+        tested_at: res.tested_at
+      });
+
+      if (res.connected) {
+        showNotification(
+          language === 'ar'
+            ? 'تم الاتصال والتحقق بنجاح مع منظومة الفاتورة الإلكترونية (ETA).'
+            : 'ETA connection and authentication successful.',
+          'success'
+        );
+      } else {
+        showNotification(
+          res.message || (language === 'ar' ? 'تعذر الاتصال بمنظومة ETA' : 'ETA connection failed'),
+          'error'
+        );
+      }
+    } catch (err: any) {
+      setEtaTestResult({
+        connected: false,
+        message: language === 'ar' ? 'تعذر اختبار الاتصال بمنظومة ETA.' : 'Failed to test ETA connection.',
+        code: 'UNKNOWN_ERROR'
+      });
+      showNotification(
+        language === 'ar' ? 'تعذر اختبار الاتصال بمنظومة ETA.' : 'Failed to test ETA connection.',
+        'error'
+      );
+    } finally {
+      setEtaTesting(false);
     }
   };
 
@@ -1466,16 +1527,38 @@ export function CompanySettings() {
               </div>
             </div>
 
-            {/* Connection Status Badge (Safe: No Fake Connected Status) */}
+            {/* Connection Status Badge (Real State: Verified vs Failed vs Untested) */}
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold border bg-amber-50 text-amber-700 border-amber-200">
-                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                <span>
-                  {language === 'ar'
-                    ? 'لم يتم اختبار الاتصال بـ ETA'
-                    : 'ETA Connection Not Tested'}
-                </span>
-              </div>
+              {etaTestResult ? (
+                etaTestResult.connected ? (
+                  <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-200">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>
+                      {language === 'ar'
+                        ? `متصل ومتحقق بنجاح مع ETA (${etaTestResult.environment === 'production' ? 'Production' : 'PreProd'})`
+                        : `Connected & Verified with ETA (${etaTestResult.environment === 'production' ? 'Production' : 'PreProd'})`}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold border bg-rose-50 text-rose-700 border-rose-200">
+                    <span className="w-2 h-2 rounded-full bg-rose-500" />
+                    <span>
+                      {language === 'ar'
+                        ? 'تعذر الاتصال بـ ETA'
+                        : 'ETA Connection Failed'}
+                    </span>
+                  </div>
+                )
+              ) : (
+                <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold border bg-amber-50 text-amber-700 border-amber-200">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  <span>
+                    {language === 'ar'
+                      ? 'لم يتم اختبار الاتصال بـ ETA'
+                      : 'ETA Connection Not Tested'}
+                  </span>
+                </div>
+              )}
               <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${
                 etaSettings.is_configured 
                   ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
@@ -1780,30 +1863,81 @@ export function CompanySettings() {
             </div>
           </div>
 
-          {/* Dedicated ETA Save Action & Notice */}
+          {/* Test Result Feedback Box (if connection was tested) */}
+          {etaTestResult && (
+            <div className={`p-4 rounded-2xl border flex items-start gap-3 ${
+              etaTestResult.connected
+                ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800'
+                : 'bg-rose-50/70 border-rose-200 text-rose-800'
+            }`}>
+              {etaTestResult.connected ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+              ) : (
+                <XCircle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
+              )}
+              <div className="flex-1 text-xs space-y-1">
+                <div className="font-bold text-sm">
+                  {etaTestResult.connected
+                    ? (language === 'ar' ? 'تم التحقق من الاتصال بنجاح' : 'Connection Verified Successfully')
+                    : (language === 'ar' ? 'فشل اختبار الاتصال' : 'Connection Test Failed')}
+                </div>
+                <p className="leading-relaxed opacity-90">{etaTestResult.message}</p>
+                {etaTestResult.tested_at && (
+                  <div className="text-[10.5px] opacity-70 mt-1">
+                    {language === 'ar' ? 'تاريخ الفحص: ' : 'Tested at: '}
+                    {new Date(etaTestResult.tested_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Dedicated ETA Save & Test Connection Actions */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-slate-100 bg-slate-50/50 p-4 rounded-2xl">
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <ShieldCheck className="w-4 h-4 text-indigo-600 flex-shrink-0" />
               <span>
                 {language === 'ar'
-                  ? 'هذه الإعدادات لحفظ بيانات الربط في النظام، ولم يتم إرسال أي فواتير أو الاتصال بمصلحة الضرائب بعد.'
-                  : 'These settings configure the ERP. No live invoices or network calls to ETA are initiated in this phase.'}
+                  ? 'اختبار الاتصال يتحقق من صحة مفاتيح الربط لدى مصلحة الضرائب دون إرسال أو تعديل أي فواتير.'
+                  : 'Connection test validates API credentials with ETA OAuth server without creating/sending invoices.'}
               </span>
             </div>
 
-            <button
-              type="button"
-              onClick={handleSaveEtaSettings}
-              disabled={etaSaving}
-              className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm active:scale-95 disabled:opacity-50 flex-shrink-0"
-            >
-              {etaSaving ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4" />
-              )}
-              <span>{language === 'ar' ? 'حفظ إعدادات الفاتورة الإلكترونية (ETA)' : 'Save ETA Settings'}</span>
-            </button>
+            <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+              {/* Test Connection Button */}
+              <button
+                type="button"
+                onClick={handleTestEtaConnection}
+                disabled={etaTesting || etaSaving}
+                className="flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm active:scale-95 disabled:opacity-50 flex-shrink-0"
+              >
+                {etaTesting ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                ) : (
+                  <Wifi className="w-4 h-4 text-emerald-600" />
+                )}
+                <span>
+                  {etaTesting
+                    ? (language === 'ar' ? 'جاري اختبار الاتصال...' : 'Testing Connection...')
+                    : (language === 'ar' ? 'اختبار الاتصال بـ ETA' : 'Test ETA Connection')}
+                </span>
+              </button>
+
+              {/* Save Settings Button */}
+              <button
+                type="button"
+                onClick={handleSaveEtaSettings}
+                disabled={etaSaving || etaTesting}
+                className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm active:scale-95 disabled:opacity-50 flex-shrink-0"
+              >
+                {etaSaving ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                <span>{language === 'ar' ? 'حفظ إعدادات الفاتورة الإلكترونية (ETA)' : 'Save ETA Settings'}</span>
+              </button>
+            </div>
           </div>
         </div>
 
