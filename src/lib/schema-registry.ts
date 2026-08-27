@@ -267,6 +267,11 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   pos_branch_linking_codes: [
     'id', 'company_id', 'department_id', 'warehouse_id', 'code', 'status', 'expires_at', 'created_by', 'created_at', 'used_at', 'used_by_device'
+  ],
+  eta_settings: [
+    'id', 'company_id', 'environment', 'activity_code', 'branch_id',
+    'country_code', 'governorate', 'city', 'street', 'building_number',
+    'postal_code', 'client_id', 'client_secret', 'is_configured', 'created_at', 'updated_at'
   ]
 };
 

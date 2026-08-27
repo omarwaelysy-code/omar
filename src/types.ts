@@ -1264,6 +1264,27 @@ export interface InventoryTransactionJournal {
   notes?: string | null;
 }
 
+export interface EtaSettings {
+  id?: string;
+  company_id: string;
+  environment: 'preprod' | 'production';
+  activity_code?: string;
+  branch_id?: string;
+  country_code?: string;
+  governorate?: string;
+  city?: string;
+  street?: string;
+  building_number?: string;
+  postal_code?: string;
+  client_id?: string;
+  client_secret?: string;
+  client_secret_configured?: boolean;
+  is_configured?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+
 
 
 

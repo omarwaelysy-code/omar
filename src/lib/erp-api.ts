@@ -10249,4 +10249,178 @@ router.get('/pos/connected-branches', authenticateToken, ensurePosEnabled, async
   }
 });
 
+// =========================================================================
+// ETA (Egyptian Tax Authority / الفاتورة الإلكترونية) COMPANY SETTINGS API
+// =========================================================================
+
+// GET /api/erp/company/eta-settings or /api/erp/eta/settings
+router.get(['/company/eta-settings', '/eta/settings'], authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  if (!companyId) {
+    return sendError(res, 401, 'Unauthorized');
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT 
+        id, company_id, environment, activity_code, branch_id,
+        country_code, governorate, city, street, building_number,
+        postal_code, client_id,
+        (client_secret IS NOT NULL AND TRIM(client_secret) != '') AS client_secret_configured,
+        is_configured, created_at, updated_at
+       FROM eta_settings 
+       WHERE company_id = $1`,
+      [companyId]
+    );
+
+    if (rows.length === 0) {
+      // Return default unconfigured template for this company
+      return res.json({
+        company_id: companyId,
+        environment: 'preprod',
+        activity_code: '',
+        branch_id: '0',
+        country_code: 'EG',
+        governorate: '',
+        city: '',
+        street: '',
+        building_number: '',
+        postal_code: '',
+        client_id: '',
+        client_secret_configured: false,
+        is_configured: false
+      });
+    }
+
+    res.json(rows[0]);
+  } catch (err: any) {
+    console.error('Error fetching ETA settings:', err);
+    sendError(res, 500, 'Failed to fetch ETA settings', err.message);
+  }
+});
+
+// POST /api/erp/company/eta-settings or /api/erp/eta/settings
+router.post(['/company/eta-settings', '/eta/settings'], authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  if (!companyId) {
+    return sendError(res, 401, 'Unauthorized');
+  }
+
+  const {
+    environment = 'preprod',
+    activity_code = '',
+    branch_id = '0',
+    country_code = 'EG',
+    governorate = '',
+    city = '',
+    street = '',
+    building_number = '',
+    postal_code = '',
+    client_id = '',
+    client_secret
+  } = req.body || {};
+
+  // Validate environment
+  const validEnvironment = environment === 'production' ? 'production' : 'preprod';
+
+  try {
+    // 1. Fetch existing settings to preserve secret if not provided or masked
+    const existingRes = await pool.query(
+      'SELECT id, client_secret FROM eta_settings WHERE company_id = $1',
+      [companyId]
+    );
+
+    const existingRow = existingRes.rows[0] || null;
+    const existingSecret = existingRow?.client_secret || '';
+
+    let secretToSave = existingSecret;
+    if (typeof client_secret === 'string' && client_secret.trim() !== '' && !client_secret.includes('••••')) {
+      secretToSave = client_secret.trim();
+    }
+
+    const cleanActivityCode = String(activity_code || '').trim();
+    const cleanBranchId = String(branch_id || '0').trim();
+    const cleanCountryCode = String(country_code || 'EG').trim().toUpperCase();
+    const cleanGovernorate = String(governorate || '').trim();
+    const cleanCity = String(city || '').trim();
+    const cleanStreet = String(street || '').trim();
+    const cleanBuildingNumber = String(building_number || '').trim();
+    const cleanPostalCode = String(postal_code || '').trim();
+    const cleanClientId = String(client_id || '').trim();
+
+    // Determine if configuration has minimum required fields
+    const isConfigured = Boolean(
+      cleanActivityCode &&
+      cleanBranchId &&
+      cleanClientId &&
+      secretToSave &&
+      secretToSave.length > 0
+    );
+
+    const id = existingRow?.id || uuidv4();
+
+    const insertOrUpdateRes = await pool.query(
+      `INSERT INTO eta_settings (
+        id, company_id, environment, activity_code, branch_id,
+        country_code, governorate, city, street, building_number,
+        postal_code, client_id, client_secret, is_configured, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
+      ON CONFLICT (company_id) DO UPDATE SET
+        environment = EXCLUDED.environment,
+        activity_code = EXCLUDED.activity_code,
+        branch_id = EXCLUDED.branch_id,
+        country_code = EXCLUDED.country_code,
+        governorate = EXCLUDED.governorate,
+        city = EXCLUDED.city,
+        street = EXCLUDED.street,
+        building_number = EXCLUDED.building_number,
+        postal_code = EXCLUDED.postal_code,
+        client_id = EXCLUDED.client_id,
+        client_secret = EXCLUDED.client_secret,
+        is_configured = EXCLUDED.is_configured,
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING 
+        id, company_id, environment, activity_code, branch_id,
+        country_code, governorate, city, street, building_number,
+        postal_code, client_id,
+        (client_secret IS NOT NULL AND TRIM(client_secret) != '') AS client_secret_configured,
+        is_configured, created_at, updated_at`,
+      [
+        id, companyId, validEnvironment, cleanActivityCode, cleanBranchId,
+        cleanCountryCode, cleanGovernorate, cleanCity, cleanStreet, cleanBuildingNumber,
+        cleanPostalCode, cleanClientId, secretToSave, isConfigured
+      ]
+    );
+
+    // Audit log without exposing client_secret
+    logAudit({
+      company_id: companyId,
+      user_id: req.user?.id,
+      username: (req.user as any)?.username || req.user?.email,
+      user_email: req.user?.email,
+      action: 'UPDATE',
+      module: 'ETA_SETTINGS',
+      details: `تم تحديث إعدادات الفاتورة الإلكترونية ETA (البيئة: ${validEnvironment}، كود النشاط: ${cleanActivityCode || 'غير محدد'}، الفرع: ${cleanBranchId})`,
+      entity_type: 'eta_settings',
+      entity_id: id,
+      metadata: {
+        environment: validEnvironment,
+        activity_code: cleanActivityCode,
+        branch_id: cleanBranchId,
+        client_id_configured: Boolean(cleanClientId),
+        is_configured: isConfigured
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'تم حفظ إعدادات الفاتورة الإلكترونية بنجاح',
+      data: insertOrUpdateRes.rows[0]
+    });
+  } catch (err: any) {
+    console.error('Error saving ETA settings:', err);
+    sendError(res, 500, 'تعذر حفظ إعدادات الفاتورة الإلكترونية', err.message);
+  }
+});
+
 export default router;

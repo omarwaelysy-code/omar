@@ -22,7 +22,13 @@ import {
   CheckCircle2,
   XCircle,
   TrendingUp,
-  ScanLine
+  ScanLine,
+  Receipt,
+  ShieldCheck,
+  Eye,
+  EyeOff,
+  KeyRound,
+  AlertCircle
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -205,6 +211,39 @@ export function CompanySettings() {
     show_success_message: true,
   });
 
+  // ─── ETA Electronic Invoicing Settings state ───────────────────────────────────────
+  const [etaSettings, setEtaSettings] = useState<{
+    environment: 'preprod' | 'production';
+    activity_code: string;
+    branch_id: string;
+    country_code: string;
+    governorate: string;
+    city: string;
+    street: string;
+    building_number: string;
+    postal_code: string;
+    client_id: string;
+    client_secret: string;
+    client_secret_configured: boolean;
+    is_configured: boolean;
+  }>({
+    environment: 'preprod',
+    activity_code: '',
+    branch_id: '0',
+    country_code: 'EG',
+    governorate: '',
+    city: '',
+    street: '',
+    building_number: '',
+    postal_code: '',
+    client_id: '',
+    client_secret: '',
+    client_secret_configured: false,
+    is_configured: false
+  });
+  const [etaSaving, setEtaSaving] = useState(false);
+  const [showClientSecret, setShowClientSecret] = useState(false);
+
   const formatSyncDateTime = () => {
     const now = new Date();
     const day = String(now.getDate()).padStart(2, '0');
@@ -358,12 +397,75 @@ export function CompanySettings() {
             auto_increase_quantity: bs.auto_increase_quantity !== false,
             show_success_message: bs.show_success_message !== false,
           });
+
+          // Load ETA Electronic Invoicing settings
+          try {
+            const etaRes = await apiRequest<any>('/company/eta-settings', 'GET');
+            if (etaRes) {
+              setEtaSettings({
+                environment: etaRes.environment === 'production' ? 'production' : 'preprod',
+                activity_code: etaRes.activity_code || '',
+                branch_id: etaRes.branch_id || '0',
+                country_code: etaRes.country_code || 'EG',
+                governorate: etaRes.governorate || '',
+                city: etaRes.city || '',
+                street: etaRes.street || '',
+                building_number: etaRes.building_number || '',
+                postal_code: etaRes.postal_code || '',
+                client_id: etaRes.client_id || '',
+                client_secret: '',
+                client_secret_configured: Boolean(etaRes.client_secret_configured),
+                is_configured: Boolean(etaRes.is_configured)
+              });
+            }
+          } catch (etaErr) {
+            console.warn('Failed to load ETA settings:', etaErr);
+          }
       }
     } catch (error) {
       console.error('Failed to load company data:', error);
       showNotification(t('common.error'), 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveEtaSettings = async (e?: React.MouseEvent | React.FormEvent) => {
+    if (e) e.preventDefault();
+    setEtaSaving(true);
+    try {
+      const res = await apiRequest<any>('/company/eta-settings', 'POST', etaSettings);
+      if (res.success && res.data) {
+        setEtaSettings(prev => ({
+          ...prev,
+          ...res.data,
+          client_secret: '',
+          client_secret_configured: Boolean(res.data.client_secret_configured),
+          is_configured: Boolean(res.data.is_configured)
+        }));
+        showNotification(
+          language === 'ar'
+            ? 'تم حفظ إعدادات الفاتورة الإلكترونية بنجاح.'
+            : 'ETA e-invoicing settings saved successfully.',
+          'success'
+        );
+      } else {
+        showNotification(
+          language === 'ar'
+            ? 'تعذر حفظ إعدادات الفاتورة الإلكترونية.'
+            : 'Failed to save ETA e-invoicing settings.',
+          'error'
+        );
+      }
+    } catch (err: any) {
+      showNotification(
+        language === 'ar'
+          ? 'تعذر حفظ إعدادات الفاتورة الإلكترونية.'
+          : 'Failed to save ETA e-invoicing settings.',
+        'error'
+      );
+    } finally {
+      setEtaSaving(false);
     }
   };
 
@@ -420,6 +522,22 @@ export function CompanySettings() {
       
       // Update local original settings to reflect the save
       setOriginalSettings(newSettings);
+
+      // Save ETA settings alongside general settings
+      try {
+        const etaRes = await apiRequest<any>('/company/eta-settings', 'POST', etaSettings);
+        if (etaRes.success && etaRes.data) {
+          setEtaSettings(prev => ({
+            ...prev,
+            ...etaRes.data,
+            client_secret: '',
+            client_secret_configured: Boolean(etaRes.data.client_secret_configured),
+            is_configured: Boolean(etaRes.data.is_configured)
+          }));
+        }
+      } catch (e) {
+        console.warn('ETA settings background save notice:', e);
+      }
       
       showNotification(t('company_settings.save_success'), 'success');
     } catch (error) {
@@ -1323,6 +1441,369 @@ export function CompanySettings() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Card 8: Egyptian E-Invoice (ETA) Settings */}
+        <div id="eta-settings-section" className="bg-white p-8 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
+                <Receipt className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🇪🇬</span>
+                  <h3 className="font-bold text-slate-800 text-lg">
+                    {language === 'ar' ? 'الفاتورة الإلكترونية المصرية (ETA)' : 'Egyptian E-Invoicing (ETA)'}
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-400 font-medium mt-0.5">
+                  {language === 'ar'
+                    ? 'تهيئة بيانات الربط مع منظومة مصلحة الضرائب المصرية'
+                    : 'Configure Egyptian Tax Authority (ETA) e-invoicing settings'}
+                </p>
+              </div>
+            </div>
+
+            {/* Connection Status Badge (Safe: No Fake Connected Status) */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold border bg-amber-50 text-amber-700 border-amber-200">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                <span>
+                  {language === 'ar'
+                    ? 'لم يتم اختبار الاتصال بـ ETA'
+                    : 'ETA Connection Not Tested'}
+                </span>
+              </div>
+              <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+                etaSettings.is_configured 
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                  : 'bg-slate-50 text-slate-500 border-slate-200'
+              }`}>
+                {language === 'ar'
+                  ? (etaSettings.is_configured ? 'البيانات مكتملة' : 'البيانات غير مكتملة')
+                  : (etaSettings.is_configured ? 'Configured' : 'Incomplete')}
+              </span>
+            </div>
+          </div>
+
+          {/* Environment Selector */}
+          <div className="space-y-3 bg-slate-50/70 p-5 rounded-2xl border border-slate-100">
+            <label className="block text-sm font-bold text-slate-700">
+              {language === 'ar' ? 'بيئة التشغيل (Environment)' : 'Operating Environment'}
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label
+                className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
+                  etaSettings.environment === 'preprod'
+                    ? 'bg-indigo-50/60 border-indigo-300 ring-2 ring-indigo-500/10'
+                    : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="eta_environment"
+                  value="preprod"
+                  checked={etaSettings.environment === 'preprod'}
+                  onChange={() => setEtaSettings(prev => ({ ...prev, environment: 'preprod' }))}
+                  className="mt-1 text-indigo-600 focus:ring-indigo-500"
+                />
+                <div className="flex flex-col">
+                  <span className="font-bold text-sm text-slate-800">
+                    {language === 'ar' ? 'بيئة الاختبار والتكامل (PreProd / Sandbox)' : 'PreProd / Sandbox (Testing)'}
+                  </span>
+                  <span className="text-xs text-slate-400 mt-0.5">
+                    {language === 'ar'
+                      ? 'مخصصة للتجارب واختبار ربط الفواتير على خوادم مصلحة الضرائب التجريبية'
+                      : 'Used for testing integration on ETA test servers'}
+                  </span>
+                </div>
+              </label>
+
+              <label
+                className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
+                  etaSettings.environment === 'production'
+                    ? 'bg-emerald-50/60 border-emerald-300 ring-2 ring-emerald-500/10'
+                    : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="eta_environment"
+                  value="production"
+                  checked={etaSettings.environment === 'production'}
+                  onChange={() => setEtaSettings(prev => ({ ...prev, environment: 'production' }))}
+                  className="mt-1 text-emerald-600 focus:ring-emerald-500"
+                />
+                <div className="flex flex-col">
+                  <span className="font-bold text-sm text-slate-800">
+                    {language === 'ar' ? 'التشغيل الفعلي (Production)' : 'Production (Live)'}
+                  </span>
+                  <span className="text-xs text-slate-400 mt-0.5">
+                    {language === 'ar'
+                      ? 'المنظومة الفعلية الرسمية لإصدار الفواتير الضريبية الحية'
+                      : 'Live ETA system for official tax invoice issuance'}
+                  </span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* Sub-section 1: Taxpayer Company Info */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-slate-800 font-bold text-sm border-b border-slate-100 pb-2">
+              <Building2 className="w-4 h-4 text-indigo-600" />
+              <span>{language === 'ar' ? 'بيانات الشركة المسجلة لدى المنظومة' : 'Company Data Registered with ETA'}</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              {/* Company Legal Name (Read-only) */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+                  {language === 'ar' ? 'اسم المنشأة (من البيانات الأساسية)' : 'Company Name (Read-only)'}
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  disabled
+                  value={data.name || (language === 'ar' ? 'غير محدد' : 'Not set')}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 font-medium text-sm cursor-not-allowed"
+                />
+              </div>
+
+              {/* Tax Registration Number (Read-only) */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+                  {language === 'ar' ? 'الرقم الضريبي للمنشأة (من البيانات الأساسية)' : 'Tax Registration Number (Read-only)'}
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  disabled
+                  value={data.tax_number || (language === 'ar' ? 'يرجى إدخال الرقم الضريبي أعلاه' : 'Please enter tax number above')}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 font-medium text-sm cursor-not-allowed"
+                />
+              </div>
+
+              {/* Activity Code */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                  {language === 'ar' ? 'كود النشاط الضريبي (Taxpayer Activity Code)' : 'Taxpayer Activity Code'} <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder={language === 'ar' ? 'مثال: 4610 أو كود النشاط المعتمد' : 'e.g., 4610'}
+                  value={etaSettings.activity_code}
+                  onChange={(e) => setEtaSettings({ ...etaSettings, activity_code: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
+                />
+                <span className="text-[10.5px] text-slate-400 mt-1 block">
+                  {language === 'ar' ? 'كود النشاط الرئيسي المسجل لدى مصلحة الضرائب' : 'Main activity code from Tax Card'}
+                </span>
+              </div>
+
+              {/* Branch ID */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                  {language === 'ar' ? 'كود الفرع الضريبي (ETA Branch ID)' : 'ETA Branch ID'} <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder={language === 'ar' ? '0 للفرع الرئيسي' : '0 for Main Branch'}
+                  value={etaSettings.branch_id}
+                  onChange={(e) => setEtaSettings({ ...etaSettings, branch_id: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
+                />
+                <span className="text-[10.5px] text-slate-400 mt-1 block">
+                  {language === 'ar' ? 'كود الفرع المسجل لدى مصلحة الضرائب (0 للمقر الرئيسي)' : 'Branch ID on ETA portal (0 for HQ)'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Sub-section 2: Address Breakdown */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-slate-800 font-bold text-sm border-b border-slate-100 pb-2">
+              <MapPin className="w-4 h-4 text-indigo-600" />
+              <span>{language === 'ar' ? 'عنوان المنشأة التفصيلي لدى مصلحة الضرائب' : 'Detailed Taxpayer Address for ETA'}</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {/* Country Code */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                  {language === 'ar' ? 'كود الدولة (Country Code)' : 'Country Code'}
+                </label>
+                <input
+                  type="text"
+                  value={etaSettings.country_code}
+                  onChange={(e) => setEtaSettings({ ...etaSettings, country_code: e.target.value.toUpperCase() })}
+                  placeholder="EG"
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all uppercase"
+                />
+              </div>
+
+              {/* Governorate */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                  {language === 'ar' ? 'المحافظة (Governorate)' : 'Governorate'}
+                </label>
+                <input
+                  type="text"
+                  placeholder={language === 'ar' ? 'مثال: القاهرة / الجيزة / الإسكندرية' : 'e.g., Cairo, Giza'}
+                  value={etaSettings.governorate}
+                  onChange={(e) => setEtaSettings({ ...etaSettings, governorate: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
+                />
+              </div>
+
+              {/* City / Region */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                  {language === 'ar' ? 'المدينة / الحي (City / Region)' : 'City / Region'}
+                </label>
+                <input
+                  type="text"
+                  placeholder={language === 'ar' ? 'مثال: مدينة نصر / المعادي / الدقي' : 'e.g., Nasr City, Maadi'}
+                  value={etaSettings.city}
+                  onChange={(e) => setEtaSettings({ ...etaSettings, city: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
+                />
+              </div>
+
+              {/* Street */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                  {language === 'ar' ? 'اسم الشارع (Street)' : 'Street'}
+                </label>
+                <input
+                  type="text"
+                  placeholder={language === 'ar' ? 'مثال: شارع التسعين الجنوبي' : 'e.g., 90th Street'}
+                  value={etaSettings.street}
+                  onChange={(e) => setEtaSettings({ ...etaSettings, street: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
+                />
+              </div>
+
+              {/* Building Number */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                  {language === 'ar' ? 'رقم المبنى (Building Number)' : 'Building Number'}
+                </label>
+                <input
+                  type="text"
+                  placeholder={language === 'ar' ? 'مثال: 14 أو مبنى النور' : 'e.g., 14'}
+                  value={etaSettings.building_number}
+                  onChange={(e) => setEtaSettings({ ...etaSettings, building_number: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
+                />
+              </div>
+
+              {/* Postal Code */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                  {language === 'ar' ? 'الرمز البريدي (Postal Code)' : 'Postal Code'}
+                </label>
+                <input
+                  type="text"
+                  placeholder={language === 'ar' ? 'مثال: 11835' : 'e.g., 11835'}
+                  value={etaSettings.postal_code}
+                  onChange={(e) => setEtaSettings({ ...etaSettings, postal_code: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Sub-section 3: ETA API Credentials */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-slate-800 font-bold text-sm border-b border-slate-100 pb-2">
+              <KeyRound className="w-4 h-4 text-indigo-600" />
+              <span>{language === 'ar' ? 'بيانات الاعتماد والربط الأمني (API Credentials)' : 'ETA API Credentials (OAuth 2.0)'}</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              {/* Client ID */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                  {language === 'ar' ? 'معرف العميل (Client ID)' : 'Client ID'} <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder={language === 'ar' ? 'المعرف الصادر من بوابة الضرائب (ERP Client ID)' : 'Client ID from ETA portal'}
+                  value={etaSettings.client_id}
+                  onChange={(e) => setEtaSettings({ ...etaSettings, client_id: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-mono text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
+                />
+              </div>
+
+              {/* Client Secret */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-600">
+                    {language === 'ar' ? 'المفتاح السري (Client Secret)' : 'Client Secret'} <span className="text-rose-500">*</span>
+                  </label>
+                  {etaSettings.client_secret_configured && (
+                    <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                      <Check className="w-3 h-3" />
+                      {language === 'ar' ? 'المفتاح محفوظ ومحمي' : 'Secret configured'}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <input
+                    type={showClientSecret ? 'text' : 'password'}
+                    placeholder={
+                      etaSettings.client_secret_configured
+                        ? (language === 'ar' ? '•••••••• تم تعيين المفتاح (اتركه فارغاً للإبقاء عليه)' : '•••••••• Configured (leave empty to keep)')
+                        : (language === 'ar' ? 'أدخل المفتاح السري الصادر من بوابة الضرائب' : 'Enter Client Secret from ETA portal')
+                    }
+                    value={etaSettings.client_secret}
+                    onChange={(e) => setEtaSettings({ ...etaSettings, client_secret: e.target.value })}
+                    className={`w-full ${dir === 'rtl' ? 'pl-10 pr-4' : 'pr-10 pl-4'} py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-mono text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowClientSecret(!showClientSecret)}
+                    className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors`}
+                  >
+                    {showClientSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <span className="text-[10.5px] text-slate-400 mt-1 block">
+                  {language === 'ar'
+                    ? 'يتم تخزين المفتاح السري بأمان تام ولا يتم إظهاره لأي مستخدم'
+                    : 'Client Secret is securely encrypted and never returned via API'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Dedicated ETA Save Action & Notice */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-slate-100 bg-slate-50/50 p-4 rounded-2xl">
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <ShieldCheck className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+              <span>
+                {language === 'ar'
+                  ? 'هذه الإعدادات لحفظ بيانات الربط في النظام، ولم يتم إرسال أي فواتير أو الاتصال بمصلحة الضرائب بعد.'
+                  : 'These settings configure the ERP. No live invoices or network calls to ETA are initiated in this phase.'}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSaveEtaSettings}
+              disabled={etaSaving}
+              className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm active:scale-95 disabled:opacity-50 flex-shrink-0"
+            >
+              {etaSaving ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              <span>{language === 'ar' ? 'حفظ إعدادات الفاتورة الإلكترونية (ETA)' : 'Save ETA Settings'}</span>
+            </button>
           </div>
         </div>
 
