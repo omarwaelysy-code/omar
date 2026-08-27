@@ -225,6 +225,8 @@ export function CompanySettings() {
     client_id: string;
     client_secret: string;
     client_secret_configured: boolean;
+    operating_key: string;
+    operating_key_configured: boolean;
     is_configured: boolean;
   }>({
     environment: 'preprod',
@@ -239,6 +241,8 @@ export function CompanySettings() {
     client_id: '',
     client_secret: '',
     client_secret_configured: false,
+    operating_key: '',
+    operating_key_configured: false,
     is_configured: false
   });
   const [etaSaving, setEtaSaving] = useState(false);
@@ -253,6 +257,7 @@ export function CompanySettings() {
     tested_at?: string;
   } | null>(null);
   const [showClientSecret, setShowClientSecret] = useState(false);
+  const [showOperatingKey, setShowOperatingKey] = useState(false);
 
   const formatSyncDateTime = () => {
     const now = new Date();
@@ -425,6 +430,8 @@ export function CompanySettings() {
                 client_id: etaRes.client_id || '',
                 client_secret: '',
                 client_secret_configured: Boolean(etaRes.client_secret_configured),
+                operating_key: '',
+                operating_key_configured: Boolean(etaRes.operating_key_configured),
                 is_configured: Boolean(etaRes.is_configured)
               });
             }
@@ -451,6 +458,8 @@ export function CompanySettings() {
           ...res.data,
           client_secret: '',
           client_secret_configured: Boolean(res.data.client_secret_configured),
+          operating_key: '',
+          operating_key_configured: Boolean(res.data.operating_key_configured),
           is_configured: Boolean(res.data.is_configured)
         }));
         showNotification(
@@ -1865,6 +1874,66 @@ export function CompanySettings() {
                     ? 'يتم تخزين المفتاح السري بأمان تام ولا يتم إظهاره لأي مستخدم'
                     : 'Client Secret is securely encrypted and never returned via API'}
                 </span>
+              </div>
+
+              {/* Operating Key (مفتاح التشغيل) */}
+              <div className="sm:col-span-2">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-600">
+                    {language === 'ar' ? 'مفتاح التشغيل (Operating Key / Verification Key)' : 'Operating Key'}
+                  </label>
+                  {etaSettings.operating_key_configured && (
+                    <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                      <Check className="w-3 h-3" />
+                      {language === 'ar' ? 'مفتاح التشغيل محفوظ ومحمي' : 'Operating Key configured'}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <input
+                    type={showOperatingKey ? 'text' : 'password'}
+                    placeholder={
+                      etaSettings.operating_key_configured
+                        ? (language === 'ar' ? '•••••••• تم تعيين مفتاح التشغيل (اتركه فارغاً للإبقاء عليه)' : '•••••••• Configured (leave empty to keep)')
+                        : (language === 'ar' ? 'مفتاح التشغيل الصادر من بوابة الضرائب عند تسجيل ERP (اختياري/بحسب التسجيل)' : 'Operating key from ETA portal (optional depending on registration)')
+                    }
+                    value={etaSettings.operating_key}
+                    onChange={(e) => setEtaSettings({ ...etaSettings, operating_key: e.target.value })}
+                    className={`w-full ${dir === 'rtl' ? 'pl-10 pr-4' : 'pr-10 pl-4'} py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-mono text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowOperatingKey(!showOperatingKey)}
+                    className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors`}
+                  >
+                    {showOperatingKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <span className="text-[10.5px] text-slate-400 mt-1 block">
+                  {language === 'ar'
+                    ? 'يُستخدم مفتاح التشغيل لتأمين إشعارات الفواتير الواردة من منظومة مصلحة الضرائب'
+                    : 'Used to verify document notifications received from ETA'}
+                </span>
+              </div>
+            </div>
+
+            {/* ERP Registration Connection Info Box */}
+            <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100 text-xs space-y-2 text-slate-700">
+              <div className="font-bold text-indigo-900 flex items-center gap-1.5">
+                <Globe className="w-4 h-4 text-indigo-600" />
+                <span>
+                  {language === 'ar' ? 'بيانات الربط المطلوب إدخالها في بوابة مصلحة الضرائب المصرية:' : 'ERP Registration URLs for ETA Portal:'}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 font-mono text-[11.5px]">
+                <div className="p-2.5 rounded-xl bg-white border border-indigo-100/80">
+                  <span className="text-[10px] uppercase font-sans font-bold text-slate-400 block">رابط الاتصال (Connection URL)</span>
+                  <span className="text-indigo-700 font-bold select-all">https://obrain.tech</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-white border border-indigo-100/80">
+                  <span className="text-[10px] uppercase font-sans font-bold text-slate-400 block">نقطة نهاية الإشعارات (Webhook Endpoint)</span>
+                  <span className="text-indigo-700 font-bold select-all">https://obrain.tech/notifications/documents</span>
+                </div>
               </div>
             </div>
           </div>

@@ -826,12 +826,16 @@ export async function initDatabase() {
         "postal_code" VARCHAR(50),
         "client_id" TEXT,
         "client_secret" TEXT,
+        "operating_key" TEXT,
+        "last_notification_at" TIMESTAMP,
         "is_configured" BOOLEAN DEFAULT FALSE,
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `, 'eta_settings table');
 
+    await safeQuery('ALTER TABLE "eta_settings" ADD COLUMN IF NOT EXISTS "operating_key" TEXT;', 'add eta_settings operating_key');
+    await safeQuery('ALTER TABLE "eta_settings" ADD COLUMN IF NOT EXISTS "last_notification_at" TIMESTAMP;', 'add eta_settings last_notification_at');
     await safeQuery('CREATE INDEX IF NOT EXISTS "idx_eta_settings_company_id" ON "eta_settings"("company_id");', 'idx_eta_settings_company_id');
 
     await safeQuery(`

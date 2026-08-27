@@ -271,7 +271,8 @@ export const EXPECTED_SCHEMA: TableSchema = {
   eta_settings: [
     'id', 'company_id', 'environment', 'activity_code', 'branch_id',
     'country_code', 'governorate', 'city', 'street', 'building_number',
-    'postal_code', 'client_id', 'client_secret', 'is_configured', 'created_at', 'updated_at'
+    'postal_code', 'client_id', 'client_secret', 'operating_key', 'last_notification_at',
+    'is_configured', 'created_at', 'updated_at'
   ],
   eta_unit_types: [
     'code', 'name_ar', 'name_en', 'symbol', 'description', 'is_active', 'created_at'

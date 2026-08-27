@@ -1279,6 +1279,9 @@ export interface EtaSettings {
   client_id?: string;
   client_secret?: string;
   client_secret_configured?: boolean;
+  operating_key?: string;
+  operating_key_configured?: boolean;
+  last_notification_at?: string;
   is_configured?: boolean;
   created_at?: string;
   updated_at?: string;
@@ -1321,6 +1324,32 @@ export interface EtaGovernorate {
   country_code: string;
   is_active: boolean;
   created_at?: string;
+}
+
+export interface EtaNotificationItem {
+  notificationId?: string;
+  type?: string;
+  documentUuid?: string;
+  documentType?: string;
+  status?: string;
+  issuedDate?: string;
+  dateTimeReceived?: string;
+  channel?: string;
+  receiverId?: string;
+  issuerId?: string;
+  [key: string]: any;
+}
+
+export interface EtaNotificationPayload {
+  notifications?: EtaNotificationItem[];
+  [key: string]: any;
+}
+
+export interface EtaNotificationResponse {
+  status: 'success' | 'active' | 'error';
+  message: string;
+  timestamp?: string;
+  receivedCount?: number;
 }
 
 

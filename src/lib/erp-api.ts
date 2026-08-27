@@ -10268,6 +10268,8 @@ router.get(['/company/eta-settings', '/eta/settings'], authenticateToken, async 
         country_code, governorate, city, street, building_number,
         postal_code, client_id,
         (client_secret IS NOT NULL AND TRIM(client_secret) != '') AS client_secret_configured,
+        (operating_key IS NOT NULL AND TRIM(operating_key) != '') AS operating_key_configured,
+        last_notification_at,
         is_configured, created_at, updated_at
        FROM eta_settings 
        WHERE company_id = $1`,
@@ -10289,6 +10291,7 @@ router.get(['/company/eta-settings', '/eta/settings'], authenticateToken, async 
         postal_code: '',
         client_id: '',
         client_secret_configured: false,
+        operating_key_configured: false,
         is_configured: false
       });
     }
@@ -10318,25 +10321,32 @@ router.post(['/company/eta-settings', '/eta/settings'], authenticateToken, async
     building_number = '',
     postal_code = '',
     client_id = '',
-    client_secret
+    client_secret,
+    operating_key
   } = req.body || {};
 
   // Validate environment
   const validEnvironment = environment === 'production' ? 'production' : 'preprod';
 
   try {
-    // 1. Fetch existing settings to preserve secret if not provided or masked
+    // 1. Fetch existing settings to preserve secret/operating key if not provided or masked
     const existingRes = await pool.query(
-      'SELECT id, client_secret FROM eta_settings WHERE company_id = $1',
+      'SELECT id, client_secret, operating_key FROM eta_settings WHERE company_id = $1',
       [companyId]
     );
 
     const existingRow = existingRes.rows[0] || null;
     const existingSecret = existingRow?.client_secret || '';
+    const existingOperatingKey = existingRow?.operating_key || '';
 
     let secretToSave = existingSecret;
     if (typeof client_secret === 'string' && client_secret.trim() !== '' && !client_secret.includes('••••')) {
       secretToSave = client_secret.trim();
+    }
+
+    let operatingKeyToSave = existingOperatingKey;
+    if (typeof operating_key === 'string' && operating_key.trim() !== '' && !operating_key.includes('••••')) {
+      operatingKeyToSave = operating_key.trim();
     }
 
     const cleanActivityCode = String(activity_code || '').trim();
@@ -10364,8 +10374,8 @@ router.post(['/company/eta-settings', '/eta/settings'], authenticateToken, async
       `INSERT INTO eta_settings (
         id, company_id, environment, activity_code, branch_id,
         country_code, governorate, city, street, building_number,
-        postal_code, client_id, client_secret, is_configured, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
+        postal_code, client_id, client_secret, operating_key, is_configured, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP)
       ON CONFLICT (company_id) DO UPDATE SET
         environment = EXCLUDED.environment,
         activity_code = EXCLUDED.activity_code,
@@ -10378,6 +10388,7 @@ router.post(['/company/eta-settings', '/eta/settings'], authenticateToken, async
         postal_code = EXCLUDED.postal_code,
         client_id = EXCLUDED.client_id,
         client_secret = EXCLUDED.client_secret,
+        operating_key = EXCLUDED.operating_key,
         is_configured = EXCLUDED.is_configured,
         updated_at = CURRENT_TIMESTAMP
       RETURNING 
@@ -10385,15 +10396,17 @@ router.post(['/company/eta-settings', '/eta/settings'], authenticateToken, async
         country_code, governorate, city, street, building_number,
         postal_code, client_id,
         (client_secret IS NOT NULL AND TRIM(client_secret) != '') AS client_secret_configured,
+        (operating_key IS NOT NULL AND TRIM(operating_key) != '') AS operating_key_configured,
+        last_notification_at,
         is_configured, created_at, updated_at`,
       [
         id, companyId, validEnvironment, cleanActivityCode, cleanBranchId,
         cleanCountryCode, cleanGovernorate, cleanCity, cleanStreet, cleanBuildingNumber,
-        cleanPostalCode, cleanClientId, secretToSave, isConfigured
+        cleanPostalCode, cleanClientId, secretToSave, operatingKeyToSave, isConfigured
       ]
     );
 
-    // Audit log without exposing client_secret
+    // Audit log without exposing client_secret or operating_key
     logAudit({
       company_id: companyId,
       user_id: req.user?.id,
@@ -10409,6 +10422,7 @@ router.post(['/company/eta-settings', '/eta/settings'], authenticateToken, async
         activity_code: cleanActivityCode,
         branch_id: cleanBranchId,
         client_id_configured: Boolean(cleanClientId),
+        operating_key_configured: Boolean(operatingKeyToSave),
         is_configured: isConfigured
       }
     });

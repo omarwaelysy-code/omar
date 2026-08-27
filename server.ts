@@ -10,6 +10,7 @@ import { runMigrations } from "./src/lib/migration-runner";
 import erpRouter from "./src/lib/erp-api";
 import subscriptionRouter from "./src/lib/subscription/subscription-api";
 import importRouter from "./src/lib/import-router";
+import etaNotificationsRouter from "./src/routes/eta-notifications";
 import { generatePDF } from "./src/lib/pdf-generator";
 
 async function startServer() {
@@ -492,6 +493,11 @@ async function startServer() {
 
   // Subscription API Routes
   app.use("/api/subscriptions", subscriptionRouter);
+
+  // ETA ERP Document Notification Callback Routes (Official ETA Webhook Endpoint)
+  // Public URL: https://obrain.tech/notifications/documents
+  app.use("/notifications", etaNotificationsRouter);
+  app.use("/api/erp/notifications", etaNotificationsRouter);
 
   // Health check
   app.get("/api/health", (req, res) => {
