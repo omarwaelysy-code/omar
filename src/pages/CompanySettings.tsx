@@ -247,6 +247,8 @@ export function CompanySettings() {
     connected: boolean;
     message: string;
     code?: string;
+    http_status?: number;
+    diagnostic?: string;
     environment?: 'preprod' | 'production';
     tested_at?: string;
   } | null>(null);
@@ -486,6 +488,8 @@ export function CompanySettings() {
         connected: boolean;
         environment: 'preprod' | 'production';
         code?: string;
+        http_status?: number;
+        diagnostic?: string;
         message: string;
         tested_at: string;
       }>('/company/eta-settings/test-connection', 'POST', {
@@ -498,6 +502,8 @@ export function CompanySettings() {
         connected: Boolean(res.connected),
         message: res.message,
         code: res.code,
+        http_status: res.http_status,
+        diagnostic: res.diagnostic,
         environment: res.environment,
         tested_at: res.tested_at
       });
@@ -1882,6 +1888,11 @@ export function CompanySettings() {
                     : (language === 'ar' ? 'فشل اختبار الاتصال' : 'Connection Test Failed')}
                 </div>
                 <p className="leading-relaxed opacity-90">{etaTestResult.message}</p>
+                {etaTestResult.diagnostic && (
+                  <div className="text-[11px] font-mono bg-black/5 dark:bg-white/5 px-2.5 py-1 rounded-lg w-fit mt-1.5 opacity-80">
+                    {etaTestResult.http_status ? `[HTTP ${etaTestResult.http_status}] ` : ''}{etaTestResult.diagnostic}
+                  </div>
+                )}
                 {etaTestResult.tested_at && (
                   <div className="text-[10.5px] opacity-70 mt-1">
                     {language === 'ar' ? 'تاريخ الفحص: ' : 'Tested at: '}

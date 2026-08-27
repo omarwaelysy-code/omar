@@ -61,6 +61,7 @@ describe('ETA Connection Test & OAuth Authentication (Phase 2.5)', () => {
     expect(result.success).toBe(true);
     expect(result.connected).toBe(true);
     expect(result.environment).toBe('preprod');
+    expect(result.http_status).toBe(200);
     expect(requestedUrl).toBe('https://id.preprod.eta.gov.eg/connect/token');
     expect(requestedBody).toContain('grant_type=client_credentials');
     expect(requestedBody).toContain('client_id=my-client-id');
@@ -94,6 +95,8 @@ describe('ETA Connection Test & OAuth Authentication (Phase 2.5)', () => {
     expect(result.success).toBe(false);
     expect(result.connected).toBe(false);
     expect(result.code).toBe('INVALID_CREDENTIALS');
+    expect(result.http_status).toBe(400);
+    expect(result.diagnostic).toContain('invalid_client');
   });
 
   it('4. should handle timeout (AbortError) cleanly', async () => {

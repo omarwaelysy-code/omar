@@ -23,6 +23,8 @@ export interface EtaConnectionTestResult {
   environment: 'preprod' | 'production';
   code?: 'MISSING_CREDENTIALS' | 'INVALID_CREDENTIALS' | 'TIMEOUT' | 'ETA_UNAVAILABLE' | 'UNKNOWN_ERROR';
   message: string;
+  http_status?: number;
+  diagnostic?: string;
   tested_at: string;
 }
 
@@ -111,12 +113,19 @@ export class EtaAuthService {
           success: true,
           connected: true,
           environment,
+          http_status: response.status,
           message: environment === 'production'
             ? 'تم الاتصال والتحقق بنجاح مع خوادم منظومة الفاتورة الإلكترونية الفعلية (Production).'
             : 'تم الاتصال والتحقق بنجاح مع خوادم مصلحة الضرائب التجريبية (PreProd / Sandbox).',
           tested_at: testedAt
         };
       }
+
+      // Read safe error payload if present
+      const errData = await response.json().catch(() => ({}));
+      const errorKey = typeof errData?.error === 'string' ? errData.error : '';
+      const errorDesc = typeof errData?.error_description === 'string' ? errData.error_description : '';
+      const safeDiag = [errorKey, errorDesc].filter(Boolean).join(': ') || undefined;
 
       // Handle HTTP Error status
       if (response.status === 400 || response.status === 401) {
@@ -125,6 +134,8 @@ export class EtaAuthService {
           connected: false,
           environment,
           code: 'INVALID_CREDENTIALS',
+          http_status: response.status,
+          diagnostic: safeDiag || (response.status === 401 ? 'Unauthorized (invalid_client)' : 'Bad Request (invalid_credentials)'),
           message: 'بيانات الدخول إلى منظومة الفاتورة الإلكترونية غير صحيحة. يرجى التحقق من صحة Client ID و Client Secret.',
           tested_at: testedAt
         };
@@ -136,6 +147,8 @@ export class EtaAuthService {
           connected: false,
           environment,
           code: 'ETA_UNAVAILABLE',
+          http_status: response.status,
+          diagnostic: safeDiag || `Server Error (HTTP ${response.status})`,
           message: 'تعذر الوصول إلى خوادم مصلحة الضرائب المصرية (ETA) حالياً. يرجى المحاولة لاحقاً.',
           tested_at: testedAt
         };
@@ -146,6 +159,8 @@ export class EtaAuthService {
         connected: false,
         environment,
         code: 'UNKNOWN_ERROR',
+        http_status: response.status,
+        diagnostic: safeDiag || `HTTP ${response.status}`,
         message: `تعذر التحقق من الاتصال بمنظومة ETA (رمز الاستجابة: ${response.status}).`,
         tested_at: testedAt
       };
@@ -158,6 +173,7 @@ export class EtaAuthService {
           connected: false,
           environment,
           code: 'TIMEOUT',
+          diagnostic: 'Request aborted due to 12s timeout',
           message: 'انتهت مهلة الاتصال بخوادم منظومة الفاتورة الإلكترونية (ETA). يرجى التحقق من اتصال الإنترنت أو المحاولة لاحقاً.',
           tested_at: testedAt
         };
@@ -168,6 +184,7 @@ export class EtaAuthService {
         connected: false,
         environment,
         code: 'ETA_UNAVAILABLE',
+        diagnostic: err instanceof Error ? err.message : 'Network failure',
         message: 'تعذر الاتصال بخوادم منظومة الفاتورة الإلكترونية (ETA).',
         tested_at: testedAt
       };
