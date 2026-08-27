@@ -10423,4 +10423,84 @@ router.post(['/company/eta-settings', '/eta/settings'], authenticateToken, async
   }
 });
 
+// =========================================================================
+// ETA MASTER DATA & CODE REGISTRIES LOOKUP APIS (READ-ONLY)
+// =========================================================================
+
+// 1. ETA Unit Types Lookup
+router.get(['/eta/lookups/units', '/eta/units'], authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const includeInactive = req.query.include_inactive === 'true';
+    const query = includeInactive
+      ? 'SELECT code, name_ar, name_en, symbol, description, is_active, created_at FROM eta_unit_types ORDER BY code ASC'
+      : 'SELECT code, name_ar, name_en, symbol, description, is_active, created_at FROM eta_unit_types WHERE is_active = TRUE ORDER BY code ASC';
+
+    const { rows } = await pool.query(query);
+    res.json(rows);
+  } catch (err: any) {
+    console.error('Error fetching ETA unit types:', err);
+    sendError(res, 500, 'Failed to fetch ETA unit types', err.message);
+  }
+});
+
+// 2. ETA Tax Types (T1 - T20) Lookup
+router.get(['/eta/lookups/tax-types', '/eta/tax-types'], authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const includeInactive = req.query.include_inactive === 'true';
+    const query = includeInactive
+      ? 'SELECT code, name_ar, name_en, description, is_active, created_at FROM eta_tax_types ORDER BY code ASC'
+      : 'SELECT code, name_ar, name_en, description, is_active, created_at FROM eta_tax_types WHERE is_active = TRUE ORDER BY code ASC';
+
+    const { rows } = await pool.query(query);
+    res.json(rows);
+  } catch (err: any) {
+    console.error('Error fetching ETA tax types:', err);
+    sendError(res, 500, 'Failed to fetch ETA tax types', err.message);
+  }
+});
+
+// 3. ETA Tax Subtypes Lookup
+router.get(['/eta/lookups/tax-subtypes', '/eta/tax-subtypes'], authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const includeInactive = req.query.include_inactive === 'true';
+    const taxTypeCode = (req.query.tax_type_code || req.query.tax_type) as string | undefined;
+
+    let query = 'SELECT code, tax_type_code, name_ar, name_en, description, default_rate, is_active, created_at FROM eta_tax_subtypes WHERE 1=1';
+    const params: any[] = [];
+
+    if (!includeInactive) {
+      query += ' AND is_active = TRUE';
+    }
+
+    if (taxTypeCode) {
+      params.push(taxTypeCode.trim().toUpperCase());
+      query += ` AND tax_type_code = $${params.length}`;
+    }
+
+    query += ' ORDER BY tax_type_code ASC, code ASC';
+
+    const { rows } = await pool.query(query, params);
+    res.json(rows);
+  } catch (err: any) {
+    console.error('Error fetching ETA tax subtypes:', err);
+    sendError(res, 500, 'Failed to fetch ETA tax subtypes', err.message);
+  }
+});
+
+// 4. ETA Egyptian Governorates Lookup
+router.get(['/eta/lookups/governorates', '/eta/governorates'], authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const includeInactive = req.query.include_inactive === 'true';
+    const query = includeInactive
+      ? 'SELECT code, name_ar, name_en, country_code, is_active, created_at FROM eta_governorates ORDER BY name_ar ASC'
+      : 'SELECT code, name_ar, name_en, country_code, is_active, created_at FROM eta_governorates WHERE is_active = TRUE ORDER BY name_ar ASC';
+
+    const { rows } = await pool.query(query);
+    res.json(rows);
+  } catch (err: any) {
+    console.error('Error fetching ETA governorates:', err);
+    sendError(res, 500, 'Failed to fetch ETA governorates', err.message);
+  }
+});
+
 export default router;

@@ -1284,6 +1284,46 @@ export interface EtaSettings {
   updated_at?: string;
 }
 
+export interface EtaUnitType {
+  code: string;
+  name_ar: string;
+  name_en: string;
+  symbol?: string;
+  description?: string;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface EtaTaxType {
+  code: string;
+  name_ar: string;
+  name_en: string;
+  description?: string;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface EtaTaxSubtype {
+  code: string;
+  tax_type_code: string;
+  name_ar: string;
+  name_en: string;
+  description?: string;
+  default_rate?: number | null;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface EtaGovernorate {
+  code: string;
+  name_ar: string;
+  name_en: string;
+  country_code: string;
+  is_active: boolean;
+  created_at?: string;
+}
+
+
 
 
 

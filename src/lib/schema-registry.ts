@@ -272,6 +272,18 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'id', 'company_id', 'environment', 'activity_code', 'branch_id',
     'country_code', 'governorate', 'city', 'street', 'building_number',
     'postal_code', 'client_id', 'client_secret', 'is_configured', 'created_at', 'updated_at'
+  ],
+  eta_unit_types: [
+    'code', 'name_ar', 'name_en', 'symbol', 'description', 'is_active', 'created_at'
+  ],
+  eta_tax_types: [
+    'code', 'name_ar', 'name_en', 'description', 'is_active', 'created_at'
+  ],
+  eta_tax_subtypes: [
+    'code', 'tax_type_code', 'name_ar', 'name_en', 'description', 'default_rate', 'is_active', 'created_at'
+  ],
+  eta_governorates: [
+    'code', 'name_ar', 'name_en', 'country_code', 'is_active', 'created_at'
   ]
 };
 

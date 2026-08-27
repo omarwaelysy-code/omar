@@ -834,6 +834,55 @@ export async function initDatabase() {
 
     await safeQuery('CREATE INDEX IF NOT EXISTS "idx_eta_settings_company_id" ON "eta_settings"("company_id");', 'idx_eta_settings_company_id');
 
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "eta_unit_types" (
+        "code" VARCHAR(20) PRIMARY KEY,
+        "name_ar" VARCHAR(100) NOT NULL,
+        "name_en" VARCHAR(100) NOT NULL,
+        "symbol" VARCHAR(20),
+        "description" TEXT,
+        "is_active" BOOLEAN DEFAULT TRUE,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'eta_unit_types table');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "eta_tax_types" (
+        "code" VARCHAR(20) PRIMARY KEY,
+        "name_ar" VARCHAR(150) NOT NULL,
+        "name_en" VARCHAR(150) NOT NULL,
+        "description" TEXT,
+        "is_active" BOOLEAN DEFAULT TRUE,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'eta_tax_types table');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "eta_tax_subtypes" (
+        "code" VARCHAR(20) PRIMARY KEY,
+        "tax_type_code" VARCHAR(20) NOT NULL REFERENCES "eta_tax_types"("code") ON DELETE CASCADE,
+        "name_ar" VARCHAR(255) NOT NULL,
+        "name_en" VARCHAR(255) NOT NULL,
+        "description" TEXT,
+        "default_rate" NUMERIC(6,3),
+        "is_active" BOOLEAN DEFAULT TRUE,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'eta_tax_subtypes table');
+
+    await safeQuery('CREATE INDEX IF NOT EXISTS "idx_eta_tax_subtypes_type" ON "eta_tax_subtypes"("tax_type_code");', 'idx_eta_tax_subtypes_type');
+
+    await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "eta_governorates" (
+        "code" VARCHAR(20) PRIMARY KEY,
+        "name_ar" VARCHAR(100) NOT NULL,
+        "name_en" VARCHAR(100) NOT NULL,
+        "country_code" VARCHAR(10) DEFAULT 'EG',
+        "is_active" BOOLEAN DEFAULT TRUE,
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `, 'eta_governorates table');
+
     // Phase 7: Flexible Operations System
     await safeQuery(`
       CREATE TABLE IF NOT EXISTS "departments" (
