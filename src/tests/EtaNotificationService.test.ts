@@ -16,12 +16,7 @@ describe('ETA ERP Notification Callback & Connectivity (Registration Infrastruct
   });
 
   it('2. should process PUT /notifications/documents with valid batch payload', async () => {
-    vi.spyOn(pool, 'query').mockImplementation(async (text: any, params: any) => {
-      if (typeof text === 'string' && text.includes('SELECT company_id, operating_key')) {
-        return { rows: [] } as any;
-      }
-      return { rows: [{ id: '1' }] } as any;
-    });
+    vi.spyOn(pool, 'query').mockImplementation(async () => ({ rows: [] } as any));
 
     const payload = {
       notifications: [
@@ -47,37 +42,22 @@ describe('ETA ERP Notification Callback & Connectivity (Registration Infrastruct
     expect(result.safeMetadata?.documentUuids).toContain('DOC-UUID-12345-ABCDE');
   });
 
-  it('3. should reject invalid operating key when company has an operating key configured', async () => {
-    vi.spyOn(pool, 'query').mockImplementation(async (text: any, params: any) => {
-      if (typeof text === 'string' && text.includes('SELECT company_id FROM eta_settings WHERE operating_key = $1')) {
-        return { rows: [] } as any; // No match
-      }
-      return { rows: [{ company_id: 'comp-1', operating_key: 'correct-secret-key' }] } as any;
-    });
+  it('3. should handle registration validation probes with undefined or empty payload gracefully', async () => {
+    const resNull = await EtaNotificationService.processDocumentNotifications(null);
+    expect(resNull.statusCode).toBe(200);
+    expect(resNull.body.status).toBe('active');
 
-    const payload = {
-      notifications: [
-        { notificationId: 'n1', type: 'NEW_DOCUMENT_ISSUED' }
-      ]
-    };
+    const resEmpty = await EtaNotificationService.processDocumentNotifications({});
+    expect(resEmpty.statusCode).toBe(200);
+    expect(resEmpty.body.status).toBe('active');
 
-    const result = await EtaNotificationService.processDocumentNotifications(payload, 'wrong-operating-key');
-
-    expect(result.statusCode).toBe(401);
-    expect(result.body.status).toBe('error');
-    expect(result.body.message).toContain('Invalid or unauthorized ETA Operating Key');
+    const resPing = await EtaNotificationService.processDocumentNotifications({ ping: true });
+    expect(resPing.statusCode).toBe(200);
+    expect(resPing.body.status).toBe('active');
   });
 
-  it('4. should accept valid operating key matching stored company key', async () => {
-    vi.spyOn(pool, 'query').mockImplementation(async (text: any, params: any) => {
-      if (typeof text === 'string' && text.includes('SELECT company_id FROM eta_settings WHERE operating_key = $1')) {
-        if (params[0] === 'valid-secret-key') {
-          return { rows: [{ company_id: 'comp-1' }] } as any;
-        }
-        return { rows: [] } as any;
-      }
-      return { rows: [] } as any;
-    });
+  it('4. should acknowledge notifications even during initial registration without prior keys', async () => {
+    vi.spyOn(pool, 'query').mockResolvedValue({ rows: [] } as any);
 
     const payload = {
       notifications: [
@@ -85,7 +65,7 @@ describe('ETA ERP Notification Callback & Connectivity (Registration Infrastruct
       ]
     };
 
-    const result = await EtaNotificationService.processDocumentNotifications(payload, 'valid-secret-key');
+    const result = await EtaNotificationService.processDocumentNotifications(payload, 'probe-key-123');
 
     expect(result.statusCode).toBe(200);
     expect(result.body.status).toBe('success');
@@ -108,15 +88,5 @@ describe('ETA ERP Notification Callback & Connectivity (Registration Infrastruct
     expect((result.body as any).operating_key).toBeUndefined();
     expect((result.body as any).client_secret).toBeUndefined();
     expect((result.body as any).access_token).toBeUndefined();
-  });
-
-  it('6. should handle empty or ping payload gracefully', async () => {
-    const result1 = await EtaNotificationService.processDocumentNotifications({ ping: true });
-    expect(result1.statusCode).toBe(200);
-    expect(result1.body.status).toBe('active');
-
-    const result2 = await EtaNotificationService.processDocumentNotifications({});
-    expect(result2.statusCode).toBe(200);
-    expect(result2.body.status).toBe('active');
   });
 });

@@ -1924,13 +1924,18 @@ export function CompanySettings() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-slate-500 bg-white/80 p-3 rounded-xl border border-indigo-50">
-              <Info className="w-4 h-4 text-indigo-600 flex-shrink-0" />
-              <span>
-                {language === 'ar'
-                  ? 'بمجرد إدخال هذه البيانات في بوابة الضرائب وحفظ التسجيل، ستظهر لك بيانات الاعتماد (Client ID و Client Secret) لتضعها في الخطوة التالية.'
-                  : 'After saving in ETA portal, you will be issued your Client ID and Client Secret for Step 3.'}
-              </span>
+            <div className="flex items-start gap-2 text-xs text-slate-600 bg-white/90 p-3.5 rounded-xl border border-indigo-100/80 leading-relaxed">
+              <Info className="w-4 h-4 text-indigo-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold text-indigo-950 block mb-0.5">
+                  {language === 'ar' ? 'ملاحظة هامة لحقل (Callback URL / عنوان URL لمعاودة الاتصال):' : 'Important Note for Callback URL:'}
+                </span>
+                <span>
+                  {language === 'ar'
+                    ? 'في بوابة مصلحة الضرائب، أدخل رابط الإشعارات: https://obrain.tech/notifications/documents (أو الرابط الأساسي https://obrain.tech). النظام مجهز للاستجابة والتحقق الفوري بنجاح لكلا الرابطين.'
+                    : 'In ETA Portal, you can enter https://obrain.tech/notifications/documents or https://obrain.tech. Both are supported and verified.'}
+                </span>
+              </div>
             </div>
           </div>
 

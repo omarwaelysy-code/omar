@@ -495,8 +495,13 @@ async function startServer() {
   app.use("/api/subscriptions", subscriptionRouter);
 
   // ETA ERP Document Notification Callback Routes (Official ETA Webhook Endpoint)
-  // Public URL: https://obrain.tech/notifications/documents
+  // Public URLs:
+  // - https://obrain.tech/notifications/documents
+  // - https://obrain.tech/api/v1.0/notifications/documents
+  // - https://obrain.tech/api/v1/notifications/documents
   app.use("/notifications", etaNotificationsRouter);
+  app.use("/api/v1.0/notifications", etaNotificationsRouter);
+  app.use("/api/v1/notifications", etaNotificationsRouter);
   app.use("/api/erp/notifications", etaNotificationsRouter);
 
   // Health check
