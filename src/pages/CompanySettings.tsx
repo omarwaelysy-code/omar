@@ -28,7 +28,12 @@ import {
   Eye,
   EyeOff,
   KeyRound,
-  AlertCircle
+  AlertCircle,
+  Copy,
+  ExternalLink,
+  HelpCircle,
+  Info,
+  Sparkles
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -258,6 +263,17 @@ export function CompanySettings() {
   } | null>(null);
   const [showClientSecret, setShowClientSecret] = useState(false);
   const [showOperatingKey, setShowOperatingKey] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const handleCopyToClipboard = (text: string, fieldKey: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldKey);
+    showNotification(
+      language === 'ar' ? `تم نسخ ${label} إلى الحافظة` : `Copied ${label} to clipboard`,
+      'success'
+    );
+    setTimeout(() => setCopiedField(null), 2500);
+  };
 
   const formatSyncDateTime = () => {
     const now = new Date();
@@ -1520,8 +1536,9 @@ export function CompanySettings() {
           </div>
         </div>
 
-        {/* Card 8: Egyptian E-Invoice (ETA) Settings */}
+        {/* Card 8: Egyptian E-Invoice (ETA) Settings & 4-Step Registration Wizard */}
         <div id="eta-settings-section" className="bg-white p-8 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-8">
+          {/* Card Header & Connection Status */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-6">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
@@ -1533,11 +1550,15 @@ export function CompanySettings() {
                   <h3 className="font-bold text-slate-800 text-lg">
                     {language === 'ar' ? 'الفاتورة الإلكترونية المصرية (ETA)' : 'Egyptian E-Invoicing (ETA)'}
                   </h3>
+                  <span className="bg-indigo-50 text-indigo-700 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-indigo-100 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-indigo-500" />
+                    {language === 'ar' ? 'دليل الربط السريع' : 'Easy Setup Wizard'}
+                  </span>
                 </div>
                 <p className="text-xs text-slate-400 font-medium mt-0.5">
                   {language === 'ar'
-                    ? 'تهيئة بيانات الربط مع منظومة مصلحة الضرائب المصرية'
-                    : 'Configure Egyptian Tax Authority (ETA) e-invoicing settings'}
+                    ? 'دليل خطوة بخطوة لتسجيل وربط نظام Obrain ERP مع منظومة مصلحة الضرائب المصرية'
+                    : 'Step-by-step wizard to register & connect Obrain ERP with Egyptian Tax Authority'}
                 </p>
               </div>
             </div>
@@ -1550,8 +1571,8 @@ export function CompanySettings() {
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     <span>
                       {language === 'ar'
-                        ? `متصل ومتحقق بنجاح مع ETA (${etaTestResult.environment === 'production' ? 'Production' : 'PreProd'})`
-                        : `Connected & Verified with ETA (${etaTestResult.environment === 'production' ? 'Production' : 'PreProd'})`}
+                        ? `🟢 متصل ومتحقق بنجاح (${etaTestResult.environment === 'production' ? 'Production' : 'PreProd'})`
+                        : `🟢 Connected & Verified (${etaTestResult.environment === 'production' ? 'Production' : 'PreProd'})`}
                     </span>
                   </div>
                 ) : (
@@ -1559,8 +1580,8 @@ export function CompanySettings() {
                     <span className="w-2 h-2 rounded-full bg-rose-500" />
                     <span>
                       {language === 'ar'
-                        ? 'تعذر الاتصال بـ ETA'
-                        : 'ETA Connection Failed'}
+                        ? '🔴 تعذر الاتصال بـ ETA'
+                        : '🔴 ETA Connection Failed'}
                     </span>
                   </div>
                 )
@@ -1569,8 +1590,8 @@ export function CompanySettings() {
                   <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                   <span>
                     {language === 'ar'
-                      ? 'لم يتم اختبار الاتصال بـ ETA'
-                      : 'ETA Connection Not Tested'}
+                      ? '🟡 لم يتم اختبار الاتصال بـ ETA'
+                      : '🟡 ETA Connection Not Tested'}
                   </span>
                 </div>
               )}
@@ -1588,14 +1609,29 @@ export function CompanySettings() {
 
           {/* Environment Selector */}
           <div className="space-y-3 bg-slate-50/70 p-5 rounded-2xl border border-slate-100">
-            <label className="block text-sm font-bold text-slate-700">
-              {language === 'ar' ? 'بيئة التشغيل (Environment)' : 'Operating Environment'}
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-bold text-slate-700">
+                {language === 'ar' ? 'بيئة التشغيل (Operating Environment)' : 'Operating Environment'}
+              </label>
+              <a
+                href={etaSettings.environment === 'production' ? 'https://invoicing.eta.gov.eg' : 'https://preprod.invoicing.eta.gov.eg'}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-bold hover:underline"
+              >
+                <span>
+                  {language === 'ar'
+                    ? (etaSettings.environment === 'production' ? 'فتح بوابة الضرائب الفعلية ↗' : 'فتح بوابة الضرائب التجريبية (PreProd) ↗')
+                    : 'Open ETA Taxpayer Portal ↗'}
+                </span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <label
                 className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
                   etaSettings.environment === 'preprod'
-                    ? 'bg-indigo-50/60 border-indigo-300 ring-2 ring-indigo-500/10'
+                    ? 'bg-indigo-50/60 border-indigo-300 ring-2 ring-indigo-500/10 shadow-sm'
                     : 'bg-white border-slate-200 hover:border-slate-300'
                 }`}
               >
@@ -1608,13 +1644,14 @@ export function CompanySettings() {
                   className="mt-1 text-indigo-600 focus:ring-indigo-500"
                 />
                 <div className="flex flex-col">
-                  <span className="font-bold text-sm text-slate-800">
-                    {language === 'ar' ? 'بيئة الاختبار والتكامل (PreProd / Sandbox)' : 'PreProd / Sandbox (Testing)'}
+                  <span className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
+                    <span>{language === 'ar' ? 'بيئة الاختبار والتكامل (PreProd / Sandbox)' : 'PreProd / Sandbox (Testing)'}</span>
+                    <span className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded font-bold">{language === 'ar' ? 'موصى به للاختبار' : 'Recommended'}</span>
                   </span>
-                  <span className="text-xs text-slate-400 mt-0.5">
+                  <span className="text-xs text-slate-500 mt-1 leading-relaxed">
                     {language === 'ar'
-                      ? 'مخصصة للتجارب واختبار ربط الفواتير على خوادم مصلحة الضرائب التجريبية'
-                      : 'Used for testing integration on ETA test servers'}
+                      ? 'مخصصة للتجارب وتوثيق الربط على خوادم مصلحة الضرائب التجريبية قبل الإطلاق الفعلي'
+                      : 'Used for testing integration on ETA test servers before going live'}
                   </span>
                 </div>
               </label>
@@ -1622,7 +1659,7 @@ export function CompanySettings() {
               <label
                 className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
                   etaSettings.environment === 'production'
-                    ? 'bg-emerald-50/60 border-emerald-300 ring-2 ring-emerald-500/10'
+                    ? 'bg-emerald-50/60 border-emerald-300 ring-2 ring-emerald-500/10 shadow-sm'
                     : 'bg-white border-slate-200 hover:border-slate-300'
                 }`}
               >
@@ -1638,9 +1675,9 @@ export function CompanySettings() {
                   <span className="font-bold text-sm text-slate-800">
                     {language === 'ar' ? 'التشغيل الفعلي (Production)' : 'Production (Live)'}
                   </span>
-                  <span className="text-xs text-slate-400 mt-0.5">
+                  <span className="text-xs text-slate-500 mt-1 leading-relaxed">
                     {language === 'ar'
-                      ? 'المنظومة الفعلية الرسمية لإصدار الفواتير الضريبية الحية'
+                      ? 'المنظومة الفعلية الرسمية لإصدار الفواتير الضريبية الحية المعتمدة'
                       : 'Live ETA system for official tax invoice issuance'}
                   </span>
                 </div>
@@ -1648,18 +1685,31 @@ export function CompanySettings() {
             </div>
           </div>
 
-          {/* Sub-section 1: Taxpayer Company Info */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-slate-800 font-bold text-sm border-b border-slate-100 pb-2">
-              <Building2 className="w-4 h-4 text-indigo-600" />
-              <span>{language === 'ar' ? 'بيانات الشركة المسجلة لدى المنظومة' : 'Company Data Registered with ETA'}</span>
+          {/* ========================================================================= */}
+          {/* STEP 1: Taxpayer & Company Info */}
+          {/* ========================================================================= */}
+          <div className="space-y-4 border border-slate-100 rounded-2xl p-6 bg-white shadow-sm">
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+              <span className="w-7 h-7 rounded-xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
+                1
+              </span>
+              <div>
+                <h4 className="font-bold text-slate-800 text-sm">
+                  {language === 'ar' ? 'الخطوة الأولى: بيانات الشركة والنشاط الضريبي' : 'Step 1: Taxpayer Company & Activity Info'}
+                </h4>
+                <p className="text-[11.5px] text-slate-400">
+                  {language === 'ar'
+                    ? 'تأكد من مطابقة هذه البيانات مع المسجل في بطاقتك الضريبية لدى مصلحة الضرائب المصرية'
+                    : 'Ensure this information matches your official Tax Card registration'}
+                </p>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              {/* Company Legal Name (Read-only) */}
+              {/* Company Legal Name */}
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1.5">
-                  {language === 'ar' ? 'اسم المنشأة (من البيانات الأساسية)' : 'Company Name (Read-only)'}
+                  {language === 'ar' ? 'اسم المنشأة' : 'Company Name'}
                 </label>
                 <input
                   type="text"
@@ -1670,166 +1720,253 @@ export function CompanySettings() {
                 />
               </div>
 
-              {/* Tax Registration Number (Read-only) */}
+              {/* Tax Registration Number */}
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1.5">
-                  {language === 'ar' ? 'الرقم الضريبي للمنشأة (من البيانات الأساسية)' : 'Tax Registration Number (Read-only)'}
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5 flex items-center gap-1">
+                  <span>{language === 'ar' ? 'رقم التسجيل الضريبي (9 أرقام)' : 'Tax Registration Number'}</span>
+                  <span title="الرقم الضريبي المكون من 9 أرقام" className="text-slate-400 cursor-help">
+                    <HelpCircle className="w-3 h-3" />
+                  </span>
                 </label>
                 <input
                   type="text"
                   readOnly
                   disabled
-                  value={data.tax_number || (language === 'ar' ? 'يرجى إدخال الرقم الضريبي أعلاه' : 'Please enter tax number above')}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 font-medium text-sm cursor-not-allowed"
+                  value={data.tax_number || (language === 'ar' ? 'يرجى إدخال الرقم الضريبي بالبيانات الأساسية' : 'Please enter in Basic Settings')}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 font-mono text-sm cursor-not-allowed"
                 />
               </div>
 
               {/* Activity Code */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  {language === 'ar' ? 'كود النشاط الضريبي (Taxpayer Activity Code)' : 'Taxpayer Activity Code'} <span className="text-rose-500">*</span>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1">
+                  <span>{language === 'ar' ? 'كود النشاط الضريبي (Activity Code)' : 'Taxpayer Activity Code'}</span>
+                  <span className="text-rose-500">*</span>
+                  <span title="كود النشاط المعتمد لدى مصلحة الضرائب (مثال: 4610)" className="text-slate-400 cursor-help">
+                    <HelpCircle className="w-3.5 h-3.5" />
+                  </span>
                 </label>
                 <input
                   type="text"
-                  placeholder={language === 'ar' ? 'مثال: 4610 أو كود النشاط المعتمد' : 'e.g., 4610'}
+                  placeholder={language === 'ar' ? 'مثال: 4610' : 'e.g., 4610'}
                   value={etaSettings.activity_code}
                   onChange={(e) => setEtaSettings({ ...etaSettings, activity_code: e.target.value })}
                   className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
                 />
                 <span className="text-[10.5px] text-slate-400 mt-1 block">
-                  {language === 'ar' ? 'كود النشاط الرئيسي المسجل لدى مصلحة الضرائب' : 'Main activity code from Tax Card'}
+                  {language === 'ar' ? 'كود النشاط المكون من 4 إلى 6 أرقام بالبطاقة الضريبية' : 'From official Tax Card'}
                 </span>
               </div>
 
               {/* Branch ID */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  {language === 'ar' ? 'كود الفرع الضريبي (ETA Branch ID)' : 'ETA Branch ID'} <span className="text-rose-500">*</span>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1">
+                  <span>{language === 'ar' ? 'كود الفرع (Branch ID)' : 'ETA Branch ID'}</span>
+                  <span className="text-rose-500">*</span>
+                  <span title="0 للفرع الرئيسي، أو رقم الفرع المسجل لدى الضرائب" className="text-slate-400 cursor-help">
+                    <HelpCircle className="w-3.5 h-3.5" />
+                  </span>
                 </label>
                 <input
                   type="text"
-                  placeholder={language === 'ar' ? '0 للفرع الرئيسي' : '0 for Main Branch'}
+                  placeholder={language === 'ar' ? '0 للمقر الرئيسي' : '0 for HQ'}
                   value={etaSettings.branch_id}
                   onChange={(e) => setEtaSettings({ ...etaSettings, branch_id: e.target.value })}
                   className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
                 />
                 <span className="text-[10.5px] text-slate-400 mt-1 block">
-                  {language === 'ar' ? 'كود الفرع المسجل لدى مصلحة الضرائب (0 للمقر الرئيسي)' : 'Branch ID on ETA portal (0 for HQ)'}
+                  {language === 'ar' ? 'كود الفرع (0 للفرع الرئيسي)' : '0 for main branch'}
                 </span>
               </div>
             </div>
-          </div>
 
-          {/* Sub-section 2: Address Breakdown */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-slate-800 font-bold text-sm border-b border-slate-100 pb-2">
-              <MapPin className="w-4 h-4 text-indigo-600" />
-              <span>{language === 'ar' ? 'عنوان المنشأة التفصيلي لدى مصلحة الضرائب' : 'Detailed Taxpayer Address for ETA'}</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {/* Country Code */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  {language === 'ar' ? 'كود الدولة (Country Code)' : 'Country Code'}
-                </label>
-                <input
-                  type="text"
-                  value={etaSettings.country_code}
-                  onChange={(e) => setEtaSettings({ ...etaSettings, country_code: e.target.value.toUpperCase() })}
-                  placeholder="EG"
-                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all uppercase"
-                />
-              </div>
-
-              {/* Governorate */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  {language === 'ar' ? 'المحافظة (Governorate)' : 'Governorate'}
-                </label>
-                <input
-                  type="text"
-                  placeholder={language === 'ar' ? 'مثال: القاهرة / الجيزة / الإسكندرية' : 'e.g., Cairo, Giza'}
-                  value={etaSettings.governorate}
-                  onChange={(e) => setEtaSettings({ ...etaSettings, governorate: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
-                />
-              </div>
-
-              {/* City / Region */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  {language === 'ar' ? 'المدينة / الحي (City / Region)' : 'City / Region'}
-                </label>
-                <input
-                  type="text"
-                  placeholder={language === 'ar' ? 'مثال: مدينة نصر / المعادي / الدقي' : 'e.g., Nasr City, Maadi'}
-                  value={etaSettings.city}
-                  onChange={(e) => setEtaSettings({ ...etaSettings, city: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
-                />
-              </div>
-
-              {/* Street */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  {language === 'ar' ? 'اسم الشارع (Street)' : 'Street'}
-                </label>
-                <input
-                  type="text"
-                  placeholder={language === 'ar' ? 'مثال: شارع التسعين الجنوبي' : 'e.g., 90th Street'}
-                  value={etaSettings.street}
-                  onChange={(e) => setEtaSettings({ ...etaSettings, street: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
-                />
-              </div>
-
-              {/* Building Number */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  {language === 'ar' ? 'رقم المبنى (Building Number)' : 'Building Number'}
-                </label>
-                <input
-                  type="text"
-                  placeholder={language === 'ar' ? 'مثال: 14 أو مبنى النور' : 'e.g., 14'}
-                  value={etaSettings.building_number}
-                  onChange={(e) => setEtaSettings({ ...etaSettings, building_number: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
-                />
-              </div>
-
-              {/* Postal Code */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  {language === 'ar' ? 'الرمز البريدي (Postal Code)' : 'Postal Code'}
-                </label>
-                <input
-                  type="text"
-                  placeholder={language === 'ar' ? 'مثال: 11835' : 'e.g., 11835'}
-                  value={etaSettings.postal_code}
-                  onChange={(e) => setEtaSettings({ ...etaSettings, postal_code: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
-                />
+            {/* Address Breakdown */}
+            <div className="pt-3 border-t border-slate-100">
+              <span className="text-xs font-bold text-slate-700 mb-3 block flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-indigo-600" />
+                {language === 'ar' ? 'العنوان الضريبي المسجل للمنشأة:' : 'Registered Tax Address:'}
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">{language === 'ar' ? 'كود الدولة' : 'Country Code'}</label>
+                  <input
+                    type="text"
+                    value={etaSettings.country_code}
+                    onChange={(e) => setEtaSettings({ ...etaSettings, country_code: e.target.value.toUpperCase() })}
+                    placeholder="EG"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 text-xs uppercase"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">{language === 'ar' ? 'المحافظة' : 'Governorate'}</label>
+                  <input
+                    type="text"
+                    placeholder={language === 'ar' ? 'مثال: القاهرة' : 'Cairo'}
+                    value={etaSettings.governorate}
+                    onChange={(e) => setEtaSettings({ ...etaSettings, governorate: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">{language === 'ar' ? 'المدينة / الحي' : 'City'}</label>
+                  <input
+                    type="text"
+                    placeholder={language === 'ar' ? 'مثال: مدينة نصر' : 'Nasr City'}
+                    value={etaSettings.city}
+                    onChange={(e) => setEtaSettings({ ...etaSettings, city: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">{language === 'ar' ? 'اسم الشارع' : 'Street'}</label>
+                  <input
+                    type="text"
+                    placeholder={language === 'ar' ? 'مثال: شارع التسعين' : '90th St'}
+                    value={etaSettings.street}
+                    onChange={(e) => setEtaSettings({ ...etaSettings, street: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">{language === 'ar' ? 'رقم المبنى' : 'Building'}</label>
+                  <input
+                    type="text"
+                    placeholder={language === 'ar' ? 'مثال: 14' : '14'}
+                    value={etaSettings.building_number}
+                    onChange={(e) => setEtaSettings({ ...etaSettings, building_number: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-800 text-xs"
+                  />
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Sub-section 3: ETA API Credentials */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-slate-800 font-bold text-sm border-b border-slate-100 pb-2">
-              <KeyRound className="w-4 h-4 text-indigo-600" />
-              <span>{language === 'ar' ? 'بيانات الاعتماد والربط الأمني (API Credentials)' : 'ETA API Credentials (OAuth 2.0)'}</span>
+          {/* ========================================================================= */}
+          {/* STEP 2: ETA Portal ERP Registration Guide & Copy Links */}
+          {/* ========================================================================= */}
+          <div className="space-y-4 border border-indigo-100 rounded-2xl p-6 bg-gradient-to-br from-indigo-50/40 via-white to-indigo-50/20 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-100/70 pb-3">
+              <div className="flex items-center gap-3">
+                <span className="w-7 h-7 rounded-xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
+                  2
+                </span>
+                <div>
+                  <h4 className="font-bold text-indigo-950 text-sm">
+                    {language === 'ar' ? 'الخطوة الثانية: تسجيل Obrain في بوابة مصلحة الضرائب' : 'Step 2: Register Obrain in ETA Portal'}
+                  </h4>
+                  <p className="text-[11.5px] text-slate-500">
+                    {language === 'ar'
+                      ? 'ادخل إلى بوابة مصلحة الضرائب المصرية > الإعدادات > تسجيل نظام ERP، وانسخ الروابط التالية:'
+                      : 'Go to ETA Portal > Settings > Add ERP System, and copy the following URLs:'}
+                  </p>
+                </div>
+              </div>
+
+              <a
+                href={etaSettings.environment === 'production' ? 'https://invoicing.eta.gov.eg' : 'https://preprod.invoicing.eta.gov.eg'}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 flex-shrink-0"
+              >
+                <span>{language === 'ar' ? 'فتح بوابة مصلحة الضرائب' : 'Open ETA Portal'}</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+
+            {/* Quick Copy Fields */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+              {/* System Name */}
+              <div className="p-3.5 rounded-xl bg-white border border-indigo-100 flex items-center justify-between gap-2 shadow-sm">
+                <div className="flex flex-col overflow-hidden">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">اسم النظام (System Name)</span>
+                  <span className="text-xs font-bold text-slate-800 truncate">Obrain ERP</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCopyToClipboard('Obrain ERP', 'sys_name', 'اسم النظام')}
+                  className="p-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors flex-shrink-0"
+                  title="نسخ اسم النظام"
+                >
+                  {copiedField === 'sys_name' ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+
+              {/* Connection URL */}
+              <div className="p-3.5 rounded-xl bg-white border border-indigo-100 flex items-center justify-between gap-2 shadow-sm">
+                <div className="flex flex-col overflow-hidden">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">رابط الاتصال (Connection URL)</span>
+                  <span className="text-xs font-bold font-mono text-indigo-700 truncate">https://obrain.tech</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCopyToClipboard('https://obrain.tech', 'conn_url', 'رابط الاتصال')}
+                  className="p-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors flex-shrink-0"
+                  title="نسخ رابط الاتصال"
+                >
+                  {copiedField === 'conn_url' ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+
+              {/* Notification URL */}
+              <div className="p-3.5 rounded-xl bg-white border border-indigo-100 flex items-center justify-between gap-2 shadow-sm">
+                <div className="flex flex-col overflow-hidden">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">رابط الإشعارات (Webhook URL)</span>
+                  <span className="text-xs font-bold font-mono text-indigo-700 truncate">https://obrain.tech/notifications/documents</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCopyToClipboard('https://obrain.tech/notifications/documents', 'notif_url', 'رابط الإشعارات')}
+                  className="p-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors flex-shrink-0"
+                  title="نسخ رابط الإشعارات"
+                >
+                  {copiedField === 'notif_url' ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs text-slate-500 bg-white/80 p-3 rounded-xl border border-indigo-50">
+              <Info className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+              <span>
+                {language === 'ar'
+                  ? 'بمجرد إدخال هذه البيانات في بوابة الضرائب وحفظ التسجيل، ستظهر لك بيانات الاعتماد (Client ID و Client Secret) لتضعها في الخطوة التالية.'
+                  : 'After saving in ETA portal, you will be issued your Client ID and Client Secret for Step 3.'}
+              </span>
+            </div>
+          </div>
+
+          {/* ========================================================================= */}
+          {/* STEP 3: API Credentials Input */}
+          {/* ========================================================================= */}
+          <div className="space-y-4 border border-slate-100 rounded-2xl p-6 bg-white shadow-sm">
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+              <span className="w-7 h-7 rounded-xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
+                3
+              </span>
+              <div>
+                <h4 className="font-bold text-slate-800 text-sm">
+                  {language === 'ar' ? 'الخطوة الثالثة: إدخال المفاتيح الصادرة من بوابة الضرائب' : 'Step 3: Enter Issued ETA Credentials'}
+                </h4>
+                <p className="text-[11.5px] text-slate-400">
+                  {language === 'ar'
+                    ? 'الصق معرف الربط والمفتاح السري ومفتاح التشغيل التي حصلت عليها من بوابة الضرائب:'
+                    : 'Paste the Client ID, Secret, and Operating Key obtained from the ETA portal:'}
+                </p>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               {/* Client ID */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                  {language === 'ar' ? 'معرف العميل (Client ID)' : 'Client ID'} <span className="text-rose-500">*</span>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1">
+                  <span>{language === 'ar' ? 'معرف الربط (Client ID)' : 'Client ID'}</span>
+                  <span className="text-rose-500">*</span>
+                  <span title="معرف العميل الصادر من بوابة الضرائب بعد إضافة النظام" className="text-slate-400 cursor-help">
+                    <HelpCircle className="w-3.5 h-3.5" />
+                  </span>
                 </label>
                 <input
                   type="text"
-                  placeholder={language === 'ar' ? 'المعرف الصادر من بوابة الضرائب (ERP Client ID)' : 'Client ID from ETA portal'}
+                  placeholder={language === 'ar' ? 'المعرف الصادر من بوابة الضرائب (Client ID)' : 'Client ID from ETA portal'}
                   value={etaSettings.client_id}
                   onChange={(e) => setEtaSettings({ ...etaSettings, client_id: e.target.value })}
                   className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-mono text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
@@ -1839,8 +1976,12 @@ export function CompanySettings() {
               {/* Client Secret */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-semibold text-slate-600">
-                    {language === 'ar' ? 'المفتاح السري (Client Secret)' : 'Client Secret'} <span className="text-rose-500">*</span>
+                  <label className="block text-xs font-semibold text-slate-700 flex items-center gap-1">
+                    <span>{language === 'ar' ? 'المفتاح السري (Client Secret)' : 'Client Secret'}</span>
+                    <span className="text-rose-500">*</span>
+                    <span title="الرمز السري الرئيسي المولد من بوابة الضرائب والمستخدم لطلب تصريح الدخول" className="text-slate-400 cursor-help">
+                      <HelpCircle className="w-3.5 h-3.5" />
+                    </span>
                   </label>
                   {etaSettings.client_secret_configured && (
                     <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
@@ -1876,11 +2017,14 @@ export function CompanySettings() {
                 </span>
               </div>
 
-              {/* Operating Key (مفتاح التشغيل) */}
+              {/* Operating Key */}
               <div className="sm:col-span-2">
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-semibold text-slate-600">
-                    {language === 'ar' ? 'مفتاح التشغيل (Operating Key / Verification Key)' : 'Operating Key'}
+                  <label className="block text-xs font-semibold text-slate-700 flex items-center gap-1">
+                    <span>{language === 'ar' ? 'مفتاح التشغيل (Operating Key / Verification Key)' : 'Operating Key'}</span>
+                    <span title="مفتاح التشغيل لتأمين وصول إشعارات الفواتير وتحديثات الحالة" className="text-slate-400 cursor-help">
+                      <HelpCircle className="w-3.5 h-3.5" />
+                    </span>
                   </label>
                   {etaSettings.operating_key_configured && (
                     <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
@@ -1895,7 +2039,7 @@ export function CompanySettings() {
                     placeholder={
                       etaSettings.operating_key_configured
                         ? (language === 'ar' ? '•••••••• تم تعيين مفتاح التشغيل (اتركه فارغاً للإبقاء عليه)' : '•••••••• Configured (leave empty to keep)')
-                        : (language === 'ar' ? 'مفتاح التشغيل الصادر من بوابة الضرائب عند تسجيل ERP (اختياري/بحسب التسجيل)' : 'Operating key from ETA portal (optional depending on registration)')
+                        : (language === 'ar' ? 'مفتاح التشغيل الصادر من بوابة الضرائب عند تسجيل ERP (اختياري/بحسب التسجيل)' : 'Operating key from ETA portal (optional)')
                     }
                     value={etaSettings.operating_key}
                     onChange={(e) => setEtaSettings({ ...etaSettings, operating_key: e.target.value })}
@@ -1911,112 +2055,111 @@ export function CompanySettings() {
                 </div>
                 <span className="text-[10.5px] text-slate-400 mt-1 block">
                   {language === 'ar'
-                    ? 'يُستخدم مفتاح التشغيل لتأمين إشعارات الفواتير الواردة من منظومة مصلحة الضرائب'
-                    : 'Used to verify document notifications received from ETA'}
+                    ? 'يُستخدم لتأمين استقبال إشعارات الفواتير من منظومة مصلحة الضرائب'
+                    : 'Used to secure document notifications received from ETA'}
                 </span>
               </div>
             </div>
 
-            {/* ERP Registration Connection Info Box */}
-            <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100 text-xs space-y-2 text-slate-700">
-              <div className="font-bold text-indigo-900 flex items-center gap-1.5">
-                <Globe className="w-4 h-4 text-indigo-600" />
-                <span>
-                  {language === 'ar' ? 'بيانات الربط المطلوب إدخالها في بوابة مصلحة الضرائب المصرية:' : 'ERP Registration URLs for ETA Portal:'}
-                </span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 font-mono text-[11.5px]">
-                <div className="p-2.5 rounded-xl bg-white border border-indigo-100/80">
-                  <span className="text-[10px] uppercase font-sans font-bold text-slate-400 block">رابط الاتصال (Connection URL)</span>
-                  <span className="text-indigo-700 font-bold select-all">https://obrain.tech</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-white border border-indigo-100/80">
-                  <span className="text-[10px] uppercase font-sans font-bold text-slate-400 block">نقطة نهاية الإشعارات (Webhook Endpoint)</span>
-                  <span className="text-indigo-700 font-bold select-all">https://obrain.tech/notifications/documents</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Test Result Feedback Box (if connection was tested) */}
-          {etaTestResult && (
-            <div className={`p-4 rounded-2xl border flex items-start gap-3 ${
-              etaTestResult.connected
-                ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800'
-                : 'bg-rose-50/70 border-rose-200 text-rose-800'
-            }`}>
-              {etaTestResult.connected ? (
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-              ) : (
-                <XCircle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
-              )}
-              <div className="flex-1 text-xs space-y-1">
-                <div className="font-bold text-sm">
-                  {etaTestResult.connected
-                    ? (language === 'ar' ? 'تم التحقق من الاتصال بنجاح' : 'Connection Verified Successfully')
-                    : (language === 'ar' ? 'فشل اختبار الاتصال' : 'Connection Test Failed')}
-                </div>
-                <p className="leading-relaxed opacity-90">{etaTestResult.message}</p>
-                {etaTestResult.diagnostic && (
-                  <div className="text-[11px] font-mono bg-black/5 dark:bg-white/5 px-2.5 py-1 rounded-lg w-fit mt-1.5 opacity-80">
-                    {etaTestResult.http_status ? `[HTTP ${etaTestResult.http_status}] ` : ''}{etaTestResult.diagnostic}
-                  </div>
-                )}
-                {etaTestResult.tested_at && (
-                  <div className="text-[10.5px] opacity-70 mt-1">
-                    {language === 'ar' ? 'تاريخ الفحص: ' : 'Tested at: '}
-                    {new Date(etaTestResult.tested_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Dedicated ETA Save & Test Connection Actions */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-slate-100 bg-slate-50/50 p-4 rounded-2xl">
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <ShieldCheck className="w-4 h-4 text-indigo-600 flex-shrink-0" />
-              <span>
-                {language === 'ar'
-                  ? 'اختبار الاتصال يتحقق من صحة مفاتيح الربط لدى مصلحة الضرائب دون إرسال أو تعديل أي فواتير.'
-                  : 'Connection test validates API credentials with ETA OAuth server without creating/sending invoices.'}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
-              {/* Test Connection Button */}
-              <button
-                type="button"
-                onClick={handleTestEtaConnection}
-                disabled={etaTesting || etaSaving}
-                className="flex items-center justify-center gap-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm active:scale-95 disabled:opacity-50 flex-shrink-0"
-              >
-                {etaTesting ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
-                ) : (
-                  <Wifi className="w-4 h-4 text-emerald-600" />
-                )}
-                <span>
-                  {etaTesting
-                    ? (language === 'ar' ? 'جاري اختبار الاتصال...' : 'Testing Connection...')
-                    : (language === 'ar' ? 'اختبار الاتصال بـ ETA' : 'Test ETA Connection')}
-                </span>
-              </button>
-
-              {/* Save Settings Button */}
+            {/* Save Button for Credentials */}
+            <div className="flex justify-end pt-2">
               <button
                 type="button"
                 onClick={handleSaveEtaSettings}
                 disabled={etaSaving || etaTesting}
-                className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm active:scale-95 disabled:opacity-50 flex-shrink-0"
+                className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm active:scale-95 disabled:opacity-50"
               >
-                {etaSaving ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                <span>{language === 'ar' ? 'حفظ إعدادات الفاتورة الإلكترونية (ETA)' : 'Save ETA Settings'}</span>
+                {etaSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                <span>{language === 'ar' ? 'حفظ إعدادات الربط' : 'Save Credentials'}</span>
               </button>
+            </div>
+          </div>
+
+          {/* ========================================================================= */}
+          {/* STEP 4: Test Connection & Live Verification */}
+          {/* ========================================================================= */}
+          <div className="space-y-4 border border-slate-100 rounded-2xl p-6 bg-slate-50/50 shadow-sm">
+            <div className="flex items-center gap-3 border-b border-slate-200/60 pb-3">
+              <span className="w-7 h-7 rounded-xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
+                4
+              </span>
+              <div>
+                <h4 className="font-bold text-slate-800 text-sm">
+                  {language === 'ar' ? 'الخطوة الرابعة: اختبار الاتصال والتحقق الفعلي مع ETA' : 'Step 4: Test Connection & Live Verification'}
+                </h4>
+                <p className="text-[11.5px] text-slate-500">
+                  {language === 'ar'
+                    ? 'اضغط على الزر أدناه ليقوم النظام بالاتصال الفعلي بخوادم مصلحة الضرائب والتحقق من صحة المفاتيح:'
+                    : 'Click below to perform a real OAuth verification with ETA servers:'}
+                </p>
+              </div>
+            </div>
+
+            {/* Test Result Feedback Box (if connection was tested) */}
+            {etaTestResult && (
+              <div className={`p-4 rounded-2xl border flex items-start gap-3 ${
+                etaTestResult.connected
+                  ? 'bg-emerald-50/90 border-emerald-200 text-emerald-900 shadow-sm'
+                  : 'bg-rose-50/90 border-rose-200 text-rose-900 shadow-sm'
+              }`}>
+                {etaTestResult.connected ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                ) : (
+                  <XCircle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
+                )}
+                <div className="flex-1 text-xs space-y-1">
+                  <div className="font-bold text-sm">
+                    {etaTestResult.connected
+                      ? (language === 'ar' ? '🟢 تم الاتصال والتحقق بنجاح مع منظومة ETA' : '🟢 Connection Verified Successfully')
+                      : (language === 'ar' ? '🔴 فشل اختبار الاتصال بـ ETA' : '🔴 Connection Test Failed')}
+                  </div>
+                  <p className="leading-relaxed font-medium">{etaTestResult.message}</p>
+                  {etaTestResult.diagnostic && (
+                    <div className="text-[11px] font-mono bg-black/5 dark:bg-white/5 px-2.5 py-1 rounded-lg w-fit mt-1.5 opacity-80">
+                      {etaTestResult.http_status ? `[HTTP ${etaTestResult.http_status}] ` : ''}{etaTestResult.diagnostic}
+                    </div>
+                  )}
+                  {etaTestResult.tested_at && (
+                    <div className="text-[10.5px] opacity-70 mt-1">
+                      {language === 'ar' ? 'تاريخ الفحص: ' : 'Tested at: '}
+                      {new Date(etaTestResult.tested_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Actions Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <ShieldCheck className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                <span>
+                  {language === 'ar'
+                    ? 'اختبار الاتصال يتحقق من صحة المفاتيح لدى خوادم الضرائب الرسمية دون إرسال أي فواتير.'
+                    : 'Validates API credentials with ETA OAuth server without creating/sending invoices.'}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+                {/* Test Connection Button */}
+                <button
+                  type="button"
+                  onClick={handleTestEtaConnection}
+                  disabled={etaTesting || etaSaving}
+                  className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold text-xs transition-all shadow-md shadow-indigo-500/10 active:scale-95 disabled:opacity-50 flex-shrink-0"
+                >
+                  {etaTesting ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  ) : (
+                    <Zap className="w-4 h-4 text-amber-300" />
+                  )}
+                  <span>
+                    {etaTesting
+                      ? (language === 'ar' ? 'جاري اختبار الاتصال...' : 'Testing Connection...')
+                      : (language === 'ar' ? '⚡ اختبار الاتصال بمنظومة ETA' : '⚡ Test ETA Connection')}
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
