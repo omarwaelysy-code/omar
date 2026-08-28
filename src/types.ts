@@ -1350,6 +1350,11 @@ export interface EtaNotificationResponse {
   message: string;
   timestamp?: string;
   receivedCount?: number;
+  registrationNumber?: string;
+  taxpayerName?: string;
+  version?: string;
+  serverName?: string;
+  [key: string]: any;
 }
 
 

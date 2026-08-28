@@ -64,8 +64,8 @@ const ALL_NOTIFICATION_PATHS = [
 ];
 
 // 1. GET & HEAD: Connectivity & Ping check (ETA ERP Registration Validation Probe)
-router.get(ALL_NOTIFICATION_PATHS, (req: Request, res: Response) => {
-  const result = EtaNotificationService.handlePing();
+router.get(ALL_NOTIFICATION_PATHS, async (req: Request, res: Response) => {
+  const result = await EtaNotificationService.handlePing();
   res.status(result.statusCode).json(result.body);
 });
 
@@ -107,7 +107,7 @@ router.post(ALL_NOTIFICATION_PATHS, async (req: Request, res: Response) => {
 });
 
 router.patch(ALL_NOTIFICATION_PATHS, async (req: Request, res: Response) => {
-  const result = EtaNotificationService.handlePing();
+  const result = await EtaNotificationService.handlePing();
   res.status(result.statusCode).json(result.body);
 });
 

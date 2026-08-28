@@ -11,6 +11,7 @@
  * - Does NOT modify invoices, customers, products, accounting, or inventory during callback validation.
  * - NEVER logs operating keys, secrets, tokens, or raw authorization headers.
  * - Always returns official ETA-compatible HTTP 200 OK responses.
+ * - Returns registrationNumber (TIN) and taxpayerName in ping response for ETA portal validation.
  */
 
 import pool from '../../lib/postgres';
@@ -29,14 +30,41 @@ export interface ProcessNotificationResult {
 export class EtaNotificationService {
   /**
    * Process ETA Ping / Connectivity check (GET, HEAD, OPTIONS, or empty ping body)
+   * 
+   * Returns the taxpayer's registration number (TIN) and company name
+   * which the ETA portal requires to validate the ERP during registration.
    */
-  public static handlePing(): ProcessNotificationResult {
+  public static async handlePing(): Promise<ProcessNotificationResult> {
+    let registrationNumber: string | undefined;
+    let taxpayerName: string | undefined;
+
+    try {
+      // Try to get the company's tax number and name from the database
+      const result = await pool.query(
+        `SELECT c.tax_number, c.name 
+         FROM companies c 
+         WHERE c.tax_number IS NOT NULL AND c.tax_number != '' 
+         LIMIT 1`
+      );
+      if (result.rows.length > 0) {
+        registrationNumber = result.rows[0].tax_number;
+        taxpayerName = result.rows[0].name;
+      }
+    } catch (dbErr) {
+      // If DB is unavailable, still return a valid ping response
+      console.warn('[ETA Ping] Could not query company data:', dbErr);
+    }
+
     return {
       statusCode: 200,
       body: {
         status: 'active',
         message: 'Obrain ERP ETA Notification Service is active and reachable',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        registrationNumber: registrationNumber || undefined,
+        taxpayerName: taxpayerName || undefined,
+        version: '1.0',
+        serverName: 'Obrain ERP'
       }
     };
   }
@@ -104,3 +132,4 @@ export class EtaNotificationService {
     };
   }
 }
+
