@@ -7,8 +7,9 @@ describe('ETA ERP Notification Callback & Connectivity (Registration Infrastruct
     vi.restoreAllMocks();
   });
 
-  it('1. should handle ping / connectivity check correctly', () => {
-    const pingResult = EtaNotificationService.handlePing();
+  it('1. should handle ping / connectivity check correctly', async () => {
+    vi.spyOn(pool, 'query').mockResolvedValue({ rows: [{ tax_number: '772681716', name: 'Test Company' }] } as any);
+    const pingResult = await EtaNotificationService.handlePing();
     expect(pingResult.statusCode).toBe(200);
     expect(pingResult.body.status).toBe('active');
     expect(pingResult.body.message).toContain('Obrain ERP ETA Notification Service is active');
