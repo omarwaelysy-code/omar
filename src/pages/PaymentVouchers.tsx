@@ -61,6 +61,19 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [voucherToDelete, setVoucherToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'general' | 'supplier'>('all');
+  const [modalMode, setModalMode] = useState<'general' | 'supplier'>('general');
+
+  const getVoucherKind = (v: any): 'supplier' | 'general' => {
+    if (!v) return 'general';
+    if (v.supplier_id || v.type === 'supplier') return 'supplier';
+    if (v.items && Array.isArray(v.items) && v.items.length > 0) {
+      if (v.items.some((i: any) => i.type === 'supplier' || i.supplier_id)) {
+        return 'supplier';
+      }
+    }
+    return 'general';
+  };
   const handleSort = (field: string) => {
     if (sortBy === field) {
       setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
@@ -1419,7 +1432,9 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
       }
 
       // Resolve voucher type label
-      const typeLabel = voucher.voucher_type === 'multi' ? 'متعدد' : voucher.type === 'supplier' ? 'مورد' : 'مصروف';
+      const typeLabel = getVoucherKind(voucher) === 'supplier' 
+        ? (language === 'ar' ? 'صرف لمورد' : 'Supplier Payment') 
+        : (language === 'ar' ? 'سند صرف' : 'Payment Voucher');
 
       return {
         ...voucher,
@@ -1593,13 +1608,65 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
     }
   };
 
-  const openEditModal = async (voucher: any) => {
+  const openNewGeneralVoucher = async () => {
+    setEditingVoucher(null);
+    setModalMode('general');
+    const newRef = await generateInternalRef(new Date().toISOString().slice(0, 10));
+    setInternalRef(newRef);
+    setVoucherData({
+      internal_reference: newRef,
+      manual_reference: '',
+      items: [{ type: 'expense', entity_id: '', amount: 0, description: '' }],
+      type: 'multi',
+      supplier_id: '',
+      expense_category_id: '',
+      customer_id: '',
+      amount: 0,
+      payment_method_id: '',
+      date: new Date().toISOString().slice(0, 10),
+      notes: '',
+      paid_to_type: 'employee',
+      paid_to_employee_id: '',
+      paid_to_external_name: '',
+      currency_id: '',
+      exchange_rate: 1
+    });
+    setIsModalOpen(true);
+  };
 
+  const openNewSupplierVoucher = async () => {
+    setEditingVoucher(null);
+    setModalMode('supplier');
+    const newRef = await generateInternalRef(new Date().toISOString().slice(0, 10));
+    setInternalRef(newRef);
+    setVoucherData({
+      internal_reference: newRef,
+      manual_reference: '',
+      items: [{ type: 'supplier', entity_id: '', amount: 0, description: '' }],
+      type: 'multi',
+      supplier_id: '',
+      expense_category_id: '',
+      customer_id: '',
+      amount: 0,
+      payment_method_id: '',
+      date: new Date().toISOString().slice(0, 10),
+      notes: '',
+      paid_to_type: 'employee',
+      paid_to_employee_id: '',
+      paid_to_external_name: '',
+      currency_id: '',
+      exchange_rate: 1
+    });
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = async (voucher: any) => {
     try {
       const fullData = await dbService.get<any>('payment_vouchers', voucher.id);
 
       if (!fullData) throw new Error('Payment voucher not found');
 
+      setModalMode(getVoucherKind(fullData));
       setInternalRef(fullData.internal_reference || fullData.voucher_number || '');
       
       // Ensure we have a clean copy of items or create from old format
@@ -1807,10 +1874,16 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
     return refB.localeCompare(refA);
   });
 
+  const generalCount = vouchers.filter(v => getVoucherKind(v) === 'general').length;
+  const supplierCount = vouchers.filter(v => getVoucherKind(v) === 'supplier').length;
+
   const filteredVouchers = sortedVouchers.filter(v => {
-    if (isSupplierOnly) {
-      const isSupplierVoucher = v.supplier_id || v.type === 'supplier' || (v.items && Array.isArray(v.items) && v.items.some((i: any) => i.type === 'supplier' || i.supplier_id));
-      if (!isSupplierVoucher) return false;
+    const kind = getVoucherKind(v);
+    if (typeFilter !== 'all' && kind !== typeFilter) {
+      return false;
+    }
+    if (isSupplierOnly && kind !== 'supplier') {
+      return false;
     }
     const searchLow = searchTerm.toLowerCase();
     return (
@@ -1831,10 +1904,10 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">
-            {pageTitle || (isSupplierOnly ? (language === 'ar' ? 'سند صرف مورد' : 'Supplier Payment Voucher') : t('payments.title'))}
+            {pageTitle || (isSupplierOnly ? (language === 'ar' ? 'سند صرف مورد' : 'Supplier Payment Voucher') : (language === 'ar' ? 'سند الصرف / صرف لمورد' : t('payments.title')))}
           </h2>
           <p className="text-zinc-500">
-            {isSupplierOnly ? (language === 'ar' ? 'إدارة وإنشاء سندات الصرف الخاصة بالموردين وتسوياتها' : 'Manage and create supplier payment vouchers') : t('payments.subtitle')}
+            {isSupplierOnly ? (language === 'ar' ? 'إدارة وإنشاء سندات الصرف الخاصة بالموردين وتسوياتها' : 'Manage and create supplier payment vouchers') : (language === 'ar' ? 'إدارة وإنشاء سندات الصرف وسندات صرف الموردين ومتابعة تسوياتها' : t('payments.subtitle'))}
           </p>
           {serverSummary.total_amount !== undefined && (
             <div className="mt-2 flex items-center gap-4 text-sm">
@@ -1859,50 +1932,100 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
             onPrint={() => printElement(tableRef.current, 'سندات الصرف')}
           />
           <button 
-            onClick={() => {
-              if (isSupplierOnly && (!voucherData.items || voucherData.items.length === 0)) {
-                setVoucherData(prev => ({
-                  ...prev,
-                  items: [{ type: 'supplier', entity_id: '', amount: 0, description: '' }]
-                }));
-              }
-              setIsModalOpen(true);
-            }}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
+            onClick={openNewGeneralVoucher}
+            className="flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
           >
             <Plus size={20} />
-            {isSupplierOnly ? (language === 'ar' ? 'إضافة سند صرف مورد' : 'Add Supplier Voucher') : t('payments.add')}
+            <span>{language === 'ar' ? 'إضافة سند صرف' : 'Add Payment Voucher'}</span>
+          </button>
+          <button 
+            onClick={openNewSupplierVoucher}
+            className="flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-200"
+          >
+            <Plus size={20} />
+            <span>{language === 'ar' ? 'إضافة صرف لمورد' : 'Add Supplier Voucher'}</span>
           </button>
         </div>
       </div>
 
       <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden no-pdf">
-        <div className="p-6 border-b border-zinc-50 flex items-center gap-4">
+        <div className="p-4 md:p-6 border-b border-zinc-50 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
           <div className="relative flex-1">
             <Search className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
             <input
               type="text"
               placeholder={language === 'ar' ? "البحث عن سندات..." : "Search vouchers..."}
-              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-zinc-900 transition-all`}
+              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2.5 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-zinc-900 transition-all text-sm font-medium`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="flex bg-zinc-100 p-1 rounded-xl">
-            <button
-              onClick={() => setView('table')}
-              className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
-              title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
-            >
-              <List size={18} />
-            </button>
-            <button
-              onClick={() => setView('card')}
-              className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
-              title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
-            >
-              <LayoutGrid size={18} />
-            </button>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Filter Tabs by Type */}
+            <div className="flex items-center bg-zinc-100/90 p-1 rounded-2xl border border-zinc-200/60 shadow-xs">
+              <button
+                type="button"
+                onClick={() => { setTypeFilter('all'); setPage(1); }}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  typeFilter === 'all' 
+                    ? 'bg-white text-zinc-900 shadow-xs border border-zinc-200/50' 
+                    : 'text-zinc-500 hover:text-zinc-900'
+                }`}
+              >
+                {language === 'ar' ? 'الكل' : 'All'} ({vouchers.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => { setTypeFilter('general'); setPage(1); }}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  typeFilter === 'general' 
+                    ? 'bg-emerald-600 text-white shadow-sm' 
+                    : 'text-zinc-600 hover:text-zinc-900'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${typeFilter === 'general' ? 'bg-white' : 'bg-emerald-500'}`} />
+                <span>{language === 'ar' ? 'سند صرف' : 'Payment Voucher'}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${typeFilter === 'general' ? 'bg-emerald-700/60 text-white' : 'bg-zinc-200 text-zinc-700'}`}>
+                  {generalCount}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setTypeFilter('supplier'); setPage(1); }}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  typeFilter === 'supplier' 
+                    ? 'bg-blue-600 text-white shadow-sm' 
+                    : 'text-zinc-600 hover:text-zinc-900'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${typeFilter === 'supplier' ? 'bg-white' : 'bg-blue-500'}`} />
+                <span>{language === 'ar' ? 'صرف لمورد' : 'Supplier Payment'}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${typeFilter === 'supplier' ? 'bg-blue-700/60 text-white' : 'bg-zinc-200 text-zinc-700'}`}>
+                  {supplierCount}
+                </span>
+              </button>
+            </div>
+
+            {/* View Mode Toggle */}
+            <div className="flex bg-zinc-100 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setView('table')}
+                className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+                title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
+              >
+                <List size={18} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setView('card')}
+                className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+                title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
+              >
+                <LayoutGrid size={18} />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1970,12 +2093,17 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
-                        voucher.voucher_type === 'multi' ? 'bg-emerald-50 text-emerald-700' :
-                        voucher.type === 'supplier' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'
-                      }`}>
-                        {voucher.voucher_type === 'multi' ? 'متعدد' : voucher.type === 'supplier' ? 'مورد' : 'مصروف'}
-                      </span>
+                      {getVoucherKind(voucher) === 'supplier' ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                          {language === 'ar' ? 'صرف لمورد' : 'Supplier Payment'}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          {language === 'ar' ? 'سند صرف' : 'Payment Voucher'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 font-bold text-zinc-900">
                       {voucher.items && voucher.items.length > 0 ? (
@@ -2149,11 +2277,14 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                         voucher.type === 'supplier' ? voucher.supplier_name : voucher.category_name
                       )}
                     </h4>
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold w-fit ${
-                      voucher.voucher_type === 'multi' ? 'bg-emerald-100 text-emerald-700' :
-                      voucher.type === 'supplier' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold w-fit ${
+                      getVoucherKind(voucher) === 'supplier'
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                     }`}>
-                      {voucher.voucher_type === 'multi' ? 'متعدد' : voucher.type === 'supplier' ? 'مورد' : 'مصروف'}
+                      {getVoucherKind(voucher) === 'supplier'
+                        ? (language === 'ar' ? 'صرف لمورد' : 'Supplier Payment')
+                        : (language === 'ar' ? 'سند صرف' : 'Payment Voucher')}
                     </span>
                     {voucher.description && (
                       <p className="text-[10px] text-zinc-500 mt-2 line-clamp-2">{voucher.description}</p>
@@ -2369,7 +2500,9 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                 </div>
               )}
               <h3 className="text-xl md:text-2xl font-black text-zinc-900 tracking-tight">
-                {editingVoucher ? (isSupplierOnly ? (language === 'ar' ? 'تعديل سند صرف مورد' : 'Edit Supplier Voucher') : (language === 'ar' ? 'تعديل سند الصرف' : t('payments.edit'))) : (isSupplierOnly ? (language === 'ar' ? 'سند صرف مورد' : 'Supplier Payment Voucher') : (language === 'ar' ? 'إضافة سند صرف جديد' : t('payments.add')))}
+                {editingVoucher 
+                  ? (modalMode === 'supplier' ? (language === 'ar' ? 'تعديل سند صرف مورد' : 'Edit Supplier Voucher') : (language === 'ar' ? 'تعديل سند الصرف' : t('payments.edit'))) 
+                  : (modalMode === 'supplier' ? (language === 'ar' ? 'إضافة سند صرف مورد' : 'Add Supplier Payment Voucher') : (language === 'ar' ? 'إضافة سند صرف جديد' : t('payments.add')))}
               </h3>
             </div>
           </div>
@@ -2715,7 +2848,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                           type="button"
                           onClick={() => setVoucherData({
                             ...voucherData,
-                            items: [...voucherData.items, { type: isSupplierOnly ? 'supplier' : 'expense', entity_id: '', amount: 0, description: '' }]
+                            items: [...voucherData.items, { type: modalMode === 'supplier' ? 'supplier' : 'expense', entity_id: '', amount: 0, description: '' }]
                           })}
                           className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-black border border-emerald-100 hover:bg-emerald-100 transition-all shadow-sm"
                         >

@@ -474,7 +474,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         subItems: [
           { id: 'receipts', label: t('nav.receipts'), icon: Receipt },
           { id: 'payment_vouchers', label: t('nav.payment_vouchers'), icon: CreditCard },
-          { id: 'supplier_payment_vouchers', label: t('nav.supplier_payment_vouchers') || (language === 'ar' ? 'سند صرف مورد' : 'Supplier Payment Voucher'), icon: CreditCard },
           { id: 'cash_transfers', label: t('nav.cash_transfers'), icon: ArrowLeftRight }
         ]
       },
