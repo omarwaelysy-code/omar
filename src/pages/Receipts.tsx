@@ -1908,7 +1908,7 @@ export const Receipts: React.FC = () => {
       (r.internal_reference || '').toLowerCase().includes(searchLow) ||
       (r.manual_reference || '').toLowerCase().includes(searchLow) ||
       (r.description || '').toLowerCase().includes(searchLow) ||
-      (r.notes || '').toLowerCase().includes(searchLow)
+      ((r as any).notes || '').toLowerCase().includes(searchLow)
     );
   });
 
@@ -3762,7 +3762,7 @@ export const Receipts: React.FC = () => {
                   const currencyCode = (companyData?.settings?.currency || 'EGP').toUpperCase();
                   const tafqeetText = tafqeet(Number(viewReceipt.amount) || 0, currencyCode, 'ar');
                   const pmName = viewReceipt.payment_method_name || paymentMethods.find(p => p.id === viewReceipt.payment_method_id)?.name || 'نقداً';
-                  const voucherDesc = viewReceipt.description || viewReceipt.notes || 'سند قبض نقدية';
+                  const voucherDesc = viewReceipt.description || (viewReceipt as any).notes || 'سند قبض نقدية';
 
                   return (
                     <div className="space-y-6 my-6 text-zinc-900">
