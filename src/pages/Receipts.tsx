@@ -6,7 +6,7 @@ import {
   Search, Plus, Trash2, X, Receipt as ReceiptIcon, Pencil, 
   CreditCard, Download, Eye, FileText, FileSpreadsheet, History, Printer, 
   Phone, Mail, MapPin, Wallet, Calendar, Hash, Layers, 
-  LayoutGrid, List, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, User, ChevronDown, Save
+  LayoutGrid, List, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, User, ChevronDown, Save, Copy, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
@@ -84,6 +84,7 @@ export const Receipts: React.FC = () => {
 
   
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showAiInput, setShowAiInput] = useState(false);
   const [editingReceipt, setEditingReceipt] = useState<ReceiptVoucher | null>(null);
   const editModalRef = useRef<HTMLDivElement>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -1879,6 +1880,23 @@ export const Receipts: React.FC = () => {
     });
   };
 
+  const handleCopyReceipt = async () => {
+    const newRef = await generateInternalRef(voucherData.date);
+    setEditingReceipt(null);
+    setInternalRef(newRef);
+    setVoucherData(prev => ({
+      ...prev,
+      internal_reference: newRef,
+      manual_reference: '',
+    }));
+    showNotification(
+      language === 'ar' 
+        ? 'تم نسخ بيانات السند، يمكنك التعديل والحفظ كسند جديد' 
+        : 'Receipt data copied, edit and save as a new voucher',
+      'info'
+    );
+  };
+
   const handlePrevReceipt = () => {
     if (!editingReceipt) return;
     const currentIndex = receipts.findIndex(r => r.id === editingReceipt.id);
@@ -2481,52 +2499,89 @@ export const Receipts: React.FC = () => {
               )}
             </AnimatePresence>
 
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32 md:pb-8">
-              <SmartAIInput 
-                onDataExtracted={(data) => {
-                  if (data.customerName) {
-                    const customer = customers.find(c => c.name.includes(data.customerName!) || data.customerName!.includes(c.name));
-                    if (customer) {
-                      setVoucherData(prev => {
-                        const items = [...prev.items];
-                        if (items.length === 0) {
-                          items.push({ type: 'customer', entity_id: customer.id, amount: data.amount || 0, description: data.description || '' });
-                        } else {
-                          items[0].entity_id = customer.id;
-                          items[0].type = 'customer';
+            {/* Floating button on the side to toggle AI Smart Creation */}
+            <button
+              type="button"
+              onClick={() => setShowAiInput(!showAiInput)}
+              className={`absolute ${dir === 'rtl' ? 'left-0 rounded-r-xl border-l-0' : 'right-0 rounded-l-xl border-r-0'} top-1/4 z-[60] flex items-center gap-2 px-2 py-3 bg-indigo-600 text-white font-black text-[10px] shadow-lg hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all [writing-mode:vertical-lr] border border-indigo-500 ${showAiInput ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+              style={{ direction: 'ltr' }}
+            >
+              <Sparkles size={12} className="animate-bounce mb-1" />
+              <span>{language === 'ar' ? 'الإنشاء الذكي بالذكاء الاصطناعي' : 'Smart AI Creation'}</span>
+            </button>
+
+            {/* AI Drawer (Smart Creation) sliding from the side */}
+            <AnimatePresence>
+              {showAiInput && (
+                <motion.div 
+                  initial={{ x: dir === 'rtl' ? '-100%' : '100%' }}
+                  animate={{ x: 0 }}
+                  exit={{ x: dir === 'rtl' ? '-100%' : '100%' }}
+                  transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                  className={`absolute inset-y-0 ${dir === 'rtl' ? 'left-0' : 'right-0'} z-50 w-full lg:w-[480px] shadow-2xl border-l border-slate-100 bg-white flex flex-col`}
+                >
+                  <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-indigo-600 font-bold">
+                      <Sparkles size={20} className="animate-pulse" />
+                      <span className="text-sm font-black">{language === 'ar' ? 'الإنشاء الذكي بالذكاء الاصطناعي' : 'Smart AI Creation'}</span>
+                    </div>
+                    <button onClick={() => setShowAiInput(false)} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50 transition-all">
+                      <X size={20} />
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50">
+                    <SmartAIInput 
+                      onDataExtracted={(data) => {
+                        if (data.customerName) {
+                          const customer = customers.find(c => c.name.includes(data.customerName!) || data.customerName!.includes(c.name));
+                          if (customer) {
+                            setVoucherData(prev => {
+                              const items = [...prev.items];
+                              if (items.length === 0) {
+                                items.push({ type: 'customer', entity_id: customer.id, amount: data.amount || 0, description: data.description || '' });
+                              } else {
+                                items[0].entity_id = customer.id;
+                                items[0].type = 'customer';
+                              }
+                              return { ...prev, items };
+                            });
+                          }
                         }
-                        return { ...prev, items };
-                      });
-                    }
-                  }
-                  if (data.amount) {
-                    setVoucherData(prev => {
-                      const items = [...prev.items];
-                      if (items.length === 0) {
-                        items.push({ type: 'customer', entity_id: '', amount: data.amount!, description: data.description || '' });
-                      } else {
-                        items[0].amount = data.amount!;
-                      }
-                      return { ...prev, amount: data.amount!, items };
-                    });
-                  }
-                  if (data.date) setVoucherData(prev => ({ ...prev, date: data.date! }));
-                  if (data.description) {
-                    setVoucherData(prev => {
-                      const items = [...prev.items];
-                      if (items.length > 0) {
-                        items[0].description = data.description!;
-                      }
-                      return { ...prev, notes: data.description!, items };
-                    });
-                  }
-                  if (data.paymentMethod) {
-                    const pm = paymentMethods.find(p => p.name.includes(data.paymentMethod!) || data.paymentMethod!.includes(p.name));
-                    if (pm) setVoucherData(prev => ({ ...prev, payment_method_id: pm.id }));
-                  }
-                }}
-                transactionType="receipt_voucher"
-              />
+                        if (data.amount) {
+                          setVoucherData(prev => {
+                            const items = [...prev.items];
+                            if (items.length === 0) {
+                              items.push({ type: 'customer', entity_id: '', amount: data.amount!, description: data.description || '' });
+                            } else {
+                              items[0].amount = data.amount!;
+                            }
+                            return { ...prev, amount: data.amount!, items };
+                          });
+                        }
+                        if (data.date) setVoucherData(prev => ({ ...prev, date: data.date! }));
+                        if (data.description) {
+                          setVoucherData(prev => {
+                            const items = [...prev.items];
+                            if (items.length > 0) {
+                              items[0].description = data.description!;
+                            }
+                            return { ...prev, notes: data.description!, items };
+                          });
+                        }
+                        if (data.paymentMethod) {
+                          const pm = paymentMethods.find(p => p.name.includes(data.paymentMethod!) || data.paymentMethod!.includes(p.name));
+                          if (pm) setVoucherData(prev => ({ ...prev, payment_method_id: pm.id }));
+                        }
+                        setShowAiInput(false);
+                      }}
+                      transactionType="receipt_voucher"
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <form id="receipt-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32 md:pb-8">
               
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-3 space-y-6">
@@ -2536,6 +2591,39 @@ export const Receipts: React.FC = () => {
                       <FileText className="w-4 h-4" />
                       <span className="text-xs font-bold">{language === 'ar' ? 'البيانات الأساسية' : 'Basic Info'}</span>
                     </div>
+
+                    {/* Total Amount & Tafqeet Banner */}
+                    {(() => {
+                      const totalAmount = voucherData.items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+                      const currencyCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase();
+                      const tafqeetText = tafqeet(totalAmount, currencyCode, language === 'ar' ? 'ar' : 'en');
+
+                      return (
+                        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 p-4 rounded-2xl border border-emerald-100/80 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xs">
+                          <div className="flex items-center gap-3">
+                            <div className="p-3 bg-emerald-600 text-white rounded-xl shadow-md">
+                              <Wallet className="w-6 h-6" />
+                            </div>
+                            <div>
+                              <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">{language === 'ar' ? 'إجمالي مبلغ السند' : 'Total Amount'}</span>
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-2xl md:text-3xl font-black text-emerald-700 font-mono tracking-tight">
+                                  {formatNumber(totalAmount)}
+                                </span>
+                                <span className="text-sm font-black text-emerald-800 bg-white px-2.5 py-0.5 rounded-lg border border-emerald-200 shadow-xs">
+                                  {currencyCode}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right bg-white/90 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-emerald-100/80 shadow-xs flex-1 max-w-lg">
+                            <span className="text-[11px] font-bold text-zinc-400 block mb-0.5 uppercase">{language === 'ar' ? 'المبلغ بالحروف (التفقيط)' : 'Amount in Words'}</span>
+                            <span className="text-xs font-black text-emerald-900 italic">{tafqeetText}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                     
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div>
