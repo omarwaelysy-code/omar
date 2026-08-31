@@ -3950,8 +3950,8 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                 <div className="absolute -top-12 -left-12 w-44 h-44 rounded-full bg-teal-500/15 pointer-events-none" />
                 <div className="absolute -top-6 -left-6 w-32 h-32 rounded-full bg-teal-500/25 pointer-events-none flex items-center justify-center">
                   <div className="w-20 h-20 rounded-full bg-teal-600/30 border-2 border-teal-500/40 flex items-center justify-center text-teal-800 font-bold text-xs">
-                    {companyData?.logo ? (
-                      <img src={companyData.logo} alt="Logo" className="w-16 h-16 rounded-full object-contain" />
+                    {(companyData?.logo_url || (companyData as any)?.logo) ? (
+                      <img src={companyData?.logo_url || (companyData as any)?.logo} alt="Logo" className="w-16 h-16 rounded-full object-contain" />
                     ) : (
                       <span>{companyData?.name?.slice(0, 10) || 'شعارك'}</span>
                     )}
