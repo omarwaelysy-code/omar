@@ -1413,6 +1413,340 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
     }
   };
 
+  const printOfficialVoucher = (v: any) => {
+    if (!v) return;
+    const kind = getVoucherKind(v);
+    const kindTitle = kind === 'supplier' ? 'سند صرف مورد' : 'إيصال صرف نقدية';
+    const voucherNum = v.internal_reference || v.voucher_number || v.number || 'جديد';
+    const voucherDate = formatDate(v.date);
+    const currencyCode = (companyCurrencies.find(c => c.id === v.currency_id)?.code || companyData?.settings?.currency || 'EGP').toUpperCase();
+    const amountVal = Number(v.amount || (v.items && Array.isArray(v.items) ? v.items.reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0) : 0)) || 0;
+    const voucherAmount = formatNumber(amountVal);
+    const tafqeetText = tafqeet(amountVal, currencyCode, 'ar');
+
+    let recipientName = '---';
+    if (v.items && Array.isArray(v.items) && v.items.length > 0) {
+      const names = v.items.map((it: any) => {
+        if (it.type === 'supplier') return suppliers.find(s => s.id === it.entity_id)?.name || 'مورد';
+        if (it.type === 'customer') return customers.find(c => c.id === it.entity_id)?.name || 'عميل';
+        if (it.type === 'expense') return categories.find(c => c.id === it.entity_id)?.name || 'مصروف';
+        return accounts.find(a => a.id === it.entity_id)?.name || 'حساب';
+      });
+      recipientName = names.join(' ، ');
+    } else if (v.type === 'supplier' || v.supplier_id) {
+      recipientName = suppliers.find(s => s.id === v.supplier_id)?.name || v.supplier_name || 'مورد';
+    } else if (v.paid_to_type === 'employee' && v.paid_to_employee_id) {
+      recipientName = employees.find(e => e.id === v.paid_to_employee_id)?.name || 'موظف';
+    } else if (v.paid_to_external_name) {
+      recipientName = v.paid_to_external_name;
+    } else if (v.category_name) {
+      recipientName = v.category_name;
+    }
+
+    const pmName = v.payment_method_name || paymentMethods.find(p => p.id === v.payment_method_id)?.name || 'نقداً';
+    const manualRefText = v.manual_reference ? `(مرجع: ${v.manual_reference})` : (v.entry_number ? `(قيد رقم: ${v.entry_number})` : '');
+    const voucherDesc = v.description || v.notes || (kind === 'supplier' ? 'سداد فواتير مورد / تسوية' : 'سند صرف نقدية');
+    const companyName = companyData?.name || localStorage.getItem('company_name') || 'نظام ERP السحابي';
+    const companyTax = companyData?.tax_number ? `| س.ت / ض.م: ${companyData.tax_number}` : '';
+    const logoImg = (companyData?.logo_url || (companyData as any)?.logo) 
+      ? `<img src="${companyData?.logo_url || (companyData as any)?.logo}" style="width:70px;height:70px;border-radius:50%;object-fit:contain;" />` 
+      : `<span>${companyName.slice(0, 10)}</span>`;
+
+    let itemsTableHtml = '';
+    if (v.items && Array.isArray(v.items) && v.items.length > 1) {
+      const rows = v.items.map((it: any, idx: number) => {
+        let name = '-';
+        if (it.type === 'supplier') name = suppliers.find(s => s.id === it.entity_id)?.name || 'مورد';
+        else if (it.type === 'customer') name = customers.find(c => c.id === it.entity_id)?.name || 'عميل';
+        else if (it.type === 'expense') name = categories.find(c => c.id === it.entity_id)?.name || 'مصروف';
+        else name = accounts.find(a => a.id === it.entity_id)?.name || 'حساب';
+
+        return `<tr>
+          <td style="text-align:center;color:#64748b;padding:6px 10px;border:1px solid #e2e8f0;">${idx + 1}</td>
+          <td style="font-weight:bold;color:#0f172a;padding:6px 10px;border:1px solid #e2e8f0;">${name}</td>
+          <td style="color:#475569;padding:6px 10px;border:1px solid #e2e8f0;">${it.description || '-'}</td>
+          <td style="text-align:left;font-weight:bold;color:#0f766e;padding:6px 10px;border:1px solid #e2e8f0;">${formatNumber(it.amount)}</td>
+        </tr>`;
+      }).join('');
+
+      itemsTableHtml = `
+        <div style="margin: 15px 0 10px;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;text-align:right;">
+            <thead>
+              <tr style="background:#ccfbf1;color:#0f766e;">
+                <th style="padding:6px 10px;border:1px solid #99f6e4;width:40px;text-align:center;">م</th>
+                <th style="padding:6px 10px;border:1px solid #99f6e4;">النوع / المستفيد</th>
+                <th style="padding:6px 10px;border:1px solid #99f6e4;">البيان والتفاصيل</th>
+                <th style="padding:6px 10px;border:1px solid #99f6e4;width:110px;text-align:left;">المبلغ</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    const printWin = window.open('', '_blank', 'width=950,height=750');
+    if (!printWin) {
+      window.print();
+      return;
+    }
+
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html dir="rtl" lang="ar">
+      <head>
+        <meta charset="utf-8">
+        <title>${kindTitle} - ${voucherNum}</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body {
+            font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif;
+            direction: rtl;
+            background: #fff;
+            color: #1e293b;
+            padding: 30px 20px;
+          }
+          .voucher-card {
+            position: relative;
+            max-width: 820px;
+            margin: 0 auto;
+            border: 2.5px solid #0d9488;
+            border-radius: 24px;
+            padding: 35px 40px;
+            background: #fff;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+          }
+          .deco-circle-bg {
+            position: absolute;
+            top: -35px;
+            left: -35px;
+            width: 160px;
+            height: 160px;
+            background: #ccfbf1;
+            border-radius: 50%;
+            z-index: 1;
+          }
+          .deco-circle-inner {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            width: 90px;
+            height: 90px;
+            background: #0d9488;
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 12px;
+            text-align: center;
+            z-index: 2;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3);
+          }
+          .deco-arcs {
+            position: absolute;
+            top: 10px;
+            left: 130px;
+            width: 75px;
+            height: 75px;
+            border-right: 3px solid #0d9488;
+            border-top: 3px dashed #0d9488;
+            border-radius: 50%;
+            opacity: 0.35;
+            z-index: 1;
+          }
+          .voucher-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 25px;
+            position: relative;
+            z-index: 3;
+            padding-left: 140px;
+            border-bottom: 2px solid #99f6e4;
+            padding-bottom: 18px;
+          }
+          .voucher-title {
+            font-size: 28px;
+            font-weight: 900;
+            color: #0d9488;
+            margin-bottom: 6px;
+            letter-spacing: -0.5px;
+          }
+          .voucher-num-date {
+            display: flex;
+            gap: 20px;
+            font-size: 13px;
+            font-weight: bold;
+            color: #475569;
+          }
+          .amount-badge {
+            background: linear-gradient(135deg, #0d9488, #059669);
+            color: #fff;
+            padding: 8px 18px;
+            border-radius: 14px;
+            font-weight: 900;
+            font-size: 18px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(13, 148, 136, 0.25);
+          }
+          .body-row {
+            display: flex;
+            align-items: baseline;
+            margin-bottom: 18px;
+            font-size: 15px;
+            position: relative;
+            z-index: 3;
+          }
+          .row-label {
+            width: 140px;
+            font-weight: 900;
+            color: #0f766e;
+            flex-shrink: 0;
+            font-size: 16px;
+          }
+          .row-value {
+            flex: 1;
+            border-bottom: 2px dotted #5eead4;
+            padding: 5px 12px;
+            font-weight: 700;
+            color: #0f172a;
+            background: #f0fdfa;
+            border-radius: 6px;
+            min-height: 34px;
+            line-height: 24px;
+          }
+          .signatures-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 35px;
+            padding-top: 20px;
+            border-top: 2px solid #ccfbf1;
+            text-align: center;
+            position: relative;
+            z-index: 3;
+          }
+          .sig-block {
+            flex: 1;
+          }
+          .sig-title {
+            font-weight: 900;
+            font-size: 13px;
+            color: #0f766e;
+            margin-bottom: 35px;
+          }
+          .sig-line {
+            border-bottom: 1.5px dashed #cbd5e1;
+            width: 75%;
+            margin: 0 auto;
+          }
+          .footer-info {
+            margin-top: 25px;
+            font-size: 10px;
+            color: #94a3b8;
+            display: flex;
+            justify-content: space-between;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 10px;
+          }
+          @media print {
+            @page { size: A4 landscape; margin: 8mm; }
+            body { padding: 0; background: transparent; }
+            .voucher-card { border: 2.5px solid #0d9488 !important; box-shadow: none !important; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="voucher-card">
+          <div class="deco-circle-bg"></div>
+          <div class="deco-circle-inner">${logoImg}</div>
+          <div class="deco-arcs"></div>
+
+          <div class="voucher-header">
+            <div>
+              <div class="voucher-title">${kindTitle}</div>
+              <div class="voucher-num-date">
+                <span>رقم: <strong>${voucherNum}</strong></span>
+                <span>التاريخ: <strong>${voucherDate} م</strong></span>
+              </div>
+            </div>
+            <div>
+              <div class="amount-badge">
+                <span style="font-size:13px;font-weight:bold;">المبلغ:</span>
+                <span>${voucherAmount}</span>
+                <span style="font-size:12px;background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:6px;">${currencyCode}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="body-row">
+            <div class="row-label">ادفعــــوا لأمـــــر :</div>
+            <div class="row-value">${recipientName}</div>
+          </div>
+
+          <div class="body-row">
+            <div class="row-label">مبلــــغ وقــــدره :</div>
+            <div class="row-value">${tafqeetText}</div>
+          </div>
+
+          <div class="body-row">
+            <div class="row-label">نقداً / شيك رقم :</div>
+            <div class="row-value">${pmName} ${manualRefText}</div>
+          </div>
+
+          <div class="body-row">
+            <div class="row-label">وذلــــك قيـمـــــة :</div>
+            <div class="row-value">${voucherDesc}</div>
+          </div>
+
+          ${itemsTableHtml}
+
+          <div class="signatures-row">
+            <div class="sig-block">
+              <div class="sig-title">المستلم</div>
+              <div class="sig-line"></div>
+            </div>
+            <div class="sig-block">
+              <div class="sig-title">أمين الخزينة / الصراف</div>
+              <div class="sig-line"></div>
+            </div>
+            <div class="sig-block">
+              <div class="sig-title">المحاسب</div>
+              <div class="sig-line"></div>
+            </div>
+            <div class="sig-block">
+              <div class="sig-title">المدير المالي / الاعتماد</div>
+              <div class="sig-line"></div>
+            </div>
+          </div>
+
+          <div class="footer-info">
+            <span>${companyName} ${companyTax}</span>
+            <span>تم الإصدار آلياً عبر نظام ERP</span>
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            window.print();
+          };
+        </script>
+      </body>
+      </html>
+    `);
+    printWin.document.close();
+  };
+
+
   const handleExportExcel = () => {
     const preparedData = filteredVouchers.map(voucher => {
       // Resolve recipient name
@@ -2169,8 +2503,19 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                             handleViewVoucher(voucher.id);
                           }}
                           className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
+                          title="معاينة السند"
                         >
                           <Eye size={18} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            printOfficialVoucher(voucher);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-teal-600 hover:bg-teal-50 rounded-xl transition-all"
+                          title="طباعة السند الرسمي"
+                        >
+                          <Printer size={18} />
                         </button>
                         <button 
                           onClick={(e) => {
@@ -2213,8 +2558,19 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                       handleViewVoucher(voucher.id);
                     }}
                     className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
+                    title="معاينة السند"
                   >
                     <Eye size={16} />
+                  </button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      printOfficialVoucher(voucher);
+                    }}
+                    className="p-2 bg-white text-teal-600 rounded-xl border border-teal-50 shadow-sm hover:bg-teal-50 transition-all font-bold"
+                    title="طباعة السند الرسمي"
+                  >
+                    <Printer size={16} />
                   </button>
                   <button 
                     onClick={(e) => {
@@ -2388,31 +2744,18 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
               {/* Print, PDF, Excel Buttons */}
               <button 
                 type="button"
-                onClick={() => {
-                  const el = editModalRef.current;
-                  if (el) printElement(el, 'سند صرف');
-                  else window.print();
-                }}
-                className="flex items-center gap-1.5 px-3 py-2 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all font-bold text-xs border border-blue-200 shadow-xs"
-                title={language === 'ar' ? 'طباعة' : 'Print'}
+                onClick={() => printOfficialVoucher(editingVoucher || voucherData)}
+                className="flex items-center gap-1.5 px-3 py-2 text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-xl transition-all font-bold text-xs border border-teal-200 shadow-xs cursor-pointer active:scale-95"
+                title={language === 'ar' ? 'طباعة السند الرسمي' : 'Print Voucher'}
               >
                 <Printer size={14} />
-                <span>{language === 'ar' ? 'طباعة' : 'Print'}</span>
+                <span>{language === 'ar' ? 'طباعة السند' : 'Print'}</span>
               </button>
 
               <button 
                 type="button"
-                onClick={() => {
-                  const el = editModalRef.current;
-                  if (el) {
-                    exportToPDFUtil(el, {
-                      filename: `Payment_Voucher_${editingVoucher?.voucher_number || 'Doc'}`,
-                      reportTitle: `سند صرف رقم ${editingVoucher?.voucher_number || ''}`,
-                      orientation: 'portrait'
-                    });
-                  }
-                }}
-                className="flex items-center gap-1.5 px-3 py-2 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all font-bold text-xs border border-rose-200 shadow-xs"
+                onClick={() => printOfficialVoucher(editingVoucher || voucherData)}
+                className="flex items-center gap-1.5 px-3 py-2 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all font-bold text-xs border border-rose-200 shadow-xs cursor-pointer active:scale-95"
                 title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
               >
                 <FileText size={14} />
