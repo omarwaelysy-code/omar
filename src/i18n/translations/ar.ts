@@ -176,7 +176,7 @@ export const ar = {
   'nav.purchase_returns': 'مرتجع مشتريات',
   'nav.customer_discounts': 'خصم عملاء',
   'nav.supplier_discounts': 'خصم موردين',
-  'nav.receipts': 'سندات القبض',
+  'nav.receipts': 'سند القبض / قبض من عميل',
   'nav.payment_vouchers': 'سند الصرف / صرف لمورد',
   'nav.supplier_payment_vouchers': 'سند صرف مورد',
   'nav.cash_transfers': 'التحويل بين الخزائن',
@@ -510,8 +510,8 @@ export const ar = {
   'purchase_returns.add': 'إضافة مرتجع مشتريات',
 
   // Receipts & Payments
-  'receipts.title': 'سندات القبض',
-  'receipts.subtitle': 'تسجيل المبالغ المحصلة من العملاء.',
+  'receipts.title': 'سند القبض / قبض من عميل',
+  'receipts.subtitle': 'إدارة وإنشاء سندات القبض وسندات قبض العملاء ومتابعة تسوياتها.',
   'receipts.add': 'إضافة سند قبض',
   'receipts.edit': 'تعديل سند قبض',
   'receipts.column_number': 'رقم السند',

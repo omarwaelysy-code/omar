@@ -11,6 +11,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
 import { exportToExcel, exportSingleDocumentToExcel, formatDataForExcel } from '../utils/excelUtils';
+import { tafqeet } from '../utils/tafqeet';
 
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
@@ -43,6 +44,19 @@ export const Receipts: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'general' | 'customer'>('all');
+  const [modalMode, setModalMode] = useState<'general' | 'customer'>('general');
+
+  const getReceiptKind = (r: any): 'customer' | 'general' => {
+    if (!r) return 'general';
+    if (r.customer_id || r.type === 'customer') return 'customer';
+    if (r.items && Array.isArray(r.items) && r.items.length > 0) {
+      if (r.items.some((i: any) => i.type === 'customer' || i.customer_id)) {
+        return 'customer';
+      }
+    }
+    return 'general';
+  };
   const handleSort = (field: string) => {
     if (sortBy === field) {
       setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
@@ -1287,10 +1301,50 @@ export const Receipts: React.FC = () => {
     }
   };
 
-  const openEditModal = async (receipt: ReceiptVoucher) => {
+  const openNewGeneralReceipt = async () => {
+    setEditingReceipt(null);
+    setModalMode('general');
+    const newRef = await generateInternalRef(new Date().toISOString().slice(0, 10));
+    setInternalRef(newRef);
+    setVoucherData({
+      internal_reference: newRef,
+      manual_reference: '',
+      items: [{ type: 'account', entity_id: '', amount: 0, description: '' }],
+      customer_id: '',
+      supplier_id: '',
+      amount: 0,
+      payment_method_id: '',
+      date: new Date().toISOString().slice(0, 10),
+      notes: ''
+    });
+    setIsModalOpen(true);
+  };
 
+  const openNewCustomerReceipt = async () => {
+    setEditingReceipt(null);
+    setModalMode('customer');
+    const newRef = await generateInternalRef(new Date().toISOString().slice(0, 10));
+    setInternalRef(newRef);
+    setVoucherData({
+      internal_reference: newRef,
+      manual_reference: '',
+      items: [{ type: 'customer', entity_id: '', amount: 0, description: '' }],
+      customer_id: '',
+      supplier_id: '',
+      amount: 0,
+      payment_method_id: '',
+      date: new Date().toISOString().slice(0, 10),
+      notes: ''
+    });
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = async (receipt: ReceiptVoucher) => {
     try {
       const fullData = await dbService.get<ReceiptVoucher>('receipt_vouchers', receipt.id);
+      if (fullData) {
+        setModalMode(getReceiptKind(fullData));
+      }
 
       if (!fullData) throw new Error('Receipt not found');
 
@@ -1447,10 +1501,342 @@ export const Receipts: React.FC = () => {
     }
   };
 
+  const printOfficialReceipt = (r: any) => {
+    if (!r) return;
+    const kind = getReceiptKind(r);
+    const kindTitle = kind === 'customer' ? 'سند قبض من عميل' : 'إيصال قبض نقدية';
+    const voucherNum = r.internal_reference || r.voucher_number || r.number || 'جديد';
+    const voucherDate = formatDate(r.date);
+    const currencyCode = (companyData?.settings?.currency || 'EGP').toUpperCase();
+    const amountVal = Number(r.amount || (r.items && Array.isArray(r.items) ? r.items.reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0) : 0)) || 0;
+    const voucherAmount = formatNumber(amountVal);
+    const tafqeetText = tafqeet(amountVal, currencyCode, 'ar');
+
+    let payerName = '---';
+    if (r.items && Array.isArray(r.items) && r.items.length > 0) {
+      const names = r.items.map((it: any) => {
+        if (it.type === 'customer') return customers.find(c => c.id === it.entity_id)?.name || 'عميل';
+        if (it.type === 'supplier') return suppliers.find(s => s.id === it.entity_id)?.name || 'مورد';
+        if (it.type === 'expense') return categories.find(c => c.id === it.entity_id)?.name || 'مصروف';
+        return accounts.find(a => a.id === it.entity_id)?.name || 'حساب';
+      });
+      payerName = names.join(' ، ');
+    } else if (r.customer_name || r.customer_id) {
+      payerName = r.customer_name || customers.find(c => c.id === r.customer_id)?.name || 'عميل';
+    }
+
+    const pmName = r.payment_method_name || paymentMethods.find(p => p.id === r.payment_method_id)?.name || 'نقداً';
+    const manualRefText = r.manual_reference ? `(مرجع: ${r.manual_reference})` : (r.entry_number ? `(قيد رقم: ${r.entry_number})` : '');
+    const voucherDesc = r.description || r.notes || (kind === 'customer' ? 'تحصيل دفعات / تسوية فواتير عميل' : 'سند قبض نقدية');
+    const companyName = companyData?.name || localStorage.getItem('company_name') || 'نظام ERP السحابي';
+    const companyTax = companyData?.tax_number ? `| س.ت / ض.م: ${companyData.tax_number}` : '';
+    const logoImg = (companyData?.logo_url || (companyData as any)?.logo) 
+      ? `<img src="${companyData?.logo_url || (companyData as any)?.logo}" style="width:70px;height:70px;border-radius:50%;object-fit:contain;" />` 
+      : `<span>${companyName.slice(0, 10)}</span>`;
+
+    let itemsTableHtml = '';
+    if (r.items && Array.isArray(r.items) && r.items.length > 1) {
+      const rows = r.items.map((it: any, idx: number) => {
+        let name = '-';
+        if (it.type === 'customer') name = customers.find(c => c.id === it.entity_id)?.name || 'عميل';
+        else if (it.type === 'supplier') name = suppliers.find(s => s.id === it.entity_id)?.name || 'مورد';
+        else if (it.type === 'expense') name = categories.find(c => c.id === it.entity_id)?.name || 'مصروف';
+        else name = accounts.find(a => a.id === it.entity_id)?.name || 'حساب';
+
+        return `<tr>
+          <td style="text-align:center;color:#64748b;padding:6px 10px;border:1px solid #e2e8f0;">${idx + 1}</td>
+          <td style="font-weight:bold;color:#0f172a;padding:6px 10px;border:1px solid #e2e8f0;">${name}</td>
+          <td style="color:#475569;padding:6px 10px;border:1px solid #e2e8f0;">${it.description || '-'}</td>
+          <td style="text-align:left;font-weight:bold;color:#0f766e;padding:6px 10px;border:1px solid #e2e8f0;">${formatNumber(it.amount)}</td>
+        </tr>`;
+      }).join('');
+
+      itemsTableHtml = `
+        <div style="margin: 15px 0 10px;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;text-align:right;">
+            <thead>
+              <tr style="background:#ccfbf1;color:#0f766e;">
+                <th style="padding:6px 10px;border:1px solid #99f6e4;width:40px;text-align:center;">م</th>
+                <th style="padding:6px 10px;border:1px solid #99f6e4;">النوع / المستفيد</th>
+                <th style="padding:6px 10px;border:1px solid #99f6e4;">البيان والتفاصيل</th>
+                <th style="padding:6px 10px;border:1px solid #99f6e4;width:110px;text-align:left;">المبلغ</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    const printWin = window.open('', '_blank', 'width=950,height=750');
+    if (!printWin) {
+      window.print();
+      return;
+    }
+
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html dir="rtl" lang="ar">
+      <head>
+        <meta charset="utf-8">
+        <title>${kindTitle} - ${voucherNum}</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body {
+            font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif;
+            direction: rtl;
+            background: #fff;
+            color: #1e293b;
+            padding: 30px 20px;
+          }
+          .voucher-card {
+            position: relative;
+            max-width: 820px;
+            margin: 0 auto;
+            border: 2.5px solid #0d9488;
+            border-radius: 24px;
+            padding: 35px 40px;
+            background: #fff;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+          }
+          .deco-circle-bg {
+            position: absolute;
+            top: -35px;
+            left: -35px;
+            width: 160px;
+            height: 160px;
+            background: #ccfbf1;
+            border-radius: 50%;
+            z-index: 1;
+          }
+          .deco-circle-inner {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            width: 90px;
+            height: 90px;
+            background: #0d9488;
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 12px;
+            text-align: center;
+            z-index: 2;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3);
+          }
+          .deco-arcs {
+            position: absolute;
+            top: 10px;
+            left: 130px;
+            width: 75px;
+            height: 75px;
+            border-right: 3px solid #0d9488;
+            border-top: 3px dashed #0d9488;
+            border-radius: 50%;
+            opacity: 0.35;
+            z-index: 1;
+          }
+          .voucher-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 25px;
+            position: relative;
+            z-index: 3;
+            padding-left: 140px;
+            border-bottom: 2px solid #99f6e4;
+            padding-bottom: 18px;
+          }
+          .voucher-title {
+            font-size: 28px;
+            font-weight: 900;
+            color: #0d9488;
+            margin-bottom: 6px;
+            letter-spacing: -0.5px;
+          }
+          .voucher-num-date {
+            display: flex;
+            gap: 20px;
+            font-size: 13px;
+            font-weight: bold;
+            color: #475569;
+          }
+          .amount-badge {
+            background: linear-gradient(135deg, #0d9488, #059669);
+            color: #fff;
+            padding: 8px 18px;
+            border-radius: 14px;
+            font-weight: 900;
+            font-size: 18px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(13, 148, 136, 0.25);
+          }
+          .body-row {
+            display: flex;
+            align-items: baseline;
+            margin-bottom: 18px;
+            font-size: 15px;
+            position: relative;
+            z-index: 3;
+          }
+          .row-label {
+            width: 170px;
+            font-weight: 900;
+            color: #0f766e;
+            flex-shrink: 0;
+            font-size: 16px;
+          }
+          .row-value {
+            flex: 1;
+            border-bottom: 2px dotted #5eead4;
+            padding: 5px 12px;
+            font-weight: 700;
+            color: #0f172a;
+            background: #f0fdfa;
+            border-radius: 6px;
+            min-height: 34px;
+            line-height: 24px;
+          }
+          .signatures-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 35px;
+            padding-top: 20px;
+            border-top: 2px solid #ccfbf1;
+            text-align: center;
+            position: relative;
+            z-index: 3;
+          }
+          .sig-block {
+            flex: 1;
+          }
+          .sig-title {
+            font-weight: 900;
+            font-size: 13px;
+            color: #0f766e;
+            margin-bottom: 35px;
+          }
+          .sig-line {
+            border-bottom: 1.5px dashed #cbd5e1;
+            width: 75%;
+            margin: 0 auto;
+          }
+          .footer-info {
+            margin-top: 25px;
+            font-size: 10px;
+            color: #94a3b8;
+            display: flex;
+            justify-content: space-between;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 10px;
+          }
+          @media print {
+            @page { size: A4 landscape; margin: 8mm; }
+            body { padding: 0; background: transparent; }
+            .voucher-card { border: 2.5px solid #0d9488 !important; box-shadow: none !important; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="voucher-card">
+          <div class="deco-circle-bg"></div>
+          <div class="deco-circle-inner">${logoImg}</div>
+          <div class="deco-arcs"></div>
+
+          <div class="voucher-header">
+            <div>
+              <div class="voucher-title">${kindTitle}</div>
+              <div class="voucher-num-date">
+                <span>رقم: <strong>${voucherNum}</strong></span>
+                <span>التاريخ: <strong>${voucherDate} م</strong></span>
+              </div>
+            </div>
+            <div>
+              <div class="amount-badge">
+                <span style="font-size:13px;font-weight:bold;">المبلغ:</span>
+                <span>${voucherAmount}</span>
+                <span style="font-size:12px;background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:6px;">${currencyCode}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="body-row">
+            <div class="row-label">استلمنا من السيد / السادة :</div>
+            <div class="row-value">${payerName}</div>
+          </div>
+
+          <div class="body-row">
+            <div class="row-label">مبلــــغ وقــــدره :</div>
+            <div class="row-value">${tafqeetText}</div>
+          </div>
+
+          <div class="body-row">
+            <div class="row-label">نقداً / شيك رقم :</div>
+            <div class="row-value">${pmName} ${manualRefText}</div>
+          </div>
+
+          <div class="body-row">
+            <div class="row-label">وذلــــك قيـمـــــة :</div>
+            <div class="row-value">${voucherDesc}</div>
+          </div>
+
+          ${itemsTableHtml}
+
+          <div class="signatures-row">
+            <div class="sig-block">
+              <div class="sig-title">المستلم (المحصّل)</div>
+              <div class="sig-line"></div>
+            </div>
+            <div class="sig-block">
+              <div class="sig-title">أمين الخزينة / الصراف</div>
+              <div class="sig-line"></div>
+            </div>
+            <div class="sig-block">
+              <div class="sig-title">المحاسب</div>
+              <div class="sig-line"></div>
+            </div>
+            <div class="sig-block">
+              <div class="sig-title">المدير المالي / الاعتماد</div>
+              <div class="sig-line"></div>
+            </div>
+          </div>
+
+          <div class="footer-info">
+            <span>${companyName} ${companyTax}</span>
+            <span>تم الإصدار آلياً عبر نظام ERP</span>
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            window.print();
+          };
+        </script>
+      </body>
+      </html>
+    `);
+    printWin.document.close();
+  };
+
+
   const handleExportExcel = () => {
     const preparedData = filteredReceipts.map(receipt => {
+      const typeLabel = getReceiptKind(receipt) === 'customer' 
+        ? (language === 'ar' ? 'قبض من عميل' : 'Customer Receipt') 
+        : (language === 'ar' ? 'سند قبض' : 'Receipt Voucher');
       return {
         ...receipt,
+        resolved_type: typeLabel,
         resolved_date: formatDate(receipt.date),
         resolved_amount: receipt.amount
       };
@@ -1458,7 +1844,8 @@ export const Receipts: React.FC = () => {
 
     const formattedData = formatDataForExcel(preparedData, {
       'voucher_number': language === 'ar' ? 'الرقم' : 'Number',
-      'customer_name': language === 'ar' ? 'العميل' : 'Customer',
+      'resolved_type': language === 'ar' ? 'النوع' : 'Type',
+      'customer_name': language === 'ar' ? 'المستفيد / العميل' : 'Customer / Beneficiary',
       'resolved_date': language === 'ar' ? 'التاريخ' : 'Date',
       'payment_method_name': language === 'ar' ? 'طريقة السداد' : 'Payment Method',
       'resolved_amount': language === 'ar' ? 'المبلغ' : 'Amount',
@@ -1508,10 +1895,22 @@ export const Receipts: React.FC = () => {
     }
   };
 
-  const filteredReceipts = receipts.filter(r => 
-    r.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    r.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const generalCount = receipts.filter(r => getReceiptKind(r) === 'general').length;
+  const customerCount = receipts.filter(r => getReceiptKind(r) === 'customer').length;
+
+  const filteredReceipts = receipts.filter(r => {
+    const kind = getReceiptKind(r);
+    if (typeFilter !== 'all' && kind !== typeFilter) return false;
+    const searchLow = searchTerm.toLowerCase();
+    return (
+      (r.customer_name || '').toLowerCase().includes(searchLow) ||
+      (r.voucher_number || '').toLowerCase().includes(searchLow) ||
+      (r.internal_reference || '').toLowerCase().includes(searchLow) ||
+      (r.manual_reference || '').toLowerCase().includes(searchLow) ||
+      (r.description || '').toLowerCase().includes(searchLow) ||
+      (r.notes || '').toLowerCase().includes(searchLow)
+    );
+  });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
@@ -1544,42 +1943,100 @@ export const Receipts: React.FC = () => {
             onPrint={() => printElement(tableRef.current, 'سندات القبض')}
           />
           <button 
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
+            onClick={openNewGeneralReceipt}
+            className="flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
           >
             <Plus size={20} />
-            {t('receipts.add')}
+            <span>{language === 'ar' ? 'إضافة سند قبض' : 'Add Receipt Voucher'}</span>
+          </button>
+          <button 
+            onClick={openNewCustomerReceipt}
+            className="flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-200"
+          >
+            <Plus size={20} />
+            <span>{language === 'ar' ? 'إضافة قبض من عميل' : 'Add Customer Receipt'}</span>
           </button>
         </div>
       </div>
 
       <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden no-pdf">
-        <div className="p-6 border-b border-zinc-50 flex items-center gap-4">
+        <div className="p-4 md:p-6 border-b border-zinc-50 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
           <div className="relative flex-1">
             <Search className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
             <input
               type="text"
               placeholder={language === 'ar' ? "البحث عن سندات..." : "Search receipts..."}
-              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all`}
+              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2.5 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-zinc-900 transition-all text-sm font-medium`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="flex bg-zinc-100 p-1 rounded-xl">
-            <button
-              onClick={() => setView('table')}
-              className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
-              title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
-            >
-              <List size={18} />
-            </button>
-            <button
-              onClick={() => setView('card')}
-              className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
-              title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
-            >
-              <LayoutGrid size={18} />
-            </button>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Filter Tabs by Type */}
+            <div className="flex items-center bg-zinc-100/90 p-1 rounded-2xl border border-zinc-200/60 shadow-xs">
+              <button
+                type="button"
+                onClick={() => { setTypeFilter('all'); setPage(1); }}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  typeFilter === 'all' 
+                    ? 'bg-white text-zinc-900 shadow-xs border border-zinc-200/50' 
+                    : 'text-zinc-500 hover:text-zinc-900'
+                }`}
+              >
+                {language === 'ar' ? 'الكل' : 'All'} ({receipts.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => { setTypeFilter('general'); setPage(1); }}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  typeFilter === 'general' 
+                    ? 'bg-emerald-600 text-white shadow-sm' 
+                    : 'text-zinc-600 hover:text-zinc-900'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${typeFilter === 'general' ? 'bg-white' : 'bg-emerald-500'}`} />
+                <span>{language === 'ar' ? 'سند قبض' : 'Receipt Voucher'}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${typeFilter === 'general' ? 'bg-emerald-700/60 text-white' : 'bg-zinc-200 text-zinc-700'}`}>
+                  {generalCount}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setTypeFilter('customer'); setPage(1); }}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  typeFilter === 'customer' 
+                    ? 'bg-blue-600 text-white shadow-sm' 
+                    : 'text-zinc-600 hover:text-zinc-900'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${typeFilter === 'customer' ? 'bg-white' : 'bg-blue-500'}`} />
+                <span>{language === 'ar' ? 'قبض من عميل' : 'Customer Receipt'}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${typeFilter === 'customer' ? 'bg-blue-700/60 text-white' : 'bg-zinc-200 text-zinc-700'}`}>
+                  {customerCount}
+                </span>
+              </button>
+            </div>
+
+            {/* View Mode Toggle */}
+            <div className="flex bg-zinc-100 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setView('table')}
+                className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+                title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
+              >
+                <List size={18} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setView('card')}
+                className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+                title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
+              >
+                <LayoutGrid size={18} />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1596,7 +2053,8 @@ export const Receipts: React.FC = () => {
                       </span>
                     </div>
                   </th>
-                  <th className="px-6 py-4 font-bold">{t('discounts.column_customer')}</th>
+                  <th className="px-6 py-4 font-bold">{language === 'ar' ? 'النوع' : 'Type'}</th>
+                  <th className="px-6 py-4 font-bold">{language === 'ar' ? 'المستفيد / العميل' : 'Customer / Beneficiary'}</th>
                   <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('date')}>
                     <div className="flex items-center gap-1">
                       التاريخ
@@ -1628,7 +2086,20 @@ export const Receipts: React.FC = () => {
                     <td className="px-6 py-4">
                       <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100">{receipt.voucher_number}</span>
                     </td>
-                    <td className="px-6 py-4 font-bold text-zinc-900">{receipt.customer_name}</td>
+                    <td className="px-6 py-4">
+                      {getReceiptKind(receipt) === 'customer' ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                          {language === 'ar' ? 'قبض من عميل' : 'Customer Receipt'}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          {language === 'ar' ? 'سند قبض' : 'Receipt Voucher'}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 font-bold text-zinc-900">{receipt.customer_name || '---'}</td>
                     <td className="px-6 py-4 text-zinc-500">{formatDate(receipt.date)}</td>
                     <td className="px-6 py-4">
                       {receipt.payment_method_name ? (
@@ -1675,8 +2146,19 @@ export const Receipts: React.FC = () => {
                             handleViewReceipt(receipt);
                           }}
                           className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
+                          title="معاينة السند"
                         >
                           <Eye size={18} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            printOfficialReceipt(receipt);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-all"
+                          title="طباعة السند الرسمي"
+                        >
+                          <Printer size={18} />
                         </button>
                         <button 
                           onClick={(e) => {
@@ -1702,7 +2184,7 @@ export const Receipts: React.FC = () => {
                 ))}
                 {filteredReceipts.length === 0 && !loading && (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-zinc-500 italic">{language === 'ar' ? 'لا توجد سندات قبض.' : 'No receipt vouchers.'}</td>
+                    <td colSpan={7} className="px-6 py-12 text-center text-zinc-500 italic">{language === 'ar' ? 'لا توجد سندات قبض.' : 'No receipt vouchers.'}</td>
                   </tr>
                 )}
               </tbody>
@@ -1724,8 +2206,19 @@ export const Receipts: React.FC = () => {
                       handleViewReceipt(receipt);
                     }}
                     className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
+                    title="معاينة السند"
                   >
                     <Eye size={16} />
+                  </button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      printOfficialReceipt(receipt);
+                    }}
+                    className="p-2 bg-white text-teal-600 rounded-xl border border-teal-50 shadow-sm hover:bg-teal-50 transition-all font-bold"
+                    title="طباعة السند الرسمي"
+                  >
+                    <Printer size={16} />
                   </button>
                   <button 
                     onClick={(e) => {
@@ -1749,7 +2242,18 @@ export const Receipts: React.FC = () => {
 
                 <div className="flex justify-between items-start">
                   <div className="flex flex-col gap-1">
-                    <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{receipt.voucher_number}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{receipt.voucher_number}</span>
+                      {getReceiptKind(receipt) === 'customer' ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                          قبض من عميل
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          سند قبض
+                        </span>
+                      )}
+                    </div>
                     <h4 className="font-bold text-zinc-900 group-hover:text-emerald-700 transition-colors text-xl mt-1 tracking-tight">{receipt.customer_name}</h4>
                   </div>
                   {receipt.entry_number && (
@@ -1939,7 +2443,9 @@ export const Receipts: React.FC = () => {
                 </div>
               )}
               <h3 className="text-xl md:text-2xl font-black text-zinc-900 tracking-tight">
-                {editingReceipt ? (language === 'ar' ? 'تعديل سند القبض' : t('receipts.edit')) : (language === 'ar' ? 'إضافة سند قبض جديد' : t('receipts.add'))}
+                {editingReceipt 
+                  ? (modalMode === 'customer' ? (language === 'ar' ? 'تعديل سند قبض من عميل' : 'Edit Customer Receipt') : (language === 'ar' ? 'تعديل سند القبض' : t('receipts.edit'))) 
+                  : (modalMode === 'customer' ? (language === 'ar' ? 'إضافة سند قبض من عميل' : 'Add Customer Receipt') : (language === 'ar' ? 'إضافة سند قبض جديد' : t('receipts.add')))}
               </h3>
             </div>
           </div>
@@ -3117,6 +3623,263 @@ export const Receipts: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* View & Print Receipt Modal (Matching the classic/modern Voucher design) */}
+      {viewReceipt && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-2 md:p-6 bg-zinc-900/60 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col my-auto border border-zinc-100">
+            {/* Top Toolbar */}
+            <div className="p-4 md:px-6 md:py-4 bg-zinc-50 border-b border-zinc-200 flex flex-wrap items-center justify-between gap-3 no-print">
+              <div className="flex items-center gap-2">
+                <span className="p-2 bg-emerald-100 text-emerald-700 rounded-xl font-bold">
+                  <ReceiptIcon size={20} />
+                </span>
+                <div>
+                  <h3 className="font-bold text-zinc-900 text-base">
+                    {getReceiptKind(viewReceipt) === 'customer' ? 'معاينة سند قبض من عميل' : 'معاينة إيصال قبض نقدية'}
+                  </h3>
+                  <span className="text-xs font-mono text-zinc-500">{viewReceipt.internal_reference || viewReceipt.voucher_number}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => printOfficialReceipt(viewReceipt)}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-sm transition-all active:scale-95 cursor-pointer"
+                >
+                  <Printer size={15} />
+                  <span>طباعة</span>
+                </button>
+
+                <button
+                  onClick={() => printOfficialReceipt(viewReceipt)}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl font-bold text-xs transition-all active:scale-95 cursor-pointer"
+                >
+                  <FileText size={15} />
+                  <span>PDF</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const target = viewReceipt;
+                    setViewReceipt(null);
+                    openEditModal(target);
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl font-bold text-xs transition-all active:scale-95 cursor-pointer"
+                >
+                  <Pencil size={15} />
+                  <span>تعديل</span>
+                </button>
+
+                <button
+                  onClick={() => setViewReceipt(null)}
+                  className="p-2 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-200 rounded-xl transition-all"
+                  title="إغلاق"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Printable Voucher Paper */}
+            <div className="p-4 md:p-8 bg-zinc-100/50 flex justify-center overflow-x-auto">
+              <div 
+                id="receipt-voucher-printable-area" 
+                className="bg-white w-full max-w-3xl p-6 md:p-10 rounded-2xl shadow-sm border border-zinc-200 text-zinc-900 relative overflow-hidden font-sans"
+                dir="rtl"
+                style={{ minHeight: '480px' }}
+              >
+                {/* Decorative Top-Left Artistic Curves and Brand Logo */}
+                <div className="absolute -top-12 -left-12 w-44 h-44 rounded-full bg-teal-500/15 pointer-events-none" />
+                <div className="absolute -top-6 -left-6 w-32 h-32 rounded-full bg-teal-500/25 pointer-events-none flex items-center justify-center">
+                  <div className="w-20 h-20 rounded-full bg-teal-600/30 border-2 border-teal-500/40 flex items-center justify-center text-teal-800 font-bold text-xs">
+                    {(companyData?.logo_url || (companyData as any)?.logo) ? (
+                      <img src={companyData?.logo_url || (companyData as any)?.logo} alt="Logo" className="w-16 h-16 rounded-full object-contain" />
+                    ) : (
+                      <span>{companyData?.name?.slice(0, 10) || 'شعارك'}</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Decorative background arc lines */}
+                <svg className="absolute top-2 left-20 w-28 h-28 opacity-20 pointer-events-none" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#0d9488" strokeWidth="2" strokeDasharray="4 2" />
+                  <circle cx="50" cy="50" r="30" fill="none" stroke="#0d9488" strokeWidth="2" />
+                  <circle cx="50" cy="50" r="20" fill="none" stroke="#0d9488" strokeWidth="1.5" strokeDasharray="3 3" />
+                </svg>
+
+                {/* Voucher Header */}
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b-2 border-teal-600/30 pb-5 mb-6">
+                  <div>
+                    <h1 className="text-2xl md:text-3xl font-black text-teal-700 tracking-tight flex items-center gap-2">
+                      {getReceiptKind(viewReceipt) === 'customer' ? 'سند قبض من عميل' : 'إيصال قبض نقدية'}
+                    </h1>
+                    <div className="flex items-center gap-3 mt-1.5 text-xs text-zinc-600 font-bold">
+                      <span className="bg-teal-50 text-teal-800 px-2.5 py-1 rounded-lg border border-teal-200 font-mono font-black">
+                        رقم: {viewReceipt.internal_reference || viewReceipt.voucher_number}
+                      </span>
+                      {viewReceipt.manual_reference && (
+                        <span className="text-zinc-500 font-mono">
+                          (مرجع يدوي: {viewReceipt.manual_reference})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-start md:items-end gap-1.5">
+                    <div className="flex items-center gap-2 text-sm font-black text-zinc-800">
+                      <span>التاريخ :</span>
+                      <span className="font-mono bg-zinc-50 px-2 py-0.5 rounded border border-zinc-200">{formatDate(viewReceipt.date)} م</span>
+                    </div>
+                    {/* Amount Box */}
+                    <div className="mt-1 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-4 py-2 rounded-xl shadow-sm flex items-center gap-2">
+                      <span className="text-xs font-bold">المبلغ:</span>
+                      <span className="text-lg md:text-xl font-black font-mono tracking-tight">
+                        {formatNumber(viewReceipt.amount)}
+                      </span>
+                      <span className="text-xs font-bold bg-white/20 px-1.5 py-0.5 rounded">
+                        {(companyData?.settings?.currency || 'EGP').toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Voucher Formal Dotted Lines Body */}
+                {(() => {
+                  let payerName = '---';
+                  if (viewReceipt.items && viewReceipt.items.length > 0) {
+                    const names = viewReceipt.items.map((it: any) => {
+                      if (it.type === 'customer') return customers.find(c => c.id === it.entity_id)?.name || 'عميل';
+                      if (it.type === 'supplier') return suppliers.find(s => s.id === it.entity_id)?.name || 'مورد';
+                      if (it.type === 'expense') return categories.find(c => c.id === it.entity_id)?.name || 'مصروف';
+                      return accounts.find(a => a.id === it.entity_id)?.name || 'حساب';
+                    });
+                    payerName = names.join(' ، ');
+                  } else if (viewReceipt.customer_name || viewReceipt.customer_id) {
+                    payerName = viewReceipt.customer_name || customers.find(c => c.id === viewReceipt.customer_id)?.name || 'عميل';
+                  }
+
+                  const currencyCode = (companyData?.settings?.currency || 'EGP').toUpperCase();
+                  const tafqeetText = tafqeet(Number(viewReceipt.amount) || 0, currencyCode, 'ar');
+                  const pmName = viewReceipt.payment_method_name || paymentMethods.find(p => p.id === viewReceipt.payment_method_id)?.name || 'نقداً';
+                  const voucherDesc = viewReceipt.description || viewReceipt.notes || 'سند قبض نقدية';
+
+                  return (
+                    <div className="space-y-6 my-6 text-zinc-900">
+                      {/* Row 1: استلمنا من السيد / السادة */}
+                      <div className="flex items-baseline gap-3">
+                        <span className="font-black text-teal-900 text-base md:text-lg shrink-0 w-44">
+                          استلمنا من السيد / السادة :
+                        </span>
+                        <div className="flex-1 border-b-2 border-dotted border-teal-700/40 pb-1 px-2 font-bold text-zinc-900 text-base md:text-lg bg-teal-50/20 rounded">
+                          {payerName}
+                        </div>
+                      </div>
+
+                      {/* Row 2: مبلغ وقدره */}
+                      <div className="flex items-baseline gap-3">
+                        <span className="font-black text-teal-900 text-base md:text-lg shrink-0 w-44">
+                          مبلــــغ وقــــدره :
+                        </span>
+                        <div className="flex-1 border-b-2 border-dotted border-teal-700/40 pb-1 px-2 font-bold text-zinc-800 text-sm md:text-base bg-teal-50/20 rounded italic">
+                          {tafqeetText}
+                        </div>
+                      </div>
+
+                      {/* Row 3: نقداً / شيك رقم */}
+                      <div className="flex items-baseline gap-3">
+                        <span className="font-black text-teal-900 text-base md:text-lg shrink-0 w-44">
+                          نقداً / شيك رقم :
+                        </span>
+                        <div className="flex-1 border-b-2 border-dotted border-teal-700/40 pb-1 px-2 font-bold text-zinc-800 text-sm md:text-base bg-teal-50/20 rounded">
+                          <span className="font-bold text-teal-800">{pmName}</span>
+                          {viewReceipt.manual_reference && <span className="mr-3 font-mono text-xs text-zinc-500">رقم: {viewReceipt.manual_reference}</span>}
+                          {viewReceipt.entry_number && <span className="mr-3 font-mono text-xs text-zinc-500">(قيد رقم: {viewReceipt.entry_number})</span>}
+                        </div>
+                      </div>
+
+                      {/* Row 4: وذلك قيمة */}
+                      <div className="flex items-baseline gap-3">
+                        <span className="font-black text-teal-900 text-base md:text-lg shrink-0 w-44">
+                          وذلــــك قيـمـــــة :
+                        </span>
+                        <div className="flex-1 border-b-2 border-dotted border-teal-700/40 pb-1 px-2 font-bold text-zinc-800 text-sm md:text-base bg-teal-50/20 rounded">
+                          {voucherDesc}
+                        </div>
+                      </div>
+
+                      {/* Breakdown table if multi items exist */}
+                      {viewReceipt.items && Array.isArray(viewReceipt.items) && viewReceipt.items.length > 1 && (
+                        <div className="mt-6 pt-4 border-t border-zinc-200">
+                          <h4 className="text-xs font-black text-teal-900 mb-2 uppercase tracking-wider">تفاصيل بنود القبض:</h4>
+                          <table className="w-full text-xs text-right border border-zinc-200 rounded-xl overflow-hidden">
+                            <thead className="bg-teal-50/80 text-teal-900 font-black">
+                              <tr>
+                                <th className="p-2 border-b border-zinc-200 w-12 text-center">م</th>
+                                <th className="p-2 border-b border-zinc-200">النوع / الحساب</th>
+                                <th className="p-2 border-b border-zinc-200">البيان والتفاصيل</th>
+                                <th className="p-2 border-b border-zinc-200 w-28 text-left">المبلغ</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-100 font-medium">
+                              {viewReceipt.items.map((item: any, idx: number) => {
+                                let name = '-';
+                                if (item.type === 'customer') name = customers.find(c => c.id === item.entity_id)?.name || 'عميل';
+                                else if (item.type === 'supplier') name = suppliers.find(s => s.id === item.entity_id)?.name || 'مورد';
+                                else if (item.type === 'expense') name = categories.find(c => c.id === item.entity_id)?.name || 'مصروف';
+                                else name = accounts.find(a => a.id === item.entity_id)?.name || 'حساب';
+
+                                return (
+                                  <tr key={idx} className="hover:bg-zinc-50/50">
+                                    <td className="p-2 text-center font-bold text-zinc-400">{idx + 1}</td>
+                                    <td className="p-2 font-bold text-zinc-900">{name}</td>
+                                    <td className="p-2 text-zinc-600">{item.description || '-'}</td>
+                                    <td className="p-2 text-left font-black font-mono text-teal-700">{formatNumber(item.amount)}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Bottom Signatures Section */}
+                <div className="mt-12 pt-6 border-t-2 border-teal-600/30 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+                  <div className="space-y-8">
+                    <span className="text-xs font-black text-teal-900 uppercase tracking-wider block">المستلم (المحصّل)</span>
+                    <div className="border-b border-zinc-300 w-3/4 mx-auto pb-1 text-xs text-zinc-400">........................</div>
+                  </div>
+
+                  <div className="space-y-8">
+                    <span className="text-xs font-black text-teal-900 uppercase tracking-wider block">أمين الخزينة / الصراف</span>
+                    <div className="border-b border-zinc-300 w-3/4 mx-auto pb-1 text-xs text-zinc-400">........................</div>
+                  </div>
+
+                  <div className="space-y-8">
+                    <span className="text-xs font-black text-teal-900 uppercase tracking-wider block">المحاسب</span>
+                    <div className="border-b border-zinc-300 w-3/4 mx-auto pb-1 text-xs text-zinc-400">........................</div>
+                  </div>
+
+                  <div className="space-y-8">
+                    <span className="text-xs font-black text-teal-900 uppercase tracking-wider block">المدير المالي / الاعتماد</span>
+                    <div className="border-b border-zinc-300 w-3/4 mx-auto pb-1 text-xs text-zinc-400">........................</div>
+                  </div>
+                </div>
+
+                {/* Company Footer Stamp / Information */}
+                <div className="mt-8 pt-4 flex items-center justify-between text-[10px] text-zinc-400 border-t border-zinc-100">
+                  <span>{companyData?.name || 'نظام ERP السحابي'} {companyData?.tax_number ? `| س.ت / ض.م: ${companyData.tax_number}` : ''}</span>
+                  <span>تمت الطباعة بواسطة النظام المالي</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       <PageActivityLog 
         category="receipts" 

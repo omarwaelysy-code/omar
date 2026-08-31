@@ -176,7 +176,7 @@ export const en = {
   'nav.purchase_returns': 'Purchase Returns',
   'nav.customer_discounts': 'Customer Discounts',
   'nav.supplier_discounts': 'Supplier Discounts',
-  'nav.receipts': 'Receipt Vouchers',
+  'nav.receipts': 'Receipt / Customer Vouchers',
   'nav.payment_vouchers': 'Payment / Supplier Vouchers',
   'nav.supplier_payment_vouchers': 'Supplier Payment Voucher',
   'nav.cash_transfers': 'Cash Transfers',
@@ -510,8 +510,8 @@ export const en = {
   'purchase_returns.add': 'Add Purchase Return',
 
   // Receipts & Payments
-  'receipts.title': 'Receipt Vouchers',
-  'receipts.subtitle': 'Record payments received from customers.',
+  'receipts.title': 'Receipt / Customer Vouchers',
+  'receipts.subtitle': 'Manage and create customer and general receipt vouchers.',
   'receipts.add': 'Add Receipt Voucher',
   'receipts.edit': 'Edit Receipt Voucher',
   'receipts.column_number': 'Voucher No.',
