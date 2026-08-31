@@ -23,7 +23,7 @@ import { SmartAIInput } from '../components/SmartAIInput';
 import { printDocument } from '../utils/printEngine';
 import { TransactionManager } from '../services/TransactionManager';
 import { VoucherSchema, JournalEntrySchema } from '../lib/schemas';
-import { ActivityLog, ReceiptVoucher, Customer, Supplier, ExpenseCategory, PaymentMethod, JournalEntry, JournalEntryItem, Account, Company } from '../types';
+import { ActivityLog, ReceiptVoucher, Customer, Supplier, ExpenseCategory, PaymentMethod, JournalEntry, JournalEntryItem, Account, Company, Currency, Employee } from '../types';
 import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { PaginationControls } from '../components/PaginationControls';
 import { useViewPreference } from '../hooks/useViewPreference';
@@ -1389,7 +1389,12 @@ export const Receipts: React.FC = () => {
       amount: 0,
       payment_method_id: '',
       date: new Date().toISOString().slice(0, 10),
-      notes: ''
+      notes: '',
+      paid_to_type: 'employee',
+      paid_to_employee_id: '',
+      paid_to_external_name: '',
+      currency_id: '',
+      exchange_rate: 1
     });
     setIsModalOpen(true);
   };
@@ -1408,7 +1413,12 @@ export const Receipts: React.FC = () => {
       amount: 0,
       payment_method_id: '',
       date: new Date().toISOString().slice(0, 10),
-      notes: ''
+      notes: '',
+      paid_to_type: 'employee',
+      paid_to_employee_id: '',
+      paid_to_external_name: '',
+      currency_id: '',
+      exchange_rate: 1
     });
     setIsModalOpen(true);
   };
@@ -1503,7 +1513,12 @@ export const Receipts: React.FC = () => {
         amount: fullData.amount,
         payment_method_id: fullData.payment_method_id || '',
         date: fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
-        notes: fullData.description || ''
+        notes: fullData.description || '',
+        paid_to_type: (fullData as any).paid_to_type || 'employee',
+        paid_to_employee_id: (fullData as any).paid_to_employee_id || '',
+        paid_to_external_name: (fullData as any).paid_to_external_name || '',
+        currency_id: (fullData as any).currency_id || '',
+        exchange_rate: (fullData as any).exchange_rate || 1
       });
       setIsModalOpen(true);
       const datesDict: Record<string, string> = {};
