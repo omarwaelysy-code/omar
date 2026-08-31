@@ -3868,6 +3868,283 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
         </div>
       )}
 
+      {/* View & Print Voucher Modal (Matching the classic/modern Voucher design) */}
+      {viewVoucher && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-2 md:p-6 bg-zinc-900/60 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col my-auto border border-zinc-100">
+            {/* Top Toolbar */}
+            <div className="p-4 md:px-6 md:py-4 bg-zinc-50 border-b border-zinc-200 flex flex-wrap items-center justify-between gap-3 no-print">
+              <div className="flex items-center gap-2">
+                <span className="p-2 bg-emerald-100 text-emerald-700 rounded-xl font-bold">
+                  <CreditCard size={20} />
+                </span>
+                <div>
+                  <h3 className="font-bold text-zinc-900 text-base">
+                    {getVoucherKind(viewVoucher) === 'supplier' ? 'معاينة سند صرف مورد' : 'معاينة إيصال صرف نقدية'}
+                  </h3>
+                  <span className="text-xs font-mono text-zinc-500">{viewVoucher.internal_reference || viewVoucher.voucher_number}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => {
+                    const el = document.getElementById('payment-voucher-printable-area');
+                    if (el) printElement(el, `سند_صرف_${viewVoucher.internal_reference || viewVoucher.voucher_number}`);
+                    else window.print();
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-sm transition-all active:scale-95"
+                >
+                  <Printer size={15} />
+                  <span>طباعة</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const el = document.getElementById('payment-voucher-printable-area');
+                    if (el) {
+                      exportToPDFUtil(el, {
+                        filename: `Payment_Voucher_${viewVoucher.internal_reference || viewVoucher.voucher_number}`,
+                        reportTitle: `سند صرف رقم ${viewVoucher.internal_reference || viewVoucher.voucher_number}`,
+                        orientation: 'portrait'
+                      });
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl font-bold text-xs transition-all active:scale-95"
+                >
+                  <FileText size={15} />
+                  <span>PDF</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const target = viewVoucher;
+                    setViewVoucher(null);
+                    openEditModal(target);
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl font-bold text-xs transition-all active:scale-95"
+                >
+                  <Pencil size={15} />
+                  <span>تعديل</span>
+                </button>
+
+                <button
+                  onClick={() => setViewVoucher(null)}
+                  className="p-2 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-200 rounded-xl transition-all"
+                  title="إغلاق"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Printable Voucher Paper */}
+            <div className="p-4 md:p-8 bg-zinc-100/50 flex justify-center overflow-x-auto">
+              <div 
+                id="payment-voucher-printable-area" 
+                className="bg-white w-full max-w-3xl p-6 md:p-10 rounded-2xl shadow-sm border border-zinc-200 text-zinc-900 relative overflow-hidden font-sans"
+                dir="rtl"
+                style={{ minHeight: '480px' }}
+              >
+                {/* Decorative Top-Left Artistic Curves and Brand Logo (Matching attached design) */}
+                <div className="absolute -top-12 -left-12 w-44 h-44 rounded-full bg-teal-500/15 pointer-events-none" />
+                <div className="absolute -top-6 -left-6 w-32 h-32 rounded-full bg-teal-500/25 pointer-events-none flex items-center justify-center">
+                  <div className="w-20 h-20 rounded-full bg-teal-600/30 border-2 border-teal-500/40 flex items-center justify-center text-teal-800 font-bold text-xs">
+                    {companyData?.logo ? (
+                      <img src={companyData.logo} alt="Logo" className="w-16 h-16 rounded-full object-contain" />
+                    ) : (
+                      <span>{companyData?.name?.slice(0, 10) || 'شعارك'}</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Decorative background arc lines */}
+                <svg className="absolute top-2 left-20 w-28 h-28 opacity-20 pointer-events-none" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#0d9488" strokeWidth="2" strokeDasharray="4 2" />
+                  <circle cx="50" cy="50" r="30" fill="none" stroke="#0d9488" strokeWidth="2" />
+                  <circle cx="50" cy="50" r="20" fill="none" stroke="#0d9488" strokeWidth="1.5" strokeDasharray="3 3" />
+                </svg>
+
+                {/* Voucher Header */}
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b-2 border-teal-600/30 pb-5 mb-6">
+                  <div>
+                    <h1 className="text-2xl md:text-3xl font-black text-teal-700 tracking-tight flex items-center gap-2">
+                      {getVoucherKind(viewVoucher) === 'supplier' ? 'سند صرف مورد' : 'إيصال صرف نقدية'}
+                    </h1>
+                    <div className="flex items-center gap-3 mt-1.5 text-xs text-zinc-600 font-bold">
+                      <span className="bg-teal-50 text-teal-800 px-2.5 py-1 rounded-lg border border-teal-200 font-mono font-black">
+                        رقم: {viewVoucher.internal_reference || viewVoucher.voucher_number || viewVoucher.number}
+                      </span>
+                      {viewVoucher.manual_reference && (
+                        <span className="text-zinc-500 font-mono">
+                          (مرجع يدوي: {viewVoucher.manual_reference})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-start md:items-end gap-1.5">
+                    <div className="flex items-center gap-2 text-sm font-black text-zinc-800">
+                      <span>التاريخ :</span>
+                      <span className="font-mono bg-zinc-50 px-2 py-0.5 rounded border border-zinc-200">{formatDate(viewVoucher.date)} م</span>
+                    </div>
+                    {/* Amount Box */}
+                    <div className="mt-1 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-4 py-2 rounded-xl shadow-sm flex items-center gap-2">
+                      <span className="text-xs font-bold">المبلغ:</span>
+                      <span className="text-lg md:text-xl font-black font-mono tracking-tight">
+                        {formatNumber(viewVoucher.amount)}
+                      </span>
+                      <span className="text-xs font-bold bg-white/20 px-1.5 py-0.5 rounded">
+                        {(companyCurrencies.find(c => c.id === viewVoucher.currency_id)?.code || companyData?.settings?.currency || 'EGP').toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Voucher Formal Dotted Lines Body (Exact layout from attached image) */}
+                {(() => {
+                  // Resolve beneficiary name
+                  let recipientName = '---';
+                  if (viewVoucher.items && viewVoucher.items.length > 0) {
+                    const names = viewVoucher.items.map((it: any) => {
+                      if (it.type === 'supplier') return suppliers.find(s => s.id === it.entity_id)?.name || 'مورد';
+                      if (it.type === 'customer') return customers.find(c => c.id === it.entity_id)?.name || 'عميل';
+                      if (it.type === 'expense') return categories.find(c => c.id === it.entity_id)?.name || 'مصروف';
+                      return accounts.find(a => a.id === it.entity_id)?.name || 'حساب';
+                    });
+                    recipientName = names.join(' ، ');
+                  } else if (viewVoucher.type === 'supplier' || viewVoucher.supplier_id) {
+                    recipientName = suppliers.find(s => s.id === viewVoucher.supplier_id)?.name || viewVoucher.supplier_name || 'مورد';
+                  } else if (viewVoucher.paid_to_type === 'employee' && viewVoucher.paid_to_employee_id) {
+                    recipientName = employees.find(e => e.id === viewVoucher.paid_to_employee_id)?.name || 'موظف';
+                  } else if (viewVoucher.paid_to_external_name) {
+                    recipientName = viewVoucher.paid_to_external_name;
+                  } else if (viewVoucher.category_name) {
+                    recipientName = viewVoucher.category_name;
+                  }
+
+                  const currencyCode = (companyCurrencies.find(c => c.id === viewVoucher.currency_id)?.code || companyData?.settings?.currency || 'EGP').toUpperCase();
+                  const tafqeetText = tafqeet(Number(viewVoucher.amount) || 0, currencyCode, 'ar');
+                  const pmName = viewVoucher.payment_method_name || paymentMethods.find(p => p.id === viewVoucher.payment_method_id)?.name || 'نقداً';
+                  const voucherDesc = viewVoucher.description || viewVoucher.notes || 'سند صرف نقدية';
+
+                  return (
+                    <div className="space-y-6 my-6 text-zinc-900">
+                      {/* Row 1: ادفعوا لأمر */}
+                      <div className="flex items-baseline gap-3">
+                        <span className="font-black text-teal-900 text-base md:text-lg shrink-0 w-32">
+                          ادفعــــوا لأمـــــر :
+                        </span>
+                        <div className="flex-1 border-b-2 border-dotted border-teal-700/40 pb-1 px-2 font-bold text-zinc-900 text-base md:text-lg bg-teal-50/20 rounded">
+                          {recipientName}
+                        </div>
+                      </div>
+
+                      {/* Row 2: مبلغ وقدره */}
+                      <div className="flex items-baseline gap-3">
+                        <span className="font-black text-teal-900 text-base md:text-lg shrink-0 w-32">
+                          مبلــــغ وقــــدره :
+                        </span>
+                        <div className="flex-1 border-b-2 border-dotted border-teal-700/40 pb-1 px-2 font-bold text-zinc-800 text-sm md:text-base bg-teal-50/20 rounded italic">
+                          {tafqeetText}
+                        </div>
+                      </div>
+
+                      {/* Row 3: نقداً / شيك رقم */}
+                      <div className="flex items-baseline gap-3">
+                        <span className="font-black text-teal-900 text-base md:text-lg shrink-0 w-32">
+                          نقداً / شيك رقم :
+                        </span>
+                        <div className="flex-1 border-b-2 border-dotted border-teal-700/40 pb-1 px-2 font-bold text-zinc-800 text-sm md:text-base bg-teal-50/20 rounded">
+                          <span className="font-bold text-teal-800">{pmName}</span>
+                          {viewVoucher.manual_reference && <span className="mr-3 font-mono text-xs text-zinc-500">رقم: {viewVoucher.manual_reference}</span>}
+                          {viewVoucher.entry_number && <span className="mr-3 font-mono text-xs text-zinc-500">(قيد رقم: {viewVoucher.entry_number})</span>}
+                        </div>
+                      </div>
+
+                      {/* Row 4: وذلك قيمة */}
+                      <div className="flex items-baseline gap-3">
+                        <span className="font-black text-teal-900 text-base md:text-lg shrink-0 w-32">
+                          وذلــــك قيـمـــــة :
+                        </span>
+                        <div className="flex-1 border-b-2 border-dotted border-teal-700/40 pb-1 px-2 font-bold text-zinc-800 text-sm md:text-base bg-teal-50/20 rounded">
+                          {voucherDesc}
+                        </div>
+                      </div>
+
+                      {/* Breakdown table if multi items exist */}
+                      {viewVoucher.items && Array.isArray(viewVoucher.items) && viewVoucher.items.length > 1 && (
+                        <div className="mt-6 pt-4 border-t border-zinc-200">
+                          <h4 className="text-xs font-black text-teal-900 mb-2 uppercase tracking-wider">تفاصيل بنود الصرف:</h4>
+                          <table className="w-full text-xs text-right border border-zinc-200 rounded-xl overflow-hidden">
+                            <thead className="bg-teal-50/80 text-teal-900 font-black">
+                              <tr>
+                                <th className="p-2 border-b border-zinc-200 w-12 text-center">م</th>
+                                <th className="p-2 border-b border-zinc-200">النوع / المستفيد</th>
+                                <th className="p-2 border-b border-zinc-200">البيان والتفاصيل</th>
+                                <th className="p-2 border-b border-zinc-200 w-28 text-left">المبلغ</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-100 font-medium">
+                              {viewVoucher.items.map((item: any, idx: number) => {
+                                let name = '-';
+                                if (item.type === 'supplier') name = suppliers.find(s => s.id === item.entity_id)?.name || 'مورد';
+                                else if (item.type === 'customer') name = customers.find(c => c.id === item.entity_id)?.name || 'عميل';
+                                else if (item.type === 'expense') name = categories.find(c => c.id === item.entity_id)?.name || 'مصروف';
+                                else name = accounts.find(a => a.id === item.entity_id)?.name || 'حساب';
+
+                                return (
+                                  <tr key={idx} className="hover:bg-zinc-50/50">
+                                    <td className="p-2 text-center font-bold text-zinc-400">{idx + 1}</td>
+                                    <td className="p-2 font-bold text-zinc-900">{name}</td>
+                                    <td className="p-2 text-zinc-600">{item.description || '-'}</td>
+                                    <td className="p-2 text-left font-black font-mono text-teal-700">{formatNumber(item.amount)}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Bottom Signatures Section (Matching attached image) */}
+                <div className="mt-12 pt-6 border-t-2 border-teal-600/30 grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+                  <div className="space-y-8">
+                    <span className="text-xs font-black text-teal-900 uppercase tracking-wider block">المستلم</span>
+                    <div className="border-b border-zinc-300 w-3/4 mx-auto pb-1 text-xs text-zinc-400">........................</div>
+                  </div>
+
+                  <div className="space-y-8">
+                    <span className="text-xs font-black text-teal-900 uppercase tracking-wider block">أمين الخزينة / الصراف</span>
+                    <div className="border-b border-zinc-300 w-3/4 mx-auto pb-1 text-xs text-zinc-400">........................</div>
+                  </div>
+
+                  <div className="space-y-8">
+                    <span className="text-xs font-black text-teal-900 uppercase tracking-wider block">المحاسب</span>
+                    <div className="border-b border-zinc-300 w-3/4 mx-auto pb-1 text-xs text-zinc-400">........................</div>
+                  </div>
+
+                  <div className="space-y-8">
+                    <span className="text-xs font-black text-teal-900 uppercase tracking-wider block">المدير المالي / الاعتماد</span>
+                    <div className="border-b border-zinc-300 w-3/4 mx-auto pb-1 text-xs text-zinc-400">........................</div>
+                  </div>
+                </div>
+
+                {/* Company Footer Stamp / Information */}
+                <div className="mt-8 pt-4 flex items-center justify-between text-[10px] text-zinc-400 border-t border-zinc-100">
+                  <span>{companyData?.name || 'نظام ERP السحابي'} {companyData?.tax_number ? `| س.ت / ض.م: ${companyData.tax_number}` : ''}</span>
+                  <span>تمت الطباعة بواسطة النظام المالي</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+
       <PageActivityLog 
         isOpen={isActivityLogOpen}
         onClose={() => {
