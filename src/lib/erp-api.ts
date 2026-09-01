@@ -4004,6 +4004,94 @@ modules.forEach(moduleName => {
           }
         }
 
+        if (moduleName === 'payment_methods') {
+          // 1. Check if linked to invoices
+          const invCheck = await client.query(
+            'SELECT COUNT(*) FROM invoices WHERE payment_method_id = $1',
+            [id]
+          );
+          if (parseInt(invCheck.rows[0]?.count || '0', 10) > 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, 'لا يمكن حذف طريقة السداد لوجود فواتير مبيعات مسجلة بها.');
+          }
+
+          // 2. Check if linked to purchase invoices
+          const purCheck = await client.query(
+            'SELECT COUNT(*) FROM purchase_invoices WHERE payment_method_id = $1',
+            [id]
+          );
+          if (parseInt(purCheck.rows[0]?.count || '0', 10) > 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, 'لا يمكن حذف طريقة السداد لوجود فواتير مشتريات مسجلة بها.');
+          }
+
+          // 3. Check if linked to receipt vouchers
+          const rvCheck = await client.query(
+            'SELECT COUNT(*) FROM receipt_vouchers WHERE payment_method_id = $1',
+            [id]
+          );
+          if (parseInt(rvCheck.rows[0]?.count || '0', 10) > 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, 'لا يمكن حذف طريقة السداد لوجود سندات قبض مسجلة بها.');
+          }
+
+          // 4. Check if linked to payment vouchers
+          const pvCheck = await client.query(
+            'SELECT COUNT(*) FROM payment_vouchers WHERE payment_method_id = $1',
+            [id]
+          );
+          if (parseInt(pvCheck.rows[0]?.count || '0', 10) > 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, 'لا يمكن حذف طريقة السداد لوجود سندات صرف مسجلة بها.');
+          }
+
+          // 5. Check if linked to cash transfers
+          try {
+            const ctCheck = await client.query(
+              'SELECT COUNT(*) FROM cash_transfers WHERE from_payment_method_id = $1 OR to_payment_method_id = $1',
+              [id]
+            );
+            if (parseInt(ctCheck.rows[0]?.count || '0', 10) > 0) {
+              await client.query('ROLLBACK');
+              client.release();
+              return sendError(res, 400, 'لا يمكن حذف طريقة السداد لوجود تحويلات نقدية مرتبطة بها.');
+            }
+          } catch (e) {}
+
+          // 6. Check if linked to orders / POS orders
+          try {
+            const ordCheck = await client.query(
+              'SELECT COUNT(*) FROM orders WHERE payment_method_id = $1',
+              [id]
+            );
+            if (parseInt(ordCheck.rows[0]?.count || '0', 10) > 0) {
+              await client.query('ROLLBACK');
+              client.release();
+              return sendError(res, 400, 'لا يمكن حذف طريقة السداد لوجود طلبات نقاط بيع مرتبطة بها.');
+            }
+          } catch (e) {}
+
+          // 7. Check if linked to journal entries (excluding its own opening balance)
+          const jeCheck = await client.query(
+            `SELECT COUNT(*) FROM journal_entry_lines 
+             WHERE sub_account_id = $1 
+               AND journal_entry_id NOT IN (
+                 SELECT id FROM journal_entries 
+                 WHERE reference_id = $1 AND reference_type = 'opening_balance'
+               )`,
+            [id]
+          );
+          if (parseInt(jeCheck.rows[0]?.count || '0', 10) > 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, 'لا يمكن حذف طريقة السداد لوجود قيود محاسبية ومعاملات مالية مسجلة عليها.');
+          }
+        }
+
         if (moduleName === 'companies') {
           const tablesToDelete = [
             'company_subscriptions', 'users', 'roles', 'journal_entry_lines', 'journal_entries',

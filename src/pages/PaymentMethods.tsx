@@ -31,6 +31,9 @@ export const PaymentMethods: React.FC = () => {
   const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [isBalanceFocused, setIsBalanceFocused] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [methodToDelete, setMethodToDelete] = useState<PaymentMethod | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const [formData, setFormData] = useState({
     code: '',
@@ -126,6 +129,122 @@ export const PaymentMethods: React.FC = () => {
       }
     } catch (e) {
       showNotification('حدث خطأ أثناء حفظ البيانات', 'error');
+    }
+  };
+
+  const handleDeleteClick = (method: PaymentMethod) => {
+    setMethodToDelete(method);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!methodToDelete || !user) return;
+    setIsDeleting(true);
+    try {
+      // 1. Check in invoices
+      const invCheck = await dbService.getDocsByFilter<any>('invoices', user.company_id, [
+        { field: 'payment_method_id', operator: '==', value: methodToDelete.id }
+      ]);
+      if (invCheck && invCheck.length > 0) {
+        showNotification(
+          language === 'ar' 
+            ? 'لا يمكن حذف طريقة السداد لوجود فواتير مبيعات مسجلة بها.' 
+            : 'Cannot delete payment method because sales invoices are linked to it.',
+          'error'
+        );
+        setIsDeleteModalOpen(false);
+        setMethodToDelete(null);
+        setIsDeleting(false);
+        return;
+      }
+
+      // 2. Check in purchase invoices
+      const purCheck = await dbService.getDocsByFilter<any>('purchase_invoices', user.company_id, [
+        { field: 'payment_method_id', operator: '==', value: methodToDelete.id }
+      ]);
+      if (purCheck && purCheck.length > 0) {
+        showNotification(
+          language === 'ar' 
+            ? 'لا يمكن حذف طريقة السداد لوجود فواتير مشتريات مسجلة بها.' 
+            : 'Cannot delete payment method because purchase invoices are linked to it.',
+          'error'
+        );
+        setIsDeleteModalOpen(false);
+        setMethodToDelete(null);
+        setIsDeleting(false);
+        return;
+      }
+
+      // 3. Check in receipt vouchers
+      const rvCheck = await dbService.getDocsByFilter<any>('receipt_vouchers', user.company_id, [
+        { field: 'payment_method_id', operator: '==', value: methodToDelete.id }
+      ]);
+      if (rvCheck && rvCheck.length > 0) {
+        showNotification(
+          language === 'ar' 
+            ? 'لا يمكن حذف طريقة السداد لوجود سندات قبض مسجلة بها.' 
+            : 'Cannot delete payment method because receipt vouchers are linked to it.',
+          'error'
+        );
+        setIsDeleteModalOpen(false);
+        setMethodToDelete(null);
+        setIsDeleting(false);
+        return;
+      }
+
+      // 4. Check in payment vouchers
+      const pvCheck = await dbService.getDocsByFilter<any>('payment_vouchers', user.company_id, [
+        { field: 'payment_method_id', operator: '==', value: methodToDelete.id }
+      ]);
+      if (pvCheck && pvCheck.length > 0) {
+        showNotification(
+          language === 'ar' 
+            ? 'لا يمكن حذف طريقة السداد لوجود سندات صرف مسجلة بها.' 
+            : 'Cannot delete payment method because payment vouchers are linked to it.',
+          'error'
+        );
+        setIsDeleteModalOpen(false);
+        setMethodToDelete(null);
+        setIsDeleting(false);
+        return;
+      }
+
+      // 5. Check in cash transfers
+      try {
+        const fromCt = await dbService.getDocsByFilter<any>('cash_transfers', user.company_id, [
+          { field: 'from_payment_method_id', operator: '==', value: methodToDelete.id }
+        ]);
+        const toCt = await dbService.getDocsByFilter<any>('cash_transfers', user.company_id, [
+          { field: 'to_payment_method_id', operator: '==', value: methodToDelete.id }
+        ]);
+        if ((fromCt && fromCt.length > 0) || (toCt && toCt.length > 0)) {
+          showNotification(
+            language === 'ar' 
+              ? 'لا يمكن حذف طريقة السداد لوجود تحويلات نقدية مرتبطة بها.' 
+              : 'Cannot delete payment method because cash transfers are linked to it.',
+            'error'
+          );
+          setIsDeleteModalOpen(false);
+          setMethodToDelete(null);
+          setIsDeleting(false);
+          return;
+        }
+      } catch (e) {}
+
+      // Delete opening balance journal entry
+      await dbService.deleteJournalEntryByReference(methodToDelete.id, user.company_id);
+
+      // Perform delete
+      await dbService.delete('payment_methods', methodToDelete.id);
+      await dbService.logActivity(user.id, user.username, user.company_id, 'حذف طريقة سداد', `حذف طريقة السداد: ${methodToDelete.name}`, 'payment_methods');
+      showNotification(t('common.deleted_successfully'), 'success');
+      setIsDeleteModalOpen(false);
+      setMethodToDelete(null);
+    } catch (e: any) {
+      console.error(e);
+      showNotification(e.message || 'حدث خطأ أثناء حذف طريقة السداد', 'error');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -272,13 +391,16 @@ export const PaymentMethods: React.FC = () => {
                              <CreditCard size={32} />
                            </div>
                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                              <button onClick={async (e) => {
-                                e.stopPropagation();
-                                if (window.confirm(t('common.confirm_delete'))) {
-                                  await dbService.delete('payment_methods', method.id);
-                                  showNotification(t('common.deleted_successfully'), 'success');
-                                }
-                              }} className="p-3 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"><Trash2 size={20} /></button>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteClick(method);
+                                }} 
+                                className="p-3 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all cursor-pointer"
+                                title={language === 'ar' ? 'حذف' : 'Delete'}
+                              >
+                                <Trash2 size={20} />
+                              </button>
                            </div>
                         </div>
 
@@ -341,14 +463,11 @@ export const PaymentMethods: React.FC = () => {
                                   <FileText size={18} />
                                 </button>
                                 <button 
-                                  onClick={async (e) => {
+                                  onClick={(e) => {
                                     e.stopPropagation();
-                                    if (window.confirm(t('common.confirm_delete'))) {
-                                      await dbService.delete('payment_methods', method.id);
-                                      showNotification(t('common.deleted_successfully'), 'success');
-                                    }
+                                    handleDeleteClick(method);
                                   }}
-                                  className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                                  className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
                                   title={language === 'ar' ? 'حذف' : 'Delete'}
                                 >
                                   <Trash2 size={18} />
@@ -579,6 +698,68 @@ export const PaymentMethods: React.FC = () => {
           onSuccess={() => setShowImportWizard(false)}
         />
       )}
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {isDeleteModalOpen && methodToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl border border-slate-100 space-y-6 text-center"
+              dir={dir}
+            >
+              <div className="w-20 h-20 bg-rose-50 text-rose-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
+                <AlertCircle size={40} />
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-slate-900 tracking-tight font-serif italic">
+                  {language === 'ar' ? 'تأكيد حذف طريقة السداد' : 'Confirm Delete Payment Method'}
+                </h3>
+                <p className="text-sm font-bold text-slate-500 leading-relaxed">
+                  {language === 'ar' 
+                    ? `هل أنت متأكد من رغبتك في حذف طريقة السداد "${methodToDelete.name}" (${methodToDelete.code})؟`
+                    : `Are you sure you want to delete payment method "${methodToDelete.name}" (${methodToDelete.code})?`}
+                </p>
+                <p className="text-xs font-semibold text-rose-600 bg-rose-50/80 p-3 rounded-2xl border border-rose-100">
+                  {language === 'ar'
+                    ? 'تنبيه: لن يسمح النظام بحذف طريقة السداد إذا كانت مرتبطة بأي معاملات مالية، فواتير مبيعات، فواتير مشتريات، سندات قبض أو سندات صرف.'
+                    : 'Notice: The system will not allow deletion if there are linked financial transactions, sales invoices, purchase invoices, or vouchers.'}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => {
+                    setIsDeleteModalOpen(false);
+                    setMethodToDelete(null);
+                  }}
+                  className="flex-1 py-4 bg-slate-100 text-slate-700 font-black rounded-2xl hover:bg-slate-200 transition-all text-sm cursor-pointer disabled:opacity-50"
+                >
+                  {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={confirmDelete}
+                  className="flex-1 py-4 bg-rose-600 text-white font-black rounded-2xl hover:bg-rose-700 transition-all shadow-lg shadow-rose-600/20 active:scale-95 text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isDeleting ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Trash2 size={18} />
+                  )}
+                  <span>{language === 'ar' ? 'تأكيد الحذف' : 'Confirm Delete'}</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 };
