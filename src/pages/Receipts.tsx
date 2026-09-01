@@ -2961,9 +2961,9 @@ export const Receipts: React.FC = () => {
                           type="button"
                           onClick={() => setVoucherData({
                             ...voucherData,
-                            items: [...voucherData.items, { type: modalMode === 'customer' ? 'customer' : 'customer', entity_id: '', amount: 0, description: '' }]
+                            items: [...voucherData.items, { type: modalMode === 'customer' ? 'customer' : 'account', entity_id: '', amount: 0, description: '' }]
                           })}
-                          className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-black border border-emerald-100 hover:bg-emerald-100 transition-all shadow-sm"
+                          className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-black border border-emerald-100 hover:bg-emerald-100 transition-all shadow-sm cursor-pointer"
                         >
                           <Plus size={16} />
                           <span>{language === 'ar' ? 'إضافة بند قبض جديد' : 'Add New Item'}</span>
@@ -2989,7 +2989,7 @@ export const Receipts: React.FC = () => {
                                     <select 
                                       className="w-full px-2 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] font-bold outline-none appearance-none"
                                       disabled={modalMode === 'customer'}
-                                      value={modalMode === 'customer' ? 'customer' : item.type}
+                                      value={modalMode === 'customer' ? 'customer' : (item.type === 'customer' ? 'account' : item.type)}
                                       onChange={(e) => {
                                         const newItems = [...voucherData.items];
                                         newItems[idx].type = e.target.value;
@@ -3003,7 +3003,6 @@ export const Receipts: React.FC = () => {
                                         <option value="customer">{t('discounts.column_customer')}</option>
                                       ) : (
                                         <>
-                                          <option value="customer">{t('discounts.column_customer')}</option>
                                           <option value="supplier">{t('discounts.column_supplier')}</option>
                                           <option value="expense">{language === 'ar' ? 'بند إيراد / مصروف' : 'Revenue / Expense'}</option>
                                           <option value="account">{language === 'ar' ? 'حساب عام' : 'General Ledger Account'}</option>
