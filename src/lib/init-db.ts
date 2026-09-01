@@ -997,7 +997,14 @@ export async function initDatabase() {
 
     await safeQuery(`
       ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "weighted_average_cost" DECIMAL(18, 4) DEFAULT 0;
-    `, 'add weighted_average_cost to products');
+      ALTER TABLE "payment_methods" ADD COLUMN IF NOT EXISTS "bank_name" VARCHAR(255);
+      ALTER TABLE "payment_methods" ADD COLUMN IF NOT EXISTS "branch_name" VARCHAR(255);
+      ALTER TABLE "payment_methods" ADD COLUMN IF NOT EXISTS "account_number" VARCHAR(100);
+      ALTER TABLE "payment_methods" ADD COLUMN IF NOT EXISTS "swift_code" VARCHAR(50);
+      ALTER TABLE "payment_methods" ADD COLUMN IF NOT EXISTS "iban" VARCHAR(100);
+      ALTER TABLE "payment_methods" ADD COLUMN IF NOT EXISTS "contact_person" VARCHAR(255);
+      ALTER TABLE "payment_methods" ADD COLUMN IF NOT EXISTS "contact_phone" VARCHAR(50);
+    `, 'add bank details columns to payment_methods');
 
     await safeQuery('CREATE INDEX IF NOT EXISTS "idx_users_email" ON "users"("email");', 'idx_users_email');
     await safeQuery('CREATE INDEX IF NOT EXISTS "idx_users_company_id" ON "users"("company_id");', 'idx_users_company_id');

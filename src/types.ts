@@ -289,6 +289,13 @@ export interface PaymentMethod {
   account_name?: string;
   counter_account_id?: string;
   company_id: string;
+  bank_name?: string;
+  branch_name?: string;
+  account_number?: string;
+  swift_code?: string;
+  iban?: string;
+  contact_person?: string;
+  contact_phone?: string;
 }
 
 export interface CashTransfer {

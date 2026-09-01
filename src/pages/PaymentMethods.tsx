@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Plus, Trash2, X, CreditCard, History, ChevronRight, ChevronLeft, 
-  Wallet, Layers, Hash, Box, AlertCircle, Calendar, LayoutGrid, List, FileText, FileUp
+  Wallet, Layers, Hash, Box, AlertCircle, Calendar, LayoutGrid, List, FileText, FileUp,
+  Building2, Landmark, Phone, User
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { dbService } from '../services/dbService';
@@ -42,7 +43,14 @@ export const PaymentMethods: React.FC = () => {
     opening_balance_date: new Date().toISOString().slice(0, 10),
     account_id: '',
     counter_account_id: '',
-    type: 'cash'
+    type: 'cash',
+    bank_name: '',
+    branch_name: '',
+    account_number: '',
+    swift_code: '',
+    iban: '',
+    contact_person: '',
+    contact_phone: ''
   });
 
   useEffect(() => {
@@ -258,7 +266,14 @@ export const PaymentMethods: React.FC = () => {
       opening_balance_date: new Date().toISOString().slice(0, 10),
       account_id: defaultCashAccount?.id || '',
       counter_account_id: '',
-      type: 'cash'
+      type: 'cash',
+      bank_name: '',
+      branch_name: '',
+      account_number: '',
+      swift_code: '',
+      iban: '',
+      contact_person: '',
+      contact_phone: ''
     });
   };
 
@@ -272,7 +287,14 @@ export const PaymentMethods: React.FC = () => {
         opening_balance_date: method.opening_balance_date ? new Date(method.opening_balance_date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
         account_id: method.account_id || '',
         counter_account_id: method.counter_account_id || '',
-        type: method.type || 'cash'
+        type: method.type || 'cash',
+        bank_name: method.bank_name || '',
+        branch_name: method.branch_name || '',
+        account_number: method.account_number || '',
+        swift_code: method.swift_code || '',
+        iban: method.iban || '',
+        contact_person: method.contact_person || '',
+        contact_phone: method.contact_phone || ''
       });
     } else {
       resetForm();
@@ -405,8 +427,27 @@ export const PaymentMethods: React.FC = () => {
                         </div>
 
                         <div className="space-y-2">
-                           <h3 className="text-2xl font-black text-slate-900 line-clamp-1 italic serif tracking-tighter group-hover:text-indigo-700 transition-colors uppercase">{method.name}</h3>
-                           <span className="inline-block px-3 py-1 bg-slate-100 text-slate-400 rounded-lg text-[10px] font-black uppercase tracking-widest border border-slate-200">{method.code}</span>
+                           <div className="flex items-center gap-2 flex-wrap">
+                             <h3 className="text-2xl font-black text-slate-900 line-clamp-1 italic serif tracking-tighter group-hover:text-indigo-700 transition-colors uppercase">{method.name}</h3>
+                             {method.type === 'bank' && (
+                               <span className="inline-block px-2.5 py-0.5 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-black border border-indigo-100">
+                                 {language === 'ar' ? 'حساب بنكي' : 'Bank'}
+                               </span>
+                             )}
+                           </div>
+                           <div className="flex items-center gap-2 flex-wrap">
+                             <span className="inline-block px-3 py-1 bg-slate-100 text-slate-400 rounded-lg text-[10px] font-black uppercase tracking-widest border border-slate-200">{method.code}</span>
+                             {method.type === 'bank' && method.account_number && (
+                               <span className="inline-block px-2.5 py-1 bg-slate-50 text-slate-600 rounded-lg text-[10px] font-mono font-bold border border-slate-200">
+                                 #{method.account_number}
+                               </span>
+                             )}
+                             {method.type === 'bank' && method.bank_name && (
+                               <span className="inline-block px-2.5 py-1 bg-slate-50 text-slate-500 rounded-lg text-[10px] font-bold border border-slate-200">
+                                 {method.bank_name}
+                               </span>
+                             )}
+                           </div>
                         </div>
 
                         <div className="pt-6 border-t border-slate-50 flex items-center justify-between">
