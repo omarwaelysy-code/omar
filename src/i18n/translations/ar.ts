@@ -179,6 +179,7 @@ export const ar = {
   'nav.receipts': 'سند القبض / قبض من عميل',
   'nav.payment_vouchers': 'سند الصرف / صرف لمورد',
   'nav.supplier_payment_vouchers': 'سند صرف مورد',
+  'nav.issued_cheques': 'الشيكات الصادرة',
   'nav.cash_transfers': 'التحويل بين الخزائن',
   'nav.warehouses_menu': 'المخازن',
   'nav.warehouse_transfers': 'تحويل بين المخازن',

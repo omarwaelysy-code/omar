@@ -11,7 +11,8 @@ import {
   Customer,
   Supplier,
   Product,
-  PaymentMethod
+  PaymentMethod,
+  IssuedCheque
 } from '../types';
 import { dbService } from './dbService';
 
@@ -910,6 +911,224 @@ export class PostingService {
       total_debit: amount,
       total_credit: amount,
       company_id: '',
+      created_at: new Date().toISOString(),
+      created_by: 'system'
+    };
+  }
+
+  /**
+   * Generates a Journal Entry for an Issued Cheque upon ISSUANCE:
+   * Debit: Supplier (Accounts Payable)
+   * Credit: Notes Payable (Cheques Payable)
+   */
+  static generateIssuedChequeJournal(
+    doc: IssuedCheque,
+    suppliers: Supplier[],
+    accounts: Account[]
+  ): Omit<JournalEntry, 'id'> {
+    const supplier = suppliers.find(s => s.id === doc.supplier_id);
+    const amount = Number(doc.amount) || 0;
+
+    // Supplier Account (Debit)
+    let supplierAccountId = supplier?.account_id || '';
+    let supplierAccountName = supplier?.account_name || '';
+    if (!supplierAccountId) {
+      const defaultSupplierAcc = accounts.find(a => a.account_usage === 'supplier' || a.account_usage === 'accounts_payable' || a.code === '210101');
+      supplierAccountId = defaultSupplierAcc?.id || '';
+      supplierAccountName = defaultSupplierAcc?.name || 'حساب الموردين';
+    }
+
+    // Notes Payable Account (Credit)
+    let notesPayableAccountId = '';
+    let notesPayableAccountName = 'حساب أوراق الدفع - شيكات صادرة';
+    const notesPayableAcc = accounts.find(a => a.account_usage === 'notes_payable' || a.code === '210102' || a.name.includes('أوراق دفع') || a.name.includes('شيكات صادرة'));
+    if (notesPayableAcc) {
+      notesPayableAccountId = notesPayableAcc.id;
+      notesPayableAccountName = notesPayableAcc.name;
+    } else {
+      // Fallback to liabilities or supplier account
+      const fallbackAcc = accounts.find(a => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
+      notesPayableAccountId = fallbackAcc?.id || supplierAccountId;
+      notesPayableAccountName = fallbackAcc?.name || 'أوراق دفع';
+    }
+
+    const journalItems: JournalEntryItem[] = [
+      {
+        account_id: supplierAccountId,
+        account_name: supplierAccountName || 'حساب الموردين',
+        debit: amount,
+        credit: 0,
+        description: `إصدار شيك رقم ${doc.cheque_number} - لصالح ${supplier?.name || doc.payee_name || 'المورد'}`,
+        supplier_id: doc.supplier_id,
+        supplier_name: supplier?.name || doc.payee_name,
+        sub_account_id: doc.supplier_id,
+        sub_account_type: 'supplier'
+      },
+      {
+        account_id: notesPayableAccountId,
+        account_name: notesPayableAccountName,
+        debit: 0,
+        credit: amount,
+        description: `أوراق دفع - شيك رقم ${doc.cheque_number} (استحقاق ${doc.due_date})`,
+        supplier_id: doc.supplier_id,
+        supplier_name: supplier?.name || doc.payee_name
+      }
+    ];
+
+    return {
+      date: doc.issue_date,
+      reference_number: doc.cheque_number,
+      reference_id: doc.id,
+      reference_type: 'issued_cheque',
+      description: `قيد إصدار شيك رقم: ${doc.cheque_number} للمورد: ${supplier?.name || doc.payee_name || ''}`,
+      items: journalItems,
+      total_debit: amount,
+      total_credit: amount,
+      company_id: doc.company_id || '',
+      created_at: new Date().toISOString(),
+      created_by: 'system'
+    };
+  }
+
+  /**
+   * Generates a Journal Entry for an Issued Cheque upon PAYMENT (Cashing from Bank):
+   * Debit: Notes Payable (Cheques Payable)
+   * Credit: Bank Account
+   */
+  static generateChequePaymentJournal(
+    doc: IssuedCheque,
+    paymentMethods: PaymentMethod[],
+    accounts: Account[]
+  ): Omit<JournalEntry, 'id'> {
+    const bankMethod = paymentMethods.find(p => p.id === doc.bank_account_id);
+    const amount = Number(doc.amount) || 0;
+
+    // Bank Account (Credit)
+    let bankAccountId = bankMethod?.account_id || '';
+    let bankAccountName = bankMethod?.account_name || bankMethod?.name || 'حساب البنك';
+    if (!bankAccountId) {
+      const defaultBankAcc = accounts.find(a => a.account_usage === 'bank' || a.code === '110103');
+      bankAccountId = defaultBankAcc?.id || '';
+      bankAccountName = defaultBankAcc?.name || bankAccountName;
+    }
+
+    // Notes Payable Account (Debit)
+    let notesPayableAccountId = '';
+    let notesPayableAccountName = 'حساب أوراق الدفع - شيكات صادرة';
+    const notesPayableAcc = accounts.find(a => a.account_usage === 'notes_payable' || a.code === '210102' || a.name.includes('أوراق دفع') || a.name.includes('شيكات صادرة'));
+    if (notesPayableAcc) {
+      notesPayableAccountId = notesPayableAcc.id;
+      notesPayableAccountName = notesPayableAcc.name;
+    } else {
+      const fallbackAcc = accounts.find(a => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
+      notesPayableAccountId = fallbackAcc?.id || bankAccountId;
+      notesPayableAccountName = fallbackAcc?.name || 'أوراق دفع';
+    }
+
+    const journalItems: JournalEntryItem[] = [
+      {
+        account_id: notesPayableAccountId,
+        account_name: notesPayableAccountName,
+        debit: amount,
+        credit: 0,
+        description: `تسوية وصرف شيك رقم ${doc.cheque_number} من بنك ${bankMethod?.name || doc.bank_name || ''}`,
+        supplier_id: doc.supplier_id,
+        supplier_name: doc.supplier_name || doc.payee_name
+      },
+      {
+        account_id: bankAccountId,
+        account_name: bankAccountName,
+        debit: 0,
+        credit: amount,
+        description: `خصم قيمة الشيك رقم ${doc.cheque_number} من الحساب البنكي ${bankMethod?.name || ''}`,
+        sub_account_id: bankMethod?.id,
+        sub_account_type: 'payment_method'
+      }
+    ];
+
+    return {
+      date: doc.payment_date || new Date().toISOString().slice(0, 10),
+      reference_number: doc.cheque_number,
+      reference_id: doc.id,
+      reference_type: 'cheque_payment',
+      description: `قيد صرف وسداد شيك رقم: ${doc.cheque_number} من بنك: ${bankMethod?.name || doc.bank_name || ''}`,
+      items: journalItems,
+      total_debit: amount,
+      total_credit: amount,
+      company_id: doc.company_id || '',
+      created_at: new Date().toISOString(),
+      created_by: 'system'
+    };
+  }
+
+  /**
+   * Generates a Journal Entry for an Issued Cheque upon RETURN:
+   * Debit: Notes Payable (Cheques Payable)
+   * Credit: Supplier (Accounts Payable)
+   */
+  static generateChequeReturnJournal(
+    doc: IssuedCheque,
+    suppliers: Supplier[],
+    accounts: Account[]
+  ): Omit<JournalEntry, 'id'> {
+    const supplier = suppliers.find(s => s.id === doc.supplier_id);
+    const amount = Number(doc.amount) || 0;
+
+    // Supplier Account (Credit - Restores debt)
+    let supplierAccountId = supplier?.account_id || '';
+    let supplierAccountName = supplier?.account_name || '';
+    if (!supplierAccountId) {
+      const defaultSupplierAcc = accounts.find(a => a.account_usage === 'supplier' || a.account_usage === 'accounts_payable' || a.code === '210101');
+      supplierAccountId = defaultSupplierAcc?.id || '';
+      supplierAccountName = defaultSupplierAcc?.name || 'حساب الموردين';
+    }
+
+    // Notes Payable Account (Debit - Clears the liability)
+    let notesPayableAccountId = '';
+    let notesPayableAccountName = 'حساب أوراق الدفع - شيكات صادرة';
+    const notesPayableAcc = accounts.find(a => a.account_usage === 'notes_payable' || a.code === '210102' || a.name.includes('أوراق دفع') || a.name.includes('شيكات صادرة'));
+    if (notesPayableAcc) {
+      notesPayableAccountId = notesPayableAcc.id;
+      notesPayableAccountName = notesPayableAcc.name;
+    } else {
+      const fallbackAcc = accounts.find(a => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
+      notesPayableAccountId = fallbackAcc?.id || supplierAccountId;
+      notesPayableAccountName = fallbackAcc?.name || 'أوراق دفع';
+    }
+
+    const journalItems: JournalEntryItem[] = [
+      {
+        account_id: notesPayableAccountId,
+        account_name: notesPayableAccountName,
+        debit: amount,
+        credit: 0,
+        description: `إلغاء ورقة دفع لارتداد شيك رقم ${doc.cheque_number} - سبب: ${doc.return_reason || 'غير محدد'}`,
+        supplier_id: doc.supplier_id,
+        supplier_name: supplier?.name || doc.payee_name
+      },
+      {
+        account_id: supplierAccountId,
+        account_name: supplierAccountName || 'حساب الموردين',
+        debit: 0,
+        credit: amount,
+        description: `إعادة إثبات مديونية لارتداد شيك رقم ${doc.cheque_number} - ${supplier?.name || ''}`,
+        supplier_id: doc.supplier_id,
+        supplier_name: supplier?.name || doc.payee_name,
+        sub_account_id: doc.supplier_id,
+        sub_account_type: 'supplier'
+      }
+    ];
+
+    return {
+      date: doc.return_date || new Date().toISOString().slice(0, 10),
+      reference_number: doc.cheque_number,
+      reference_id: doc.id,
+      reference_type: 'cheque_return',
+      description: `قيد ارتداد شيك رقم: ${doc.cheque_number} للمورد: ${supplier?.name || doc.payee_name || ''} - سبب: ${doc.return_reason || ''}`,
+      items: journalItems,
+      total_debit: amount,
+      total_credit: amount,
+      company_id: doc.company_id || '',
       created_at: new Date().toISOString(),
       created_by: 'system'
     };

@@ -179,6 +179,7 @@ export const en = {
   'nav.receipts': 'Receipt / Customer Vouchers',
   'nav.payment_vouchers': 'Payment / Supplier Vouchers',
   'nav.supplier_payment_vouchers': 'Supplier Payment Voucher',
+  'nav.issued_cheques': 'Issued Cheques',
   'nav.cash_transfers': 'Cash Transfers',
   'nav.warehouses_menu': 'Warehouses',
   'nav.warehouse_transfers': 'Warehouse Transfers',

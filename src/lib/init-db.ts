@@ -562,6 +562,52 @@ export async function initDatabase() {
     `, 'payment_vouchers table');
 
     await safeQuery(`
+      CREATE TABLE IF NOT EXISTS "issued_cheques" (
+        "id" VARCHAR(36) PRIMARY KEY,
+        "company_id" VARCHAR(36) NOT NULL REFERENCES "companies"("id") ON DELETE CASCADE,
+        "cheque_number" VARCHAR(100) NOT NULL,
+        "supplier_id" VARCHAR(36) NOT NULL REFERENCES "suppliers"("id"),
+        "bank_account_id" VARCHAR(36) NOT NULL REFERENCES "payment_methods"("id"),
+        "bank_name" VARCHAR(255),
+        "account_number" VARCHAR(100),
+        "amount" DECIMAL(18, 4) NOT NULL CHECK ("amount" > 0),
+        "currency" VARCHAR(10) DEFAULT 'EGP',
+        "exchange_rate" DECIMAL(18, 6) DEFAULT 1.0,
+        "issue_date" DATE NOT NULL,
+        "due_date" DATE NOT NULL,
+        "status" VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
+        "description" TEXT,
+        "notes" TEXT,
+        "payee_name" VARCHAR(255),
+        "payment_date" DATE,
+        "return_date" DATE,
+        "return_reason" TEXT,
+        "old_due_date" DATE,
+        "new_due_date" DATE,
+        "postponement_reason" TEXT,
+        "cancelled_at" TIMESTAMP,
+        "cancelled_by" VARCHAR(36),
+        "cancel_reason" TEXT,
+        "issue_journal_entry_id" VARCHAR(36) REFERENCES "journal_entries"("id"),
+        "payment_journal_entry_id" VARCHAR(36) REFERENCES "journal_entries"("id"),
+        "cancel_journal_entry_id" VARCHAR(36) REFERENCES "journal_entries"("id"),
+        "attachments" JSONB DEFAULT '[]',
+        "created_by" VARCHAR(36),
+        "updated_by" VARCHAR(36),
+        "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "chk_issued_cheque_due_date" CHECK ("due_date" >= "issue_date"),
+        CONSTRAINT "unique_company_bank_cheque_number" UNIQUE ("company_id", "bank_account_id", "cheque_number")
+      );
+    `, 'issued_cheques table');
+
+    await safeQuery(`CREATE INDEX IF NOT EXISTS "idx_issued_cheques_company_status" ON "issued_cheques"("company_id", "status");`, 'idx_issued_cheques_company_status');
+    await safeQuery(`CREATE INDEX IF NOT EXISTS "idx_issued_cheques_due_date" ON "issued_cheques"("company_id", "due_date");`, 'idx_issued_cheques_due_date');
+    await safeQuery(`CREATE INDEX IF NOT EXISTS "idx_issued_cheques_supplier" ON "issued_cheques"("company_id", "supplier_id");`, 'idx_issued_cheques_supplier');
+    await safeQuery(`CREATE INDEX IF NOT EXISTS "idx_issued_cheques_bank_account" ON "issued_cheques"("company_id", "bank_account_id");`, 'idx_issued_cheques_bank_account');
+    await safeQuery(`CREATE INDEX IF NOT EXISTS "idx_issued_cheques_cheque_number" ON "issued_cheques"("company_id", "cheque_number");`, 'idx_issued_cheques_cheque_number');
+
+    await safeQuery(`
       CREATE TABLE IF NOT EXISTS "cash_transfers" (
         "id" VARCHAR(36) PRIMARY KEY,
         "company_id" VARCHAR(36) REFERENCES "companies"("id"),

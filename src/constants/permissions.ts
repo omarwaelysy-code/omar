@@ -38,9 +38,9 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
   },
   {
     id: 'cash_banks',
-    nameAr: 'الخزينة والبنوك',
-    nameEn: 'Cash & Banks',
-    modules: ['receipts', 'payment_vouchers', 'cash_transfers', 'cash_balances']
+    nameAr: 'الخزينة والبنوك والشيكات',
+    nameEn: 'Cash, Banks & Cheques',
+    modules: ['receipts', 'payment_vouchers', 'cash_transfers', 'cash_balances', 'issued_cheques']
   },
   {
     id: 'general_ledger',
@@ -205,6 +205,36 @@ export const SPECIAL_PERMISSIONS_DESC: { [key: string]: { ar: string; en: string
     en: 'Bypass Closing with Password',
     descAr: 'يسمح بتخطي منع إدخال الحركات في الفترات المغلقة باستخدام كلمة سر تجاوز الإغلاق.',
     descEn: 'Allows bypassing the restriction of adding transactions in closed periods using bypass password.'
+  },
+  issue: {
+    ar: 'إصدار الشيك',
+    en: 'Issue Cheque',
+    descAr: 'يسمح باعتماد وإصدار الشيك الصادر وتوليد القيد المحاسبي لأوراق الدفع.',
+    descEn: 'Allows issuing the cheque and posting notes payable journal entry.'
+  },
+  pay: {
+    ar: 'صرف وسداد الشيك',
+    en: 'Pay/Clear Cheque',
+    descAr: 'يسمح بتسجيل خصم وصرف الشيك من البنك وتوليد قيد السداد.',
+    descEn: 'Allows cashing/clearing the cheque and posting the bank deduction journal entry.'
+  },
+  postpone: {
+    ar: 'تأجيل الاستحقاق',
+    en: 'Postpone Due Date',
+    descAr: 'يسمح بتمديد وتعديل تاريخ استحقاق الشيك وتوثيق السبب.',
+    descEn: 'Allows extending the cheque due date and recording the postponement reason.'
+  },
+  return: {
+    ar: 'تسجيل الارتداد',
+    en: 'Return Cheque',
+    descAr: 'يسمح بتسجيل ارتداد الشيك من البنك وتوليد القيد المحاسبي لإعادة المديونية.',
+    descEn: 'Allows recording cheque return from bank and generating reversal entry.'
+  },
+  cancel: {
+    ar: 'إلغاء الشيك',
+    en: 'Cancel Cheque',
+    descAr: 'يسمح بإلغاء الشيك وعكس أي أثر محاسبي له.',
+    descEn: 'Allows cancelling the cheque and reversing any associated journal entries.'
   }
 };
 
@@ -249,6 +279,7 @@ export const MODULE_PERMISSIONS_META: { [moduleId: string]: { labelAr: string; l
   supplier_payment_vouchers: { labelAr: 'سند صرف مورد', labelEn: 'Supplier Payment Vouchers', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved'] },
   cash_transfers: { labelAr: 'حوالات الخزينة', labelEn: 'Cash Transfers', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'edit_approved', 'delete_approved'] },
   cash_balances: { labelAr: 'أرصدة النقدية والخزائن', labelEn: 'Cash Balances', hasCrud: true },
+  issued_cheques: { labelAr: 'الشيكات الصادرة', labelEn: 'Issued Cheques', hasCrud: true, special: ['issue', 'pay', 'postpone', 'cancel', 'return', 'print', 'export_pdf', 'export_excel'] },
   // GL
   account_types: { labelAr: 'أنواع الحسابات', labelEn: 'Account Types', hasCrud: true },
   accounts: { labelAr: 'دليل الحسابات', labelEn: 'Accounts', hasCrud: true },

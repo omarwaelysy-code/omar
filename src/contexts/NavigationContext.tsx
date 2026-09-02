@@ -44,6 +44,7 @@ export const pageLabels: { [key: string]: string } = {
   'receipts': 'سند القبض / قبض من عميل',
   'payment_vouchers': 'سند الصرف / صرف لمورد',
   'supplier_payment_vouchers': 'سند صرف مورد',
+  'issued_cheques': 'الشيكات الصادرة',
   'returns': 'مرتجع مبيعات',
   'purchase_returns': 'مرتجع مشتريات',
   'customer_discounts': 'خصم عملاء',

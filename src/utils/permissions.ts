@@ -38,7 +38,7 @@ export function getDefaultRolePermissions(roleName: string): any {
       const isFin = [
         'account_types', 'accounts', 'chart_of_accounts', 'create_journal_entry', 
         'journal_entries', 'detailed_journal_entries', 'receipts', 'payment_vouchers', 'supplier_payment_vouchers', 
-        'cash_transfers', 'cash_balances', 'customer_statement', 'supplier_statement', 
+        'cash_transfers', 'cash_balances', 'issued_cheques', 'customer_statement', 'supplier_statement', 
         'customer_balances', 'supplier_balances', 'sales_report', 'expenses_report', 
         'cash_report', 'general_ledger_report', 'trial_balance', 'income_statement', 
         'balance_sheet'
@@ -62,7 +62,7 @@ export function getDefaultRolePermissions(roleName: string): any {
       const isAcc = [
         'account_types', 'accounts', 'chart_of_accounts', 'create_journal_entry', 
         'journal_entries', 'detailed_journal_entries', 'receipts', 'payment_vouchers', 'supplier_payment_vouchers', 
-        'cash_transfers', 'cash_balances'
+        'cash_transfers', 'cash_balances', 'issued_cheques'
       ].includes(modId);
       
       const isRep = modId.endsWith('_report') || [
@@ -74,6 +74,10 @@ export function getDefaultRolePermissions(roleName: string): any {
         perms[modId].view = true;
         perms[modId].create = true;
         perms[modId].edit = true;
+        if ('issue' in perms[modId]) perms[modId].issue = true;
+        if ('pay' in perms[modId]) perms[modId].pay = true;
+        if ('postpone' in perms[modId]) perms[modId].postpone = true;
+        if ('return' in perms[modId]) perms[modId].return = true;
         if ('print' in perms[modId]) perms[modId].print = true;
         if ('export_pdf' in perms[modId]) perms[modId].export_pdf = true;
         if ('export_excel' in perms[modId]) perms[modId].export_excel = true;

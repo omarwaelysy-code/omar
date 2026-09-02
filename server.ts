@@ -118,6 +118,7 @@ async function startServer() {
       'ALTER TABLE "inventory_layers" ADD COLUMN IF NOT EXISTS "warehouse_id" VARCHAR(36)',
       
       // Other
+      'CREATE TABLE IF NOT EXISTS "issued_cheques" ("id" VARCHAR(36) PRIMARY KEY, "company_id" VARCHAR(36) NOT NULL, "cheque_number" VARCHAR(100) NOT NULL, "supplier_id" VARCHAR(36) NOT NULL, "bank_account_id" VARCHAR(36) NOT NULL, "bank_name" VARCHAR(255), "account_number" VARCHAR(100), "amount" DECIMAL(18, 4) NOT NULL, "currency" VARCHAR(10) DEFAULT \'EGP\', "exchange_rate" DECIMAL(18, 6) DEFAULT 1.0, "issue_date" DATE NOT NULL, "due_date" DATE NOT NULL, "status" VARCHAR(20) NOT NULL DEFAULT \'DRAFT\', "description" TEXT, "notes" TEXT, "payee_name" VARCHAR(255), "payment_date" DATE, "return_date" DATE, "return_reason" TEXT, "old_due_date" DATE, "new_due_date" DATE, "postponement_reason" TEXT, "cancelled_at" TIMESTAMP, "cancelled_by" VARCHAR(36), "cancel_reason" TEXT, "issue_journal_entry_id" VARCHAR(36), "payment_journal_entry_id" VARCHAR(36), "cancel_journal_entry_id" VARCHAR(36), "attachments" JSONB DEFAULT \'[]\', "created_by" VARCHAR(36), "updated_by" VARCHAR(36), "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)',
       'ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "required_sub_account" BOOLEAN DEFAULT FALSE',
       'ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "account_usage" VARCHAR(50) DEFAULT \'other\'',
       'ALTER TABLE "payment_methods" ADD COLUMN IF NOT EXISTS "type" VARCHAR(50) DEFAULT \'cash\'',

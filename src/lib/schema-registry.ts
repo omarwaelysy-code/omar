@@ -123,6 +123,14 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'items', 'internal_reference', 'manual_reference', 'voucher_type', 'customer_id', 'customer_name', 'voucher_number',
     'paid_to_type', 'paid_to_employee_id', 'paid_to_external_name', 'currency_id', 'exchange_rate'
   ],
+  issued_cheques: [
+    'id', 'company_id', 'cheque_number', 'supplier_id', 'bank_account_id', 'bank_name', 'account_number',
+    'amount', 'currency', 'exchange_rate', 'issue_date', 'due_date', 'status', 'description', 'notes',
+    'payee_name', 'payment_date', 'return_date', 'return_reason', 'old_due_date', 'new_due_date',
+    'postponement_reason', 'cancelled_at', 'cancelled_by', 'cancel_reason', 'issue_journal_entry_id',
+    'payment_journal_entry_id', 'cancel_journal_entry_id', 'attachments', 'created_by', 'updated_by',
+    'created_at', 'updated_at'
+  ],
   customer_discounts: [
     'id', 'company_id', 'customer_id', 'customer_name', 'date', 'amount', 'description'
   ],

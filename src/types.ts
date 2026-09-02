@@ -521,6 +521,74 @@ export interface PaymentVoucher {
   created_by?: string;
 }
 
+export type IssuedChequeStatus = 'DRAFT' | 'ISSUED' | 'DUE' | 'PAID' | 'POSTPONED' | 'RETURNED' | 'CANCELLED';
+
+export interface IssuedChequeAttachment {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  url: string;
+  uploaded_at: string;
+}
+
+export interface IssuedCheque {
+  id: string;
+  company_id: string;
+  cheque_number: string;
+  supplier_id: string;
+  supplier_name?: string;
+  bank_account_id: string;
+  bank_name?: string;
+  account_number?: string;
+  amount: number;
+  currency?: string;
+  exchange_rate?: number;
+  issue_date: string;
+  due_date: string;
+  status: IssuedChequeStatus;
+  description?: string;
+  notes?: string;
+  payee_name?: string;
+  payment_date?: string | null;
+  return_date?: string | null;
+  return_reason?: string | null;
+  old_due_date?: string | null;
+  new_due_date?: string | null;
+  postponement_reason?: string | null;
+  cancelled_at?: string | null;
+  cancelled_by?: string | null;
+  cancel_reason?: string | null;
+  issue_journal_entry_id?: string | null;
+  payment_journal_entry_id?: string | null;
+  cancel_journal_entry_id?: string | null;
+  attachments?: IssuedChequeAttachment[];
+  created_by?: string;
+  updated_by?: string;
+  created_at?: string;
+  updated_at?: string;
+  is_overdue?: boolean;
+}
+
+export interface IssuedChequeStats {
+  totalAmount: number;
+  totalCount: number;
+  dueWithin7DaysAmount: number;
+  dueWithin7DaysCount: number;
+  dueWithin30DaysAmount: number;
+  dueWithin30DaysCount: number;
+  overdueAmount: number;
+  overdueCount: number;
+  paidAmount: number;
+  paidCount: number;
+  returnedAmount: number;
+  returnedCount: number;
+  cancelledAmount: number;
+  cancelledCount: number;
+  futureObligationsAmount: number;
+  futureObligationsCount: number;
+}
+
 export interface Return {
   id: string;
   return_number: string;

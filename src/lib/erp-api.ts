@@ -55,7 +55,7 @@ export function getInitialPermissionsState() {
     'customer_discounts', 'customer_settlements', 'purchase_orders', 'purchase_invoices',
     'purchase_returns', 'supplier_discounts', 'supplier_settlements', 'warehouses',
     'goods_receipts', 'warehouse_transfers', 'opening_stock_balances', 'stock_adjustments',
-    'receipts', 'payment_vouchers', 'cash_transfers', 'cash_balances', 'account_types',
+    'receipts', 'payment_vouchers', 'cash_transfers', 'cash_balances', 'issued_cheques', 'account_types',
     'accounts', 'chart_of_accounts', 'create_journal_entry', 'journal_entries',
     'detailed_journal_entries', 'customer_statement', 'supplier_statement',
     'customer_balances', 'supplier_balances', 'sales_report', 'expenses_report',
@@ -82,6 +82,7 @@ export function getInitialPermissionsState() {
     receipts: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved'],
     payment_vouchers: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved'],
     cash_transfers: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'edit_approved', 'delete_approved'],
+    issued_cheques: ['issue', 'pay', 'postpone', 'cancel', 'return', 'print', 'export_pdf', 'export_excel'],
     journal_entries: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved', 'repost'],
     company_settings: ['open_closed_period']
   };
@@ -112,7 +113,7 @@ export function getDefaultRolePermissions(roleName: string): any {
       const isFin = [
         'account_types', 'accounts', 'chart_of_accounts', 'create_journal_entry', 
         'journal_entries', 'detailed_journal_entries', 'receipts', 'payment_vouchers', 
-        'cash_transfers', 'cash_balances', 'customer_statement', 'supplier_statement', 
+        'cash_transfers', 'cash_balances', 'issued_cheques', 'customer_statement', 'supplier_statement', 
         'customer_balances', 'supplier_balances', 'sales_report', 'expenses_report', 
         'cash_report', 'general_ledger_report', 'trial_balance', 'income_statement', 
         'balance_sheet'
@@ -134,7 +135,7 @@ export function getDefaultRolePermissions(roleName: string): any {
       const isAcc = [
         'account_types', 'accounts', 'chart_of_accounts', 'create_journal_entry', 
         'journal_entries', 'detailed_journal_entries', 'receipts', 'payment_vouchers', 
-        'cash_transfers', 'cash_balances'
+        'cash_transfers', 'cash_balances', 'issued_cheques'
       ].includes(modId);
       
       const isRep = modId.endsWith('_report') || [
@@ -927,6 +928,7 @@ const TABLES_TO_BACKUP = [
   'receipt_vouchers',
   'payment_vouchers',
   'cash_transfers',
+  'issued_cheques',
   'journal_entries',
   'journal_entry_lines',
   'activity_logs',
@@ -2132,7 +2134,7 @@ const modules = [
   'expense_categories', 'accounts', 'account_types', 'settings', 'users', 'roles', 'companies',
   'invoices', 'invoice_items', 'journal_entries', 'journal_entry_lines', 'activity_logs',
   'returns', 'return_items', 'purchase_invoices', 'purchase_returns', 
-  'customer_discounts', 'supplier_discounts', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers',
+  'customer_discounts', 'supplier_discounts', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers', 'issued_cheques',
   'system_config', 'audit_logs', 'operation_categories', 'operations', 'operation_fields',
   'departments', 'cost_centers', 'operation_field_values', 'field_operation_categories',
   'currencies', 'exchange_rates', 'inventory_movements', 'inventory_layers',
@@ -2302,7 +2304,7 @@ function sanitizeData(table: string, data: any) {
   if (!allowedKeys) return data;
   
   const sanitized: any = {};
-  const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features', 'value', 'options', 'settlements', 'filters', 'role_ids'];
+  const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features', 'value', 'options', 'settlements', 'filters', 'role_ids', 'attachments'];
 
   allowedKeys.forEach(key => {
     if (key in data) {
@@ -2985,6 +2987,787 @@ router.get('/activity_logs', authenticateToken, async (req: AuthRequest, res) =>
   }
 });
 
+// =========================================================================
+// DEDICATED ROUTES FOR ISSUED CHEQUES (🏦 الشيكات الصادرة)
+// =========================================================================
+
+// Helper for atomic Journal Entry creation for Cheques
+async function createChequeJournalEntry(
+  client: any,
+  companyId: string,
+  entryData: {
+    date: string;
+    description: string;
+    reference_id: string;
+    reference_type: string;
+    reference_number: string;
+    total_debit: number;
+    total_credit: number;
+    created_by?: string;
+    items: Array<{
+      account_id: string;
+      account_name: string;
+      debit: number;
+      credit: number;
+      description?: string;
+      supplier_id?: string;
+      supplier_name?: string;
+      sub_account_id?: string;
+      sub_account_type?: string;
+    }>;
+  }
+): Promise<string> {
+  const jeId = uuidv4();
+  const dateStr = entryData.date || new Date().toISOString().slice(0, 10);
+  const entryNumber = await ensureUniqueSequenceNumber(pool, companyId, 'journal_entries', dateStr);
+  
+  await client.query(
+    `INSERT INTO journal_entries (
+      id, company_id, entry_number, date, description, 
+      reference_id, reference_type, reference_number, 
+      total_debit, total_credit, status, created_by, created_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'posted', $11, CURRENT_TIMESTAMP)`,
+    [
+      jeId, companyId, entryNumber, dateStr, entryData.description,
+      entryData.reference_id, entryData.reference_type, entryData.reference_number,
+      entryData.total_debit, entryData.total_credit, entryData.created_by || 'system'
+    ]
+  );
+
+  for (const item of entryData.items) {
+    const lineId = uuidv4();
+    await client.query(
+      `INSERT INTO journal_entry_lines (
+        id, journal_entry_id, account_id, account_name, description,
+        debit, credit, company_id, supplier_id, supplier_name,
+        sub_account_id, sub_account_type
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [
+        lineId, jeId, item.account_id, item.account_name, item.description || '',
+        item.debit || 0, item.credit || 0, companyId, item.supplier_id || null, item.supplier_name || null,
+        item.sub_account_id || null, item.sub_account_type || null
+      ]
+    );
+  }
+
+  return jeId;
+}
+
+// 1. Dashboard Stats
+const chequeDashboardHandler = async (req: AuthRequest, res: any) => {
+  try {
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
+    if (!await checkPermission(req, 'issued_cheques', 'view')) {
+      return res.status(403).json({ error: 'Access Denied: No View Permission' });
+    }
+
+    const { rows } = await pool.query(`
+      SELECT 
+        COUNT(*)::int AS total_count,
+        COALESCE(SUM(amount), 0)::float AS total_amount,
+        
+        COUNT(CASE WHEN status IN ('ISSUED', 'POSTPONED') AND due_date >= CURRENT_DATE AND due_date <= (CURRENT_DATE + INTERVAL '7 days') THEN 1 END)::int AS due_7_count,
+        COALESCE(SUM(CASE WHEN status IN ('ISSUED', 'POSTPONED') AND due_date >= CURRENT_DATE AND due_date <= (CURRENT_DATE + INTERVAL '7 days') THEN amount ELSE 0 END), 0)::float AS due_7_amount,
+
+        COUNT(CASE WHEN status IN ('ISSUED', 'POSTPONED') AND due_date >= CURRENT_DATE AND due_date <= (CURRENT_DATE + INTERVAL '30 days') THEN 1 END)::int AS due_30_count,
+        COALESCE(SUM(CASE WHEN status IN ('ISSUED', 'POSTPONED') AND due_date >= CURRENT_DATE AND due_date <= (CURRENT_DATE + INTERVAL '30 days') THEN amount ELSE 0 END), 0)::float AS due_30_amount,
+
+        COUNT(CASE WHEN status IN ('ISSUED', 'POSTPONED') AND due_date < CURRENT_DATE THEN 1 END)::int AS overdue_count,
+        COALESCE(SUM(CASE WHEN status IN ('ISSUED', 'POSTPONED') AND due_date < CURRENT_DATE THEN amount ELSE 0 END), 0)::float AS overdue_amount,
+
+        COUNT(CASE WHEN status = 'PAID' THEN 1 END)::int AS paid_count,
+        COALESCE(SUM(CASE WHEN status = 'PAID' THEN amount ELSE 0 END), 0)::float AS paid_amount,
+
+        COUNT(CASE WHEN status = 'RETURNED' THEN 1 END)::int AS returned_count,
+        COALESCE(SUM(CASE WHEN status = 'RETURNED' THEN amount ELSE 0 END), 0)::float AS returned_amount,
+
+        COUNT(CASE WHEN status = 'CANCELLED' THEN 1 END)::int AS cancelled_count,
+        COALESCE(SUM(CASE WHEN status = 'CANCELLED' THEN amount ELSE 0 END), 0)::float AS cancelled_amount,
+
+        COUNT(CASE WHEN status IN ('ISSUED', 'POSTPONED') THEN 1 END)::int AS future_count,
+        COALESCE(SUM(CASE WHEN status IN ('ISSUED', 'POSTPONED') THEN amount ELSE 0 END), 0)::float AS future_amount
+      FROM issued_cheques
+      WHERE company_id = $1
+    `, [companyId]);
+
+    const r = rows[0] || {};
+    const stats = {
+      totalAmount: r.total_amount || 0,
+      totalCount: r.total_count || 0,
+      dueWithin7DaysAmount: r.due_7_amount || 0,
+      dueWithin7DaysCount: r.due_7_count || 0,
+      dueWithin30DaysAmount: r.due_30_amount || 0,
+      dueWithin30DaysCount: r.due_30_count || 0,
+      overdueAmount: r.overdue_amount || 0,
+      overdueCount: r.overdue_count || 0,
+      paidAmount: r.paid_amount || 0,
+      paidCount: r.paid_count || 0,
+      returnedAmount: r.returned_amount || 0,
+      returnedCount: r.returned_count || 0,
+      cancelledAmount: r.cancelled_amount || 0,
+      cancelledCount: r.cancelled_count || 0,
+      futureObligationsAmount: r.future_amount || 0,
+      futureObligationsCount: r.future_count || 0
+    };
+
+    res.json(stats);
+  } catch (error: any) {
+    console.error('Error in GET /issued-cheques/dashboard-stats:', error);
+    sendError(res, 500, error.message);
+  }
+};
+
+router.get('/issued-cheques/dashboard-stats', authenticateToken, chequeDashboardHandler);
+router.get('/issued_cheques/dashboard-stats', authenticateToken, chequeDashboardHandler);
+
+// 2. Upcoming Cheques
+const chequeUpcomingHandler = async (req: AuthRequest, res: any) => {
+  try {
+    const companyId = req.user?.company_id;
+    if (!companyId) return sendError(res, 401, 'Unauthorized');
+
+    if (!await checkPermission(req, 'issued_cheques', 'view')) {
+      return res.status(403).json({ error: 'Access Denied: No View Permission' });
+    }
+
+    const { rows } = await pool.query(`
+      SELECT 
+        c.*,
+        s.name AS supplier_name,
+        pm.name AS bank_name,
+        pm.bank_name AS bank_display_name,
+        pm.account_number AS bank_account_number,
+        (c.due_date < CURRENT_DATE) AS is_overdue
+      FROM issued_cheques c
+      LEFT JOIN suppliers s ON s.id = c.supplier_id
+      LEFT JOIN payment_methods pm ON pm.id = c.bank_account_id
+      WHERE c.company_id = $1 AND c.status IN ('ISSUED', 'POSTPONED')
+      ORDER BY c.due_date ASC
+      LIMIT 20
+    `, [companyId]);
+
+    res.json(rows);
+  } catch (error: any) {
+    console.error('Error in GET /issued-cheques/upcoming:', error);
+    sendError(res, 500, error.message);
+  }
+};
+
+router.get('/issued-cheques/upcoming', authenticateToken, chequeUpcomingHandler);
+router.get('/issued_cheques/upcoming', authenticateToken, chequeUpcomingHandler);
+
+// 3. Issue Cheque (DRAFT -> ISSUED)
+const chequeIssueHandler = async (req: AuthRequest, res: any) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const companyId = req.user?.company_id;
+    const { id } = req.params;
+
+    if (!companyId) {
+      await client.query('ROLLBACK');
+      return sendError(res, 401, 'Unauthorized');
+    }
+
+    if (!await checkPermission(req, 'issued_cheques', 'issue') && !await checkPermission(req, 'issued_cheques', 'edit')) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'ليس لديك صلاحية اعتماد / إصدار الشيكات الصادرة.' });
+    }
+
+    const { rows: chequeRows } = await client.query(
+      `SELECT * FROM issued_cheques WHERE id = $1 AND company_id = $2 FOR UPDATE`,
+      [id, companyId]
+    );
+
+    if (chequeRows.length === 0) {
+      await client.query('ROLLBACK');
+      return sendError(res, 404, 'الشيك غير موجود.');
+    }
+
+    const cheque = chequeRows[0];
+    if (cheque.status !== 'DRAFT') {
+      await client.query('ROLLBACK');
+      return sendError(res, 400, `لا يمكن إصدار هذا الشيك لأن حالته الحالية هي (${cheque.status}). يجب أن يكون في حالة مسودة (DRAFT).`);
+    }
+
+    // Fetch Supplier and Accounts for Journal Entry
+    const { rows: suppRows } = await client.query(`SELECT * FROM suppliers WHERE id = $1`, [cheque.supplier_id]);
+    const { rows: accRows } = await client.query(`SELECT * FROM accounts WHERE company_id = $1`, [companyId]);
+
+    const supplier = suppRows[0] || null;
+    let supplierAccId = supplier?.account_id;
+    let supplierAccName = supplier?.account_name || 'حساب الموردين';
+
+    if (!supplierAccId) {
+      const defSuppAcc = accRows.find((a: any) => a.account_usage === 'supplier' || a.account_usage === 'accounts_payable' || a.code === '210101');
+      supplierAccId = defSuppAcc?.id;
+      supplierAccName = defSuppAcc?.name || supplierAccName;
+    }
+
+    let notesPayableAccId = '';
+    let notesPayableAccName = 'حساب أوراق الدفع - شيكات صادرة';
+    const notesAcc = accRows.find((a: any) => a.account_usage === 'notes_payable' || a.code === '210102' || a.name?.includes('أوراق دفع') || a.name?.includes('شيكات صادرة'));
+    if (notesAcc) {
+      notesPayableAccId = notesAcc.id;
+      notesPayableAccName = notesAcc.name;
+    } else {
+      const fallbackAcc = accRows.find((a: any) => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
+      notesPayableAccId = fallbackAcc?.id || supplierAccId;
+      notesPayableAccName = fallbackAcc?.name || 'أوراق دفع';
+    }
+
+    const amount = Number(cheque.amount);
+    const jeId = await createChequeJournalEntry(client, companyId, {
+      date: cheque.issue_date,
+      description: `قيد إصدار شيك رقم: ${cheque.cheque_number} للمورد: ${supplier?.name || cheque.payee_name || ''}`,
+      reference_id: cheque.id,
+      reference_type: 'issued_cheque',
+      reference_number: cheque.cheque_number,
+      total_debit: amount,
+      total_credit: amount,
+      created_by: req.user?.username || req.user?.email || 'system',
+      items: [
+        {
+          account_id: supplierAccId,
+          account_name: supplierAccName,
+          debit: amount,
+          credit: 0,
+          description: `إصدار شيك رقم ${cheque.cheque_number} - لصالح ${supplier?.name || cheque.payee_name || 'المورد'}`,
+          supplier_id: cheque.supplier_id,
+          supplier_name: supplier?.name || cheque.payee_name,
+          sub_account_id: cheque.supplier_id,
+          sub_account_type: 'supplier'
+        },
+        {
+          account_id: notesPayableAccId,
+          account_name: notesPayableAccName,
+          debit: 0,
+          credit: amount,
+          description: `أوراق دفع - شيك رقم ${cheque.cheque_number} (استحقاق ${cheque.due_date})`,
+          supplier_id: cheque.supplier_id,
+          supplier_name: supplier?.name || cheque.payee_name
+        }
+      ]
+    });
+
+    await client.query(
+      `UPDATE issued_cheques 
+       SET status = 'ISSUED', issue_journal_entry_id = $1, updated_by = $2, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3`,
+      [jeId, req.user?.id || null, id]
+    );
+
+    await client.query('COMMIT');
+
+    logAudit({
+      company_id: companyId,
+      user_id: req.user?.id,
+      username: req.user?.username || req.user?.email,
+      action: 'CHEQUE_ISSUE',
+      module: 'issued_cheques',
+      details: `Issued cheque #${cheque.cheque_number} for amount ${amount}`,
+      entity_type: 'issued_cheques',
+      entity_id: id,
+      ip_address: getIp(req),
+      metadata: { before: cheque, after: { ...cheque, status: 'ISSUED', issue_journal_entry_id: jeId } }
+    });
+
+    res.json({ success: true, message: 'تم إصدار الشيك وترحيل قيد أوراق الدفع بنجاح.', journal_entry_id: jeId });
+  } catch (error: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Error in POST /issued-cheques/:id/issue:', error);
+    sendError(res, 500, error.message);
+  } finally {
+    client.release();
+  }
+};
+
+router.post('/issued-cheques/:id/issue', authenticateToken, chequeIssueHandler);
+router.post('/issued_cheques/:id/issue', authenticateToken, chequeIssueHandler);
+
+// 4. Pay / Clear Cheque (ISSUED / POSTPONED -> PAID)
+const chequePayHandler = async (req: AuthRequest, res: any) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const companyId = req.user?.company_id;
+    const { id } = req.params;
+    const { payment_date, notes } = req.body;
+
+    if (!companyId) {
+      await client.query('ROLLBACK');
+      return sendError(res, 401, 'Unauthorized');
+    }
+
+    if (!await checkPermission(req, 'issued_cheques', 'pay') && !await checkPermission(req, 'issued_cheques', 'edit')) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'ليس لديك صلاحية تسجيل صرف وسداد الشيكات الصادرة.' });
+    }
+
+    const { rows: chequeRows } = await client.query(
+      `SELECT * FROM issued_cheques WHERE id = $1 AND company_id = $2 FOR UPDATE`,
+      [id, companyId]
+    );
+
+    if (chequeRows.length === 0) {
+      await client.query('ROLLBACK');
+      return sendError(res, 404, 'الشيك غير موجود.');
+    }
+
+    const cheque = chequeRows[0];
+    if (!['ISSUED', 'POSTPONED'].includes(cheque.status)) {
+      await client.query('ROLLBACK');
+      return sendError(res, 400, `لا يمكن صرف هذا الشيك لأن حالته الحالية هي (${cheque.status}). يجب أن يكون صادراً أولاً.`);
+    }
+
+    // Fetch Bank Method and Accounts
+    const { rows: pmRows } = await client.query(`SELECT * FROM payment_methods WHERE id = $1`, [cheque.bank_account_id]);
+    const { rows: accRows } = await client.query(`SELECT * FROM accounts WHERE company_id = $1`, [companyId]);
+
+    const pm = pmRows[0] || null;
+    let bankAccId = pm?.account_id;
+    let bankAccName = pm?.account_name || pm?.name || 'حساب البنك';
+
+    if (!bankAccId) {
+      const defBankAcc = accRows.find((a: any) => a.account_usage === 'bank' || a.code === '110103');
+      bankAccId = defBankAcc?.id;
+      bankAccName = defBankAcc?.name || bankAccName;
+    }
+
+    let notesPayableAccId = '';
+    let notesPayableAccName = 'حساب أوراق الدفع - شيكات صادرة';
+    const notesAcc = accRows.find((a: any) => a.account_usage === 'notes_payable' || a.code === '210102' || a.name?.includes('أوراق دفع') || a.name?.includes('شيكات صادرة'));
+    if (notesAcc) {
+      notesPayableAccId = notesAcc.id;
+      notesPayableAccName = notesAcc.name;
+    } else {
+      const fallbackAcc = accRows.find((a: any) => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
+      notesPayableAccId = fallbackAcc?.id || bankAccId;
+      notesPayableAccName = fallbackAcc?.name || 'أوراق دفع';
+    }
+
+    const amount = Number(cheque.amount);
+    const payDate = payment_date || new Date().toISOString().slice(0, 10);
+
+    const jeId = await createChequeJournalEntry(client, companyId, {
+      date: payDate,
+      description: `قيد صرف وسداد شيك رقم: ${cheque.cheque_number} من بنك: ${pm?.name || cheque.bank_name || ''}`,
+      reference_id: cheque.id,
+      reference_type: 'cheque_payment',
+      reference_number: cheque.cheque_number,
+      total_debit: amount,
+      total_credit: amount,
+      created_by: req.user?.username || req.user?.email || 'system',
+      items: [
+        {
+          account_id: notesPayableAccId,
+          account_name: notesPayableAccName,
+          debit: amount,
+          credit: 0,
+          description: `تسوية وصرف شيك رقم ${cheque.cheque_number} من بنك ${pm?.name || cheque.bank_name || ''}`,
+          supplier_id: cheque.supplier_id,
+          supplier_name: cheque.supplier_name || cheque.payee_name
+        },
+        {
+          account_id: bankAccId,
+          account_name: bankAccName,
+          debit: 0,
+          credit: amount,
+          description: `خصم قيمة الشيك رقم ${cheque.cheque_number} من الحساب البنكي ${pm?.name || ''}`,
+          sub_account_id: pm?.id,
+          sub_account_type: 'payment_method'
+        }
+      ]
+    });
+
+    await client.query(
+      `UPDATE issued_cheques 
+       SET status = 'PAID', payment_date = $1, payment_journal_entry_id = $2, notes = COALESCE($3, notes), updated_by = $4, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5`,
+      [payDate, jeId, notes || null, req.user?.id || null, id]
+    );
+
+    await client.query('COMMIT');
+
+    logAudit({
+      company_id: companyId,
+      user_id: req.user?.id,
+      username: req.user?.username || req.user?.email,
+      action: 'CHEQUE_PAY',
+      module: 'issued_cheques',
+      details: `Paid/Cashed cheque #${cheque.cheque_number} on ${payDate}`,
+      entity_type: 'issued_cheques',
+      entity_id: id,
+      ip_address: getIp(req),
+      metadata: { before: cheque, after: { ...cheque, status: 'PAID', payment_date: payDate, payment_journal_entry_id: jeId } }
+    });
+
+    res.json({ success: true, message: 'تم تسجيل سداد وصرف الشيك من البنك بنجاح.', journal_entry_id: jeId });
+  } catch (error: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Error in POST /issued-cheques/:id/pay:', error);
+    sendError(res, 500, error.message);
+  } finally {
+    client.release();
+  }
+};
+
+router.post('/issued-cheques/:id/pay', authenticateToken, chequePayHandler);
+router.post('/issued_cheques/:id/pay', authenticateToken, chequePayHandler);
+
+// 5. Postpone Cheque (ISSUED / POSTPONED -> POSTPONED)
+const chequePostponeHandler = async (req: AuthRequest, res: any) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const companyId = req.user?.company_id;
+    const { id } = req.params;
+    const { new_due_date, reason } = req.body;
+
+    if (!companyId) {
+      await client.query('ROLLBACK');
+      return sendError(res, 401, 'Unauthorized');
+    }
+
+    if (!new_due_date) {
+      await client.query('ROLLBACK');
+      return sendError(res, 400, 'يرجى تحديد تاريخ الاستحقاق الجديد.');
+    }
+
+    if (!await checkPermission(req, 'issued_cheques', 'postpone') && !await checkPermission(req, 'issued_cheques', 'edit')) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'ليس لديك صلاحية تأجيل استحقاق الشيكات.' });
+    }
+
+    const { rows: chequeRows } = await client.query(
+      `SELECT * FROM issued_cheques WHERE id = $1 AND company_id = $2 FOR UPDATE`,
+      [id, companyId]
+    );
+
+    if (chequeRows.length === 0) {
+      await client.query('ROLLBACK');
+      return sendError(res, 404, 'الشيك غير موجود.');
+    }
+
+    const cheque = chequeRows[0];
+    if (!['ISSUED', 'POSTPONED'].includes(cheque.status)) {
+      await client.query('ROLLBACK');
+      return sendError(res, 400, `لا يمكن تأجيل هذا الشيك لأن حالته هي (${cheque.status}).`);
+    }
+
+    const currentDueDateStr = cheque.due_date instanceof Date ? cheque.due_date.toISOString().slice(0, 10) : String(cheque.due_date).slice(0, 10);
+    const newDueDateStr = String(new_due_date).slice(0, 10);
+
+    if (newDueDateStr <= currentDueDateStr) {
+      await client.query('ROLLBACK');
+      return sendError(res, 400, 'تاريخ الاستحقاق الجديد يجب أن يكون لاحقاً للتاريخ الحالي.');
+    }
+
+    await client.query(
+      `UPDATE issued_cheques 
+       SET status = 'POSTPONED', old_due_date = $1, due_date = $2, new_due_date = $2, postponement_reason = $3, updated_by = $4, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $5`,
+      [currentDueDateStr, newDueDateStr, reason || null, req.user?.id || null, id]
+    );
+
+    await client.query('COMMIT');
+
+    logAudit({
+      company_id: companyId,
+      user_id: req.user?.id,
+      username: req.user?.username || req.user?.email,
+      action: 'CHEQUE_POSTPONE',
+      module: 'issued_cheques',
+      details: `Postponed cheque #${cheque.cheque_number} to ${newDueDateStr}. Reason: ${reason || ''}`,
+      entity_type: 'issued_cheques',
+      entity_id: id,
+      ip_address: getIp(req),
+      metadata: { before: cheque, after: { ...cheque, status: 'POSTPONED', due_date: newDueDateStr, postponement_reason: reason } }
+    });
+
+    res.json({ success: true, message: `تم تأجيل تاريخ استحقاق الشيك إلى ${newDueDateStr} بنجاح.` });
+  } catch (error: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Error in POST /issued-cheques/:id/postpone:', error);
+    sendError(res, 500, error.message);
+  } finally {
+    client.release();
+  }
+};
+
+router.post('/issued-cheques/:id/postpone', authenticateToken, chequePostponeHandler);
+router.post('/issued_cheques/:id/postpone', authenticateToken, chequePostponeHandler);
+
+// 6. Return Cheque (ISSUED / POSTPONED -> RETURNED)
+const chequeReturnHandler = async (req: AuthRequest, res: any) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const companyId = req.user?.company_id;
+    const { id } = req.params;
+    const { return_date, reason } = req.body;
+
+    if (!companyId) {
+      await client.query('ROLLBACK');
+      return sendError(res, 401, 'Unauthorized');
+    }
+
+    if (!await checkPermission(req, 'issued_cheques', 'return') && !await checkPermission(req, 'issued_cheques', 'edit')) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'ليس لديك صلاحية تسجيل ارتداد الشيكات.' });
+    }
+
+    const { rows: chequeRows } = await client.query(
+      `SELECT * FROM issued_cheques WHERE id = $1 AND company_id = $2 FOR UPDATE`,
+      [id, companyId]
+    );
+
+    if (chequeRows.length === 0) {
+      await client.query('ROLLBACK');
+      return sendError(res, 404, 'الشيك غير موجود.');
+    }
+
+    const cheque = chequeRows[0];
+    if (!['ISSUED', 'POSTPONED'].includes(cheque.status)) {
+      await client.query('ROLLBACK');
+      return sendError(res, 400, `لا يمكن تسجيل ارتداد هذا الشيك لأن حالته هي (${cheque.status}).`);
+    }
+
+    // Fetch Supplier and Accounts for Reversal Journal Entry
+    const { rows: suppRows } = await client.query(`SELECT * FROM suppliers WHERE id = $1`, [cheque.supplier_id]);
+    const { rows: accRows } = await client.query(`SELECT * FROM accounts WHERE company_id = $1`, [companyId]);
+
+    const supplier = suppRows[0] || null;
+    let supplierAccId = supplier?.account_id;
+    let supplierAccName = supplier?.account_name || 'حساب الموردين';
+
+    if (!supplierAccId) {
+      const defSuppAcc = accRows.find((a: any) => a.account_usage === 'supplier' || a.account_usage === 'accounts_payable' || a.code === '210101');
+      supplierAccId = defSuppAcc?.id;
+      supplierAccName = defSuppAcc?.name || supplierAccName;
+    }
+
+    let notesPayableAccId = '';
+    let notesPayableAccName = 'حساب أوراق الدفع - شيكات صادرة';
+    const notesAcc = accRows.find((a: any) => a.account_usage === 'notes_payable' || a.code === '210102' || a.name?.includes('أوراق دفع') || a.name?.includes('شيكات صادرة'));
+    if (notesAcc) {
+      notesPayableAccId = notesAcc.id;
+      notesPayableAccName = notesAcc.name;
+    } else {
+      const fallbackAcc = accRows.find((a: any) => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
+      notesPayableAccId = fallbackAcc?.id || supplierAccId;
+      notesPayableAccName = fallbackAcc?.name || 'أوراق دفع';
+    }
+
+    const amount = Number(cheque.amount);
+    const retDate = return_date || new Date().toISOString().slice(0, 10);
+
+    const jeId = await createChequeJournalEntry(client, companyId, {
+      date: retDate,
+      description: `قيد ارتداد شيك رقم: ${cheque.cheque_number} للمورد: ${supplier?.name || cheque.payee_name || ''} - سبب: ${reason || ''}`,
+      reference_id: cheque.id,
+      reference_type: 'cheque_return',
+      reference_number: cheque.cheque_number,
+      total_debit: amount,
+      total_credit: amount,
+      created_by: req.user?.username || req.user?.email || 'system',
+      items: [
+        {
+          account_id: notesPayableAccId,
+          account_name: notesPayableAccName,
+          debit: amount,
+          credit: 0,
+          description: `إلغاء ورقة دفع لارتداد شيك رقم ${cheque.cheque_number} - سبب: ${reason || 'غير محدد'}`,
+          supplier_id: cheque.supplier_id,
+          supplier_name: supplier?.name || cheque.payee_name
+        },
+        {
+          account_id: supplierAccId,
+          account_name: supplierAccName,
+          debit: 0,
+          credit: amount,
+          description: `إعادة إثبات مديونية لارتداد شيك رقم ${cheque.cheque_number} - ${supplier?.name || ''}`,
+          supplier_id: cheque.supplier_id,
+          supplier_name: supplier?.name || cheque.payee_name,
+          sub_account_id: cheque.supplier_id,
+          sub_account_type: 'supplier'
+        }
+      ]
+    });
+
+    await client.query(
+      `UPDATE issued_cheques 
+       SET status = 'RETURNED', return_date = $1, return_reason = $2, updated_by = $3, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4`,
+      [retDate, reason || null, req.user?.id || null, id]
+    );
+
+    await client.query('COMMIT');
+
+    logAudit({
+      company_id: companyId,
+      user_id: req.user?.id,
+      username: req.user?.username || req.user?.email,
+      action: 'CHEQUE_RETURN',
+      module: 'issued_cheques',
+      details: `Recorded return of cheque #${cheque.cheque_number}. Reason: ${reason || ''}`,
+      entity_type: 'issued_cheques',
+      entity_id: id,
+      ip_address: getIp(req),
+      metadata: { before: cheque, after: { ...cheque, status: 'RETURNED', return_date: retDate, return_reason: reason } }
+    });
+
+    res.json({ success: true, message: 'تم تسجيل ارتداد الشيك وإعادة إثبات المديونية بنجاح.', journal_entry_id: jeId });
+  } catch (error: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Error in POST /issued-cheques/:id/return:', error);
+    sendError(res, 500, error.message);
+  } finally {
+    client.release();
+  }
+};
+
+router.post('/issued-cheques/:id/return', authenticateToken, chequeReturnHandler);
+router.post('/issued_cheques/:id/return', authenticateToken, chequeReturnHandler);
+
+// 7. Cancel Cheque (DRAFT / ISSUED / POSTPONED -> CANCELLED)
+const chequeCancelHandler = async (req: AuthRequest, res: any) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const companyId = req.user?.company_id;
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!companyId) {
+      await client.query('ROLLBACK');
+      return sendError(res, 401, 'Unauthorized');
+    }
+
+    if (!await checkPermission(req, 'issued_cheques', 'cancel') && !await checkPermission(req, 'issued_cheques', 'delete')) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'ليس لديك صلاحية إلغاء الشيكات.' });
+    }
+
+    const { rows: chequeRows } = await client.query(
+      `SELECT * FROM issued_cheques WHERE id = $1 AND company_id = $2 FOR UPDATE`,
+      [id, companyId]
+    );
+
+    if (chequeRows.length === 0) {
+      await client.query('ROLLBACK');
+      return sendError(res, 404, 'الشيك غير موجود.');
+    }
+
+    const cheque = chequeRows[0];
+    if (['PAID', 'CANCELLED'].includes(cheque.status)) {
+      await client.query('ROLLBACK');
+      return sendError(res, 400, `لا يمكن إلغاء هذا الشيك لأن حالته هي (${cheque.status}).`);
+    }
+
+    let cancelJeId: string | null = null;
+
+    // If cheque was ISSUED or POSTPONED, reverse the issuance entry
+    if (['ISSUED', 'POSTPONED'].includes(cheque.status)) {
+      const { rows: suppRows } = await client.query(`SELECT * FROM suppliers WHERE id = $1`, [cheque.supplier_id]);
+      const { rows: accRows } = await client.query(`SELECT * FROM accounts WHERE company_id = $1`, [companyId]);
+
+      const supplier = suppRows[0] || null;
+      let supplierAccId = supplier?.account_id;
+      let supplierAccName = supplier?.account_name || 'حساب الموردين';
+
+      if (!supplierAccId) {
+        const defSuppAcc = accRows.find((a: any) => a.account_usage === 'supplier' || a.account_usage === 'accounts_payable' || a.code === '210101');
+        supplierAccId = defSuppAcc?.id;
+        supplierAccName = defSuppAcc?.name || supplierAccName;
+      }
+
+      let notesPayableAccId = '';
+      let notesPayableAccName = 'حساب أوراق الدفع - شيكات صادرة';
+      const notesAcc = accRows.find((a: any) => a.account_usage === 'notes_payable' || a.code === '210102' || a.name?.includes('أوراق دفع') || a.name?.includes('شيكات صادرة'));
+      if (notesAcc) {
+        notesPayableAccId = notesAcc.id;
+        notesPayableAccName = notesAcc.name;
+      } else {
+        const fallbackAcc = accRows.find((a: any) => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
+        notesPayableAccId = fallbackAcc?.id || supplierAccId;
+        notesPayableAccName = fallbackAcc?.name || 'أوراق دفع';
+      }
+
+      const amount = Number(cheque.amount);
+      const cancelDate = new Date().toISOString().slice(0, 10);
+
+      cancelJeId = await createChequeJournalEntry(client, companyId, {
+        date: cancelDate,
+        description: `قيد إلغاء شيك رقم: ${cheque.cheque_number} - سبب: ${reason || 'إلغاء بناء على طلب المستخدم'}`,
+        reference_id: cheque.id,
+        reference_type: 'cheque_cancellation',
+        reference_number: cheque.cheque_number,
+        total_debit: amount,
+        total_credit: amount,
+        created_by: req.user?.username || req.user?.email || 'system',
+        items: [
+          {
+            account_id: notesPayableAccId,
+            account_name: notesPayableAccName,
+            debit: amount,
+            credit: 0,
+            description: `عكس أوراق دفع لإلغاء شيك رقم ${cheque.cheque_number}`,
+            supplier_id: cheque.supplier_id,
+            supplier_name: supplier?.name || cheque.payee_name
+          },
+          {
+            account_id: supplierAccId,
+            account_name: supplierAccName,
+            debit: 0,
+            credit: amount,
+            description: `إعادة مديونية المورد لإلغاء شيك رقم ${cheque.cheque_number} - ${supplier?.name || ''}`,
+            supplier_id: cheque.supplier_id,
+            supplier_name: supplier?.name || cheque.payee_name,
+            sub_account_id: cheque.supplier_id,
+            sub_account_type: 'supplier'
+          }
+        ]
+      });
+    }
+
+    await client.query(
+      `UPDATE issued_cheques 
+       SET status = 'CANCELLED', cancelled_at = CURRENT_TIMESTAMP, cancelled_by = $1, cancel_reason = $2, cancel_journal_entry_id = $3, updated_by = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4`,
+      [req.user?.id || null, reason || null, cancelJeId, id]
+    );
+
+    await client.query('COMMIT');
+
+    logAudit({
+      company_id: companyId,
+      user_id: req.user?.id,
+      username: req.user?.username || req.user?.email,
+      action: 'CHEQUE_CANCEL',
+      module: 'issued_cheques',
+      details: `Cancelled cheque #${cheque.cheque_number}. Reason: ${reason || ''}`,
+      entity_type: 'issued_cheques',
+      entity_id: id,
+      ip_address: getIp(req),
+      metadata: { before: cheque, after: { ...cheque, status: 'CANCELLED', cancel_reason: reason, cancel_journal_entry_id: cancelJeId } }
+    });
+
+    res.json({ success: true, message: 'تم إلغاء الشيك وعكس أثره المحاسبي بنجاح.' });
+  } catch (error: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Error in POST /issued-cheques/:id/cancel:', error);
+    sendError(res, 500, error.message);
+  } finally {
+    client.release();
+  }
+};
+
+router.post('/issued-cheques/:id/cancel', authenticateToken, chequeCancelHandler);
+router.post('/issued_cheques/:id/cancel', authenticateToken, chequeCancelHandler);
+
 modules.forEach(moduleName => {
   const hyphenName = moduleName.replace(/_/g, '-');
   const routeNames = [moduleName];
@@ -3379,7 +4162,7 @@ modules.forEach(moduleName => {
           'invoices', 'purchase_invoices', 'receipt_vouchers', 'payment_vouchers',
           'returns', 'purchase_returns', 'cash_transfers', 'customer_discounts',
           'supplier_discounts', 'opening_stock_balances', 'stock_adjustments',
-          'warehouse_transfers'
+          'warehouse_transfers', 'issued_cheques'
         ];
         if (journaledTables.includes(moduleName)) {
           queryStr = `SELECT t.*, (SELECT entry_number FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS entry_number FROM "${moduleName}" t WHERE t.id = $1`;
@@ -4089,6 +4872,38 @@ modules.forEach(moduleName => {
             await client.query('ROLLBACK');
             client.release();
             return sendError(res, 400, 'لا يمكن حذف طريقة السداد لوجود قيود محاسبية ومعاملات مالية مسجلة عليها.');
+          }
+
+          // 8. Check if linked to issued cheques
+          const chkCheck = await client.query(
+            'SELECT COUNT(*) FROM issued_cheques WHERE bank_account_id = $1',
+            [id]
+          );
+          if (parseInt(chkCheck.rows[0]?.count || '0', 10) > 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, 'لا يمكن حذف طريقة السداد / الحساب البنكي لوجود شيكات صادرة مسجلة عليه.');
+          }
+        }
+
+        if (moduleName === 'suppliers') {
+          const chkSuppCheck = await client.query(
+            'SELECT COUNT(*) FROM issued_cheques WHERE supplier_id = $1',
+            [id]
+          );
+          if (parseInt(chkSuppCheck.rows[0]?.count || '0', 10) > 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, 'لا يمكن حذف المورد لوجود شيكات صادرة محررة لصالحه.');
+          }
+        }
+
+        if (moduleName === 'issued_cheques') {
+          const chk = await client.query('SELECT status, cheque_number FROM issued_cheques WHERE id = $1', [id]);
+          if (chk.rows.length > 0 && chk.rows[0].status !== 'DRAFT') {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, `لا يمكن حذف هذا الشيك رقم (${chk.rows[0].cheque_number}) لأنه تم إصداره أو معالجته مسبقاً (الحالة: ${chk.rows[0].status}). يمكنك إلغاء الشيك بدلاً من حذفه.`);
           }
         }
 
