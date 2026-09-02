@@ -620,6 +620,151 @@ export const PaymentMethods: React.FC = () => {
                         </div>
                      </div>
 
+                     {/* Bank Specific Details Section (Optional) */}
+                     {formData.type === 'bank' && (
+                       <div className="space-y-10 bg-indigo-50/40 p-8 md:p-10 rounded-[2.5rem] border border-indigo-100/80 shadow-xs">
+                         <div className="flex items-center justify-between border-b border-indigo-100 pb-6">
+                           <div className="flex items-center gap-4">
+                             <div className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-md shadow-indigo-500/20">
+                               <Building2 size={24} />
+                             </div>
+                             <div className={dir === 'rtl' ? 'text-right' : 'text-left'}>
+                               <h2 className="text-2xl font-black text-slate-900 leading-none tracking-tight uppercase">
+                                 {language === 'ar' ? 'بيانات الحساب البنكي' : 'Bank Account Details'}
+                               </h2>
+                               <p className="text-xs font-bold text-indigo-600/70 mt-1">
+                                 {language === 'ar' ? 'معلومات تفصيلية للحساب والتحويلات (اختياري)' : 'Detailed bank & transfer information (Optional)'}
+                               </p>
+                             </div>
+                           </div>
+                           <span className="text-xs font-black px-3 py-1 bg-white text-indigo-600 border border-indigo-200 rounded-full shadow-xs">
+                             {language === 'ar' ? 'اختياري' : 'Optional'}
+                           </span>
+                         </div>
+                         
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-right">
+                           {/* Bank Name */}
+                           <div className="space-y-3">
+                             <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest px-1">
+                               {language === 'ar' ? 'اسم البنك' : 'Bank Name'}
+                             </label>
+                             <div className="relative group">
+                               <Landmark className={`absolute ${dir === 'rtl' ? 'right-5' : 'left-5'} top-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors pointer-events-none`} size={20} />
+                               <input 
+                                 type="text" 
+                                 placeholder={language === 'ar' ? 'مثال: البنك التجاري الدولي (CIB)...' : 'e.g. Commercial International Bank...'}
+                                 className={`w-full ${dir === 'rtl' ? 'pr-14 pl-5' : 'pl-14 pr-5'} py-4 bg-white border border-slate-200 rounded-2xl text-base font-bold text-slate-900 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-xs`}
+                                 value={formData.bank_name || ''} 
+                                 onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })} 
+                               />
+                             </div>
+                           </div>
+
+                           {/* Branch Name */}
+                           <div className="space-y-3">
+                             <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest px-1">
+                               {language === 'ar' ? 'الفرع' : 'Branch Name'}
+                             </label>
+                             <div className="relative group">
+                               <Building2 className={`absolute ${dir === 'rtl' ? 'right-5' : 'left-5'} top-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors pointer-events-none`} size={20} />
+                               <input 
+                                 type="text" 
+                                 placeholder={language === 'ar' ? 'مثال: فرع المهندسين / التجمع...' : 'e.g. Main Branch...'}
+                                 className={`w-full ${dir === 'rtl' ? 'pr-14 pl-5' : 'pl-14 pr-5'} py-4 bg-white border border-slate-200 rounded-2xl text-base font-bold text-slate-900 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-xs`}
+                                 value={formData.branch_name || ''} 
+                                 onChange={(e) => setFormData({ ...formData, branch_name: e.target.value })} 
+                               />
+                             </div>
+                           </div>
+
+                           {/* Account Number */}
+                           <div className="space-y-3">
+                             <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest px-1">
+                               {language === 'ar' ? 'رقم الحساب' : 'Account Number'}
+                             </label>
+                             <div className="relative group">
+                               <Hash className={`absolute ${dir === 'rtl' ? 'right-5' : 'left-5'} top-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors pointer-events-none`} size={20} />
+                               <input 
+                                 type="text" 
+                                 placeholder="100012345678"
+                                 className={`w-full ${dir === 'rtl' ? 'pr-14 pl-5' : 'pl-14 pr-5'} py-4 bg-white border border-slate-200 rounded-2xl text-base font-mono font-bold text-slate-900 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-xs`}
+                                 value={formData.account_number || ''} 
+                                 onChange={(e) => setFormData({ ...formData, account_number: e.target.value })} 
+                               />
+                             </div>
+                           </div>
+
+                           {/* SWIFT Code */}
+                           <div className="space-y-3">
+                             <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest px-1">
+                               {language === 'ar' ? 'كود السويفت (SWIFT Code)' : 'SWIFT Code'}
+                             </label>
+                             <div className="relative group">
+                               <Layers className={`absolute ${dir === 'rtl' ? 'right-5' : 'left-5'} top-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors pointer-events-none`} size={20} />
+                               <input 
+                                 type="text" 
+                                 placeholder="CIBEEGCX"
+                                 className={`w-full ${dir === 'rtl' ? 'pr-14 pl-5' : 'pl-14 pr-5'} py-4 bg-white border border-slate-200 rounded-2xl text-base font-mono font-bold text-slate-900 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-xs uppercase`}
+                                 value={formData.swift_code || ''} 
+                                 onChange={(e) => setFormData({ ...formData, swift_code: e.target.value.toUpperCase() })} 
+                               />
+                             </div>
+                           </div>
+
+                           {/* IBAN */}
+                           <div className="md:col-span-2 space-y-3">
+                             <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest px-1">
+                               {language === 'ar' ? 'رقم الآيبان الدولي (IBAN)' : 'IBAN (International Bank Account Number)'}
+                             </label>
+                             <div className="relative group">
+                               <CreditCard className={`absolute ${dir === 'rtl' ? 'right-5' : 'left-5'} top-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors pointer-events-none`} size={20} />
+                               <input 
+                                 type="text" 
+                                 placeholder="EG380002000100000012345678"
+                                 className={`w-full ${dir === 'rtl' ? 'pr-14 pl-5' : 'pl-14 pr-5'} py-4 bg-white border border-slate-200 rounded-2xl text-base font-mono font-bold text-slate-900 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-xs uppercase tracking-wider`}
+                                 value={formData.iban || ''} 
+                                 onChange={(e) => setFormData({ ...formData, iban: e.target.value.toUpperCase() })} 
+                               />
+                             </div>
+                           </div>
+
+                           {/* Contact Person */}
+                           <div className="space-y-3">
+                             <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest px-1">
+                               {language === 'ar' ? 'مسؤول الاتصال' : 'Contact Person'}
+                             </label>
+                             <div className="relative group">
+                               <User className={`absolute ${dir === 'rtl' ? 'right-5' : 'left-5'} top-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors pointer-events-none`} size={20} />
+                               <input 
+                                 type="text" 
+                                 placeholder={language === 'ar' ? 'اسم مسؤول الحساب بالبنك...' : 'Bank representative name...'}
+                                 className={`w-full ${dir === 'rtl' ? 'pr-14 pl-5' : 'pl-14 pr-5'} py-4 bg-white border border-slate-200 rounded-2xl text-base font-bold text-slate-900 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-xs`}
+                                 value={formData.contact_person || ''} 
+                                 onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })} 
+                               />
+                             </div>
+                           </div>
+
+                           {/* Contact Phone */}
+                           <div className="space-y-3">
+                             <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest px-1">
+                               {language === 'ar' ? 'تليفون مسؤول الاتصال' : 'Contact Phone'}
+                             </label>
+                             <div className="relative group">
+                               <Phone className={`absolute ${dir === 'rtl' ? 'right-5' : 'left-5'} top-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors pointer-events-none`} size={20} />
+                               <input 
+                                 type="tel" 
+                                 placeholder={language === 'ar' ? 'رقم الهاتف / الموبايل...' : 'Phone / Mobile number...'}
+                                 className={`w-full ${dir === 'rtl' ? 'pr-14 pl-5' : 'pl-14 pr-5'} py-4 bg-white border border-slate-200 rounded-2xl text-base font-bold text-slate-900 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-xs`}
+                                 value={formData.contact_phone || ''} 
+                                 onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })} 
+                               />
+                             </div>
+                           </div>
+                         </div>
+                       </div>
+                     )}
+
                      {/* Opening Balance Section */}
                      <div className="space-y-12">
                         <div className="flex items-center gap-4 border-b border-slate-50 pb-8">
