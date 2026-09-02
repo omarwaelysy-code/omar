@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, AlertCircle, Calendar, DollarSign, Building2, User, FileText, Paperclip, Trash2, CheckCircle2 } from 'lucide-react';
+import { X, Save, AlertCircle, Calendar, DollarSign, Building2, User, FileText, Paperclip, Trash2, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { IssuedCheque, Supplier, PaymentMethod, IssuedChequeAttachment } from '../../types';
 import { issuedChequeService } from '../../services/issuedChequeService';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -12,6 +12,7 @@ interface ChequeFormModalProps {
   chequeToEdit?: IssuedCheque | null;
   suppliers: Supplier[];
   paymentMethods: PaymentMethod[];
+  inline?: boolean;
 }
 
 export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
@@ -20,7 +21,8 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
   onSuccess,
   chequeToEdit,
   suppliers,
-  paymentMethods
+  paymentMethods,
+  inline = false
 }) => {
   const { showSuccess, showError } = useNotification();
   const { user } = useAuth();
@@ -184,32 +186,42 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200" dir="rtl">
-        
-        {/* Modal Header */}
-        <div className="px-6 py-5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
-              🏦
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                {chequeToEdit ? 'تعديل مسودة الشيك الصادر' : 'تحرير وإضافة شيك صادر جديد'}
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                تسجيل بيانات الشيك البنكي الصادر للمورد مع ربط الحسابات
-              </p>
-            </div>
+  const formContent = (
+    <div className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 w-full ${inline ? 'rounded-3xl shadow-sm' : 'max-w-3xl rounded-3xl shadow-2xl'} overflow-hidden animate-in fade-in duration-200`} dir="rtl">
+      
+      {/* Header */}
+      <div className="px-6 py-5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xl">
+            🏦
           </div>
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+              {chequeToEdit ? 'تعديل مسودة الشيك الصادر' : 'تحرير وإضافة شيك صادر جديد'}
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              تسجيل بيانات الشيك البنكي الصادر للمورد مع ربط الحسابات المحاسبية
+            </p>
+          </div>
+        </div>
+        {inline ? (
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 border border-slate-200 dark:border-slate-700"
+          >
+            <span>الرجوع للقائمة</span>
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+        ) : (
           <button
             onClick={onClose}
             className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
-        </div>
+        )}
+      </div>
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
@@ -452,6 +464,15 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
 
         </form>
       </div>
+  );
+
+  if (inline) {
+    return formContent;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      {formContent}
     </div>
   );
 };

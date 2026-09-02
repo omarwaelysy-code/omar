@@ -24,7 +24,7 @@ export const IssuedCheques: React.FC = () => {
   const { user } = useAuth();
 
   // Active Main Tab
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'all' | 'due' | 'reports'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'all' | 'create' | 'due' | 'reports'>('dashboard');
 
   // Data States
   const [cheques, setCheques] = useState<IssuedCheque[]>([]);
@@ -41,8 +41,7 @@ export const IssuedCheques: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [duePeriodFilter, setDuePeriodFilter] = useState<'all' | 'today' | '7days' | '30days' | 'overdue'>('all');
 
-  // Modals
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  // Modals & Forms
   const [selectedChequeForEdit, setSelectedChequeForEdit] = useState<IssuedCheque | null>(null);
   const [selectedChequeForDetails, setSelectedChequeForDetails] = useState<IssuedCheque | null>(null);
   const [selectedChequeForPay, setSelectedChequeForPay] = useState<IssuedCheque | null>(null);
@@ -252,7 +251,7 @@ export const IssuedCheques: React.FC = () => {
         <button
           onClick={() => {
             setSelectedChequeForEdit(null);
-            setIsFormOpen(true);
+            setActiveTab('create');
           }}
           className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2.5 transition-all hover:scale-[1.02] active:scale-[0.98]"
         >
@@ -288,6 +287,18 @@ export const IssuedCheques: React.FC = () => {
         </button>
 
         <button
+          onClick={() => { setActiveTab('create'); }}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'create'
+              ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Plus className="w-4 h-4" />
+          <span>{selectedChequeForEdit ? 'تعديل مسودة الشيك' : 'تحرير شيك صادر'}</span>
+        </button>
+
+        <button
           onClick={() => { setActiveTab('due'); setCurrentPage(1); }}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'due'
@@ -319,9 +330,22 @@ export const IssuedCheques: React.FC = () => {
           upcomingCheques={upcomingCheques}
           loading={loading}
           onRefresh={fetchData}
-          onCreateNew={() => { setSelectedChequeForEdit(null); setIsFormOpen(true); }}
+          onCreateNew={() => { setSelectedChequeForEdit(null); setActiveTab('create'); }}
           onViewCheque={cheque => setSelectedChequeForDetails(cheque)}
           onPayCheque={cheque => setSelectedChequeForPay(cheque)}
+        />
+      )}
+
+      {/* In-Page Form Tab: تحرير وإضافة شيك صادر في صلب الصفحة */}
+      {activeTab === 'create' && (
+        <ChequeFormModal
+          isOpen={true}
+          inline={true}
+          onClose={() => { setActiveTab('all'); setSelectedChequeForEdit(null); }}
+          onSuccess={() => { fetchData(); setActiveTab('all'); setSelectedChequeForEdit(null); }}
+          chequeToEdit={selectedChequeForEdit}
+          suppliers={suppliers}
+          paymentMethods={paymentMethods}
         />
       )}
 
@@ -493,7 +517,7 @@ export const IssuedCheques: React.FC = () => {
                                   إصدار
                                 </button>
                                 <button
-                                  onClick={() => { setSelectedChequeForEdit(cheque); setIsFormOpen(true); }}
+                                  onClick={() => { setSelectedChequeForEdit(cheque); setActiveTab('create'); }}
                                   className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                                   title="تعديل المسودة"
                                 >
@@ -599,15 +623,6 @@ export const IssuedCheques: React.FC = () => {
       )}
 
       {/* Modals Container */}
-      <ChequeFormModal
-        isOpen={isFormOpen}
-        onClose={() => { setIsFormOpen(false); setSelectedChequeForEdit(null); }}
-        onSuccess={fetchData}
-        chequeToEdit={selectedChequeForEdit}
-        suppliers={suppliers}
-        paymentMethods={paymentMethods}
-      />
-
       <ChequeDetailsModal
         isOpen={!!selectedChequeForDetails}
         onClose={() => setSelectedChequeForDetails(null)}
