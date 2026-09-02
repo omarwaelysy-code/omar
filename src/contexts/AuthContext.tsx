@@ -76,6 +76,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initAuth();
   }, []);
 
+  const getCompanyHistory = (emailKey: string, userId?: string): string[] => {
+    let history: string[] = [];
+    try {
+      const raw = (emailKey ? localStorage.getItem(`company_history_${emailKey}`) : null) || (userId ? localStorage.getItem(`company_history_${userId}`) : null);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          history = parsed.filter(id => typeof id === 'string' && id.trim().length > 0);
+        }
+      }
+    } catch (e) {
+      console.error('AuthContext: Error parsing company history:', e);
+    }
+
+    // Fallback to legacy single preferred_company if history is empty
+    if (history.length === 0) {
+      const pref = (emailKey ? localStorage.getItem(`preferred_company_${emailKey}`) : null) || (userId ? localStorage.getItem(`preferred_company_${userId}`) : null);
+      if (pref) {
+        history = [pref];
+      }
+    }
+    return history;
+  };
+
+  const recordCompanyOpened = (companyId: string, emailKey: string, userId?: string) => {
+    if (!companyId || companyId === 'system' || companyId === 'SYSTEM') return;
+    const currentHistory = getCompanyHistory(emailKey, userId);
+    const updatedHistory = [companyId, ...currentHistory.filter(id => id !== companyId)].slice(0, 20);
+    
+    if (emailKey) {
+      localStorage.setItem(`company_history_${emailKey}`, JSON.stringify(updatedHistory));
+      localStorage.setItem(`preferred_company_${emailKey}`, companyId);
+    }
+    if (userId) {
+      localStorage.setItem(`company_history_${userId}`, JSON.stringify(updatedHistory));
+      localStorage.setItem(`preferred_company_${userId}`, companyId);
+    }
+  };
+
   const checkCompanyExpiry = async (companyId: string): Promise<{ isExpired: boolean; endDateStr: string; companyName: string; reason: string }> => {
     if (!companyId || companyId === 'system' || companyId === 'SYSTEM') {
       return { isExpired: false, endDateStr: '', companyName: '', reason: '' };
@@ -151,37 +190,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (memberships.length > 0) {
         const emailKey = (email || '').toLowerCase().trim();
-        const preferredCompanyId = (emailKey ? localStorage.getItem(`preferred_company_${emailKey}`) : null) || localStorage.getItem(`preferred_company_${userId}`);
-        
-        let selectedMembership: User | null = null;
-        
-        // 1. Check preferred company first if set
-        if (preferredCompanyId) {
-          const pref = memberships.find(m => m.company_id === preferredCompanyId);
-          if (pref && pref.company_id) {
-            const check = await checkCompanyExpiry(pref.company_id);
-            if (!check.isExpired) {
-              selectedMembership = pref;
-            }
+        const history = getCompanyHistory(emailKey, userId);
+
+        // Build candidate list in strict priority order:
+        // 1. Companies from history in MRU order (index 0 = last opened company, index 1 = one before it, etc.)
+        // 2. Any other memberships not yet in history
+        const candidateCompanyIds: string[] = [];
+        for (const compId of history) {
+          if (memberships.some(m => m.company_id === compId) && !candidateCompanyIds.includes(compId)) {
+            candidateCompanyIds.push(compId);
+          }
+        }
+        for (const m of memberships) {
+          if (m.company_id && !candidateCompanyIds.includes(m.company_id)) {
+            candidateCompanyIds.push(m.company_id);
           }
         }
 
-        // 2. If preferred company is expired or not set, find first non-expired active company
-        if (!selectedMembership) {
-          for (const m of memberships) {
-            if (m.company_id) {
-              const check = await checkCompanyExpiry(m.company_id);
-              if (!check.isExpired) {
-                selectedMembership = m;
-                if (emailKey) localStorage.setItem(`preferred_company_${emailKey}`, m.company_id);
-                localStorage.setItem(`preferred_company_${userId}`, m.company_id);
-                break;
-              }
-            }
+        let selectedMembership: User | null = null;
+        let selectedExpiryCheck: { isExpired: boolean; endDateStr: string; companyName: string; reason: string } = {
+          isExpired: false,
+          endDateStr: '',
+          companyName: '',
+          reason: ''
+        };
+
+        // Check each candidate in order: last opened -> previous opened -> ...
+        for (const compId of candidateCompanyIds) {
+          const m = memberships.find(mem => mem.company_id === compId);
+          if (!m) continue;
+
+          const check = await checkCompanyExpiry(compId);
+          if (!check.isExpired) {
+            selectedMembership = m;
+            selectedExpiryCheck = check;
+            recordCompanyOpened(compId, emailKey, userId);
+            break;
           }
         }
         
-        // 3. If ALL companies are expired:
+        // If ALL companies are expired:
         if (!selectedMembership) {
           if (hasSuperAdminRole) {
             // If user is a super admin, switch automatically to super_admin workspace mode
@@ -199,25 +247,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
             return;
           } else {
-            selectedMembership = memberships[0];
+            // Fallback to the last opened company or first membership so that expiry message displays for it
+            const fallbackCompId = candidateCompanyIds[0] || memberships[0]?.company_id;
+            selectedMembership = memberships.find(m => m.company_id === fallbackCompId) || memberships[0];
+            if (selectedMembership?.company_id) {
+              selectedExpiryCheck = await checkCompanyExpiry(selectedMembership.company_id);
+            }
           }
         }
 
-        const activeMembership = selectedMembership || memberships[0];
-        
-        if (activeMembership && activeMembership.company_id) {
-          const expiryCheck = await checkCompanyExpiry(activeMembership.company_id);
-          setSubscriptionExpiredDetails({
-            expired: expiryCheck.isExpired,
-            expiryDate: expiryCheck.endDateStr,
-            companyName: expiryCheck.companyName,
-            reason: expiryCheck.reason
-          });
-        }
+        setSubscriptionExpiredDetails({
+          expired: selectedExpiryCheck.isExpired,
+          expiryDate: selectedExpiryCheck.endDateStr,
+          companyName: selectedExpiryCheck.companyName,
+          reason: selectedExpiryCheck.reason
+        });
 
         setUser({ 
-          ...activeMembership, 
-          must_change_password: activeMembership.must_change_password || false
+          ...selectedMembership, 
+          must_change_password: selectedMembership.must_change_password || false
         });
       } else {
         // Fallback for super admin
@@ -286,10 +334,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         setUser(updatedUser);
         localStorage.setItem('auth_user', JSON.stringify(updatedUser));
-        if (updatedUser.email) {
-          localStorage.setItem(`preferred_company_${updatedUser.email.toLowerCase().trim()}`, companyId);
+        
+        const emailKey = (updatedUser.email || user.email || '').toLowerCase().trim();
+        recordCompanyOpened(companyId, emailKey, user.id);
+
+        if (companyId) {
+          const expiryCheck = await checkCompanyExpiry(companyId);
+          setSubscriptionExpiredDetails({
+            expired: expiryCheck.isExpired,
+            expiryDate: expiryCheck.endDateStr,
+            companyName: expiryCheck.companyName,
+            reason: expiryCheck.reason
+          });
         }
-        localStorage.setItem(`preferred_company_${user.id}`, companyId);
       }
     } finally {
       setLoading(false);

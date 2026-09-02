@@ -3,10 +3,11 @@ import { LogOut, ArrowRight, Building2, Calendar, Lock, ShieldAlert } from 'luci
 import { useAuth } from '../contexts/AuthContext';
 
 export const SubscriptionExpiredScreen: React.FC = () => {
-  const { logout, user, isSuperAdmin, isSuperAdminAccount, subscriptionExpiredDetails, setWorkspaceMode } = useAuth();
+  const { logout, user, userMemberships, switchCompany, isSuperAdmin, isSuperAdminAccount, subscriptionExpiredDetails, setWorkspaceMode } = useAuth();
 
   const companyName = subscriptionExpiredDetails?.companyName || user?.company_name || user?.company_id || 'الشركة';
   const expiryDate = subscriptionExpiredDetails?.expiryDate || '';
+  const otherMemberships = (userMemberships || []).filter(m => m.company_id && m.company_id !== user?.company_id);
 
   return (
     <div className="min-h-screen bg-stone-900 flex items-center justify-center p-4" dir="rtl">
@@ -51,6 +52,29 @@ export const SubscriptionExpiredScreen: React.FC = () => {
             </span>
           </div>
         </div>
+
+        {/* Other Companies to Switch to */}
+        {otherMemberships.length > 0 && (
+          <div className="bg-stone-900/50 border border-stone-700/40 rounded-2xl p-3 text-right space-y-2">
+            <p className="text-[11px] font-bold text-stone-400">التبديل إلى شركة أخرى متاحة:</p>
+            <div className="space-y-1.5 max-h-36 overflow-y-auto custom-scrollbar">
+              {otherMemberships.map(m => (
+                <button
+                  key={m.company_id}
+                  type="button"
+                  onClick={() => switchCompany(m.company_id)}
+                  className="w-full flex items-center justify-between p-2.5 rounded-xl bg-stone-800 hover:bg-stone-700 border border-stone-700 text-stone-200 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  <span className="flex items-center gap-2 truncate">
+                    <Building2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span className="truncate">{m.company_name || m.company_id}</span>
+                  </span>
+                  <span className="text-emerald-400 text-[10px] shrink-0 font-medium">فتح الشركة &larr;</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="space-y-3 pt-2">
