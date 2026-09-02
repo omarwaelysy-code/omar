@@ -3056,7 +3056,7 @@ async function createChequeJournalEntry(
 // 1. Dashboard Stats
 const chequeDashboardHandler = async (req: AuthRequest, res: any) => {
   try {
-    const companyId = req.user?.company_id;
+    const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
     if (!companyId) return sendError(res, 401, 'Unauthorized');
 
     if (!await checkPermission(req, 'issued_cheques', 'view')) {
@@ -3125,7 +3125,7 @@ router.get('/issued_cheques/dashboard-stats', authenticateToken, chequeDashboard
 // 2. Upcoming Cheques
 const chequeUpcomingHandler = async (req: AuthRequest, res: any) => {
   try {
-    const companyId = req.user?.company_id;
+    const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
     if (!companyId) return sendError(res, 401, 'Unauthorized');
 
     if (!await checkPermission(req, 'issued_cheques', 'view')) {
@@ -3163,27 +3163,26 @@ const chequeIssueHandler = async (req: AuthRequest, res: any) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const companyId = req.user?.company_id;
+    const requestedCompanyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
     const { id } = req.params;
 
-    if (!companyId) {
-      await client.query('ROLLBACK');
-      return sendError(res, 401, 'Unauthorized');
-    }
-
-    if (!await checkPermission(req, 'issued_cheques', 'issue') && !await checkPermission(req, 'issued_cheques', 'edit')) {
-      await client.query('ROLLBACK');
-      return res.status(403).json({ error: 'ليس لديك صلاحية اعتماد / إصدار الشيكات الصادرة.' });
-    }
-
     const { rows: chequeRows } = await client.query(
-      `SELECT * FROM issued_cheques WHERE id = $1 AND company_id = $2 FOR UPDATE`,
-      [id, companyId]
+      `SELECT * FROM issued_cheques WHERE id = $1 FOR UPDATE`,
+      [id]
     );
 
     if (chequeRows.length === 0) {
       await client.query('ROLLBACK');
       return sendError(res, 404, 'الشيك غير موجود.');
+    }
+
+    const cheque = chequeRows[0];
+    const companyId = cheque.company_id || requestedCompanyId;
+    if (req.user) req.user.company_id = companyId;
+
+    if (!await checkPermission(req, 'issued_cheques', 'issue') && !await checkPermission(req, 'issued_cheques', 'edit')) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'ليس لديك صلاحية اعتماد / إصدار الشيكات الصادرة.' });
     }
 
     const cheque = chequeRows[0];
@@ -3292,28 +3291,27 @@ const chequePayHandler = async (req: AuthRequest, res: any) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const companyId = req.user?.company_id;
+    const requestedCompanyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
     const { id } = req.params;
     const { payment_date, notes } = req.body;
 
-    if (!companyId) {
-      await client.query('ROLLBACK');
-      return sendError(res, 401, 'Unauthorized');
-    }
-
-    if (!await checkPermission(req, 'issued_cheques', 'pay') && !await checkPermission(req, 'issued_cheques', 'edit')) {
-      await client.query('ROLLBACK');
-      return res.status(403).json({ error: 'ليس لديك صلاحية تسجيل صرف وسداد الشيكات الصادرة.' });
-    }
-
     const { rows: chequeRows } = await client.query(
-      `SELECT * FROM issued_cheques WHERE id = $1 AND company_id = $2 FOR UPDATE`,
-      [id, companyId]
+      `SELECT * FROM issued_cheques WHERE id = $1 FOR UPDATE`,
+      [id]
     );
 
     if (chequeRows.length === 0) {
       await client.query('ROLLBACK');
       return sendError(res, 404, 'الشيك غير موجود.');
+    }
+
+    const cheque = chequeRows[0];
+    const companyId = cheque.company_id || requestedCompanyId;
+    if (req.user) req.user.company_id = companyId;
+
+    if (!await checkPermission(req, 'issued_cheques', 'pay') && !await checkPermission(req, 'issued_cheques', 'edit')) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'ليس لديك صلاحية تسجيل صرف وسداد الشيكات الصادرة.' });
     }
 
     const cheque = chequeRows[0];
@@ -3422,33 +3420,32 @@ const chequePostponeHandler = async (req: AuthRequest, res: any) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const companyId = req.user?.company_id;
+    const requestedCompanyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
     const { id } = req.params;
     const { new_due_date, reason } = req.body;
-
-    if (!companyId) {
-      await client.query('ROLLBACK');
-      return sendError(res, 401, 'Unauthorized');
-    }
 
     if (!new_due_date) {
       await client.query('ROLLBACK');
       return sendError(res, 400, 'يرجى تحديد تاريخ الاستحقاق الجديد.');
     }
 
-    if (!await checkPermission(req, 'issued_cheques', 'postpone') && !await checkPermission(req, 'issued_cheques', 'edit')) {
-      await client.query('ROLLBACK');
-      return res.status(403).json({ error: 'ليس لديك صلاحية تأجيل استحقاق الشيكات.' });
-    }
-
     const { rows: chequeRows } = await client.query(
-      `SELECT * FROM issued_cheques WHERE id = $1 AND company_id = $2 FOR UPDATE`,
-      [id, companyId]
+      `SELECT * FROM issued_cheques WHERE id = $1 FOR UPDATE`,
+      [id]
     );
 
     if (chequeRows.length === 0) {
       await client.query('ROLLBACK');
       return sendError(res, 404, 'الشيك غير موجود.');
+    }
+
+    const cheque = chequeRows[0];
+    const companyId = cheque.company_id || requestedCompanyId;
+    if (req.user) req.user.company_id = companyId;
+
+    if (!await checkPermission(req, 'issued_cheques', 'postpone') && !await checkPermission(req, 'issued_cheques', 'edit')) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'ليس لديك صلاحية تأجيل استحقاق الشيكات.' });
     }
 
     const cheque = chequeRows[0];
@@ -3505,28 +3502,27 @@ const chequeReturnHandler = async (req: AuthRequest, res: any) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const companyId = req.user?.company_id;
+    const requestedCompanyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
     const { id } = req.params;
     const { return_date, reason } = req.body;
 
-    if (!companyId) {
-      await client.query('ROLLBACK');
-      return sendError(res, 401, 'Unauthorized');
-    }
-
-    if (!await checkPermission(req, 'issued_cheques', 'return') && !await checkPermission(req, 'issued_cheques', 'edit')) {
-      await client.query('ROLLBACK');
-      return res.status(403).json({ error: 'ليس لديك صلاحية تسجيل ارتداد الشيكات.' });
-    }
-
     const { rows: chequeRows } = await client.query(
-      `SELECT * FROM issued_cheques WHERE id = $1 AND company_id = $2 FOR UPDATE`,
-      [id, companyId]
+      `SELECT * FROM issued_cheques WHERE id = $1 FOR UPDATE`,
+      [id]
     );
 
     if (chequeRows.length === 0) {
       await client.query('ROLLBACK');
       return sendError(res, 404, 'الشيك غير موجود.');
+    }
+
+    const cheque = chequeRows[0];
+    const companyId = cheque.company_id || requestedCompanyId;
+    if (req.user) req.user.company_id = companyId;
+
+    if (!await checkPermission(req, 'issued_cheques', 'return') && !await checkPermission(req, 'issued_cheques', 'edit')) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'ليس لديك صلاحية تسجيل ارتداد الشيكات.' });
     }
 
     const cheque = chequeRows[0];
@@ -3637,28 +3633,27 @@ const chequeCancelHandler = async (req: AuthRequest, res: any) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const companyId = req.user?.company_id;
+    const requestedCompanyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
     const { id } = req.params;
     const { reason } = req.body;
 
-    if (!companyId) {
-      await client.query('ROLLBACK');
-      return sendError(res, 401, 'Unauthorized');
-    }
-
-    if (!await checkPermission(req, 'issued_cheques', 'cancel') && !await checkPermission(req, 'issued_cheques', 'delete')) {
-      await client.query('ROLLBACK');
-      return res.status(403).json({ error: 'ليس لديك صلاحية إلغاء الشيكات.' });
-    }
-
     const { rows: chequeRows } = await client.query(
-      `SELECT * FROM issued_cheques WHERE id = $1 AND company_id = $2 FOR UPDATE`,
-      [id, companyId]
+      `SELECT * FROM issued_cheques WHERE id = $1 FOR UPDATE`,
+      [id]
     );
 
     if (chequeRows.length === 0) {
       await client.query('ROLLBACK');
       return sendError(res, 404, 'الشيك غير موجود.');
+    }
+
+    const cheque = chequeRows[0];
+    const companyId = cheque.company_id || requestedCompanyId;
+    if (req.user) req.user.company_id = companyId;
+
+    if (!await checkPermission(req, 'issued_cheques', 'cancel') && !await checkPermission(req, 'issued_cheques', 'delete')) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'ليس لديك صلاحية إلغاء الشيكات.' });
     }
 
     const cheque = chequeRows[0];

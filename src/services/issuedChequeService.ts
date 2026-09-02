@@ -1,6 +1,24 @@
 import { dbService } from './dbService';
 import { IssuedCheque, IssuedChequeStats } from '../types';
 
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem('auth_token');
+  const authUserStr = localStorage.getItem('auth_user');
+  let companyId = localStorage.getItem('active_company_id') || '';
+  if (!companyId && authUserStr) {
+    try {
+      const parsed = JSON.parse(authUserStr);
+      companyId = parsed.company_id || '';
+    } catch (e) {}
+  }
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (companyId) headers['x-company-id'] = companyId;
+  return headers;
+}
+
 export const issuedChequeService = {
   /**
    * Fetch all or filtered cheques
@@ -44,14 +62,7 @@ export const issuedChequeService = {
    * Fetch real dashboard KPI statistics
    */
   async getDashboardStats(): Promise<IssuedChequeStats> {
-    const token = localStorage.getItem('auth_token');
-    const activeCompanyId = localStorage.getItem('active_company_id');
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    if (activeCompanyId) headers['x-company-id'] = activeCompanyId;
-
+    const headers = getAuthHeaders();
     const res = await fetch('/api/erp/issued-cheques/dashboard-stats', { headers });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -64,14 +75,7 @@ export const issuedChequeService = {
    * Fetch top upcoming / due cheques
    */
   async getUpcomingCheques(): Promise<IssuedCheque[]> {
-    const token = localStorage.getItem('auth_token');
-    const activeCompanyId = localStorage.getItem('active_company_id');
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    if (activeCompanyId) headers['x-company-id'] = activeCompanyId;
-
+    const headers = getAuthHeaders();
     const res = await fetch('/api/erp/issued-cheques/upcoming', { headers });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -84,14 +88,7 @@ export const issuedChequeService = {
    * Issue / Approve Cheque (DRAFT -> ISSUED) + Journal Entry
    */
   async issueCheque(id: string): Promise<{ success: boolean; message: string; journal_entry_id?: string }> {
-    const token = localStorage.getItem('auth_token');
-    const activeCompanyId = localStorage.getItem('active_company_id');
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    if (activeCompanyId) headers['x-company-id'] = activeCompanyId;
-
+    const headers = getAuthHeaders();
     const res = await fetch(`/api/erp/issued-cheques/${id}/issue`, {
       method: 'POST',
       headers
@@ -109,14 +106,7 @@ export const issuedChequeService = {
    * Pay / Cash Cheque from Bank (ISSUED / POSTPONED -> PAID) + Journal Entry
    */
   async payCheque(id: string, paymentDate?: string, notes?: string): Promise<{ success: boolean; message: string; journal_entry_id?: string }> {
-    const token = localStorage.getItem('auth_token');
-    const activeCompanyId = localStorage.getItem('active_company_id');
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    if (activeCompanyId) headers['x-company-id'] = activeCompanyId;
-
+    const headers = getAuthHeaders();
     const res = await fetch(`/api/erp/issued-cheques/${id}/pay`, {
       method: 'POST',
       headers,
@@ -135,14 +125,7 @@ export const issuedChequeService = {
    * Postpone Cheque Due Date (ISSUED / POSTPONED -> POSTPONED)
    */
   async postponeCheque(id: string, newDueDate: string, reason?: string): Promise<{ success: boolean; message: string }> {
-    const token = localStorage.getItem('auth_token');
-    const activeCompanyId = localStorage.getItem('active_company_id');
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    if (activeCompanyId) headers['x-company-id'] = activeCompanyId;
-
+    const headers = getAuthHeaders();
     const res = await fetch(`/api/erp/issued-cheques/${id}/postpone`, {
       method: 'POST',
       headers,
@@ -160,14 +143,7 @@ export const issuedChequeService = {
    * Return Cheque from Bank (ISSUED / POSTPONED -> RETURNED) + Reversal Entry
    */
   async returnCheque(id: string, returnDate?: string, reason?: string): Promise<{ success: boolean; message: string; journal_entry_id?: string }> {
-    const token = localStorage.getItem('auth_token');
-    const activeCompanyId = localStorage.getItem('active_company_id');
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    if (activeCompanyId) headers['x-company-id'] = activeCompanyId;
-
+    const headers = getAuthHeaders();
     const res = await fetch(`/api/erp/issued-cheques/${id}/return`, {
       method: 'POST',
       headers,
@@ -186,14 +162,7 @@ export const issuedChequeService = {
    * Cancel Cheque (DRAFT / ISSUED / POSTPONED -> CANCELLED) + Reversal Entry if issued
    */
   async cancelCheque(id: string, reason?: string): Promise<{ success: boolean; message: string }> {
-    const token = localStorage.getItem('auth_token');
-    const activeCompanyId = localStorage.getItem('active_company_id');
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    if (activeCompanyId) headers['x-company-id'] = activeCompanyId;
-
+    const headers = getAuthHeaders();
     const res = await fetch(`/api/erp/issued-cheques/${id}/cancel`, {
       method: 'POST',
       headers,
