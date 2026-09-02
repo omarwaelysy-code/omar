@@ -8,10 +8,11 @@ describe('🏦 Issued Cheques Module - Accounting & Logic Verification', () => {
       id: 'supp-1',
       name: 'شركة الأمل للتوريدات',
       code: 'SUPP-001',
+      mobile: '01000000000',
+      opening_balance: 0,
       account_id: 'acc-supp-1',
       account_name: 'حساب المورد - شركة الأمل',
-      company_id: 'comp-1',
-      created_at: '2026-01-01'
+      company_id: 'comp-1'
     }
   ];
 
@@ -23,6 +24,7 @@ describe('🏦 Issued Cheques Module - Accounting & Logic Verification', () => {
       name: 'حساب المورد - شركة الأمل',
       type_id: 'liabilities',
       account_usage: 'supplier',
+      opening_balance: 0,
       is_active: true
     },
     {
@@ -32,6 +34,7 @@ describe('🏦 Issued Cheques Module - Accounting & Logic Verification', () => {
       name: 'أوراق الدفع - شيكات صادرة',
       type_id: 'liabilities',
       account_usage: 'notes_payable',
+      opening_balance: 0,
       is_active: true
     },
     {
@@ -41,6 +44,7 @@ describe('🏦 Issued Cheques Module - Accounting & Logic Verification', () => {
       name: 'البنك التجاري الدولي CIB',
       type_id: 'assets',
       account_usage: 'bank',
+      opening_balance: 0,
       is_active: true
     }
   ];
@@ -48,11 +52,13 @@ describe('🏦 Issued Cheques Module - Accounting & Logic Verification', () => {
   const mockPaymentMethods: PaymentMethod[] = [
     {
       id: 'pm-bank-1',
+      code: 'PM-001',
       name: 'CIB البنك التجاري الدولي',
       type: 'bank',
       bank_name: 'CIB',
       account_number: '1000258963',
       account_id: 'acc-bank-cib',
+      opening_balance: 0,
       company_id: 'comp-1'
     }
   ];

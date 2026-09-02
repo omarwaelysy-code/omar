@@ -39,7 +39,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
   const [validationError, setValidationError] = useState('');
 
   // Filter bank payment methods only
-  const bankAccounts = paymentMethods.filter(p => p.type === 'bank' || p.account_usage === 'bank' || p.bank_name);
+  const bankAccounts = paymentMethods.filter(p => p.type === 'bank' || Boolean(p.bank_name));
 
   useEffect(() => {
     if (chequeToEdit) {

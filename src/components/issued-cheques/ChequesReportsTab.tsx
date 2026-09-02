@@ -23,7 +23,7 @@ export const ChequesReportsTab: React.FC<ChequesReportsTabProps> = ({
   const [selectedBankId, setSelectedBankId] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
 
-  const bankAccounts = paymentMethods.filter(p => p.type === 'bank' || p.account_usage === 'bank' || p.bank_name);
+  const bankAccounts = paymentMethods.filter(p => p.type === 'bank' || Boolean(p.bank_name));
 
   // Filtered dataset
   const filteredCheques = useMemo(() => {

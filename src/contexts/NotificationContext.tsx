@@ -15,6 +15,8 @@ interface Toast {
 
 interface NotificationContextType {
   showNotification: (message: string, type?: ToastType) => void;
+  showSuccess: (message: string) => void;
+  showError: (message: string) => void;
   addPersistentNotification: (notification: Omit<AppNotification, 'id' | 'timestamp' | 'read'> & { id?: string }) => void;
   notifications: AppNotification[];
   unreadCount: number;
@@ -115,6 +117,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setPersistentNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
+  const showSuccess = useCallback((message: string) => {
+    showNotification(message, 'success');
+  }, [showNotification]);
+
+  const showError = useCallback((message: string) => {
+    showNotification(message, 'error');
+  }, [showNotification]);
+
   const markAllAsRead = () => {
     setPersistentNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
@@ -128,6 +138,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   return (
     <NotificationContext.Provider value={{ 
       showNotification, 
+      showSuccess,
+      showError,
       addPersistentNotification,
       notifications: persistentNotifications,
       unreadCount,
