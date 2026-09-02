@@ -3185,7 +3185,6 @@ const chequeIssueHandler = async (req: AuthRequest, res: any) => {
       return res.status(403).json({ error: 'ليس لديك صلاحية اعتماد / إصدار الشيكات الصادرة.' });
     }
 
-    const cheque = chequeRows[0];
     if (cheque.status !== 'DRAFT') {
       await client.query('ROLLBACK');
       return sendError(res, 400, `لا يمكن إصدار هذا الشيك لأن حالته الحالية هي (${cheque.status}). يجب أن يكون في حالة مسودة (DRAFT).`);
@@ -3314,7 +3313,6 @@ const chequePayHandler = async (req: AuthRequest, res: any) => {
       return res.status(403).json({ error: 'ليس لديك صلاحية تسجيل صرف وسداد الشيكات الصادرة.' });
     }
 
-    const cheque = chequeRows[0];
     if (!['ISSUED', 'POSTPONED'].includes(cheque.status)) {
       await client.query('ROLLBACK');
       return sendError(res, 400, `لا يمكن صرف هذا الشيك لأن حالته الحالية هي (${cheque.status}). يجب أن يكون صادراً أولاً.`);
@@ -3448,7 +3446,6 @@ const chequePostponeHandler = async (req: AuthRequest, res: any) => {
       return res.status(403).json({ error: 'ليس لديك صلاحية تأجيل استحقاق الشيكات.' });
     }
 
-    const cheque = chequeRows[0];
     if (!['ISSUED', 'POSTPONED'].includes(cheque.status)) {
       await client.query('ROLLBACK');
       return sendError(res, 400, `لا يمكن تأجيل هذا الشيك لأن حالته هي (${cheque.status}).`);
@@ -3525,7 +3522,6 @@ const chequeReturnHandler = async (req: AuthRequest, res: any) => {
       return res.status(403).json({ error: 'ليس لديك صلاحية تسجيل ارتداد الشيكات.' });
     }
 
-    const cheque = chequeRows[0];
     if (!['ISSUED', 'POSTPONED'].includes(cheque.status)) {
       await client.query('ROLLBACK');
       return sendError(res, 400, `لا يمكن تسجيل ارتداد هذا الشيك لأن حالته هي (${cheque.status}).`);
@@ -3656,7 +3652,6 @@ const chequeCancelHandler = async (req: AuthRequest, res: any) => {
       return res.status(403).json({ error: 'ليس لديك صلاحية إلغاء الشيكات.' });
     }
 
-    const cheque = chequeRows[0];
     if (['PAID', 'CANCELLED'].includes(cheque.status)) {
       await client.query('ROLLBACK');
       return sendError(res, 400, `لا يمكن إلغاء هذا الشيك لأن حالته هي (${cheque.status}).`);
