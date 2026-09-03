@@ -263,7 +263,7 @@ export function EtaReceivedInvoices() {
     };
   }, [selectedInvoice?.uuid]);
 
-  // Fetch all documents across the full portal history
+  // Fetch all documents across the full portal history (Received + Sent)
   const fetchAllPortalInvoices = useCallback(async (isRefresh = false) => {
     if (!user?.company_id) return;
     try {
@@ -271,15 +271,8 @@ export function EtaReceivedInvoices() {
       setErrorMessage(null);
 
       const queryParams = new URLSearchParams();
-      if (directionFilter !== 'all') {
-        queryParams.set('direction', directionFilter);
-      }
-      if (docTypeFilter !== 'all') {
-        queryParams.set('documentType', docTypeFilter);
-      }
-      if (statusFilter !== 'all') {
-        queryParams.set('status', statusFilter);
-      }
+      // In all_portal mode, we always fetch the full portal dataset once
+      // allowing instant 0ms client-side switching between All, Received, and Sent
       if (isRefresh) {
         queryParams.set('refresh', 'true');
       }
@@ -290,7 +283,7 @@ export function EtaReceivedInvoices() {
         environment: 'preprod' | 'production';
         data: EtaReceivedInvoice[];
         totalCount: number;
-      }>(`/eta/invoices/all?${queryParams.toString()}`, 'GET', undefined, 120000);
+      }>(`/eta/invoices/all?${queryParams.toString()}`, 'GET', undefined, 180000);
 
       if (res) {
         setIsConfigured(res.isConfigured !== false);
@@ -309,7 +302,25 @@ export function EtaReceivedInvoices() {
     } finally {
       setAllLoading(false);
     }
-  }, [user?.company_id, directionFilter, docTypeFilter, statusFilter, showNotification]);
+  }, [user?.company_id, showNotification]);
+
+  // Dynamic counts for direction tabs (All / Received / Sent)
+  const directionCounts = useMemo(() => {
+    let received = 0;
+    let sent = 0;
+    for (const inv of allPortalInvoices) {
+      if (inv.direction === 'Sent') {
+        sent++;
+      } else {
+        received++;
+      }
+    }
+    return {
+      all: allPortalInvoices.length,
+      received,
+      sent
+    };
+  }, [allPortalInvoices]);
 
   // Dynamic counts per year calculated directly from fetched documents
   const yearCounts = useMemo(() => {
@@ -366,8 +377,10 @@ export function EtaReceivedInvoices() {
       list = list.filter(inv => moSet.has((inv.dateTimeIssued || '').slice(5, 7)));
     }
 
-    if (directionFilter !== 'all') {
-      list = list.filter(inv => inv.direction === directionFilter);
+    if (directionFilter === 'Received') {
+      list = list.filter(inv => inv.direction !== 'Sent');
+    } else if (directionFilter === 'Sent') {
+      list = list.filter(inv => inv.direction === 'Sent');
     }
     if (docTypeFilter !== 'all') {
       list = list.filter(inv => inv.typeName === docTypeFilter);
@@ -797,20 +810,27 @@ export function EtaReceivedInvoices() {
         </div>
 
         {/* Direction Filter Tabs (الكل / الوثائق المستلمة / الوثائق المرسلة) */}
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+        <div className="flex items-center gap-1.5 bg-slate-100/90 p-1 rounded-xl border border-slate-200 shadow-2xs">
           <button
             type="button"
             onClick={() => {
               setDirectionFilter('all');
               setClientPage(1);
             }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               directionFilter === 'all'
-                ? 'bg-white text-slate-900 shadow-2xs'
+                ? 'bg-white text-indigo-700 shadow-sm border border-indigo-200 ring-1 ring-indigo-200'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            {language === 'ar' ? 'الكل' : 'All'}
+            <span>{language === 'ar' ? 'الكل' : 'All'}</span>
+            {allFetched && (
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                directionFilter === 'all' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200/80 text-slate-700'
+              }`}>
+                {directionCounts.all}
+              </span>
+            )}
           </button>
           <button
             type="button"
@@ -818,14 +838,21 @@ export function EtaReceivedInvoices() {
               setDirectionFilter('Received');
               setClientPage(1);
             }}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               directionFilter === 'Received'
-                ? 'bg-white text-emerald-700 shadow-2xs'
+                ? 'bg-white text-emerald-700 shadow-sm border border-emerald-200 ring-1 ring-emerald-200'
                 : 'text-slate-600 hover:text-emerald-700'
             }`}
           >
-            <ArrowDownLeft className="w-3.5 h-3.5" />
+            <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-600" />
             <span>{language === 'ar' ? 'الوثائق المستلمة' : 'Received'}</span>
+            {allFetched && (
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                directionFilter === 'Received' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200/80 text-slate-700'
+              }`}>
+                {directionCounts.received}
+              </span>
+            )}
           </button>
           <button
             type="button"
@@ -833,14 +860,21 @@ export function EtaReceivedInvoices() {
               setDirectionFilter('Sent');
               setClientPage(1);
             }}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               directionFilter === 'Sent'
-                ? 'bg-white text-sky-700 shadow-2xs'
+                ? 'bg-white text-sky-700 shadow-sm border border-sky-200 ring-1 ring-sky-200'
                 : 'text-slate-600 hover:text-sky-700'
             }`}
           >
-            <ArrowUpRight className="w-3.5 h-3.5" />
+            <ArrowUpRight className="w-3.5 h-3.5 text-sky-600" />
             <span>{language === 'ar' ? 'الوثائق المرسلة' : 'Sent'}</span>
+            {allFetched && (
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                directionFilter === 'Sent' ? 'bg-sky-100 text-sky-800' : 'bg-slate-200/80 text-slate-700'
+              }`}>
+                {directionCounts.sent}
+              </span>
+            )}
           </button>
         </div>
       </div>

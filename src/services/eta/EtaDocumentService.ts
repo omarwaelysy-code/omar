@@ -357,10 +357,10 @@ export class EtaDocumentService {
     };
 
     if (targetYear === 'all') {
-      // Dynamically start from currentYear (e.g. 2026, 2027, 2028...) down to 2024
-      for (let yr = currentYear; yr >= 2024; yr--) {
+      // Dynamically scan from currentYear down to 2020 (when official ETA e-invoicing launched in Egypt)
+      for (let yr = currentYear; yr >= 2020; yr--) {
         const startMonth = (yr === currentYear) ? new Date().getMonth() + 1 : 12;
-        const endMonth = (yr === 2024) ? 10 : 1;
+        const endMonth = (yr === 2020) ? 11 : 1;
         addYearWindows(yr, startMonth, endMonth);
       }
     } else {
@@ -373,28 +373,55 @@ export class EtaDocumentService {
 
     const docMap = new Map<string, EtaReceivedInvoiceDTO>();
 
+    // Determine directions to query: if 'all' or not specified, fetch both Received and Sent
+    const fetchDirections: ('Received' | 'Sent')[] =
+      !options.direction || options.direction.toLowerCase() === 'all'
+        ? ['Received', 'Sent']
+        : options.direction === 'Sent'
+        ? ['Sent']
+        : ['Received'];
+
     for (const win of windows) {
-      try {
-        const res = await this.searchReceivedInvoices(companyId, {
-          issueDateFrom: win.from,
-          issueDateTo: win.to,
-          direction: options.direction,
-          documentType: options.documentType,
-          status: options.status,
-          pageSize: 100
-        });
+      for (const dir of fetchDirections) {
+        let continuationToken: string | undefined = undefined;
+        let hasMore = true;
 
-        if (res.data && res.data.length > 0) {
-          for (const doc of res.data) {
-            docMap.set(doc.uuid, doc);
+        while (hasMore) {
+          try {
+            const res = await this.searchReceivedInvoices(companyId, {
+              issueDateFrom: win.from,
+              issueDateTo: win.to,
+              direction: dir,
+              documentType: options.documentType,
+              status: options.status,
+              continuationToken,
+              pageSize: 100
+            });
+
+            if (res.data && res.data.length > 0) {
+              for (const doc of res.data) {
+                if (!doc.direction) {
+                  doc.direction = dir;
+                }
+                docMap.set(doc.uuid, doc);
+              }
+            }
+
+            const nextTok = res.pagination?.continuationToken;
+            if (nextTok && nextTok !== 'EndofResultSet' && nextTok !== continuationToken) {
+              continuationToken = nextTok;
+            } else {
+              hasMore = false;
+            }
+          } catch (err: any) {
+            console.warn(`[ETA Multi-Period Fetch] Window ${win.from} - ${win.to} (${dir}) skipped:`, err?.message || err);
+            hasMore = false;
           }
-        }
-      } catch (err: any) {
-        console.warn(`[ETA Multi-Period Fetch] Window ${win.from} - ${win.to} skipped:`, err?.message || err);
-      }
 
-      // Safe pause to respect ETA's 2 req/sec rate limit
-      await new Promise(resolve => setTimeout(resolve, 450));
+          // Safe pause between calls to respect ETA's 2 req/sec rate limit
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+      }
     }
 
     const allDocs = Array.from(docMap.values());
@@ -658,9 +685,9 @@ export class EtaDocumentService {
   }
 
   /**
-   * Private helper to fetch Search Documents
+   * Private helper to fetch Search Documents with auto-retry on 429 rate limit
    */
-  private static async executeSearchFetch(url: string, token: string): Promise<Response> {
+  private static async executeSearchFetch(url: string, token: string, retryCount = 0): Promise<Response> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
@@ -675,6 +702,14 @@ export class EtaDocumentService {
         signal: controller.signal
       });
       clearTimeout(timeoutId);
+
+      // Auto-retry on HTTP 429 Rate Limit (ETA allows 2 req/sec)
+      if (response.status === 429 && retryCount < 3) {
+        console.warn(`[ETA 429 Rate Limit] Backing off 1.5s then retrying attempt ${retryCount + 1}/3...`);
+        await new Promise(r => setTimeout(r, 1500));
+        return this.executeSearchFetch(url, token, retryCount + 1);
+      }
+
       return response;
     } catch (err: any) {
       clearTimeout(timeoutId);
