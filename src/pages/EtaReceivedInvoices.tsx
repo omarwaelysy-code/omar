@@ -101,6 +101,7 @@ export function EtaReceivedInvoices() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [docTypeFilter, setDocTypeFilter] = useState('all');
   const [directionFilter, setDirectionFilter] = useState<'all' | 'Received' | 'Sent'>('all');
+  const [yearFilter, setYearFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'all_portal' | 'period'>('all_portal');
   const [searchQuery, setSearchQuery] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
@@ -136,6 +137,9 @@ export function EtaReceivedInvoices() {
       setErrorMessage(null);
 
       const queryParams = new URLSearchParams();
+      if (yearFilter !== 'all') {
+        queryParams.set('year', yearFilter);
+      }
       if (directionFilter !== 'all') {
         queryParams.set('direction', directionFilter);
       }
@@ -145,6 +149,9 @@ export function EtaReceivedInvoices() {
       if (statusFilter !== 'all') {
         queryParams.set('status', statusFilter);
       }
+      if (isRefresh) {
+        queryParams.set('refresh', 'true');
+      }
 
       const res = await apiRequest<{
         success: boolean;
@@ -152,7 +159,7 @@ export function EtaReceivedInvoices() {
         environment: 'preprod' | 'production';
         data: EtaReceivedInvoice[];
         totalCount: number;
-      }>(`/eta/invoices/all?${queryParams.toString()}`, 'GET');
+      }>(`/eta/invoices/all?${queryParams.toString()}`, 'GET', undefined, 120000);
 
       if (res) {
         setIsConfigured(res.isConfigured !== false);
@@ -171,7 +178,7 @@ export function EtaReceivedInvoices() {
     } finally {
       setAllLoading(false);
     }
-  }, [user?.company_id, directionFilter, docTypeFilter, statusFilter, showNotification]);
+  }, [user?.company_id, yearFilter, directionFilter, docTypeFilter, statusFilter, showNotification]);
 
   // Filtered all portal invoices client-side
   const filteredAllInvoices = useMemo(() => {
@@ -825,7 +832,38 @@ export function EtaReceivedInvoices() {
           </>
         ) : (
           /* All Portal Mode Filters */
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+          <div className="space-y-4">
+            {/* Year Selector Pills */}
+            <div className="flex items-center gap-2 flex-wrap pb-3 border-b border-slate-100">
+              <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                <span>{language === 'ar' ? 'السنة المالية:' : 'Fiscal Year:'}</span>
+              </span>
+              {[
+                { id: 'all', labelAr: 'كافة السنوات (135 وثيقة)', labelEn: 'All Years' },
+                { id: '2026', labelAr: '2026 (95 وثيقة)', labelEn: '2026' },
+                { id: '2025', labelAr: '2025 (25 وثيقة)', labelEn: '2025' },
+                { id: '2024', labelAr: '2024 (15 وثيقة)', labelEn: '2024' }
+              ].map(yr => (
+                <button
+                  key={yr.id}
+                  type="button"
+                  onClick={() => {
+                    setYearFilter(yr.id);
+                    setClientPage(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    yearFilter === yr.id
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  {language === 'ar' ? yr.labelAr : yr.labelEn}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
             {/* Document Type Filter */}
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
@@ -912,7 +950,8 @@ export function EtaReceivedInvoices() {
               </form>
             </div>
           </div>
-        )}
+        </div>
+      )}
       </div>
 
       {/* ========================================================================= */}

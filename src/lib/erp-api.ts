@@ -11569,12 +11569,13 @@ router.get('/eta/invoices/all', authenticateToken, async (req: AuthRequest, res)
   }
 
   try {
-    const { year, direction, documentType, status } = req.query;
+    const { year, direction, documentType, status, refresh } = req.query;
     const result = await EtaDocumentService.fetchAllDocuments(companyId, {
       year: year as string | undefined,
       direction: direction as string | undefined,
       documentType: documentType as string | undefined,
-      status: status as string | undefined
+      status: status as string | undefined,
+      forceRefresh: refresh === 'true'
     });
     res.json(result);
   } catch (err: any) {

@@ -287,6 +287,12 @@ export class EtaDocumentService {
   /**
    * Fetch all documents across multi-month periods (Auto-Chunked Full Sync)
    */
+  private static portalCache: Map<string, { timestamp: number; data: EtaReceivedInvoiceDTO[] }> = new Map();
+  private static CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache
+
+  /**
+   * Fetch all documents across multi-month periods (Auto-Chunked Full Sync with In-Memory Caching)
+   */
   public static async fetchAllDocuments(
     companyId: string,
     options: {
@@ -294,6 +300,7 @@ export class EtaDocumentService {
       direction?: string;
       documentType?: string;
       status?: string;
+      forceRefresh?: boolean;
     } = {}
   ): Promise<{
     success: boolean;
@@ -316,34 +323,43 @@ export class EtaDocumentService {
     const targetYear = options.year ? String(options.year) : 'all';
     const currentYear = new Date().getFullYear();
 
-    // Build 29-day windows covering the requested scope
-    const windows: { from: string; to: string }[] = [];
+    // Check in-memory cache
+    const cacheKey = `${companyId}_${targetYear}_${options.direction || 'all'}_${options.documentType || 'all'}_${options.status || 'all'}`;
+    if (!options.forceRefresh && this.portalCache.has(cacheKey)) {
+      const cached = this.portalCache.get(cacheKey)!;
+      if (Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
+        return {
+          success: true,
+          isConfigured: true,
+          environment: settings.environment,
+          data: cached.data,
+          totalCount: cached.data.length
+        };
+      }
+    }
 
-    const addYearWindows = (yr: number, maxMonth = 12) => {
-      const pad = (n: number) => (n < 10 ? '0' + n : String(n));
-      for (let m = 1; m <= maxMonth; m++) {
+    // Build 1-month windows (ETA allows up to 31 days per query)
+    const windows: { from: string; to: string }[] = [];
+    const pad = (n: number) => (n < 10 ? '0' + n : String(n));
+
+    const addYearWindows = (yr: number, startMonth = 12, endMonth = 1) => {
+      for (let m = startMonth; m >= endMonth; m--) {
         const daysInMonth = new Date(yr, m, 0).getDate();
         windows.push({
           from: `${yr}-${pad(m)}-01T00:00:00Z`,
-          to: `${yr}-${pad(m)}-${pad(Math.min(29, daysInMonth))}T23:59:59Z`
+          to: `${yr}-${pad(m)}-${pad(daysInMonth)}T23:59:59Z`
         });
-        if (daysInMonth > 29) {
-          windows.push({
-            from: `${yr}-${pad(m)}-29T00:00:00Z`,
-            to: `${yr}-${pad(m)}-${pad(daysInMonth)}T23:59:59Z`
-          });
-        }
       }
     };
 
     if (targetYear === 'all') {
-      // Covers full history from 2024 to current month
-      addYearWindows(2024);
-      addYearWindows(2025);
-      addYearWindows(2026, new Date().getMonth() + 1);
+      // Prioritize newest: 2026, 2025, 2024
+      addYearWindows(2026, new Date().getMonth() + 1, 1);
+      addYearWindows(2025, 12, 1);
+      addYearWindows(2024, 12, 10); // Phase 8 invoicing started late 2024
     } else {
       const yr = Number(targetYear) || currentYear;
-      addYearWindows(yr, yr === currentYear ? new Date().getMonth() + 1 : 12);
+      addYearWindows(yr, yr === currentYear ? new Date().getMonth() + 1 : 12, 1);
     }
 
     const docMap = new Map<string, EtaReceivedInvoiceDTO>();
@@ -369,11 +385,17 @@ export class EtaDocumentService {
       }
 
       // Safe pause to respect ETA's 2 req/sec rate limit
-      await new Promise(resolve => setTimeout(resolve, 550));
+      await new Promise(resolve => setTimeout(resolve, 450));
     }
 
     const allDocs = Array.from(docMap.values());
     allDocs.sort((a, b) => new Date(b.dateTimeIssued).getTime() - new Date(a.dateTimeIssued).getTime());
+
+    // Save to cache
+    this.portalCache.set(cacheKey, {
+      timestamp: Date.now(),
+      data: allDocs
+    });
 
     return {
       success: true,
