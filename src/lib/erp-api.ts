@@ -27,6 +27,7 @@ import { TransactionsLimitMiddleware } from './subscription/middlewares/limits/T
 import { subscriptionService } from './subscription/SubscriptionService';
 import { isCompanyPosEnabled } from './subscription/FeatureService';
 import { EtaAuthService } from '../services/eta/EtaAuthService';
+import { EtaDocumentService } from '../services/eta/EtaDocumentService';
 
 export function getEffectiveModule(moduleName: string): string {
   const mapping: { [key: string]: string } = {
@@ -63,7 +64,7 @@ export function getInitialPermissionsState() {
     'balance_sheet', 'stock_card_report', 'stock_balances_report', 'general_stock_movements_report',
     'users', 'companies', 'activity_log', 'audit_logs', 'system_check', 'company_settings',
     'discount_settings', 'backup_restore', 'templates', 'create_template', 'operation_categories',
-    'operation_fields', 'operations', 'period_closing'
+    'operation_fields', 'operations', 'period_closing', 'eta_received_invoices'
   ];
   
   const specials: any = {
@@ -11492,4 +11493,103 @@ router.get(['/eta/lookups/governorates', '/eta/governorates'], authenticateToken
   }
 });
 
+// =========================================================================
+// ETA RECEIVED ELECTRONIC INVOICES (READ-ONLY)
+// =========================================================================
+
+// GET /api/erp/eta/invoices/received
+router.get('/eta/invoices/received', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  if (!companyId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  // Permission check
+  const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
+  const isCompanyAdmin = req.user?.role === 'admin' || isSuperAdmin;
+  if (!isCompanyAdmin) {
+    const userPermissions = (req.user as any)?.permissions;
+    if (userPermissions && userPermissions['eta_received_invoices']?.view === false) {
+      return res.status(403).json({ error: 'غير مصرح لك بعرض الفواتير الإلكترونية المستلمة.' });
+    }
+  }
+
+  try {
+    const {
+      pageSize,
+      continuationToken,
+      issueDateFrom,
+      issueDateTo,
+      submissionDateFrom,
+      submissionDateTo,
+      status,
+      documentType,
+      internalId,
+      issuerId,
+      uuid
+    } = req.query;
+
+    const result = await EtaDocumentService.searchReceivedInvoices(companyId, {
+      pageSize: pageSize ? Number(pageSize) : undefined,
+      continuationToken: continuationToken as string | undefined,
+      issueDateFrom: issueDateFrom as string | undefined,
+      issueDateTo: issueDateTo as string | undefined,
+      submissionDateFrom: submissionDateFrom as string | undefined,
+      submissionDateTo: submissionDateTo as string | undefined,
+      status: status as string | undefined,
+      documentType: (documentType as string) || 'i',
+      internalId: internalId as string | undefined,
+      issuerId: issuerId as string | undefined,
+      uuid: uuid as string | undefined
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Error fetching received ETA invoices:', err.message || err);
+    const statusCode = err.statusCode || 500;
+    res.status(statusCode).json({
+      success: false,
+      error: err.message || 'تعذر جلب الفواتير الإلكترونية المستلمة من منظومة الضرائب.',
+      code: err.code || 'ETA_ERROR',
+      diagnostic: err.diagnostic || undefined
+    });
+  }
+});
+
+// GET /api/erp/eta/invoices/:uuid/details
+router.get('/eta/invoices/:uuid/details', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  if (!companyId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
+  const isCompanyAdmin = req.user?.role === 'admin' || isSuperAdmin;
+  if (!isCompanyAdmin) {
+    const userPermissions = (req.user as any)?.permissions;
+    if (userPermissions && userPermissions['eta_received_invoices']?.view === false) {
+      return res.status(403).json({ error: 'غير مصرح لك بعرض تفاصيل الفواتير الإلكترونية المستلمة.' });
+    }
+  }
+
+  try {
+    const { uuid } = req.params;
+    if (!uuid) {
+      return res.status(400).json({ error: 'معرف الفاتورة (UUID) مطلوب.' });
+    }
+
+    const result = await EtaDocumentService.getDocumentDetails(companyId, uuid);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Error fetching ETA invoice details:', err.message || err);
+    const statusCode = err.statusCode || 500;
+    res.status(statusCode).json({
+      success: false,
+      error: err.message || 'تعذر جلب تفاصيل الفاتورة من منظومة الضرائب.',
+      code: err.code || 'ETA_ERROR'
+    });
+  }
+});
+
 export default router;
+

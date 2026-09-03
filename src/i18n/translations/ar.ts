@@ -191,6 +191,8 @@ export const ar = {
   'nav.cost_centers': 'مراكز التكلفة',
   'nav.operation_categories': 'تصنيفات العمليات',
   'nav.operation_fields': 'حقول البيانات',
+  'nav.eta_menu': 'ETA',
+  'nav.eta_received_invoices': 'الفواتير الإلكترونية المستلمة',
 
   // Operations System
   'operations.title': 'نظام العمليات',

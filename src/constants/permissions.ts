@@ -76,6 +76,12 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     nameAr: 'الإعدادات',
     nameEn: 'Settings',
     modules: ['company_settings', 'discount_settings', 'backup_restore', 'templates', 'create_template', 'operation_categories', 'operation_fields', 'operations']
+  },
+  {
+    id: 'eta',
+    nameAr: 'الفاتورة الإلكترونية (ETA)',
+    nameEn: 'ETA e-Invoicing',
+    modules: ['eta_received_invoices']
   }
 ];
 
@@ -318,7 +324,9 @@ export const MODULE_PERMISSIONS_META: { [moduleId: string]: { labelAr: string; l
   create_template: { labelAr: 'مصمم قوالب المطبوعات', labelEn: 'Print Template Designer', hasCrud: true },
   operation_categories: { labelAr: 'فئات الحسابات الإدارية', labelEn: 'Operation Categories', hasCrud: true },
   operation_fields: { labelAr: 'تعريف الحقول الإضافية', labelEn: 'Custom Operation Fields', hasCrud: true },
-  operations: { labelAr: 'حركات الحسابات الإدارية', labelEn: 'Operation Transactions', hasCrud: true }
+  operations: { labelAr: 'حركات الحسابات الإدارية', labelEn: 'Operation Transactions', hasCrud: true },
+  // ETA e-Invoicing
+  eta_received_invoices: { labelAr: 'الفواتير الإلكترونية المستلمة (ETA)', labelEn: 'ETA Received Invoices', hasCrud: true, special: ['print', 'export_pdf', 'export_excel'] }
 };
 
 export interface BusinessPermissionMeta {

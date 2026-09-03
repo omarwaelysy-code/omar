@@ -192,6 +192,104 @@ export class EtaAuthService {
   }
 
   /**
+   * Get a valid ETA access token for API calls (using in-memory cache or requesting a new token)
+   */
+  public static async getValidAccessToken(params: {
+    companyId: string;
+    environment?: 'preprod' | 'production';
+    clientId: string;
+    clientSecret: string;
+    forceRefresh?: boolean;
+  }): Promise<string> {
+    const environment = params.environment === 'production' ? 'production' : 'preprod';
+    const clientId = params.clientId?.trim();
+    const clientSecret = params.clientSecret?.trim();
+    const cacheKey = `${params.companyId}_${environment}`;
+
+    if (!clientId || !clientSecret) {
+      const err = new Error('بيانات الربط مع منظومة الفاتورة الإلكترونية غير مكتملة (Client ID / Client Secret).');
+      (err as any).statusCode = 400;
+      (err as any).code = 'MISSING_CREDENTIALS';
+      throw err;
+    }
+
+    // 1. Check in-memory cache if not forced refresh
+    if (!params.forceRefresh) {
+      const cached = this.tokenCache.get(cacheKey);
+      if (cached && cached.expiresAt > Date.now()) {
+        return cached.token;
+      }
+    }
+
+    // 2. Request new token from official ETA Identity Server
+    const tokenUrl = this.getIdentityUrl(environment);
+    const bodyParams = new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: clientId,
+      client_secret: clientSecret
+    });
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    try {
+      const response = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: bodyParams.toString(),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        const errorKey = typeof errData?.error === 'string' ? errData.error : '';
+        const errorDesc = typeof errData?.error_description === 'string' ? errData.error_description : '';
+        const safeDiag = [errorKey, errorDesc].filter(Boolean).join(': ');
+
+        const error = new Error(
+          response.status === 401 || response.status === 400
+            ? 'فشلت المصادقة مع منظومة الضرائب ETA. يرجى التحقق من صحة بيانات الربط (Client ID و Client Secret).'
+            : response.status >= 500
+              ? 'تعذر الوصول إلى خوادم مصلحة الضرائب المصرية (ETA) حالياً.'
+              : `فشل الحصول على تصريح الوصول من ETA (رمز الاستجابة: ${response.status}).`
+        );
+        (error as any).statusCode = response.status;
+        (error as any).code = response.status === 401 || response.status === 400 ? 'INVALID_CREDENTIALS' : 'ETA_ERROR';
+        (error as any).diagnostic = safeDiag || undefined;
+        throw error;
+      }
+
+      const data = await response.json();
+      if (!data || typeof data.access_token !== 'string') {
+        const err = new Error('استجابة غير متوقعة من خوادم هوية مصلحة الضرائب المصرية.');
+        (err as any).statusCode = 502;
+        throw err;
+      }
+
+      const ttlMs = (Number(data.expires_in || 3600) - 60) * 1000;
+      this.tokenCache.set(cacheKey, {
+        token: data.access_token,
+        expiresAt: Date.now() + Math.max(ttlMs, 60000)
+      });
+
+      return data.access_token;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        const timeoutErr = new Error('انتهت مهلة الاتصال بخوادم هوية منظومة الفاتورة الإلكترونية ETA (15 ثانية).');
+        (timeoutErr as any).statusCode = 504;
+        (timeoutErr as any).code = 'TIMEOUT';
+        throw timeoutErr;
+      }
+      throw err;
+    }
+  }
+
+  /**
    * Clear cached token for a company/environment
    */
   public static clearCache(companyId: string, environment?: 'preprod' | 'production'): void {

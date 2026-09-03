@@ -98,6 +98,7 @@ export const pageLabels: { [key: string]: string } = {
   'quotations': 'عروض الأسعار',
   'pos_connected_branches': 'الفروع المتصلة',
   'pos_branch_linking': 'ربط الفرع',
+  'eta_received_invoices': 'الفواتير الإلكترونية المستلمة',
 };
 
 export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

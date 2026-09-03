@@ -123,7 +123,9 @@ const getTabIcon = (id: string) => {
       return <Layers {...iconProps} />;
     case 'purchase_invoices': return <ArrowDownToLine {...iconProps} />;
     case 'goods_receipts': return <PackageCheck {...iconProps} />;
-    case 'receipts': return <Receipt {...iconProps} />;
+    case 'receipts':
+    case 'eta_received_invoices':
+      return <Receipt {...iconProps} />;
     case 'operations': return <List {...iconProps} />;
     case 'departments':
     case 'company_settings':
@@ -466,6 +468,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'purchase_returns', label: t('nav.purchase_returns'), icon: RotateCcw },
           { id: 'supplier_discounts', label: t('nav.supplier_discounts'), icon: Tags },
           { id: 'supplier_settlements', label: t('nav.supplier_settlements') || 'تسويات الموردين', icon: Layers }
+        ]
+      },
+      {
+        id: 'eta_menu',
+        label: 'ETA',
+        icon: Building2,
+        subItems: [
+          { 
+            id: 'eta_received_invoices', 
+            label: language === 'ar' ? 'الفواتير الإلكترونية المستلمة' : 'Received Electronic Invoices', 
+            icon: ArrowDownToLine 
+          }
         ]
       },
       {

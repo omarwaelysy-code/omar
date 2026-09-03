@@ -191,6 +191,8 @@ export const en = {
   'nav.cost_centers': 'Cost Centers',
   'nav.operation_categories': 'Operation Categories',
   'nav.operation_fields': 'Data Fields',
+  'nav.eta_menu': 'ETA',
+  'nav.eta_received_invoices': 'Received Electronic Invoices',
 
   // Operations System
   'operations.title': 'Operations System',
