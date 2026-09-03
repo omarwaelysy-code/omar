@@ -82,10 +82,10 @@ export function EtaReceivedInvoices() {
   const { showNotification } = useNotification();
   const { openTab } = useNavigation();
 
-  // Date filters: default to last 30 days
+  // Date filters: default to last 29 days (ETA Search Documents API requires maximum 30 days interval)
   const defaultDates = useMemo(() => {
     const end = new Date();
-    const start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const start = new Date(end.getTime() - 29 * 24 * 60 * 60 * 1000);
     return {
       from: start.toISOString().split('T')[0],
       to: end.toISOString().split('T')[0]
@@ -188,6 +188,23 @@ export function EtaReceivedInvoices() {
       setRefreshing(false);
     }
   }, [user?.company_id, dateFrom, dateTo, statusFilter, appliedSearch, showNotification]);
+
+  // Initial ETA settings retrieval for environment accuracy
+  useEffect(() => {
+    if (!user?.company_id) return;
+    apiRequest<any>('/company/eta-settings', 'GET')
+      .then(settings => {
+        if (settings) {
+          if (settings.environment) {
+            setEnvironment(settings.environment === 'production' ? 'production' : 'preprod');
+          }
+          if (settings.client_id && (settings.client_secret || settings.client_secret_configured)) {
+            setIsConfigured(true);
+          }
+        }
+      })
+      .catch(err => console.warn('Could not load company ETA settings:', err));
+  }, [user?.company_id]);
 
   // Initial and filter changes
   useEffect(() => {

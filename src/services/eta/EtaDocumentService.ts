@@ -77,8 +77,8 @@ export interface EtaSearchDocumentsResponse {
 
 export class EtaDocumentService {
   // Official ETA API Base URLs
-  public static readonly PREPROD_API_URL = 'https://api.preprod.eta.gov.eg';
-  public static readonly PRODUCTION_API_URL = 'https://api.eta.gov.eg';
+  public static readonly PREPROD_API_URL = 'https://api.preprod.invoicing.eta.gov.eg';
+  public static readonly PRODUCTION_API_URL = 'https://api.invoicing.eta.gov.eg';
 
   public static getApiBaseUrl(environment: 'preprod' | 'production' = 'preprod'): string {
     return environment === 'production'
@@ -349,6 +349,7 @@ export class EtaDocumentService {
       return response;
     } catch (err: any) {
       clearTimeout(timeoutId);
+      console.error('[ETA Document Search Network Error]:', err?.message || err);
       if (err.name === 'AbortError') {
         const timeoutErr = new Error('انتهت مهلة البحث عن المستندات في منظومة مصلحة الضرائب المصرية (15 ثانية).');
         (timeoutErr as any).statusCode = 504;

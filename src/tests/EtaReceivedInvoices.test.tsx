@@ -183,9 +183,12 @@ describe('EtaReceivedInvoices Component (Frontend UI & UX)', () => {
   });
 
   it('5. should display error banner when API fails and allow retry', async () => {
-    vi.spyOn(dbServiceModule, 'apiRequest').mockRejectedValueOnce(
-      new Error('تعذر الوصول إلى خوادم مصلحة الضرائب المصرية')
-    );
+    vi.spyOn(dbServiceModule, 'apiRequest').mockImplementation(async (path: string) => {
+      if (path.includes('/eta/invoices/received')) {
+        throw new Error('تعذر الوصول إلى خوادم مصلحة الضرائب المصرية');
+      }
+      return { environment: 'preprod', isConfigured: true };
+    });
 
     render(<EtaReceivedInvoices />);
 

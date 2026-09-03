@@ -90,7 +90,7 @@ describe('ETA Document Service — Search Received Documents (Read-Only Phase 1)
     const parsedUrl = new URL(requestedUrl);
     expect(parsedUrl.searchParams.get('direction')).toBe('Received');
     expect(parsedUrl.searchParams.get('documentType')).toBe('i');
-    expect(requestedUrl).toContain('https://api.preprod.eta.gov.eg/api/v1.0/documents/search');
+    expect(requestedUrl).toContain('https://api.preprod.invoicing.eta.gov.eg/api/v1.0/documents/search');
   });
 
   it('4. should apply date filters, status filters, and pagination parameters correctly', async () => {
@@ -131,7 +131,7 @@ describe('ETA Document Service — Search Received Documents (Read-Only Phase 1)
     });
 
     const parsedUrl = new URL(requestedUrl);
-    expect(parsedUrl.hostname).toBe('api.eta.gov.eg'); // Production URL
+    expect(parsedUrl.hostname).toBe('api.invoicing.eta.gov.eg'); // Production URL
     expect(parsedUrl.searchParams.get('issueDateFrom')).toBe('2026-08-01T00:00:00Z');
     expect(parsedUrl.searchParams.get('issueDateTo')).toBe('2026-08-31T23:59:59Z');
     expect(parsedUrl.searchParams.get('status')).toBe('Valid');
