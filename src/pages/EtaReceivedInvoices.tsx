@@ -95,6 +95,7 @@ export function EtaReceivedInvoices() {
   const [dateFrom, setDateFrom] = useState(defaultDates.from);
   const [dateTo, setDateTo] = useState(defaultDates.to);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [docTypeFilter, setDocTypeFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
 
@@ -133,7 +134,9 @@ export function EtaReceivedInvoices() {
 
       const queryParams = new URLSearchParams();
       queryParams.set('pageSize', '20');
-      queryParams.set('documentType', 'i');
+      if (docTypeFilter && docTypeFilter !== 'all') {
+        queryParams.set('documentType', docTypeFilter);
+      }
 
       if (dateFrom) {
         queryParams.set('issueDateFrom', `${dateFrom}T00:00:00Z`);
@@ -187,7 +190,7 @@ export function EtaReceivedInvoices() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user?.company_id, dateFrom, dateTo, statusFilter, appliedSearch, showNotification]);
+  }, [user?.company_id, dateFrom, dateTo, statusFilter, docTypeFilter, appliedSearch, showNotification]);
 
   // Initial ETA settings retrieval for environment accuracy
   useEffect(() => {
@@ -213,7 +216,7 @@ export function EtaReceivedInvoices() {
     setTokenHistory([]);
     setPageNumber(1);
     fetchInvoices(undefined, false);
-  }, [dateFrom, dateTo, statusFilter, appliedSearch, fetchInvoices]);
+  }, [dateFrom, dateTo, statusFilter, docTypeFilter, appliedSearch, fetchInvoices]);
 
   const handleRefresh = () => {
     fetchInvoices(currentToken, true);
@@ -316,6 +319,29 @@ export function EtaReceivedInvoices() {
     } catch {
       return dateStr;
     }
+  };
+
+  const renderDocTypeBadge = (typeName?: string, docTypeName?: string) => {
+    const t = String(typeName || '').toLowerCase();
+    if (t === 'c' || (docTypeName && docTypeName.includes('دائن'))) {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+          {language === 'ar' ? 'إشعار دائن' : 'Credit Note'}
+        </span>
+      );
+    }
+    if (t === 'd' || (docTypeName && docTypeName.includes('مدين'))) {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
+          {language === 'ar' ? 'إشعار مدين' : 'Debit Note'}
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+        {language === 'ar' ? 'فاتورة' : 'Invoice'}
+      </span>
+    );
   };
 
   const formatCurrency = (val: number, curr = 'EGP') => {
@@ -424,7 +450,66 @@ export function EtaReceivedInvoices() {
       {/* 4. FILTERS & SEARCH BAR */}
       {/* ========================================================================= */}
       <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        {/* Quick Period Presets */}
+        <div className="flex items-center gap-2 flex-wrap pb-3 border-b border-slate-100">
+          <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-600" />
+            <span>{language === 'ar' ? 'فترات سريعة:' : 'Quick Presets:'}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              const end = new Date();
+              const start = new Date(end.getTime() - 29 * 24 * 60 * 60 * 1000);
+              setDateFrom(start.toISOString().split('T')[0]);
+              setDateTo(end.toISOString().split('T')[0]);
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+              dateTo === defaultDates.to && dateFrom === defaultDates.from
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700'
+            }`}
+          >
+            {language === 'ar' ? 'آخر 30 يوماً (الفترة الحالية)' : 'Last 30 Days'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setDateFrom('2026-07-01');
+              setDateTo('2026-07-30');
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+              dateFrom === '2026-07-01' && dateTo === '2026-07-30'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/60'
+            }`}
+          >
+            {language === 'ar' ? '📅 شهر يوليو 2026 (01/07 - 30/07)' : 'July 2026'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setDateFrom('2026-08-01');
+              setDateTo('2026-08-30');
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+              dateFrom === '2026-08-01' && dateTo === '2026-08-30'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700'
+            }`}
+          >
+            {language === 'ar' ? 'شهر أغسطس 2026 (01/08 - 30/08)' : 'August 2026'}
+          </button>
+
+          <span className="text-[11px] text-slate-400 mr-auto flex items-center gap-1">
+            <Info className="w-3.5 h-3.5 text-indigo-500" />
+            {language === 'ar'
+              ? 'تسمح مصلحة الضرائب بالاستعلام في نطاق 30 يوماً كحد أقصى لكل عملية بحث.'
+              : 'ETA allows maximum 30 days window per search.'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
           {/* Issue Date From */}
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
@@ -451,6 +536,24 @@ export function EtaReceivedInvoices() {
               onChange={e => setDateTo(e.target.value)}
               className="w-full text-xs md:text-sm px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-hidden"
             />
+          </div>
+
+          {/* Document Type Filter */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+              <Receipt className="w-3.5 h-3.5 text-indigo-600" />
+              <span>{language === 'ar' ? 'نوع الوثيقة' : 'Document Type'}</span>
+            </label>
+            <select
+              value={docTypeFilter}
+              onChange={e => setDocTypeFilter(e.target.value)}
+              className="w-full text-xs md:text-sm px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-hidden"
+            >
+              <option value="all">{language === 'ar' ? 'الكل (فواتير وإشعارات)' : 'All Documents'}</option>
+              <option value="i">{language === 'ar' ? 'فاتورة (Invoice)' : 'Invoice'}</option>
+              <option value="c">{language === 'ar' ? 'إشعار دائن (Credit Note)' : 'Credit Note'}</option>
+              <option value="d">{language === 'ar' ? 'إشعار مدين (Debit Note)' : 'Debit Note'}</option>
+            </select>
           </div>
 
           {/* Status Filter */}
@@ -484,7 +587,7 @@ export function EtaReceivedInvoices() {
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder={language === 'ar' ? 'رقم الفاتورة، الرقم الضريبي، UUID...' : 'Invoice ID, Tax ID, UUID...'}
+                placeholder={language === 'ar' ? 'رقم الفاتورة، الرقم الضريبي...' : 'Invoice ID, Tax ID...'}
                 className="w-full text-xs md:text-sm px-3.5 py-2 pr-9 pl-9 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-hidden"
               />
               <button
@@ -552,6 +655,7 @@ export function EtaReceivedInvoices() {
               <thead>
                 <tr className="border-b border-slate-200/80 bg-slate-50/75 text-slate-600 font-bold">
                   <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'رقم الفاتورة' : 'Invoice ID'}</th>
+                  <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'النوع' : 'Type'}</th>
                   <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'المورد (المصدر)' : 'Issuer / Supplier'}</th>
                   <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'تاريخ الإصدار' : 'Issue Date'}</th>
                   <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'تاريخ الاستلام' : 'Received Date'}</th>
@@ -569,6 +673,11 @@ export function EtaReceivedInvoices() {
                     {/* Internal ID */}
                     <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
                       {inv.internalId}
+                    </td>
+
+                    {/* Document Type */}
+                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                      {renderDocTypeBadge(inv.typeName, inv.documentTypeName)}
                     </td>
 
                     {/* Issuer */}

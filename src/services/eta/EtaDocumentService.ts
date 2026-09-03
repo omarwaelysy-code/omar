@@ -164,11 +164,14 @@ export class EtaDocumentService {
     const pageSize = Math.min(100, Math.max(1, Number(params.pageSize) || 20));
     const query = new URLSearchParams({
       direction: 'Received',
-      documentType: params.documentType?.trim() || 'i',
       pageSize: pageSize.toString(),
       issueDateFrom,
       issueDateTo
     });
+
+    if (params.documentType?.trim() && params.documentType.trim().toLowerCase() !== 'all') {
+      query.set('documentType', params.documentType.trim());
+    }
 
     if (params.continuationToken?.trim()) {
       query.set('continuationToken', params.continuationToken.trim());

@@ -11535,7 +11535,7 @@ router.get('/eta/invoices/received', authenticateToken, async (req: AuthRequest,
       submissionDateFrom: submissionDateFrom as string | undefined,
       submissionDateTo: submissionDateTo as string | undefined,
       status: status as string | undefined,
-      documentType: (documentType as string) || 'i',
+      documentType: (documentType as string) || undefined,
       internalId: internalId as string | undefined,
       issuerId: issuerId as string | undefined,
       uuid: uuid as string | undefined
