@@ -25,7 +25,8 @@ import {
   Info,
   ArrowUpRight,
   ArrowDownLeft,
-  Globe
+  Globe,
+  ChevronDown
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -101,10 +102,29 @@ export function EtaReceivedInvoices() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [docTypeFilter, setDocTypeFilter] = useState('all');
   const [directionFilter, setDirectionFilter] = useState<'all' | 'Received' | 'Sent'>('all');
-  const [yearFilter, setYearFilter] = useState<string>('all');
+  const [selectedYears, setSelectedYears] = useState<string[]>([]);
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
+  const [showYearDropdown, setShowYearDropdown] = useState(false);
+  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
   const [viewMode, setViewMode] = useState<'all_portal' | 'period'>('all_portal');
   const [searchQuery, setSearchQuery] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
+
+  // Months definition
+  const MONTHS_LIST = useMemo(() => [
+    { id: '01', nameAr: 'شهر 01 - يناير', nameEn: '01 - Jan' },
+    { id: '02', nameAr: 'شهر 02 - فبراير', nameEn: '02 - Feb' },
+    { id: '03', nameAr: 'شهر 03 - مارس', nameEn: '03 - Mar' },
+    { id: '04', nameAr: 'شهر 04 - أبريل', nameEn: '04 - Apr' },
+    { id: '05', nameAr: 'شهر 05 - مايو', nameEn: '05 - May' },
+    { id: '06', nameAr: 'شهر 06 - يونيو', nameEn: '06 - Jun' },
+    { id: '07', nameAr: 'شهر 07 - يوليو', nameEn: '07 - Jul' },
+    { id: '08', nameAr: 'شهر 08 - أغسطس', nameEn: '08 - Aug' },
+    { id: '09', nameAr: 'شهر 09 - سبتمبر', nameEn: '09 - Sep' },
+    { id: '10', nameAr: 'شهر 10 - أكتوبر', nameEn: '10 - Oct' },
+    { id: '11', nameAr: 'شهر 11 - نوفمبر', nameEn: '11 - Nov' },
+    { id: '12', nameAr: 'شهر 12 - ديسمبر', nameEn: '12 - Dec' },
+  ], []);
 
   // Data & State
   const [loading, setLoading] = useState(true);
@@ -137,9 +157,6 @@ export function EtaReceivedInvoices() {
       setErrorMessage(null);
 
       const queryParams = new URLSearchParams();
-      if (yearFilter !== 'all') {
-        queryParams.set('year', yearFilter);
-      }
       if (directionFilter !== 'all') {
         queryParams.set('direction', directionFilter);
       }
@@ -178,7 +195,7 @@ export function EtaReceivedInvoices() {
     } finally {
       setAllLoading(false);
     }
-  }, [user?.company_id, yearFilter, directionFilter, docTypeFilter, statusFilter, showNotification]);
+  }, [user?.company_id, directionFilter, docTypeFilter, statusFilter, showNotification]);
 
   // Dynamic counts per year calculated directly from fetched documents
   const yearCounts = useMemo(() => {
@@ -192,23 +209,49 @@ export function EtaReceivedInvoices() {
     return counts;
   }, [allPortalInvoices]);
 
-  const availableYears = useMemo(() => {
+  // Dynamic counts per month
+  const monthCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const inv of allPortalInvoices) {
+      const yr = (inv.dateTimeIssued || '').slice(0, 4);
+      const mo = (inv.dateTimeIssued || '').slice(5, 7);
+      if (selectedYears.length === 0 || selectedYears.includes(yr)) {
+        if (mo) {
+          counts[mo] = (counts[mo] || 0) + 1;
+        }
+      }
+    }
+    return counts;
+  }, [allPortalInvoices, selectedYears]);
+
+  // List of all system years (future upcoming down to 2020)
+  const allSystemYears = useMemo(() => {
     const currentYear = new Date().getFullYear();
     const detected = Object.keys(yearCounts);
-    const defaultYears: string[] = [];
-    for (let y = currentYear; y >= 2024; y--) {
-      defaultYears.push(String(y));
+    const set = new Set<string>();
+    for (let y = currentYear + 1; y >= 2020; y--) {
+      set.add(String(y));
     }
-    const set = new Set([...defaultYears, ...detected]);
-    return Array.from(set).filter(Boolean).sort((a, b) => Number(b) - Number(a));
+    detected.forEach(y => set.add(y));
+    return Array.from(set).sort((a, b) => Number(b) - Number(a));
   }, [yearCounts]);
 
   // Filtered all portal invoices client-side
   const filteredAllInvoices = useMemo(() => {
     let list = allPortalInvoices;
-    if (yearFilter !== 'all') {
-      list = list.filter(inv => (inv.dateTimeIssued || '').startsWith(yearFilter));
+
+    // Filter by selected years (if any chosen)
+    if (selectedYears.length > 0) {
+      const yrSet = new Set(selectedYears);
+      list = list.filter(inv => yrSet.has((inv.dateTimeIssued || '').slice(0, 4)));
     }
+
+    // Filter by selected months (if any chosen)
+    if (selectedMonths.length > 0) {
+      const moSet = new Set(selectedMonths);
+      list = list.filter(inv => moSet.has((inv.dateTimeIssued || '').slice(5, 7)));
+    }
+
     if (directionFilter !== 'all') {
       list = list.filter(inv => inv.direction === directionFilter);
     }
@@ -228,7 +271,7 @@ export function EtaReceivedInvoices() {
       (inv.receiverName && inv.receiverName.toLowerCase().includes(q)) ||
       (inv.receiverId && inv.receiverId.toLowerCase().includes(q))
     );
-  }, [allPortalInvoices, yearFilter, directionFilter, docTypeFilter, statusFilter, appliedSearch]);
+  }, [allPortalInvoices, selectedYears, selectedMonths, directionFilter, docTypeFilter, statusFilter, appliedSearch]);
 
   const totalPagesAll = Math.ceil(filteredAllInvoices.length / clientPageSize) || 1;
   const paginatedAllInvoices = useMemo(() => {
@@ -858,81 +901,204 @@ export function EtaReceivedInvoices() {
           </>
         ) : (
           /* All Portal Mode Filters */
-          <div className="space-y-4">
-            {/* Dynamic Year Selector Pills */}
-            <div className="flex items-center gap-2 flex-wrap pb-3 border-b border-slate-100">
-              <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5 text-indigo-600" />
-                <span>{language === 'ar' ? 'السنة المالية:' : 'Fiscal Year:'}</span>
-              </span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
+            {/* 1. قائمة الأعوام مع مربع صح */}
+            <div className="relative">
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>{language === 'ar' ? 'السنوات المالية' : 'Fiscal Years'}</span>
+                </span>
+                {selectedYears.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedYears([]); setClientPage(1); }}
+                    className="text-[10px] text-indigo-600 hover:underline font-bold"
+                  >
+                    {language === 'ar' ? 'إعادة تعيين' : 'Reset'}
+                  </button>
+                )}
+              </label>
 
               <button
                 type="button"
                 onClick={() => {
-                  setYearFilter('all');
-                  setClientPage(1);
+                  setShowYearDropdown(p => !p);
+                  setShowMonthDropdown(false);
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  yearFilter === 'all'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                }`}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-50 hover:bg-white border border-slate-200 focus:border-indigo-500 text-xs md:text-sm font-semibold text-slate-800 transition-all text-start"
               >
-                {language === 'ar' ? 'كافة السنوات' : 'All Years'}
-                {allPortalInvoices.length > 0 && ` (${allPortalInvoices.length} وثيقة)`}
+                <span className="truncate">
+                  {selectedYears.length === 0
+                    ? (language === 'ar' ? 'كافة الأعوام' : 'All Years')
+                    : selectedYears.length === 1
+                    ? (language === 'ar' ? `عام ${selectedYears[0]}` : `Year ${selectedYears[0]}`)
+                    : (language === 'ar' ? `${selectedYears.length} أعوام محددة` : `${selectedYears.length} Years`)}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showYearDropdown ? 'rotate-180' : ''}`} />
               </button>
 
-              {availableYears.map(yr => {
-                const count = yearCounts[yr] || 0;
-                return (
-                  <button
-                    key={yr}
-                    type="button"
-                    onClick={() => {
-                      setYearFilter(yr);
-                      setClientPage(1);
-                    }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                      yearFilter === yr
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                    }`}
-                  >
-                    {yr}
-                    {count > 0 ? ` (${count} وثيقة)` : ` (0)`}
-                  </button>
-                );
-              })}
+              {/* Dropdown Menu */}
+              {showYearDropdown && (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={() => setShowYearDropdown(false)} />
+                  <div className="absolute top-full right-0 mt-1.5 w-72 bg-white rounded-2xl border border-slate-200 shadow-xl z-30 p-2 space-y-1 max-h-72 overflow-y-auto">
+                    {/* Header Controls */}
+                    <div className="flex items-center justify-between pb-2 mb-1 border-b border-slate-100 px-2 pt-1 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedYears([]); setClientPage(1); }}
+                        className={`font-bold ${selectedYears.length === 0 ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
+                      >
+                        {language === 'ar' ? 'تحديد كافة الأعوام' : 'Select All Years'}
+                      </button>
+                      {selectedYears.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => { setSelectedYears([]); setClientPage(1); }}
+                          className="text-[11px] text-rose-500 hover:underline font-semibold"
+                        >
+                          {language === 'ar' ? 'مسح' : 'Clear'}
+                        </button>
+                      )}
+                    </div>
 
-              {/* Earlier Years Dropdown (2020 - 2023) */}
-              <div className="relative inline-flex items-center">
-                <select
-                  value={['2023', '2022', '2021', '2020'].includes(yearFilter) ? yearFilter : ''}
-                  onChange={e => {
-                    if (e.target.value) {
-                      setYearFilter(e.target.value);
-                      setClientPage(1);
-                    }
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border outline-hidden ${
-                    ['2023', '2022', '2021', '2020'].includes(yearFilter)
-                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
-                  }`}
-                >
-                  <option value="" disabled className="text-slate-500 bg-white">
-                    {language === 'ar' ? 'سنوات سابقة (2020 - 2023)...' : 'Earlier Years (2020-2023)...'}
-                  </option>
-                  <option value="2023" className="text-slate-800 bg-white">2023</option>
-                  <option value="2022" className="text-slate-800 bg-white">2022</option>
-                  <option value="2021" className="text-slate-800 bg-white">2021</option>
-                  <option value="2020" className="text-slate-800 bg-white">2020 (بداية المنظومة)</option>
-                </select>
-              </div>
+                    {allSystemYears.map(yr => {
+                      const count = yearCounts[yr] || 0;
+                      const isChecked = selectedYears.includes(yr);
+                      return (
+                        <label
+                          key={yr}
+                          className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-50 cursor-pointer text-xs select-none transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedYears(prev => [...prev, yr]);
+                                } else {
+                                  setSelectedYears(prev => prev.filter(y => y !== yr));
+                                }
+                                setClientPage(1);
+                              }}
+                              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                            />
+                            <span className="font-semibold text-slate-800">{yr}</span>
+                          </div>
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
+                            count > 0 ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-400'
+                          }`}>
+                            {count} {language === 'ar' ? 'وثيقة' : 'docs'}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
-            {/* Document Type Filter */}
+            {/* 2. قائمة الشهور مع مربع صح */}
+            <div className="relative">
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>{language === 'ar' ? 'الشهور' : 'Months'}</span>
+                </span>
+                {selectedMonths.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedMonths([]); setClientPage(1); }}
+                    className="text-[10px] text-indigo-600 hover:underline font-bold"
+                  >
+                    {language === 'ar' ? 'إعادة تعيين' : 'Reset'}
+                  </button>
+                )}
+              </label>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMonthDropdown(p => !p);
+                  setShowYearDropdown(false);
+                }}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-50 hover:bg-white border border-slate-200 focus:border-indigo-500 text-xs md:text-sm font-semibold text-slate-800 transition-all text-start"
+              >
+                <span className="truncate">
+                  {selectedMonths.length === 0
+                    ? (language === 'ar' ? 'كافة الشهور' : 'All Months')
+                    : selectedMonths.length === 1
+                    ? (MONTHS_LIST.find(m => m.id === selectedMonths[0])?.nameAr || selectedMonths[0])
+                    : (language === 'ar' ? `${selectedMonths.length} شهور محددة` : `${selectedMonths.length} Months`)}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showMonthDropdown ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Dropdown Menu */}
+              {showMonthDropdown && (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={() => setShowMonthDropdown(false)} />
+                  <div className="absolute top-full right-0 mt-1.5 w-72 bg-white rounded-2xl border border-slate-200 shadow-xl z-30 p-2 space-y-1 max-h-72 overflow-y-auto">
+                    {/* Header Controls */}
+                    <div className="flex items-center justify-between pb-2 mb-1 border-b border-slate-100 px-2 pt-1 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedMonths([]); setClientPage(1); }}
+                        className={`font-bold ${selectedMonths.length === 0 ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
+                      >
+                        {language === 'ar' ? 'تحديد كافة الشهور' : 'Select All Months'}
+                      </button>
+                      {selectedMonths.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => { setSelectedMonths([]); setClientPage(1); }}
+                          className="text-[11px] text-rose-500 hover:underline font-semibold"
+                        >
+                          {language === 'ar' ? 'مسح' : 'Clear'}
+                        </button>
+                      )}
+                    </div>
+
+                    {MONTHS_LIST.map(mo => {
+                      const count = monthCounts[mo.id] || 0;
+                      const isChecked = selectedMonths.includes(mo.id);
+                      return (
+                        <label
+                          key={mo.id}
+                          className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-50 cursor-pointer text-xs select-none transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedMonths(prev => [...prev, mo.id]);
+                                } else {
+                                  setSelectedMonths(prev => prev.filter(m => m !== mo.id));
+                                }
+                                setClientPage(1);
+                              }}
+                              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                            />
+                            <span className="font-semibold text-slate-800">{mo.nameAr}</span>
+                          </div>
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
+                            count > 0 ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-400'
+                          }`}>
+                            {count} {language === 'ar' ? 'وثيقة' : 'docs'}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* 3. Document Type Filter */}
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
                 <Receipt className="w-3.5 h-3.5 text-indigo-600" />
@@ -953,7 +1119,7 @@ export function EtaReceivedInvoices() {
               </select>
             </div>
 
-            {/* Status Filter */}
+            {/* 4. Status Filter */}
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
                 <Filter className="w-3.5 h-3.5 text-indigo-600" />
@@ -976,7 +1142,7 @@ export function EtaReceivedInvoices() {
               </select>
             </div>
 
-            {/* Quick Search */}
+            {/* 5. Quick Search */}
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
                 <Search className="w-3.5 h-3.5 text-indigo-600" />
@@ -1018,8 +1184,7 @@ export function EtaReceivedInvoices() {
               </form>
             </div>
           </div>
-        </div>
-      )}
+        )}
       </div>
 
       {/* ========================================================================= */}
