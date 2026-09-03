@@ -112,18 +112,18 @@ export function EtaReceivedInvoices() {
 
   // Months definition
   const MONTHS_LIST = useMemo(() => [
-    { id: '01', nameAr: 'شهر 01 - يناير', nameEn: '01 - Jan' },
-    { id: '02', nameAr: 'شهر 02 - فبراير', nameEn: '02 - Feb' },
-    { id: '03', nameAr: 'شهر 03 - مارس', nameEn: '03 - Mar' },
-    { id: '04', nameAr: 'شهر 04 - أبريل', nameEn: '04 - Apr' },
-    { id: '05', nameAr: 'شهر 05 - مايو', nameEn: '05 - May' },
-    { id: '06', nameAr: 'شهر 06 - يونيو', nameEn: '06 - Jun' },
-    { id: '07', nameAr: 'شهر 07 - يوليو', nameEn: '07 - Jul' },
-    { id: '08', nameAr: 'شهر 08 - أغسطس', nameEn: '08 - Aug' },
-    { id: '09', nameAr: 'شهر 09 - سبتمبر', nameEn: '09 - Sep' },
-    { id: '10', nameAr: 'شهر 10 - أكتوبر', nameEn: '10 - Oct' },
-    { id: '11', nameAr: 'شهر 11 - نوفمبر', nameEn: '11 - Nov' },
-    { id: '12', nameAr: 'شهر 12 - ديسمبر', nameEn: '12 - Dec' },
+    { id: '01', nameAr: 'شهر 01 - يناير', nameEn: 'Month 01 - January' },
+    { id: '02', nameAr: 'شهر 02 - فبراير', nameEn: 'Month 02 - February' },
+    { id: '03', nameAr: 'شهر 03 - مارس', nameEn: 'Month 03 - March' },
+    { id: '04', nameAr: 'شهر 04 - أبريل', nameEn: 'Month 04 - April' },
+    { id: '05', nameAr: 'شهر 05 - مايو', nameEn: 'Month 05 - May' },
+    { id: '06', nameAr: 'شهر 06 - يونيو', nameEn: 'Month 06 - June' },
+    { id: '07', nameAr: 'شهر 07 - يوليو', nameEn: 'Month 07 - July' },
+    { id: '08', nameAr: 'شهر 08 - أغسطس', nameEn: 'Month 08 - August' },
+    { id: '09', nameAr: 'شهر 09 - سبتمبر', nameEn: 'Month 09 - September' },
+    { id: '10', nameAr: 'شهر 10 - أكتوبر', nameEn: 'Month 10 - October' },
+    { id: '11', nameAr: 'شهر 11 - نوفمبر', nameEn: 'Month 11 - November' },
+    { id: '12', nameAr: 'شهر 12 - ديسمبر', nameEn: 'Month 12 - December' },
   ], []);
 
   // Data & State
@@ -990,7 +990,7 @@ export function EtaReceivedInvoices() {
                           <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
                             count > 0 ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-400'
                           }`}>
-                            {count} {language === 'ar' ? 'وثيقة' : 'docs'}
+                            {count} {language === 'ar' ? 'وثيقة' : (count === 1 ? 'doc' : 'docs')}
                           </span>
                         </label>
                       );
@@ -1030,8 +1030,11 @@ export function EtaReceivedInvoices() {
                   {selectedMonths.length === 0
                     ? (language === 'ar' ? 'كافة الشهور' : 'All Months')
                     : selectedMonths.length === 1
-                    ? (MONTHS_LIST.find(m => m.id === selectedMonths[0])?.nameAr || selectedMonths[0])
-                    : (language === 'ar' ? `${selectedMonths.length} شهور محددة` : `${selectedMonths.length} Months`)}
+                    ? (() => {
+                        const m = MONTHS_LIST.find(x => x.id === selectedMonths[0]);
+                        return language === 'ar' ? m?.nameAr : m?.nameEn;
+                      })()
+                    : (language === 'ar' ? `${selectedMonths.length} شهور محددة` : `${selectedMonths.length} Months Selected`)}
                 </span>
                 <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showMonthDropdown ? 'rotate-180' : ''}`} />
               </button>
@@ -1083,12 +1086,12 @@ export function EtaReceivedInvoices() {
                               }}
                               className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
                             />
-                            <span className="font-semibold text-slate-800">{mo.nameAr}</span>
+                            <span className="font-semibold text-slate-800">{language === 'ar' ? mo.nameAr : mo.nameEn}</span>
                           </div>
                           <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
                             count > 0 ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-400'
                           }`}>
-                            {count} {language === 'ar' ? 'وثيقة' : 'docs'}
+                            {count} {language === 'ar' ? 'وثيقة' : (count === 1 ? 'doc' : 'docs')}
                           </span>
                         </label>
                       );
