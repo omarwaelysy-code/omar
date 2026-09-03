@@ -353,13 +353,18 @@ export class EtaDocumentService {
     };
 
     if (targetYear === 'all') {
-      // Prioritize newest: 2026, 2025, 2024
-      addYearWindows(2026, new Date().getMonth() + 1, 1);
-      addYearWindows(2025, 12, 1);
-      addYearWindows(2024, 12, 10); // Phase 8 invoicing started late 2024
+      // Dynamically start from currentYear (e.g. 2026, 2027, 2028...) down to 2024
+      for (let yr = currentYear; yr >= 2024; yr--) {
+        const startMonth = (yr === currentYear) ? new Date().getMonth() + 1 : 12;
+        const endMonth = (yr === 2024) ? 10 : 1;
+        addYearWindows(yr, startMonth, endMonth);
+      }
     } else {
+      // Single specific year (e.g. 2027, 2026, 2025, 2024, 2023, 2022, 2021, 2020)
       const yr = Number(targetYear) || currentYear;
-      addYearWindows(yr, yr === currentYear ? new Date().getMonth() + 1 : 12, 1);
+      const startMonth = (yr === currentYear) ? new Date().getMonth() + 1 : 12;
+      const endMonth = (yr === 2020) ? 11 : 1; // ETA started in Nov 2020
+      addYearWindows(yr, startMonth, endMonth);
     }
 
     const docMap = new Map<string, EtaReceivedInvoiceDTO>();

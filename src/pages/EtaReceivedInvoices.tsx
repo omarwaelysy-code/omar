@@ -195,7 +195,11 @@ export function EtaReceivedInvoices() {
   const availableYears = useMemo(() => {
     const currentYear = new Date().getFullYear();
     const detected = Object.keys(yearCounts);
-    const set = new Set([String(currentYear), String(currentYear - 1), String(currentYear - 2), ...detected]);
+    const defaultYears: string[] = [];
+    for (let y = currentYear; y >= 2024; y--) {
+      defaultYears.push(String(y));
+    }
+    const set = new Set([...defaultYears, ...detected]);
     return Array.from(set).filter(Boolean).sort((a, b) => Number(b) - Number(a));
   }, [yearCounts]);
 
@@ -899,6 +903,32 @@ export function EtaReceivedInvoices() {
                   </button>
                 );
               })}
+
+              {/* Earlier Years Dropdown (2020 - 2023) */}
+              <div className="relative inline-flex items-center">
+                <select
+                  value={['2023', '2022', '2021', '2020'].includes(yearFilter) ? yearFilter : ''}
+                  onChange={e => {
+                    if (e.target.value) {
+                      setYearFilter(e.target.value);
+                      setClientPage(1);
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border outline-hidden ${
+                    ['2023', '2022', '2021', '2020'].includes(yearFilter)
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                  }`}
+                >
+                  <option value="" disabled className="text-slate-500 bg-white">
+                    {language === 'ar' ? 'سنوات سابقة (2020 - 2023)...' : 'Earlier Years (2020-2023)...'}
+                  </option>
+                  <option value="2023" className="text-slate-800 bg-white">2023</option>
+                  <option value="2022" className="text-slate-800 bg-white">2022</option>
+                  <option value="2021" className="text-slate-800 bg-white">2021</option>
+                  <option value="2020" className="text-slate-800 bg-white">2020 (بداية المنظومة)</option>
+                </select>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
