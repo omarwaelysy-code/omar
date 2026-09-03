@@ -2456,7 +2456,14 @@ export async function ensureUniqueSequenceNumber(
   const target = SEQUENCE_MODULE_CONFIG[moduleName];
   if (!target) return proposedNumber || '';
 
-  const safeDateStr = (dateStr || new Date().toISOString()).slice(0, 10);
+  let safeDateStr = '';
+  if (dateStr instanceof Date) {
+    safeDateStr = (dateStr as any).toISOString().slice(0, 10);
+  } else if (typeof dateStr === 'string' && dateStr.trim() !== '') {
+    safeDateStr = dateStr.slice(0, 10);
+  } else {
+    safeDateStr = new Date().toISOString().slice(0, 10);
+  }
   const parts = safeDateStr.split('-');
   const year = parts[0] || new Date().getFullYear().toString();
   const month = (parts[1] || '01').padStart(2, '0');
@@ -3018,7 +3025,10 @@ async function createChequeJournalEntry(
   }
 ): Promise<string> {
   const jeId = uuidv4();
-  const dateStr = entryData.date || new Date().toISOString().slice(0, 10);
+  const rawDate = entryData.date;
+  const dateStr = rawDate instanceof Date 
+    ? (rawDate as any).toISOString().slice(0, 10) 
+    : String(rawDate || new Date().toISOString().slice(0, 10)).slice(0, 10);
   const entryNumber = await ensureUniqueSequenceNumber(pool, companyId, 'journal_entries', dateStr);
   
   await client.query(
@@ -3217,8 +3227,11 @@ const chequeIssueHandler = async (req: AuthRequest, res: any) => {
     }
 
     const amount = Number(cheque.amount);
+    const issueDateStr = parseToStandardDateStr(cheque.issue_date) || new Date().toISOString().slice(0, 10);
+    const dueDateStr = parseToStandardDateStr(cheque.due_date) || issueDateStr;
+
     const jeId = await createChequeJournalEntry(client, companyId, {
-      date: cheque.issue_date,
+      date: issueDateStr,
       description: `قيد إصدار شيك رقم: ${cheque.cheque_number} للمورد: ${supplier?.name || cheque.payee_name || ''}`,
       reference_id: cheque.id,
       reference_type: 'issued_cheque',
@@ -3243,7 +3256,7 @@ const chequeIssueHandler = async (req: AuthRequest, res: any) => {
           account_name: notesPayableAccName,
           debit: 0,
           credit: amount,
-          description: `أوراق دفع - شيك رقم ${cheque.cheque_number} (استحقاق ${cheque.due_date})`,
+          description: `أوراق دفع - شيك رقم ${cheque.cheque_number} (استحقاق ${dueDateStr})`,
           supplier_id: cheque.supplier_id,
           supplier_name: supplier?.name || cheque.payee_name
         }
@@ -3345,7 +3358,7 @@ const chequePayHandler = async (req: AuthRequest, res: any) => {
     }
 
     const amount = Number(cheque.amount);
-    const payDate = payment_date || new Date().toISOString().slice(0, 10);
+    const payDate = parseToStandardDateStr(payment_date) || new Date().toISOString().slice(0, 10);
 
     const jeId = await createChequeJournalEntry(client, companyId, {
       date: payDate,
@@ -3554,7 +3567,7 @@ const chequeReturnHandler = async (req: AuthRequest, res: any) => {
     }
 
     const amount = Number(cheque.amount);
-    const retDate = return_date || new Date().toISOString().slice(0, 10);
+    const retDate = parseToStandardDateStr(return_date) || new Date().toISOString().slice(0, 10);
 
     const jeId = await createChequeJournalEntry(client, companyId, {
       date: retDate,
