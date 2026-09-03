@@ -252,6 +252,7 @@ export class EtaDocumentService {
           : [];
 
     const mappedDocuments: EtaReceivedInvoiceDTO[] = rawList.map(item => this.mapDocumentSummary(item));
+    await this.enrichWithPartnerAddresses(companyId, mappedDocuments);
 
     // 8. Extract continuation token and pagination info
     const continuationToken =
@@ -399,11 +400,17 @@ export class EtaDocumentService {
     const allDocs = Array.from(docMap.values());
     allDocs.sort((a, b) => new Date(b.dateTimeIssued).getTime() - new Date(a.dateTimeIssued).getTime());
 
+    // Enrich with cached or local database partner addresses
+    await this.enrichWithPartnerAddresses(companyId, allDocs);
+
     // Save to cache
     this.portalCache.set(cacheKey, {
       timestamp: Date.now(),
       data: allDocs
     });
+
+    // Background address resolution for unique unknown partners (non-blocking)
+    this.resolveMissingAddressesInBackground(companyId, allDocs).catch(() => {});
 
     return {
       success: true,
@@ -458,6 +465,23 @@ export class EtaDocumentService {
       }
 
       const data = await response.json();
+
+      // Automatically cache partner addresses learned from full document details
+      if (data?.issuer) {
+        await this.savePartnerAddress({
+          taxNumber: data.issuer.id,
+          name: data.issuer.name,
+          addressObj: data.issuer.address
+        });
+      }
+      if (data?.receiver) {
+        await this.savePartnerAddress({
+          taxNumber: data.receiver.id,
+          name: data.receiver.name,
+          addressObj: data.receiver.address
+        });
+      }
+
       return { success: true, data };
     } catch (err: any) {
       clearTimeout(timeoutId);
@@ -467,6 +491,169 @@ export class EtaDocumentService {
         throw timeoutErr;
       }
       throw err;
+    }
+  }
+
+  /**
+   * Static cache for partner addresses
+   */
+  public static partnerAddressCache: Map<string, string> = new Map();
+
+  /**
+   * Format ETA address object into human-readable Arabic string
+   */
+  public static formatAddress(addr: any): string {
+    if (!addr) return '';
+    if (typeof addr === 'string') return addr.trim();
+    const parts = [
+      addr.buildingNumber,
+      addr.street,
+      addr.regionCity,
+      addr.governate,
+      addr.country
+    ].filter(Boolean);
+    return parts.join('، ');
+  }
+
+  /**
+   * Save or upsert partner address into in-memory cache and eta_partner_cache table
+   */
+  public static async savePartnerAddress(partner: {
+    taxNumber?: string;
+    name?: string;
+    addressObj?: any;
+    formattedAddress?: string;
+  }): Promise<void> {
+    const taxNumber = String(partner.taxNumber || '').trim();
+    if (!taxNumber) return;
+
+    const formatted = partner.formattedAddress || this.formatAddress(partner.addressObj);
+    if (!formatted) return;
+
+    this.partnerAddressCache.set(taxNumber, formatted);
+
+    try {
+      await pool.query(
+        `INSERT INTO eta_partner_cache (tax_number, name, address, governate, city, street, building_number, postal_code, country, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+         ON CONFLICT (tax_number) DO UPDATE
+         SET name = COALESCE(EXCLUDED.name, eta_partner_cache.name),
+             address = EXCLUDED.address,
+             governate = COALESCE(EXCLUDED.governate, eta_partner_cache.governate),
+             city = COALESCE(EXCLUDED.city, eta_partner_cache.city),
+             street = COALESCE(EXCLUDED.street, eta_partner_cache.street),
+             building_number = COALESCE(EXCLUDED.building_number, eta_partner_cache.building_number),
+             postal_code = COALESCE(EXCLUDED.postal_code, eta_partner_cache.postal_code),
+             country = COALESCE(EXCLUDED.country, eta_partner_cache.country),
+             updated_at = NOW()`,
+        [
+          taxNumber,
+          partner.name || null,
+          formatted,
+          partner.addressObj?.governate || null,
+          partner.addressObj?.regionCity || null,
+          partner.addressObj?.street || null,
+          partner.addressObj?.buildingNumber || null,
+          partner.addressObj?.postalCode || null,
+          partner.addressObj?.country || 'EG'
+        ]
+      );
+    } catch {
+      // Non-fatal if table not created yet or db unavailable
+    }
+  }
+
+  /**
+   * Enrich documents with cached or database partner addresses
+   */
+  public static async enrichWithPartnerAddresses(
+    companyId: string,
+    docs: EtaReceivedInvoiceDTO[]
+  ): Promise<EtaReceivedInvoiceDTO[]> {
+    if (!docs || docs.length === 0) return docs;
+
+    const missingTaxIds = new Set<string>();
+    for (const doc of docs) {
+      const partnerTaxId = (doc.direction === 'Sent' ? doc.receiverId : doc.issuerId) || doc.issuerId || doc.receiverId;
+      if (!doc.address && partnerTaxId) {
+        if (this.partnerAddressCache.has(partnerTaxId)) {
+          doc.address = this.partnerAddressCache.get(partnerTaxId)!;
+        } else {
+          missingTaxIds.add(partnerTaxId);
+        }
+      }
+    }
+
+    if (missingTaxIds.size > 0) {
+      const taxIdArray = Array.from(missingTaxIds);
+      try {
+        // 1. Check eta_partner_cache table
+        const cachedRes = await pool.query(
+          `SELECT tax_number, address FROM eta_partner_cache WHERE tax_number = ANY($1) AND address IS NOT NULL AND address <> ''`,
+          [taxIdArray]
+        );
+        for (const row of cachedRes.rows) {
+          if (row.tax_number && row.address) {
+            this.partnerAddressCache.set(row.tax_number, row.address);
+          }
+        }
+
+        // 2. Check local suppliers and customers
+        const stillMissing = taxIdArray.filter(t => !this.partnerAddressCache.has(t));
+        if (stillMissing.length > 0) {
+          const dbPartners = await pool.query(
+            `SELECT tax_number, address FROM suppliers WHERE company_id = $1 AND tax_number = ANY($2) AND address IS NOT NULL AND address <> ''
+             UNION ALL
+             SELECT tax_number, address FROM customers WHERE company_id = $1 AND tax_number = ANY($2) AND address IS NOT NULL AND address <> ''`,
+            [companyId, stillMissing]
+          );
+          for (const row of dbPartners.rows) {
+            if (row.tax_number && row.address) {
+              this.partnerAddressCache.set(row.tax_number, row.address);
+            }
+          }
+        }
+
+        // Assign resolved addresses
+        for (const doc of docs) {
+          const partnerTaxId = (doc.direction === 'Sent' ? doc.receiverId : doc.issuerId) || doc.issuerId || doc.receiverId;
+          if (!doc.address && partnerTaxId && this.partnerAddressCache.has(partnerTaxId)) {
+            doc.address = this.partnerAddressCache.get(partnerTaxId)!;
+          }
+        }
+      } catch (err) {
+        console.warn('[ETA Address Enrichment] Non-fatal query error:', err);
+      }
+    }
+
+    return docs;
+  }
+
+  /**
+   * Background resolver: fetches details for a few unique partners without addresses
+   */
+  private static async resolveMissingAddressesInBackground(companyId: string, docs: EtaReceivedInvoiceDTO[]): Promise<void> {
+    if (!docs || docs.length === 0) return;
+    const uniqueUnknownPartners = new Map<string, string>();
+    for (const doc of docs) {
+      const partnerTaxId = (doc.direction === 'Sent' ? doc.receiverId : doc.issuerId) || doc.issuerId || doc.receiverId;
+      if (!doc.address && partnerTaxId && !this.partnerAddressCache.has(partnerTaxId) && doc.uuid) {
+        if (!uniqueUnknownPartners.has(partnerTaxId)) {
+          uniqueUnknownPartners.set(partnerTaxId, doc.uuid);
+        }
+      }
+    }
+
+    if (uniqueUnknownPartners.size === 0) return;
+
+    const partnersToFetch = Array.from(uniqueUnknownPartners.entries()).slice(0, 5);
+    for (const [, uuid] of partnersToFetch) {
+      try {
+        await this.getDocumentDetails(companyId, uuid);
+      } catch {
+        // Non-fatal background fetch
+      }
+      await new Promise(r => setTimeout(r, 550));
     }
   }
 
@@ -552,22 +739,13 @@ export class EtaDocumentService {
       direction = 'Sent';
     }
 
-    const formatAddress = (addr: any) => {
-      if (!addr) return '';
-      if (typeof addr === 'string') return addr.trim();
-      const parts = [
-        addr.buildingNumber,
-        addr.street,
-        addr.regionCity,
-        addr.governate,
-        addr.country
-      ].filter(Boolean);
-      return parts.join('، ');
-    };
-
-    const issuerAddress = formatAddress(item?.issuer?.address || item?.issuerAddress);
-    const receiverAddress = formatAddress(item?.receiver?.address || item?.receiverAddress);
-    const address = (direction === 'Sent' ? receiverAddress : issuerAddress) || issuerAddress || receiverAddress || '';
+    const partnerTaxId = (direction === 'Sent' ? receiverId : issuerId) || issuerId || receiverId;
+    const issuerAddress = EtaDocumentService.formatAddress(item?.issuer?.address || item?.issuerAddress);
+    const receiverAddress = EtaDocumentService.formatAddress(item?.receiver?.address || item?.receiverAddress);
+    let address = (direction === 'Sent' ? receiverAddress : issuerAddress) || issuerAddress || receiverAddress || '';
+    if (!address && partnerTaxId && EtaDocumentService.partnerAddressCache.has(partnerTaxId)) {
+      address = EtaDocumentService.partnerAddressCache.get(partnerTaxId)!;
+    }
 
     return {
       uuid,

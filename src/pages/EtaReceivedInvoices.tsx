@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FileText,
@@ -26,13 +26,16 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   Globe,
-  ChevronDown
+  ChevronDown,
+  FileSpreadsheet,
+  Download
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useNavigation } from '../contexts/NavigationContext';
 import { apiRequest } from '../services/dbService';
+import { exportToExcel } from '../utils/excelUtils';
 
 export interface EtaReceivedInvoice {
   uuid: string;
@@ -151,6 +154,114 @@ export function EtaReceivedInvoices() {
   // Details Modal
   const [selectedInvoice, setSelectedInvoice] = useState<EtaReceivedInvoice | null>(null);
   const [copiedUuid, setCopiedUuid] = useState<string | null>(null);
+  const [modalDetailsLoading, setModalDetailsLoading] = useState(false);
+
+  // Top & Table synchronized horizontal scrollbar refs
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const [tableScrollWidth, setTableScrollWidth] = useState(0);
+  const isSyncingTop = useRef(false);
+  const isSyncingTable = useRef(false);
+
+  const handleTopScroll = () => {
+    if (isSyncingTop.current) {
+      isSyncingTop.current = false;
+      return;
+    }
+    if (topScrollRef.current && tableContainerRef.current) {
+      isSyncingTable.current = true;
+      tableContainerRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+    }
+  };
+
+  const handleTableScroll = () => {
+    if (isSyncingTable.current) {
+      isSyncingTable.current = false;
+      return;
+    }
+    if (topScrollRef.current && tableContainerRef.current) {
+      isSyncingTop.current = true;
+      topScrollRef.current.scrollLeft = tableContainerRef.current.scrollLeft;
+    }
+  };
+
+  // Sync scroll width on updates and window resize
+  useEffect(() => {
+    const updateScrollWidth = () => {
+      if (tableContainerRef.current) {
+        setTableScrollWidth(tableContainerRef.current.scrollWidth);
+      }
+    };
+    updateScrollWidth();
+    const timer = setTimeout(updateScrollWidth, 120);
+    window.addEventListener('resize', updateScrollWidth);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', updateScrollWidth);
+    };
+  }, [invoices, allPortalInvoices, clientPage, clientPageSize, viewMode]);
+
+  // When an invoice is opened in the modal, fetch full ETA details to enrich partner address live
+  useEffect(() => {
+    if (!selectedInvoice?.uuid) {
+      setModalDetailsLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    setModalDetailsLoading(true);
+
+    apiRequest<{ success: boolean; data: any }>(`/api/erp/eta/invoices/${encodeURIComponent(selectedInvoice.uuid)}/details`)
+      .then(res => {
+        if (!isMounted || !res?.data) return;
+
+        const formatAddr = (addr: any) => {
+          if (!addr) return '';
+          if (typeof addr === 'string') return addr.trim();
+          return [addr.buildingNumber, addr.street, addr.regionCity, addr.governate, addr.country].filter(Boolean).join('، ');
+        };
+
+        const issuerAddr = formatAddr(res.data.issuer?.address);
+        const receiverAddr = formatAddr(res.data.receiver?.address);
+        const resolvedAddr = (selectedInvoice.direction === 'Sent' ? receiverAddr : issuerAddr) || issuerAddr || receiverAddr;
+
+        if (resolvedAddr) {
+          setSelectedInvoice(prev => prev ? {
+            ...prev,
+            address: resolvedAddr,
+            issuerAddress: issuerAddr,
+            receiverAddress: receiverAddr
+          } : null);
+
+          const partnerTaxId = (selectedInvoice.direction === 'Sent' ? selectedInvoice.receiverId : selectedInvoice.issuerId) || selectedInvoice.issuerId;
+          const updater = (list: EtaReceivedInvoice[]) =>
+            list.map(inv => {
+              const invPartner = (inv.direction === 'Sent' ? inv.receiverId : inv.issuerId) || inv.issuerId;
+              if (invPartner === partnerTaxId || inv.uuid === selectedInvoice.uuid) {
+                return {
+                  ...inv,
+                  address: resolvedAddr,
+                  issuerAddress: issuerAddr,
+                  receiverAddress: receiverAddr
+                };
+              }
+              return inv;
+            });
+          setInvoices(updater);
+          setAllPortalInvoices(updater);
+        }
+      })
+      .catch(err => {
+        console.warn('Could not load invoice details from ETA:', err);
+      })
+      .finally(() => {
+        if (isMounted) setModalDetailsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedInvoice?.uuid]);
 
   // Fetch all documents across the full portal history
   const fetchAllPortalInvoices = useCallback(async (isRefresh = false) => {
@@ -433,6 +544,60 @@ export function EtaReceivedInvoices() {
     showNotification(language === 'ar' ? 'تم نسخ الرمز إلى الحافظة' : 'Copied to clipboard', 'success');
     setTimeout(() => setCopiedUuid(null), 2000);
   };
+
+  // Export invoices to Excel (.xlsx)
+  const handleExportExcel = useCallback(() => {
+    const listToExport = viewMode === 'all_portal' ? filteredAllInvoices : invoices;
+    if (!listToExport || listToExport.length === 0) {
+      showNotification(language === 'ar' ? 'لا توجد فواتير لتصديرها' : 'No invoices to export', 'warning');
+      return;
+    }
+
+    const exportData = listToExport.map((inv, idx) => ({
+      '#': idx + 1,
+      [language === 'ar' ? 'رقم الفاتورة' : 'Invoice ID']: inv.internalId || '',
+      [language === 'ar' ? 'الاتجاه' : 'Direction']:
+        inv.direction === 'Sent'
+          ? (language === 'ar' ? 'صادرة' : 'Sent')
+          : (language === 'ar' ? 'واردة' : 'Received'),
+      [language === 'ar' ? 'نوع الوثيقة' : 'Document Type']: inv.documentTypeName || inv.typeName || '',
+      [language === 'ar' ? 'المورد / العميل' : 'Partner Name']:
+        inv.direction === 'Sent'
+          ? (inv.receiverName || inv.issuerName || '')
+          : (inv.issuerName || inv.receiverName || ''),
+      [language === 'ar' ? 'الرقم الضريبي' : 'Tax ID']:
+        inv.direction === 'Sent'
+          ? (inv.receiverId || inv.issuerId || '-')
+          : (inv.issuerId || '-'),
+      [language === 'ar' ? 'العنوان' : 'Address']: inv.address || inv.issuerAddress || inv.receiverAddress || '-',
+      [language === 'ar' ? 'تاريخ الإصدار' : 'Issue Date']: inv.dateTimeIssued
+        ? new Date(inv.dateTimeIssued).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')
+        : '-',
+      [language === 'ar' ? 'تاريخ الاستلام' : 'Received Date']: inv.dateTimeReceived
+        ? new Date(inv.dateTimeReceived).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')
+        : '-',
+      [language === 'ar' ? 'الصافي' : 'Net Amount']: inv.netAmount ?? 0,
+      [language === 'ar' ? 'الضريبة' : 'Tax Amount']: inv.taxAmount ?? 0,
+      [language === 'ar' ? 'الإجمالي' : 'Total Amount']: inv.totalAmount ?? 0,
+      [language === 'ar' ? 'العملة' : 'Currency']: inv.currency || 'EGP',
+      [language === 'ar' ? 'الحالة' : 'Status']: inv.status || '',
+      'UUID': inv.uuid || ''
+    }));
+
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    exportToExcel(exportData, {
+      filename: `eta_invoices_${dateStr}`,
+      sheetName: 'ETA Invoices'
+    });
+
+    showNotification(
+      language === 'ar'
+        ? `تم تصدير ${listToExport.length} فاتورة بنجاح إلى ملف إكسيل`
+        : `Successfully exported ${listToExport.length} invoices to Excel`,
+      'success'
+    );
+  }, [viewMode, filteredAllInvoices, invoices, language, showNotification]);
 
   // Status Badge Component
   const renderStatusBadge = (status: string) => {
@@ -1235,6 +1400,18 @@ export function EtaReceivedInvoices() {
                         <option value="all">{language === 'ar' ? 'الكل' : 'All'}</option>
                       </select>
                     </div>
+
+                    {/* Export to Excel Button */}
+                    <button
+                      type="button"
+                      onClick={handleExportExcel}
+                      disabled={filteredAllInvoices.length === 0}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition-all shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      title={language === 'ar' ? 'تصدير كافة النتائج الحالية إلى إكسيل' : 'Export current results to Excel'}
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{language === 'ar' ? 'تصدير إكسيل' : 'Export Excel'}</span>
+                    </button>
                   </div>
 
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -1302,10 +1479,23 @@ export function EtaReceivedInvoices() {
               ) : (
                 /* Period Mode Pagination */
                 <>
-                  <div className="text-slate-500 font-medium">
-                    {language === 'ar'
-                      ? `الصفحة ${pageNumber} — عرض ${invoices.length} فاتورة`
-                      : `Page ${pageNumber} — showing ${invoices.length} invoices`}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="text-slate-500 font-medium">
+                      {language === 'ar'
+                        ? `الصفحة ${pageNumber} — عرض ${invoices.length} فاتورة`
+                        : `Page ${pageNumber} — showing ${invoices.length} invoices`}
+                    </div>
+                    {/* Export to Excel Button */}
+                    <button
+                      type="button"
+                      onClick={handleExportExcel}
+                      disabled={invoices.length === 0}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition-all shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      title={language === 'ar' ? 'تصدير كافة النتائج الحالية إلى إكسيل' : 'Export current results to Excel'}
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>{language === 'ar' ? 'تصدير إكسيل' : 'Export Excel'}</span>
+                    </button>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -1372,9 +1562,20 @@ export function EtaReceivedInvoices() {
                   </button>
                 </div>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-start border-collapse text-xs md:text-sm">
+              <>
+                {/* TOP SYNCHRONIZED SCROLLBAR (شريط التمرير الأفقي العلوي) */}
+                <div
+                  ref={topScrollRef}
+                  onScroll={handleTopScroll}
+                  dir={dir}
+                  className="overflow-x-auto border-b border-slate-200/90 bg-slate-100/70 select-none scrollbar-thin"
+                  style={{ height: '14px', minHeight: '14px' }}
+                >
+                  <div style={{ width: `${tableScrollWidth}px`, minWidth: '100%', height: '1px' }} />
+                </div>
+
+                <div ref={tableContainerRef} onScroll={handleTableScroll} dir={dir} className="overflow-x-auto">
+                  <table className="w-full text-start border-collapse text-xs md:text-sm">
                   <thead>
                     <tr className="border-b border-slate-200/80 bg-slate-50/75 text-slate-600 font-bold">
                       <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'رقم الفاتورة' : 'Invoice ID'}</th>
@@ -1496,7 +1697,8 @@ export function EtaReceivedInvoices() {
               </tbody>
             </table>
           </div>
-        )}
+        </>
+      )}
 
             {/* BOTTOM PAGINATION BAR */}
             {renderPaginationBar('bottom')}
@@ -1527,9 +1729,17 @@ export function EtaReceivedInvoices() {
                     <h3 className="font-bold text-base text-slate-900">
                       {language === 'ar' ? 'تفاصيل الفاتورة الإلكترونية' : 'Electronic Invoice Details'}
                     </h3>
-                    <p className="text-xs text-slate-500 font-mono mt-0.5">
-                      {selectedInvoice.internalId}
-                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-xs text-slate-500 font-mono">
+                        {selectedInvoice.internalId}
+                      </p>
+                      {modalDetailsLoading && (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-indigo-600 font-medium">
+                          <RefreshCw className="w-3 h-3 animate-spin" />
+                          <span>{language === 'ar' ? 'جاري جلب تفاصيل العنوان...' : 'Loading address...'}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1598,6 +1808,12 @@ export function EtaReceivedInvoices() {
                     <div className="text-xs font-mono text-slate-600 mt-1">
                       {language === 'ar' ? 'الرقم الضريبي:' : 'Tax ID:'} {selectedInvoice.issuerId}
                     </div>
+                    {(selectedInvoice.issuerAddress || selectedInvoice.address) && (
+                      <div className="text-xs text-slate-600 mt-2 pt-2 border-t border-indigo-100 flex items-start gap-1">
+                        <span className="font-semibold text-indigo-900 shrink-0">{language === 'ar' ? 'العنوان:' : 'Address:'}</span>
+                        <span className="leading-relaxed">{selectedInvoice.issuerAddress || selectedInvoice.address}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Receiver / Our Company */}
@@ -1611,6 +1827,12 @@ export function EtaReceivedInvoices() {
                     {selectedInvoice.receiverId && (
                       <div className="text-xs font-mono text-slate-600 mt-1">
                         {language === 'ar' ? 'الرقم الضريبي:' : 'Tax ID:'} {selectedInvoice.receiverId}
+                      </div>
+                    )}
+                    {selectedInvoice.receiverAddress && (
+                      <div className="text-xs text-slate-600 mt-2 pt-2 border-t border-slate-200/80 flex items-start gap-1">
+                        <span className="font-semibold text-slate-700 shrink-0">{language === 'ar' ? 'العنوان:' : 'Address:'}</span>
+                        <span className="leading-relaxed">{selectedInvoice.receiverAddress}</span>
                       </div>
                     )}
                   </div>
