@@ -1562,6 +1562,7 @@ export function EtaReceivedInvoices() {
                   </button>
                 </div>
               </div>
+            ) : (
               <>
                 {/* TOP SYNCHRONIZED SCROLLBAR (شريط التمرير الأفقي العلوي) */}
                 <div
