@@ -2449,7 +2449,7 @@ export async function ensureUniqueSequenceNumber(
   client: any,
   companyId: string,
   moduleName: string,
-  dateStr: string,
+  dateStr: any,
   proposedNumber?: string,
   currentRecordId?: string
 ): Promise<string> {
@@ -2457,7 +2457,7 @@ export async function ensureUniqueSequenceNumber(
   if (!target) return proposedNumber || '';
 
   let safeDateStr = '';
-  if (dateStr instanceof Date) {
+  if ((dateStr as any) instanceof Date) {
     safeDateStr = (dateStr as any).toISOString().slice(0, 10);
   } else if (typeof dateStr === 'string' && dateStr.trim() !== '') {
     safeDateStr = dateStr.slice(0, 10);
@@ -3025,8 +3025,8 @@ async function createChequeJournalEntry(
   }
 ): Promise<string> {
   const jeId = uuidv4();
-  const rawDate = entryData.date;
-  const dateStr = rawDate instanceof Date 
+  const rawDate: any = entryData.date;
+  const dateStr = (rawDate as any) instanceof Date 
     ? (rawDate as any).toISOString().slice(0, 10) 
     : String(rawDate || new Date().toISOString().slice(0, 10)).slice(0, 10);
   const entryNumber = await ensureUniqueSequenceNumber(pool, companyId, 'journal_entries', dateStr);
