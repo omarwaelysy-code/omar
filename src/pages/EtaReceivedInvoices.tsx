@@ -180,9 +180,31 @@ export function EtaReceivedInvoices() {
     }
   }, [user?.company_id, yearFilter, directionFilter, docTypeFilter, statusFilter, showNotification]);
 
+  // Dynamic counts per year calculated directly from fetched documents
+  const yearCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const inv of allPortalInvoices) {
+      const yr = (inv.dateTimeIssued || '').slice(0, 4);
+      if (yr) {
+        counts[yr] = (counts[yr] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [allPortalInvoices]);
+
+  const availableYears = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const detected = Object.keys(yearCounts);
+    const set = new Set([String(currentYear), String(currentYear - 1), String(currentYear - 2), ...detected]);
+    return Array.from(set).filter(Boolean).sort((a, b) => Number(b) - Number(a));
+  }, [yearCounts]);
+
   // Filtered all portal invoices client-side
   const filteredAllInvoices = useMemo(() => {
     let list = allPortalInvoices;
+    if (yearFilter !== 'all') {
+      list = list.filter(inv => (inv.dateTimeIssued || '').startsWith(yearFilter));
+    }
     if (directionFilter !== 'all') {
       list = list.filter(inv => inv.direction === directionFilter);
     }
@@ -202,7 +224,7 @@ export function EtaReceivedInvoices() {
       (inv.receiverName && inv.receiverName.toLowerCase().includes(q)) ||
       (inv.receiverId && inv.receiverId.toLowerCase().includes(q))
     );
-  }, [allPortalInvoices, directionFilter, docTypeFilter, statusFilter, appliedSearch]);
+  }, [allPortalInvoices, yearFilter, directionFilter, docTypeFilter, statusFilter, appliedSearch]);
 
   const totalPagesAll = Math.ceil(filteredAllInvoices.length / clientPageSize) || 1;
   const paginatedAllInvoices = useMemo(() => {
@@ -833,34 +855,50 @@ export function EtaReceivedInvoices() {
         ) : (
           /* All Portal Mode Filters */
           <div className="space-y-4">
-            {/* Year Selector Pills */}
+            {/* Dynamic Year Selector Pills */}
             <div className="flex items-center gap-2 flex-wrap pb-3 border-b border-slate-100">
               <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5 text-indigo-600" />
                 <span>{language === 'ar' ? 'السنة المالية:' : 'Fiscal Year:'}</span>
               </span>
-              {[
-                { id: 'all', labelAr: 'كافة السنوات (135 وثيقة)', labelEn: 'All Years' },
-                { id: '2026', labelAr: '2026 (95 وثيقة)', labelEn: '2026' },
-                { id: '2025', labelAr: '2025 (25 وثيقة)', labelEn: '2025' },
-                { id: '2024', labelAr: '2024 (15 وثيقة)', labelEn: '2024' }
-              ].map(yr => (
-                <button
-                  key={yr.id}
-                  type="button"
-                  onClick={() => {
-                    setYearFilter(yr.id);
-                    setClientPage(1);
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    yearFilter === yr.id
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                  }`}
-                >
-                  {language === 'ar' ? yr.labelAr : yr.labelEn}
-                </button>
-              ))}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setYearFilter('all');
+                  setClientPage(1);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  yearFilter === 'all'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
+              >
+                {language === 'ar' ? 'كافة السنوات' : 'All Years'}
+                {allPortalInvoices.length > 0 && ` (${allPortalInvoices.length} وثيقة)`}
+              </button>
+
+              {availableYears.map(yr => {
+                const count = yearCounts[yr] || 0;
+                return (
+                  <button
+                    key={yr}
+                    type="button"
+                    onClick={() => {
+                      setYearFilter(yr);
+                      setClientPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      yearFilter === yr
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {yr}
+                    {count > 0 ? ` (${count} وثيقة)` : ` (0)`}
+                  </button>
+                );
+              })}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
