@@ -110,7 +110,8 @@ export class EtaDocumentService {
     const environment = row.environment === 'production' ? 'production' : 'preprod';
     const clientId = String(row.client_id || '').trim();
     const clientSecret = String(row.client_secret || '').trim();
-    const isConfigured = Boolean(row.is_configured && clientId && clientSecret);
+    // Company is configured for ETA operations if both Client ID and Client Secret are present
+    const isConfigured = Boolean(clientId && clientSecret);
 
     return {
       environment,

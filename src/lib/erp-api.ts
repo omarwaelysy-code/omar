@@ -11173,7 +11173,7 @@ router.get(['/company/eta-settings', '/eta/settings'], authenticateToken, async 
       `SELECT 
         id, company_id, environment, activity_code, branch_id,
         country_code, governorate, city, street, building_number,
-        postal_code, client_id,
+        postal_code, client_id, client_secret, operating_key,
         (client_secret IS NOT NULL AND TRIM(client_secret) != '') AS client_secret_configured,
         (operating_key IS NOT NULL AND TRIM(operating_key) != '') AS operating_key_configured,
         last_notification_at,
@@ -11266,10 +11266,8 @@ router.post(['/company/eta-settings', '/eta/settings'], authenticateToken, async
     const cleanPostalCode = String(postal_code || '').trim();
     const cleanClientId = String(client_id || '').trim();
 
-    // Determine if configuration has minimum required fields
+    // Determine if configuration has minimum required credentials to operate with ETA
     const isConfigured = Boolean(
-      cleanActivityCode &&
-      cleanBranchId &&
       cleanClientId &&
       secretToSave &&
       secretToSave.length > 0

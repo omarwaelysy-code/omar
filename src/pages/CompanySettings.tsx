@@ -261,8 +261,8 @@ export function CompanySettings() {
     environment?: 'preprod' | 'production';
     tested_at?: string;
   } | null>(null);
-  const [showClientSecret, setShowClientSecret] = useState(false);
-  const [showOperatingKey, setShowOperatingKey] = useState(false);
+  const [showClientSecret, setShowClientSecret] = useState(true);
+  const [showOperatingKey, setShowOperatingKey] = useState(true);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const handleCopyToClipboard = (text: string, fieldKey: string, label: string) => {
@@ -444,11 +444,11 @@ export function CompanySettings() {
                 building_number: etaRes.building_number || '',
                 postal_code: etaRes.postal_code || '',
                 client_id: etaRes.client_id || '',
-                client_secret: '',
-                client_secret_configured: Boolean(etaRes.client_secret_configured),
-                operating_key: '',
-                operating_key_configured: Boolean(etaRes.operating_key_configured),
-                is_configured: Boolean(etaRes.is_configured)
+                client_secret: etaRes.client_secret || '',
+                client_secret_configured: Boolean(etaRes.client_secret_configured || etaRes.client_secret),
+                operating_key: etaRes.operating_key || '',
+                operating_key_configured: Boolean(etaRes.operating_key_configured || etaRes.operating_key),
+                is_configured: Boolean(etaRes.is_configured || (etaRes.client_id && (etaRes.client_secret || etaRes.client_secret_configured)))
               });
             }
           } catch (etaErr) {
@@ -472,11 +472,11 @@ export function CompanySettings() {
         setEtaSettings(prev => ({
           ...prev,
           ...res.data,
-          client_secret: '',
-          client_secret_configured: Boolean(res.data.client_secret_configured),
-          operating_key: '',
-          operating_key_configured: Boolean(res.data.operating_key_configured),
-          is_configured: Boolean(res.data.is_configured)
+          client_secret: res.data.client_secret || etaSettings.client_secret || '',
+          client_secret_configured: Boolean(res.data.client_secret_configured || res.data.client_secret),
+          operating_key: res.data.operating_key || etaSettings.operating_key || '',
+          operating_key_configured: Boolean(res.data.operating_key_configured || res.data.operating_key),
+          is_configured: Boolean(res.data.is_configured || (res.data.client_id && (res.data.client_secret || res.data.client_secret_configured)))
         }));
         showNotification(
           language === 'ar'
@@ -1999,9 +1999,7 @@ export function CompanySettings() {
                   <input
                     type={showClientSecret ? 'text' : 'password'}
                     placeholder={
-                      etaSettings.client_secret_configured
-                        ? (language === 'ar' ? '•••••••• تم تعيين المفتاح (اتركه فارغاً للإبقاء عليه)' : '•••••••• Configured (leave empty to keep)')
-                        : (language === 'ar' ? 'أدخل المفتاح السري الصادر من بوابة الضرائب' : 'Enter Client Secret from ETA portal')
+                      language === 'ar' ? 'أدخل المفتاح السري الصادر من بوابة الضرائب' : 'Enter Client Secret from ETA portal'
                     }
                     value={etaSettings.client_secret}
                     onChange={(e) => setEtaSettings({ ...etaSettings, client_secret: e.target.value })}
@@ -2017,8 +2015,8 @@ export function CompanySettings() {
                 </div>
                 <span className="text-[10.5px] text-slate-400 mt-1 block">
                   {language === 'ar'
-                    ? 'يتم تخزين المفتاح السري بأمان تام ولا يتم إظهاره لأي مستخدم'
-                    : 'Client Secret is securely encrypted and never returned via API'}
+                    ? 'المفتاح السري المستخدم للاتصال والمصادقة مع منظومة مصلحة الضرائب المصرية'
+                    : 'Client Secret used for authentication with Egyptian Tax Authority'}
                 </span>
               </div>
 
@@ -2042,9 +2040,7 @@ export function CompanySettings() {
                   <input
                     type={showOperatingKey ? 'text' : 'password'}
                     placeholder={
-                      etaSettings.operating_key_configured
-                        ? (language === 'ar' ? '•••••••• تم تعيين مفتاح التشغيل (اتركه فارغاً للإبقاء عليه)' : '•••••••• Configured (leave empty to keep)')
-                        : (language === 'ar' ? 'مفتاح التشغيل الصادر من بوابة الضرائب عند تسجيل ERP (اختياري/بحسب التسجيل)' : 'Operating key from ETA portal (optional)')
+                      language === 'ar' ? 'مفتاح التشغيل الصادر من بوابة الضرائب عند تسجيل ERP (اختياري/بحسب التسجيل)' : 'Operating key from ETA portal (optional)'
                     }
                     value={etaSettings.operating_key}
                     onChange={(e) => setEtaSettings({ ...etaSettings, operating_key: e.target.value })}
