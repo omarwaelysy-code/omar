@@ -56,6 +56,9 @@ export interface EtaReceivedInvoiceDTO {
   status: string;
   cancelRequestDate?: string | null;
   rejectRequestDate?: string | null;
+  address?: string;
+  issuerAddress?: string;
+  receiverAddress?: string;
 }
 
 export interface EtaSearchDocumentsResponse {
@@ -549,6 +552,23 @@ export class EtaDocumentService {
       direction = 'Sent';
     }
 
+    const formatAddress = (addr: any) => {
+      if (!addr) return '';
+      if (typeof addr === 'string') return addr.trim();
+      const parts = [
+        addr.buildingNumber,
+        addr.street,
+        addr.regionCity,
+        addr.governate,
+        addr.country
+      ].filter(Boolean);
+      return parts.join('، ');
+    };
+
+    const issuerAddress = formatAddress(item?.issuer?.address || item?.issuerAddress);
+    const receiverAddress = formatAddress(item?.receiver?.address || item?.receiverAddress);
+    const address = (direction === 'Sent' ? receiverAddress : issuerAddress) || issuerAddress || receiverAddress || '';
+
     return {
       uuid,
       submissionUuid: submissionUuid || undefined,
@@ -572,7 +592,10 @@ export class EtaDocumentService {
       currency,
       status,
       cancelRequestDate: item?.cancelRequestDate || null,
-      rejectRequestDate: item?.rejectRequestDate || null
+      rejectRequestDate: item?.rejectRequestDate || null,
+      address,
+      issuerAddress,
+      receiverAddress
     };
   }
 

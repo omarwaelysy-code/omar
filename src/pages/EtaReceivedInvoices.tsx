@@ -58,6 +58,9 @@ export interface EtaReceivedInvoice {
   status: string;
   cancelRequestDate?: string | null;
   rejectRequestDate?: string | null;
+  address?: string;
+  issuerAddress?: string;
+  receiverAddress?: string;
 }
 
 interface EtaSearchApiResponse {
@@ -1198,8 +1201,145 @@ export function EtaReceivedInvoices() {
         const isCurrentLoading = viewMode === 'all_portal' ? allLoading : loading;
         const totalFound = viewMode === 'all_portal' ? filteredAllInvoices.length : invoices.length;
 
+        const renderPaginationBar = (position: 'top' | 'bottom') => {
+          if (isCurrentLoading || totalFound === 0) return null;
+
+          return (
+            <div className={`p-3.5 bg-slate-50/75 flex items-center justify-between gap-3 flex-wrap text-xs md:text-sm ${
+              position === 'top' ? 'border-b border-slate-200/80' : 'border-t border-slate-200/80'
+            }`}>
+              {viewMode === 'all_portal' ? (
+                <>
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <span className="font-bold text-slate-800 bg-indigo-50 text-indigo-700 px-3 py-1 rounded-xl border border-indigo-200/60">
+                      {language === 'ar' ? `النتائج: ${filteredAllInvoices.length}` : `Results: ${filteredAllInvoices.length}`}
+                    </span>
+                    <div className="flex items-center gap-1.5 text-slate-600 font-semibold">
+                      <span>{language === 'ar' ? 'النتائج لكل صفحة:' : 'Per page:'}</span>
+                      <select
+                        value={clientPageSize >= 99999 ? 'all' : clientPageSize}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setClientPageSize(val === 'all' ? 999999 : Number(val));
+                          setClientPage(1);
+                        }}
+                        className="px-2.5 py-1 rounded-xl border border-slate-300 bg-white text-xs font-bold focus:outline-hidden text-slate-800 cursor-pointer shadow-2xs"
+                      >
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                        <option value={200}>200</option>
+                        <option value={500}>500</option>
+                        <option value={1000}>1000</option>
+                        <option value="all">{language === 'ar' ? 'الكل' : 'All'}</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {/* First page button */}
+                    <button
+                      type="button"
+                      onClick={() => setClientPage(1)}
+                      disabled={clientPage === 1}
+                      className="px-2.5 py-1 rounded-xl border border-slate-300 bg-white text-slate-700 disabled:opacity-40 hover:bg-slate-50 font-bold transition-all shadow-2xs"
+                      title={language === 'ar' ? 'الصفحة الأولى' : 'First'}
+                    >
+                      «
+                    </button>
+                    {/* Prev */}
+                    <button
+                      type="button"
+                      onClick={() => setClientPage(p => Math.max(1, p - 1))}
+                      disabled={clientPage === 1}
+                      className="px-3 py-1 rounded-xl border border-slate-300 bg-white text-slate-700 disabled:opacity-40 hover:bg-slate-50 font-bold transition-all shadow-2xs"
+                    >
+                      ‹
+                    </button>
+
+                    {/* Page numbers */}
+                    {Array.from({ length: totalPagesAll }, (_, i) => i + 1)
+                      .filter(p => Math.abs(p - clientPage) <= 2 || p === 1 || p === totalPagesAll)
+                      .map((p, idx, arr) => (
+                        <React.Fragment key={p}>
+                          {idx > 0 && arr[idx - 1] !== p - 1 && <span className="px-1 text-slate-400">...</span>}
+                          <button
+                            type="button"
+                            onClick={() => setClientPage(p)}
+                            className={`w-7 h-7 rounded-xl text-xs font-bold transition-all ${
+                              clientPage === p
+                                ? 'bg-indigo-600 text-white shadow-xs'
+                                : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        </React.Fragment>
+                      ))}
+
+                    {/* Next */}
+                    <button
+                      type="button"
+                      onClick={() => setClientPage(p => Math.min(totalPagesAll, p + 1))}
+                      disabled={clientPage >= totalPagesAll}
+                      className="px-3 py-1 rounded-xl border border-slate-300 bg-white text-slate-700 disabled:opacity-40 hover:bg-slate-50 font-bold transition-all shadow-2xs"
+                    >
+                      ›
+                    </button>
+                    {/* Last page button */}
+                    <button
+                      type="button"
+                      onClick={() => setClientPage(totalPagesAll)}
+                      disabled={clientPage >= totalPagesAll}
+                      className="px-2.5 py-1 rounded-xl border border-slate-300 bg-white text-slate-700 disabled:opacity-40 hover:bg-slate-50 font-bold transition-all shadow-2xs"
+                      title={language === 'ar' ? 'الصفحة الأخيرة' : 'Last'}
+                    >
+                      »
+                    </button>
+                  </div>
+                </>
+              ) : (
+                /* Period Mode Pagination */
+                <>
+                  <div className="text-slate-500 font-medium">
+                    {language === 'ar'
+                      ? `الصفحة ${pageNumber} — عرض ${invoices.length} فاتورة`
+                      : `Page ${pageNumber} — showing ${invoices.length} invoices`}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handlePrevPage}
+                      disabled={tokenHistory.length === 0}
+                      className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <ChevronRight className="w-4 h-4 rtl:rotate-0 ltr:rotate-180" />
+                      <span>{language === 'ar' ? 'السابق' : 'Previous'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleNextPage}
+                      disabled={!nextToken}
+                      className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <span>{language === 'ar' ? 'التالي' : 'Next'}</span>
+                      <ChevronLeft className="w-4 h-4 rtl:rotate-0 ltr:rotate-180" />
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        };
+
         return (
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            {/* 1. TOP PAGINATION BAR (المستطيل في أعلى الجدول) */}
+            {renderPaginationBar('top')}
+
             {isCurrentLoading ? (
               <div className="py-20 flex flex-col items-center justify-center gap-3">
                 <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" />
@@ -1240,7 +1380,9 @@ export function EtaReceivedInvoices() {
                       <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'رقم الفاتورة' : 'Invoice ID'}</th>
                       <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الاتجاه' : 'Direction'}</th>
                       <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'النوع' : 'Type'}</th>
-                      <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'المورد (المصدر)' : 'Issuer / Supplier'}</th>
+                      <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'المورد / العميل' : 'Partner Name'}</th>
+                      <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الرقم الضريبي' : 'Tax ID'}</th>
+                      <th className="py-3 px-4 text-start whitespace-nowrap min-w-[150px]">{language === 'ar' ? 'العنوان' : 'Address'}</th>
                       <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'تاريخ الإصدار' : 'Issue Date'}</th>
                       <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'تاريخ الاستلام' : 'Received Date'}</th>
                       <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الصافي' : 'Net Amount'}</th>
@@ -1269,14 +1411,23 @@ export function EtaReceivedInvoices() {
                           {renderDocTypeBadge(inv.typeName, inv.documentTypeName)}
                         </td>
 
-                        {/* Issuer */}
+                        {/* Partner Name */}
                         <td className="py-3.5 px-4">
-                          <div className="font-semibold text-slate-900 max-w-[220px] truncate" title={inv.issuerName}>
-                            {inv.issuerName}
+                          <div className="font-semibold text-slate-900 max-w-[200px] truncate" title={inv.direction === 'Sent' ? (inv.receiverName || inv.issuerName) : inv.issuerName}>
+                            {inv.direction === 'Sent' ? (inv.receiverName || 'عميل غير محدد') : (inv.issuerName || 'مورد غير محدد')}
                           </div>
-                          <div className="text-[11px] font-mono text-slate-400 mt-0.5">
-                            {inv.issuerId}
-                          </div>
+                        </td>
+
+                        {/* Tax ID */}
+                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                          <span className="inline-block px-2.5 py-1 rounded-lg bg-slate-100 font-mono text-xs font-bold text-slate-700">
+                            {inv.direction === 'Sent' ? (inv.receiverId || inv.issuerId || '-') : (inv.issuerId || '-')}
+                          </span>
+                        </td>
+
+                        {/* Address */}
+                        <td className="py-3.5 px-4 text-slate-600 text-xs max-w-[180px] truncate" title={inv.address || inv.issuerAddress || inv.receiverAddress || '-'}>
+                          {inv.address || inv.issuerAddress || inv.receiverAddress || '-'}
                         </td>
 
                         {/* Issue Date */}
@@ -1347,130 +1498,8 @@ export function EtaReceivedInvoices() {
           </div>
         )}
 
-            {/* ========================================================================= */}
-            {/* 6. PAGINATION FOOTER */}
-            {/* ========================================================================= */}
-            {!isCurrentLoading && totalFound > 0 && (
-              <div className="p-4 border-t border-slate-200/80 bg-slate-50/50 flex items-center justify-between gap-3 flex-wrap text-xs md:text-sm">
-                {viewMode === 'all_portal' ? (
-                  <>
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <span className="font-bold text-slate-800 bg-indigo-50 text-indigo-700 px-3 py-1 rounded-xl border border-indigo-200/60">
-                        {language === 'ar' ? `النتائج: ${filteredAllInvoices.length}` : `Results: ${filteredAllInvoices.length}`}
-                      </span>
-                      <div className="flex items-center gap-1.5 text-slate-600">
-                        <span>{language === 'ar' ? 'النتائج لكل صفحة:' : 'Per page:'}</span>
-                        <select
-                          value={clientPageSize}
-                          onChange={e => {
-                            setClientPageSize(Number(e.target.value));
-                            setClientPage(1);
-                          }}
-                          className="px-2.5 py-1 rounded-xl border border-slate-300 bg-white text-xs font-semibold focus:outline-hidden"
-                        >
-                          <option value={10}>10</option>
-                          <option value={20}>20</option>
-                          <option value={50}>50</option>
-                          <option value={100}>100</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {/* First page button */}
-                      <button
-                        type="button"
-                        onClick={() => setClientPage(1)}
-                        disabled={clientPage === 1}
-                        className="px-2.5 py-1 rounded-xl border border-slate-300 bg-white text-slate-700 disabled:opacity-40 hover:bg-slate-50 font-bold transition-all shadow-2xs"
-                        title={language === 'ar' ? 'الصفحة الأولى' : 'First'}
-                      >
-                        «
-                      </button>
-                      {/* Prev */}
-                      <button
-                        type="button"
-                        onClick={() => setClientPage(p => Math.max(1, p - 1))}
-                        disabled={clientPage === 1}
-                        className="px-3 py-1 rounded-xl border border-slate-300 bg-white text-slate-700 disabled:opacity-40 hover:bg-slate-50 font-bold transition-all shadow-2xs"
-                      >
-                        ‹
-                      </button>
-
-                      {/* Page numbers */}
-                      {Array.from({ length: totalPagesAll }, (_, i) => i + 1)
-                        .filter(p => Math.abs(p - clientPage) <= 2 || p === 1 || p === totalPagesAll)
-                        .map((p, idx, arr) => (
-                          <React.Fragment key={p}>
-                            {idx > 0 && arr[idx - 1] !== p - 1 && <span className="px-1 text-slate-400">...</span>}
-                            <button
-                              type="button"
-                              onClick={() => setClientPage(p)}
-                              className={`w-7 h-7 rounded-xl text-xs font-bold transition-all ${
-                                clientPage === p
-                                  ? 'bg-indigo-600 text-white shadow-xs'
-                                  : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
-                              }`}
-                            >
-                              {p}
-                            </button>
-                          </React.Fragment>
-                        ))}
-
-                      {/* Next */}
-                      <button
-                        type="button"
-                        onClick={() => setClientPage(p => Math.min(totalPagesAll, p + 1))}
-                        disabled={clientPage >= totalPagesAll}
-                        className="px-3 py-1 rounded-xl border border-slate-300 bg-white text-slate-700 disabled:opacity-40 hover:bg-slate-50 font-bold transition-all shadow-2xs"
-                      >
-                        ›
-                      </button>
-                      {/* Last page button */}
-                      <button
-                        type="button"
-                        onClick={() => setClientPage(totalPagesAll)}
-                        disabled={clientPage >= totalPagesAll}
-                        className="px-2.5 py-1 rounded-xl border border-slate-300 bg-white text-slate-700 disabled:opacity-40 hover:bg-slate-50 font-bold transition-all shadow-2xs"
-                        title={language === 'ar' ? 'الصفحة الأخيرة' : 'Last'}
-                      >
-                        »
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-slate-500 font-medium">
-                      {language === 'ar'
-                        ? `الصفحة ${pageNumber} — عرض ${invoices.length} فاتورة`
-                        : `Page ${pageNumber} — showing ${invoices.length} invoices`}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handlePrevPage}
-                        disabled={tokenHistory.length === 0}
-                        className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 shadow-2xs"
-                      >
-                        <ChevronRight className="w-4 h-4 rtl:rotate-0 ltr:rotate-180" />
-                        <span>{language === 'ar' ? 'السابق' : 'Previous'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleNextPage}
-                        disabled={!nextToken}
-                        className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 shadow-2xs"
-                      >
-                        <span>{language === 'ar' ? 'التالي' : 'Next'}</span>
-                        <ChevronLeft className="w-4 h-4 rtl:rotate-0 ltr:rotate-180" />
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
+            {/* BOTTOM PAGINATION BAR */}
+            {renderPaginationBar('bottom')}
           </div>
         );
       })()}
