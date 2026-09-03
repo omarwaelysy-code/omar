@@ -22,7 +22,10 @@ import {
   ArrowDownToLine,
   Receipt,
   ExternalLink,
-  Info
+  Info,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Globe
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -38,6 +41,7 @@ export interface EtaReceivedInvoice {
   typeName: string;
   documentTypeName: string;
   typeVersionName?: string;
+  direction?: 'Sent' | 'Received';
   issuerId: string;
   issuerName: string;
   receiverId: string;
@@ -96,6 +100,8 @@ export function EtaReceivedInvoices() {
   const [dateTo, setDateTo] = useState(defaultDates.to);
   const [statusFilter, setStatusFilter] = useState('all');
   const [docTypeFilter, setDocTypeFilter] = useState('all');
+  const [directionFilter, setDirectionFilter] = useState<'all' | 'Received' | 'Sent'>('all');
+  const [viewMode, setViewMode] = useState<'all_portal' | 'period'>('all_portal');
   const [searchQuery, setSearchQuery] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
 
@@ -103,6 +109,11 @@ export function EtaReceivedInvoices() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [invoices, setInvoices] = useState<EtaReceivedInvoice[]>([]);
+  const [allPortalInvoices, setAllPortalInvoices] = useState<EtaReceivedInvoice[]>([]);
+  const [allLoading, setAllLoading] = useState(false);
+  const [allFetched, setAllFetched] = useState(false);
+  const [clientPage, setClientPage] = useState(1);
+  const [clientPageSize, setClientPageSize] = useState(10);
   const [isConfigured, setIsConfigured] = useState(true);
   const [environment, setEnvironment] = useState<'preprod' | 'production'>('preprod');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -116,6 +127,81 @@ export function EtaReceivedInvoices() {
   // Details Modal
   const [selectedInvoice, setSelectedInvoice] = useState<EtaReceivedInvoice | null>(null);
   const [copiedUuid, setCopiedUuid] = useState<string | null>(null);
+
+  // Fetch all documents across the full portal history
+  const fetchAllPortalInvoices = useCallback(async (isRefresh = false) => {
+    if (!user?.company_id) return;
+    try {
+      setAllLoading(true);
+      setErrorMessage(null);
+
+      const queryParams = new URLSearchParams();
+      if (directionFilter !== 'all') {
+        queryParams.set('direction', directionFilter);
+      }
+      if (docTypeFilter !== 'all') {
+        queryParams.set('documentType', docTypeFilter);
+      }
+      if (statusFilter !== 'all') {
+        queryParams.set('status', statusFilter);
+      }
+
+      const res = await apiRequest<{
+        success: boolean;
+        isConfigured: boolean;
+        environment: 'preprod' | 'production';
+        data: EtaReceivedInvoice[];
+        totalCount: number;
+      }>(`/eta/invoices/all?${queryParams.toString()}`, 'GET');
+
+      if (res) {
+        setIsConfigured(res.isConfigured !== false);
+        setEnvironment(res.environment || 'production');
+        setAllPortalInvoices(res.data || []);
+        setAllFetched(true);
+        setClientPage(1);
+      }
+    } catch (err: any) {
+      console.error('Failed to load all portal invoices:', err);
+      const msg = err.message || 'تعذر تحميل كافة وثائق البوابة.';
+      setErrorMessage(msg);
+      if (isRefresh) {
+        showNotification(msg, 'error');
+      }
+    } finally {
+      setAllLoading(false);
+    }
+  }, [user?.company_id, directionFilter, docTypeFilter, statusFilter, showNotification]);
+
+  // Filtered all portal invoices client-side
+  const filteredAllInvoices = useMemo(() => {
+    let list = allPortalInvoices;
+    if (directionFilter !== 'all') {
+      list = list.filter(inv => inv.direction === directionFilter);
+    }
+    if (docTypeFilter !== 'all') {
+      list = list.filter(inv => inv.typeName === docTypeFilter);
+    }
+    if (statusFilter !== 'all') {
+      list = list.filter(inv => inv.status === statusFilter);
+    }
+    if (!appliedSearch.trim()) return list;
+    const q = appliedSearch.trim().toLowerCase();
+    return list.filter(inv =>
+      inv.internalId.toLowerCase().includes(q) ||
+      inv.issuerName.toLowerCase().includes(q) ||
+      inv.issuerId.toLowerCase().includes(q) ||
+      inv.uuid.toLowerCase().includes(q) ||
+      (inv.receiverName && inv.receiverName.toLowerCase().includes(q)) ||
+      (inv.receiverId && inv.receiverId.toLowerCase().includes(q))
+    );
+  }, [allPortalInvoices, directionFilter, docTypeFilter, statusFilter, appliedSearch]);
+
+  const totalPagesAll = Math.ceil(filteredAllInvoices.length / clientPageSize) || 1;
+  const paginatedAllInvoices = useMemo(() => {
+    const start = (clientPage - 1) * clientPageSize;
+    return filteredAllInvoices.slice(start, start + clientPageSize);
+  }, [filteredAllInvoices, clientPage, clientPageSize]);
 
   // Fetch received invoices from Backend
   const fetchInvoices = useCallback(async (token?: string, isRefresh = false) => {
@@ -134,6 +220,9 @@ export function EtaReceivedInvoices() {
 
       const queryParams = new URLSearchParams();
       queryParams.set('pageSize', '20');
+      if (directionFilter !== 'all') {
+        queryParams.set('direction', directionFilter);
+      }
       if (docTypeFilter && docTypeFilter !== 'all') {
         queryParams.set('documentType', docTypeFilter);
       }
@@ -209,17 +298,29 @@ export function EtaReceivedInvoices() {
       .catch(err => console.warn('Could not load company ETA settings:', err));
   }, [user?.company_id]);
 
-  // Initial and filter changes
+  // Fetch when in all_portal mode
   useEffect(() => {
-    // Reset pagination token history on filter change
-    setCurrentToken(undefined);
-    setTokenHistory([]);
-    setPageNumber(1);
-    fetchInvoices(undefined, false);
-  }, [dateFrom, dateTo, statusFilter, docTypeFilter, appliedSearch, fetchInvoices]);
+    if (viewMode === 'all_portal') {
+      fetchAllPortalInvoices(false);
+    }
+  }, [viewMode, fetchAllPortalInvoices]);
+
+  // Filter changes for period mode
+  useEffect(() => {
+    if (viewMode === 'period') {
+      setCurrentToken(undefined);
+      setTokenHistory([]);
+      setPageNumber(1);
+      fetchInvoices(undefined, false);
+    }
+  }, [viewMode, dateFrom, dateTo, statusFilter, docTypeFilter, directionFilter, appliedSearch, fetchInvoices]);
 
   const handleRefresh = () => {
-    fetchInvoices(currentToken, true);
+    if (viewMode === 'all_portal') {
+      fetchAllPortalInvoices(true);
+    } else {
+      fetchInvoices(currentToken, true);
+    }
   };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -344,6 +445,23 @@ export function EtaReceivedInvoices() {
     );
   };
 
+  const renderDirectionBadge = (dir?: 'Sent' | 'Received') => {
+    if (dir === 'Sent') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200" title={language === 'ar' ? 'وثيقة صادرة' : 'Sent Document'}>
+          <ArrowUpRight className="w-3.5 h-3.5" />
+          <span>{language === 'ar' ? 'صادرة' : 'Sent'}</span>
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" title={language === 'ar' ? 'وثيقة واردة' : 'Received Document'}>
+        <ArrowDownLeft className="w-3.5 h-3.5" />
+        <span>{language === 'ar' ? 'واردة' : 'Received'}</span>
+      </span>
+    );
+  };
+
   const formatCurrency = (val: number, curr = 'EGP') => {
     const num = Number(val) || 0;
     return `${num.toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${curr}`;
@@ -384,12 +502,101 @@ export function EtaReceivedInvoices() {
           <button
             type="button"
             onClick={handleRefresh}
-            disabled={refreshing || loading || !isConfigured}
+            disabled={refreshing || loading || allLoading || !isConfigured}
             className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-all disabled:opacity-50 shadow-2xs"
             title={language === 'ar' ? 'تحديث البيانات من منظومة الضرائب' : 'Refresh from ETA'}
           >
-            <RefreshCw className={`w-4 h-4 text-indigo-600 ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 text-indigo-600 ${refreshing || allLoading ? 'animate-spin' : ''}`} />
             <span>{language === 'ar' ? 'تحديث' : 'Refresh'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 1.1 VIEW MODE & DIRECTION TABS (MATCHING ETA PORTAL) */}
+      {/* ========================================================================= */}
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
+        {/* View Mode: All Portal vs Period */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setViewMode('all_portal')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs md:text-sm font-bold transition-all ${
+              viewMode === 'all_portal'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            <Globe className="w-4 h-4" />
+            <span>{language === 'ar' ? 'بحث في كافة الوثائق (كل ما على البوابة)' : 'All Portal Documents'}</span>
+            {allPortalInvoices.length > 0 && (
+              <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                viewMode === 'all_portal' ? 'bg-indigo-800 text-white' : 'bg-slate-300 text-slate-800'
+              }`}>
+                {filteredAllInvoices.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewMode('period')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs md:text-sm font-bold transition-all ${
+              viewMode === 'period'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            <Calendar className="w-4 h-4" />
+            <span>{language === 'ar' ? 'بحث حسب الفترة / الشهر' : 'Search by Period'}</span>
+          </button>
+        </div>
+
+        {/* Direction Filter Tabs (الكل / الوثائق المستلمة / الوثائق المرسلة) */}
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+          <button
+            type="button"
+            onClick={() => {
+              setDirectionFilter('all');
+              setClientPage(1);
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              directionFilter === 'all'
+                ? 'bg-white text-slate-900 shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            {language === 'ar' ? 'الكل' : 'All'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setDirectionFilter('Received');
+              setClientPage(1);
+            }}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              directionFilter === 'Received'
+                ? 'bg-white text-emerald-700 shadow-2xs'
+                : 'text-slate-600 hover:text-emerald-700'
+            }`}
+          >
+            <ArrowDownLeft className="w-3.5 h-3.5" />
+            <span>{language === 'ar' ? 'الوثائق المستلمة' : 'Received'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setDirectionFilter('Sent');
+              setClientPage(1);
+            }}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              directionFilter === 'Sent'
+                ? 'bg-white text-sky-700 shadow-2xs'
+                : 'text-slate-600 hover:text-sky-700'
+            }`}
+          >
+            <ArrowUpRight className="w-3.5 h-3.5" />
+            <span>{language === 'ar' ? 'الوثائق المرسلة' : 'Sent'}</span>
           </button>
         </div>
       </div>
@@ -450,255 +657,362 @@ export function EtaReceivedInvoices() {
       {/* 4. FILTERS & SEARCH BAR */}
       {/* ========================================================================= */}
       <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-        {/* Quick Period Presets */}
-        <div className="flex items-center gap-2 flex-wrap pb-3 border-b border-slate-100">
-          <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
-            <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-600" />
-            <span>{language === 'ar' ? 'فترات سريعة:' : 'Quick Presets:'}</span>
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              const end = new Date();
-              const start = new Date(end.getTime() - 29 * 24 * 60 * 60 * 1000);
-              setDateFrom(start.toISOString().split('T')[0]);
-              setDateTo(end.toISOString().split('T')[0]);
-            }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-              dateTo === defaultDates.to && dateFrom === defaultDates.from
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700'
-            }`}
-          >
-            {language === 'ar' ? 'آخر 30 يوماً (الفترة الحالية)' : 'Last 30 Days'}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setDateFrom('2026-07-01');
-              setDateTo('2026-07-30');
-            }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-              dateFrom === '2026-07-01' && dateTo === '2026-07-30'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/60'
-            }`}
-          >
-            {language === 'ar' ? '📅 شهر يوليو 2026 (01/07 - 30/07)' : 'July 2026'}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setDateFrom('2026-08-01');
-              setDateTo('2026-08-30');
-            }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-              dateFrom === '2026-08-01' && dateTo === '2026-08-30'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700'
-            }`}
-          >
-            {language === 'ar' ? 'شهر أغسطس 2026 (01/08 - 30/08)' : 'August 2026'}
-          </button>
-
-          <span className="text-[11px] text-slate-400 mr-auto flex items-center gap-1">
-            <Info className="w-3.5 h-3.5 text-indigo-500" />
-            {language === 'ar'
-              ? 'تسمح مصلحة الضرائب بالاستعلام في نطاق 30 يوماً كحد أقصى لكل عملية بحث.'
-              : 'ETA allows maximum 30 days window per search.'}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
-          {/* Issue Date From */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-indigo-600" />
-              <span>{language === 'ar' ? 'من تاريخ الإصدار' : 'From Issue Date'}</span>
-            </label>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={e => setDateFrom(e.target.value)}
-              className="w-full text-xs md:text-sm px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-hidden"
-            />
-          </div>
-
-          {/* Issue Date To */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-indigo-600" />
-              <span>{language === 'ar' ? 'إلى تاريخ الإصدار' : 'To Issue Date'}</span>
-            </label>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={e => setDateTo(e.target.value)}
-              className="w-full text-xs md:text-sm px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-hidden"
-            />
-          </div>
-
-          {/* Document Type Filter */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
-              <Receipt className="w-3.5 h-3.5 text-indigo-600" />
-              <span>{language === 'ar' ? 'نوع الوثيقة' : 'Document Type'}</span>
-            </label>
-            <select
-              value={docTypeFilter}
-              onChange={e => setDocTypeFilter(e.target.value)}
-              className="w-full text-xs md:text-sm px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-hidden"
-            >
-              <option value="all">{language === 'ar' ? 'الكل (فواتير وإشعارات)' : 'All Documents'}</option>
-              <option value="i">{language === 'ar' ? 'فاتورة (Invoice)' : 'Invoice'}</option>
-              <option value="c">{language === 'ar' ? 'إشعار دائن (Credit Note)' : 'Credit Note'}</option>
-              <option value="d">{language === 'ar' ? 'إشعار مدين (Debit Note)' : 'Debit Note'}</option>
-            </select>
-          </div>
-
-          {/* Status Filter */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
-              <Filter className="w-3.5 h-3.5 text-indigo-600" />
-              <span>{language === 'ar' ? 'حالة الفاتورة' : 'Status'}</span>
-            </label>
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="w-full text-xs md:text-sm px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-hidden"
-            >
-              <option value="all">{language === 'ar' ? 'الكل (جميع الحالات)' : 'All Statuses'}</option>
-              <option value="Valid">{language === 'ar' ? 'صحيحة (Valid)' : 'Valid'}</option>
-              <option value="Invalid">{language === 'ar' ? 'غير صالحة (Invalid)' : 'Invalid'}</option>
-              <option value="Rejected">{language === 'ar' ? 'مرفوضة (Rejected)' : 'Rejected'}</option>
-              <option value="Cancelled">{language === 'ar' ? 'ملغاة (Cancelled)' : 'Cancelled'}</option>
-              <option value="Submitted">{language === 'ar' ? 'مقدمة (Submitted)' : 'Submitted'}</option>
-            </select>
-          </div>
-
-          {/* Quick Search */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5 text-indigo-600" />
-              <span>{language === 'ar' ? 'بحث برقم الفاتورة أو المورد' : 'Search by ID / Supplier'}</span>
-            </label>
-            <form onSubmit={handleSearchSubmit} className="relative">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder={language === 'ar' ? 'رقم الفاتورة، الرقم الضريبي...' : 'Invoice ID, Tax ID...'}
-                className="w-full text-xs md:text-sm px-3.5 py-2 pr-9 pl-9 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-hidden"
-              />
+        {viewMode === 'period' ? (
+          <>
+            {/* Quick Period Presets */}
+            <div className="flex items-center gap-2 flex-wrap pb-3 border-b border-slate-100">
+              <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-600" />
+                <span>{language === 'ar' ? 'فترات سريعة:' : 'Quick Presets:'}</span>
+              </span>
               <button
-                type="submit"
-                className="absolute inset-y-0 right-0 px-3 flex items-center text-slate-400 hover:text-indigo-600"
-                title={language === 'ar' ? 'بحث' : 'Search'}
+                type="button"
+                onClick={() => {
+                  const end = new Date();
+                  const start = new Date(end.getTime() - 29 * 24 * 60 * 60 * 1000);
+                  setDateFrom(start.toISOString().split('T')[0]);
+                  setDateTo(end.toISOString().split('T')[0]);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                  dateTo === defaultDates.to && dateFrom === defaultDates.from
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700'
+                }`}
               >
-                <Search className="w-4 h-4" />
+                {language === 'ar' ? 'آخر 30 يوماً (الفترة الحالية)' : 'Last 30 Days'}
               </button>
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchQuery('');
-                    setAppliedSearch('');
-                  }}
-                  className="absolute inset-y-0 left-0 px-3 flex items-center text-slate-400 hover:text-slate-600"
-                  title={language === 'ar' ? 'مسح' : 'Clear'}
+              <button
+                type="button"
+                onClick={() => {
+                  setDateFrom('2026-07-01');
+                  setDateTo('2026-07-30');
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                  dateFrom === '2026-07-01' && dateTo === '2026-07-30'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/60'
+                }`}
+              >
+                {language === 'ar' ? '📅 شهر يوليو 2026' : 'July 2026'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDateFrom('2026-04-01');
+                  setDateTo('2026-04-30');
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                  dateFrom === '2026-04-01' && dateTo === '2026-04-30'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700'
+                }`}
+              >
+                {language === 'ar' ? 'شهر أبريل 2026' : 'April 2026'}
+              </button>
+
+              <span className="text-[11px] text-slate-400 mr-auto flex items-center gap-1">
+                <Info className="w-3.5 h-3.5 text-indigo-500" />
+                {language === 'ar'
+                  ? 'تسمح مصلحة الضرائب بالاستعلام في نطاق 30 يوماً كحد أقصى لكل عملية بحث.'
+                  : 'ETA allows maximum 30 days window per search.'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
+              {/* Issue Date From */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>{language === 'ar' ? 'من تاريخ الإصدار' : 'From Issue Date'}</span>
+                </label>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={e => setDateFrom(e.target.value)}
+                  className="w-full text-xs md:text-sm px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-hidden"
+                />
+              </div>
+
+              {/* Issue Date To */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>{language === 'ar' ? 'إلى تاريخ الإصدار' : 'To Issue Date'}</span>
+                </label>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={e => setDateTo(e.target.value)}
+                  className="w-full text-xs md:text-sm px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-hidden"
+                />
+              </div>
+
+              {/* Document Type Filter */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+                  <Receipt className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>{language === 'ar' ? 'نوع الوثيقة' : 'Document Type'}</span>
+                </label>
+                <select
+                  value={docTypeFilter}
+                  onChange={e => setDocTypeFilter(e.target.value)}
+                  className="w-full text-xs md:text-sm px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-hidden"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <option value="all">{language === 'ar' ? 'الكل (فواتير وإشعارات)' : 'All Documents'}</option>
+                  <option value="i">{language === 'ar' ? 'فاتورة (Invoice)' : 'Invoice'}</option>
+                  <option value="c">{language === 'ar' ? 'إشعار دائن (Credit Note)' : 'Credit Note'}</option>
+                  <option value="d">{language === 'ar' ? 'إشعار مدين (Debit Note)' : 'Debit Note'}</option>
+                </select>
+              </div>
+
+              {/* Status Filter */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+                  <Filter className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>{language === 'ar' ? 'حالة الفاتورة' : 'Status'}</span>
+                </label>
+                <select
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value)}
+                  className="w-full text-xs md:text-sm px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-hidden"
+                >
+                  <option value="all">{language === 'ar' ? 'الكل (جميع الحالات)' : 'All Statuses'}</option>
+                  <option value="Valid">{language === 'ar' ? 'صحيحة (Valid)' : 'Valid'}</option>
+                  <option value="Invalid">{language === 'ar' ? 'غير صالحة (Invalid)' : 'Invalid'}</option>
+                  <option value="Rejected">{language === 'ar' ? 'مرفوضة (Rejected)' : 'Rejected'}</option>
+                  <option value="Cancelled">{language === 'ar' ? 'ملغاة (Cancelled)' : 'Cancelled'}</option>
+                  <option value="Submitted">{language === 'ar' ? 'مقدمة (Submitted)' : 'Submitted'}</option>
+                </select>
+              </div>
+
+              {/* Quick Search */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+                  <Search className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>{language === 'ar' ? 'بحث برقم الفاتورة أو المورد' : 'Search by ID / Supplier'}</span>
+                </label>
+                <form onSubmit={handleSearchSubmit} className="relative">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder={language === 'ar' ? 'رقم الفاتورة، الرقم الضريبي...' : 'Invoice ID, Tax ID...'}
+                    className="w-full text-xs md:text-sm px-3.5 py-2 pr-9 pl-9 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-hidden"
+                  />
+                  <button
+                    type="submit"
+                    className="absolute inset-y-0 right-0 px-3 flex items-center text-slate-400 hover:text-indigo-600"
+                    title={language === 'ar' ? 'بحث' : 'Search'}
+                  >
+                    <Search className="w-4 h-4" />
+                  </button>
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchQuery('');
+                        setAppliedSearch('');
+                      }}
+                      className="absolute inset-y-0 left-0 px-3 flex items-center text-slate-400 hover:text-slate-600"
+                      title={language === 'ar' ? 'مسح' : 'Clear'}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </form>
+              </div>
+            </div>
+          </>
+        ) : (
+          /* All Portal Mode Filters */
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+            {/* Document Type Filter */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+                <Receipt className="w-3.5 h-3.5 text-indigo-600" />
+                <span>{language === 'ar' ? 'نوع الوثيقة' : 'Document Type'}</span>
+              </label>
+              <select
+                value={docTypeFilter}
+                onChange={e => {
+                  setDocTypeFilter(e.target.value);
+                  setClientPage(1);
+                }}
+                className="w-full text-xs md:text-sm px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-hidden"
+              >
+                <option value="all">{language === 'ar' ? 'الكل (فواتير وإشعارات)' : 'All Documents'}</option>
+                <option value="i">{language === 'ar' ? 'فاتورة (Invoice)' : 'Invoice'}</option>
+                <option value="c">{language === 'ar' ? 'إشعار دائن (Credit Note)' : 'Credit Note'}</option>
+                <option value="d">{language === 'ar' ? 'إشعار مدين (Debit Note)' : 'Debit Note'}</option>
+              </select>
+            </div>
+
+            {/* Status Filter */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5 text-indigo-600" />
+                <span>{language === 'ar' ? 'حالة الفاتورة' : 'Status'}</span>
+              </label>
+              <select
+                value={statusFilter}
+                onChange={e => {
+                  setStatusFilter(e.target.value);
+                  setClientPage(1);
+                }}
+                className="w-full text-xs md:text-sm px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-hidden"
+              >
+                <option value="all">{language === 'ar' ? 'الكل (جميع الحالات)' : 'All Statuses'}</option>
+                <option value="Valid">{language === 'ar' ? 'صحيحة (Valid)' : 'Valid'}</option>
+                <option value="Invalid">{language === 'ar' ? 'غير صالحة (Invalid)' : 'Invalid'}</option>
+                <option value="Rejected">{language === 'ar' ? 'مرفوضة (Rejected)' : 'Rejected'}</option>
+                <option value="Cancelled">{language === 'ar' ? 'ملغاة (Cancelled)' : 'Cancelled'}</option>
+                <option value="Submitted">{language === 'ar' ? 'مقدمة (Submitted)' : 'Submitted'}</option>
+              </select>
+            </div>
+
+            {/* Quick Search */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+                <Search className="w-3.5 h-3.5 text-indigo-600" />
+                <span>{language === 'ar' ? 'بحث لحظي في كافة الوثائق' : 'Search All Documents'}</span>
+              </label>
+              <form onSubmit={handleSearchSubmit} className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => {
+                    setSearchQuery(e.target.value);
+                    setAppliedSearch(e.target.value);
+                    setClientPage(1);
+                  }}
+                  placeholder={language === 'ar' ? 'رقم الفاتورة، اسم المورد، الرقم الضريبي، UUID...' : 'ID, Supplier, Tax ID, UUID...'}
+                  className="w-full text-xs md:text-sm px-3.5 py-2 pr-9 pl-9 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-hidden"
+                />
+                <button
+                  type="submit"
+                  className="absolute inset-y-0 right-0 px-3 flex items-center text-slate-400 hover:text-indigo-600"
+                  title={language === 'ar' ? 'بحث' : 'Search'}
+                >
+                  <Search className="w-4 h-4" />
                 </button>
-              )}
-            </form>
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setAppliedSearch('');
+                      setClientPage(1);
+                    }}
+                    className="absolute inset-y-0 left-0 px-3 flex items-center text-slate-400 hover:text-slate-600"
+                    title={language === 'ar' ? 'مسح' : 'Clear'}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </form>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* ========================================================================= */}
       {/* 5. INVOICES TABLE */}
       {/* ========================================================================= */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        {loading ? (
-          <div className="py-20 flex flex-col items-center justify-center gap-3">
-            <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" />
-            <p className="text-sm font-medium text-slate-500">
-              {language === 'ar' ? 'جاري جلب الفواتير الإلكترونية من منظومة مصلحة الضرائب...' : 'Loading invoices from ETA...'}
-            </p>
-          </div>
-        ) : invoices.length === 0 ? (
-          <div className="py-16 text-center px-4">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 mx-auto flex items-center justify-center mb-3">
-              <Receipt className="w-8 h-8" />
-            </div>
-            <h3 className="font-bold text-base text-slate-800">
-              {language === 'ar' ? 'لا توجد فواتير إلكترونية مستلمة' : 'No received invoices found'}
-            </h3>
-            <p className="text-xs md:text-sm text-slate-400 max-w-md mx-auto mt-1 leading-relaxed">
-              {language === 'ar'
-                ? 'لم يتم العثور على فواتير إلكترونية واردة خلال الفترة أو الفلاتر المحددة. يمكنك تغيير نطاق التاريخ أو إعادة المحاولة.'
-                : 'No incoming invoices found for the selected date range and filters. Try adjusting the dates or status.'}
-            </p>
-            <div className="mt-4 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={handleRefresh}
-                className="px-4 py-2 text-xs md:text-sm font-semibold rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors"
-              >
-                {language === 'ar' ? 'إعادة المحاولة' : 'Retry'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-start border-collapse text-xs md:text-sm">
-              <thead>
-                <tr className="border-b border-slate-200/80 bg-slate-50/75 text-slate-600 font-bold">
-                  <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'رقم الفاتورة' : 'Invoice ID'}</th>
-                  <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'النوع' : 'Type'}</th>
-                  <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'المورد (المصدر)' : 'Issuer / Supplier'}</th>
-                  <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'تاريخ الإصدار' : 'Issue Date'}</th>
-                  <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'تاريخ الاستلام' : 'Received Date'}</th>
-                  <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الصافي' : 'Net Amount'}</th>
-                  <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الضريبة' : 'Tax'}</th>
-                  <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الإجمالي' : 'Total'}</th>
-                  <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الحالة' : 'Status'}</th>
-                  <th className="py-3 px-4 text-center whitespace-nowrap">UUID</th>
-                  <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {invoices.map((inv) => (
-                  <tr key={inv.uuid} className="hover:bg-slate-50/80 transition-colors group">
-                    {/* Internal ID */}
-                    <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
-                      {inv.internalId}
-                    </td>
+      {(() => {
+        const currentDisplayInvoices = viewMode === 'all_portal' ? paginatedAllInvoices : invoices;
+        const isCurrentLoading = viewMode === 'all_portal' ? allLoading : loading;
+        const totalFound = viewMode === 'all_portal' ? filteredAllInvoices.length : invoices.length;
 
-                    {/* Document Type */}
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                      {renderDocTypeBadge(inv.typeName, inv.documentTypeName)}
-                    </td>
+        return (
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            {isCurrentLoading ? (
+              <div className="py-20 flex flex-col items-center justify-center gap-3">
+                <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" />
+                <p className="text-sm font-medium text-slate-500">
+                  {viewMode === 'all_portal'
+                    ? (language === 'ar' ? 'جاري جلب ومزامنة كافة وثائق البوابة عبر جميع الفترات...' : 'Loading all documents across all portal periods...')
+                    : (language === 'ar' ? 'جاري جلب الفواتير الإلكترونية من منظومة مصلحة الضرائب...' : 'Loading invoices from ETA...')}
+                </p>
+              </div>
+            ) : totalFound === 0 ? (
+              <div className="py-16 text-center px-4">
+                <div className="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-600 mx-auto flex items-center justify-center mb-3">
+                  <Receipt className="w-8 h-8" />
+                </div>
+                <h3 className="font-bold text-base text-slate-800">
+                  {language === 'ar' ? 'لا توجد وثائق مطابقة' : 'No documents found'}
+                </h3>
+                <p className="text-xs md:text-sm text-slate-400 max-w-md mx-auto mt-1 leading-relaxed">
+                  {language === 'ar'
+                    ? 'لم يتم العثور على وثائق إلكترونية مطابقة للفلاتر المحددة. يمكنك تغيير خيارات البحث أو إعادة المحاولة.'
+                    : 'No documents found matching the filters. Try changing your search query or filters.'}
+                </p>
+                <div className="mt-4 flex items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleRefresh}
+                    className="px-4 py-2 text-xs md:text-sm font-semibold rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors"
+                  >
+                    {language === 'ar' ? 'إعادة المحاولة' : 'Retry'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-start border-collapse text-xs md:text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200/80 bg-slate-50/75 text-slate-600 font-bold">
+                      <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'رقم الفاتورة' : 'Invoice ID'}</th>
+                      <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الاتجاه' : 'Direction'}</th>
+                      <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'النوع' : 'Type'}</th>
+                      <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'المورد (المصدر)' : 'Issuer / Supplier'}</th>
+                      <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'تاريخ الإصدار' : 'Issue Date'}</th>
+                      <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'تاريخ الاستلام' : 'Received Date'}</th>
+                      <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الصافي' : 'Net Amount'}</th>
+                      <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الضريبة' : 'Tax'}</th>
+                      <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الإجمالي' : 'Total'}</th>
+                      <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الحالة' : 'Status'}</th>
+                      <th className="py-3 px-4 text-center whitespace-nowrap">UUID</th>
+                      <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {currentDisplayInvoices.map((inv) => (
+                      <tr key={inv.uuid} className="hover:bg-slate-50/80 transition-colors group">
+                        {/* Internal ID */}
+                        <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
+                          {inv.internalId}
+                        </td>
 
-                    {/* Issuer */}
-                    <td className="py-3.5 px-4">
-                      <div className="font-semibold text-slate-900 max-w-[220px] truncate" title={inv.issuerName}>
-                        {inv.issuerName}
-                      </div>
-                      <div className="text-[11px] font-mono text-slate-400 mt-0.5">
-                        {inv.issuerId}
-                      </div>
-                    </td>
+                        {/* Direction */}
+                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                          {renderDirectionBadge(inv.direction)}
+                        </td>
 
-                    {/* Issue Date */}
-                    <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap">
-                      {formatDateTime(inv.dateTimeIssued)}
-                    </td>
+                        {/* Document Type */}
+                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                          {renderDocTypeBadge(inv.typeName, inv.documentTypeName)}
+                        </td>
 
-                    {/* Received Date */}
-                    <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
-                      {formatDateTime(inv.dateTimeReceived)}
-                    </td>
+                        {/* Issuer */}
+                        <td className="py-3.5 px-4">
+                          <div className="font-semibold text-slate-900 max-w-[220px] truncate" title={inv.issuerName}>
+                            {inv.issuerName}
+                          </div>
+                          <div className="text-[11px] font-mono text-slate-400 mt-0.5">
+                            {inv.issuerId}
+                          </div>
+                        </td>
+
+                        {/* Issue Date */}
+                        <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap">
+                          {formatDateTime(inv.dateTimeIssued)}
+                        </td>
+
+                        {/* Received Date */}
+                        <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
+                          {formatDateTime(inv.dateTimeReceived)}
+                        </td>
 
                     {/* Net Amount */}
                     <td className="py-3.5 px-4 text-end font-medium text-slate-700 whitespace-nowrap">
@@ -758,41 +1072,133 @@ export function EtaReceivedInvoices() {
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* 6. PAGINATION FOOTER */}
-        {/* ========================================================================= */}
-        {!loading && invoices.length > 0 && (
-          <div className="p-4 border-t border-slate-200/80 bg-slate-50/50 flex items-center justify-between gap-3 flex-wrap text-xs md:text-sm">
-            <div className="text-slate-500 font-medium">
-              {language === 'ar'
-                ? `الصفحة ${pageNumber} — عرض ${invoices.length} فاتورة`
-                : `Page ${pageNumber} — showing ${invoices.length} invoices`}
-            </div>
+            {/* ========================================================================= */}
+            {/* 6. PAGINATION FOOTER */}
+            {/* ========================================================================= */}
+            {!isCurrentLoading && totalFound > 0 && (
+              <div className="p-4 border-t border-slate-200/80 bg-slate-50/50 flex items-center justify-between gap-3 flex-wrap text-xs md:text-sm">
+                {viewMode === 'all_portal' ? (
+                  <>
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <span className="font-bold text-slate-800 bg-indigo-50 text-indigo-700 px-3 py-1 rounded-xl border border-indigo-200/60">
+                        {language === 'ar' ? `النتائج: ${filteredAllInvoices.length}` : `Results: ${filteredAllInvoices.length}`}
+                      </span>
+                      <div className="flex items-center gap-1.5 text-slate-600">
+                        <span>{language === 'ar' ? 'النتائج لكل صفحة:' : 'Per page:'}</span>
+                        <select
+                          value={clientPageSize}
+                          onChange={e => {
+                            setClientPageSize(Number(e.target.value));
+                            setClientPage(1);
+                          }}
+                          className="px-2.5 py-1 rounded-xl border border-slate-300 bg-white text-xs font-semibold focus:outline-hidden"
+                        >
+                          <option value={10}>10</option>
+                          <option value={20}>20</option>
+                          <option value={50}>50</option>
+                          <option value={100}>100</option>
+                        </select>
+                      </div>
+                    </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handlePrevPage}
-                disabled={tokenHistory.length === 0}
-                className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 shadow-2xs"
-              >
-                <ChevronRight className="w-4 h-4 rtl:rotate-0 ltr:rotate-180" />
-                <span>{language === 'ar' ? 'السابق' : 'Previous'}</span>
-              </button>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {/* First page button */}
+                      <button
+                        type="button"
+                        onClick={() => setClientPage(1)}
+                        disabled={clientPage === 1}
+                        className="px-2.5 py-1 rounded-xl border border-slate-300 bg-white text-slate-700 disabled:opacity-40 hover:bg-slate-50 font-bold transition-all shadow-2xs"
+                        title={language === 'ar' ? 'الصفحة الأولى' : 'First'}
+                      >
+                        «
+                      </button>
+                      {/* Prev */}
+                      <button
+                        type="button"
+                        onClick={() => setClientPage(p => Math.max(1, p - 1))}
+                        disabled={clientPage === 1}
+                        className="px-3 py-1 rounded-xl border border-slate-300 bg-white text-slate-700 disabled:opacity-40 hover:bg-slate-50 font-bold transition-all shadow-2xs"
+                      >
+                        ‹
+                      </button>
 
-              <button
-                type="button"
-                onClick={handleNextPage}
-                disabled={!nextToken}
-                className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 shadow-2xs"
-              >
-                <span>{language === 'ar' ? 'التالي' : 'Next'}</span>
-                <ChevronLeft className="w-4 h-4 rtl:rotate-0 ltr:rotate-180" />
-              </button>
-            </div>
+                      {/* Page numbers */}
+                      {Array.from({ length: totalPagesAll }, (_, i) => i + 1)
+                        .filter(p => Math.abs(p - clientPage) <= 2 || p === 1 || p === totalPagesAll)
+                        .map((p, idx, arr) => (
+                          <React.Fragment key={p}>
+                            {idx > 0 && arr[idx - 1] !== p - 1 && <span className="px-1 text-slate-400">...</span>}
+                            <button
+                              type="button"
+                              onClick={() => setClientPage(p)}
+                              className={`w-7 h-7 rounded-xl text-xs font-bold transition-all ${
+                                clientPage === p
+                                  ? 'bg-indigo-600 text-white shadow-xs'
+                                  : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              {p}
+                            </button>
+                          </React.Fragment>
+                        ))}
+
+                      {/* Next */}
+                      <button
+                        type="button"
+                        onClick={() => setClientPage(p => Math.min(totalPagesAll, p + 1))}
+                        disabled={clientPage >= totalPagesAll}
+                        className="px-3 py-1 rounded-xl border border-slate-300 bg-white text-slate-700 disabled:opacity-40 hover:bg-slate-50 font-bold transition-all shadow-2xs"
+                      >
+                        ›
+                      </button>
+                      {/* Last page button */}
+                      <button
+                        type="button"
+                        onClick={() => setClientPage(totalPagesAll)}
+                        disabled={clientPage >= totalPagesAll}
+                        className="px-2.5 py-1 rounded-xl border border-slate-300 bg-white text-slate-700 disabled:opacity-40 hover:bg-slate-50 font-bold transition-all shadow-2xs"
+                        title={language === 'ar' ? 'الصفحة الأخيرة' : 'Last'}
+                      >
+                        »
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-slate-500 font-medium">
+                      {language === 'ar'
+                        ? `الصفحة ${pageNumber} — عرض ${invoices.length} فاتورة`
+                        : `Page ${pageNumber} — showing ${invoices.length} invoices`}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handlePrevPage}
+                        disabled={tokenHistory.length === 0}
+                        className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 shadow-2xs"
+                      >
+                        <ChevronRight className="w-4 h-4 rtl:rotate-0 ltr:rotate-180" />
+                        <span>{language === 'ar' ? 'السابق' : 'Previous'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleNextPage}
+                        disabled={!nextToken}
+                        className="px-3.5 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 shadow-2xs"
+                      >
+                        <span>{language === 'ar' ? 'التالي' : 'Next'}</span>
+                        <ChevronLeft className="w-4 h-4 rtl:rotate-0 ltr:rotate-180" />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* 7. DETAILS MODAL (READ-ONLY) */}

@@ -11522,6 +11522,7 @@ router.get('/eta/invoices/received', authenticateToken, async (req: AuthRequest,
       submissionDateTo,
       status,
       documentType,
+      direction,
       internalId,
       issuerId,
       uuid
@@ -11536,6 +11537,7 @@ router.get('/eta/invoices/received', authenticateToken, async (req: AuthRequest,
       submissionDateTo: submissionDateTo as string | undefined,
       status: status as string | undefined,
       documentType: (documentType as string) || undefined,
+      direction: (direction as string) || undefined,
       internalId: internalId as string | undefined,
       issuerId: issuerId as string | undefined,
       uuid: uuid as string | undefined
@@ -11550,6 +11552,37 @@ router.get('/eta/invoices/received', authenticateToken, async (req: AuthRequest,
       error: err.message || 'تعذر جلب الفواتير الإلكترونية المستلمة من منظومة الضرائب.',
       code: err.code || 'ETA_ERROR',
       diagnostic: err.diagnostic || undefined
+    });
+  }
+});
+
+// GET /api/erp/eta/invoices/all - Multi-period full portal sync
+router.get('/eta/invoices/all', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  if (!companyId) {
+    return res.status(400).json({ error: 'Company ID is required' });
+  }
+
+  const userPermissions = (req.user as any)?.permissions;
+  if (userPermissions && userPermissions['eta_received_invoices']?.view === false) {
+    return res.status(403).json({ error: 'غير مصرح لك بعرض الفواتير الإلكترونية.' });
+  }
+
+  try {
+    const { year, direction, documentType, status } = req.query;
+    const result = await EtaDocumentService.fetchAllDocuments(companyId, {
+      year: year as string | undefined,
+      direction: direction as string | undefined,
+      documentType: documentType as string | undefined,
+      status: status as string | undefined
+    });
+    res.json(result);
+  } catch (err: any) {
+    console.error('Error fetching all ETA invoices:', err.message || err);
+    res.status(err.statusCode || 500).json({
+      success: false,
+      error: err.message || 'تعذر جلب كافة وثائق البوابة.',
+      code: err.code || 'ETA_ERROR'
     });
   }
 });

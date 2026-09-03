@@ -25,6 +25,7 @@ export interface EtaSearchDocumentsParams {
   submissionDateTo?: string;
   status?: string;
   documentType?: string;
+  direction?: string;
   uuid?: string;
   internalId?: string;
   issuerId?: string;
@@ -39,6 +40,7 @@ export interface EtaReceivedInvoiceDTO {
   typeName: string;
   documentTypeName: string;
   typeVersionName?: string;
+  direction?: 'Sent' | 'Received';
   issuerId: string;
   issuerName: string;
   receiverId: string;
@@ -163,11 +165,18 @@ export class EtaDocumentService {
     // 4. Build query parameters according to official ETA Search Documents API
     const pageSize = Math.min(100, Math.max(1, Number(params.pageSize) || 20));
     const query = new URLSearchParams({
-      direction: 'Received',
       pageSize: pageSize.toString(),
       issueDateFrom,
       issueDateTo
     });
+
+    const dirParam = params.direction?.trim();
+    if (dirParam && dirParam.toLowerCase() !== 'all') {
+      query.set('direction', dirParam);
+    } else if (!params.direction) {
+      // Default to Received if direction not specified
+      query.set('direction', 'Received');
+    }
 
     if (params.documentType?.trim() && params.documentType.trim().toLowerCase() !== 'all') {
       query.set('documentType', params.documentType.trim());
@@ -267,11 +276,111 @@ export class EtaDocumentService {
         totalPages
       },
       filterSummary: {
-        direction: 'Received',
-        documentType: params.documentType?.trim() || 'i',
+        direction: (params.direction || 'Received') as any,
+        documentType: params.documentType?.trim() || 'all',
         issueDateFrom,
         issueDateTo
       }
+    };
+  }
+
+  /**
+   * Fetch all documents across multi-month periods (Auto-Chunked Full Sync)
+   */
+  public static async fetchAllDocuments(
+    companyId: string,
+    options: {
+      year?: string | number;
+      direction?: string;
+      documentType?: string;
+      status?: string;
+    } = {}
+  ): Promise<{
+    success: boolean;
+    isConfigured: boolean;
+    environment: 'preprod' | 'production';
+    data: EtaReceivedInvoiceDTO[];
+    totalCount: number;
+  }> {
+    const settings = await this.getCompanySettings(companyId);
+    if (!settings || !settings.isConfigured) {
+      return {
+        success: false,
+        isConfigured: false,
+        environment: settings?.environment || 'preprod',
+        data: [],
+        totalCount: 0
+      };
+    }
+
+    const targetYear = options.year ? String(options.year) : 'all';
+    const currentYear = new Date().getFullYear();
+
+    // Build 29-day windows covering the requested scope
+    const windows: { from: string; to: string }[] = [];
+
+    const addYearWindows = (yr: number, maxMonth = 12) => {
+      const pad = (n: number) => (n < 10 ? '0' + n : String(n));
+      for (let m = 1; m <= maxMonth; m++) {
+        const daysInMonth = new Date(yr, m, 0).getDate();
+        windows.push({
+          from: `${yr}-${pad(m)}-01T00:00:00Z`,
+          to: `${yr}-${pad(m)}-${pad(Math.min(29, daysInMonth))}T23:59:59Z`
+        });
+        if (daysInMonth > 29) {
+          windows.push({
+            from: `${yr}-${pad(m)}-29T00:00:00Z`,
+            to: `${yr}-${pad(m)}-${pad(daysInMonth)}T23:59:59Z`
+          });
+        }
+      }
+    };
+
+    if (targetYear === 'all') {
+      // Covers full history from 2024 to current month
+      addYearWindows(2024);
+      addYearWindows(2025);
+      addYearWindows(2026, new Date().getMonth() + 1);
+    } else {
+      const yr = Number(targetYear) || currentYear;
+      addYearWindows(yr, yr === currentYear ? new Date().getMonth() + 1 : 12);
+    }
+
+    const docMap = new Map<string, EtaReceivedInvoiceDTO>();
+
+    for (const win of windows) {
+      try {
+        const res = await this.searchReceivedInvoices(companyId, {
+          issueDateFrom: win.from,
+          issueDateTo: win.to,
+          direction: options.direction,
+          documentType: options.documentType,
+          status: options.status,
+          pageSize: 100
+        });
+
+        if (res.data && res.data.length > 0) {
+          for (const doc of res.data) {
+            docMap.set(doc.uuid, doc);
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[ETA Multi-Period Fetch] Window ${win.from} - ${win.to} skipped:`, err?.message || err);
+      }
+
+      // Safe pause to respect ETA's 2 req/sec rate limit
+      await new Promise(resolve => setTimeout(resolve, 550));
+    }
+
+    const allDocs = Array.from(docMap.values());
+    allDocs.sort((a, b) => new Date(b.dateTimeIssued).getTime() - new Date(a.dateTimeIssued).getTime());
+
+    return {
+      success: true,
+      isConfigured: true,
+      environment: settings.environment,
+      data: allDocs,
+      totalCount: allDocs.length
     };
   }
 
@@ -405,6 +514,14 @@ export class EtaDocumentService {
       item?.documentTypeNamePrimaryLang ||
       (typeName === 'i' ? 'فاتورة' : typeName === 'c' ? 'إشعار دائن' : typeName === 'd' ? 'إشعار مدين' : typeName);
 
+    // Infer direction (Sent vs Received)
+    let direction: 'Sent' | 'Received' = 'Received';
+    if (item?.direction) {
+      direction = String(item.direction).toLowerCase() === 'sent' ? 'Sent' : 'Received';
+    } else if (issuerId === '672574845') {
+      direction = 'Sent';
+    }
+
     return {
       uuid,
       submissionUuid: submissionUuid || undefined,
@@ -413,6 +530,7 @@ export class EtaDocumentService {
       typeName,
       documentTypeName,
       typeVersionName,
+      direction,
       issuerId,
       issuerName,
       receiverId,
