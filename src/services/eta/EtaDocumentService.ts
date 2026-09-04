@@ -176,10 +176,9 @@ export class EtaDocumentService {
     const dirParam = params.direction?.trim();
     if (dirParam && dirParam.toLowerCase() !== 'all') {
       query.set('direction', dirParam);
-    } else if (!params.direction) {
-      // Default to Received if direction not specified
-      query.set('direction', 'Received');
     }
+    // Note: When direction is 'all' or omitted, we do NOT pass 'direction' to ETA.
+    // Official ETA Search API returns BOTH Received and Sent documents in a single request.
 
     if (params.documentType?.trim() && params.documentType.trim().toLowerCase() !== 'all') {
       query.set('documentType', params.documentType.trim());
@@ -357,70 +356,63 @@ export class EtaDocumentService {
     };
 
     if (targetYear === 'all') {
-      // Dynamically scan from currentYear down to 2020 (when official ETA e-invoicing launched in Egypt)
-      for (let yr = currentYear; yr >= 2020; yr--) {
+      // Dynamically scan from currentYear down to 2022 (when company records began on ETA)
+      for (let yr = currentYear; yr >= 2022; yr--) {
         const startMonth = (yr === currentYear) ? new Date().getMonth() + 1 : 12;
-        const endMonth = (yr === 2020) ? 11 : 1;
+        const endMonth = 1;
         addYearWindows(yr, startMonth, endMonth);
       }
     } else {
-      // Single specific year (e.g. 2027, 2026, 2025, 2024, 2023, 2022, 2021, 2020)
+      // Single specific year (e.g. 2027, 2026, 2025, 2024, 2023, 2022)
       const yr = Number(targetYear) || currentYear;
       const startMonth = (yr === currentYear) ? new Date().getMonth() + 1 : 12;
-      const endMonth = (yr === 2020) ? 11 : 1; // ETA started in Nov 2020
+      const endMonth = 1;
       addYearWindows(yr, startMonth, endMonth);
     }
 
     const docMap = new Map<string, EtaReceivedInvoiceDTO>();
 
-    // Determine directions to query: if 'all' or not specified, fetch both Received and Sent
-    const fetchDirections: ('Received' | 'Sent')[] =
-      !options.direction || options.direction.toLowerCase() === 'all'
-        ? ['Received', 'Sent']
-        : options.direction === 'Sent'
-        ? ['Sent']
-        : ['Received'];
+    // If direction is specific ('Received' or 'Sent'), pass it. Otherwise leave undefined to get BOTH in 1 query.
+    const queryDirection =
+      options.direction && options.direction.toLowerCase() !== 'all'
+        ? options.direction
+        : undefined;
 
     for (const win of windows) {
-      for (const dir of fetchDirections) {
-        let continuationToken: string | undefined = undefined;
-        let hasMore = true;
+      let continuationToken: string | undefined = undefined;
+      let hasMore = true;
 
-        while (hasMore) {
-          try {
-            const res = await this.searchReceivedInvoices(companyId, {
-              issueDateFrom: win.from,
-              issueDateTo: win.to,
-              direction: dir,
-              documentType: options.documentType,
-              status: options.status,
-              continuationToken,
-              pageSize: 100
-            });
+      while (hasMore) {
+        try {
+          const res = await this.searchReceivedInvoices(companyId, {
+            issueDateFrom: win.from,
+            issueDateTo: win.to,
+            direction: queryDirection,
+            documentType: options.documentType,
+            status: options.status,
+            continuationToken,
+            pageSize: 100
+          });
 
-            if (res.data && res.data.length > 0) {
-              for (const doc of res.data) {
-                if (!doc.direction) {
-                  doc.direction = dir;
-                }
-                docMap.set(doc.uuid, doc);
-              }
+          if (res.data && res.data.length > 0) {
+            for (const doc of res.data) {
+              docMap.set(doc.uuid, doc);
             }
-
-            const nextTok = res.pagination?.continuationToken;
-            if (nextTok && nextTok !== 'EndofResultSet' && nextTok !== continuationToken) {
-              continuationToken = nextTok;
-            } else {
-              hasMore = false;
-            }
-          } catch (err: any) {
-            console.warn(`[ETA Multi-Period Fetch] Window ${win.from} - ${win.to} (${dir}) skipped:`, err?.message || err);
-            hasMore = false;
           }
 
-          // Safe pause between calls to respect ETA's 2 req/sec rate limit
-          await new Promise(resolve => setTimeout(resolve, 300));
+          const nextTok = res.pagination?.continuationToken;
+          if (nextTok && nextTok !== 'EndofResultSet' && nextTok !== continuationToken) {
+            continuationToken = nextTok;
+          } else {
+            hasMore = false;
+          }
+        } catch (err: any) {
+          console.warn(`[ETA Multi-Period Fetch] Window ${win.from} - ${win.to} skipped:`, err?.message || err);
+          hasMore = false;
         }
+
+        // 180ms delay between calls completes ~57 windows in ~17 seconds, well under Nginx 60s timeout
+        await new Promise(resolve => setTimeout(resolve, 180));
       }
     }
 
