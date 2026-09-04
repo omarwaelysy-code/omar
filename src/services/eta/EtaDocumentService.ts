@@ -287,11 +287,6 @@ export class EtaDocumentService {
     };
   }
 
-  /**
-   * Fetch all documents across multi-month periods (Auto-Chunked Full Sync)
-   */
-  private static portalCache: Map<string, { timestamp: number; data: EtaReceivedInvoiceDTO[] }> = new Map();
-  private static CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache
 
   /**
    * Load saved ETA documents from PostgreSQL eta_documents table
