@@ -99,6 +99,7 @@ export const pageLabels: { [key: string]: string } = {
   'pos_connected_branches': 'الفروع المتصلة',
   'pos_branch_linking': 'ربط الفرع',
   'eta_received_invoices': 'الوثائق الإلكترونية',
+  'eta_detailed_invoices': 'الوثائق الإلكترونية بالتفصيل',
 };
 
 export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

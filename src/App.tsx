@@ -68,6 +68,7 @@ const BalanceSheet = React.lazy(() => import('./pages/BalanceSheet').then(m => (
 const PosBranchLinking = React.lazy(() => import('./pages/PosBranchLinking').then(m => ({ default: m.PosBranchLinking })));
 const PosConnectedBranches = React.lazy(() => import('./pages/PosConnectedBranches').then(m => ({ default: m.PosConnectedBranches })));
 const EtaReceivedInvoices = React.lazy(() => import('./pages/EtaReceivedInvoices').then(m => ({ default: m.EtaReceivedInvoices })));
+const EtaDetailedInvoices = React.lazy(() => import('./pages/EtaDetailedInvoices').then(m => ({ default: m.EtaDetailedInvoices })));
 
 import { useNavigation } from './contexts/NavigationContext';
 import { useLanguage } from './contexts/LanguageContext';
@@ -280,6 +281,7 @@ export default function App() {
       case 'pos_connected_branches': return <PosConnectedBranches />;
       case 'pos_branch_linking': return <PosBranchLinking />;
       case 'eta_received_invoices': return <EtaReceivedInvoices />;
+      case 'eta_detailed_invoices': return <EtaDetailedInvoices />;
       default: return <Dashboard />;
     }
   }

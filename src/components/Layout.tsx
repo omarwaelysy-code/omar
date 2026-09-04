@@ -125,6 +125,7 @@ const getTabIcon = (id: string) => {
     case 'goods_receipts': return <PackageCheck {...iconProps} />;
     case 'receipts':
     case 'eta_received_invoices':
+    case 'eta_detailed_invoices':
       return <Receipt {...iconProps} />;
     case 'operations': return <List {...iconProps} />;
     case 'departments':
@@ -523,6 +524,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             id: 'eta_received_invoices', 
             label: language === 'ar' ? 'الوثائق الإلكترونية' : 'Electronic Documents', 
             icon: ArrowDownToLine 
+          },
+          { 
+            id: 'eta_detailed_invoices', 
+            label: language === 'ar' ? 'الوثائق الإلكترونية بالتفصيل' : 'Detailed Electronic Documents', 
+            icon: Layers 
           }
         ]
       }] : []),
@@ -693,7 +699,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       if (item.subItems) {
         const visibleSubItems = (item.subItems as any[]).filter((sub: any) => {
           if (sub.isDivider || sub.isHeader) return true;
-          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking' || sub.id === 'pos_connected_branches' || sub.id === 'eta_received_invoices') return true;
+          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking' || sub.id === 'pos_connected_branches' || sub.id === 'eta_received_invoices' || sub.id === 'eta_detailed_invoices') return true;
           return hasPermission(sub.id, 'view');
         });
         

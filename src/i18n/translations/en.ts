@@ -193,6 +193,7 @@ export const en = {
   'nav.operation_fields': 'Data Fields',
   'nav.eta_menu': 'ETA',
   'nav.eta_received_invoices': 'Received Electronic Invoices',
+  'nav.eta_detailed_invoices': 'Detailed Electronic Documents',
 
   // Operations System
   'operations.title': 'Operations System',

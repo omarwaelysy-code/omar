@@ -80,6 +80,36 @@ export interface EtaSearchDocumentsResponse {
   };
 }
 
+export interface EtaDetailedInvoiceLineDTO {
+  rowKey: string;
+  uuid: string;
+  internalId: string;
+  direction: 'Sent' | 'Received';
+  typeName: string;
+  documentTypeName: string;
+  partnerName: string;
+  taxId: string;
+  address: string;
+  dateTimeIssued: string;
+  dateTimeReceived: string;
+  currency: string;
+  status: string;
+  longId?: string;
+
+  // Item details
+  itemCodeName: string;
+  itemCode: string;
+  itemType: string;
+  description: string;
+  quantity: number;
+  unitType: string;
+  unitPrice: number;
+  salesTotal: number;
+  discountAmount: number;
+  taxAmount: number;
+  lineTotal: number;
+}
+
 export class EtaDocumentService {
   // Official ETA API Base URLs
   public static readonly PREPROD_API_URL = 'https://api.preprod.invoicing.eta.gov.eg';
@@ -593,6 +623,188 @@ export class EtaDocumentService {
       totalCount: allDocs.length,
       lastSyncedAt: nowIso,
       syncedCount: savedCount
+    };
+  }
+
+  private static isEnrichingDetails = false;
+
+  /**
+   * Enrich document lines in background with ETA rate limit awareness
+   */
+  public static async enrichDocumentsDetailsInBackground(companyId: string, uuids: string[]): Promise<void> {
+    if (this.isEnrichingDetails || !uuids || uuids.length === 0) return;
+    this.isEnrichingDetails = true;
+    try {
+      for (const uuid of uuids.slice(0, 40)) {
+        try {
+          await this.getDocumentDetails(companyId, uuid);
+        } catch {}
+        await new Promise(r => setTimeout(r, 600)); // Respect ETA rate limits (2 req/sec)
+      }
+    } finally {
+      this.isEnrichingDetails = false;
+    }
+  }
+
+  /**
+   * Fetch flattened detailed invoice lines across all documents
+   */
+  public static async getDetailedDocumentLines(
+    companyId: string,
+    options: {
+      year?: string;
+      direction?: string;
+      documentType?: string;
+      status?: string;
+      forceRefresh?: boolean;
+    } = {}
+  ): Promise<{
+    success: boolean;
+    isConfigured: boolean;
+    environment: 'preprod' | 'production';
+    data: EtaDetailedInvoiceLineDTO[];
+    totalCount: number;
+    lastSyncedAt?: string | null;
+  }> {
+    const settings = await this.getCompanySettings(companyId);
+    if (!settings || !settings.isConfigured) {
+      return {
+        success: false,
+        isConfigured: false,
+        environment: settings?.environment || 'preprod',
+        data: [],
+        totalCount: 0
+      };
+    }
+
+    // If forceRefresh requested or DB empty, sync from ETA
+    if (options.forceRefresh) {
+      await this.fetchAllDocuments(companyId, { forceRefresh: true });
+    } else {
+      const existing = await pool.query(`SELECT count(1) FROM eta_documents WHERE company_id = $1`, [companyId]);
+      if (Number(existing.rows[0]?.count || 0) === 0) {
+        await this.fetchAllDocuments(companyId, { forceRefresh: false });
+      }
+    }
+
+    const res = await pool.query(
+      `SELECT * FROM eta_documents WHERE company_id = $1 ORDER BY date_time_issued DESC`,
+      [companyId]
+    );
+
+    let lastSyncedAt: string | null = null;
+    const lines: EtaDetailedInvoiceLineDTO[] = [];
+    const missingLineDocUuids: string[] = [];
+
+    for (const row of res.rows) {
+      if (!lastSyncedAt && row.last_synced_at) {
+        lastSyncedAt = new Date(row.last_synced_at).toISOString();
+      }
+
+      let rawDataObj: any = null;
+      if (row.raw_data) {
+        try {
+          rawDataObj = typeof row.raw_data === 'string' ? JSON.parse(row.raw_data) : row.raw_data;
+        } catch {}
+      }
+
+      const partnerName = row.direction === 'Sent'
+        ? (row.receiver_name || row.issuer_name || 'عميل غير محدد')
+        : (row.issuer_name || row.receiver_name || 'مورد غير محدد');
+
+      const taxId = row.direction === 'Sent'
+        ? (row.receiver_id || row.issuer_id || '-')
+        : (row.issuer_id || row.receiver_id || '-');
+
+      const address = (row.direction === 'Sent' ? row.receiver_address : row.issuer_address) ||
+        row.issuer_address ||
+        row.receiver_address ||
+        '-';
+
+      const baseDocInfo = {
+        uuid: row.uuid,
+        internalId: row.internal_id,
+        direction: (row.direction || 'Received') as 'Sent' | 'Received',
+        typeName: row.type_name || 'I',
+        documentTypeName: row.document_type_name || 'فاتورة',
+        partnerName,
+        taxId,
+        address,
+        dateTimeIssued: row.date_time_issued ? new Date(row.date_time_issued).toISOString() : '',
+        dateTimeReceived: row.date_time_received ? new Date(row.date_time_received).toISOString() : '',
+        currency: row.currency || 'EGP',
+        status: row.status || 'Valid',
+        longId: row.long_id || undefined
+      };
+
+      const rawLines: any[] = Array.isArray(rawDataObj?.invoiceLines)
+        ? rawDataObj.invoiceLines
+        : (Array.isArray(rawDataObj?.details?.invoiceLines)
+            ? rawDataObj.details.invoiceLines
+            : (Array.isArray(rawDataObj?.rawDocument?.invoiceLines) ? rawDataObj.rawDocument.invoiceLines : []));
+
+      if (rawLines.length > 0) {
+        rawLines.forEach((l, idx) => {
+          const itemCodeName = l.itemCodeName || l.itemPrimaryName || l.itemSecondaryName || '---';
+          const itemCode = l.itemCode || '---';
+          const itemType = l.itemType || 'EGS';
+          const description = l.description || l.itemPrimaryName || '---';
+          const quantity = Number(l.quantity ?? 1);
+          const unitType = l.unitType || '';
+          const unitPrice = Number(l.unitPrice ?? (l.unitValue?.amountEGP || l.unitValue?.amountSold || 0));
+          const salesTotal = Number(l.salesTotal ?? (quantity * unitPrice));
+          const discountAmount = Number(l.discountAmount ?? (l.itemsDiscount || l.discount?.amount || 0));
+          const taxAmount = Number(l.taxAmount ?? (Array.isArray(l.taxesList) ? l.taxesList.reduce((s: number, t: any) => s + (Number(t.amount) || 0), 0) : 0));
+          const lineTotal = Number(l.lineTotal ?? l.total ?? (salesTotal - discountAmount + taxAmount));
+
+          lines.push({
+            ...baseDocInfo,
+            rowKey: `${row.uuid}_${idx}`,
+            itemCodeName,
+            itemCode,
+            itemType,
+            description,
+            quantity,
+            unitType,
+            unitPrice,
+            salesTotal,
+            discountAmount,
+            taxAmount,
+            lineTotal
+          });
+        });
+      } else {
+        missingLineDocUuids.push(row.uuid);
+        // Fallback: 1 line with document totals until full details are enriched
+        lines.push({
+          ...baseDocInfo,
+          rowKey: `${row.uuid}_0`,
+          itemCodeName: '---',
+          itemCode: '---',
+          itemType: 'EGS',
+          description: row.document_type_name || 'فاتورة إلكترونية',
+          quantity: 1,
+          unitType: '',
+          unitPrice: Number(row.net_amount || 0),
+          salesTotal: Number(row.total_sales_amount || row.net_amount || 0),
+          discountAmount: Number(row.total_discount_amount || 0),
+          taxAmount: Number(row.tax_amount || 0),
+          lineTotal: Number(row.total_amount || 0)
+        });
+      }
+    }
+
+    if (missingLineDocUuids.length > 0) {
+      this.enrichDocumentsDetailsInBackground(companyId, missingLineDocUuids).catch(() => {});
+    }
+
+    return {
+      success: true,
+      isConfigured: true,
+      environment: settings.environment,
+      data: lines,
+      totalCount: lines.length,
+      lastSyncedAt
     };
   }
 

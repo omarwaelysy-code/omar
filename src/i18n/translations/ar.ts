@@ -193,6 +193,7 @@ export const ar = {
   'nav.operation_fields': 'حقول البيانات',
   'nav.eta_menu': 'ETA',
   'nav.eta_received_invoices': 'الوثائق الإلكترونية',
+  'nav.eta_detailed_invoices': 'الوثائق الإلكترونية بالتفصيل',
 
   // Operations System
   'operations.title': 'نظام العمليات',
