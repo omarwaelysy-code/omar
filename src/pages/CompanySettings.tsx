@@ -622,9 +622,11 @@ export function CompanySettings() {
           setEtaSettings(prev => ({
             ...prev,
             ...etaRes.data,
-            client_secret: '',
-            client_secret_configured: Boolean(etaRes.data.client_secret_configured),
-            is_configured: Boolean(etaRes.data.is_configured)
+            client_secret: etaSettings.client_secret || '',
+            client_secret_configured: Boolean(etaRes.data.client_secret_configured || etaSettings.client_secret),
+            operating_key: etaSettings.operating_key || '',
+            operating_key_configured: Boolean(etaRes.data.operating_key_configured || etaSettings.operating_key),
+            is_configured: Boolean(etaRes.data.is_configured || (etaRes.data.client_id && (etaRes.data.client_secret_configured || etaSettings.client_secret)))
           }));
         }
       } catch (e) {
@@ -1605,6 +1607,46 @@ export function CompanySettings() {
                   : (etaSettings.is_configured ? 'Configured' : 'Incomplete')}
               </span>
             </div>
+          </div>
+
+          {/* Active Company Indicator Banner */}
+          <div className="bg-gradient-to-r from-slate-50 via-indigo-50/40 to-slate-50 border border-indigo-100 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-sm flex-shrink-0">
+                <Building2 className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-semibold text-slate-500">
+                    {language === 'ar' ? 'الشركة الحالية الخاضعة للربط:' : 'Currently active company:'}
+                  </span>
+                  <span className="text-sm font-black text-indigo-900 bg-white px-2.5 py-0.5 rounded-lg border border-indigo-200 shadow-sm">
+                    {data.name || (language === 'ar' ? 'الشركة الحالية' : 'Current Company')}
+                  </span>
+                  {data.tax_number && (
+                    <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                      {language === 'ar' ? `رقم ضريبي: ${data.tax_number}` : `Tax ID: ${data.tax_number}`}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  {language === 'ar' 
+                    ? '⚠️ إعدادات ومفاتيح الربط مستقلة تماماً لكل شركة بحسب ملفها الضريبي. لإدارة شركة أخرى، اخترها من قائمة الشركات أعلى الشاشة.'
+                    : 'Important: ETA credentials are independent per company. To manage another company, switch from the top navbar.'}
+                </p>
+              </div>
+            </div>
+            {etaSettings.is_configured ? (
+              <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-xl flex items-center gap-1.5 flex-shrink-0">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                {language === 'ar' ? 'مفاتيح الربط محفوظة' : 'Credentials Configured'}
+              </span>
+            ) : (
+              <span className="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1 rounded-xl flex items-center gap-1.5 flex-shrink-0">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                {language === 'ar' ? 'غير مربوطة بـ ETA بعد' : 'Not Configured Yet'}
+              </span>
+            )}
           </div>
 
           {/* Environment Selector */}

@@ -11236,24 +11236,38 @@ router.post(['/company/eta-settings', '/eta/settings'], authenticateToken, async
   const validEnvironment = environment === 'production' ? 'production' : 'preprod';
 
   try {
-    // 1. Fetch existing settings to preserve secret/operating key if not provided or masked
+    // 1. Fetch existing settings to preserve client_id / secret / operating key if not provided
     const existingRes = await pool.query(
-      'SELECT id, client_secret, operating_key FROM eta_settings WHERE company_id = $1',
+      'SELECT id, client_id, client_secret, operating_key FROM eta_settings WHERE company_id = $1',
       [companyId]
     );
 
     const existingRow = existingRes.rows[0] || null;
+    const existingClientId = existingRow?.client_id || '';
     const existingSecret = existingRow?.client_secret || '';
     const existingOperatingKey = existingRow?.operating_key || '';
+
+    let clientIdToSave = existingClientId;
+    if (client_id !== undefined && client_id !== null) {
+      if (typeof client_id === 'string' && client_id.trim() !== '') {
+        clientIdToSave = client_id.trim();
+      } else if (req.body?.clear_credentials === true) {
+        clientIdToSave = '';
+      }
+    }
 
     let secretToSave = existingSecret;
     if (typeof client_secret === 'string' && client_secret.trim() !== '' && !client_secret.includes('••••')) {
       secretToSave = client_secret.trim();
+    } else if (req.body?.clear_credentials === true) {
+      secretToSave = '';
     }
 
     let operatingKeyToSave = existingOperatingKey;
     if (typeof operating_key === 'string' && operating_key.trim() !== '' && !operating_key.includes('••••')) {
       operatingKeyToSave = operating_key.trim();
+    } else if (req.body?.clear_credentials === true) {
+      operatingKeyToSave = '';
     }
 
     const cleanActivityCode = String(activity_code || '').trim();
@@ -11264,7 +11278,7 @@ router.post(['/company/eta-settings', '/eta/settings'], authenticateToken, async
     const cleanStreet = String(street || '').trim();
     const cleanBuildingNumber = String(building_number || '').trim();
     const cleanPostalCode = String(postal_code || '').trim();
-    const cleanClientId = String(client_id || '').trim();
+    const cleanClientId = clientIdToSave;
 
     // Determine if configuration has minimum required credentials to operate with ETA
     const isConfigured = Boolean(
