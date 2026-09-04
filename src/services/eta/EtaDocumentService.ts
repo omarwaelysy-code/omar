@@ -477,31 +477,90 @@ export class EtaDocumentService {
         },
         signal: controller.signal
       });
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
+        clearTimeout(timeoutId);
         this.handleEtaHttpError(response.status);
       }
 
       const data = await response.json();
 
+      // Fetch raw document in parallel or fallback to get invoice lines, items and taxes
+      let rawDoc: any = null;
+      try {
+        const rawUrl = `${this.getApiBaseUrl(environment)}/api/v1.0/documents/${encodeURIComponent(documentUuid)}/raw`;
+        const rawRes = await fetch(rawUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Accept-Language': 'ar'
+          },
+          signal: controller.signal
+        });
+        if (rawRes.ok) {
+          rawDoc = await rawRes.json();
+        }
+      } catch (rawErr) {
+        console.warn('Could not fetch raw document from ETA:', rawErr);
+      }
+
+      clearTimeout(timeoutId);
+
+      // Construct portal share URL matching ETA specifications
+      const portalHost = environment === 'production' ? 'invoicing.eta.gov.eg' : 'preprod.invoicing.eta.gov.eg';
+      const longId = data?.longId || data?.document?.longId || rawDoc?.longId;
+      const shareUrl =
+        data?.publicUrl ||
+        (longId
+          ? `https://${portalHost}/documents/${encodeURIComponent(documentUuid)}/share/${longId}`
+          : `https://${portalHost}/documents/${encodeURIComponent(documentUuid)}`);
+
       // Automatically cache partner addresses learned from full document details
-      if (data?.issuer) {
+      if (data?.issuer || rawDoc?.issuer) {
+        const issuer = data?.issuer || rawDoc?.issuer;
         await this.savePartnerAddress({
-          taxNumber: data.issuer.id,
-          name: data.issuer.name,
-          addressObj: data.issuer.address
+          taxNumber: issuer.id,
+          name: issuer.name,
+          addressObj: issuer.address
         });
       }
-      if (data?.receiver) {
+      if (data?.receiver || rawDoc?.receiver) {
+        const receiver = data?.receiver || rawDoc?.receiver;
         await this.savePartnerAddress({
-          taxNumber: data.receiver.id,
-          name: data.receiver.name,
-          addressObj: data.receiver.address
+          taxNumber: receiver.id,
+          name: receiver.name,
+          addressObj: receiver.address
         });
       }
 
-      return { success: true, data };
+      const mergedData = {
+        ...rawDoc,
+        ...data,
+        rawDocument: rawDoc,
+        details: data,
+        uuid: documentUuid,
+        longId: longId || undefined,
+        shareUrl,
+        publicUrl: shareUrl,
+        environment,
+        portalHost,
+        invoiceLines: data?.invoiceLines || data?.document?.invoiceLines || rawDoc?.invoiceLines || [],
+        taxTotals: data?.taxTotals || data?.document?.taxTotals || rawDoc?.taxTotals || [],
+        signatures: data?.signatures || data?.document?.signatures || rawDoc?.signatures || [],
+        taxpayerActivityCode:
+          data?.taxpayerActivityCode ||
+          rawDoc?.taxpayerActivityCode ||
+          data?.issuer?.activityCode ||
+          rawDoc?.issuer?.activityCode,
+        totalSalesAmount: data?.totalSalesAmount ?? data?.totalSales ?? rawDoc?.totalSalesAmount ?? 0,
+        totalDiscountAmount: data?.totalDiscountAmount ?? data?.totalDiscount ?? rawDoc?.totalDiscountAmount ?? 0,
+        netAmount: data?.netAmount ?? rawDoc?.netAmount ?? 0,
+        totalAmount: data?.totalAmount ?? data?.total ?? rawDoc?.totalAmount ?? 0,
+        extraDiscountAmount: data?.extraDiscountAmount ?? rawDoc?.extraDiscountAmount ?? 0
+      };
+
+      return { success: true, data: mergedData };
     } catch (err: any) {
       clearTimeout(timeoutId);
       if (err.name === 'AbortError') {
@@ -509,6 +568,60 @@ export class EtaDocumentService {
         (timeoutErr as any).statusCode = 504;
         throw timeoutErr;
       }
+      throw err;
+    }
+  }
+
+  /**
+   * Get Document PDF stream from ETA
+   */
+  public static async getDocumentPdf(
+    companyId: string,
+    documentUuid: string
+  ): Promise<{ buffer: Buffer; contentType: string; filename: string }> {
+    const settings = await this.getCompanySettings(companyId);
+    if (!settings || !settings.isConfigured) {
+      const err = new Error('لم يتم إعداد الربط مع منظومة ETA لهذه الشركة.');
+      (err as any).statusCode = 400;
+      throw err;
+    }
+
+    const { environment, clientId, clientSecret } = settings;
+    const token = await EtaAuthService.getValidAccessToken({
+      companyId,
+      environment,
+      clientId,
+      clientSecret
+    });
+
+    const pdfUrl = `${this.getApiBaseUrl(environment)}/api/v1.0/documents/${encodeURIComponent(documentUuid)}/pdf`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+    try {
+      const response = await fetch(pdfUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/pdf, application/json'
+        },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        this.handleEtaHttpError(response.status);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      return {
+        buffer,
+        contentType: response.headers.get('content-type') || 'application/pdf',
+        filename: `ETA_Invoice_${documentUuid}.pdf`
+      };
+    } catch (err: any) {
+      clearTimeout(timeoutId);
       throw err;
     }
   }

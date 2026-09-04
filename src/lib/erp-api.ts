@@ -11637,5 +11637,32 @@ router.get('/eta/invoices/:uuid/details', authenticateToken, async (req: AuthReq
   }
 });
 
+// GET /api/erp/eta/invoices/:uuid/pdf
+router.get('/eta/invoices/:uuid/pdf', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  if (!companyId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const { uuid } = req.params;
+    if (!uuid) {
+      return res.status(400).json({ error: 'معرف الفاتورة (UUID) مطلوب.' });
+    }
+
+    const pdfResult = await EtaDocumentService.getDocumentPdf(companyId, uuid);
+    res.setHeader('Content-Type', pdfResult.contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${pdfResult.filename}"`);
+    res.send(pdfResult.buffer);
+  } catch (err: any) {
+    console.error('Error fetching ETA invoice PDF:', err.message || err);
+    res.status(err.statusCode || 500).json({
+      success: false,
+      error: err.message || 'تعذر تحميل ملف PDF من منظومة مصلحة الضرائب المصرية.',
+      code: err.code || 'ETA_ERROR'
+    });
+  }
+});
+
 export default router;
 
