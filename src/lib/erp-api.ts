@@ -11247,27 +11247,27 @@ router.post(['/company/eta-settings', '/eta/settings'], authenticateToken, async
     const existingSecret = existingRow?.client_secret || '';
     const existingOperatingKey = existingRow?.operating_key || '';
 
+    const isGeneralSave = Boolean(req.body?.is_general_save);
+    const isClearRequested = Boolean(req.body?.clear_credentials) || (!isGeneralSave && (client_id === '' || client_id === null));
+
     let clientIdToSave = existingClientId;
-    if (client_id !== undefined && client_id !== null) {
+    let secretToSave = existingSecret;
+    let operatingKeyToSave = existingOperatingKey;
+
+    if (isClearRequested) {
+      clientIdToSave = '';
+      secretToSave = '';
+      operatingKeyToSave = '';
+    } else {
       if (typeof client_id === 'string' && client_id.trim() !== '') {
         clientIdToSave = client_id.trim();
-      } else if (req.body?.clear_credentials === true) {
-        clientIdToSave = '';
       }
-    }
-
-    let secretToSave = existingSecret;
-    if (typeof client_secret === 'string' && client_secret.trim() !== '' && !client_secret.includes('••••')) {
-      secretToSave = client_secret.trim();
-    } else if (req.body?.clear_credentials === true) {
-      secretToSave = '';
-    }
-
-    let operatingKeyToSave = existingOperatingKey;
-    if (typeof operating_key === 'string' && operating_key.trim() !== '' && !operating_key.includes('••••')) {
-      operatingKeyToSave = operating_key.trim();
-    } else if (req.body?.clear_credentials === true) {
-      operatingKeyToSave = '';
+      if (typeof client_secret === 'string' && client_secret.trim() !== '' && !client_secret.includes('••••')) {
+        secretToSave = client_secret.trim();
+      }
+      if (typeof operating_key === 'string' && operating_key.trim() !== '' && !operating_key.includes('••••')) {
+        operatingKeyToSave = operating_key.trim();
+      }
     }
 
     const cleanActivityCode = String(activity_code || '').trim();

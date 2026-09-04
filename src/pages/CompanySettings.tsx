@@ -33,7 +33,8 @@ import {
   ExternalLink,
   HelpCircle,
   Info,
-  Sparkles
+  Sparkles,
+  Trash2
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -466,25 +467,48 @@ export function CompanySettings() {
   const handleSaveEtaSettings = async (e?: React.MouseEvent | React.FormEvent) => {
     if (e) e.preventDefault();
     setEtaSaving(true);
+    const isClearing = !etaSettings.client_id || etaSettings.client_id.trim() === '';
     try {
-      const res = await apiRequest<any>('/company/eta-settings', 'POST', etaSettings);
+      const res = await apiRequest<any>('/company/eta-settings', 'POST', {
+        ...etaSettings,
+        clear_credentials: isClearing
+      });
       if (res.success && res.data) {
-        setEtaSettings(prev => ({
-          ...prev,
-          ...res.data,
-          client_id: res.data.client_id || etaSettings.client_id || prev.client_id,
-          client_secret: res.data.client_secret || etaSettings.client_secret || prev.client_secret,
-          client_secret_configured: Boolean(res.data.client_secret_configured || res.data.client_secret || etaSettings.client_secret),
-          operating_key: res.data.operating_key || etaSettings.operating_key || prev.operating_key,
-          operating_key_configured: Boolean(res.data.operating_key_configured || res.data.operating_key || etaSettings.operating_key),
-          is_configured: Boolean(res.data.is_configured || (res.data.client_id && (res.data.client_secret || res.data.client_secret_configured)))
-        }));
-        showNotification(
-          language === 'ar'
-            ? 'تم حفظ إعدادات الفاتورة الإلكترونية بنجاح.'
-            : 'ETA e-invoicing settings saved successfully.',
-          'success'
-        );
+        if (isClearing) {
+          setEtaSettings(prev => ({
+            ...prev,
+            client_id: '',
+            client_secret: '',
+            client_secret_configured: false,
+            operating_key: '',
+            operating_key_configured: false,
+            is_configured: false
+          }));
+          setEtaTestResult(null);
+          showNotification(
+            language === 'ar'
+              ? 'تم تفريغ مفاتيح الربط للشركة بنجاح.'
+              : 'ETA credentials cleared successfully.',
+            'success'
+          );
+        } else {
+          setEtaSettings(prev => ({
+            ...prev,
+            ...res.data,
+            client_id: res.data.client_id || etaSettings.client_id,
+            client_secret: res.data.client_secret || etaSettings.client_secret,
+            client_secret_configured: Boolean(res.data.client_secret_configured || res.data.client_secret || etaSettings.client_secret),
+            operating_key: res.data.operating_key || etaSettings.operating_key,
+            operating_key_configured: Boolean(res.data.operating_key_configured || res.data.operating_key || etaSettings.operating_key),
+            is_configured: Boolean(res.data.is_configured || (res.data.client_id && (res.data.client_secret || res.data.client_secret_configured)))
+          }));
+          showNotification(
+            language === 'ar'
+              ? 'تم حفظ إعدادات الفاتورة الإلكترونية بنجاح.'
+              : 'ETA e-invoicing settings saved successfully.',
+            'success'
+          );
+        }
       } else {
         showNotification(
           language === 'ar'
@@ -498,6 +522,51 @@ export function CompanySettings() {
         language === 'ar'
           ? 'تعذر حفظ إعدادات الفاتورة الإلكترونية.'
           : 'Failed to save ETA e-invoicing settings.',
+        'error'
+      );
+    } finally {
+      setEtaSaving(false);
+    }
+  };
+
+  const handleClearEtaCredentials = async () => {
+    if (!window.confirm(
+      language === 'ar' 
+        ? 'هل أنت متأكد من رغبتك في تفريغ وحذف مفاتيح الربط لهذه الشركة؟' 
+        : 'Are you sure you want to clear credentials for this company?'
+    )) {
+      return;
+    }
+    setEtaSaving(true);
+    try {
+      const res = await apiRequest<any>('/company/eta-settings', 'POST', {
+        ...etaSettings,
+        client_id: '',
+        client_secret: '',
+        operating_key: '',
+        clear_credentials: true
+      });
+      if (res.success) {
+        setEtaSettings(prev => ({
+          ...prev,
+          client_id: '',
+          client_secret: '',
+          client_secret_configured: false,
+          operating_key: '',
+          operating_key_configured: false,
+          is_configured: false
+        }));
+        setEtaTestResult(null);
+        showNotification(
+          language === 'ar'
+            ? 'تم تفريغ مفاتيح الربط للشركة بنجاح.'
+            : 'ETA credentials cleared successfully.',
+          'success'
+        );
+      }
+    } catch (err: any) {
+      showNotification(
+        language === 'ar' ? 'تعذر تفريغ المفاتيح.' : 'Failed to clear credentials.',
         'error'
       );
     } finally {
@@ -618,7 +687,10 @@ export function CompanySettings() {
 
       // Save ETA settings alongside general settings
       try {
-        const etaRes = await apiRequest<any>('/company/eta-settings', 'POST', etaSettings);
+        const etaRes = await apiRequest<any>('/company/eta-settings', 'POST', {
+          ...etaSettings,
+          is_general_save: true
+        });
         if (etaRes.success && etaRes.data) {
           setEtaSettings(prev => ({
             ...prev,
@@ -2106,8 +2178,21 @@ export function CompanySettings() {
               </div>
             </div>
 
-            {/* Save Button for Credentials */}
-            <div className="flex justify-end pt-2">
+            {/* Actions for Step 3: Clear & Save Buttons */}
+            <div className="flex items-center justify-between pt-2">
+              {(etaSettings.client_id || etaSettings.client_secret_configured || etaSettings.client_secret) ? (
+                <button
+                  type="button"
+                  onClick={handleClearEtaCredentials}
+                  disabled={etaSaving || etaTesting}
+                  className="flex items-center gap-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-3.5 py-2 rounded-xl font-bold text-xs transition-all border border-rose-200 active:scale-95 disabled:opacity-50"
+                  title={language === 'ar' ? 'مسح وتفريغ المفاتيح لهذه الشركة' : 'Clear credentials for this company'}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{language === 'ar' ? 'تفريغ وحذف مفاتيح الربط' : 'Clear Credentials'}</span>
+                </button>
+              ) : <div />}
+
               <button
                 type="button"
                 onClick={handleSaveEtaSettings}
