@@ -183,6 +183,10 @@ export function EtaReceivedInvoices() {
   const [dateTo, setDateTo] = useState(defaultDates.to);
   const [statusFilter, setStatusFilter] = useState('all');
   const [docTypeFilter, setDocTypeFilter] = useState('all');
+  const [selectedDocTypes, setSelectedDocTypes] = useState<string[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [showDocTypeDropdown, setShowDocTypeDropdown] = useState(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [directionFilter, setDirectionFilter] = useState<'all' | 'Received' | 'Sent'>('all');
   const [selectedYears, setSelectedYears] = useState<string[]>([]);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
@@ -212,6 +216,20 @@ export function EtaReceivedInvoices() {
     { id: '10', nameAr: 'شهر 10 - أكتوبر', nameEn: 'Month 10 - October' },
     { id: '11', nameAr: 'شهر 11 - نوفمبر', nameEn: 'Month 11 - November' },
     { id: '12', nameAr: 'شهر 12 - ديسمبر', nameEn: 'Month 12 - December' },
+  ], []);
+
+  const DOC_TYPES_LIST = useMemo(() => [
+    { id: 'i', nameAr: 'فاتورة (Invoice)', nameEn: 'Invoice' },
+    { id: 'c', nameAr: 'إشعار دائن (Credit Note)', nameEn: 'Credit Note' },
+    { id: 'd', nameAr: 'إشعار مدين (Debit Note)', nameEn: 'Debit Note' }
+  ], []);
+
+  const STATUSES_LIST = useMemo(() => [
+    { id: 'Valid', nameAr: 'صحيحة (Valid)', nameEn: 'Valid' },
+    { id: 'Invalid', nameAr: 'غير صالحة (Invalid)', nameEn: 'Invalid' },
+    { id: 'Rejected', nameAr: 'مرفوضة (Rejected)', nameEn: 'Rejected' },
+    { id: 'Cancelled', nameAr: 'ملغاة (Cancelled)', nameEn: 'Cancelled' },
+    { id: 'Submitted', nameAr: 'مقدمة (Submitted)', nameEn: 'Submitted' }
   ], []);
 
   // Data & State
@@ -584,6 +602,30 @@ export function EtaReceivedInvoices() {
     return counts;
   }, [allPortalInvoices, selectedYears]);
 
+  // Dynamic counts per document type
+  const docTypeCounts = useMemo(() => {
+    const counts: Record<string, number> = { i: 0, c: 0, d: 0 };
+    const source = viewMode === 'all_portal' ? allPortalInvoices : invoices;
+    for (const inv of source) {
+      if (inv.typeName && counts[inv.typeName] !== undefined) {
+        counts[inv.typeName] = (counts[inv.typeName] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [allPortalInvoices, invoices, viewMode]);
+
+  // Dynamic counts per status
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = { Valid: 0, Invalid: 0, Rejected: 0, Cancelled: 0, Submitted: 0 };
+    const source = viewMode === 'all_portal' ? allPortalInvoices : invoices;
+    for (const inv of source) {
+      if (inv.status && counts[inv.status] !== undefined) {
+        counts[inv.status] = (counts[inv.status] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [allPortalInvoices, invoices, viewMode]);
+
   // List of all system years (future upcoming down to 2020)
   const allSystemYears = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -652,10 +694,14 @@ export function EtaReceivedInvoices() {
     } else if (directionFilter === 'Sent') {
       list = list.filter(inv => inv.direction === 'Sent');
     }
-    if (docTypeFilter !== 'all') {
+    if (selectedDocTypes.length > 0) {
+      list = list.filter(inv => selectedDocTypes.includes(inv.typeName));
+    } else if (docTypeFilter !== 'all') {
       list = list.filter(inv => inv.typeName === docTypeFilter);
     }
-    if (statusFilter !== 'all') {
+    if (selectedStatuses.length > 0) {
+      list = list.filter(inv => selectedStatuses.includes(inv.status));
+    } else if (statusFilter !== 'all') {
       list = list.filter(inv => inv.status === statusFilter);
     }
     if (amountOperator !== 'all') {
@@ -671,7 +717,7 @@ export function EtaReceivedInvoices() {
       (inv.receiverName && inv.receiverName.toLowerCase().includes(q)) ||
       (inv.receiverId && inv.receiverId.toLowerCase().includes(q))
     );
-  }, [allPortalInvoices, selectedYears, selectedMonths, directionFilter, docTypeFilter, statusFilter, amountOperator, matchesAmountFilter, appliedSearch]);
+  }, [allPortalInvoices, selectedYears, selectedMonths, directionFilter, docTypeFilter, statusFilter, selectedDocTypes, selectedStatuses, amountOperator, matchesAmountFilter, appliedSearch]);
 
   const totalPagesAll = Math.ceil(filteredAllInvoices.length / clientPageSize) || 1;
   const paginatedAllInvoices = useMemo(() => {
@@ -682,11 +728,21 @@ export function EtaReceivedInvoices() {
   // Period mode invoices with client-side amount filtering applied
   const filteredPeriodInvoices = useMemo(() => {
     let list = invoices;
+    if (selectedDocTypes.length > 0) {
+      list = list.filter(inv => selectedDocTypes.includes(inv.typeName));
+    } else if (docTypeFilter !== 'all') {
+      list = list.filter(inv => inv.typeName === docTypeFilter);
+    }
+    if (selectedStatuses.length > 0) {
+      list = list.filter(inv => selectedStatuses.includes(inv.status));
+    } else if (statusFilter !== 'all') {
+      list = list.filter(inv => inv.status === statusFilter);
+    }
     if (amountOperator !== 'all') {
       list = list.filter(matchesAmountFilter);
     }
     return list;
-  }, [invoices, amountOperator, matchesAmountFilter]);
+  }, [invoices, selectedDocTypes, selectedStatuses, docTypeFilter, statusFilter, amountOperator, matchesAmountFilter]);
 
   const currentDisplayInvoices = useMemo(() => {
     return viewMode === 'all_portal' ? paginatedAllInvoices : filteredPeriodInvoices;
@@ -763,7 +819,9 @@ export function EtaReceivedInvoices() {
       if (directionFilter !== 'all') {
         queryParams.set('direction', directionFilter);
       }
-      if (docTypeFilter && docTypeFilter !== 'all') {
+      if (selectedDocTypes.length === 1) {
+        queryParams.set('documentType', selectedDocTypes[0]);
+      } else if (docTypeFilter && docTypeFilter !== 'all') {
         queryParams.set('documentType', docTypeFilter);
       }
 
@@ -773,7 +831,9 @@ export function EtaReceivedInvoices() {
       if (dateTo) {
         queryParams.set('issueDateTo', `${dateTo}T23:59:59Z`);
       }
-      if (statusFilter && statusFilter !== 'all') {
+      if (selectedStatuses.length === 1) {
+        queryParams.set('status', selectedStatuses[0]);
+      } else if (statusFilter && statusFilter !== 'all') {
         queryParams.set('status', statusFilter);
       }
       if (token) {
@@ -853,7 +913,7 @@ export function EtaReceivedInvoices() {
       setPageNumber(1);
       fetchInvoices(undefined, false);
     }
-  }, [viewMode, dateFrom, dateTo, statusFilter, docTypeFilter, directionFilter, appliedSearch, fetchInvoices]);
+  }, [viewMode, dateFrom, dateTo, statusFilter, docTypeFilter, selectedDocTypes, selectedStatuses, directionFilter, appliedSearch, fetchInvoices]);
 
   const handleRefresh = () => {
     if (viewMode === 'all_portal') {
@@ -1127,6 +1187,230 @@ export function EtaReceivedInvoices() {
   const formatCurrency = (val: number, curr = 'EGP') => {
     const num = Number(val) || 0;
     return `${num.toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${curr}`;
+  };
+
+  const renderDocTypeFilter = () => {
+    const isFiltered = selectedDocTypes.length > 0 || docTypeFilter !== 'all';
+    return (
+      <div className="relative">
+        <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center justify-between">
+          <span className="flex items-center gap-1.5">
+            <Receipt className="w-3.5 h-3.5 text-indigo-600" />
+            <span>{language === 'ar' ? 'نوع الوثيقة' : 'Document Type'}</span>
+          </span>
+          {isFiltered && (
+            <button
+              type="button"
+              onClick={() => { setSelectedDocTypes([]); setDocTypeFilter('all'); setClientPage(1); }}
+              className="text-[10px] text-indigo-600 hover:underline font-bold cursor-pointer"
+            >
+              {language === 'ar' ? 'إعادة تعيين' : 'Reset'}
+            </button>
+          )}
+        </label>
+
+        <button
+          type="button"
+          onClick={() => {
+            setShowDocTypeDropdown(p => !p);
+            setShowStatusDropdown(false);
+            setShowYearDropdown(false);
+            setShowMonthDropdown(false);
+          }}
+          className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-50 hover:bg-white border border-slate-200 focus:border-indigo-500 text-xs md:text-sm font-semibold text-slate-800 transition-all text-start cursor-pointer"
+        >
+          <span className="truncate">
+            {selectedDocTypes.length === 0
+              ? (docTypeFilter !== 'all'
+                  ? (DOC_TYPES_LIST.find(x => x.id === docTypeFilter)?.[language === 'ar' ? 'nameAr' : 'nameEn'] || docTypeFilter)
+                  : (language === 'ar' ? 'الكل (فواتير وإشعارات)' : 'All Documents'))
+              : selectedDocTypes.length === 1
+              ? (() => {
+                  const dt = DOC_TYPES_LIST.find(x => x.id === selectedDocTypes[0]);
+                  return language === 'ar' ? dt?.nameAr : dt?.nameEn;
+                })()
+              : (language === 'ar' ? `${selectedDocTypes.length} أنواع محددة` : `${selectedDocTypes.length} Types Selected`)}
+          </span>
+          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showDocTypeDropdown ? 'rotate-180' : ''}`} />
+        </button>
+
+        {showDocTypeDropdown && (
+          <>
+            <div className="fixed inset-0 z-20" onClick={() => setShowDocTypeDropdown(false)} />
+            <div className="absolute top-full right-0 mt-1.5 w-72 bg-white rounded-2xl border border-slate-200 shadow-xl z-30 p-2 space-y-1 max-h-72 overflow-y-auto">
+              <div className="flex items-center justify-between pb-2 mb-1 border-b border-slate-100 px-2 pt-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => { setSelectedDocTypes([]); setDocTypeFilter('all'); setClientPage(1); }}
+                  className={`font-bold cursor-pointer ${selectedDocTypes.length === 0 && docTypeFilter === 'all' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
+                >
+                  {language === 'ar' ? 'تحديد كافة الأنواع' : 'Select All Types'}
+                </button>
+                {isFiltered && (
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedDocTypes([]); setDocTypeFilter('all'); setClientPage(1); }}
+                    className="text-[11px] text-rose-500 hover:underline font-semibold cursor-pointer"
+                  >
+                    {language === 'ar' ? 'مسح' : 'Clear'}
+                  </button>
+                )}
+              </div>
+
+              {DOC_TYPES_LIST.map(dt => {
+                const count = docTypeCounts[dt.id] || 0;
+                const isChecked = selectedDocTypes.length > 0 ? selectedDocTypes.includes(dt.id) : (docTypeFilter === dt.id);
+                return (
+                  <label
+                    key={dt.id}
+                    className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-50 cursor-pointer text-xs select-none transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          let newSelected = selectedDocTypes.length > 0
+                            ? [...selectedDocTypes]
+                            : (docTypeFilter !== 'all' ? [docTypeFilter] : []);
+                          if (e.target.checked) {
+                            if (!newSelected.includes(dt.id)) newSelected.push(dt.id);
+                          } else {
+                            newSelected = newSelected.filter(x => x !== dt.id);
+                          }
+                          setSelectedDocTypes(newSelected);
+                          setDocTypeFilter(newSelected.length === 1 ? newSelected[0] : 'all');
+                          setClientPage(1);
+                        }}
+                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                      />
+                      <span className="font-semibold text-slate-800">{language === 'ar' ? dt.nameAr : dt.nameEn}</span>
+                    </div>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
+                      count > 0 ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-400'
+                    }`}>
+                      {count} {language === 'ar' ? 'وثيقة' : (count === 1 ? 'doc' : 'docs')}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const renderStatusFilter = () => {
+    const isFiltered = selectedStatuses.length > 0 || statusFilter !== 'all';
+    return (
+      <div className="relative">
+        <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center justify-between">
+          <span className="flex items-center gap-1.5">
+            <Filter className="w-3.5 h-3.5 text-indigo-600" />
+            <span>{language === 'ar' ? 'حالة الفاتورة' : 'Status'}</span>
+          </span>
+          {isFiltered && (
+            <button
+              type="button"
+              onClick={() => { setSelectedStatuses([]); setStatusFilter('all'); setClientPage(1); }}
+              className="text-[10px] text-indigo-600 hover:underline font-bold cursor-pointer"
+            >
+              {language === 'ar' ? 'إعادة تعيين' : 'Reset'}
+            </button>
+          )}
+        </label>
+
+        <button
+          type="button"
+          onClick={() => {
+            setShowStatusDropdown(p => !p);
+            setShowDocTypeDropdown(false);
+            setShowYearDropdown(false);
+            setShowMonthDropdown(false);
+          }}
+          className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-50 hover:bg-white border border-slate-200 focus:border-indigo-500 text-xs md:text-sm font-semibold text-slate-800 transition-all text-start cursor-pointer"
+        >
+          <span className="truncate">
+            {selectedStatuses.length === 0
+              ? (statusFilter !== 'all'
+                  ? (STATUSES_LIST.find(x => x.id === statusFilter)?.[language === 'ar' ? 'nameAr' : 'nameEn'] || statusFilter)
+                  : (language === 'ar' ? 'الكل (جميع الحالات)' : 'All Statuses'))
+              : selectedStatuses.length === 1
+              ? (() => {
+                  const st = STATUSES_LIST.find(x => x.id === selectedStatuses[0]);
+                  return language === 'ar' ? st?.nameAr : st?.nameEn;
+                })()
+              : (language === 'ar' ? `${selectedStatuses.length} حالات محددة` : `${selectedStatuses.length} Statuses Selected`)}
+          </span>
+          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showStatusDropdown ? 'rotate-180' : ''}`} />
+        </button>
+
+        {showStatusDropdown && (
+          <>
+            <div className="fixed inset-0 z-20" onClick={() => setShowStatusDropdown(false)} />
+            <div className="absolute top-full right-0 mt-1.5 w-72 bg-white rounded-2xl border border-slate-200 shadow-xl z-30 p-2 space-y-1 max-h-72 overflow-y-auto">
+              <div className="flex items-center justify-between pb-2 mb-1 border-b border-slate-100 px-2 pt-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => { setSelectedStatuses([]); setStatusFilter('all'); setClientPage(1); }}
+                  className={`font-bold cursor-pointer ${selectedStatuses.length === 0 && statusFilter === 'all' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
+                >
+                  {language === 'ar' ? 'تحديد كافة الحالات' : 'Select All Statuses'}
+                </button>
+                {isFiltered && (
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedStatuses([]); setStatusFilter('all'); setClientPage(1); }}
+                    className="text-[11px] text-rose-500 hover:underline font-semibold cursor-pointer"
+                  >
+                    {language === 'ar' ? 'مسح' : 'Clear'}
+                  </button>
+                )}
+              </div>
+
+              {STATUSES_LIST.map(st => {
+                const count = statusCounts[st.id] || 0;
+                const isChecked = selectedStatuses.length > 0 ? selectedStatuses.includes(st.id) : (statusFilter === st.id);
+                return (
+                  <label
+                    key={st.id}
+                    className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-50 cursor-pointer text-xs select-none transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          let newSelected = selectedStatuses.length > 0
+                            ? [...selectedStatuses]
+                            : (statusFilter !== 'all' ? [statusFilter] : []);
+                          if (e.target.checked) {
+                            if (!newSelected.includes(st.id)) newSelected.push(st.id);
+                          } else {
+                            newSelected = newSelected.filter(x => x !== st.id);
+                          }
+                          setSelectedStatuses(newSelected);
+                          setStatusFilter(newSelected.length === 1 ? newSelected[0] : 'all');
+                          setClientPage(1);
+                        }}
+                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                      />
+                      <span className="font-semibold text-slate-800">{language === 'ar' ? st.nameAr : st.nameEn}</span>
+                    </div>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
+                      count > 0 ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-400'
+                    }`}>
+                      {count} {language === 'ar' ? 'وثيقة' : (count === 1 ? 'doc' : 'docs')}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -1493,42 +1777,10 @@ export function EtaReceivedInvoices() {
               </div>
 
               {/* Document Type Filter */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
-                  <Receipt className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>{language === 'ar' ? 'نوع الوثيقة' : 'Document Type'}</span>
-                </label>
-                <select
-                  value={docTypeFilter}
-                  onChange={e => setDocTypeFilter(e.target.value)}
-                  className="w-full text-xs md:text-sm px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-hidden"
-                >
-                  <option value="all">{language === 'ar' ? 'الكل (فواتير وإشعارات)' : 'All Documents'}</option>
-                  <option value="i">{language === 'ar' ? 'فاتورة (Invoice)' : 'Invoice'}</option>
-                  <option value="c">{language === 'ar' ? 'إشعار دائن (Credit Note)' : 'Credit Note'}</option>
-                  <option value="d">{language === 'ar' ? 'إشعار مدين (Debit Note)' : 'Debit Note'}</option>
-                </select>
-              </div>
+              {renderDocTypeFilter()}
 
               {/* Status Filter */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
-                  <Filter className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>{language === 'ar' ? 'حالة الفاتورة' : 'Status'}</span>
-                </label>
-                <select
-                  value={statusFilter}
-                  onChange={e => setStatusFilter(e.target.value)}
-                  className="w-full text-xs md:text-sm px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-hidden"
-                >
-                  <option value="all">{language === 'ar' ? 'الكل (جميع الحالات)' : 'All Statuses'}</option>
-                  <option value="Valid">{language === 'ar' ? 'صحيحة (Valid)' : 'Valid'}</option>
-                  <option value="Invalid">{language === 'ar' ? 'غير صالحة (Invalid)' : 'Invalid'}</option>
-                  <option value="Rejected">{language === 'ar' ? 'مرفوضة (Rejected)' : 'Rejected'}</option>
-                  <option value="Cancelled">{language === 'ar' ? 'ملغاة (Cancelled)' : 'Cancelled'}</option>
-                  <option value="Submitted">{language === 'ar' ? 'مقدمة (Submitted)' : 'Submitted'}</option>
-                </select>
-              </div>
+              {renderStatusFilter()}
 
               {/* Quick Search */}
               <div>
@@ -1771,48 +2023,10 @@ export function EtaReceivedInvoices() {
             </div>
 
             {/* 3. Document Type Filter */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
-                <Receipt className="w-3.5 h-3.5 text-indigo-600" />
-                <span>{language === 'ar' ? 'نوع الوثيقة' : 'Document Type'}</span>
-              </label>
-              <select
-                value={docTypeFilter}
-                onChange={e => {
-                  setDocTypeFilter(e.target.value);
-                  setClientPage(1);
-                }}
-                className="w-full text-xs md:text-sm px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-hidden"
-              >
-                <option value="all">{language === 'ar' ? 'الكل (فواتير وإشعارات)' : 'All Documents'}</option>
-                <option value="i">{language === 'ar' ? 'فاتورة (Invoice)' : 'Invoice'}</option>
-                <option value="c">{language === 'ar' ? 'إشعار دائن (Credit Note)' : 'Credit Note'}</option>
-                <option value="d">{language === 'ar' ? 'إشعار مدين (Debit Note)' : 'Debit Note'}</option>
-              </select>
-            </div>
+            {renderDocTypeFilter()}
 
             {/* 4. Status Filter */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
-                <Filter className="w-3.5 h-3.5 text-indigo-600" />
-                <span>{language === 'ar' ? 'حالة الفاتورة' : 'Status'}</span>
-              </label>
-              <select
-                value={statusFilter}
-                onChange={e => {
-                  setStatusFilter(e.target.value);
-                  setClientPage(1);
-                }}
-                className="w-full text-xs md:text-sm px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all outline-hidden"
-              >
-                <option value="all">{language === 'ar' ? 'الكل (جميع الحالات)' : 'All Statuses'}</option>
-                <option value="Valid">{language === 'ar' ? 'صحيحة (Valid)' : 'Valid'}</option>
-                <option value="Invalid">{language === 'ar' ? 'غير صالحة (Invalid)' : 'Invalid'}</option>
-                <option value="Rejected">{language === 'ar' ? 'مرفوضة (Rejected)' : 'Rejected'}</option>
-                <option value="Cancelled">{language === 'ar' ? 'ملغاة (Cancelled)' : 'Cancelled'}</option>
-                <option value="Submitted">{language === 'ar' ? 'مقدمة (Submitted)' : 'Submitted'}</option>
-              </select>
-            </div>
+            {renderStatusFilter()}
 
             {/* 5. Quick Search */}
             <div>
