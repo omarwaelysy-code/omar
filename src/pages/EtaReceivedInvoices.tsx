@@ -1809,6 +1809,106 @@ export function EtaReceivedInvoices() {
         const renderPaginationBar = (position: 'top' | 'bottom') => {
           if (isCurrentLoading || totalFound === 0) return null;
 
+          const renderViewAndColumnControls = () => {
+            if (position !== 'top') return null;
+            return (
+              <>
+                {/* View Switcher: Table vs Cards */}
+                <div className="flex bg-slate-200/70 p-0.5 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setView('table')}
+                    className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                      view === 'table' ? 'bg-white text-indigo-600 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
+                  >
+                    <List size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setView('card')}
+                    className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                      view === 'card' ? 'bg-white text-indigo-600 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
+                  >
+                    <LayoutGrid size={16} />
+                  </button>
+                </div>
+
+                {/* Column Customization Dropdown (أعمدة الجدول) */}
+                {view === 'table' && (
+                  <div 
+                    className="relative" 
+                    ref={columnSelectorRef}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsColumnSelectorOpen(prev => !prev);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                    >
+                      <Eye size={14} className="text-slate-400" />
+                      <span>{language === 'ar' ? 'أعمدة الجدول' : 'Table Columns'}</span>
+                      <ChevronDown size={14} className="text-slate-400" />
+                    </button>
+
+                    {isColumnSelectorOpen && (
+                      <div 
+                        className="absolute top-full mt-1.5 right-0 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-50 min-w-[240px] max-h-[320px] overflow-y-auto space-y-1 animate-in fade-in slide-in-from-top-2 duration-150 scrollbar-thin"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider pb-1.5 mb-1 border-b border-slate-100 flex items-center justify-between">
+                          <span>{language === 'ar' ? 'تخصيص الأعمدة' : 'Customize Columns'}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setVisibleColumns(defaultVisibleColumns);
+                              if (user?.id) localStorage.setItem(`eta_visible_columns_${user.id}`, JSON.stringify(defaultVisibleColumns));
+                            }}
+                            className="text-[10px] text-indigo-600 hover:underline font-bold cursor-pointer"
+                          >
+                            {language === 'ar' ? 'استعادة الافتراضي' : 'Reset'}
+                          </button>
+                        </div>
+                        {Object.keys(defaultVisibleColumns).map((colKey) => (
+                          <label 
+                            key={colKey} 
+                            className="flex items-center gap-2.5 text-xs font-semibold text-slate-700 cursor-pointer hover:bg-slate-100/80 p-2 rounded-xl transition-colors select-none"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={visibleColumns[colKey] !== false}
+                              onChange={() => {
+                                const updated = {
+                                  ...visibleColumns,
+                                  [colKey]: !visibleColumns[colKey]
+                                };
+                                setVisibleColumns(updated);
+                                if (user?.id) {
+                                  localStorage.setItem(`eta_visible_columns_${user.id}`, JSON.stringify(updated));
+                                }
+                              }}
+                              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                            />
+                            <span>{language === 'ar' ? columnLabels[colKey]?.ar : columnLabels[colKey]?.en}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            );
+          };
+
           return (
             <div className={`p-3.5 bg-slate-50/75 flex items-center justify-between gap-3 flex-wrap text-xs md:text-sm ${
               position === 'top' ? 'border-b border-slate-200/80' : 'border-t border-slate-200/80'
@@ -1841,82 +1941,7 @@ export function EtaReceivedInvoices() {
                       </select>
                     </div>
 
-                    {/* View Switcher: Table vs Cards */}
-                    <div className="flex bg-slate-200/70 p-0.5 rounded-xl">
-                      <button
-                        type="button"
-                        onClick={() => setView('table')}
-                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                          view === 'table' ? 'bg-white text-indigo-600 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                        title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
-                      >
-                        <List size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setView('card')}
-                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                          view === 'card' ? 'bg-white text-indigo-600 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                        title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
-                      >
-                        <LayoutGrid size={16} />
-                      </button>
-                    </div>
-
-                    {/* Column Customization Dropdown (أعمدة الجدول) */}
-                    {view === 'table' && (
-                      <div className="relative" ref={columnSelectorRef}>
-                        <button
-                          type="button"
-                          onClick={() => setIsColumnSelectorOpen(!isColumnSelectorOpen)}
-                          className="flex items-center gap-1.5 px-3 py-1 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow-2xs active:scale-95 cursor-pointer"
-                        >
-                          <Eye size={14} className="text-slate-400" />
-                          <span>{language === 'ar' ? 'أعمدة الجدول' : 'Table Columns'}</span>
-                          <ChevronDown size={14} className="text-slate-400" />
-                        </button>
-
-                        {isColumnSelectorOpen && (
-                          <div className="absolute top-full mt-1.5 right-0 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-50 min-w-[220px] max-h-[320px] overflow-y-auto space-y-1 animate-in fade-in slide-in-from-top-2 duration-150">
-                            <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider pb-1.5 mb-1 border-b border-slate-100 flex items-center justify-between">
-                              <span>{language === 'ar' ? 'تخصيص الأعمدة' : 'Customize Columns'}</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setVisibleColumns(defaultVisibleColumns);
-                                  if (user?.id) localStorage.setItem(`eta_visible_columns_${user.id}`, JSON.stringify(defaultVisibleColumns));
-                                }}
-                                className="text-[10px] text-indigo-600 hover:underline font-bold cursor-pointer"
-                              >
-                                {language === 'ar' ? 'استعادة الافتراضي' : 'Reset'}
-                              </button>
-                            </div>
-                            {Object.keys(defaultVisibleColumns).map((colKey) => (
-                              <label key={colKey} className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer hover:bg-slate-50 p-1.5 rounded-lg transition-colors select-none">
-                                <input
-                                  type="checkbox"
-                                  checked={visibleColumns[colKey] !== false}
-                                  onChange={() => {
-                                    const updated = {
-                                      ...visibleColumns,
-                                      [colKey]: !visibleColumns[colKey]
-                                    };
-                                    setVisibleColumns(updated);
-                                    if (user?.id) {
-                                      localStorage.setItem(`eta_visible_columns_${user.id}`, JSON.stringify(updated));
-                                    }
-                                  }}
-                                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
-                                />
-                                <span>{language === 'ar' ? columnLabels[colKey]?.ar : columnLabels[colKey]?.en}</span>
-                              </label>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    {renderViewAndColumnControls()}
 
                     {/* Export to Excel Button */}
                     <button
@@ -2003,82 +2028,7 @@ export function EtaReceivedInvoices() {
                         : `Page ${pageNumber} — showing ${invoices.length} invoices`}
                     </div>
 
-                    {/* View Switcher: Table vs Cards */}
-                    <div className="flex bg-slate-200/70 p-0.5 rounded-xl">
-                      <button
-                        type="button"
-                        onClick={() => setView('table')}
-                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                          view === 'table' ? 'bg-white text-indigo-600 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                        title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
-                      >
-                        <List size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setView('card')}
-                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                          view === 'card' ? 'bg-white text-indigo-600 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                        title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
-                      >
-                        <LayoutGrid size={16} />
-                      </button>
-                    </div>
-
-                    {/* Column Customization Dropdown (أعمدة الجدول) */}
-                    {view === 'table' && (
-                      <div className="relative" ref={columnSelectorRef}>
-                        <button
-                          type="button"
-                          onClick={() => setIsColumnSelectorOpen(!isColumnSelectorOpen)}
-                          className="flex items-center gap-1.5 px-3 py-1 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow-2xs active:scale-95 cursor-pointer"
-                        >
-                          <Eye size={14} className="text-slate-400" />
-                          <span>{language === 'ar' ? 'أعمدة الجدول' : 'Table Columns'}</span>
-                          <ChevronDown size={14} className="text-slate-400" />
-                        </button>
-
-                        {isColumnSelectorOpen && (
-                          <div className="absolute top-full mt-1.5 right-0 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-50 min-w-[220px] max-h-[320px] overflow-y-auto space-y-1 animate-in fade-in slide-in-from-top-2 duration-150">
-                            <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider pb-1.5 mb-1 border-b border-slate-100 flex items-center justify-between">
-                              <span>{language === 'ar' ? 'تخصيص الأعمدة' : 'Customize Columns'}</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setVisibleColumns(defaultVisibleColumns);
-                                  if (user?.id) localStorage.setItem(`eta_visible_columns_${user.id}`, JSON.stringify(defaultVisibleColumns));
-                                }}
-                                className="text-[10px] text-indigo-600 hover:underline font-bold cursor-pointer"
-                              >
-                                {language === 'ar' ? 'استعادة الافتراضي' : 'Reset'}
-                              </button>
-                            </div>
-                            {Object.keys(defaultVisibleColumns).map((colKey) => (
-                              <label key={colKey} className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer hover:bg-slate-50 p-1.5 rounded-lg transition-colors select-none">
-                                <input
-                                  type="checkbox"
-                                  checked={visibleColumns[colKey] !== false}
-                                  onChange={() => {
-                                    const updated = {
-                                      ...visibleColumns,
-                                      [colKey]: !visibleColumns[colKey]
-                                    };
-                                    setVisibleColumns(updated);
-                                    if (user?.id) {
-                                      localStorage.setItem(`eta_visible_columns_${user.id}`, JSON.stringify(updated));
-                                    }
-                                  }}
-                                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
-                                />
-                                <span>{language === 'ar' ? columnLabels[colKey]?.ar : columnLabels[colKey]?.en}</span>
-                              </label>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    {renderViewAndColumnControls()}
 
                     {/* Export to Excel Button */}
                     <button
