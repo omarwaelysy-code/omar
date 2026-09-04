@@ -107,12 +107,12 @@ const defaultVisibleColumns: Record<string, boolean> = {
   address: true,
   date_issued: true,
   date_received: true,
+  currency: true,
   net_amount: true,
   tax_amount: true,
   total_amount: true,
   status: true,
   uuid: true,
-  actions: true,
 };
 
 const columnLabels: Record<string, { ar: string; en: string }> = {
@@ -124,12 +124,12 @@ const columnLabels: Record<string, { ar: string; en: string }> = {
   address: { ar: 'العنوان', en: 'Address' },
   date_issued: { ar: 'تاريخ الإصدار', en: 'Issue Date' },
   date_received: { ar: 'تاريخ الاستلام', en: 'Received Date' },
+  currency: { ar: 'العملة', en: 'Currency' },
   net_amount: { ar: 'الصافي', en: 'Net Amount' },
   tax_amount: { ar: 'الضريبة', en: 'Tax Amount' },
   total_amount: { ar: 'الإجمالي', en: 'Total Amount' },
   status: { ar: 'الحالة', en: 'Status' },
   uuid: { ar: 'UUID', en: 'UUID' },
-  actions: { ar: 'الإجراءات', en: 'Actions' },
 };
 
 export function EtaReceivedInvoices() {
@@ -148,7 +148,10 @@ export function EtaReceivedInvoices() {
     const saved = user?.id ? localStorage.getItem(`eta_visible_columns_${user.id}`) : null;
     if (saved) {
       try {
-        return { ...defaultVisibleColumns, ...JSON.parse(saved) };
+        const parsed = JSON.parse(saved);
+        delete parsed.actions;
+        if (parsed.currency === undefined) parsed.currency = true;
+        return { ...defaultVisibleColumns, ...parsed };
       } catch (e) {
         console.error(e);
       }
@@ -188,6 +191,12 @@ export function EtaReceivedInvoices() {
   const [viewMode, setViewMode] = useState<'all_portal' | 'period'>('all_portal');
   const [searchQuery, setSearchQuery] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
+
+  // Amount filter state (البحث في القيمة المالية)
+  const [amountField, setAmountField] = useState<'total_amount' | 'net_amount' | 'tax_amount'>('total_amount');
+  const [amountOperator, setAmountOperator] = useState<'all' | 'eq' | 'between' | 'gt' | 'lt'>('all');
+  const [amountValueFrom, setAmountValueFrom] = useState<string>('');
+  const [amountValueTo, setAmountValueTo] = useState<string>('');
 
   // Months definition
   const MONTHS_LIST = useMemo(() => [
@@ -587,6 +596,41 @@ export function EtaReceivedInvoices() {
     return Array.from(set).sort((a, b) => Number(b) - Number(a));
   }, [yearCounts]);
 
+  // Helper to match financial amount filter
+  const matchesAmountFilter = useCallback((inv: EtaReceivedInvoice) => {
+    if (amountOperator === 'all') return true;
+    const fromVal = amountValueFrom.trim() !== '' ? Number(amountValueFrom.replace(/,/g, '')) : null;
+    const toVal = amountValueTo.trim() !== '' ? Number(amountValueTo.replace(/,/g, '')) : null;
+
+    const amt = amountField === 'net_amount'
+      ? (Number(inv.netAmount) || 0)
+      : amountField === 'tax_amount'
+      ? (Number(inv.taxAmount) || 0)
+      : (Number(inv.totalAmount) || 0);
+
+    if (amountOperator === 'eq') {
+      if (fromVal === null || isNaN(fromVal)) return true;
+      return Math.abs(amt - fromVal) < 0.01;
+    }
+    if (amountOperator === 'gt') {
+      if (fromVal === null || isNaN(fromVal)) return true;
+      return amt > fromVal;
+    }
+    if (amountOperator === 'lt') {
+      if (fromVal === null || isNaN(fromVal)) return true;
+      return amt < fromVal;
+    }
+    if (amountOperator === 'between') {
+      if (fromVal !== null && !isNaN(fromVal) && toVal !== null && !isNaN(toVal)) {
+        return amt >= Math.min(fromVal, toVal) && amt <= Math.max(fromVal, toVal);
+      }
+      if (fromVal !== null && !isNaN(fromVal)) return amt >= fromVal;
+      if (toVal !== null && !isNaN(toVal)) return amt <= toVal;
+      return true;
+    }
+    return true;
+  }, [amountField, amountOperator, amountValueFrom, amountValueTo]);
+
   // Filtered all portal invoices client-side
   const filteredAllInvoices = useMemo(() => {
     let list = allPortalInvoices;
@@ -614,6 +658,9 @@ export function EtaReceivedInvoices() {
     if (statusFilter !== 'all') {
       list = list.filter(inv => inv.status === statusFilter);
     }
+    if (amountOperator !== 'all') {
+      list = list.filter(matchesAmountFilter);
+    }
     if (!appliedSearch.trim()) return list;
     const q = appliedSearch.trim().toLowerCase();
     return list.filter(inv =>
@@ -624,7 +671,7 @@ export function EtaReceivedInvoices() {
       (inv.receiverName && inv.receiverName.toLowerCase().includes(q)) ||
       (inv.receiverId && inv.receiverId.toLowerCase().includes(q))
     );
-  }, [allPortalInvoices, selectedYears, selectedMonths, directionFilter, docTypeFilter, statusFilter, appliedSearch]);
+  }, [allPortalInvoices, selectedYears, selectedMonths, directionFilter, docTypeFilter, statusFilter, amountOperator, matchesAmountFilter, appliedSearch]);
 
   const totalPagesAll = Math.ceil(filteredAllInvoices.length / clientPageSize) || 1;
   const paginatedAllInvoices = useMemo(() => {
@@ -632,13 +679,22 @@ export function EtaReceivedInvoices() {
     return filteredAllInvoices.slice(start, start + clientPageSize);
   }, [filteredAllInvoices, clientPage, clientPageSize]);
 
+  // Period mode invoices with client-side amount filtering applied
+  const filteredPeriodInvoices = useMemo(() => {
+    let list = invoices;
+    if (amountOperator !== 'all') {
+      list = list.filter(matchesAmountFilter);
+    }
+    return list;
+  }, [invoices, amountOperator, matchesAmountFilter]);
+
   const currentDisplayInvoices = useMemo(() => {
-    return viewMode === 'all_portal' ? paginatedAllInvoices : invoices;
-  }, [viewMode, paginatedAllInvoices, invoices]);
+    return viewMode === 'all_portal' ? paginatedAllInvoices : filteredPeriodInvoices;
+  }, [viewMode, paginatedAllInvoices, filteredPeriodInvoices]);
 
   // Financial summary totals based on all currently filtered documents
   const summaryTotals = useMemo(() => {
-    const list = viewMode === 'all_portal' ? filteredAllInvoices : invoices;
+    const list = viewMode === 'all_portal' ? filteredAllInvoices : filteredPeriodInvoices;
     return list.reduce(
       (acc, inv) => {
         acc.totalAmount += Number(inv.totalAmount) || 0;
@@ -649,11 +705,11 @@ export function EtaReceivedInvoices() {
       },
       { totalAmount: 0, totalDiscount: 0, netAmount: 0, taxAmount: 0 }
     );
-  }, [viewMode, filteredAllInvoices, invoices]);
+  }, [viewMode, filteredAllInvoices, filteredPeriodInvoices]);
 
   // Financial summary totals for selected items
   const selectedTotals = useMemo(() => {
-    const list = viewMode === 'all_portal' ? filteredAllInvoices : invoices;
+    const list = viewMode === 'all_portal' ? filteredAllInvoices : filteredPeriodInvoices;
     const selectedList = list.filter(inv => selectedUuids.includes(inv.uuid));
     return selectedList.reduce(
       (acc, inv) => {
@@ -665,7 +721,7 @@ export function EtaReceivedInvoices() {
       },
       { totalAmount: 0, totalDiscount: 0, netAmount: 0, taxAmount: 0 }
     );
-  }, [viewMode, filteredAllInvoices, invoices, selectedUuids]);
+  }, [viewMode, filteredAllInvoices, filteredPeriodInvoices, selectedUuids]);
 
   const isAllSelected = useMemo(() => {
     if (currentDisplayInvoices.length === 0) return false;
@@ -1061,6 +1117,11 @@ export function EtaReceivedInvoices() {
         <span>{language === 'ar' ? 'واردة' : 'Received'}</span>
       </span>
     );
+  };
+
+  const formatAmount = (val: number) => {
+    const num = Number(val) || 0;
+    return num.toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
   const formatCurrency = (val: number, curr = 'EGP') => {
@@ -1796,6 +1857,130 @@ export function EtaReceivedInvoices() {
             </div>
           </div>
         )}
+
+        {/* ========================================================================= */}
+        {/* 4.1 ADVANCED AMOUNT SEARCH (البحث في القيمة المالية) */}
+        {/* ========================================================================= */}
+        <div className="pt-3.5 mt-3.5 border-t border-slate-100 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 text-xs md:text-sm">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 font-bold text-slate-700">
+              <SlidersHorizontal className="w-4 h-4 text-indigo-600" />
+              <span>{language === 'ar' ? 'البحث في القيمة:' : 'Search by Amount:'}</span>
+            </div>
+
+            {/* اختيار نوع القيمة: الصافي - الضريبة - الإجمالي */}
+            <div className="flex items-center gap-1">
+              <select
+                value={amountField}
+                onChange={(e) => {
+                  setAmountField(e.target.value as any);
+                  setClientPage(1);
+                }}
+                className="px-3 py-1.5 rounded-xl border border-slate-300 bg-white font-semibold text-slate-800 text-xs focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-hidden shadow-2xs cursor-pointer"
+              >
+                <option value="total_amount">{language === 'ar' ? 'الإجمالي (Total)' : 'Total Amount'}</option>
+                <option value="net_amount">{language === 'ar' ? 'الصافي (Net)' : 'Net Amount'}</option>
+                <option value="tax_amount">{language === 'ar' ? 'الضريبة (Tax)' : 'Tax Amount'}</option>
+              </select>
+            </div>
+
+            {/* اختيار شرط المقارنة: يساوي - من إلى - أكبر من - أصغر من */}
+            <div className="flex items-center gap-1">
+              <select
+                value={amountOperator}
+                onChange={(e) => {
+                  setAmountOperator(e.target.value as any);
+                  setClientPage(1);
+                }}
+                className="px-3 py-1.5 rounded-xl border border-slate-300 bg-white font-semibold text-slate-800 text-xs focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-hidden shadow-2xs cursor-pointer"
+              >
+                <option value="all">{language === 'ar' ? 'بدون تصفية بالمبلغ' : 'No Amount Filter'}</option>
+                <option value="eq">{language === 'ar' ? 'يساوي (=)' : 'Equals (=)'}</option>
+                <option value="between">{language === 'ar' ? 'من - إلى (نطاق)' : 'Between (Range)'}</option>
+                <option value="gt">{language === 'ar' ? 'أكبر من (>)' : 'Greater Than (>)'}</option>
+                <option value="lt">{language === 'ar' ? 'أصغر من (<)' : 'Less Than (<)'}</option>
+              </select>
+            </div>
+
+            {/* حقول إدخال المبلغ */}
+            {amountOperator !== 'all' && (
+              <div className="flex items-center gap-2 flex-wrap animate-in fade-in duration-150">
+                {amountOperator === 'between' ? (
+                  <>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-slate-500 font-medium">{language === 'ar' ? 'من:' : 'From:'}</span>
+                      <input
+                        type="number"
+                        step="any"
+                        value={amountValueFrom}
+                        onChange={(e) => {
+                          setAmountValueFrom(e.target.value);
+                          setClientPage(1);
+                        }}
+                        placeholder="0.00"
+                        className="w-28 px-2.5 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-hidden shadow-2xs"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-slate-500 font-medium">{language === 'ar' ? 'إلى:' : 'To:'}</span>
+                      <input
+                        type="number"
+                        step="any"
+                        value={amountValueTo}
+                        onChange={(e) => {
+                          setAmountValueTo(e.target.value);
+                          setClientPage(1);
+                        }}
+                        placeholder="0.00"
+                        className="w-28 px-2.5 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-hidden shadow-2xs"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-slate-500 font-medium">{language === 'ar' ? 'المبلغ:' : 'Amount:'}</span>
+                    <input
+                      type="number"
+                      step="any"
+                      value={amountValueFrom}
+                      onChange={(e) => {
+                        setAmountValueFrom(e.target.value);
+                        setClientPage(1);
+                      }}
+                      placeholder="0.00"
+                      className="w-32 px-2.5 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-hidden shadow-2xs"
+                    />
+                  </div>
+                )}
+
+                {(amountValueFrom || amountValueTo) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAmountValueFrom('');
+                      setAmountValueTo('');
+                      setAmountOperator('all');
+                      setClientPage(1);
+                    }}
+                    className="inline-flex items-center gap-1 text-xs text-rose-500 hover:text-rose-700 hover:underline font-semibold cursor-pointer px-1.5 py-1"
+                    title={language === 'ar' ? 'إلغاء تصفية القيمة' : 'Clear amount filter'}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>{language === 'ar' ? 'إلغاء الفلتر' : 'Clear'}</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {amountOperator !== 'all' && (amountValueFrom || amountValueTo) && (
+            <div className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100 self-start lg:self-center">
+              {language === 'ar'
+                ? `تصفية حسب: ${amountField === 'net_amount' ? 'الصافي' : amountField === 'tax_amount' ? 'الضريبة' : 'الإجمالي'}`
+                : `Filtering by: ${amountField === 'net_amount' ? 'Net' : amountField === 'tax_amount' ? 'Tax' : 'Total'}`}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ========================================================================= */}
@@ -2187,15 +2372,18 @@ export function EtaReceivedInvoices() {
                           <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                             <div>
                               <span className="text-slate-400 block text-[10px]">{language === 'ar' ? 'الصافي' : 'Net'}</span>
-                              <span className="font-semibold text-slate-700">{formatCurrency(inv.netAmount, inv.currency)}</span>
+                              <span className="font-semibold text-slate-700">{formatAmount(inv.netAmount)}</span>
                             </div>
                             <div>
                               <span className="text-slate-400 block text-[10px]">{language === 'ar' ? 'الضريبة' : 'Tax'}</span>
-                              <span className="font-semibold text-slate-600">{formatCurrency(inv.taxAmount, inv.currency)}</span>
+                              <span className="font-semibold text-slate-600">{formatAmount(inv.taxAmount)}</span>
                             </div>
                             <div className="text-end">
-                              <span className="text-slate-400 block text-[10px]">{language === 'ar' ? 'الإجمالي' : 'Total'}</span>
-                              <span className="font-bold text-slate-900 text-sm">{formatCurrency(inv.totalAmount, inv.currency)}</span>
+                              <span className="text-slate-400 block text-[10px] flex items-center justify-end gap-1">
+                                <span>{language === 'ar' ? 'الإجمالي' : 'Total'}</span>
+                                <span className="text-indigo-600 font-mono font-bold">({inv.currency || 'EGP'})</span>
+                              </span>
+                              <span className="font-bold text-slate-900 text-sm">{formatAmount(inv.totalAmount)}</span>
                             </div>
                           </div>
 
@@ -2248,12 +2436,12 @@ export function EtaReceivedInvoices() {
                       {visibleColumns.address && <th className="py-3 px-4 text-start whitespace-nowrap min-w-[150px]">{language === 'ar' ? 'العنوان' : 'Address'}</th>}
                       {visibleColumns.date_issued && <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'تاريخ الإصدار' : 'Issue Date'}</th>}
                       {visibleColumns.date_received && <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'تاريخ الاستلام' : 'Received Date'}</th>}
+                      {visibleColumns.currency && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'العملة' : 'Currency'}</th>}
                       {visibleColumns.net_amount && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الصافي' : 'Net Amount'}</th>}
                       {visibleColumns.tax_amount && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الضريبة' : 'Tax'}</th>}
                       {visibleColumns.total_amount && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الإجمالي' : 'Total'}</th>}
                       {visibleColumns.status && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الحالة' : 'Status'}</th>}
                       {visibleColumns.uuid && <th className="py-3 px-4 text-center whitespace-nowrap">UUID</th>}
-                      {visibleColumns.actions && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -2329,24 +2517,33 @@ export function EtaReceivedInvoices() {
                           </td>
                         )}
 
+                        {/* Currency */}
+                        {visibleColumns.currency && (
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            <span className="inline-block px-2.5 py-0.5 rounded-lg bg-slate-100 font-mono text-xs font-bold text-slate-700">
+                              {inv.currency || 'EGP'}
+                            </span>
+                          </td>
+                        )}
+
                         {/* Net Amount */}
                         {visibleColumns.net_amount && (
                           <td className="py-3.5 px-4 text-end font-medium text-slate-700 whitespace-nowrap">
-                            {formatCurrency(inv.netAmount, inv.currency)}
+                            {formatAmount(inv.netAmount)}
                           </td>
                         )}
 
                         {/* Tax Amount */}
                         {visibleColumns.tax_amount && (
                           <td className="py-3.5 px-4 text-end font-medium text-slate-600 whitespace-nowrap">
-                            {formatCurrency(inv.taxAmount, inv.currency)}
+                            {formatAmount(inv.taxAmount)}
                           </td>
                         )}
 
                         {/* Total Amount */}
                         {visibleColumns.total_amount && (
                           <td className="py-3.5 px-4 text-end font-bold text-slate-900 whitespace-nowrap">
-                            {formatCurrency(inv.totalAmount, inv.currency)}
+                            {formatAmount(inv.totalAmount)}
                           </td>
                         )}
 
@@ -2386,21 +2583,6 @@ export function EtaReceivedInvoices() {
                                 )}
                               </button>
                             </div>
-                          </td>
-                        )}
-
-                        {/* Actions */}
-                        {visibleColumns.actions && (
-                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedInvoice(inv)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition-colors cursor-pointer"
-                              title={language === 'ar' ? 'عرض تفاصيل الفاتورة' : 'View Details'}
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>{language === 'ar' ? 'التفاصيل' : 'Details'}</span>
-                            </button>
                           </td>
                         )}
                       </tr>
