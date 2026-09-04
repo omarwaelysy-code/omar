@@ -34,7 +34,9 @@ import {
   Link2,
   FileDown,
   Ban,
-  ShieldCheck
+  ShieldCheck,
+  List,
+  LayoutGrid
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -42,6 +44,9 @@ import { useNotification } from '../contexts/NotificationContext';
 import { useNavigation } from '../contexts/NavigationContext';
 import { apiRequest } from '../services/dbService';
 import { exportToExcel } from '../utils/excelUtils';
+import { ExportButtons } from '../components/ExportButtons';
+import { exportToPDF, printElement } from '../utils/pdfUtils';
+import { formatMoney } from '../utils/formatUtils';
 
 export interface EtaReceivedInvoice {
   uuid: string;
@@ -93,11 +98,73 @@ interface EtaSearchApiResponse {
   code?: string;
 }
 
+const defaultVisibleColumns: Record<string, boolean> = {
+  internal_id: true,
+  direction: true,
+  type: true,
+  partner_name: true,
+  tax_id: true,
+  address: true,
+  date_issued: true,
+  date_received: true,
+  net_amount: true,
+  tax_amount: true,
+  total_amount: true,
+  status: true,
+  uuid: true,
+  actions: true,
+};
+
+const columnLabels: Record<string, { ar: string; en: string }> = {
+  internal_id: { ar: 'رقم الفاتورة', en: 'Invoice ID' },
+  direction: { ar: 'الاتجاه', en: 'Direction' },
+  type: { ar: 'نوع الوثيقة', en: 'Document Type' },
+  partner_name: { ar: 'المورد / العميل', en: 'Partner Name' },
+  tax_id: { ar: 'الرقم الضريبي', en: 'Tax ID' },
+  address: { ar: 'العنوان', en: 'Address' },
+  date_issued: { ar: 'تاريخ الإصدار', en: 'Issue Date' },
+  date_received: { ar: 'تاريخ الاستلام', en: 'Received Date' },
+  net_amount: { ar: 'الصافي', en: 'Net Amount' },
+  tax_amount: { ar: 'الضريبة', en: 'Tax Amount' },
+  total_amount: { ar: 'الإجمالي', en: 'Total Amount' },
+  status: { ar: 'الحالة', en: 'Status' },
+  uuid: { ar: 'UUID', en: 'UUID' },
+  actions: { ar: 'الإجراءات', en: 'Actions' },
+};
+
 export function EtaReceivedInvoices() {
   const { language, dir } = useLanguage();
   const { user } = useAuth();
   const { showNotification } = useNotification();
   const { openTab } = useNavigation();
+
+  // Selection, View (Table vs Cards), and Column Visibility
+  const [selectedUuids, setSelectedUuids] = useState<string[]>([]);
+  const [view, setView] = useState<'table' | 'card'>('table');
+  const [isColumnSelectorOpen, setIsColumnSelectorOpen] = useState(false);
+  const columnSelectorRef = useRef<HTMLDivElement>(null);
+
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
+    const saved = user?.id ? localStorage.getItem(`eta_visible_columns_${user.id}`) : null;
+    if (saved) {
+      try {
+        return { ...defaultVisibleColumns, ...JSON.parse(saved) };
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return defaultVisibleColumns;
+  });
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (columnSelectorRef.current && !columnSelectorRef.current.contains(event.target as Node)) {
+        setIsColumnSelectorOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Date filters: default to last 29 days (ETA Search Documents API requires maximum 30 days interval)
   const defaultDates = useMemo(() => {
@@ -565,6 +632,61 @@ export function EtaReceivedInvoices() {
     return filteredAllInvoices.slice(start, start + clientPageSize);
   }, [filteredAllInvoices, clientPage, clientPageSize]);
 
+  const currentDisplayInvoices = useMemo(() => {
+    return viewMode === 'all_portal' ? paginatedAllInvoices : invoices;
+  }, [viewMode, paginatedAllInvoices, invoices]);
+
+  // Financial summary totals based on all currently filtered documents
+  const summaryTotals = useMemo(() => {
+    const list = viewMode === 'all_portal' ? filteredAllInvoices : invoices;
+    return list.reduce(
+      (acc, inv) => {
+        acc.totalAmount += Number(inv.totalAmount) || 0;
+        acc.totalDiscount += Number(inv.totalDiscount) || 0;
+        acc.netAmount += Number(inv.netAmount) || 0;
+        acc.taxAmount += Number(inv.taxAmount) || 0;
+        return acc;
+      },
+      { totalAmount: 0, totalDiscount: 0, netAmount: 0, taxAmount: 0 }
+    );
+  }, [viewMode, filteredAllInvoices, invoices]);
+
+  // Financial summary totals for selected items
+  const selectedTotals = useMemo(() => {
+    const list = viewMode === 'all_portal' ? filteredAllInvoices : invoices;
+    const selectedList = list.filter(inv => selectedUuids.includes(inv.uuid));
+    return selectedList.reduce(
+      (acc, inv) => {
+        acc.totalAmount += Number(inv.totalAmount) || 0;
+        acc.totalDiscount += Number(inv.totalDiscount) || 0;
+        acc.netAmount += Number(inv.netAmount) || 0;
+        acc.taxAmount += Number(inv.taxAmount) || 0;
+        return acc;
+      },
+      { totalAmount: 0, totalDiscount: 0, netAmount: 0, taxAmount: 0 }
+    );
+  }, [viewMode, filteredAllInvoices, invoices, selectedUuids]);
+
+  const isAllSelected = useMemo(() => {
+    if (currentDisplayInvoices.length === 0) return false;
+    return currentDisplayInvoices.every(inv => selectedUuids.includes(inv.uuid));
+  }, [currentDisplayInvoices, selectedUuids]);
+
+  const handleSelectAll = useCallback(() => {
+    if (isAllSelected) {
+      setSelectedUuids(prev => prev.filter(id => !currentDisplayInvoices.some(inv => inv.uuid === id)));
+    } else {
+      const newIds = currentDisplayInvoices.map(inv => inv.uuid);
+      setSelectedUuids(prev => Array.from(new Set([...prev, ...newIds])));
+    }
+  }, [isAllSelected, currentDisplayInvoices]);
+
+  const handleToggleSelect = useCallback((uuid: string) => {
+    setSelectedUuids(prev =>
+      prev.includes(uuid) ? prev.filter(id => id !== uuid) : [...prev, uuid]
+    );
+  }, []);
+
   // Fetch received invoices from Backend
   const fetchInvoices = useCallback(async (token?: string, isRefresh = false) => {
     if (!user?.company_id) {
@@ -718,10 +840,14 @@ export function EtaReceivedInvoices() {
   };
 
   // Export invoices to Excel (.xlsx)
-  const handleExportExcel = useCallback(() => {
-    const listToExport = viewMode === 'all_portal' ? filteredAllInvoices : invoices;
+  const handleExportExcel = useCallback((onlySelected = false) => {
+    const currentList = viewMode === 'all_portal' ? filteredAllInvoices : invoices;
+    const listToExport = onlySelected
+      ? currentList.filter(inv => selectedUuids.includes(inv.uuid))
+      : currentList;
+
     if (!listToExport || listToExport.length === 0) {
-      showNotification(language === 'ar' ? 'لا توجد فواتير لتصديرها' : 'No invoices to export', 'warning');
+      showNotification(language === 'ar' ? 'لا توجد وثائق لتصديرها' : 'No documents to export', 'warning');
       return;
     }
 
@@ -759,17 +885,76 @@ export function EtaReceivedInvoices() {
     const now = new Date();
     const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     exportToExcel(exportData, {
-      filename: `eta_invoices_${dateStr}`,
-      sheetName: 'ETA Invoices'
+      filename: onlySelected ? `eta_documents_selected_${dateStr}` : `eta_documents_${dateStr}`,
+      sheetName: 'الوثائق الإلكترونية'
     });
 
     showNotification(
       language === 'ar'
-        ? `تم تصدير ${listToExport.length} فاتورة بنجاح إلى ملف إكسيل`
-        : `Successfully exported ${listToExport.length} invoices to Excel`,
+        ? `تم تصدير ${listToExport.length} وثيقة بنجاح إلى ملف إكسيل`
+        : `Successfully exported ${listToExport.length} documents to Excel`,
       'success'
     );
-  }, [viewMode, filteredAllInvoices, invoices, language, showNotification]);
+  }, [viewMode, filteredAllInvoices, invoices, selectedUuids, language, showNotification]);
+
+  // Export to PDF
+  const handleExportPDF = useCallback(async (onlySelected = false) => {
+    const tableEl = tableContainerRef.current;
+    if (!tableEl) return;
+
+    try {
+      const currentList = viewMode === 'all_portal' ? filteredAllInvoices : invoices;
+      const list = onlySelected
+        ? currentList.filter(inv => selectedUuids.includes(inv.uuid))
+        : currentList;
+
+      if (list.length === 0) {
+        showNotification(language === 'ar' ? 'لا توجد وثائق لتصديرها' : 'No documents to export', 'warning');
+        return;
+      }
+
+      if (onlySelected) {
+        const cloned = tableEl.cloneNode(true) as HTMLElement;
+        const rows = Array.from(cloned.querySelectorAll('tbody tr'));
+        rows.forEach(r => {
+          const rowUuid = r.getAttribute('data-uuid');
+          if (rowUuid && !selectedUuids.includes(rowUuid)) {
+            r.remove();
+          }
+        });
+        await exportToPDF(cloned, {
+          filename: `eta_documents_selected_${Date.now()}`,
+          reportTitle: language === 'ar' ? 'الوثائق الإلكترونية المحددة' : 'Selected Electronic Documents',
+          orientation: 'landscape'
+        });
+      } else {
+        await exportToPDF(tableEl, {
+          filename: `eta_documents_${Date.now()}`,
+          reportTitle: language === 'ar' ? 'كافة الوثائق الإلكترونية' : 'All Electronic Documents',
+          orientation: 'landscape'
+        });
+      }
+    } catch (err) {
+      console.error('PDF export error:', err);
+      showNotification(language === 'ar' ? 'حدث خطأ أثناء تصدير PDF' : 'Error exporting PDF', 'error');
+    }
+  }, [viewMode, filteredAllInvoices, invoices, selectedUuids, language, showNotification]);
+
+  // Direct Print for Selected
+  const handlePrintSelected = useCallback(() => {
+    if (selectedUuids.length === 0) return;
+    const tableEl = tableContainerRef.current;
+    if (!tableEl) return;
+    const cloned = tableEl.cloneNode(true) as HTMLElement;
+    const rows = Array.from(cloned.querySelectorAll('tbody tr'));
+    rows.forEach(r => {
+      const rowUuid = r.getAttribute('data-uuid');
+      if (rowUuid && !selectedUuids.includes(rowUuid)) {
+        r.remove();
+      }
+    });
+    printElement(cloned, language === 'ar' ? 'الوثائق الإلكترونية المحددة' : 'Selected Electronic Documents');
+  }, [selectedUuids, language]);
 
   // Status Badge Component
   const renderStatusBadge = (status: string) => {
@@ -889,8 +1074,8 @@ export function EtaReceivedInvoices() {
       {/* 1. PAGE HEADER */}
       {/* ========================================================================= */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center shadow-md shadow-indigo-100 flex-shrink-0">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center shadow-md shadow-indigo-100 flex-shrink-0 mt-0.5">
             <ArrowDownToLine className="w-6 h-6" />
           </div>
           <div>
@@ -921,10 +1106,62 @@ export function EtaReceivedInvoices() {
                 ? 'استعراض ومزامنة وحفظ فوري لكافة الوثائق (الواردة والصادرة) للشركة على منظومة مصلحة الضرائب المصرية'
                 : 'Live synchronization & persistent storage of electronic documents (Incoming & Outgoing) from ETA'}
             </p>
+
+            {/* Top Financial Badges (Matching Invoices page) */}
+            <div className="mt-3 flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm">
+                <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold shadow-2xs">
+                  {language === 'ar' ? 'إجمالي الوثائق' : 'Total Documents'}: {formatMoney(summaryTotals.totalAmount)} EGP
+                </span>
+                <span className="bg-red-50 text-red-700 px-3 py-1 rounded-full border border-red-100 font-bold shadow-2xs">
+                  {language === 'ar' ? 'إجمالي الخصومات' : 'Total Discounts'}: {formatMoney(summaryTotals.totalDiscount)} EGP
+                </span>
+                <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100 font-bold shadow-2xs">
+                  {language === 'ar' ? 'الصافي' : 'Net'}: {formatMoney(summaryTotals.netAmount)} EGP
+                </span>
+                <span className="bg-amber-50 text-amber-700 px-3 py-1 rounded-full border border-amber-100 font-bold shadow-2xs">
+                  {language === 'ar' ? 'إجمالي الضرائب' : 'Total Tax'}: {formatMoney(summaryTotals.taxAmount)} EGP
+                </span>
+              </div>
+
+              {/* Selected Items Calculation Bar */}
+              {selectedUuids.length > 0 && (
+                <div className="flex items-center gap-3 text-xs sm:text-sm animate-in slide-in-from-top-1 duration-200">
+                  <span className="bg-zinc-100 text-zinc-700 px-3.5 py-1.5 rounded-full border border-zinc-200 font-bold flex flex-wrap items-center gap-1.5 shadow-xs">
+                    <span>{language === 'ar' ? `مجموع المحدد (${selectedUuids.length}):` : `Selected (${selectedUuids.length}):`}</span>
+                    <span className="text-emerald-700">{language === 'ar' ? 'الإجمالي: ' : 'Total: '}{formatMoney(selectedTotals.totalAmount)}</span>
+                    <span className="text-zinc-300 font-normal">/</span>
+                    <span className="text-red-650">{language === 'ar' ? 'الخصم: ' : 'Discount: '}{formatMoney(selectedTotals.totalDiscount)}</span>
+                    <span className="text-zinc-300 font-normal">/</span>
+                    <span className="text-blue-700">{language === 'ar' ? 'الصافي: ' : 'Net: '}{formatMoney(selectedTotals.netAmount)}</span>
+                    <span className="text-zinc-300 font-normal">/</span>
+                    <span className="text-amber-700">{language === 'ar' ? 'الضريبة: ' : 'Tax: '}{formatMoney(selectedTotals.taxAmount)}</span>
+                    <span className="text-zinc-500 font-mono text-[10px]">EGP</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUuids([])}
+                    className="text-xs text-rose-500 hover:text-rose-700 underline font-semibold cursor-pointer"
+                  >
+                    {language === 'ar' ? 'إلغاء التحديد' : 'Deselect'}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Top Header Action Buttons: Export Buttons + Sync Button */}
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-center">
+          <ExportButtons 
+            onExportExcel={() => handleExportExcel(false)} 
+            onExportPDF={() => handleExportPDF(false)} 
+            onPrint={() => printElement(tableContainerRef.current, language === 'ar' ? 'الوثائق الإلكترونية' : 'Electronic Documents')}
+            onExportExcelSelected={() => handleExportExcel(true)}
+            onExportPDFSelected={() => handleExportPDF(true)}
+            onPrintSelected={() => handlePrintSelected()}
+            selectedCount={selectedUuids.length}
+          />
           <button
             type="button"
             onClick={handleRefresh}
@@ -1578,7 +1815,7 @@ export function EtaReceivedInvoices() {
             }`}>
               {viewMode === 'all_portal' ? (
                 <>
-                  <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
                     <span className="font-bold text-slate-800 bg-indigo-50 text-indigo-700 px-3 py-1 rounded-xl border border-indigo-200/60">
                       {language === 'ar' ? `النتائج: ${filteredAllInvoices.length}` : `Results: ${filteredAllInvoices.length}`}
                     </span>
@@ -1604,10 +1841,87 @@ export function EtaReceivedInvoices() {
                       </select>
                     </div>
 
+                    {/* View Switcher: Table vs Cards */}
+                    <div className="flex bg-slate-200/70 p-0.5 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => setView('table')}
+                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                          view === 'table' ? 'bg-white text-indigo-600 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                        title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
+                      >
+                        <List size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setView('card')}
+                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                          view === 'card' ? 'bg-white text-indigo-600 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                        title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
+                      >
+                        <LayoutGrid size={16} />
+                      </button>
+                    </div>
+
+                    {/* Column Customization Dropdown (أعمدة الجدول) */}
+                    {view === 'table' && (
+                      <div className="relative" ref={columnSelectorRef}>
+                        <button
+                          type="button"
+                          onClick={() => setIsColumnSelectorOpen(!isColumnSelectorOpen)}
+                          className="flex items-center gap-1.5 px-3 py-1 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                        >
+                          <Eye size={14} className="text-slate-400" />
+                          <span>{language === 'ar' ? 'أعمدة الجدول' : 'Table Columns'}</span>
+                          <ChevronDown size={14} className="text-slate-400" />
+                        </button>
+
+                        {isColumnSelectorOpen && (
+                          <div className="absolute top-full mt-1.5 right-0 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-50 min-w-[220px] max-h-[320px] overflow-y-auto space-y-1 animate-in fade-in slide-in-from-top-2 duration-150">
+                            <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider pb-1.5 mb-1 border-b border-slate-100 flex items-center justify-between">
+                              <span>{language === 'ar' ? 'تخصيص الأعمدة' : 'Customize Columns'}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setVisibleColumns(defaultVisibleColumns);
+                                  if (user?.id) localStorage.setItem(`eta_visible_columns_${user.id}`, JSON.stringify(defaultVisibleColumns));
+                                }}
+                                className="text-[10px] text-indigo-600 hover:underline font-bold cursor-pointer"
+                              >
+                                {language === 'ar' ? 'استعادة الافتراضي' : 'Reset'}
+                              </button>
+                            </div>
+                            {Object.keys(defaultVisibleColumns).map((colKey) => (
+                              <label key={colKey} className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer hover:bg-slate-50 p-1.5 rounded-lg transition-colors select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={visibleColumns[colKey] !== false}
+                                  onChange={() => {
+                                    const updated = {
+                                      ...visibleColumns,
+                                      [colKey]: !visibleColumns[colKey]
+                                    };
+                                    setVisibleColumns(updated);
+                                    if (user?.id) {
+                                      localStorage.setItem(`eta_visible_columns_${user.id}`, JSON.stringify(updated));
+                                    }
+                                  }}
+                                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                                />
+                                <span>{language === 'ar' ? columnLabels[colKey]?.ar : columnLabels[colKey]?.en}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Export to Excel Button */}
                     <button
                       type="button"
-                      onClick={handleExportExcel}
+                      onClick={() => handleExportExcel(false)}
                       disabled={filteredAllInvoices.length === 0}
                       className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition-all shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                       title={language === 'ar' ? 'تصدير كافة النتائج الحالية إلى إكسيل' : 'Export current results to Excel'}
@@ -1688,10 +2002,88 @@ export function EtaReceivedInvoices() {
                         ? `الصفحة ${pageNumber} — عرض ${invoices.length} فاتورة`
                         : `Page ${pageNumber} — showing ${invoices.length} invoices`}
                     </div>
+
+                    {/* View Switcher: Table vs Cards */}
+                    <div className="flex bg-slate-200/70 p-0.5 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => setView('table')}
+                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                          view === 'table' ? 'bg-white text-indigo-600 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                        title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
+                      >
+                        <List size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setView('card')}
+                        className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                          view === 'card' ? 'bg-white text-indigo-600 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                        title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
+                      >
+                        <LayoutGrid size={16} />
+                      </button>
+                    </div>
+
+                    {/* Column Customization Dropdown (أعمدة الجدول) */}
+                    {view === 'table' && (
+                      <div className="relative" ref={columnSelectorRef}>
+                        <button
+                          type="button"
+                          onClick={() => setIsColumnSelectorOpen(!isColumnSelectorOpen)}
+                          className="flex items-center gap-1.5 px-3 py-1 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                        >
+                          <Eye size={14} className="text-slate-400" />
+                          <span>{language === 'ar' ? 'أعمدة الجدول' : 'Table Columns'}</span>
+                          <ChevronDown size={14} className="text-slate-400" />
+                        </button>
+
+                        {isColumnSelectorOpen && (
+                          <div className="absolute top-full mt-1.5 right-0 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 z-50 min-w-[220px] max-h-[320px] overflow-y-auto space-y-1 animate-in fade-in slide-in-from-top-2 duration-150">
+                            <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider pb-1.5 mb-1 border-b border-slate-100 flex items-center justify-between">
+                              <span>{language === 'ar' ? 'تخصيص الأعمدة' : 'Customize Columns'}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setVisibleColumns(defaultVisibleColumns);
+                                  if (user?.id) localStorage.setItem(`eta_visible_columns_${user.id}`, JSON.stringify(defaultVisibleColumns));
+                                }}
+                                className="text-[10px] text-indigo-600 hover:underline font-bold cursor-pointer"
+                              >
+                                {language === 'ar' ? 'استعادة الافتراضي' : 'Reset'}
+                              </button>
+                            </div>
+                            {Object.keys(defaultVisibleColumns).map((colKey) => (
+                              <label key={colKey} className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer hover:bg-slate-50 p-1.5 rounded-lg transition-colors select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={visibleColumns[colKey] !== false}
+                                  onChange={() => {
+                                    const updated = {
+                                      ...visibleColumns,
+                                      [colKey]: !visibleColumns[colKey]
+                                    };
+                                    setVisibleColumns(updated);
+                                    if (user?.id) {
+                                      localStorage.setItem(`eta_visible_columns_${user.id}`, JSON.stringify(updated));
+                                    }
+                                  }}
+                                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                                />
+                                <span>{language === 'ar' ? columnLabels[colKey]?.ar : columnLabels[colKey]?.en}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Export to Excel Button */}
                     <button
                       type="button"
-                      onClick={handleExportExcel}
+                      onClick={() => handleExportExcel(false)}
                       disabled={invoices.length === 0}
                       className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition-all shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                       title={language === 'ar' ? 'تصدير كافة النتائج الحالية إلى إكسيل' : 'Export current results to Excel'}
@@ -1768,152 +2160,306 @@ export function EtaReceivedInvoices() {
             ) : (
               <>
                 {/* TOP SYNCHRONIZED SCROLLBAR (شريط التمرير الأفقي العلوي) */}
-                <div
-                  ref={topScrollRef}
-                  onScroll={handleTopScroll}
-                  dir={dir}
-                  className="overflow-x-auto border-b border-slate-200/90 bg-slate-100/70 select-none scrollbar-thin"
-                  style={{ height: '14px', minHeight: '14px' }}
-                >
-                  <div style={{ width: `${tableScrollWidth}px`, minWidth: '100%', height: '1px' }} />
-                </div>
+                {view === 'table' && (
+                  <div
+                    ref={topScrollRef}
+                    onScroll={handleTopScroll}
+                    dir={dir}
+                    className="overflow-x-auto border-b border-slate-200/90 bg-slate-100/70 select-none scrollbar-thin"
+                    style={{ height: '14px', minHeight: '14px' }}
+                  >
+                    <div style={{ width: `${tableScrollWidth}px`, minWidth: '100%', height: '1px' }} />
+                  </div>
+                )}
 
-                <div ref={tableContainerRef} onScroll={handleTableScroll} dir={dir} className="overflow-x-auto">
+                {/* CARD VIEW */}
+                {view === 'card' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-slate-50/50">
+                    {currentDisplayInvoices.map((inv) => {
+                      const isSelected = selectedUuids.includes(inv.uuid);
+                      return (
+                        <div
+                          key={inv.uuid}
+                          data-uuid={inv.uuid}
+                          className={`bg-white rounded-2xl border p-4 transition-all shadow-2xs hover:shadow-md flex flex-col justify-between gap-3 ${
+                            isSelected ? 'border-indigo-500 bg-indigo-50/20 ring-1 ring-indigo-500' : 'border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          {/* Card Header */}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => handleToggleSelect(inv.uuid)}
+                                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                              />
+                              <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                                <span>{inv.internalId}</span>
+                                {renderDocTypeBadge(inv.typeName, inv.documentTypeName)}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {renderDirectionBadge(inv.direction)}
+                              {renderStatusBadge(inv.status)}
+                            </div>
+                          </div>
+
+                          {/* Card Details */}
+                          <div className="space-y-1.5 text-xs">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-slate-500">{language === 'ar' ? 'الطرف:' : 'Partner:'}</span>
+                              <span className="font-bold text-slate-800 truncate max-w-[180px]" title={inv.direction === 'Sent' ? (inv.receiverName || inv.issuerName) : inv.issuerName}>
+                                {inv.direction === 'Sent' ? (inv.receiverName || 'عميل غير محدد') : (inv.issuerName || 'مورد غير محدد')}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-slate-500">{language === 'ar' ? 'الرقم الضريبي:' : 'Tax ID:'}</span>
+                              <span className="font-mono font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                                {inv.direction === 'Sent' ? (inv.receiverId || inv.issuerId || '-') : (inv.issuerId || '-')}
+                              </span>
+                            </div>
+                            {(inv.address || inv.issuerAddress || inv.receiverAddress) && (
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-slate-500">{language === 'ar' ? 'العنوان:' : 'Address:'}</span>
+                                <span className="text-slate-600 truncate max-w-[180px]">
+                                  {inv.address || inv.issuerAddress || inv.receiverAddress}
+                                </span>
+                              </div>
+                            )}
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-slate-500">{language === 'ar' ? 'تاريخ الإصدار:' : 'Issue Date:'}</span>
+                              <span className="text-slate-600">{formatDateTime(inv.dateTimeIssued)}</span>
+                            </div>
+                          </div>
+
+                          {/* Card Amounts */}
+                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                            <div>
+                              <span className="text-slate-400 block text-[10px]">{language === 'ar' ? 'الصافي' : 'Net'}</span>
+                              <span className="font-semibold text-slate-700">{formatCurrency(inv.netAmount, inv.currency)}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block text-[10px]">{language === 'ar' ? 'الضريبة' : 'Tax'}</span>
+                              <span className="font-semibold text-slate-600">{formatCurrency(inv.taxAmount, inv.currency)}</span>
+                            </div>
+                            <div className="text-end">
+                              <span className="text-slate-400 block text-[10px]">{language === 'ar' ? 'الإجمالي' : 'Total'}</span>
+                              <span className="font-bold text-slate-900 text-sm">{formatCurrency(inv.totalAmount, inv.currency)}</span>
+                            </div>
+                          </div>
+
+                          {/* Card Footer Actions */}
+                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                            <div className="inline-flex items-center gap-1 text-[11px] font-mono text-slate-500 bg-slate-50 px-2 py-1 rounded">
+                              <span className="truncate max-w-[80px]">{inv.uuid.slice(0, 8)}...</span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(inv.uuid, inv.uuid)}
+                                className="text-slate-400 hover:text-indigo-600 p-0.5 rounded cursor-pointer"
+                                title={language === 'ar' ? 'نسخ UUID' : 'Copy UUID'}
+                              >
+                                {copiedUuid === inv.uuid ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedInvoice(inv)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-colors cursor-pointer"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>{language === 'ar' ? 'التفاصيل' : 'Details'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* TABLE VIEW (always in DOM so tableContainerRef is available for PDF export & print) */}
+                <div ref={tableContainerRef} onScroll={handleTableScroll} dir={dir} className={`overflow-x-auto ${view !== 'table' ? 'hidden' : ''}`}>
                   <table className="w-full text-start border-collapse text-xs md:text-sm">
                   <thead>
                     <tr className="border-b border-slate-200/80 bg-slate-50/75 text-slate-600 font-bold">
-                      <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'رقم الفاتورة' : 'Invoice ID'}</th>
-                      <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الاتجاه' : 'Direction'}</th>
-                      <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'النوع' : 'Type'}</th>
-                      <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'المورد / العميل' : 'Partner Name'}</th>
-                      <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الرقم الضريبي' : 'Tax ID'}</th>
-                      <th className="py-3 px-4 text-start whitespace-nowrap min-w-[150px]">{language === 'ar' ? 'العنوان' : 'Address'}</th>
-                      <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'تاريخ الإصدار' : 'Issue Date'}</th>
-                      <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'تاريخ الاستلام' : 'Received Date'}</th>
-                      <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الصافي' : 'Net Amount'}</th>
-                      <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الضريبة' : 'Tax'}</th>
-                      <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الإجمالي' : 'Total'}</th>
-                      <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الحالة' : 'Status'}</th>
-                      <th className="py-3 px-4 text-center whitespace-nowrap">UUID</th>
-                      <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
+                      <th className="py-3 px-4 text-center w-12 no-pdf whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={isAllSelected}
+                          onChange={handleSelectAll}
+                          className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                        />
+                      </th>
+                      {visibleColumns.internal_id && <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'رقم الفاتورة' : 'Invoice ID'}</th>}
+                      {visibleColumns.direction && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الاتجاه' : 'Direction'}</th>}
+                      {visibleColumns.type && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'النوع' : 'Type'}</th>}
+                      {visibleColumns.partner_name && <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'المورد / العميل' : 'Partner Name'}</th>}
+                      {visibleColumns.tax_id && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الرقم الضريبي' : 'Tax ID'}</th>}
+                      {visibleColumns.address && <th className="py-3 px-4 text-start whitespace-nowrap min-w-[150px]">{language === 'ar' ? 'العنوان' : 'Address'}</th>}
+                      {visibleColumns.date_issued && <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'تاريخ الإصدار' : 'Issue Date'}</th>}
+                      {visibleColumns.date_received && <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'تاريخ الاستلام' : 'Received Date'}</th>}
+                      {visibleColumns.net_amount && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الصافي' : 'Net Amount'}</th>}
+                      {visibleColumns.tax_amount && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الضريبة' : 'Tax'}</th>}
+                      {visibleColumns.total_amount && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الإجمالي' : 'Total'}</th>}
+                      {visibleColumns.status && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الحالة' : 'Status'}</th>}
+                      {visibleColumns.uuid && <th className="py-3 px-4 text-center whitespace-nowrap">UUID</th>}
+                      {visibleColumns.actions && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {currentDisplayInvoices.map((inv) => (
-                      <tr key={inv.uuid} className="hover:bg-slate-50/80 transition-colors group">
-                        {/* Internal ID */}
-                        <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
-                          {inv.internalId}
+                      <tr key={inv.uuid} data-uuid={inv.uuid} className={`hover:bg-slate-50/80 transition-colors group ${selectedUuids.includes(inv.uuid) ? 'bg-indigo-50/40' : ''}`}>
+                        {/* Checkbox */}
+                        <td className="py-3.5 px-4 text-center no-pdf whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedUuids.includes(inv.uuid)}
+                            onChange={() => handleToggleSelect(inv.uuid)}
+                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                          />
                         </td>
+
+                        {/* Internal ID */}
+                        {visibleColumns.internal_id && (
+                          <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
+                            {inv.internalId}
+                          </td>
+                        )}
 
                         {/* Direction */}
-                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                          {renderDirectionBadge(inv.direction)}
-                        </td>
+                        {visibleColumns.direction && (
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            {renderDirectionBadge(inv.direction)}
+                          </td>
+                        )}
 
                         {/* Document Type */}
-                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                          {renderDocTypeBadge(inv.typeName, inv.documentTypeName)}
-                        </td>
+                        {visibleColumns.type && (
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            {renderDocTypeBadge(inv.typeName, inv.documentTypeName)}
+                          </td>
+                        )}
 
                         {/* Partner Name */}
-                        <td className="py-3.5 px-4">
-                          <div className="font-semibold text-slate-900 max-w-[200px] truncate" title={inv.direction === 'Sent' ? (inv.receiverName || inv.issuerName) : inv.issuerName}>
-                            {inv.direction === 'Sent' ? (inv.receiverName || 'عميل غير محدد') : (inv.issuerName || 'مورد غير محدد')}
-                          </div>
-                        </td>
+                        {visibleColumns.partner_name && (
+                          <td className="py-3.5 px-4">
+                            <div className="font-semibold text-slate-900 max-w-[200px] truncate" title={inv.direction === 'Sent' ? (inv.receiverName || inv.issuerName) : inv.issuerName}>
+                              {inv.direction === 'Sent' ? (inv.receiverName || 'عميل غير محدد') : (inv.issuerName || 'مورد غير محدد')}
+                            </div>
+                          </td>
+                        )}
 
                         {/* Tax ID */}
-                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                          <span className="inline-block px-2.5 py-1 rounded-lg bg-slate-100 font-mono text-xs font-bold text-slate-700">
-                            {inv.direction === 'Sent' ? (inv.receiverId || inv.issuerId || '-') : (inv.issuerId || '-')}
-                          </span>
-                        </td>
+                        {visibleColumns.tax_id && (
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            <span className="inline-block px-2.5 py-1 rounded-lg bg-slate-100 font-mono text-xs font-bold text-slate-700">
+                              {inv.direction === 'Sent' ? (inv.receiverId || inv.issuerId || '-') : (inv.issuerId || '-')}
+                            </span>
+                          </td>
+                        )}
 
                         {/* Address */}
-                        <td className="py-3.5 px-4 text-slate-600 text-xs max-w-[180px] truncate" title={inv.address || inv.issuerAddress || inv.receiverAddress || '-'}>
-                          {inv.address || inv.issuerAddress || inv.receiverAddress || '-'}
-                        </td>
+                        {visibleColumns.address && (
+                          <td className="py-3.5 px-4 text-slate-600 text-xs max-w-[180px] truncate" title={inv.address || inv.issuerAddress || inv.receiverAddress || '-'}>
+                            {inv.address || inv.issuerAddress || inv.receiverAddress || '-'}
+                          </td>
+                        )}
 
                         {/* Issue Date */}
-                        <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap">
-                          {formatDateTime(inv.dateTimeIssued)}
-                        </td>
+                        {visibleColumns.date_issued && (
+                          <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap">
+                            {formatDateTime(inv.dateTimeIssued)}
+                          </td>
+                        )}
 
                         {/* Received Date */}
-                        <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
-                          {formatDateTime(inv.dateTimeReceived)}
-                        </td>
+                        {visibleColumns.date_received && (
+                          <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
+                            {formatDateTime(inv.dateTimeReceived)}
+                          </td>
+                        )}
 
-                    {/* Net Amount */}
-                    <td className="py-3.5 px-4 text-end font-medium text-slate-700 whitespace-nowrap">
-                      {formatCurrency(inv.netAmount, inv.currency)}
-                    </td>
+                        {/* Net Amount */}
+                        {visibleColumns.net_amount && (
+                          <td className="py-3.5 px-4 text-end font-medium text-slate-700 whitespace-nowrap">
+                            {formatCurrency(inv.netAmount, inv.currency)}
+                          </td>
+                        )}
 
-                    {/* Tax Amount */}
-                    <td className="py-3.5 px-4 text-end font-medium text-slate-600 whitespace-nowrap">
-                      {formatCurrency(inv.taxAmount, inv.currency)}
-                    </td>
+                        {/* Tax Amount */}
+                        {visibleColumns.tax_amount && (
+                          <td className="py-3.5 px-4 text-end font-medium text-slate-600 whitespace-nowrap">
+                            {formatCurrency(inv.taxAmount, inv.currency)}
+                          </td>
+                        )}
 
-                    {/* Total Amount */}
-                    <td className="py-3.5 px-4 text-end font-bold text-slate-900 whitespace-nowrap">
-                      {formatCurrency(inv.totalAmount, inv.currency)}
-                    </td>
+                        {/* Total Amount */}
+                        {visibleColumns.total_amount && (
+                          <td className="py-3.5 px-4 text-end font-bold text-slate-900 whitespace-nowrap">
+                            {formatCurrency(inv.totalAmount, inv.currency)}
+                          </td>
+                        )}
 
-                    {/* Status Badge */}
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                      {renderStatusBadge(inv.status)}
-                    </td>
+                        {/* Status Badge */}
+                        {visibleColumns.status && (
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            {renderStatusBadge(inv.status)}
+                          </td>
+                        )}
 
-                    {/* UUID with click to open & copy */}
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                      <div className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-lg px-2.5 py-1 text-[11px] font-mono transition-all">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedInvoice(inv)}
-                          className="text-indigo-600 hover:text-indigo-800 font-bold underline decoration-indigo-300 hover:decoration-indigo-600 cursor-pointer flex items-center gap-1"
-                          title={language === 'ar' ? 'عرض تفاصيل المستند بالكامل كما بالمنظومة' : 'View full document'}
-                        >
-                          <FileText className="w-3.5 h-3.5 opacity-70" />
-                          <span className="truncate max-w-[95px]">{inv.uuid.slice(0, 10)}...</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCopy(inv.uuid, inv.uuid);
-                          }}
-                          className="text-slate-400 hover:text-indigo-600 p-0.5 rounded transition-colors cursor-pointer"
-                          title={language === 'ar' ? 'نسخ UUID' : 'Copy UUID'}
-                        >
-                          {copiedUuid === inv.uuid ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                          ) : (
-                            <Copy className="w-3.5 h-3.5" />
-                          )}
-                        </button>
-                      </div>
-                    </td>
+                        {/* UUID with click to open & copy */}
+                        {visibleColumns.uuid && (
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-lg px-2.5 py-1 text-[11px] font-mono transition-all">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedInvoice(inv)}
+                                className="text-indigo-600 hover:text-indigo-800 font-bold underline decoration-indigo-300 hover:decoration-indigo-600 cursor-pointer flex items-center gap-1"
+                                title={language === 'ar' ? 'عرض تفاصيل المستند بالكامل كما بالمنظومة' : 'View full document'}
+                              >
+                                <FileText className="w-3.5 h-3.5 opacity-70" />
+                                <span className="truncate max-w-[95px]">{inv.uuid.slice(0, 10)}...</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopy(inv.uuid, inv.uuid);
+                                }}
+                                className="text-slate-400 hover:text-indigo-600 p-0.5 rounded transition-colors cursor-pointer"
+                                title={language === 'ar' ? 'نسخ UUID' : 'Copy UUID'}
+                              >
+                                {copiedUuid === inv.uuid ? (
+                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                ) : (
+                                  <Copy className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            </div>
+                          </td>
+                        )}
 
-                    {/* Actions */}
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedInvoice(inv)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition-colors"
-                        title={language === 'ar' ? 'عرض تفاصيل الفاتورة' : 'View Details'}
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>{language === 'ar' ? 'التفاصيل' : 'Details'}</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+                        {/* Actions */}
+                        {visibleColumns.actions && (
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedInvoice(inv)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition-colors cursor-pointer"
+                              title={language === 'ar' ? 'عرض تفاصيل الفاتورة' : 'View Details'}
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>{language === 'ar' ? 'التفاصيل' : 'Details'}</span>
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
 
             {/* BOTTOM PAGINATION BAR */}
             {renderPaginationBar('bottom')}
