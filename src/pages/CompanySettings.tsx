@@ -472,10 +472,11 @@ export function CompanySettings() {
         setEtaSettings(prev => ({
           ...prev,
           ...res.data,
-          client_secret: res.data.client_secret || etaSettings.client_secret || '',
-          client_secret_configured: Boolean(res.data.client_secret_configured || res.data.client_secret),
-          operating_key: res.data.operating_key || etaSettings.operating_key || '',
-          operating_key_configured: Boolean(res.data.operating_key_configured || res.data.operating_key),
+          client_id: res.data.client_id || etaSettings.client_id || prev.client_id,
+          client_secret: res.data.client_secret || etaSettings.client_secret || prev.client_secret,
+          client_secret_configured: Boolean(res.data.client_secret_configured || res.data.client_secret || etaSettings.client_secret),
+          operating_key: res.data.operating_key || etaSettings.operating_key || prev.operating_key,
+          operating_key_configured: Boolean(res.data.operating_key_configured || res.data.operating_key || etaSettings.operating_key),
           is_configured: Boolean(res.data.is_configured || (res.data.client_id && (res.data.client_secret || res.data.client_secret_configured)))
         }));
         showNotification(
@@ -622,10 +623,11 @@ export function CompanySettings() {
           setEtaSettings(prev => ({
             ...prev,
             ...etaRes.data,
-            client_secret: etaSettings.client_secret || '',
-            client_secret_configured: Boolean(etaRes.data.client_secret_configured || etaSettings.client_secret),
-            operating_key: etaSettings.operating_key || '',
-            operating_key_configured: Boolean(etaRes.data.operating_key_configured || etaSettings.operating_key),
+            client_id: etaRes.data.client_id || etaSettings.client_id || prev.client_id,
+            client_secret: etaRes.data.client_secret || etaSettings.client_secret || prev.client_secret,
+            client_secret_configured: Boolean(etaRes.data.client_secret_configured || etaSettings.client_secret || prev.client_secret),
+            operating_key: etaRes.data.operating_key || etaSettings.operating_key || prev.operating_key,
+            operating_key_configured: Boolean(etaRes.data.operating_key_configured || etaSettings.operating_key || prev.operating_key),
             is_configured: Boolean(etaRes.data.is_configured || (etaRes.data.client_id && (etaRes.data.client_secret_configured || etaSettings.client_secret)))
           }));
         }

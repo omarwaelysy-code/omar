@@ -11313,7 +11313,7 @@ router.post(['/company/eta-settings', '/eta/settings'], authenticateToken, async
       RETURNING 
         id, company_id, environment, activity_code, branch_id,
         country_code, governorate, city, street, building_number,
-        postal_code, client_id,
+        postal_code, client_id, client_secret, operating_key,
         (client_secret IS NOT NULL AND TRIM(client_secret) != '') AS client_secret_configured,
         (operating_key IS NOT NULL AND TRIM(operating_key) != '') AS operating_key_configured,
         last_notification_at,
