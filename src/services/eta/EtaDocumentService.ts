@@ -294,7 +294,151 @@ export class EtaDocumentService {
   private static CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache
 
   /**
-   * Fetch all documents across multi-month periods (Auto-Chunked Full Sync with In-Memory Caching)
+   * Load saved ETA documents from PostgreSQL eta_documents table
+   */
+  public static async getDocumentsFromDatabase(companyId: string): Promise<{ data: EtaReceivedInvoiceDTO[]; lastSyncedAt: string | null }> {
+    if (!companyId) return { data: [], lastSyncedAt: null };
+    try {
+      const res = await pool.query(
+        `SELECT * FROM eta_documents WHERE company_id = $1 ORDER BY date_time_issued DESC`,
+        [companyId]
+      );
+      if (!res.rows || res.rows.length === 0) {
+        return { data: [], lastSyncedAt: null };
+      }
+      let lastSyncedAt: string | null = null;
+      const data: EtaReceivedInvoiceDTO[] = res.rows.map(row => {
+        if (!lastSyncedAt && row.last_synced_at) {
+          lastSyncedAt = new Date(row.last_synced_at).toISOString();
+        }
+        return {
+          uuid: row.uuid,
+          submissionUuid: row.submission_uuid || undefined,
+          longId: row.long_id || undefined,
+          internalId: row.internal_id,
+          typeName: row.type_name || 'I',
+          documentTypeName: row.document_type_name || 'فاتورة',
+          typeVersionName: row.document_type_version || '1.0',
+          direction: row.direction as any,
+          status: row.status || 'Valid',
+          dateTimeIssued: row.date_time_issued ? new Date(row.date_time_issued).toISOString() : '',
+          dateTimeReceived: row.date_time_received ? new Date(row.date_time_received).toISOString() : '',
+          totalSales: Number(row.total_sales_amount || 0),
+          totalDiscount: Number(row.total_discount_amount || 0),
+          netAmount: Number(row.net_amount || 0),
+          taxAmount: Number(row.tax_amount || 0),
+          totalAmount: Number(row.total_amount || 0),
+          currency: row.currency || 'EGP',
+          issuerId: row.issuer_id || '',
+          issuerName: row.issuer_name || '',
+          issuerAddress: row.issuer_address || '',
+          receiverId: row.receiver_id || '',
+          receiverName: row.receiver_name || '',
+          receiverAddress: row.receiver_address || '',
+          address: (row.direction === 'Sent' ? row.receiver_address : row.issuer_address) || row.issuer_address || row.receiver_address || ''
+        };
+      });
+      return { data, lastSyncedAt };
+    } catch (e: any) {
+      console.warn('[ETA DB] Error loading documents from database:', e.message || e);
+      return { data: [], lastSyncedAt: null };
+    }
+  }
+
+  /**
+   * Batch upsert documents to PostgreSQL eta_documents table
+   */
+  public static async saveDocumentsToDatabase(companyId: string, docs: EtaReceivedInvoiceDTO[]): Promise<number> {
+    if (!companyId || !docs || docs.length === 0) return 0;
+    try {
+      let savedCount = 0;
+      for (const doc of docs) {
+        if (!doc.uuid) continue;
+        await pool.query(
+          `INSERT INTO eta_documents (
+            id, company_id, uuid, submission_uuid, long_id, internal_id,
+            type_name, document_type_name, document_type_version, direction,
+            status, date_time_issued, date_time_received,
+            issuer_id, issuer_name, issuer_type, issuer_address,
+            receiver_id, receiver_name, receiver_type, receiver_address,
+            total_sales_amount, total_discount_amount, net_amount, tax_amount, total_amount,
+            extra_discount_amount, total_items_discount_amount, currency, raw_data,
+            last_synced_at, updated_at
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6,
+            $7, $8, $9, $10,
+            $11, $12, $13,
+            $14, $15, $16, $17,
+            $18, $19, $20, $21,
+            $22, $23, $24, $25, $26,
+            $27, $28, $29, $30,
+            NOW(), NOW()
+          )
+          ON CONFLICT (company_id, uuid) DO UPDATE SET
+            long_id = COALESCE(EXCLUDED.long_id, eta_documents.long_id),
+            internal_id = EXCLUDED.internal_id,
+            status = EXCLUDED.status,
+            type_name = EXCLUDED.type_name,
+            document_type_name = EXCLUDED.document_type_name,
+            issuer_name = COALESCE(EXCLUDED.issuer_name, eta_documents.issuer_name),
+            receiver_name = COALESCE(EXCLUDED.receiver_name, eta_documents.receiver_name),
+            issuer_address = COALESCE(NULLIF(EXCLUDED.issuer_address, ''), eta_documents.issuer_address),
+            receiver_address = COALESCE(NULLIF(EXCLUDED.receiver_address, ''), eta_documents.receiver_address),
+            total_sales_amount = EXCLUDED.total_sales_amount,
+            total_discount_amount = EXCLUDED.total_discount_amount,
+            net_amount = EXCLUDED.net_amount,
+            tax_amount = EXCLUDED.tax_amount,
+            total_amount = EXCLUDED.total_amount,
+            raw_data = COALESCE(EXCLUDED.raw_data, eta_documents.raw_data),
+            last_synced_at = NOW(),
+            updated_at = NOW()`,
+          [
+            `eta_${doc.uuid}`,
+            companyId,
+            doc.uuid,
+            doc.submissionUuid || null,
+            doc.longId || null,
+            doc.internalId || '',
+            doc.typeName || 'I',
+            doc.documentTypeName || 'فاتورة',
+            doc.typeVersionName || '1.0',
+            doc.direction || 'Received',
+            doc.status || 'Valid',
+            doc.dateTimeIssued ? new Date(doc.dateTimeIssued) : null,
+            doc.dateTimeReceived ? new Date(doc.dateTimeReceived) : null,
+            doc.issuerId || null,
+            doc.issuerName || null,
+            null,
+            doc.issuerAddress || doc.address || null,
+            doc.receiverId || null,
+            doc.receiverName || null,
+            null,
+            doc.receiverAddress || null,
+            doc.totalSales || 0,
+            doc.totalDiscount || 0,
+            doc.netAmount || 0,
+            doc.taxAmount || 0,
+            doc.totalAmount || 0,
+            0,
+            0,
+            doc.currency || 'EGP',
+            JSON.stringify(doc)
+          ]
+        );
+        savedCount++;
+      }
+      return savedCount;
+    } catch (e: any) {
+      console.error('[ETA Save] Error saving documents to database:', e.message || e);
+      return 0;
+    }
+  }
+
+  private static portalCache: Map<string, { timestamp: number; data: EtaReceivedInvoiceDTO[]; lastSyncedAt?: string }> = new Map();
+  private static CACHE_TTL_MS = 10 * 60 * 1000;
+
+  /**
+   * Fetch all documents across multi-month periods (Full Sync with Persistent DB Storage & Fast Fallback)
    */
   public static async fetchAllDocuments(
     companyId: string,
@@ -311,6 +455,8 @@ export class EtaDocumentService {
     environment: 'preprod' | 'production';
     data: EtaReceivedInvoiceDTO[];
     totalCount: number;
+    lastSyncedAt?: string | null;
+    syncedCount?: number;
   }> {
     const settings = await this.getCompanySettings(companyId);
     if (!settings || !settings.isConfigured) {
@@ -326,22 +472,35 @@ export class EtaDocumentService {
     const targetYear = options.year ? String(options.year) : 'all';
     const currentYear = new Date().getFullYear();
 
-    // Check in-memory cache
-    const cacheKey = `${companyId}_${targetYear}_${options.direction || 'all'}_${options.documentType || 'all'}_${options.status || 'all'}`;
-    if (!options.forceRefresh && this.portalCache.has(cacheKey)) {
-      const cached = this.portalCache.get(cacheKey)!;
-      if (Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
+    // 1. If not forcing refresh, check PostgreSQL persistent storage first (instant 0ms response)
+    if (!options.forceRefresh) {
+      const dbResult = await this.getDocumentsFromDatabase(companyId);
+      if (dbResult.data && dbResult.data.length > 0) {
+        let filtered = dbResult.data;
+        if (options.year && options.year !== 'all') {
+          filtered = filtered.filter(d => (d.dateTimeIssued || '').slice(0, 4) === String(options.year));
+        }
+        if (options.direction && options.direction !== 'all') {
+          filtered = filtered.filter(d => d.direction === options.direction);
+        }
+        if (options.documentType && options.documentType !== 'all') {
+          filtered = filtered.filter(d => d.typeName === options.documentType);
+        }
+        if (options.status && options.status !== 'all') {
+          filtered = filtered.filter(d => d.status === options.status);
+        }
         return {
           success: true,
           isConfigured: true,
           environment: settings.environment,
-          data: cached.data,
-          totalCount: cached.data.length
+          data: filtered,
+          totalCount: filtered.length,
+          lastSyncedAt: dbResult.lastSyncedAt
         };
       }
     }
 
-    // Build 1-month windows (ETA allows up to 31 days per query)
+    // 2. Perform fresh multi-period sync directly from ETA Tax Authority servers
     const windows: { from: string; to: string }[] = [];
     const pad = (n: number) => (n < 10 ? '0' + n : String(n));
 
@@ -356,14 +515,12 @@ export class EtaDocumentService {
     };
 
     if (targetYear === 'all') {
-      // Dynamically scan from currentYear down to 2022 (when company records began on ETA)
       for (let yr = currentYear; yr >= 2022; yr--) {
         const startMonth = (yr === currentYear) ? new Date().getMonth() + 1 : 12;
         const endMonth = 1;
         addYearWindows(yr, startMonth, endMonth);
       }
     } else {
-      // Single specific year (e.g. 2027, 2026, 2025, 2024, 2023, 2022)
       const yr = Number(targetYear) || currentYear;
       const startMonth = (yr === currentYear) ? new Date().getMonth() + 1 : 12;
       const endMonth = 1;
@@ -371,8 +528,6 @@ export class EtaDocumentService {
     }
 
     const docMap = new Map<string, EtaReceivedInvoiceDTO>();
-
-    // If direction is specific ('Received' or 'Sent'), pass it. Otherwise leave undefined to get BOTH in 1 query.
     const queryDirection =
       options.direction && options.direction.toLowerCase() !== 'all'
         ? options.direction
@@ -411,7 +566,6 @@ export class EtaDocumentService {
           hasMore = false;
         }
 
-        // 180ms delay between calls completes ~57 windows in ~17 seconds, well under Nginx 60s timeout
         await new Promise(resolve => setTimeout(resolve, 180));
       }
     }
@@ -422,10 +576,15 @@ export class EtaDocumentService {
     // Enrich with cached or local database partner addresses
     await this.enrichWithPartnerAddresses(companyId, allDocs);
 
-    // Save to cache
+    // 3. Save all synced documents into PostgreSQL eta_documents table permanently
+    const savedCount = await this.saveDocumentsToDatabase(companyId, allDocs);
+
+    const nowIso = new Date().toISOString();
+    const cacheKey = `${companyId}_${targetYear}_${options.direction || 'all'}_${options.documentType || 'all'}_${options.status || 'all'}`;
     this.portalCache.set(cacheKey, {
       timestamp: Date.now(),
-      data: allDocs
+      data: allDocs,
+      lastSyncedAt: nowIso
     });
 
     // Background address resolution for unique unknown partners (non-blocking)
@@ -436,7 +595,9 @@ export class EtaDocumentService {
       isConfigured: true,
       environment: settings.environment,
       data: allDocs,
-      totalCount: allDocs.length
+      totalCount: allDocs.length,
+      lastSyncedAt: nowIso,
+      syncedCount: savedCount
     };
   }
 
@@ -694,6 +855,33 @@ export class EtaDocumentService {
         totalAmount: data?.totalAmount ?? data?.total ?? parsedRawDoc?.totalAmount ?? 0,
         extraDiscountAmount: data?.extraDiscountAmount ?? parsedRawDoc?.extraDiscountAmount ?? 0
       };
+
+      // Persist full enriched details to PostgreSQL eta_documents table
+      try {
+        await pool.query(
+          `UPDATE eta_documents
+           SET raw_data = $1,
+               long_id = COALESCE($2, long_id),
+               issuer_address = COALESCE(NULLIF($3, ''), issuer_address),
+               receiver_address = COALESCE(NULLIF($4, ''), receiver_address),
+               issuer_type = COALESCE($5, issuer_type),
+               receiver_type = COALESCE($6, receiver_type),
+               updated_at = NOW()
+           WHERE company_id = $7 AND uuid = $8`,
+          [
+            JSON.stringify(mergedData),
+            longId || null,
+            issuerAddress || null,
+            receiverAddress || null,
+            issuerType,
+            receiverType,
+            companyId,
+            documentUuid
+          ]
+        );
+      } catch (dbErr) {
+        // Non-fatal if DB is busy or offline
+      }
 
       return { success: true, data: mergedData };
     } catch (err: any) {

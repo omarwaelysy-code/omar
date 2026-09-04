@@ -521,7 +521,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         subItems: [
           { 
             id: 'eta_received_invoices', 
-            label: language === 'ar' ? 'الفواتير الإلكترونية المستلمة' : 'Received Electronic Invoices', 
+            label: language === 'ar' ? 'الوثائق الإلكترونية' : 'Electronic Documents', 
             icon: ArrowDownToLine 
           }
         ]

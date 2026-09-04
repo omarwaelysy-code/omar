@@ -326,7 +326,7 @@ export const MODULE_PERMISSIONS_META: { [moduleId: string]: { labelAr: string; l
   operation_fields: { labelAr: 'تعريف الحقول الإضافية', labelEn: 'Custom Operation Fields', hasCrud: true },
   operations: { labelAr: 'حركات الحسابات الإدارية', labelEn: 'Operation Transactions', hasCrud: true },
   // ETA e-Invoicing
-  eta_received_invoices: { labelAr: 'الفواتير الإلكترونية المستلمة (ETA)', labelEn: 'ETA Received Invoices', hasCrud: true, special: ['print', 'export_pdf', 'export_excel'] }
+  eta_received_invoices: { labelAr: 'الوثائق الإلكترونية (ETA)', labelEn: 'ETA Electronic Documents', hasCrud: true, special: ['print', 'export_pdf', 'export_excel'] }
 };
 
 export interface BusinessPermissionMeta {

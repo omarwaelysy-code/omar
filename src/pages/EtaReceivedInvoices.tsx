@@ -150,6 +150,7 @@ export function EtaReceivedInvoices() {
   const [isConfigured, setIsConfigured] = useState(true);
   const [environment, setEnvironment] = useState<'preprod' | 'production'>('preprod');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
   // Pagination tokens history
   const [currentToken, setCurrentToken] = useState<string | undefined>(undefined);
@@ -428,6 +429,8 @@ export function EtaReceivedInvoices() {
         environment: 'preprod' | 'production';
         data: EtaReceivedInvoice[];
         totalCount: number;
+        lastSyncedAt?: string | null;
+        syncedCount?: number;
       }>(`/eta/invoices/all?${queryParams.toString()}`, 'GET', undefined, 180000);
 
       if (res) {
@@ -436,6 +439,17 @@ export function EtaReceivedInvoices() {
         setAllPortalInvoices(res.data || []);
         setAllFetched(true);
         setClientPage(1);
+        if (res.lastSyncedAt) {
+          setLastSyncedAt(res.lastSyncedAt);
+        }
+        if (isRefresh) {
+          showNotification(
+            language === 'ar'
+              ? `تمت مزامنة وحفظ ${res.data?.length || 0} وثيقة بنجاح من منظومة الضرائب`
+              : `Successfully synced & saved ${res.data?.length || 0} documents from ETA`,
+            'success'
+          );
+        }
       }
     } catch (err: any) {
       console.error('Failed to load all portal invoices:', err);
@@ -447,7 +461,7 @@ export function EtaReceivedInvoices() {
     } finally {
       setAllLoading(false);
     }
-  }, [user?.company_id, showNotification]);
+  }, [user?.company_id, language, showNotification]);
 
   // Dynamic counts for direction tabs (All / Received / Sent)
   const directionCounts = useMemo(() => {
@@ -882,7 +896,7 @@ export function EtaReceivedInvoices() {
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="text-xl md:text-2xl font-bold text-slate-900">
-                {language === 'ar' ? 'الفواتير الإلكترونية المستلمة' : 'Received Electronic Invoices'}
+                {language === 'ar' ? 'الوثائق الإلكترونية' : 'Electronic Documents'}
               </h1>
               <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
                 environment === 'production'
@@ -891,11 +905,21 @@ export function EtaReceivedInvoices() {
               }`}>
                 {environment === 'production' ? 'ETA Production' : 'ETA PreProd'}
               </span>
+              {lastSyncedAt && (
+                <span className="text-[11px] font-medium text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span>
+                    {language === 'ar'
+                      ? `آخر مزامنة: ${new Date(lastSyncedAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`
+                      : `Last Synced: ${new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                  </span>
+                </span>
+              )}
             </div>
             <p className="text-xs md:text-sm text-slate-500 mt-1">
               {language === 'ar'
-                ? 'استعراض فوري ومباشر للفواتير الواردة للشركة على منظومة مصلحة الضرائب المصرية'
-                : 'Live read-only view of incoming electronic invoices from Egyptian Tax Authority'}
+                ? 'استعراض ومزامنة وحفظ فوري لكافة الوثائق (الواردة والصادرة) للشركة على منظومة مصلحة الضرائب المصرية'
+                : 'Live synchronization & persistent storage of electronic documents (Incoming & Outgoing) from ETA'}
             </p>
           </div>
         </div>
@@ -905,11 +929,11 @@ export function EtaReceivedInvoices() {
             type="button"
             onClick={handleRefresh}
             disabled={refreshing || loading || allLoading || !isConfigured}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:border-slate-400 transition-all disabled:opacity-50 shadow-2xs"
-            title={language === 'ar' ? 'تحديث البيانات من منظومة الضرائب' : 'Refresh from ETA'}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white border border-indigo-700 transition-all disabled:opacity-50 shadow-sm cursor-pointer"
+            title={language === 'ar' ? 'مزامنة وحفظ الوثائق من منظومة مصلحة الضرائب' : 'Sync & Save documents from ETA'}
           >
-            <RefreshCw className={`w-4 h-4 text-indigo-600 ${refreshing || allLoading ? 'animate-spin' : ''}`} />
-            <span>{language === 'ar' ? 'تحديث' : 'Refresh'}</span>
+            <RefreshCw className={`w-4 h-4 text-white ${refreshing || allLoading ? 'animate-spin' : ''}`} />
+            <span>{language === 'ar' ? 'تحديث ومزامنة' : 'Refresh & Sync'}</span>
           </button>
         </div>
       </div>
