@@ -86,7 +86,8 @@ const defaultVisibleColumns: Record<string, boolean> = {
   item_code_name: true,
   item_code: true,
   item_description: true,
-  item_quantity_unit: true,
+  item_quantity: true,
+  item_unit: true,
   item_unit_price: true,
   item_sales_total: true,
   item_discount: true,
@@ -109,7 +110,8 @@ const columnLabels: Record<string, { ar: string; en: string }> = {
   item_code_name: { ar: 'اسم الكود', en: 'Code Name' },
   item_code: { ar: 'كود الصنف', en: 'Item Code' },
   item_description: { ar: 'الوصف', en: 'Description' },
-  item_quantity_unit: { ar: 'الكمية / الوحدة', en: 'Quantity / Unit' },
+  item_quantity: { ar: 'الكمية', en: 'Quantity' },
+  item_unit: { ar: 'الوحدة', en: 'Unit' },
   item_unit_price: { ar: 'سعر الوحدة', en: 'Unit Price' },
   item_sales_total: { ar: 'قيمة المبيعات', en: 'Sales Total' },
   item_discount: { ar: 'الخصم', en: 'Discount' },
@@ -137,6 +139,11 @@ export function EtaDetailedInvoices() {
       try {
         const parsed = JSON.parse(saved);
         delete parsed.actions;
+        if (parsed.item_quantity_unit !== undefined) {
+          parsed.item_quantity = parsed.item_quantity ?? parsed.item_quantity_unit;
+          parsed.item_unit = parsed.item_unit ?? parsed.item_quantity_unit;
+          delete parsed.item_quantity_unit;
+        }
         return { ...defaultVisibleColumns, ...parsed };
       } catch (e) {
         console.error(e);
@@ -1848,7 +1855,8 @@ export function EtaDetailedInvoices() {
                         {visibleColumns.item_code_name && <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'اسم الكود' : 'Code Name'}</th>}
                         {visibleColumns.item_code && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'كود الصنف' : 'Item Code'}</th>}
                         {visibleColumns.item_description && <th className="py-3 px-4 text-start whitespace-nowrap min-w-[200px]">{language === 'ar' ? 'الوصف' : 'Description'}</th>}
-                        {visibleColumns.item_quantity_unit && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الكمية / الوحدة' : 'Qty / Unit'}</th>}
+                        {visibleColumns.item_quantity && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الكمية' : 'Quantity'}</th>}
+                        {visibleColumns.item_unit && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الوحدة' : 'Unit'}</th>}
                         {visibleColumns.item_unit_price && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'سعر الوحدة' : 'Unit Price'}</th>}
                         {visibleColumns.item_sales_total && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'قيمة المبيعات' : 'Sales Total'}</th>}
                         {visibleColumns.item_discount && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الخصم' : 'Discount'}</th>}
@@ -1970,11 +1978,21 @@ export function EtaDetailedInvoices() {
                               </td>
                             )}
 
-                            {/* Quantity / Unit (الكمية / الوحدة) */}
-                            {visibleColumns.item_quantity_unit && (
+                            {/* Quantity (الكمية) */}
+                            {visibleColumns.item_quantity && (
                               <td className="py-3.5 px-4 text-center whitespace-nowrap font-semibold text-slate-800">
                                 <span className="font-mono text-indigo-700">{line.quantity}</span>
-                                {line.unitType && <span className="text-slate-400 font-normal mr-1">{line.unitType}</span>}
+                              </td>
+                            )}
+
+                            {/* Unit (الوحدة) */}
+                            {visibleColumns.item_unit && (
+                              <td className="py-3.5 px-4 text-center whitespace-nowrap text-slate-600 font-medium">
+                                {line.unitType ? (
+                                  <span className="inline-block px-2 py-0.5 rounded bg-slate-100 font-mono text-xs text-slate-700">
+                                    {line.unitType}
+                                  </span>
+                                ) : '-'}
                               </td>
                             )}
 
