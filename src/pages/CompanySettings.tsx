@@ -509,6 +509,7 @@ export function CompanySettings() {
             'success'
           );
         }
+        window.dispatchEvent(new Event('eta_settings_updated'));
       } else {
         showNotification(
           language === 'ar'
@@ -557,6 +558,7 @@ export function CompanySettings() {
           is_configured: false
         }));
         setEtaTestResult(null);
+        window.dispatchEvent(new Event('eta_settings_updated'));
         showNotification(
           language === 'ar'
             ? 'تم تفريغ مفاتيح الربط للشركة بنجاح.'

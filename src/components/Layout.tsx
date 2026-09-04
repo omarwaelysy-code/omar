@@ -61,7 +61,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { notificationService } from '../services/notificationService';
-import { dbService } from '../services/dbService';
+import { dbService, apiRequest } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Company } from '../types';
 
@@ -199,6 +199,50 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
     if (!user?.id) return null;
     return localStorage.getItem(`user_avatar_${user.id}`);
   });
+
+  const [etaConfigured, setEtaConfigured] = React.useState<boolean>(() => {
+    if (!user?.company_id) return false;
+    return sessionStorage.getItem(`eta_configured_${user.company_id}`) === 'true';
+  });
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const checkEtaStatus = async () => {
+      if (!user?.company_id) {
+        if (isMounted) setEtaConfigured(false);
+        return;
+      }
+      try {
+        const res = await apiRequest<any>('/company/eta-settings');
+        if (isMounted) {
+          const data = res?.data || res;
+          const isConfigured = Boolean(
+            data &&
+            data.client_id &&
+            data.client_id.trim() !== '' &&
+            (data.is_configured === true || data.is_configured === 'true' || data.client_secret_configured)
+          );
+          sessionStorage.setItem(`eta_configured_${user.company_id}`, String(isConfigured));
+          setEtaConfigured(isConfigured);
+        }
+      } catch (err) {
+        if (isMounted) setEtaConfigured(false);
+      }
+    };
+
+    checkEtaStatus();
+
+    const handleEtaUpdated = () => {
+      checkEtaStatus();
+    };
+
+    window.addEventListener('eta_settings_updated', handleEtaUpdated);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('eta_settings_updated', handleEtaUpdated);
+    };
+  }, [user?.company_id]);
 
   React.useEffect(() => {
     if (user?.id) {
@@ -470,7 +514,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'supplier_settlements', label: t('nav.supplier_settlements') || 'تسويات الموردين', icon: Layers }
         ]
       },
-      {
+      ...(etaConfigured ? [{
         id: 'eta_menu',
         label: 'ETA',
         icon: Building2,
@@ -481,7 +525,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             icon: ArrowDownToLine 
           }
         ]
-      },
+      }] : []),
       {
         id: 'cash',
         label: t('nav.cash'),
@@ -644,12 +688,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
     return filteredByFeatures.map(item => {
       // Check if top-level item should be visible
-      const canView = hasPermission(item.id, 'view') || item.id === 'currencies' || item.id === 'templates_menu' || item.id === 'pos_menu';
+      const canView = hasPermission(item.id, 'view') || item.id === 'currencies' || item.id === 'templates_menu' || item.id === 'pos_menu' || item.id === 'eta_menu';
       
       if (item.subItems) {
         const visibleSubItems = (item.subItems as any[]).filter((sub: any) => {
           if (sub.isDivider || sub.isHeader) return true;
-          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking' || sub.id === 'pos_connected_branches') return true;
+          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking' || sub.id === 'pos_connected_branches' || sub.id === 'eta_received_invoices') return true;
           return hasPermission(sub.id, 'view');
         });
         
@@ -676,7 +720,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       
       return canView ? item : null;
     }).filter(Boolean) as typeof navItems;
-  }, [user, isSuperAdmin, isCompanyAdmin, hasPermission, company, t, language, featuresLoaded, activeFeatures]);
+  }, [user, isSuperAdmin, isCompanyAdmin, hasPermission, company, t, language, featuresLoaded, activeFeatures, etaConfigured]);
 
 
   // Update nav item click to use openTab
