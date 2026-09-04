@@ -507,37 +507,152 @@ export class EtaDocumentService {
 
       clearTimeout(timeoutId);
 
+      // Parse inner raw document string if wrapped by ETA
+      let parsedRawDoc: any = null;
+      if (rawDoc) {
+        if (typeof rawDoc.document === 'string') {
+          try {
+            parsedRawDoc = JSON.parse(rawDoc.document);
+          } catch (e) {
+            console.warn('Could not parse rawDoc.document string:', e);
+          }
+        } else if (rawDoc.document && typeof rawDoc.document === 'object') {
+          parsedRawDoc = rawDoc.document;
+        } else {
+          parsedRawDoc = rawDoc;
+        }
+      }
+
       // Construct portal share URL matching ETA specifications
       const portalHost = environment === 'production' ? 'invoicing.eta.gov.eg' : 'preprod.invoicing.eta.gov.eg';
-      const longId = data?.longId || data?.document?.longId || rawDoc?.longId;
+      const longId = data?.longId || data?.document?.longId || parsedRawDoc?.longId || rawDoc?.longId;
       const shareUrl =
         data?.publicUrl ||
         (longId
           ? `https://${portalHost}/documents/${encodeURIComponent(documentUuid)}/share/${longId}`
           : `https://${portalHost}/documents/${encodeURIComponent(documentUuid)}`);
 
+      // Address formatting helper
+      const formatAddr = (addr: any) => {
+        if (!addr) return '';
+        if (typeof addr === 'string') return addr.trim();
+        const parts = [
+          addr.buildingNumber,
+          addr.street,
+          addr.regionCity,
+          addr.city,
+          addr.governate,
+          addr.governorate,
+          addr.country
+        ].map((p: any) => (p ? String(p).trim() : '')).filter(Boolean);
+        const uniqueParts: string[] = [];
+        for (const p of parts) {
+          if (!uniqueParts.includes(p)) uniqueParts.push(p);
+        }
+        return uniqueParts.join('، ');
+      };
+
+      // Type formatting helper (B/0 = شركة, P/1 = فرد, F/2 = أجنبي)
+      const formatPartnerType = (type: any) => {
+        const t = String(type ?? '').toUpperCase().trim();
+        if (t === 'B' || t === '0' || t === 'BUSINESS' || t === 'COMPANY') return 'شركة';
+        if (t === 'P' || t === '1' || t === 'PERSON' || t === 'INDIVIDUAL') return 'فرد';
+        if (t === 'F' || t === '2' || t === 'FOREIGNER') return 'أجنبي';
+        return 'شركة';
+      };
+
+      const issuerObj = parsedRawDoc?.issuer || data?.issuer || {};
+      const receiverObj = parsedRawDoc?.receiver || data?.receiver || {};
+
+      const issuerAddress = formatAddr(issuerObj.address || data?.issuer?.address);
+      const receiverAddress = formatAddr(receiverObj.address || data?.receiver?.address);
+
+      const issuerType = formatPartnerType(issuerObj.type ?? data?.issuer?.type);
+      const receiverType = formatPartnerType(receiverObj.type ?? data?.receiver?.type);
+
       // Automatically cache partner addresses learned from full document details
-      if (data?.issuer || rawDoc?.issuer) {
-        const issuer = data?.issuer || rawDoc?.issuer;
+      if (issuerObj.id) {
         await this.savePartnerAddress({
-          taxNumber: issuer.id,
-          name: issuer.name,
-          addressObj: issuer.address
+          taxNumber: issuerObj.id,
+          name: issuerObj.name,
+          addressObj: issuerObj.address
         });
       }
-      if (data?.receiver || rawDoc?.receiver) {
-        const receiver = data?.receiver || rawDoc?.receiver;
+      if (receiverObj.id) {
         await this.savePartnerAddress({
-          taxNumber: receiver.id,
-          name: receiver.name,
-          addressObj: receiver.address
+          taxNumber: receiverObj.id,
+          name: receiverObj.name,
+          addressObj: receiverObj.address
         });
       }
 
+      // Merge and normalize invoice lines from details or parsed raw document
+      const rawLines = Array.isArray(parsedRawDoc?.invoiceLines) ? parsedRawDoc.invoiceLines : [];
+      const detailsLines = Array.isArray(data?.invoiceLines) ? data.invoiceLines : [];
+      const baseLines = detailsLines.length > 0 ? detailsLines : rawLines;
+
+      const normalizedLines = baseLines.map((line: any, idx: number) => {
+        const matchingRaw = rawLines[idx] || {};
+        const description = line.description || matchingRaw.description || line.itemPrimaryName || '---';
+        const itemCodeName = line.itemPrimaryName || line.itemSecondaryName || matchingRaw.itemPrimaryName || '---';
+        const itemCode = line.itemCode || matchingRaw.itemCode || '---';
+        const itemType = line.itemType || matchingRaw.itemType || 'EGS';
+        const unitType = line.unitType || matchingRaw.unitType || '';
+        const quantity = Number(line.quantity ?? matchingRaw.quantity ?? 1);
+        const unitPrice = Number(
+          line.unitValue?.amountEGP ||
+          matchingRaw.unitValue?.amountEGP ||
+          line.unitValue?.amountSold ||
+          matchingRaw.unitValue?.amountSold ||
+          line.unitPrice ||
+          matchingRaw.unitPrice ||
+          0
+        );
+        const salesTotal = Number(line.salesTotal ?? matchingRaw.salesTotal ?? (quantity * unitPrice));
+        const discountAmount = Number(
+          line.itemsDiscount ??
+          matchingRaw.itemsDiscount ??
+          line.discount?.amount ??
+          matchingRaw.discount?.amount ??
+          0
+        );
+
+        // Taxes breakdown on item line
+        let taxesList = Array.isArray(line.lineTaxableItems) && line.lineTaxableItems.length > 0
+          ? line.lineTaxableItems
+          : (Array.isArray(matchingRaw.taxableItems) && matchingRaw.taxableItems.length > 0 ? matchingRaw.taxableItems : []);
+
+        const taxAmount = taxesList.reduce((acc: number, t: any) => acc + (Number(t.amount) || 0), 0);
+        const lineTotal = Number(
+          line.total ??
+          matchingRaw.total ??
+          line.netTotal ??
+          matchingRaw.netTotal ??
+          (salesTotal - discountAmount + taxAmount)
+        );
+
+        return {
+          ...matchingRaw,
+          ...line,
+          description,
+          itemCodeName,
+          itemCode,
+          itemType,
+          unitType,
+          quantity,
+          unitPrice,
+          salesTotal,
+          discountAmount,
+          taxAmount,
+          taxesList,
+          lineTotal
+        };
+      });
+
       const mergedData = {
-        ...rawDoc,
+        ...parsedRawDoc,
         ...data,
-        rawDocument: rawDoc,
+        rawDocument: parsedRawDoc || rawDoc,
         details: data,
         uuid: documentUuid,
         longId: longId || undefined,
@@ -545,19 +660,39 @@ export class EtaDocumentService {
         publicUrl: shareUrl,
         environment,
         portalHost,
-        invoiceLines: data?.invoiceLines || data?.document?.invoiceLines || rawDoc?.invoiceLines || [],
-        taxTotals: data?.taxTotals || data?.document?.taxTotals || rawDoc?.taxTotals || [],
-        signatures: data?.signatures || data?.document?.signatures || rawDoc?.signatures || [],
+        issuer: {
+          ...issuerObj,
+          name: issuerObj.name || data?.issuer?.name,
+          id: issuerObj.id || data?.issuer?.id,
+          type: issuerType,
+          typeName: issuerType,
+          address: issuerObj.address || data?.issuer?.address
+        },
+        receiver: {
+          ...receiverObj,
+          name: receiverObj.name || data?.receiver?.name,
+          id: receiverObj.id || data?.receiver?.id,
+          type: receiverType,
+          typeName: receiverType,
+          address: receiverObj.address || data?.receiver?.address
+        },
+        issuerAddress,
+        receiverAddress,
+        issuerType,
+        receiverType,
+        invoiceLines: normalizedLines,
+        taxTotals: data?.taxTotals || parsedRawDoc?.taxTotals || [],
+        signatures: data?.signatures || parsedRawDoc?.signatures || [],
         taxpayerActivityCode:
           data?.taxpayerActivityCode ||
-          rawDoc?.taxpayerActivityCode ||
-          data?.issuer?.activityCode ||
-          rawDoc?.issuer?.activityCode,
-        totalSalesAmount: data?.totalSalesAmount ?? data?.totalSales ?? rawDoc?.totalSalesAmount ?? 0,
-        totalDiscountAmount: data?.totalDiscountAmount ?? data?.totalDiscount ?? rawDoc?.totalDiscountAmount ?? 0,
-        netAmount: data?.netAmount ?? rawDoc?.netAmount ?? 0,
-        totalAmount: data?.totalAmount ?? data?.total ?? rawDoc?.totalAmount ?? 0,
-        extraDiscountAmount: data?.extraDiscountAmount ?? rawDoc?.extraDiscountAmount ?? 0
+          parsedRawDoc?.taxpayerActivityCode ||
+          issuerObj?.activityCode ||
+          '---',
+        totalSalesAmount: data?.totalSalesAmount ?? data?.totalSales ?? parsedRawDoc?.totalSalesAmount ?? 0,
+        totalDiscountAmount: data?.totalDiscountAmount ?? data?.totalDiscount ?? parsedRawDoc?.totalDiscountAmount ?? 0,
+        netAmount: data?.netAmount ?? parsedRawDoc?.netAmount ?? 0,
+        totalAmount: data?.totalAmount ?? data?.total ?? parsedRawDoc?.totalAmount ?? 0,
+        extraDiscountAmount: data?.extraDiscountAmount ?? parsedRawDoc?.extraDiscountAmount ?? 0
       };
 
       return { success: true, data: mergedData };

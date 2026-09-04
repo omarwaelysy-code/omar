@@ -225,7 +225,7 @@ export function EtaReceivedInvoices() {
     setFullInvoiceDetails(null);
     setModalActiveTab('summary');
 
-    apiRequest<{ success: boolean; data: any }>(`/api/erp/eta/invoices/${encodeURIComponent(selectedInvoice.uuid)}/details`)
+    apiRequest<{ success: boolean; data: any }>(`/eta/invoices/${encodeURIComponent(selectedInvoice.uuid)}/details`)
       .then(res => {
         if (!isMounted || !res?.data) return;
 
@@ -2099,85 +2099,133 @@ export function EtaReceivedInvoices() {
                 </div>
 
                 {/* Parties (Seller & Buyer) — ETA Portal Styled */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Seller / البائع */}
-                  <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-xs bg-white">
-                    <div className="bg-[#1e3a5f] text-white px-4 py-2 font-bold text-xs flex items-center justify-between">
-                      <span>{language === 'ar' ? 'البائع' : 'Seller / Issuer'}</span>
-                      <span className="text-[11px] opacity-80 font-normal">
-                        {fullInvoiceDetails?.issuer?.type === 'B' || fullInvoiceDetails?.issuer?.type === 'C'
-                          ? (language === 'ar' ? 'شركة' : 'Company')
-                          : (language === 'ar' ? 'فرد' : 'Individual')}
-                      </span>
-                    </div>
-                    <div className="p-4 space-y-2.5 text-xs">
-                      <div className="grid grid-cols-3 gap-2">
-                        <span className="text-slate-400 font-medium">{language === 'ar' ? 'الاسم:' : 'Name:'}</span>
-                        <span className="col-span-2 font-bold text-slate-900 leading-snug">
-                          {fullInvoiceDetails?.issuer?.name || selectedInvoice.issuerName}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <span className="text-slate-400 font-medium">{language === 'ar' ? 'رقم التسجيل:' : 'Tax ID:'}</span>
-                        <span className="col-span-2 font-mono font-bold text-slate-800">
-                          {fullInvoiceDetails?.issuer?.id || selectedInvoice.issuerId}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <span className="text-slate-400 font-medium">{language === 'ar' ? 'كود النشاط:' : 'Activity Code:'}</span>
-                        <span className="col-span-2 font-mono font-bold text-slate-800">
-                          {fullInvoiceDetails?.taxpayerActivityCode || fullInvoiceDetails?.issuer?.activityCode || '---'}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100">
-                        <span className="text-slate-400 font-medium">{language === 'ar' ? 'عنوان الفرع:' : 'Address:'}</span>
-                        <span className="col-span-2 text-slate-700 leading-relaxed font-medium">
-                          {fullInvoiceDetails?.issuerAddress || selectedInvoice.issuerAddress || selectedInvoice.address || '---'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                {(() => {
+                  const formatPartnerType = (t: any) => {
+                    if (t === null || t === undefined || t === '') return language === 'ar' ? 'شركة' : 'Company';
+                    const s = String(t).trim().toUpperCase();
+                    if (s === '0' || s === 'B' || s === 'C' || s === 'BUSINESS' || s === 'COMPANY' || s === 'شركة') {
+                      return language === 'ar' ? 'شركة' : 'Company';
+                    }
+                    if (s === '1' || s === 'P' || s === 'PERSON' || s === 'INDIVIDUAL' || s === 'فرد') {
+                      return language === 'ar' ? 'فرد' : 'Individual';
+                    }
+                    if (s === '2' || s === 'F' || s === 'FOREIGNER' || s === 'أجنبي') {
+                      return language === 'ar' ? 'أجنبي' : 'Foreigner';
+                    }
+                    return language === 'ar' ? 'شركة' : 'Company';
+                  };
 
-                  {/* Buyer / المشتري */}
-                  <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-xs bg-white">
-                    <div className="bg-[#1e3a5f] text-white px-4 py-2 font-bold text-xs flex items-center justify-between">
-                      <span>{language === 'ar' ? 'المشتري' : 'Buyer / Recipient'}</span>
-                      <span className="text-[11px] opacity-80 font-normal">
-                        {fullInvoiceDetails?.receiver?.type === 'B' || fullInvoiceDetails?.receiver?.type === 'C'
-                          ? (language === 'ar' ? 'شركة' : 'Company')
-                          : (language === 'ar' ? 'فرد' : 'Individual')}
-                      </span>
+                  const formatAddr = (addr: any) => {
+                    if (!addr) return '';
+                    if (typeof addr === 'string') return addr.trim();
+                    const parts = [
+                      addr.buildingNumber,
+                      addr.street,
+                      addr.regionCity,
+                      addr.city,
+                      addr.governate,
+                      addr.governorate,
+                      addr.country
+                    ].map((p: any) => (p ? String(p).trim() : '')).filter(Boolean);
+                    const uniqueParts: string[] = [];
+                    for (const p of parts) {
+                      if (!uniqueParts.includes(p)) uniqueParts.push(p);
+                    }
+                    return uniqueParts.join('، ');
+                  };
+
+                  const issuerTypeDisplay = formatPartnerType(fullInvoiceDetails?.issuerType || fullInvoiceDetails?.issuer?.type);
+                  const receiverTypeDisplay = formatPartnerType(fullInvoiceDetails?.receiverType || fullInvoiceDetails?.receiver?.type);
+
+                  const issuerAddressDisplay =
+                    fullInvoiceDetails?.issuerAddress ||
+                    formatAddr(fullInvoiceDetails?.issuer?.address) ||
+                    selectedInvoice.issuerAddress ||
+                    selectedInvoice.address ||
+                    '---';
+
+                  const receiverAddressDisplay =
+                    fullInvoiceDetails?.receiverAddress ||
+                    formatAddr(fullInvoiceDetails?.receiver?.address) ||
+                    selectedInvoice.receiverAddress ||
+                    '---';
+
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Seller / البائع */}
+                      <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-xs bg-white">
+                        <div className="bg-[#1e3a5f] text-white px-4 py-2 font-bold text-xs flex items-center justify-between">
+                          <span>{language === 'ar' ? 'البائع' : 'Seller / Issuer'}</span>
+                          <span className="text-[11px] opacity-90 font-medium bg-white/10 px-2 py-0.5 rounded">
+                            {issuerTypeDisplay}
+                          </span>
+                        </div>
+                        <div className="p-4 space-y-2.5 text-xs">
+                          <div className="grid grid-cols-3 gap-2">
+                            <span className="text-slate-400 font-medium">{language === 'ar' ? 'الاسم:' : 'Name:'}</span>
+                            <span className="col-span-2 font-bold text-slate-900 leading-snug">
+                              {fullInvoiceDetails?.issuer?.name || selectedInvoice.issuerName}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <span className="text-slate-400 font-medium">{language === 'ar' ? 'رقم التسجيل:' : 'Tax ID:'}</span>
+                            <span className="col-span-2 font-mono font-bold text-slate-800">
+                              {fullInvoiceDetails?.issuer?.id || selectedInvoice.issuerId}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <span className="text-slate-400 font-medium">{language === 'ar' ? 'كود النشاط:' : 'Activity Code:'}</span>
+                            <span className="col-span-2 font-mono font-bold text-slate-800">
+                              {fullInvoiceDetails?.taxpayerActivityCode || fullInvoiceDetails?.issuer?.activityCode || '---'}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100">
+                            <span className="text-slate-400 font-medium">{language === 'ar' ? 'عنوان الفرع:' : 'Address:'}</span>
+                            <span className="col-span-2 text-slate-700 leading-relaxed font-medium">
+                              {issuerAddressDisplay}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Buyer / المشتري */}
+                      <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-xs bg-white">
+                        <div className="bg-[#1e3a5f] text-white px-4 py-2 font-bold text-xs flex items-center justify-between">
+                          <span>{language === 'ar' ? 'المشتري' : 'Buyer / Recipient'}</span>
+                          <span className="text-[11px] opacity-90 font-medium bg-white/10 px-2 py-0.5 rounded">
+                            {receiverTypeDisplay}
+                          </span>
+                        </div>
+                        <div className="p-4 space-y-2.5 text-xs">
+                          <div className="grid grid-cols-3 gap-2">
+                            <span className="text-slate-400 font-medium">{language === 'ar' ? 'الاسم:' : 'Name:'}</span>
+                            <span className="col-span-2 font-bold text-slate-900 leading-snug">
+                              {fullInvoiceDetails?.receiver?.name || selectedInvoice.receiverName || (user?.company_name || 'شركتنا')}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <span className="text-slate-400 font-medium">{language === 'ar' ? 'رقم التسجيل:' : 'Tax ID:'}</span>
+                            <span className="col-span-2 font-mono font-bold text-slate-800">
+                              {fullInvoiceDetails?.receiver?.id || selectedInvoice.receiverId || '---'}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <span className="text-slate-400 font-medium">{language === 'ar' ? 'النوع:' : 'Type:'}</span>
+                            <span className="col-span-2 font-medium text-slate-800">
+                              {receiverTypeDisplay}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100">
+                            <span className="text-slate-400 font-medium">{language === 'ar' ? 'العنوان:' : 'Address:'}</span>
+                            <span className="col-span-2 text-slate-700 leading-relaxed font-medium">
+                              {receiverAddressDisplay}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="p-4 space-y-2.5 text-xs">
-                      <div className="grid grid-cols-3 gap-2">
-                        <span className="text-slate-400 font-medium">{language === 'ar' ? 'الاسم:' : 'Name:'}</span>
-                        <span className="col-span-2 font-bold text-slate-900 leading-snug">
-                          {fullInvoiceDetails?.receiver?.name || selectedInvoice.receiverName || (user?.company_name || 'شركتنا')}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <span className="text-slate-400 font-medium">{language === 'ar' ? 'رقم التسجيل:' : 'Tax ID:'}</span>
-                        <span className="col-span-2 font-mono font-bold text-slate-800">
-                          {fullInvoiceDetails?.receiver?.id || selectedInvoice.receiverId || '---'}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <span className="text-slate-400 font-medium">{language === 'ar' ? 'النوع:' : 'Type:'}</span>
-                        <span className="col-span-2 font-medium text-slate-700">
-                          {fullInvoiceDetails?.receiver?.type === 'B' || fullInvoiceDetails?.receiver?.type === 'C'
-                            ? (language === 'ar' ? 'شركة' : 'Company')
-                            : (language === 'ar' ? 'فرد' : 'Individual')}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100">
-                        <span className="text-slate-400 font-medium">{language === 'ar' ? 'العنوان:' : 'Address:'}</span>
-                        <span className="col-span-2 text-slate-700 leading-relaxed font-medium">
-                          {fullInvoiceDetails?.receiverAddress || selectedInvoice.receiverAddress || '---'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 {/* Line Items Table (الأصناف) */}
                 <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-xs bg-white">
@@ -2197,12 +2245,13 @@ export function EtaReceivedInvoices() {
                       <thead className="bg-slate-100/80 text-slate-700 font-bold border-b border-slate-200">
                         <tr>
                           <th className="py-2.5 px-3 text-center w-10">#</th>
-                          <th className="py-2.5 px-3 text-start min-w-[200px]">{language === 'ar' ? 'الوصف / اسم الصنف' : 'Description'}</th>
-                          <th className="py-2.5 px-3 text-start min-w-[140px]">{language === 'ar' ? 'كود الصنف' : 'Item Code'}</th>
+                          <th className="py-2.5 px-3 text-start min-w-[130px]">{language === 'ar' ? 'اسم الكود' : 'Code Name'}</th>
+                          <th className="py-2.5 px-3 text-start min-w-[130px]">{language === 'ar' ? 'كود الصنف' : 'Item Code'}</th>
+                          <th className="py-2.5 px-3 text-start min-w-[180px]">{language === 'ar' ? 'الوصف' : 'Description'}</th>
                           <th className="py-2.5 px-3 text-center min-w-[90px]">{language === 'ar' ? 'الكمية / الوحدة' : 'Qty / Unit'}</th>
                           <th className="py-2.5 px-3 text-end min-w-[100px]">{language === 'ar' ? 'سعر الوحدة' : 'Unit Price'}</th>
                           <th className="py-2.5 px-3 text-end min-w-[100px]">{language === 'ar' ? 'قيمة المبيعات' : 'Sales Total'}</th>
-                          <th className="py-2.5 px-3 text-end min-w-[90px]">{language === 'ar' ? 'الخصم' : 'Discount'}</th>
+                          <th className="py-2.5 px-3 text-end min-w-[80px]">{language === 'ar' ? 'الخصم' : 'Discount'}</th>
                           <th className="py-2.5 px-3 text-end min-w-[90px]">{language === 'ar' ? 'الضرائب' : 'Taxes'}</th>
                           <th className="py-2.5 px-3 text-end min-w-[110px]">{language === 'ar' ? 'إجمالي المبلغ' : 'Total Amount'}</th>
                         </tr>
@@ -2210,26 +2259,50 @@ export function EtaReceivedInvoices() {
                       <tbody className="divide-y divide-slate-100">
                         {Array.isArray(fullInvoiceDetails?.invoiceLines) && fullInvoiceDetails.invoiceLines.length > 0 ? (
                           fullInvoiceDetails.invoiceLines.map((line: any, idx: number) => {
-                            const unitPrice = Number(line?.unitValue?.amountEGP || line?.unitValue?.amountSold || line?.unitPrice || 0);
-                            const salesTotal = Number(line?.salesTotal || (line?.quantity * unitPrice) || 0);
-                            const discountAmount = Number(line?.itemsDiscount || line?.discount?.amount || 0);
-                            const taxAmount = Array.isArray(line?.taxableItems)
-                              ? line.taxableItems.reduce((acc: number, t: any) => acc + (Number(t?.amount) || 0), 0)
-                              : 0;
-                            const lineTotal = Number(line?.total || line?.netTotal || (salesTotal - discountAmount + taxAmount) || 0);
+                            const codeName = line.itemCodeName || line.itemPrimaryName || line.description || '---';
+                            const itemCode = line.itemCode || '---';
+                            const description = line.description || line.itemCodeName || '---';
+                            const unitPrice = Number(
+                              line?.unitPrice ||
+                              line?.unitValue?.amountEGP ||
+                              line?.unitValue?.amountSold ||
+                              0
+                            );
+                            const salesTotal = Number(line?.salesTotal ?? (line?.quantity * unitPrice) ?? 0);
+                            const discountAmount = Number(
+                              line?.discountAmount ??
+                              line?.itemsDiscount ??
+                              line?.discount?.amount ??
+                              0
+                            );
+                            const taxAmount = Number(
+                              line?.taxAmount ??
+                              (Array.isArray(line?.lineTaxableItems)
+                                ? line.lineTaxableItems.reduce((acc: number, t: any) => acc + (Number(t?.amount) || 0), 0)
+                                : Array.isArray(line?.taxableItems)
+                                ? line.taxableItems.reduce((acc: number, t: any) => acc + (Number(t?.amount) || 0), 0)
+                                : 0)
+                            );
+                            const lineTotal = Number(
+                              line?.lineTotal ??
+                              line?.total ??
+                              line?.netTotal ??
+                              (salesTotal - discountAmount + taxAmount)
+                            );
 
                             return (
                               <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
                                 <td className="py-2.5 px-3 text-center text-slate-400 font-mono font-semibold">{idx + 1}</td>
-                                <td className="py-2.5 px-3 font-semibold text-slate-900 leading-snug">{line.description || '---'}</td>
+                                <td className="py-2.5 px-3 font-semibold text-slate-800 leading-snug">{codeName}</td>
                                 <td className="py-2.5 px-3 font-mono text-[11px] text-slate-700">
                                   <span className="bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-[10px] text-slate-600 me-1">
                                     {line.itemType || 'EGS'}
                                   </span>
-                                  <span>{line.itemCode || '---'}</span>
+                                  <span>{itemCode}</span>
                                 </td>
+                                <td className="py-2.5 px-3 text-slate-700 leading-snug">{description}</td>
                                 <td className="py-2.5 px-3 text-center font-bold text-slate-800">
-                                  {line.quantity} <span className="text-[10px] font-normal text-slate-500">{line.unitType || ''}</span>
+                                  {line.quantity ?? 1} <span className="text-[10px] font-normal text-slate-500">{line.unitType || ''}</span>
                                 </td>
                                 <td className="py-2.5 px-3 text-end font-mono text-slate-800">{formatCurrency(unitPrice, selectedInvoice.currency)}</td>
                                 <td className="py-2.5 px-3 text-end font-mono text-slate-800">{formatCurrency(salesTotal, selectedInvoice.currency)}</td>
@@ -2245,14 +2318,14 @@ export function EtaReceivedInvoices() {
                           })
                         ) : modalDetailsLoading ? (
                           <tr>
-                            <td colSpan={9} className="py-8 text-center text-slate-400">
+                            <td colSpan={10} className="py-8 text-center text-slate-400">
                               <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-indigo-600" />
                               <span>{language === 'ar' ? 'جاري جلب بنود الفاتورة الرسمية من منظومة الضرائب المصرية...' : 'Loading official invoice lines from ETA...'}</span>
                             </td>
                           </tr>
                         ) : (
                           <tr>
-                            <td colSpan={9} className="py-6 text-center text-slate-500">
+                            <td colSpan={10} className="py-6 text-center text-slate-500">
                               {language === 'ar' ? 'تم جلب ملخص الفاتورة بنجاح. لا توجد بنود تفصيلية معروضة.' : 'Invoice summary loaded.'}
                             </td>
                           </tr>

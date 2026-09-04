@@ -204,7 +204,10 @@ export async function apiRequest<T>(path: string, method: string = 'GET', body?:
   }
 
   try {
-    const response = await fetch(`${API_BASE}${path}`, {
+    const requestUrl = path.startsWith('/api/erp')
+      ? path
+      : `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`;
+    const response = await fetch(requestUrl, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
@@ -221,7 +224,7 @@ export async function apiRequest<T>(path: string, method: string = 'GET', body?:
         if (password !== null && password !== '') {
           setBypassPassword(password);
           
-          const retryResponse = await fetch(`${API_BASE}${path}`, {
+          const retryResponse = await fetch(requestUrl, {
             method,
             headers: {
               'Content-Type': 'application/json',
