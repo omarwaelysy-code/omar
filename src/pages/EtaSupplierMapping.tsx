@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
+import { useNavigation } from '../contexts/NavigationContext';
 import { apiRequest } from '../services/dbService';
 import { formatMoney } from '../utils/formatUtils';
 import { exportToExcel } from '../utils/excelUtils';
@@ -80,6 +81,7 @@ interface ErpSupplierOption {
 export function EtaSupplierMapping() {
   const { language } = useLanguage();
   const { showNotification } = useNotification();
+  const { openTab, setPendingEtaSupplierForCreation } = useNavigation();
   const isAr = language === 'ar';
 
   // Tabs: all = كل الموردين الواردة من البوابة, linked = الموردين المربوطة, unlinked = الموردين غير المربوطة
@@ -120,19 +122,6 @@ export function EtaSupplierMapping() {
   const [linkNotes, setLinkNotes] = useState<string>('');
   const [modalSearchSupplier, setModalSearchSupplier] = useState<string>('');
   const [savingLink, setSavingLink] = useState(false);
-
-  // Create & Link Modal
-  const [createModalSupplier, setCreateModalSupplier] = useState<EtaPortalSupplier | null>(null);
-  const [createForm, setCreateForm] = useState({
-    name: '',
-    taxNumber: '',
-    address: '',
-    phone: '',
-    account_id: '',
-    account_name: '',
-    notes: ''
-  });
-  const [savingCreate, setSavingCreate] = useState(false);
 
   // Unlink Confirmation Modal
   const [unlinkSupplierTarget, setUnlinkSupplierTarget] = useState<EtaPortalSupplier | null>(null);
@@ -334,72 +323,20 @@ export function EtaSupplierMapping() {
     }
   };
 
-  // Open Create & Link Modal
-  const openCreateModal = (supplier: EtaPortalSupplier) => {
-    const defaultAcc = supplierAccounts.find(a => a.account_usage === 'supplier')
-      || supplierAccounts.find(a => a.account_usage === 'accounts_payable')
-      || supplierAccounts.find(a => a.code === '210101')
-      || supplierAccounts[0];
-
-    setCreateModalSupplier(supplier);
-    setCreateForm({
-      name: supplier.name || '',
-      taxNumber: supplier.taxNumber || '',
-      address: supplier.address || '',
-      phone: '',
-      account_id: defaultAcc?.id || '',
-      account_name: defaultAcc?.name || '',
-      notes: isAr ? 'تم إنشاؤه وربطه تلقائياً من منظومة الفاتورة الإلكترونية ETA' : 'Created & mapped from ETA Portal'
+  // Redirect to official Suppliers screen to create with all official accounting accounts and link immediately
+  const handleOpenCreateInSuppliers = (supplier: EtaPortalSupplier) => {
+    setPendingEtaSupplierForCreation({
+      name: supplier.name,
+      taxNumber: supplier.taxNumber,
+      address: supplier.address
     });
-  };
-
-  // Save Create & Link
-  const handleSaveCreateAndLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!createModalSupplier) return;
-    if (!createForm.name.trim()) {
-      showNotification(isAr ? 'اسم المورد مطلوب' : 'Supplier name is required', 'warning');
-      return;
-    }
-    if (!createForm.account_id) {
-      showNotification(isAr ? 'يجب تحديد الحساب المحاسبي المرتبط بالمورد' : 'Accounting account is required', 'error');
-      return;
-    }
-
-    try {
-      setSavingCreate(true);
-      const res = await apiRequest<{ success: boolean; supplier?: any; message?: string }>(
-        '/eta/suppliers/mapping/create-and-link',
-        'POST',
-        {
-          etaTaxNumber: createModalSupplier.taxNumber,
-          name: createForm.name.trim(),
-          address: createForm.address.trim(),
-          phone: createForm.phone.trim(),
-          account_id: createForm.account_id,
-          account_name: createForm.account_name,
-          notes: createForm.notes.trim()
-        }
-      );
-
-      if (res && res.success) {
-        showNotification(
-          isAr
-            ? `تم إنشاء المورد "${createForm.name}" وربطه بالحساب المحاسبي بنجاح!`
-            : `Supplier created and linked successfully!`,
-          'success'
-        );
-        setCreateModalSupplier(null);
-        loadMappings(true);
-        loadErpSuppliers();
-      } else {
-        showNotification(res.message || (isAr ? 'فشل إنشاء وربط المورد' : 'Failed to create & link'), 'error');
-      }
-    } catch (err: any) {
-      showNotification(err.message || (isAr ? 'خطأ في إنشاء المورد' : 'Error creating supplier'), 'error');
-    } finally {
-      setSavingCreate(false);
-    }
+    openTab('suppliers', isAr ? 'الموردين' : 'Suppliers');
+    showNotification(
+      isAr 
+        ? `تم فتح شاشة الموردين لإنشاء المورد "${supplier.name}". اضغط "حفظ وربط مع منظومة ETA فوراً" بعد مراجعة البيانات.` 
+        : `Suppliers screen opened for "${supplier.name}". Review and click Save & Link to ETA.`,
+      'info'
+    );
   };
 
   // Filtered Suppliers based on Active Tab, Search Query, and Auto-Match Toggle
@@ -953,11 +890,11 @@ export function EtaSupplierMapping() {
                                 <span>{isAr ? 'ربط بمورد' : 'Link'}</span>
                               </button>
 
-                              {/* Create & Link button */}
+                              {/* Create in Suppliers screen & Link button */}
                               <button
-                                onClick={() => openCreateModal(supplier)}
-                                className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors flex items-center gap-1"
-                                title={isAr ? 'إنشاء مورد جديد بالبيانات وربطه فوراً' : 'Create & Link'}
+                                onClick={() => handleOpenCreateInSuppliers(supplier)}
+                                className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 dark:text-emerald-300 transition-colors flex items-center gap-1"
+                                title={isAr ? 'فتح شاشة الموردين الرسمية لإنشاء المورد مع الحسابات وربطه فوراً' : 'Create in official Suppliers screen & link'}
                               >
                                 <Plus className="w-3 h-3" />
                                 <span>{isAr ? 'إنشاء جديد' : 'New'}</span>
@@ -1160,163 +1097,6 @@ export function EtaSupplierMapping() {
                   {savingLink ? (isAr ? 'جاري الحفظ...' : 'Saving...') : (isAr ? 'حفظ الربط' : 'Save Mapping')}
                 </button>
               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Create & Link Supplier Modal */}
-      <AnimatePresence>
-        {createModalSupplier && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-lg overflow-hidden"
-            >
-              <form onSubmit={handleSaveCreateAndLink}>
-                {/* Header */}
-                <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-xl">
-                      <Plus className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-base text-slate-900 dark:text-white">
-                        {isAr ? 'إنشاء مورد جديد بالنظام وربطه فوراً' : 'Create & Link New Supplier'}
-                      </h3>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        {isAr ? 'يتم ملء البيانات تلقائياً من بيانات منظومة الفاتورة الإلكترونية' : 'Pre-filled from ETA Portal invoice details'}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setCreateModalSupplier(null)}
-                    className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                {/* Form Fields */}
-                <div className="p-5 space-y-3.5 text-sm">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      {isAr ? 'اسم المورد *' : 'Supplier Name *'}
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={createForm.name}
-                      onChange={e => setCreateForm({ ...createForm, name: e.target.value })}
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                        {isAr ? 'الرقم الضريبي (ETA)' : 'Tax ID (ETA)'}
-                      </label>
-                      <input
-                        type="text"
-                        disabled
-                        value={createForm.taxNumber}
-                        className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono text-slate-600 dark:text-slate-300 cursor-not-allowed"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                        {isAr ? 'رقم الهاتف / الجوال' : 'Phone / Mobile'}
-                      </label>
-                      <input
-                        type="text"
-                        value={createForm.phone}
-                        onChange={e => setCreateForm({ ...createForm, phone: e.target.value })}
-                        placeholder={isAr ? 'مثال: 01012345678' : 'e.g. 01012345678'}
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      {isAr ? 'العنوان' : 'Address'}
-                    </label>
-                    <input
-                      type="text"
-                      value={createForm.address}
-                      onChange={e => setCreateForm({ ...createForm, address: e.target.value })}
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
-                    />
-                  </div>
-
-                  {/* Accounting Account (Mandatory) */}
-                  <div className="p-3 bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-xl space-y-1.5">
-                    <label className="block text-xs font-bold text-amber-900 dark:text-amber-300">
-                      {isAr ? 'الحساب المحاسبي المرتبط * (دليل الحسابات)' : 'Linked Accounting Account * (Chart of Accounts)'}
-                    </label>
-                    <select
-                      required
-                      value={createForm.account_id}
-                      onChange={e => {
-                        const selectedId = e.target.value;
-                        const acc = supplierAccounts.find(a => a.id === selectedId);
-                        setCreateForm({
-                          ...createForm,
-                          account_id: selectedId,
-                          account_name: acc?.name || ''
-                        });
-                      }}
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 rounded-lg text-xs font-medium focus:ring-2 focus:ring-amber-500/30"
-                    >
-                      <option value="">{isAr ? '-- اختر الحساب المحاسبي للمورد --' : '-- Select Supplier Account --'}</option>
-                      {supplierAccounts.map(acc => (
-                        <option key={acc.id} value={acc.id}>
-                          {acc.code ? `${acc.code} - ` : ''}{acc.name}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-[11px] text-amber-700/90 dark:text-amber-400/90">
-                      {isAr
-                        ? 'إلزامي: يتم ربط كافة المعاملات المالية والفواتير وسندات الصرف بهذا الحساب المحاسبي.'
-                        : 'Mandatory: All financial transactions, vouchers and invoices link to this account.'}
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      {isAr ? 'ملاحظات' : 'Notes'}
-                    </label>
-                    <input
-                      type="text"
-                      value={createForm.notes}
-                      onChange={e => setCreateForm({ ...createForm, notes: e.target.value })}
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
-                    />
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCreateModalSupplier(null)}
-                    className="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 dark:text-slate-400 rounded-xl"
-                  >
-                    {isAr ? 'إلغاء' : 'Cancel'}
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={savingCreate}
-                    className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm transition-all disabled:opacity-50"
-                  >
-                    {savingCreate ? (isAr ? 'جاري الإنشاء والربط...' : 'Creating...') : (isAr ? 'تأكيد الإنشاء والربط' : 'Create & Link')}
-                  </button>
-                </div>
-              </form>
             </motion.div>
           </div>
         )}

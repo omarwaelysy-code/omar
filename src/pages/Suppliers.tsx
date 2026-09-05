@@ -6,10 +6,12 @@ import { Supplier, Account, JournalEntry } from '../types';
 import { 
   Search, Plus, Trash2, Edit2, X, Truck, Phone, Mail, MapPin, 
   Wallet, Calendar, History, FileText, User, Hash, Box,
-  LayoutGrid, List, ChevronRight, ChevronLeft, CreditCard, FileUp
+  LayoutGrid, List, ChevronRight, ChevronLeft, CreditCard, FileUp,
+  Link2, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { dbService } from '../services/dbService';
+import { dbService, apiRequest } from '../services/dbService';
+import { useNavigation } from '../contexts/NavigationContext';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
@@ -26,6 +28,7 @@ export const Suppliers: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
+  const { pendingEtaSupplierForCreation, setPendingEtaSupplierForCreation } = useNavigation();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +43,7 @@ export const Suppliers: React.FC = () => {
   const tableRef = useRef<HTMLTableElement>(null);
   const [view, setView] = useViewPreference('suppliers', 'table');
   const [showImportWizard, setShowImportWizard] = useState(false);
+  const [linkWithEta, setLinkWithEta] = useState(true);
 
   const handleExportExcel = () => {
     const headers = {
@@ -116,6 +120,34 @@ export const Suppliers: React.FC = () => {
       };
     }
   }, [user?.company_id]);
+
+  // Handle incoming ETA Supplier creation
+  useEffect(() => {
+    if (pendingEtaSupplierForCreation && accounts.length > 0) {
+      const defaultAccount = accounts.find(a => a.account_usage === 'supplier') || accounts.find(a => a.account_usage === 'accounts_payable');
+      const defaultCounterAccount = accounts.find(a => a.account_usage === 'opening_balance');
+      setEditingSupplier(null);
+      setFormData({
+        name: pendingEtaSupplierForCreation.name || '',
+        mobile: pendingEtaSupplierForCreation.phone || '',
+        email: '',
+        tax_number: pendingEtaSupplierForCreation.taxNumber || '',
+        address: pendingEtaSupplierForCreation.address || '',
+        opening_balance: 0,
+        opening_balance_date: new Date().toISOString().slice(0, 10),
+        account_id: defaultAccount?.id || '',
+        account_name: defaultAccount?.name || '',
+        counter_account_id: defaultCounterAccount?.id || '',
+        payment_method: 'credit',
+        credit_limit: 0,
+        payment_terms: 'due_on_receipt',
+        payment_terms_days: 0,
+        advance_percentage: 0,
+        is_active: true
+      });
+      setIsModalOpen(true);
+    }
+  }, [pendingEtaSupplierForCreation, accounts]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -213,8 +245,32 @@ export const Suppliers: React.FC = () => {
         });
       }
 
-      // Success notification and modal close early
-      showNotification(editingSupplier ? 'تم تحديث بيانات المورد بنجاح' : 'تم إضافة المورد بنجاح', 'success');
+      // Success notification and modal close
+      if (pendingEtaSupplierForCreation && linkWithEta) {
+        try {
+          await apiRequest('/eta/suppliers/mapping/link', 'POST', {
+            etaTaxNumber: pendingEtaSupplierForCreation.taxNumber,
+            supplierId: id,
+            etaSupplierName: formData.name,
+            notes: 'تم إنشاؤه من شاشة الموردين وربطه تلقائياً بـ ETA'
+          });
+          showNotification(
+            language === 'ar'
+              ? `تم إضافة المورد "${formData.name}" وربطه بنجاح مع منظومة الفاتورة الإلكترونية (ETA)!`
+              : `Supplier added and linked to ETA successfully!`,
+            'success'
+          );
+        } catch (linkErr: any) {
+          console.error('ETA link error:', linkErr);
+          showNotification(language === 'ar' ? 'تم حفظ المورد ولكن تعذر إتمام ربط ETA' : 'Supplier saved, but failed to link to ETA', 'warning');
+        }
+        setPendingEtaSupplierForCreation(null);
+      } else {
+        if (pendingEtaSupplierForCreation) {
+          setPendingEtaSupplierForCreation(null);
+        }
+        showNotification(editingSupplier ? 'تم تحديث بيانات المورد بنجاح' : 'تم إضافة المورد بنجاح', 'success');
+      }
       closeModal();
 
       // Background post-save hooks
@@ -375,6 +431,9 @@ export const Suppliers: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingSupplier(null);
+    if (pendingEtaSupplierForCreation) {
+      setPendingEtaSupplierForCreation(null);
+    }
   };
 
   const getSupplierBalance = (supplierId: string) => {
@@ -649,6 +708,32 @@ export const Suppliers: React.FC = () => {
                 
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                   <form onSubmit={handleSubmit} className="p-8 md:p-12 space-y-12">
+                    {/* ETA Linked Banner */}
+                    {pendingEtaSupplierForCreation && (
+                      <div className="p-5 bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent border-2 border-emerald-500/30 rounded-[2rem] flex items-center justify-between gap-4 shadow-sm">
+                        <div className="flex items-center gap-4">
+                          <div className="p-3 bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-600/30">
+                            <Link2 className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <h4 className="text-base font-black text-slate-900 flex items-center gap-2">
+                              <span>{language === 'ar' ? 'إضافة مورد قادم من منظومة الفاتورة الإلكترونية (ETA)' : 'ETA Incoming Portal Supplier'}</span>
+                              <span className="text-xs font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md">
+                                {language === 'ar' ? 'ربط مباشر' : 'Direct Link'}
+                              </span>
+                            </h4>
+                            <p className="text-xs text-slate-500 mt-1">
+                              {language === 'ar' ? 'الرقم الضريبي للبوابة:' : 'ETA Tax ID:'}{' '}
+                              <span className="font-mono font-bold text-emerald-700 bg-white px-2 py-0.5 rounded border border-emerald-200">
+                                {pendingEtaSupplierForCreation.taxNumber}
+                              </span>{' '}
+                              • {language === 'ar' ? 'تم تعبئة البيانات وتحديد الحساب المحاسبي تلقائياً. اضغط "حفظ وربط مع منظومة ETA" لإتمام العملية.' : 'Data prefilled with accounting account. Click Save & Link to complete.'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
                       <div className="md:col-span-2">
                         <label className={`block text-[10px] font-black text-slate-400 mb-3 uppercase tracking-widest px-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_name')}</label>
@@ -1023,12 +1108,23 @@ export const Suppliers: React.FC = () => {
                       )}
                     </div>
 
-                    <div className="pt-12 pb-6 flex gap-6 sticky bottom-0 bg-white/95 backdrop-blur-md z-30">
+                    <div className="pt-12 pb-6 flex flex-wrap gap-4 sticky bottom-0 bg-white/95 backdrop-blur-md z-30">
+                      {pendingEtaSupplierForCreation && (
+                        <button 
+                          type="submit"
+                          onClick={() => setLinkWithEta(true)}
+                          className="flex-1 py-5 px-6 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white rounded-[2rem] font-black text-xl hover:from-emerald-700 hover:to-teal-800 transition-all shadow-xl shadow-emerald-600/30 active:scale-[0.98] border border-emerald-400/40 flex items-center justify-center gap-3"
+                        >
+                          <Link2 className="w-6 h-6" />
+                          <span>{language === 'ar' ? 'حفظ وربط مع منظومة ETA فوراً' : 'Save & Link to ETA'}</span>
+                        </button>
+                      )}
                       <button 
                         type="submit"
-                        className="flex-1 py-6 bg-zinc-900 text-white rounded-[2rem] font-black text-2xl hover:bg-zinc-800 transition-all shadow-2xl active:scale-[0.98] border border-white/10"
+                        onClick={() => setLinkWithEta(false)}
+                        className={`${pendingEtaSupplierForCreation ? 'px-8 font-bold text-lg' : 'flex-1 font-black text-2xl'} py-6 bg-zinc-900 text-white rounded-[2rem] hover:bg-zinc-800 transition-all shadow-2xl active:scale-[0.98] border border-white/10`}
                       >
-                        {editingSupplier ? 'حفظ التعديلات' : 'إضافة المورد'}
+                        {editingSupplier ? 'حفظ التعديلات' : (pendingEtaSupplierForCreation ? (language === 'ar' ? 'حفظ المورد فقط (بدون ربط)' : 'Save Only') : 'إضافة المورد')}
                       </button>
                       <button 
                         type="button"
