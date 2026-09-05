@@ -20,10 +20,18 @@ export interface EtaPortalItemDTO {
   totalQuantity: number;
   totalAmount: number;
   lastDocDate: string | null;
+  supplierTaxNumber: string;
+  supplierName: string;
+  suppliers: Array<{
+    taxNumber: string;
+    name: string;
+    docCount: number;
+  }>;
   sampleDocument?: {
     uuid: string;
     internalId: string;
     issuerName: string;
+    issuerId?: string;
     date: string;
   };
   isLinked: boolean;
@@ -90,7 +98,7 @@ export class EtaItemMappingService {
     // 1. Fetch received documents with raw_data to extract item lines
     const docsRes = await pool.query(`
       SELECT 
-        id, uuid, internal_id, date_time_issued, issuer_name, total_amount, raw_data
+        id, uuid, internal_id, date_time_issued, issuer_id, issuer_name, total_amount, raw_data
       FROM eta_documents
       WHERE company_id = $1 
         AND direction = 'Received'
@@ -109,10 +117,14 @@ export class EtaItemMappingService {
       totalQuantity: number;
       totalAmount: number;
       lastDocDate: string | null;
+      supplierTaxNumber: string;
+      supplierName: string;
+      suppliersMap: Map<string, { taxNumber: string; name: string; docCount: number }>;
       sampleDocument?: {
         uuid: string;
         internalId: string;
         issuerName: string;
+        issuerId?: string;
         date: string;
       };
     }>();
@@ -125,6 +137,9 @@ export class EtaItemMappingService {
 
       const rawDataObj = row.raw_data;
       if (!rawDataObj) continue;
+
+      const docIssuerId = (row.issuer_id || rawDataObj?.issuer?.id || '').trim();
+      const docIssuerName = (row.issuer_name || rawDataObj?.issuer?.name || '').trim();
 
       const rawLines: any[] = Array.isArray(rawDataObj?.invoiceLines)
         ? rawDataObj.invoiceLines
@@ -149,6 +164,16 @@ export class EtaItemMappingService {
 
         const existing = aggregatedItems.get(itemCodeRaw);
         if (!existing) {
+          const suppliersMap = new Map<string, { taxNumber: string; name: string; docCount: number }>();
+          if (docIssuerId || docIssuerName) {
+            const key = docIssuerId || docIssuerName;
+            suppliersMap.set(key, {
+              taxNumber: docIssuerId,
+              name: docIssuerName,
+              docCount: 1
+            });
+          }
+
           aggregatedItems.set(itemCodeRaw, {
             itemCode: itemCodeRaw,
             itemType,
@@ -160,10 +185,14 @@ export class EtaItemMappingService {
             totalQuantity: quantity,
             totalAmount: lineTotal,
             lastDocDate: row.date_time_issued ? new Date(row.date_time_issued).toISOString() : null,
+            supplierTaxNumber: docIssuerId,
+            supplierName: docIssuerName,
+            suppliersMap,
             sampleDocument: {
               uuid: row.uuid,
               internalId: row.internal_id || '',
               issuerName: row.issuer_name || '',
+              issuerId: row.issuer_id || '',
               date: row.date_time_issued ? new Date(row.date_time_issued).toISOString() : ''
             }
           });
@@ -175,10 +204,28 @@ export class EtaItemMappingService {
           if (!existing.description && description) existing.description = description;
           if (!existing.unitType && unitType) existing.unitType = unitType;
           if (unitPrice > 0) existing.lastUnitPrice = unitPrice;
+
+          if (docIssuerId || docIssuerName) {
+            const key = docIssuerId || docIssuerName;
+            const sEntry = existing.suppliersMap.get(key);
+            if (sEntry) {
+              sEntry.docCount++;
+              if (!sEntry.name && docIssuerName) sEntry.name = docIssuerName;
+            } else {
+              existing.suppliersMap.set(key, {
+                taxNumber: docIssuerId,
+                name: docIssuerName,
+                docCount: 1
+              });
+            }
+          }
+
           if (row.date_time_issued) {
             const rowDate = new Date(row.date_time_issued).toISOString();
             if (!existing.lastDocDate || rowDate > existing.lastDocDate) {
               existing.lastDocDate = rowDate;
+              if (docIssuerId) existing.supplierTaxNumber = docIssuerId;
+              if (docIssuerName) existing.supplierName = docIssuerName;
             }
           }
         }
@@ -351,6 +398,9 @@ export class EtaItemMappingService {
         totalQuantity: agg.totalQuantity,
         totalAmount: agg.totalAmount,
         lastDocDate: agg.lastDocDate,
+        supplierTaxNumber: agg.supplierTaxNumber || '',
+        supplierName: agg.supplierName || '',
+        suppliers: Array.from(agg.suppliersMap.values()),
         sampleDocument: agg.sampleDocument,
         isLinked,
         linkedProduct,
@@ -375,6 +425,9 @@ export class EtaItemMappingService {
           totalQuantity: 0,
           totalAmount: 0,
           lastDocDate: null,
+          supplierTaxNumber: '',
+          supplierName: '',
+          suppliers: [],
           isLinked: true,
           linkedProduct: {
             id: row.product_id,
