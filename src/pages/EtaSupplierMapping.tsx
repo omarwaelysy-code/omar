@@ -652,15 +652,22 @@ export function EtaSupplierMapping() {
             <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
               <span>{isAr ? 'عرض في الصفحة:' : 'Per page:'}</span>
               <select
-                value={pageSize}
-                onChange={e => setPageSize(Number(e.target.value))}
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs focus:outline-none"
+                value={pageSize >= 99999 ? 'all' : pageSize}
+                onChange={e => {
+                  const val = e.target.value;
+                  setPageSize(val === 'all' ? 999999 : Number(val));
+                }}
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs focus:outline-none cursor-pointer"
               >
                 <option value={10}>10</option>
                 <option value={15}>15</option>
                 <option value={25}>25</option>
                 <option value={50}>50</option>
                 <option value={100}>100</option>
+                <option value={200}>200</option>
+                <option value={500}>500</option>
+                <option value={1000}>1000</option>
+                <option value="all">{isAr ? 'الكل' : 'All'}</option>
               </select>
             </div>
           </div>
