@@ -852,7 +852,7 @@ export function EtaDetailedInvoices() {
             {selectedDocTypes.length === 0
               ? (docTypeFilter !== 'all'
                   ? (DOC_TYPES_LIST.find(x => x.id === docTypeFilter)?.[language === 'ar' ? 'nameAr' : 'nameEn'] || docTypeFilter)
-                  : (language === 'ar' ? 'الكل (فواتير وإشعارات)' : 'All Documents'))
+                  : (language === 'ar' ? 'الكل (وثائق وإشعارات)' : 'All Documents'))
               : selectedDocTypes.length === 1
               ? (() => {
                   const dt = DOC_TYPES_LIST.find(x => x.id === selectedDocTypes[0]);
@@ -1897,20 +1897,27 @@ export function EtaDetailedInvoices() {
                   <Receipt className="w-8 h-8" />
                 </div>
                 <h3 className="font-bold text-base text-slate-800">
-                  {language === 'ar' ? 'لا توجد بنود مطابقة' : 'No items found'}
+                  {allLines.length === 0 && !appliedSearch && !dateFrom && !dateTo
+                    ? (language === 'ar' ? 'لا توجد بنود وثائق إلكترونية محفوظة حاليًا.' : 'No saved document lines found.')
+                    : (language === 'ar' ? 'لا توجد بنود مطابقة' : 'No items found')}
                 </h3>
                 <p className="text-xs md:text-sm text-slate-400 max-w-md mx-auto mt-1 leading-relaxed">
-                  {language === 'ar'
-                    ? 'لم يتم العثور على بنود وثائق إلكترونية مطابقة للفلاتر المحددة. يمكنك تغيير خيارات البحث أو إعادة المحاولة.'
-                    : 'No document lines found matching filters.'}
+                  {allLines.length === 0 && !appliedSearch && !dateFrom && !dateTo
+                    ? (language === 'ar'
+                        ? 'اضغط على زر "تحديث" لبدء المزامنة وجلب الوثائق الإلكترونية من منظومة مصلحة الضرائب المصرية وحفظها محليًا.'
+                        : 'Click "Refresh" to sync electronic documents from ETA into local storage.')
+                    : (language === 'ar'
+                        ? 'لم يتم العثور على بنود وثائق إلكترونية مطابقة للفلاتر المحددة. يمكنك تغيير خيارات البحث أو إعادة المحاولة.'
+                        : 'No document lines found matching filters.')}
                 </p>
                 <div className="mt-4 flex items-center justify-center gap-3">
                   <button
                     type="button"
                     onClick={handleRefresh}
-                    className="px-4 py-2 text-xs md:text-sm font-semibold rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-2 px-4 py-2 text-xs md:text-sm font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shadow-sm cursor-pointer"
                   >
-                    {language === 'ar' ? 'إعادة المحاولة' : 'Retry'}
+                    <RefreshCw className="w-4 h-4" />
+                    {language === 'ar' ? 'تحديث' : 'Refresh'}
                   </button>
                 </div>
               </div>

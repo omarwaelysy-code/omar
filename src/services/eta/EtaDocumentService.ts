@@ -503,11 +503,12 @@ export class EtaDocumentService {
     const targetYear = options.year ? String(options.year) : 'all';
     const currentYear = new Date().getFullYear();
 
-    // 1. If not forcing refresh, check PostgreSQL persistent storage first (instant 0ms response)
+    // 1. LOCAL-FIRST: If not forcing refresh, always return PostgreSQL persistent storage records
+    // (Never contact ETA on page load or empty database; empty DB returns empty state)
     if (!options.forceRefresh) {
       const dbResult = await this.getDocumentsFromDatabase(companyId);
-      if (dbResult.data && dbResult.data.length > 0) {
-        let filtered = dbResult.data;
+      let filtered = dbResult.data || [];
+      if (filtered.length > 0) {
         if (options.year && options.year !== 'all') {
           filtered = filtered.filter(d => (d.dateTimeIssued || '').slice(0, 4) === String(options.year));
         }
@@ -520,18 +521,18 @@ export class EtaDocumentService {
         if (options.status && options.status !== 'all') {
           filtered = filtered.filter(d => d.status === options.status);
         }
-        return {
-          success: true,
-          isConfigured: true,
-          environment: settings.environment,
-          data: filtered,
-          totalCount: filtered.length,
-          lastSyncedAt: dbResult.lastSyncedAt
-        };
       }
+      return {
+        success: true,
+        isConfigured: true,
+        environment: settings.environment,
+        data: filtered,
+        totalCount: filtered.length,
+        lastSyncedAt: dbResult.lastSyncedAt
+      };
     }
 
-    // 2. Perform fresh multi-period sync directly from ETA Tax Authority servers
+    // 2. Refresh-Only: Perform fresh multi-period sync directly from ETA Tax Authority servers
     const windows: { from: string; to: string }[] = [];
     const pad = (n: number) => (n < 10 ? '0' + n : String(n));
 
@@ -618,8 +619,8 @@ export class EtaDocumentService {
       lastSyncedAt: nowIso
     });
 
-    // Background address resolution for unique unknown partners (non-blocking)
-    this.resolveMissingAddressesInBackground(companyId, allDocs).catch(() => {});
+    // Note: Automatic background ETA sync/enrichment is strictly disabled per local-first policy.
+    // Address enrichment is performed locally from cached partner data without live ETA requests.
 
     return {
       success: true,
@@ -635,21 +636,11 @@ export class EtaDocumentService {
   private static isEnrichingDetails = false;
 
   /**
-   * Enrich document lines in background with ETA rate limit awareness
+   * Background enricher is disabled per local-first policy to prevent automatic ETA calls
    */
-  public static async enrichDocumentsDetailsInBackground(companyId: string, uuids: string[]): Promise<void> {
-    if (this.isEnrichingDetails || !uuids || uuids.length === 0) return;
-    this.isEnrichingDetails = true;
-    try {
-      for (const uuid of uuids.slice(0, 40)) {
-        try {
-          await this.getDocumentDetails(companyId, uuid);
-        } catch {}
-        await new Promise(r => setTimeout(r, 600)); // Respect ETA rate limits (2 req/sec)
-      }
-    } finally {
-      this.isEnrichingDetails = false;
-    }
+  public static async enrichDocumentsDetailsInBackground(_companyId: string, _uuids: string[]): Promise<void> {
+    // Disabled: No automatic background calls to ETA
+    return;
   }
 
   /**
@@ -683,14 +674,9 @@ export class EtaDocumentService {
       };
     }
 
-    // If forceRefresh requested or DB empty, sync from ETA
+    // If forceRefresh requested, sync all documents from ETA portal
     if (options.forceRefresh) {
       await this.fetchAllDocuments(companyId, { forceRefresh: true });
-    } else {
-      const existing = await pool.query(`SELECT count(1) FROM eta_documents WHERE company_id = $1`, [companyId]);
-      if (Number(existing.rows[0]?.count || 0) === 0) {
-        await this.fetchAllDocuments(companyId, { forceRefresh: false });
-      }
     }
 
     const res = await pool.query(
@@ -700,7 +686,6 @@ export class EtaDocumentService {
 
     let lastSyncedAt: string | null = null;
     const lines: EtaDetailedInvoiceLineDTO[] = [];
-    const missingLineDocUuids: string[] = [];
 
     for (const row of res.rows) {
       if (!lastSyncedAt && row.last_synced_at) {
@@ -780,15 +765,14 @@ export class EtaDocumentService {
           });
         });
       } else {
-        missingLineDocUuids.push(row.uuid);
-        // Fallback: 1 line with document totals until full details are enriched
+        // Fallback: 1 line with document totals
         lines.push({
           ...baseDocInfo,
           rowKey: `${row.uuid}_0`,
           itemCodeName: '---',
           itemCode: '---',
           itemType: 'EGS',
-          description: row.document_type_name || 'فاتورة إلكترونية',
+          description: row.document_type_name || 'وثيقة إلكترونية',
           quantity: 1,
           unitType: '',
           unitPrice: Number(row.net_amount || 0),
@@ -798,10 +782,6 @@ export class EtaDocumentService {
           lineTotal: Number(row.total_amount || 0)
         });
       }
-    }
-
-    if (missingLineDocUuids.length > 0) {
-      this.enrichDocumentsDetailsInBackground(companyId, missingLineDocUuids).catch(() => {});
     }
 
     return {
@@ -815,157 +795,97 @@ export class EtaDocumentService {
   }
 
   /**
-   * Get Document Details from ETA (Read-Only)
+   * Get Document Details strictly from PostgreSQL eta_documents (Local-First).
+   * Zero external calls to ETA API.
    */
   public static async getDocumentDetails(
     companyId: string,
     documentUuid: string
   ): Promise<{ success: boolean; data: any }> {
     const settings = await this.getCompanySettings(companyId);
-    if (!settings || !settings.isConfigured) {
-      const err = new Error('لم يتم إعداد الربط مع منظومة ETA لهذه الشركة.');
-      (err as any).statusCode = 400;
-      (err as any).code = 'ETA_NOT_CONFIGURED';
+    const environment = settings?.environment || 'production';
+
+    // 1. Fetch document record from PostgreSQL
+    const res = await pool.query(
+      `SELECT * FROM eta_documents WHERE company_id = $1 AND uuid = $2`,
+      [companyId, documentUuid]
+    );
+
+    if (res.rows.length === 0) {
+      const err = new Error('الوثيقة الإلكترونية غير موجودة في قاعدة البيانات المحلية.');
+      (err as any).statusCode = 404;
+      (err as any).code = 'NOT_FOUND';
       throw err;
     }
 
-    const { environment, clientId, clientSecret } = settings;
-    const token = await EtaAuthService.getValidAccessToken({
-      companyId,
-      environment,
-      clientId,
-      clientSecret
-    });
+    const row = res.rows[0];
 
-    const apiUrl = `${this.getApiBaseUrl(environment)}/api/v1.0/documents/${encodeURIComponent(documentUuid)}/details`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-    try {
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Accept-Language': 'ar'
-        },
-        signal: controller.signal
-      });
-
-      if (!response.ok) {
-        clearTimeout(timeoutId);
-        this.handleEtaHttpError(response.status);
-      }
-
-      const data = await response.json();
-
-      // Fetch raw document in parallel or fallback to get invoice lines, items and taxes
-      let rawDoc: any = null;
+    // 2. Parse stored raw_data if available
+    let rawDataObj: any = null;
+    if (row.raw_data) {
       try {
-        const rawUrl = `${this.getApiBaseUrl(environment)}/api/v1.0/documents/${encodeURIComponent(documentUuid)}/raw`;
-        const rawRes = await fetch(rawUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json',
-            'Accept-Language': 'ar'
-          },
-          signal: controller.signal
-        });
-        if (rawRes.ok) {
-          rawDoc = await rawRes.json();
-        }
-      } catch (rawErr) {
-        console.warn('Could not fetch raw document from ETA:', rawErr);
+        rawDataObj = typeof row.raw_data === 'string' ? JSON.parse(row.raw_data) : row.raw_data;
+      } catch {}
+    }
+
+    // 3. Format address and type helpers
+    const formatAddr = (addr: any) => {
+      if (!addr) return '';
+      if (typeof addr === 'string') return addr.trim();
+      const parts = [
+        addr.buildingNumber,
+        addr.street,
+        addr.regionCity,
+        addr.city,
+        addr.governate,
+        addr.governorate,
+        addr.country
+      ].map((p: any) => (p ? String(p).trim() : '')).filter(Boolean);
+      const uniqueParts: string[] = [];
+      for (const p of parts) {
+        if (!uniqueParts.includes(p)) uniqueParts.push(p);
       }
+      return uniqueParts.join('، ');
+    };
 
-      clearTimeout(timeoutId);
+    const formatPartnerType = (type: any) => {
+      const t = String(type ?? '').toUpperCase().trim();
+      if (t === 'B' || t === '0' || t === 'BUSINESS' || t === 'COMPANY') return 'شركة';
+      if (t === 'P' || t === '1' || t === 'PERSON' || t === 'INDIVIDUAL') return 'فرد';
+      if (t === 'F' || t === '2' || t === 'FOREIGNER') return 'أجنبي';
+      return 'شركة';
+    };
 
-      // Parse inner raw document string if wrapped by ETA
-      let parsedRawDoc: any = null;
-      if (rawDoc) {
-        if (typeof rawDoc.document === 'string') {
-          try {
-            parsedRawDoc = JSON.parse(rawDoc.document);
-          } catch (e) {
-            console.warn('Could not parse rawDoc.document string:', e);
-          }
-        } else if (rawDoc.document && typeof rawDoc.document === 'object') {
-          parsedRawDoc = rawDoc.document;
-        } else {
-          parsedRawDoc = rawDoc;
-        }
-      }
+    const issuerObj = rawDataObj?.issuer || {
+      id: row.issuer_id,
+      name: row.issuer_name,
+      address: row.issuer_address,
+      type: row.issuer_type
+    };
 
-      // Construct portal share URL matching ETA specifications
-      const portalHost = environment === 'production' ? 'invoicing.eta.gov.eg' : 'preprod.invoicing.eta.gov.eg';
-      const longId = data?.longId || data?.document?.longId || parsedRawDoc?.longId || rawDoc?.longId;
-      const shareUrl =
-        data?.publicUrl ||
-        (longId
-          ? `https://${portalHost}/documents/${encodeURIComponent(documentUuid)}/share/${longId}`
-          : `https://${portalHost}/documents/${encodeURIComponent(documentUuid)}`);
+    const receiverObj = rawDataObj?.receiver || {
+      id: row.receiver_id,
+      name: row.receiver_name,
+      address: row.receiver_address,
+      type: row.receiver_type
+    };
 
-      // Address formatting helper
-      const formatAddr = (addr: any) => {
-        if (!addr) return '';
-        if (typeof addr === 'string') return addr.trim();
-        const parts = [
-          addr.buildingNumber,
-          addr.street,
-          addr.regionCity,
-          addr.city,
-          addr.governate,
-          addr.governorate,
-          addr.country
-        ].map((p: any) => (p ? String(p).trim() : '')).filter(Boolean);
-        const uniqueParts: string[] = [];
-        for (const p of parts) {
-          if (!uniqueParts.includes(p)) uniqueParts.push(p);
-        }
-        return uniqueParts.join('، ');
-      };
+    const issuerAddress = formatAddr(issuerObj.address) || row.issuer_address || '';
+    const receiverAddress = formatAddr(receiverObj.address) || row.receiver_address || '';
+    const issuerType = formatPartnerType(issuerObj.type || row.issuer_type);
+    const receiverType = formatPartnerType(receiverObj.type || row.receiver_type);
 
-      // Type formatting helper (B/0 = شركة, P/1 = فرد, F/2 = أجنبي)
-      const formatPartnerType = (type: any) => {
-        const t = String(type ?? '').toUpperCase().trim();
-        if (t === 'B' || t === '0' || t === 'BUSINESS' || t === 'COMPANY') return 'شركة';
-        if (t === 'P' || t === '1' || t === 'PERSON' || t === 'INDIVIDUAL') return 'فرد';
-        if (t === 'F' || t === '2' || t === 'FOREIGNER') return 'أجنبي';
-        return 'شركة';
-      };
+    // 4. Extract or synthesize invoice lines
+    const parsedRawDoc = rawDataObj?.rawDocument || rawDataObj?.document || rawDataObj;
+    const rawLines = Array.isArray(parsedRawDoc?.invoiceLines)
+      ? parsedRawDoc.invoiceLines
+      : (Array.isArray(rawDataObj?.invoiceLines) ? rawDataObj.invoiceLines : []);
+    const detailsLines = Array.isArray(rawDataObj?.details?.invoiceLines) ? rawDataObj.details.invoiceLines : [];
+    const baseLines = detailsLines.length > 0 ? detailsLines : rawLines;
 
-      const issuerObj = parsedRawDoc?.issuer || data?.issuer || {};
-      const receiverObj = parsedRawDoc?.receiver || data?.receiver || {};
-
-      const issuerAddress = formatAddr(issuerObj.address || data?.issuer?.address);
-      const receiverAddress = formatAddr(receiverObj.address || data?.receiver?.address);
-
-      const issuerType = formatPartnerType(issuerObj.type ?? data?.issuer?.type);
-      const receiverType = formatPartnerType(receiverObj.type ?? data?.receiver?.type);
-
-      // Automatically cache partner addresses learned from full document details
-      if (issuerObj.id) {
-        await this.savePartnerAddress({
-          taxNumber: issuerObj.id,
-          name: cleanDuplicatedPartnerName(issuerObj.name),
-          addressObj: issuerObj.address
-        });
-      }
-      if (receiverObj.id) {
-        await this.savePartnerAddress({
-          taxNumber: receiverObj.id,
-          name: cleanDuplicatedPartnerName(receiverObj.name),
-          addressObj: receiverObj.address
-        });
-      }
-
-      // Merge and normalize invoice lines from details or parsed raw document
-      const rawLines = Array.isArray(parsedRawDoc?.invoiceLines) ? parsedRawDoc.invoiceLines : [];
-      const detailsLines = Array.isArray(data?.invoiceLines) ? data.invoiceLines : [];
-      const baseLines = detailsLines.length > 0 ? detailsLines : rawLines;
-
-      const normalizedLines = baseLines.map((line: any, idx: number) => {
+    let normalizedLines: any[] = [];
+    if (baseLines.length > 0) {
+      normalizedLines = baseLines.map((line: any, idx: number) => {
         const matchingRaw = rawLines[idx] || {};
         const description = line.description || matchingRaw.description || line.itemPrimaryName || '---';
         const itemCodeName = line.itemPrimaryName || line.itemSecondaryName || matchingRaw.itemPrimaryName || '---';
@@ -991,7 +911,6 @@ export class EtaDocumentService {
           0
         );
 
-        // Taxes breakdown on item line
         let taxesList = Array.isArray(line.lineTaxableItems) && line.lineTaxableItems.length > 0
           ? line.lineTaxableItems
           : (Array.isArray(matchingRaw.taxableItems) && matchingRaw.taxableItems.length > 0 ? matchingRaw.taxableItems : []);
@@ -1022,90 +941,258 @@ export class EtaDocumentService {
           lineTotal
         };
       });
-
-      const mergedData = {
-        ...parsedRawDoc,
-        ...data,
-        rawDocument: parsedRawDoc || rawDoc,
-        details: data,
-        uuid: documentUuid,
-        longId: longId || undefined,
-        shareUrl,
-        publicUrl: shareUrl,
-        environment,
-        portalHost,
-        issuer: {
-          ...issuerObj,
-          name: cleanDuplicatedPartnerName(issuerObj.name || data?.issuer?.name),
-          id: issuerObj.id || data?.issuer?.id,
-          type: issuerType,
-          typeName: issuerType,
-          address: issuerObj.address || data?.issuer?.address
-        },
-        receiver: {
-          ...receiverObj,
-          name: cleanDuplicatedPartnerName(receiverObj.name || data?.receiver?.name),
-          id: receiverObj.id || data?.receiver?.id,
-          type: receiverType,
-          typeName: receiverType,
-          address: receiverObj.address || data?.receiver?.address
-        },
-        issuerAddress,
-        receiverAddress,
-        issuerType,
-        receiverType,
-        invoiceLines: normalizedLines,
-        taxTotals: data?.taxTotals || parsedRawDoc?.taxTotals || [],
-        signatures: data?.signatures || parsedRawDoc?.signatures || [],
-        taxpayerActivityCode:
-          data?.taxpayerActivityCode ||
-          parsedRawDoc?.taxpayerActivityCode ||
-          issuerObj?.activityCode ||
-          '---',
-        totalSalesAmount: data?.totalSalesAmount ?? data?.totalSales ?? parsedRawDoc?.totalSalesAmount ?? 0,
-        totalDiscountAmount: data?.totalDiscountAmount ?? data?.totalDiscount ?? parsedRawDoc?.totalDiscountAmount ?? 0,
-        netAmount: data?.netAmount ?? parsedRawDoc?.netAmount ?? 0,
-        totalAmount: data?.totalAmount ?? data?.total ?? parsedRawDoc?.totalAmount ?? 0,
-        extraDiscountAmount: data?.extraDiscountAmount ?? parsedRawDoc?.extraDiscountAmount ?? 0
-      };
-
-      // Persist full enriched details to PostgreSQL eta_documents table
-      try {
-        await pool.query(
-          `UPDATE eta_documents
-           SET raw_data = $1,
-               long_id = COALESCE($2, long_id),
-               issuer_address = COALESCE(NULLIF($3, ''), issuer_address),
-               receiver_address = COALESCE(NULLIF($4, ''), receiver_address),
-               issuer_type = COALESCE($5, issuer_type),
-               receiver_type = COALESCE($6, receiver_type),
-               updated_at = NOW()
-           WHERE company_id = $7 AND uuid = $8`,
-          [
-            JSON.stringify(mergedData),
-            longId || null,
-            issuerAddress || null,
-            receiverAddress || null,
-            issuerType,
-            receiverType,
-            companyId,
-            documentUuid
-          ]
-        );
-      } catch (dbErr) {
-        // Non-fatal if DB is busy or offline
-      }
-
-      return { success: true, data: mergedData };
-    } catch (err: any) {
-      clearTimeout(timeoutId);
-      if (err.name === 'AbortError') {
-        const timeoutErr = new Error('انتهت مهلة جلب تفاصيل المستند من منظومة ETA.');
-        (timeoutErr as any).statusCode = 504;
-        throw timeoutErr;
-      }
-      throw err;
+    } else {
+      // Fallback from document headers if detailed lines are not in raw_data
+      normalizedLines = [{
+        description: row.document_type_name || 'وثيقة إلكترونية',
+        itemCode: '---',
+        itemCodeName: row.document_type_name || '---',
+        itemType: 'EGS',
+        unitType: '',
+        quantity: 1,
+        unitPrice: Number(row.net_amount || 0),
+        salesTotal: Number(row.total_sales_amount || row.net_amount || 0),
+        discountAmount: Number(row.total_discount_amount || 0),
+        taxAmount: Number(row.tax_amount || 0),
+        lineTotal: Number(row.total_amount || 0),
+        taxesList: []
+      }];
     }
+
+    const portalHost = environment === 'production' ? 'invoicing.eta.gov.eg' : 'preprod.invoicing.eta.gov.eg';
+    const longId = row.long_id || rawDataObj?.longId || rawDataObj?.document?.longId;
+    const shareUrl =
+      rawDataObj?.publicUrl ||
+      rawDataObj?.shareUrl ||
+      (longId
+        ? `https://${portalHost}/documents/${encodeURIComponent(documentUuid)}/share/${longId}`
+        : `https://${portalHost}/documents/${encodeURIComponent(documentUuid)}`);
+
+    const mergedData = {
+      ...rawDataObj,
+      rawDocument: parsedRawDoc || rawDataObj,
+      details: rawDataObj?.details || rawDataObj,
+      uuid: documentUuid,
+      internalId: row.internal_id,
+      typeName: row.type_name,
+      documentTypeName: row.document_type_name,
+      typeVersionName: row.type_version_name,
+      direction: row.direction,
+      dateTimeIssued: row.date_time_issued ? new Date(row.date_time_issued).toISOString() : '',
+      dateTimeReceived: row.date_time_received ? new Date(row.date_time_received).toISOString() : '',
+      currency: row.currency || 'EGP',
+      status: row.status || 'Valid',
+      longId: longId || undefined,
+      shareUrl,
+      publicUrl: shareUrl,
+      environment,
+      portalHost,
+      issuer: {
+        ...issuerObj,
+        name: cleanDuplicatedPartnerName(issuerObj.name || row.issuer_name),
+        id: issuerObj.id || row.issuer_id,
+        type: issuerType,
+        typeName: issuerType,
+        address: issuerObj.address || issuerAddress
+      },
+      receiver: {
+        ...receiverObj,
+        name: cleanDuplicatedPartnerName(receiverObj.name || row.receiver_name),
+        id: receiverObj.id || row.receiver_id,
+        type: receiverType,
+        typeName: receiverType,
+        address: receiverObj.address || receiverAddress
+      },
+      issuerAddress,
+      receiverAddress,
+      issuerType,
+      receiverType,
+      invoiceLines: normalizedLines,
+      taxTotals: rawDataObj?.taxTotals || parsedRawDoc?.taxTotals || [],
+      signatures: rawDataObj?.signatures || parsedRawDoc?.signatures || [],
+      taxpayerActivityCode:
+        rawDataObj?.taxpayerActivityCode ||
+        parsedRawDoc?.taxpayerActivityCode ||
+        issuerObj?.activityCode ||
+        '---',
+      totalSalesAmount: Number(row.total_sales_amount || rawDataObj?.totalSalesAmount || rawDataObj?.totalSales || 0),
+      totalDiscountAmount: Number(row.total_discount_amount || rawDataObj?.totalDiscountAmount || rawDataObj?.totalDiscount || 0),
+      netAmount: Number(row.net_amount || rawDataObj?.netAmount || 0),
+      taxAmount: Number(row.tax_amount || 0),
+      totalAmount: Number(row.total_amount || rawDataObj?.totalAmount || rawDataObj?.total || 0),
+      extraDiscountAmount: Number(row.extra_discount_amount || rawDataObj?.extraDiscountAmount || 0)
+    };
+
+    return { success: true, data: mergedData };
+  }
+
+  /**
+   * Search saved electronic documents strictly from PostgreSQL eta_documents (Local-First).
+   * Zero external ETA API calls.
+   */
+  public static async searchLocalDocuments(
+    companyId: string,
+    params: {
+      pageSize?: number;
+      page?: number;
+      direction?: string;
+      documentType?: string;
+      status?: string;
+      issueDateFrom?: string;
+      issueDateTo?: string;
+      submissionDateFrom?: string;
+      submissionDateTo?: string;
+      internalId?: string;
+      issuerId?: string;
+      uuid?: string;
+      search?: string;
+    } = {}
+  ): Promise<{
+    success: boolean;
+    isConfigured: boolean;
+    environment: 'preprod' | 'production';
+    data: EtaReceivedInvoiceDTO[];
+    pagination: {
+      pageSize: number;
+      currentPage: number;
+      totalPages: number;
+      totalCount: number;
+      continuationToken: null;
+    };
+    lastSyncedAt?: string | null;
+  }> {
+    const settings = await this.getCompanySettings(companyId);
+
+    const conditions: string[] = ['company_id = $1'];
+    const values: any[] = [companyId];
+    let idx = 2;
+
+    if (params.direction && params.direction !== 'all') {
+      conditions.push(`direction = $${idx++}`);
+      values.push(params.direction);
+    }
+
+    if (params.documentType && params.documentType !== 'all') {
+      conditions.push(`type_name = $${idx++}`);
+      values.push(params.documentType);
+    }
+
+    if (params.status && params.status !== 'all') {
+      conditions.push(`LOWER(status) = LOWER($${idx++})`);
+      values.push(params.status);
+    }
+
+    if (params.issueDateFrom) {
+      conditions.push(`date_time_issued >= $${idx++}`);
+      values.push(params.issueDateFrom);
+    }
+
+    if (params.issueDateTo) {
+      conditions.push(`date_time_issued <= $${idx++}`);
+      values.push(params.issueDateTo);
+    }
+
+    if (params.submissionDateFrom) {
+      conditions.push(`date_time_received >= $${idx++}`);
+      values.push(params.submissionDateFrom);
+    }
+
+    if (params.submissionDateTo) {
+      conditions.push(`date_time_received <= $${idx++}`);
+      values.push(params.submissionDateTo);
+    }
+
+    if (params.uuid) {
+      conditions.push(`uuid ILIKE $${idx++}`);
+      values.push(`%${params.uuid.trim()}%`);
+    }
+
+    if (params.internalId) {
+      conditions.push(`internal_id ILIKE $${idx++}`);
+      values.push(`%${params.internalId.trim()}%`);
+    }
+
+    if (params.issuerId) {
+      conditions.push(`(issuer_id ILIKE $${idx} OR receiver_id ILIKE $${idx})`);
+      values.push(`%${params.issuerId.trim()}%`);
+      idx++;
+    }
+
+    if (params.search && params.search.trim()) {
+      const q = `%${params.search.trim()}%`;
+      conditions.push(`(uuid ILIKE $${idx} OR internal_id ILIKE $${idx} OR issuer_name ILIKE $${idx} OR receiver_name ILIKE $${idx} OR issuer_id ILIKE $${idx} OR receiver_id ILIKE $${idx})`);
+      values.push(q);
+      idx++;
+    }
+
+    const whereClause = conditions.join(' AND ');
+
+    // 1. Get total count
+    const countRes = await pool.query(
+      `SELECT COUNT(*)::int as total, MAX(last_synced_at) as last_synced FROM eta_documents WHERE ${whereClause}`,
+      values
+    );
+    const totalCount = Number(countRes.rows[0]?.total || 0);
+    const lastSyncedAt = countRes.rows[0]?.last_synced ? new Date(countRes.rows[0].last_synced).toISOString() : null;
+
+    // 2. Pagination
+    const pageSize = Math.min(100, Math.max(1, Number(params.pageSize) || 20));
+    const currentPage = Math.max(1, Number(params.page) || 1);
+    const offset = (currentPage - 1) * pageSize;
+    const totalPages = Math.ceil(totalCount / pageSize) || 1;
+
+    const dataQuery = `
+      SELECT * FROM eta_documents 
+      WHERE ${whereClause} 
+      ORDER BY date_time_issued DESC 
+      LIMIT $${idx++} OFFSET $${idx++}
+    `;
+    const dataValues = [...values, pageSize, offset];
+    const dataRes = await pool.query(dataQuery, dataValues);
+
+    const mappedDocs: EtaReceivedInvoiceDTO[] = dataRes.rows.map(row => ({
+      uuid: row.uuid,
+      submissionUuid: row.submission_uuid || undefined,
+      longId: row.long_id || undefined,
+      internalId: row.internal_id,
+      typeName: row.type_name,
+      documentTypeName: row.document_type_name || 'فاتورة',
+      typeVersionName: row.type_version_name || undefined,
+      direction: (row.direction || 'Received') as 'Sent' | 'Received',
+      issuerId: row.issuer_id,
+      issuerName: cleanDuplicatedPartnerName(row.issuer_name || 'مورد غير محدد'),
+      receiverId: row.receiver_id,
+      receiverName: cleanDuplicatedPartnerName(row.receiver_name || 'عميل غير محدد'),
+      dateTimeIssued: row.date_time_issued ? new Date(row.date_time_issued).toISOString() : '',
+      dateTimeReceived: row.date_time_received ? new Date(row.date_time_received).toISOString() : '',
+      totalSales: Number(row.total_sales_amount || 0),
+      totalDiscount: Number(row.total_discount_amount || 0),
+      netAmount: Number(row.net_amount || 0),
+      taxAmount: Number(row.tax_amount || 0),
+      totalAmount: Number(row.total_amount || 0),
+      currency: row.currency || 'EGP',
+      status: row.status || 'Valid',
+      cancelRequestDate: row.cancel_request_date ? new Date(row.cancel_request_date).toISOString() : null,
+      rejectRequestDate: row.reject_request_date ? new Date(row.reject_request_date).toISOString() : null,
+      address: (row.direction === 'Sent' ? row.receiver_address : row.issuer_address) || row.issuer_address || row.receiver_address || '',
+      issuerAddress: row.issuer_address || '',
+      receiverAddress: row.receiver_address || ''
+    }));
+
+    return {
+      success: true,
+      isConfigured: settings?.isConfigured !== false,
+      environment: settings?.environment || 'production',
+      data: mappedDocs,
+      pagination: {
+        pageSize,
+        currentPage,
+        totalPages,
+        totalCount,
+        continuationToken: null
+      },
+      lastSyncedAt
+    };
   }
 
   /**

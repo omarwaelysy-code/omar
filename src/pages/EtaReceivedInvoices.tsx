@@ -496,8 +496,8 @@ export function EtaReceivedInvoices() {
     const shareUrl = getExternalShareUrl();
     if (window.confirm(
       language === 'ar'
-        ? 'هل ترغب في فتح بوابة منظومة الفواتير الإلكترونية لمصلحة الضرائب المصرية لتسجيل رفض الفاتورة رسمياً؟'
-        : 'Do you want to open the official ETA Taxpayer Portal to reject this invoice?'
+        ? 'هل ترغب في فتح بوابة منظومة الوثائق الإلكترونية لمصلحة الضرائب المصرية لتسجيل رفض الوثيقة رسمياً؟'
+        : 'Do you want to open the official ETA Taxpayer Portal to reject this document?'
     )) {
       window.open(shareUrl, '_blank');
     }
@@ -816,6 +816,9 @@ export function EtaReceivedInvoices() {
 
       const queryParams = new URLSearchParams();
       queryParams.set('pageSize', '20');
+      if (isRefresh) {
+        queryParams.set('refresh', 'true');
+      }
       if (directionFilter !== 'all') {
         queryParams.set('direction', directionFilter);
       }
@@ -870,7 +873,7 @@ export function EtaReceivedInvoices() {
       }
     } catch (err: any) {
       console.error('Failed to load ETA received invoices:', err);
-      const msg = err.message || 'تعذر الاتصال بمنظومة الفاتورة الإلكترونية ETA.';
+      const msg = err.message || 'تعذر جلب الوثائق الإلكترونية من البيانات المحلية.';
       setErrorMessage(msg);
       if (isRefresh) {
         showNotification(msg, 'error');
@@ -1223,7 +1226,7 @@ export function EtaReceivedInvoices() {
             {selectedDocTypes.length === 0
               ? (docTypeFilter !== 'all'
                   ? (DOC_TYPES_LIST.find(x => x.id === docTypeFilter)?.[language === 'ar' ? 'nameAr' : 'nameEn'] || docTypeFilter)
-                  : (language === 'ar' ? 'الكل (فواتير وإشعارات)' : 'All Documents'))
+                  : (language === 'ar' ? 'الكل (وثائق وإشعارات)' : 'All Documents'))
               : selectedDocTypes.length === 1
               ? (() => {
                   const dt = DOC_TYPES_LIST.find(x => x.id === selectedDocTypes[0]);
@@ -1647,8 +1650,8 @@ export function EtaReceivedInvoices() {
               </h3>
               <p className="text-xs md:text-sm text-amber-800 mt-1 leading-relaxed">
                 {language === 'ar'
-                  ? 'لعرض الفواتير المستلمة، يرجى إدخال بيانات الاعتماد (Client ID و Client Secret) واختيار البيئة من إعدادات الشركة.'
-                  : 'To view incoming invoices, please provide ETA credentials (Client ID & Client Secret) in Company Settings.'}
+                  ? 'لعرض الوثائق الإلكترونية المستلمة، يرجى إدخال بيانات الاعتماد (Client ID و Client Secret) واختيار البيئة من إعدادات الشركة.'
+                  : 'To view incoming electronic documents, please provide ETA credentials (Client ID & Client Secret) in Company Settings.'}
               </p>
             </div>
           </div>
@@ -2479,8 +2482,8 @@ export function EtaReceivedInvoices() {
                 <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" />
                 <p className="text-sm font-medium text-slate-500">
                   {viewMode === 'all_portal'
-                    ? (language === 'ar' ? 'جاري جلب ومزامنة كافة وثائق البوابة عبر جميع الفترات...' : 'Loading all documents across all portal periods...')
-                    : (language === 'ar' ? 'جاري جلب الفواتير الإلكترونية من منظومة مصلحة الضرائب...' : 'Loading invoices from ETA...')}
+                    ? (language === 'ar' ? 'جاري جلب الوثائق الإلكترونية المحفوظة...' : 'Loading saved electronic documents...')
+                    : (language === 'ar' ? 'جاري جلب الوثائق الإلكترونية المحفوظة...' : 'Loading saved electronic documents...')}
                 </p>
               </div>
             ) : totalFound === 0 ? (
@@ -2489,20 +2492,27 @@ export function EtaReceivedInvoices() {
                   <Receipt className="w-8 h-8" />
                 </div>
                 <h3 className="font-bold text-base text-slate-800">
-                  {language === 'ar' ? 'لا توجد وثائق مطابقة' : 'No documents found'}
+                  {allPortalInvoices.length === 0 && !appliedSearch && !dateFrom && !dateTo
+                    ? (language === 'ar' ? 'لا توجد وثائق إلكترونية مستلمة محفوظة حاليًا.' : 'No saved electronic documents found.')
+                    : (language === 'ar' ? 'لا توجد وثائق مطابقة' : 'No documents found')}
                 </h3>
                 <p className="text-xs md:text-sm text-slate-400 max-w-md mx-auto mt-1 leading-relaxed">
-                  {language === 'ar'
-                    ? 'لم يتم العثور على وثائق إلكترونية مطابقة للفلاتر المحددة. يمكنك تغيير خيارات البحث أو إعادة المحاولة.'
-                    : 'No documents found matching the filters. Try changing your search query or filters.'}
+                  {allPortalInvoices.length === 0 && !appliedSearch && !dateFrom && !dateTo
+                    ? (language === 'ar'
+                        ? 'اضغط على زر "تحديث" لبدء المزامنة وجلب الوثائق الإلكترونية من منظومة مصلحة الضرائب المصرية وحفظها محليًا.'
+                        : 'Click "Refresh" to sync electronic documents from ETA into local storage.')
+                    : (language === 'ar'
+                        ? 'لم يتم العثور على وثائق إلكترونية مطابقة للفلاتر المحددة. يمكنك تغيير خيارات البحث أو إعادة المحاولة.'
+                        : 'No documents found matching the filters. Try changing your search query or filters.')}
                 </p>
                 <div className="mt-4 flex items-center justify-center gap-3">
                   <button
                     type="button"
                     onClick={handleRefresh}
-                    className="px-4 py-2 text-xs md:text-sm font-semibold rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors"
+                    className="inline-flex items-center gap-2 px-4 py-2 text-xs md:text-sm font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shadow-sm cursor-pointer"
                   >
-                    {language === 'ar' ? 'إعادة المحاولة' : 'Retry'}
+                    <RefreshCw className="w-4 h-4" />
+                    {language === 'ar' ? 'تحديث' : 'Refresh'}
                   </button>
                 </div>
               </div>

@@ -11509,7 +11509,7 @@ router.get(['/eta/lookups/governorates', '/eta/governorates'], authenticateToken
 // ETA RECEIVED ELECTRONIC INVOICES (READ-ONLY)
 // =========================================================================
 
-// GET /api/erp/eta/invoices/received
+// GET /api/erp/eta/invoices/received - Local-First search from PostgreSQL
 router.get('/eta/invoices/received', authenticateToken, async (req: AuthRequest, res) => {
   const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
   if (!companyId) {
@@ -11522,14 +11522,14 @@ router.get('/eta/invoices/received', authenticateToken, async (req: AuthRequest,
   if (!isCompanyAdmin) {
     const userPermissions = (req.user as any)?.permissions;
     if (userPermissions && userPermissions['eta_received_invoices']?.view === false) {
-      return res.status(403).json({ error: 'غير مصرح لك بعرض الفواتير الإلكترونية المستلمة.' });
+      return res.status(403).json({ error: 'غير مصرح لك بعرض الوثائق الإلكترونية المستلمة.' });
     }
   }
 
   try {
     const {
       pageSize,
-      continuationToken,
+      page,
       issueDateFrom,
       issueDateTo,
       submissionDateFrom,
@@ -11539,12 +11539,20 @@ router.get('/eta/invoices/received', authenticateToken, async (req: AuthRequest,
       direction,
       internalId,
       issuerId,
-      uuid
+      uuid,
+      search,
+      refresh
     } = req.query;
 
-    const result = await EtaDocumentService.searchReceivedInvoices(companyId, {
+    // If explicit refresh requested, sync from ETA first
+    if (refresh === 'true') {
+      await EtaDocumentService.fetchAllDocuments(companyId, { forceRefresh: true });
+    }
+
+    // Local-First: Search documents directly from PostgreSQL eta_documents (zero ETA calls on view/search/filter)
+    const result = await EtaDocumentService.searchLocalDocuments(companyId, {
       pageSize: pageSize ? Number(pageSize) : undefined,
-      continuationToken: continuationToken as string | undefined,
+      page: page ? Number(page) : undefined,
       issueDateFrom: issueDateFrom as string | undefined,
       issueDateTo: issueDateTo as string | undefined,
       submissionDateFrom: submissionDateFrom as string | undefined,
@@ -11554,17 +11562,18 @@ router.get('/eta/invoices/received', authenticateToken, async (req: AuthRequest,
       direction: (direction as string) || undefined,
       internalId: internalId as string | undefined,
       issuerId: issuerId as string | undefined,
-      uuid: uuid as string | undefined
+      uuid: uuid as string | undefined,
+      search: search as string | undefined
     });
 
     res.json(result);
   } catch (err: any) {
-    console.error('Error fetching received ETA invoices:', err.message || err);
+    console.error('Error fetching local ETA documents:', err.message || err);
     const statusCode = err.statusCode || 500;
     res.status(statusCode).json({
       success: false,
-      error: err.message || 'تعذر جلب الفواتير الإلكترونية المستلمة من منظومة الضرائب.',
-      code: err.code || 'ETA_ERROR',
+      error: err.message || 'تعذر جلب الوثائق الإلكترونية من البيانات المحلية.',
+      code: err.code || 'ETA_LOCAL_ERROR',
       diagnostic: err.diagnostic || undefined
     });
   }
@@ -11579,7 +11588,7 @@ router.get('/eta/invoices/all', authenticateToken, async (req: AuthRequest, res)
 
   const userPermissions = (req.user as any)?.permissions;
   if (userPermissions && userPermissions['eta_received_invoices']?.view === false) {
-    return res.status(403).json({ error: 'غير مصرح لك بعرض الفواتير الإلكترونية.' });
+    return res.status(403).json({ error: 'غير مصرح لك بعرض الوثائق الإلكترونية.' });
   }
 
   try {
@@ -11758,14 +11767,14 @@ router.get('/eta/invoices/:uuid/details', authenticateToken, async (req: AuthReq
   if (!isCompanyAdmin) {
     const userPermissions = (req.user as any)?.permissions;
     if (userPermissions && userPermissions['eta_received_invoices']?.view === false) {
-      return res.status(403).json({ error: 'غير مصرح لك بعرض تفاصيل الفواتير الإلكترونية المستلمة.' });
+      return res.status(403).json({ error: 'غير مصرح لك بعرض تفاصيل الوثائق الإلكترونية المستلمة.' });
     }
   }
 
   try {
     const { uuid } = req.params;
     if (!uuid) {
-      return res.status(400).json({ error: 'معرف الفاتورة (UUID) مطلوب.' });
+      return res.status(400).json({ error: 'معرف الوثيقة (UUID) مطلوب.' });
     }
 
     const result = await EtaDocumentService.getDocumentDetails(companyId, uuid);
@@ -11775,8 +11784,8 @@ router.get('/eta/invoices/:uuid/details', authenticateToken, async (req: AuthReq
     const statusCode = err.statusCode || 500;
     res.status(statusCode).json({
       success: false,
-      error: err.message || 'تعذر جلب تفاصيل الفاتورة من منظومة الضرائب.',
-      code: err.code || 'ETA_ERROR'
+      error: err.message || 'تعذر جلب تفاصيل الوثيقة من البيانات المحلية.',
+      code: err.code || 'ETA_LOCAL_ERROR'
     });
   }
 });
