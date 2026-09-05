@@ -293,6 +293,20 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   eta_governorates: [
     'code', 'name_ar', 'name_en', 'country_code', 'is_active', 'created_at'
+  ],
+  eta_documents: [
+    'id', 'company_id', 'uuid', 'submission_uuid', 'long_id', 'internal_id', 'type_name',
+    'document_type_name', 'document_type_version', 'direction', 'status', 'date_time_issued',
+    'date_time_received', 'issuer_id', 'issuer_name', 'issuer_type', 'issuer_address',
+    'receiver_id', 'receiver_name', 'receiver_type', 'receiver_address', 'total_sales_amount',
+    'total_discount_amount', 'net_amount', 'tax_amount', 'total_amount', 'extra_discount_amount',
+    'total_items_discount_amount', 'currency', 'raw_data', 'created_at', 'updated_at', 'last_synced_at'
+  ],
+  eta_supplier_mappings: [
+    'id', 'company_id', 'eta_tax_number', 'eta_supplier_name', 'supplier_id', 'notes', 'created_at', 'updated_at'
+  ],
+  eta_item_mappings: [
+    'id', 'company_id', 'eta_item_code', 'eta_item_name', 'eta_item_type', 'product_id', 'notes', 'created_at', 'updated_at'
   ]
 };
 

@@ -2,12 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Plus, Trash2, X, Package, History, ChevronRight, ChevronLeft, 
   Wallet, Layers, Hash, User, Calendar, Paperclip, LayoutGrid, List,
-  Lock, Camera, Printer, Download, FileText, RefreshCw, AlertCircle, Settings, FileUp, Percent
+  Lock, Camera, Printer, Download, FileText, RefreshCw, AlertCircle, Settings, FileUp, Percent,
+  Link2, Check, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Barcode from 'react-barcode';
 import QRCode from 'react-qr-code';
-import { dbService } from '../services/dbService';
+import { dbService, apiRequest } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
@@ -150,7 +151,16 @@ export const Products: React.FC = () => {
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
   const { canView, canCreate, canEdit, canDelete, canViewCost, canEditCostPrice } = usePermissions('products');
-  const { setCurrentPage, setPendingViewDoc } = useNavigation();
+  const { 
+    setCurrentPage, 
+    setPendingViewDoc,
+    pendingEtaProductForCreation,
+    setPendingEtaProductForCreation,
+    pendingEtaProductForLinking,
+    setPendingEtaProductForLinking
+  } = useNavigation();
+  const [linkWithEta, setLinkWithEta] = useState(false);
+  const [isLinkingDirect, setIsLinkingDirect] = useState(false);
   
   const [products, setProducts] = useState<Product[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -265,6 +275,72 @@ export const Products: React.FC = () => {
       };
     }
   }, [user]);
+
+  // Golden Rule: Handle incoming ETA Product creation with pre-filled values & accounting defaults
+  useEffect(() => {
+    if (pendingEtaProductForCreation && accounts.length > 0) {
+      const defaultRevenue = accounts.find(a => ['sales_revenue', 'service_revenue', 'other_revenue'].includes(a.account_usage || ''));
+      const defaultCost = accounts.find(a => a.account_usage === 'cost_of_sales') || accounts.find(a => ['cost_of_sales', 'purchases'].includes(a.account_usage || ''));
+      const defaultInventory = accounts.find(a => ['inventory', 'raw_materials', 'finished_goods'].includes(a.account_usage || ''));
+      const defaultVat = accounts.find(a => a.account_usage === 'vat');
+      const defaultGroup = itemGroups[0]?.id || '';
+
+      setEditingProduct(null);
+      setFormData(prev => ({
+        ...prev,
+        name: pendingEtaProductForCreation.itemName || '',
+        description: pendingEtaProductForCreation.description || pendingEtaProductForCreation.itemName || '',
+        tax_item_code: pendingEtaProductForCreation.itemCode || '',
+        tax_code_type: (pendingEtaProductForCreation.itemType as any) || 'EGS',
+        unit: pendingEtaProductForCreation.unit || 'قطعة',
+        sale_price: Number(pendingEtaProductForCreation.salePrice || 0),
+        cost_price: Number(pendingEtaProductForCreation.costPrice || 0),
+        item_group_id: defaultGroup,
+        revenue_account_id: defaultRevenue?.id || '',
+        cost_account_id: defaultCost?.id || '',
+        inventory_account_id: defaultInventory?.id || '',
+        vat_account_id: defaultVat?.id || '',
+        vat_rate: defaultVat ? 14 : 0,
+        type: 'finished_good',
+        is_active: true
+      }));
+      setLinkWithEta(true);
+      setIsModalOpen(true);
+    }
+  }, [pendingEtaProductForCreation, accounts, itemGroups]);
+
+  // Handle linking existing product to ETA tax code
+  const handleLinkExistingToEta = async (product: Product) => {
+    if (!pendingEtaProductForLinking) return;
+    try {
+      setIsLinkingDirect(true);
+      await apiRequest('/eta/items/mapping/link', 'POST', {
+        etaItemCode: pendingEtaProductForLinking.itemCode,
+        productId: product.id,
+        etaItemName: pendingEtaProductForLinking.itemName || product.name,
+        etaItemType: pendingEtaProductForLinking.itemType || 'EGS',
+        notes: `ربط من شاشة الأصناف مع الصنف ${product.code}`
+      });
+      // Update tax_item_code on product
+      await dbService.update('products', product.id, {
+        tax_item_code: pendingEtaProductForLinking.itemCode,
+        tax_code_type: pendingEtaProductForLinking.itemType || 'EGS',
+        eta_item_code: pendingEtaProductForLinking.itemCode,
+        eta_code_type: pendingEtaProductForLinking.itemType || 'EGS'
+      });
+      showNotification(
+        language === 'ar'
+          ? `تم ربط الصنف "${product.name}" بنجاح مع كود الضرائب "${pendingEtaProductForLinking.itemCode}"!`
+          : `Linked "${product.name}" with ETA tax code!`,
+        'success'
+      );
+      setPendingEtaProductForLinking(null);
+    } catch (err: any) {
+      showNotification(err.message || (language === 'ar' ? 'فشل إتمام الربط' : 'Failed to link'), 'error');
+    } finally {
+      setIsLinkingDirect(false);
+    }
+  };
 
   useEffect(() => {
     if (!editingProduct && formData.type && isModalOpen && isAutoCode) {
@@ -473,8 +549,33 @@ export const Products: React.FC = () => {
         await dbService.update('products', editingProduct.id, dataToSave);
         showNotification(t('common.updated_successfully'), 'success');
       } else {
-        await dbService.add('products', { ...dataToSave, company_id: user.company_id });
-        showNotification(t('common.created_successfully'), 'success');
+        const newProdId = await dbService.add('products', { ...dataToSave, company_id: user.company_id });
+        if (pendingEtaProductForCreation && linkWithEta) {
+          try {
+            await apiRequest('/eta/items/mapping/link', 'POST', {
+              etaItemCode: pendingEtaProductForCreation.itemCode,
+              productId: newProdId,
+              etaItemName: formData.name,
+              etaItemType: formData.tax_code_type || 'EGS',
+              notes: 'تم إنشاؤه من شاشة الأصناف وربطه تلقائياً بـ ETA'
+            });
+            showNotification(
+              language === 'ar'
+                ? `تم إضافة الصنف "${formData.name}" وربطه بنجاح مع منظومة الفاتورة الإلكترونية (ETA)!`
+                : `Product added and linked to ETA successfully!`,
+              'success'
+            );
+          } catch (linkErr: any) {
+            console.error('ETA link error:', linkErr);
+            showNotification(language === 'ar' ? 'تم حفظ الصنف ولكن تعذر إتمام ربط ETA' : 'Product saved, but failed to link to ETA', 'warning');
+          }
+          setPendingEtaProductForCreation(null);
+        } else {
+          if (pendingEtaProductForCreation) {
+            setPendingEtaProductForCreation(null);
+          }
+          showNotification(t('common.created_successfully'), 'success');
+        }
       }
       setIsModalOpen(false);
       resetForm();
@@ -929,6 +1030,39 @@ export const Products: React.FC = () => {
             exit={{ opacity: 0, y: -20 }}
             className="flex-1 flex flex-col space-y-8 overflow-hidden max-w-7xl mx-auto w-full p-4"
           >
+            {/* ETA Linking Banner when navigated from EtaItemMapping */}
+            {pendingEtaProductForLinking && (
+              <div className="p-5 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-transparent border-2 border-indigo-500/30 rounded-3xl flex items-center justify-between gap-4 shadow-sm">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-600/30">
+                    <Link2 size={24} />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-black text-slate-900 flex items-center gap-2">
+                      <span>{language === 'ar' ? 'جاري اختيار صنف لربطه بكود الضرائب ETA:' : 'Select a product to link with ETA code:'}</span>
+                      <span className="font-mono font-black text-indigo-700 bg-white px-2.5 py-0.5 rounded-lg border border-indigo-200">
+                        {pendingEtaProductForLinking.itemCode}
+                      </span>
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {language === 'ar' ? 'اسم الصنف بالبوابة:' : 'Portal Item Name:'}{' '}
+                      <span className="font-bold text-slate-700">{pendingEtaProductForLinking.itemName || '---'}</span>
+                      {' • '}
+                      {language === 'ar' ? 'اختر الصنف المطلوب واضغط زر "ربط مع ETA" المقابل له.' : 'Click "Link with ETA" on the desired product row.'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPendingEtaProductForLinking(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1"
+                >
+                  <X size={16} />
+                  <span>{language === 'ar' ? 'إلغاء الربط' : 'Cancel'}</span>
+                </button>
+              </div>
+            )}
+
             {/* Header - Styled like Discount Settings */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-8 pb-6 border-b border-slate-100">
               <div className={dir === 'rtl' ? 'text-right' : 'text-left'}>
@@ -1098,7 +1232,22 @@ export const Products: React.FC = () => {
                               <span className="font-black text-emerald-600 text-lg">{formatNumber(product.sale_price || 0)} <span className="text-[10px] text-slate-400 italic ms-1">{t('invoices.currency')}</span></span>
                             </td>
                             <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                               <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1 opacity-0 group-hover:opacity-100 transition-all`}>
+                                <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1.5 ${pendingEtaProductForLinking ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-all`}>
+                                   {pendingEtaProductForLinking && (
+                                     <button
+                                       type="button"
+                                       onClick={(e) => {
+                                         e.stopPropagation();
+                                         handleLinkExistingToEta(product);
+                                       }}
+                                       disabled={isLinkingDirect}
+                                       className="px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-md shadow-indigo-600/20 active:scale-95 disabled:opacity-50"
+                                       title={language === 'ar' ? 'ربط هذا الصنف مع كود الضرائب' : 'Link with ETA'}
+                                     >
+                                       <Link2 size={14} />
+                                       <span>{language === 'ar' ? 'ربط مع ETA' : 'Link ETA'}</span>
+                                     </button>
+                                   )}
                                   <button 
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1179,6 +1328,21 @@ export const Products: React.FC = () => {
                             <p className="font-black text-3xl tracking-tighter leading-none text-emerald-600">{formatNumber(product.sale_price || 0)} <span className="text-xs font-normal text-slate-300 italic serif">{t('invoices.currency')}</span></p>
                           </div>
                           <div className="flex gap-2">
+                            {pendingEtaProductForLinking && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleLinkExistingToEta(product);
+                                }}
+                                disabled={isLinkingDirect}
+                                className="px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-2xl text-xs font-black transition-all flex items-center gap-1 shadow-md shadow-indigo-600/20 active:scale-95 disabled:opacity-50"
+                                title={language === 'ar' ? 'ربط هذا الصنف مع كود الضرائب' : 'Link with ETA'}
+                              >
+                                <Link2 size={14} />
+                                <span>{language === 'ar' ? 'ربط مع ETA' : 'Link ETA'}</span>
+                              </button>
+                            )}
                             <button 
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1228,10 +1392,32 @@ export const Products: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <button type="submit" form="product-form" className="px-10 py-5 bg-zinc-900 text-white rounded-[1.5rem] font-black hover:bg-zinc-800 transition-all active:scale-95 shadow-xl">
-                       {editingProduct ? t('common.save') : t('common.add')}
+                    {pendingEtaProductForCreation && (
+                      <button 
+                        type="submit" 
+                        form="product-form"
+                        onClick={() => setLinkWithEta(true)}
+                        className="px-8 py-5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white rounded-[1.5rem] font-black hover:from-emerald-700 hover:to-teal-800 transition-all active:scale-95 shadow-xl flex items-center gap-2 border border-emerald-400/40 text-base"
+                      >
+                        <Link2 size={20} />
+                        <span>{language === 'ar' ? 'حفظ وربط مع منظومة ETA فوراً' : 'Save & Link to ETA'}</span>
+                      </button>
+                    )}
+                    <button 
+                      type="submit" 
+                      form="product-form" 
+                      onClick={() => setLinkWithEta(false)}
+                      className="px-10 py-5 bg-zinc-900 text-white rounded-[1.5rem] font-black hover:bg-zinc-800 transition-all active:scale-95 shadow-xl"
+                    >
+                       {editingProduct ? t('common.save') : (pendingEtaProductForCreation ? (language === 'ar' ? 'حفظ عادي' : 'Save Normal') : t('common.add'))}
                     </button>
-                    <button onClick={closeModal} className="w-14 h-14 flex items-center justify-center bg-slate-50 text-slate-400 rounded-[1.5rem] hover:bg-rose-50 hover:text-rose-500 transition-all">
+                    <button 
+                      onClick={() => {
+                        if (pendingEtaProductForCreation) setPendingEtaProductForCreation(null);
+                        closeModal();
+                      }} 
+                      className="w-14 h-14 flex items-center justify-center bg-slate-50 text-slate-400 rounded-[1.5rem] hover:bg-rose-50 hover:text-rose-500 transition-all"
+                    >
                        <X size={28} />
                     </button>
                   </div>
@@ -1240,6 +1426,35 @@ export const Products: React.FC = () => {
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-10 md:p-14">
                   <form id="product-form" onSubmit={handleSubmit} className="space-y-16" dir={dir}>
+                     {/* ETA Linked Banner */}
+                     {pendingEtaProductForCreation && (
+                       <div className="p-6 bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent border-2 border-emerald-500/30 rounded-[2.5rem] flex items-center justify-between gap-4 shadow-sm mb-10">
+                         <div className="flex items-center gap-4">
+                           <div className="p-4 bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-600/30 flex-shrink-0">
+                             <Link2 className="w-7 h-7" />
+                           </div>
+                           <div>
+                             <h4 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                               <span>{language === 'ar' ? 'إضافة صنف قادم من منظومة الفاتورة الإلكترونية (ETA)' : 'ETA Incoming Portal Item'}</span>
+                               <span className="text-xs font-bold px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-lg">
+                                 {language === 'ar' ? 'ربط مباشر ومحاسبي معتمد' : 'Direct Link'}
+                               </span>
+                             </h4>
+                             <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                               {language === 'ar' ? 'كود الصنف بالضرائب:' : 'ETA Item Code:'}{' '}
+                               <span className="font-mono font-black text-emerald-700 bg-white px-2 py-0.5 rounded border border-emerald-200 text-sm">
+                                 {pendingEtaProductForCreation.itemCode}
+                               </span>{' '}
+                               ({pendingEtaProductForCreation.itemType || 'EGS'})
+                               {' • '}
+                               {language === 'ar' 
+                                 ? 'تم تعبئة البيانات الأساسية وتحديد الحسابات تلقائياً. اضغط "حفظ وربط مع منظومة ETA فوراً" لحفظ الصنف وربطه مع الحفاظ الكامل على القيود المحاسبية.'
+                                 : 'Data pre-filled with official accounts. Click Save & Link to ETA to save with accounting validation.'}
+                             </p>
+                           </div>
+                         </div>
+                       </div>
+                     )}
                      {/* Base Data Section */}
                      <div className="space-y-10">
                         <div className="flex items-center gap-4 border-b border-slate-50 pb-8">
@@ -1725,7 +1940,28 @@ export const Products: React.FC = () => {
                             </div>
                          </div>
                       </div>
-                  </form>
+
+                      {/* Sticky Bottom Actions */}
+                      <div className="pt-8 pb-4 flex flex-wrap gap-4 sticky bottom-0 bg-white/95 backdrop-blur-md z-30 border-t border-slate-100 mt-10">
+                        {pendingEtaProductForCreation && (
+                          <button 
+                            type="submit"
+                            onClick={() => setLinkWithEta(true)}
+                            className="flex-1 py-5 px-6 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white rounded-[2rem] font-black text-xl hover:from-emerald-700 hover:to-teal-800 transition-all shadow-xl shadow-emerald-600/30 active:scale-[0.98] border border-emerald-400/40 flex items-center justify-center gap-3"
+                          >
+                            <Link2 className="w-6 h-6" />
+                            <span>{language === 'ar' ? 'حفظ وربط مع منظومة ETA فوراً' : 'Save & Link to ETA'}</span>
+                          </button>
+                        )}
+                        <button 
+                          type="submit"
+                          onClick={() => setLinkWithEta(false)}
+                          className={`${pendingEtaProductForCreation ? 'px-8 font-bold text-lg' : 'flex-1 font-black text-2xl'} py-5 bg-zinc-900 text-white rounded-[2rem] hover:bg-zinc-800 transition-all shadow-2xl active:scale-[0.98] border border-white/10 flex items-center justify-center gap-3`}
+                        >
+                          {editingProduct ? t('common.save') : (pendingEtaProductForCreation ? (language === 'ar' ? 'حفظ عادي' : 'Save Normal') : t('common.add'))}
+                        </button>
+                      </div>
+                   </form>
                 </div>
               </div>
 

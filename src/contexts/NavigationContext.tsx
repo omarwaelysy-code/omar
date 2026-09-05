@@ -25,6 +25,34 @@ interface NavigationContextType {
   setPendingEtaSupplierForCreation: (val: { name: string; taxNumber: string; address?: string; phone?: string } | null) => void;
   pendingEtaSupplierForLinking: { name: string; taxNumber: string; address?: string } | null;
   setPendingEtaSupplierForLinking: (val: { name: string; taxNumber: string; address?: string } | null) => void;
+  pendingEtaProductForCreation: {
+    itemCode: string;
+    itemName?: string;
+    itemType?: string;
+    unit?: string;
+    salePrice?: number;
+    costPrice?: number;
+    description?: string;
+  } | null;
+  setPendingEtaProductForCreation: (val: {
+    itemCode: string;
+    itemName?: string;
+    itemType?: string;
+    unit?: string;
+    salePrice?: number;
+    costPrice?: number;
+    description?: string;
+  } | null) => void;
+  pendingEtaProductForLinking: {
+    itemCode: string;
+    itemName?: string;
+    itemType?: string;
+  } | null;
+  setPendingEtaProductForLinking: (val: {
+    itemCode: string;
+    itemName?: string;
+    itemType?: string;
+  } | null) => void;
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
@@ -105,6 +133,7 @@ export const pageLabels: { [key: string]: string } = {
   'eta_received_invoices': 'الوثائق الإلكترونية',
   'eta_detailed_invoices': 'الوثائق الإلكترونية بالتفصيل',
   'eta_supplier_mapping': 'ربط الموردين (ETA)',
+  'eta_item_mapping': 'ربط الأصناف (ETA)',
 };
 
 export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -117,6 +146,20 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [pendingAccountTypeEditId, setPendingAccountTypeEditId] = useState<string | null>(null);
   const [pendingEtaSupplierForCreation, setPendingEtaSupplierForCreation] = useState<{ name: string; taxNumber: string; address?: string; phone?: string } | null>(null);
   const [pendingEtaSupplierForLinking, setPendingEtaSupplierForLinking] = useState<{ name: string; taxNumber: string; address?: string } | null>(null);
+  const [pendingEtaProductForCreation, setPendingEtaProductForCreation] = useState<{
+    itemCode: string;
+    itemName?: string;
+    itemType?: string;
+    unit?: string;
+    salePrice?: number;
+    costPrice?: number;
+    description?: string;
+  } | null>(null);
+  const [pendingEtaProductForLinking, setPendingEtaProductForLinking] = useState<{
+    itemCode: string;
+    itemName?: string;
+    itemType?: string;
+  } | null>(null);
 
   const openTab = (id: string, label?: string) => {
     const tabLabel = label || pageLabels[id] || id;
@@ -192,7 +235,11 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       pendingEtaSupplierForCreation,
       setPendingEtaSupplierForCreation,
       pendingEtaSupplierForLinking,
-      setPendingEtaSupplierForLinking
+      setPendingEtaSupplierForLinking,
+      pendingEtaProductForCreation,
+      setPendingEtaProductForCreation,
+      pendingEtaProductForLinking,
+      setPendingEtaProductForLinking
     }}>
       {children}
     </NavigationContext.Provider>

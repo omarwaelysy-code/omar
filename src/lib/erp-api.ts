@@ -29,6 +29,7 @@ import { isCompanyPosEnabled } from './subscription/FeatureService';
 import { EtaAuthService } from '../services/eta/EtaAuthService';
 import { EtaDocumentService } from '../services/eta/EtaDocumentService';
 import { EtaSupplierMappingService } from '../services/eta/EtaSupplierMappingService';
+import { EtaItemMappingService } from '../services/eta/EtaItemMappingService';
 
 export function getEffectiveModule(moduleName: string): string {
   const mapping: { [key: string]: string } = {
@@ -65,7 +66,7 @@ export function getInitialPermissionsState() {
     'balance_sheet', 'stock_card_report', 'stock_balances_report', 'general_stock_movements_report',
     'users', 'companies', 'activity_log', 'audit_logs', 'system_check', 'company_settings',
     'discount_settings', 'backup_restore', 'templates', 'create_template', 'operation_categories',
-    'operation_fields', 'operations', 'period_closing', 'eta_received_invoices', 'eta_detailed_invoices', 'eta_supplier_mapping'
+    'operation_fields', 'operations', 'period_closing', 'eta_received_invoices', 'eta_detailed_invoices', 'eta_supplier_mapping', 'eta_item_mapping'
   ];
   
   const specials: any = {
@@ -11752,6 +11753,88 @@ router.post('/eta/suppliers/mapping/create-and-link', authenticateToken, async (
   } catch (err: any) {
     console.error('Error creating and linking supplier:', err.message || err);
     res.status(400).json({ success: false, error: err.message || 'تعذر إنشاء وربط المورد الجديد.' });
+  }
+});
+
+// =========================================================================
+// ETA ITEM MAPPING APIS
+// =========================================================================
+
+// GET /api/erp/eta/items/mapping
+router.get('/eta/items/mapping', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  if (!companyId) {
+    return res.status(401).json({ error: 'Unauthorized: Company ID is required' });
+  }
+
+  const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
+  const isCompanyAdmin = req.user?.role === 'admin' || isSuperAdmin;
+  if (!isCompanyAdmin) {
+    const userPermissions = (req.user as any)?.permissions;
+    if (userPermissions && userPermissions['eta_item_mapping']?.view === false && userPermissions['eta_received_invoices']?.view === false) {
+      return res.status(403).json({ error: 'غير مصرح لك بعرض ربط الأصناف.' });
+    }
+  }
+
+  try {
+    const { refresh } = req.query;
+    const result = await EtaItemMappingService.getItemMappings(companyId, {
+      forceRefresh: refresh === 'true'
+    });
+    res.json(result);
+  } catch (err: any) {
+    console.error('Error fetching ETA item mappings:', err.message || err);
+    res.status(500).json({ success: false, error: err.message || 'تعذر جلب بيانات ربط الأصناف.' });
+  }
+});
+
+// POST /api/erp/eta/items/mapping/link
+router.post('/eta/items/mapping/link', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  if (!companyId) {
+    return res.status(401).json({ error: 'Unauthorized: Company ID is required' });
+  }
+
+  try {
+    const { etaItemCode, productId, etaItemName, etaItemType, notes } = req.body;
+    const result = await EtaItemMappingService.linkItem(companyId, etaItemCode, productId, etaItemName, etaItemType, notes);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Error linking ETA item:', err.message || err);
+    res.status(400).json({ success: false, error: err.message || 'تعذر ربط الصنف.' });
+  }
+});
+
+// POST /api/erp/eta/items/mapping/unlink
+router.post('/eta/items/mapping/unlink', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  if (!companyId) {
+    return res.status(401).json({ error: 'Unauthorized: Company ID is required' });
+  }
+
+  try {
+    const { etaItemCode } = req.body;
+    const result = await EtaItemMappingService.unlinkItem(companyId, etaItemCode);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Error unlinking ETA item:', err.message || err);
+    res.status(400).json({ success: false, error: err.message || 'تعذر فك ارتباط الصنف.' });
+  }
+});
+
+// POST /api/erp/eta/items/mapping/quick-link-all
+router.post('/eta/items/mapping/quick-link-all', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  if (!companyId) {
+    return res.status(401).json({ error: 'Unauthorized: Company ID is required' });
+  }
+
+  try {
+    const result = await EtaItemMappingService.bulkLinkAutoMatched(companyId);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Error in quickLinkAllMatched items:', err.message || err);
+    res.status(500).json({ success: false, error: err.message || 'تعذر إجراء الربط التلقائي للأصناف.' });
   }
 });
 
