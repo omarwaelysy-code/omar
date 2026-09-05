@@ -11722,15 +11722,20 @@ router.post('/eta/suppliers/mapping/create-and-link', authenticateToken, async (
   }
 
   try {
-    const { name, taxNumber, etaTaxNumber, address, mobile, phone, email } = req.body;
+    const { name, taxNumber, etaTaxNumber, address, mobile, phone, email, account_id, accountId, account_name, accountName } = req.body;
     const resolvedTaxNumber = taxNumber || etaTaxNumber;
     const resolvedMobile = mobile || phone;
+    const resolvedAccountId = account_id || accountId;
+    const resolvedAccountName = account_name || accountName;
+
     const result = await EtaSupplierMappingService.createAndLinkSupplier(companyId, {
       name,
       taxNumber: resolvedTaxNumber,
       address,
       mobile: resolvedMobile,
-      email
+      email,
+      accountId: resolvedAccountId,
+      accountName: resolvedAccountName
     });
     res.json(result);
   } catch (err: any) {

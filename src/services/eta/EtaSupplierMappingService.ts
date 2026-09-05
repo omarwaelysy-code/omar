@@ -293,11 +293,64 @@ export class EtaSupplierMappingService {
       address?: string;
       mobile?: string;
       email?: string;
+      accountId?: string;
+      accountName?: string;
     }
   ): Promise<{ success: boolean; supplierId: string; code: string; message: string }> {
     const { name, taxNumber, address, mobile, email } = data;
     if (!name || !taxNumber) {
       throw new Error('اسم المورد والرقم الضريبي مطلوبان لإنشاء المورد.');
+    }
+
+    let finalAccountId = data.accountId?.trim() || '';
+    let finalAccountName = data.accountName?.trim() || '';
+
+    // If accountId provided, verify it exists and get its official name
+    if (finalAccountId) {
+      const accCheck = await pool.query(`
+        SELECT id, name, code, account_usage FROM accounts 
+        WHERE id = $1 AND company_id = $2
+      `, [finalAccountId, companyId]);
+
+      if (accCheck.rows.length === 0) {
+        throw new Error('الحساب المحاسبي المحدد غير موجود أو غير تابع لهذه الشركة.');
+      }
+      finalAccountName = accCheck.rows[0].name;
+    } else {
+      // Automatic fallback: find default supplier account in Chart of Accounts
+      const defaultAccRes = await pool.query(`
+        SELECT id, name, code, account_usage FROM accounts 
+        WHERE company_id = $1 
+          AND (
+            account_usage = 'supplier' 
+            OR account_usage = 'accounts_payable' 
+            OR code = '210101' 
+            OR code LIKE '2101%'
+            OR name LIKE '%مورد%'
+          )
+          AND (is_active IS NULL OR is_active = true)
+        ORDER BY 
+          CASE 
+            WHEN account_usage = 'supplier' THEN 1 
+            WHEN account_usage = 'accounts_payable' THEN 2 
+            WHEN code = '210101' THEN 3
+            WHEN code LIKE '2101%' THEN 4
+            ELSE 5 
+          END,
+          code ASC
+        LIMIT 1
+      `, [companyId]);
+
+      if (defaultAccRes.rows.length === 0) {
+        throw new Error('خطأ فادح: لا يمكن إنشاء المورد لعدم وجود حساب محاسبي للموردين بدليل الحسابات. يرجى تحديد الحساب المحاسبي أولاً.');
+      }
+
+      finalAccountId = defaultAccRes.rows[0].id;
+      finalAccountName = defaultAccRes.rows[0].name;
+    }
+
+    if (!finalAccountId) {
+      throw new Error('لا يمكن حفظ المورد بدون حساب محاسبي مربوط.');
     }
 
     // Generate next supplier code
@@ -317,13 +370,25 @@ export class EtaSupplierMappingService {
     const code = `supp ${nextNum.toString().padStart(5, '0')}`;
     const supplierId = crypto.randomUUID();
 
-    // Insert into suppliers
+    // Insert into suppliers WITH account_id and account_name
     await pool.query(`
       INSERT INTO suppliers (
-        id, company_id, name, code, tax_number, address, mobile, email, is_active, created_at
+        id, company_id, name, code, tax_number, address, mobile, email,
+        account_id, account_name, payment_method, is_active, created_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, CURRENT_TIMESTAMP)
-    `, [supplierId, companyId, name.trim(), code, taxNumber.trim(), address || '', mobile || '', email || '']);
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'credit', true, CURRENT_TIMESTAMP)
+    `, [
+      supplierId,
+      companyId,
+      name.trim(),
+      code,
+      taxNumber.trim(),
+      address || '',
+      mobile || '',
+      email || '',
+      finalAccountId,
+      finalAccountName
+    ]);
 
     // Link immediately in eta_supplier_mappings
     await this.linkSupplier(companyId, taxNumber, supplierId, name);
@@ -332,7 +397,7 @@ export class EtaSupplierMappingService {
       success: true,
       supplierId,
       code,
-      message: `تم إنشاء المورد "${name}" بالكود (${code}) وربطه بنجاح.`
+      message: `تم إنشاء المورد "${name}" بالكود (${code}) وربطه بالحساب المحاسبي (${finalAccountName}) بنجاح.`
     };
   }
 }

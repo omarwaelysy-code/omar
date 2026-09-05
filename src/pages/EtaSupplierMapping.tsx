@@ -101,6 +101,7 @@ export function EtaSupplierMapping() {
   // ERP Suppliers List for Manual Select Modal
   const [allErpSuppliers, setAllErpSuppliers] = useState<ErpSupplierOption[]>([]);
   const [loadingErpSuppliers, setLoadingErpSuppliers] = useState(false);
+  const [supplierAccounts, setSupplierAccounts] = useState<any[]>([]);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -127,6 +128,8 @@ export function EtaSupplierMapping() {
     taxNumber: '',
     address: '',
     phone: '',
+    account_id: '',
+    account_name: '',
     notes: ''
   });
   const [savingCreate, setSavingCreate] = useState(false);
@@ -165,16 +168,30 @@ export function EtaSupplierMapping() {
     }
   }, [isAr, showNotification]);
 
-  // Load ERP Suppliers for dropdowns
+  // Load ERP Suppliers & Chart of Accounts for dropdowns
   const loadErpSuppliers = useCallback(async () => {
     try {
       setLoadingErpSuppliers(true);
-      const res = await apiRequest<{ success: boolean; data: ErpSupplierOption[] }>('/suppliers?limit=1000');
-      if (res && res.data) {
-        setAllErpSuppliers(res.data);
+      const [supRes, accRes] = await Promise.all([
+        apiRequest<{ success: boolean; data: ErpSupplierOption[] }>('/suppliers?limit=1000'),
+        apiRequest<{ success: boolean; data: any[] }>('/accounts?limit=2000').catch(() => ({ success: true, data: [] }))
+      ]);
+
+      if (supRes && supRes.data) {
+        setAllErpSuppliers(supRes.data);
+      }
+
+      if (accRes && accRes.data) {
+        const suppAccs = (accRes.data || []).filter((a: any) =>
+          a.account_usage === 'supplier' ||
+          a.account_usage === 'accounts_payable' ||
+          (a.code && a.code.startsWith('2101')) ||
+          (a.name && (a.name.includes('مورد') || a.name.includes('دائن')))
+        );
+        setSupplierAccounts(suppAccs);
       }
     } catch (err) {
-      console.warn('Could not load ERP suppliers list:', err);
+      console.warn('Could not load ERP suppliers or accounts list:', err);
     } finally {
       setLoadingErpSuppliers(false);
     }
@@ -319,12 +336,19 @@ export function EtaSupplierMapping() {
 
   // Open Create & Link Modal
   const openCreateModal = (supplier: EtaPortalSupplier) => {
+    const defaultAcc = supplierAccounts.find(a => a.account_usage === 'supplier')
+      || supplierAccounts.find(a => a.account_usage === 'accounts_payable')
+      || supplierAccounts.find(a => a.code === '210101')
+      || supplierAccounts[0];
+
     setCreateModalSupplier(supplier);
     setCreateForm({
       name: supplier.name || '',
       taxNumber: supplier.taxNumber || '',
       address: supplier.address || '',
       phone: '',
+      account_id: defaultAcc?.id || '',
+      account_name: defaultAcc?.name || '',
       notes: isAr ? 'تم إنشاؤه وربطه تلقائياً من منظومة الفاتورة الإلكترونية ETA' : 'Created & mapped from ETA Portal'
     });
   };
@@ -335,6 +359,10 @@ export function EtaSupplierMapping() {
     if (!createModalSupplier) return;
     if (!createForm.name.trim()) {
       showNotification(isAr ? 'اسم المورد مطلوب' : 'Supplier name is required', 'warning');
+      return;
+    }
+    if (!createForm.account_id) {
+      showNotification(isAr ? 'يجب تحديد الحساب المحاسبي المرتبط بالمورد' : 'Accounting account is required', 'error');
       return;
     }
 
@@ -348,6 +376,8 @@ export function EtaSupplierMapping() {
           name: createForm.name.trim(),
           address: createForm.address.trim(),
           phone: createForm.phone.trim(),
+          account_id: createForm.account_id,
+          account_name: createForm.account_name,
           notes: createForm.notes.trim()
         }
       );
@@ -355,7 +385,7 @@ export function EtaSupplierMapping() {
       if (res && res.success) {
         showNotification(
           isAr
-            ? `تم إنشاء المورد "${createForm.name}" وربطه بنجاح!`
+            ? `تم إنشاء المورد "${createForm.name}" وربطه بالحساب المحاسبي بنجاح!`
             : `Supplier created and linked successfully!`,
           'success'
         );
@@ -1221,6 +1251,39 @@ export function EtaSupplierMapping() {
                       onChange={e => setCreateForm({ ...createForm, address: e.target.value })}
                       className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
                     />
+                  </div>
+
+                  {/* Accounting Account (Mandatory) */}
+                  <div className="p-3 bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-xl space-y-1.5">
+                    <label className="block text-xs font-bold text-amber-900 dark:text-amber-300">
+                      {isAr ? 'الحساب المحاسبي المرتبط * (دليل الحسابات)' : 'Linked Accounting Account * (Chart of Accounts)'}
+                    </label>
+                    <select
+                      required
+                      value={createForm.account_id}
+                      onChange={e => {
+                        const selectedId = e.target.value;
+                        const acc = supplierAccounts.find(a => a.id === selectedId);
+                        setCreateForm({
+                          ...createForm,
+                          account_id: selectedId,
+                          account_name: acc?.name || ''
+                        });
+                      }}
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 rounded-lg text-xs font-medium focus:ring-2 focus:ring-amber-500/30"
+                    >
+                      <option value="">{isAr ? '-- اختر الحساب المحاسبي للمورد --' : '-- Select Supplier Account --'}</option>
+                      {supplierAccounts.map(acc => (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.code ? `${acc.code} - ` : ''}{acc.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-amber-700/90 dark:text-amber-400/90">
+                      {isAr
+                        ? 'إلزامي: يتم ربط كافة المعاملات المالية والفواتير وسندات الصرف بهذا الحساب المحاسبي.'
+                        : 'Mandatory: All financial transactions, vouchers and invoices link to this account.'}
+                    </p>
                   </div>
 
                   <div>
