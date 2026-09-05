@@ -85,6 +85,7 @@ const defaultVisibleColumns: Record<string, boolean> = {
   currency: true,
   item_code_name: true,
   item_code: true,
+  item_type: true,
   item_description: true,
   item_quantity: true,
   item_unit: true,
@@ -109,6 +110,7 @@ const columnLabels: Record<string, { ar: string; en: string }> = {
   currency: { ar: 'العملة', en: 'Currency' },
   item_code_name: { ar: 'اسم الكود', en: 'Code Name' },
   item_code: { ar: 'كود الصنف', en: 'Item Code' },
+  item_type: { ar: 'نوع الكود', en: 'Code Type' },
   item_description: { ar: 'الوصف', en: 'Description' },
   item_quantity: { ar: 'الكمية', en: 'Quantity' },
   item_unit: { ar: 'الوحدة', en: 'Unit' },
@@ -744,6 +746,7 @@ export function EtaDetailedInvoices() {
       [language === 'ar' ? 'العملة' : 'Currency']: line.currency || 'EGP',
       [language === 'ar' ? 'اسم الكود' : 'Code Name']: line.itemCodeName || '---',
       [language === 'ar' ? 'كود الصنف' : 'Item Code']: line.itemCode || '---',
+      [language === 'ar' ? 'نوع الكود' : 'Code Type']: line.itemType || 'EGS',
       [language === 'ar' ? 'الوصف' : 'Description']: line.description || '---',
       [language === 'ar' ? 'الكمية' : 'Quantity']: line.quantity ?? 1,
       [language === 'ar' ? 'الوحدة' : 'Unit']: line.unitType || '',
@@ -2068,6 +2071,7 @@ export function EtaDetailedInvoices() {
                         {visibleColumns.currency && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'العملة' : 'Currency'}</th>}
                         {visibleColumns.item_code_name && <th className="py-3 px-4 text-start whitespace-nowrap">{language === 'ar' ? 'اسم الكود' : 'Code Name'}</th>}
                         {visibleColumns.item_code && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'كود الصنف' : 'Item Code'}</th>}
+                        {visibleColumns.item_type && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'نوع الكود' : 'Code Type'}</th>}
                         {visibleColumns.item_description && <th className="py-3 px-4 text-start whitespace-nowrap min-w-[200px]">{language === 'ar' ? 'الوصف' : 'Description'}</th>}
                         {visibleColumns.item_quantity && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الكمية' : 'Quantity'}</th>}
                         {visibleColumns.item_unit && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الوحدة' : 'Unit'}</th>}
@@ -2178,9 +2182,17 @@ export function EtaDetailedInvoices() {
                             {/* Item Code (كود الصنف) */}
                             {visibleColumns.item_code && (
                               <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 font-mono text-xs text-slate-800">
-                                  <span className="text-[10px] font-bold text-indigo-600">{line.itemType || 'EGS'}</span>
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-slate-100 font-mono text-xs font-semibold text-slate-800">
                                   <span>{line.itemCode}</span>
+                                </span>
+                              </td>
+                            )}
+
+                            {/* Item Code Type (نوع الكود) */}
+                            {visibleColumns.item_type && (
+                              <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-200/60 font-mono text-[11px] font-bold text-indigo-700">
+                                  {line.itemType || 'EGS'}
                                 </span>
                               </td>
                             )}
