@@ -914,43 +914,6 @@ export function EtaSupplierMapping() {
           </div>
         </div>
       </div>
-                </div>
-
-                {/* Notes */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    {isAr ? 'ملاحظات الربط (اختياري)' : 'Notes (Optional)'}
-                  </label>
-                  <input
-                    type="text"
-                    value={linkNotes}
-                    onChange={e => setLinkNotes(e.target.value)}
-                    placeholder={isAr ? 'أي ملاحظات خاصة بربط هذا المورد...' : 'Any mapping notes...'}
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
-                  />
-                </div>
-              </div>
-
-              {/* Modal Actions */}
-              <div className="p-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-2">
-                <button
-                  onClick={() => setLinkModalSupplier(null)}
-                  className="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 dark:text-slate-400 rounded-xl"
-                >
-                  {isAr ? 'إلغاء' : 'Cancel'}
-                </button>
-                <button
-                  onClick={handleSaveManualLink}
-                  disabled={!selectedErpSupplierId || savingLink}
-                  className="px-5 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm transition-all disabled:opacity-50"
-                >
-                  {savingLink ? (isAr ? 'جاري الحفظ...' : 'Saving...') : (isAr ? 'حفظ الربط' : 'Save Mapping')}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Unlink Confirmation Modal */}
       <AnimatePresence>
