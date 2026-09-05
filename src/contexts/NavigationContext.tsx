@@ -23,6 +23,8 @@ interface NavigationContextType {
   setPendingAccountTypeEditId: (id: string | null) => void;
   pendingEtaSupplierForCreation: { name: string; taxNumber: string; address?: string; phone?: string } | null;
   setPendingEtaSupplierForCreation: (val: { name: string; taxNumber: string; address?: string; phone?: string } | null) => void;
+  pendingEtaSupplierForLinking: { name: string; taxNumber: string; address?: string } | null;
+  setPendingEtaSupplierForLinking: (val: { name: string; taxNumber: string; address?: string } | null) => void;
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
@@ -114,6 +116,7 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [pendingLedgerParams, setPendingLedgerParams] = useState<{ accountId: string; startDate: string; endDate: string } | null>(null);
   const [pendingAccountTypeEditId, setPendingAccountTypeEditId] = useState<string | null>(null);
   const [pendingEtaSupplierForCreation, setPendingEtaSupplierForCreation] = useState<{ name: string; taxNumber: string; address?: string; phone?: string } | null>(null);
+  const [pendingEtaSupplierForLinking, setPendingEtaSupplierForLinking] = useState<{ name: string; taxNumber: string; address?: string } | null>(null);
 
   const openTab = (id: string, label?: string) => {
     const tabLabel = label || pageLabels[id] || id;
@@ -187,7 +190,9 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       pendingAccountTypeEditId,
       setPendingAccountTypeEditId,
       pendingEtaSupplierForCreation,
-      setPendingEtaSupplierForCreation
+      setPendingEtaSupplierForCreation,
+      pendingEtaSupplierForLinking,
+      setPendingEtaSupplierForLinking
     }}>
       {children}
     </NavigationContext.Provider>

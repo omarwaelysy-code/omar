@@ -81,7 +81,7 @@ interface ErpSupplierOption {
 export function EtaSupplierMapping() {
   const { language } = useLanguage();
   const { showNotification } = useNotification();
-  const { openTab, setPendingEtaSupplierForCreation } = useNavigation();
+  const { openTab, setPendingEtaSupplierForCreation, setPendingEtaSupplierForLinking } = useNavigation();
   const isAr = language === 'ar';
 
   // Tabs: all = كل الموردين الواردة من البوابة, linked = الموردين المربوطة, unlinked = الموردين غير المربوطة
@@ -116,11 +116,6 @@ export function EtaSupplierMapping() {
   // Copy Tax ID tooltip state
   const [copiedTax, setCopiedTax] = useState<string | null>(null);
 
-  // Modal States
-  const [linkModalSupplier, setLinkModalSupplier] = useState<EtaPortalSupplier | null>(null);
-  const [selectedErpSupplierId, setSelectedErpSupplierId] = useState<string>('');
-  const [linkNotes, setLinkNotes] = useState<string>('');
-  const [modalSearchSupplier, setModalSearchSupplier] = useState<string>('');
   const [savingLink, setSavingLink] = useState(false);
 
   // Unlink Confirmation Modal
@@ -261,42 +256,21 @@ export function EtaSupplierMapping() {
     }
   };
 
-  // Open Manual Link Modal
-  const openLinkModal = (supplier: EtaPortalSupplier) => {
-    setLinkModalSupplier(supplier);
-    setSelectedErpSupplierId(supplier.linkedSupplier?.id || supplier.autoMatchedSupplier?.id || '');
-    setLinkNotes('');
-    setModalSearchSupplier('');
-  };
-
-  // Save Manual Link
-  const handleSaveManualLink = async () => {
-    if (!linkModalSupplier || !selectedErpSupplierId) {
-      showNotification(isAr ? 'يرجى اختيار المورد من النظام' : 'Please select an ERP supplier', 'warning');
-      return;
-    }
-
-    try {
-      setSavingLink(true);
-      const res = await apiRequest<{ success: boolean; message?: string }>('/eta/suppliers/mapping/link', 'POST', {
-        etaTaxNumber: linkModalSupplier.taxNumber,
-        supplierId: selectedErpSupplierId,
-        etaSupplierName: linkModalSupplier.name,
-        notes: linkNotes
-      });
-
-      if (res && res.success) {
-        showNotification(isAr ? 'تم حفظ ربط المورد بنجاح' : 'Supplier mapping saved successfully', 'success');
-        setLinkModalSupplier(null);
-        loadMappings(true);
-      } else {
-        showNotification(res.message || (isAr ? 'فشل حفظ الربط' : 'Failed to save mapping'), 'error');
-      }
-    } catch (err: any) {
-      showNotification(err.message || (isAr ? 'خطأ أثناء حفظ الربط' : 'Error saving mapping'), 'error');
-    } finally {
-      setSavingLink(false);
-    }
+  // Redirect to official Suppliers screen to select and link with confirmation of Tax ID / Address
+  const handleOpenLinkInSuppliers = (supplier: EtaPortalSupplier) => {
+    const cleanedName = cleanDuplicatedPartnerName(supplier.name);
+    setPendingEtaSupplierForLinking({
+      name: cleanedName,
+      taxNumber: supplier.taxNumber,
+      address: supplier.address
+    });
+    openTab('suppliers', isAr ? 'الموردين' : 'Suppliers');
+    showNotification(
+      isAr 
+        ? `تم الانتقال إلى شاشة الموردين. اختر المورد المطلوب لربطه مع "${cleanedName}".` 
+        : `Switched to Suppliers. Select the supplier to link with "${cleanedName}".`,
+      'info'
+    );
   };
 
   // Unlink Supplier
@@ -412,16 +386,7 @@ export function EtaSupplierMapping() {
     window.print();
   };
 
-  // Filtered ERP Suppliers in Modal
-  const modalFilteredErpSuppliers = useMemo(() => {
-    if (!modalSearchSupplier.trim()) return allErpSuppliers;
-    const q = modalSearchSupplier.toLowerCase().trim();
-    return allErpSuppliers.filter(s =>
-      s.name.toLowerCase().includes(q) ||
-      s.code.toLowerCase().includes(q) ||
-      (s.tax_number && s.tax_number.includes(q))
-    );
-  }, [allErpSuppliers, modalSearchSupplier]);
+
 
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 p-4 md:p-6 lg:p-8 space-y-6">
@@ -850,9 +815,9 @@ export function EtaSupplierMapping() {
                           {supplier.isLinked ? (
                             <>
                               <button
-                                onClick={() => openLinkModal(supplier)}
+                                onClick={() => handleOpenLinkInSuppliers(supplier)}
                                 className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition-colors flex items-center gap-1"
-                                title={isAr ? 'تعديل الربط' : 'Edit link'}
+                                title={isAr ? 'تعديل الربط بشاشة الموردين' : 'Edit link in Suppliers'}
                               >
                                 <ArrowRightLeft className="w-3 h-3" />
                                 <span>{isAr ? 'تعديل' : 'Edit'}</span>
@@ -881,11 +846,11 @@ export function EtaSupplierMapping() {
                                 </button>
                               )}
 
-                              {/* Manual Link Modal button */}
+                              {/* Manual Link button -> Open in Suppliers */}
                               <button
-                                onClick={() => openLinkModal(supplier)}
+                                onClick={() => handleOpenLinkInSuppliers(supplier)}
                                 className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/60 dark:text-indigo-300 transition-colors flex items-center gap-1"
-                                title={isAr ? 'ربط بمورد مسجل بالنظام' : 'Link to ERP supplier'}
+                                title={isAr ? 'اختيار وربط بمورد مسجل من شاشة الموردين الرسمية' : 'Link from official Suppliers screen'}
                               >
                                 <Link2 className="w-3 h-3" />
                                 <span>{isAr ? 'ربط بمورد' : 'Link'}</span>
@@ -949,122 +914,6 @@ export function EtaSupplierMapping() {
           </div>
         </div>
       </div>
-
-      {/* Manual Link Modal */}
-      <AnimatePresence>
-        {linkModalSupplier && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-lg overflow-hidden"
-            >
-              {/* Modal Header */}
-              <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-xl">
-                    <Link2 className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-base text-slate-900 dark:text-white">
-                      {isAr ? 'ربط مورد البوابة بحساب بالنظام' : 'Link ETA Supplier to ERP'}
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {isAr ? 'اختر المورد المقابل في دليل حسابات الموردين' : 'Select corresponding ERP supplier'}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setLinkModalSupplier(null)}
-                  className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Modal Body */}
-              <div className="p-5 space-y-4 text-sm">
-                {/* Target ETA Supplier Info */}
-                <div className="p-3 bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-700 rounded-xl space-y-1">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-400">{isAr ? 'مورد البوابة:' : 'ETA Supplier:'}</span>
-                    <span className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                      {linkModalSupplier.taxNumber}
-                    </span>
-                  </div>
-                  <div className="font-bold text-slate-800 dark:text-slate-200">
-                    {linkModalSupplier.name}
-                  </div>
-                  {linkModalSupplier.address && (
-                    <div className="text-xs text-slate-400 truncate">
-                      {linkModalSupplier.address}
-                    </div>
-                  )}
-                </div>
-
-                {/* ERP Supplier Search & Select */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    {isAr ? 'اختر مورد النظام المقابل *' : 'Select ERP Supplier *'}
-                  </label>
-                  
-                  {/* Search inside ERP suppliers */}
-                  <div className="relative mb-2">
-                    <Search className="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      value={modalSearchSupplier}
-                      onChange={e => setModalSearchSupplier(e.target.value)}
-                      placeholder={isAr ? 'ابحث في قائمة الموردين...' : 'Search ERP suppliers...'}
-                      className="w-full pl-3 pr-8 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs"
-                    />
-                  </div>
-
-                  {/* Select Dropdown / List */}
-                  <div className="max-h-48 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-xl divide-y divide-slate-100 dark:divide-slate-700/60">
-                    {modalFilteredErpSuppliers.length === 0 ? (
-                      <div className="p-4 text-center text-xs text-slate-400">
-                        {isAr ? 'لا يوجد موردين مطابقين للبحث' : 'No suppliers found'}
-                      </div>
-                    ) : (
-                      modalFilteredErpSuppliers.map(erpSup => {
-                        const isSelected = selectedErpSupplierId === erpSup.id;
-                        const isTaxExactMatch = erpSup.tax_number && erpSup.tax_number.replace(/[-\s]/g, '') === linkModalSupplier.taxNumber.replace(/[-\s]/g, '');
-
-                        return (
-                          <div
-                            key={erpSup.id}
-                            onClick={() => setSelectedErpSupplierId(erpSup.id)}
-                            className={`p-2.5 flex items-center justify-between cursor-pointer transition-colors ${
-                              isSelected
-                                ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-900 dark:text-indigo-200'
-                                : 'hover:bg-slate-50 dark:hover:bg-slate-750'
-                            }`}
-                          >
-                            <div>
-                              <div className="font-semibold text-xs flex items-center gap-1.5">
-                                <span>{erpSup.name}</span>
-                                {isTaxExactMatch && (
-                                  <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 px-1 rounded font-bold">
-                                    {isAr ? 'مطابق ضريبياً' : 'Tax Match'}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                                {isAr ? 'كود:' : 'Code:'} {erpSup.code} {erpSup.tax_number ? `• ضريبي: ${erpSup.tax_number}` : ''}
-                              </div>
-                            </div>
-                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                              isSelected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300'
-                            }`}>
-                              {isSelected && <Check className="w-2.5 h-2.5" />}
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
                 </div>
 
                 {/* Notes */}

@@ -28,7 +28,12 @@ export const Suppliers: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
-  const { pendingEtaSupplierForCreation, setPendingEtaSupplierForCreation } = useNavigation();
+  const { 
+    pendingEtaSupplierForCreation, 
+    setPendingEtaSupplierForCreation,
+    pendingEtaSupplierForLinking,
+    setPendingEtaSupplierForLinking 
+  } = useNavigation();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +50,12 @@ export const Suppliers: React.FC = () => {
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [linkWithEta, setLinkWithEta] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  // ETA Linking Mode State
+  const [linkingTargetSupplier, setLinkingTargetSupplier] = useState<Supplier | null>(null);
+  const [updateTaxNumber, setUpdateTaxNumber] = useState(true);
+  const [updateAddress, setUpdateAddress] = useState(true);
+  const [isLinking, setIsLinking] = useState(false);
 
   const handleExportExcel = () => {
     const headers = {
@@ -480,10 +491,71 @@ export const Suppliers: React.FC = () => {
     return '0';
   };
 
+  const handleStartLinkToSupplier = (supplier: Supplier) => {
+    setLinkingTargetSupplier(supplier);
+    setUpdateTaxNumber(Boolean(pendingEtaSupplierForLinking?.taxNumber));
+    setUpdateAddress(Boolean(pendingEtaSupplierForLinking?.address));
+  };
+
+  const handleConfirmLinking = async () => {
+    if (!linkingTargetSupplier || !pendingEtaSupplierForLinking || !user || isLinking) return;
+
+    try {
+      setIsLinking(true);
+
+      const updates: Partial<Supplier> = {};
+      if (updateTaxNumber && pendingEtaSupplierForLinking.taxNumber) {
+        updates.tax_number = pendingEtaSupplierForLinking.taxNumber.trim();
+      }
+      if (updateAddress && pendingEtaSupplierForLinking.address) {
+        updates.address = pendingEtaSupplierForLinking.address.trim();
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await dbService.update('suppliers', linkingTargetSupplier.id, updates);
+        await dbService.logActivity(
+          user.id,
+          user.username,
+          user.company_id,
+          'تعديل مورد',
+          `تحديث بيانات المورد أثناء الربط بـ ETA: ${Object.keys(updates).join(', ')}`,
+          'suppliers',
+          linkingTargetSupplier.id
+        );
+      }
+
+      const res = await apiRequest<{ success: boolean; message?: string }>('/eta/suppliers/mapping/link', 'POST', {
+        etaTaxNumber: pendingEtaSupplierForLinking.taxNumber,
+        supplierId: linkingTargetSupplier.id,
+        etaSupplierName: pendingEtaSupplierForLinking.name,
+        notes: `تم الربط يدوياً من شاشة الموردين (تحديث ضريبي: ${updateTaxNumber ? 'نعم' : 'لا'}، تحديث عنوان: ${updateAddress ? 'نعم' : 'لا'})`
+      });
+
+      if (res && res.success) {
+        showNotification(
+          language === 'ar'
+            ? `تم ربط المورد "${linkingTargetSupplier.name}" بنجاح مع منظومة الفاتورة الإلكترونية!`
+            : `Supplier successfully linked to ETA portal!`,
+          'success'
+        );
+        setLinkingTargetSupplier(null);
+        setPendingEtaSupplierForLinking(null);
+      } else {
+        showNotification(res.message || (language === 'ar' ? 'فشل إتمام الربط' : 'Failed to link'), 'error');
+      }
+    } catch (err: any) {
+      console.error('Error linking supplier:', err);
+      showNotification(err.message || (language === 'ar' ? 'حدث خطأ أثناء إتمام الربط' : 'Error linking supplier'), 'error');
+    } finally {
+      setIsLinking(false);
+    }
+  };
+
   const filteredSuppliers = suppliers.filter(s => 
     s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.mobile.includes(searchTerm)
+    s.mobile.includes(searchTerm) ||
+    (s.tax_number && s.tax_number.includes(searchTerm))
   );
 
   return (
@@ -526,6 +598,44 @@ export const Suppliers: React.FC = () => {
             >
               <Plus size={20} />
               {t('suppliers.add')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ETA Linking Mode Banner */}
+      {pendingEtaSupplierForLinking && !isModalOpen && (
+        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white p-5 rounded-3xl shadow-xl shadow-blue-500/20 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-blue-400/30 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-white border border-white/20 shrink-0">
+              <Link2 size={24} className="animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black px-2.5 py-0.5 bg-white/20 rounded-full">
+                  {language === 'ar' ? 'وضع ربط مورد الفاتورة الإلكترونية' : 'ETA Supplier Linking Mode'}
+                </span>
+                <span className="text-xs font-mono font-bold text-blue-200">
+                  {language === 'ar' ? 'الرقم الضريبي:' : 'Tax ID:'} {pendingEtaSupplierForLinking.taxNumber}
+                </span>
+              </div>
+              <h3 className="text-xl font-black mt-1 tracking-tight">
+                {language === 'ar' ? 'مورد البوابة:' : 'Portal Supplier:'} {pendingEtaSupplierForLinking.name}
+              </h3>
+              <p className="text-xs text-blue-100 font-medium mt-0.5">
+                {language === 'ar' 
+                  ? 'ابحث في دليلك أدناه، ثم اضغط على زر "اختيار وربط" أمام المورد المطلوب لإتمام الربط وتحديث بياناته.' 
+                  : 'Search in your directory below, then click "Select & Link" to connect and update details.'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end md:self-auto shrink-0">
+            <button
+              onClick={() => setPendingEtaSupplierForLinking(null)}
+              className="px-4 py-2 bg-white/15 hover:bg-white/25 text-white font-bold text-sm rounded-xl border border-white/20 transition-all active:scale-95 flex items-center gap-1.5 shadow-sm"
+            >
+              <X size={16} />
+              <span>{language === 'ar' ? 'إلغاء وضع الربط' : 'Cancel Linking'}</span>
             </button>
           </div>
         </div>
@@ -580,8 +690,18 @@ export const Suppliers: React.FC = () => {
                       {filteredSuppliers.map((supplier) => (
                         <tr 
                           key={supplier.id} 
-                          onClick={() => openModal(supplier)}
-                          className={`hover:bg-emerald-50/40 transition-all group cursor-pointer border-transparent border-x-4 ${editingSupplier?.id === supplier.id ? 'bg-emerald-50 border-emerald-500' : ''}`}
+                          onClick={() => {
+                            if (pendingEtaSupplierForLinking) {
+                              handleStartLinkToSupplier(supplier);
+                            } else {
+                              openModal(supplier);
+                            }
+                          }}
+                          className={`hover:bg-emerald-50/40 transition-all group cursor-pointer border-transparent border-x-4 ${
+                            pendingEtaSupplierForLinking 
+                              ? 'hover:bg-blue-50/50 hover:border-blue-500' 
+                              : editingSupplier?.id === supplier.id ? 'bg-emerald-50 border-emerald-500' : ''
+                          }`}
                         >
                           <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                             <span className="font-mono text-[10px] bg-slate-100 px-3 py-1 rounded-lg text-slate-500 font-black border border-slate-200 group-hover:border-emerald-200 group-hover:text-emerald-600 transition-all">{supplier.code}</span>
@@ -621,18 +741,32 @@ export const Suppliers: React.FC = () => {
                             </span>
                           </td>
                           <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                            <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1 opacity-0 group-hover:opacity-100 transition-all`}>
-                               <button 
-                                  onClick={(e) => { e.stopPropagation(); handleDelete(supplier.id); }}
-                                  className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
-                                  title="حذف"
-                                >
-                                  <Trash2 size={18} />
-                                </button>
-                              <div className="p-2 text-emerald-400 bg-emerald-50 rounded-xl">
-                                 {dir === 'rtl' ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+                            {pendingEtaSupplierForLinking ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStartLinkToSupplier(supplier);
+                                }}
+                                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-black rounded-xl shadow-md shadow-blue-500/20 flex items-center gap-1.5 transition-all active:scale-95 shrink-0"
+                              >
+                                <Link2 size={14} />
+                                <span>{language === 'ar' ? 'اختيار وربط' : 'Select & Link'}</span>
+                              </button>
+                            ) : (
+                              <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1 opacity-0 group-hover:opacity-100 transition-all`}>
+                                 <button 
+                                    onClick={(e) => { e.stopPropagation(); handleDelete(supplier.id); }}
+                                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                                    title="حذف"
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                <div className="p-2 text-emerald-400 bg-emerald-50 rounded-xl">
+                                   {dir === 'rtl' ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+                                </div>
                               </div>
-                            </div>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -652,8 +786,20 @@ export const Suppliers: React.FC = () => {
                   {filteredSuppliers.map((supplier) => (
                     <div 
                       key={supplier.id} 
-                      onClick={() => openModal(supplier)}
-                      className={`p-8 space-y-6 rounded-[2.5rem] border transition-all cursor-pointer group relative overflow-hidden ${editingSupplier?.id === supplier.id ? 'bg-emerald-50 border-emerald-200 shadow-xl shadow-emerald-500/10' : 'bg-slate-50/40 border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 hover:bg-white'}`}
+                      onClick={() => {
+                        if (pendingEtaSupplierForLinking) {
+                          handleStartLinkToSupplier(supplier);
+                        } else {
+                          openModal(supplier);
+                        }
+                      }}
+                      className={`p-8 space-y-6 rounded-[2.5rem] border transition-all cursor-pointer group relative overflow-hidden ${
+                        pendingEtaSupplierForLinking 
+                          ? 'border-blue-200 bg-blue-50/20 hover:border-blue-400 hover:shadow-xl hover:shadow-blue-500/10'
+                          : editingSupplier?.id === supplier.id 
+                            ? 'bg-emerald-50 border-emerald-200 shadow-xl shadow-emerald-500/10' 
+                            : 'bg-slate-50/40 border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 hover:bg-white'
+                      }`}
                     >
                       <div className="flex justify-between items-start relative z-10">
                         <div className="flex flex-col gap-2">
@@ -661,6 +807,11 @@ export const Suppliers: React.FC = () => {
                           <h4 className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors text-2xl tracking-tighter leading-none">{supplier.name}</h4>
                           <span className="text-xs text-slate-400 font-bold tracking-[0.1em]">{supplier.mobile}</span>
                           <div className="flex flex-wrap gap-2 mt-1">
+                            {supplier.tax_number && (
+                              <span className="text-[10px] font-black px-2 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200/30 font-mono">
+                                {language === 'ar' ? 'ضريبي: ' : 'VAT: '}{supplier.tax_number}
+                              </span>
+                            )}
                             {supplier.payment_method && (
                               <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-600 rounded">
                                 {supplier.payment_method === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') :
@@ -691,9 +842,23 @@ export const Suppliers: React.FC = () => {
                             {formatBalance(getSupplierBalance(supplier.id))}
                           </p>
                         </div>
-                        <div className="p-3 bg-white border border-slate-100 rounded-2xl text-slate-300 group-hover:text-emerald-500 group-hover:border-emerald-100 transition-all shadow-sm">
-                           {dir === 'rtl' ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}
-                        </div>
+                        {pendingEtaSupplierForLinking ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStartLinkToSupplier(supplier);
+                            }}
+                            className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-black rounded-2xl shadow-md shadow-blue-500/20 flex items-center gap-1.5 transition-all active:scale-95"
+                          >
+                            <Link2 size={16} />
+                            <span>{language === 'ar' ? 'اختيار وربط' : 'Select & Link'}</span>
+                          </button>
+                        ) : (
+                          <div className="p-3 bg-white border border-slate-100 rounded-2xl text-slate-300 group-hover:text-emerald-500 group-hover:border-emerald-100 transition-all shadow-sm">
+                             {dir === 'rtl' ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1226,6 +1391,171 @@ export const Suppliers: React.FC = () => {
                 className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all shadow-lg shadow-red-500/20"
               >
                 {language === 'ar' ? 'حذف' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ETA Linking Confirmation & Data Update Modal */}
+      {linkingTargetSupplier && pendingEtaSupplierForLinking && (
+        <div className="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-xl rounded-3xl shadow-2xl p-6 sm:p-8 animate-in zoom-in-95 duration-200 border border-slate-100 space-y-6" dir={dir}>
+            {/* Header */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-200/50 shadow-sm">
+                  <Link2 size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-900">
+                    {language === 'ar' ? 'تأكيد ربط المورد بالفاتورة الإلكترونية' : 'Confirm ETA Supplier Linking'}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    {language === 'ar' ? 'حدد خيارات تحديث البيانات قبل إتمام عملية الربط' : 'Choose update options before completing the link'}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setLinkingTargetSupplier(null)}
+                disabled={isLinking}
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Comparison Cards: ETA vs System */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* ETA Supplier Card */}
+              <div className="p-4 bg-blue-50/50 border border-blue-200/60 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-md">
+                    {language === 'ar' ? 'بيانات مورد البوابة (ETA)' : 'ETA Portal'}
+                  </span>
+                  <span className="text-xs font-mono font-black text-blue-800">{pendingEtaSupplierForLinking.taxNumber}</span>
+                </div>
+                <h4 className="font-black text-slate-900 text-sm line-clamp-2">{pendingEtaSupplierForLinking.name}</h4>
+                {pendingEtaSupplierForLinking.address && (
+                  <p className="text-xs text-slate-600 flex items-start gap-1">
+                    <MapPin size={12} className="shrink-0 mt-0.5 text-blue-500" />
+                    <span className="line-clamp-2">{pendingEtaSupplierForLinking.address}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* ERP System Supplier Card */}
+              <div className="p-4 bg-emerald-50/50 border border-emerald-200/60 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-md">
+                    {language === 'ar' ? 'مورد النظام المختار' : 'System Supplier'}
+                  </span>
+                  <span className="text-xs font-mono font-bold text-slate-500">{linkingTargetSupplier.code}</span>
+                </div>
+                <h4 className="font-black text-slate-900 text-sm line-clamp-2">{linkingTargetSupplier.name}</h4>
+                <div className="text-xs text-slate-600 space-y-0.5">
+                  <p className="font-mono text-[11px]">
+                    <span className="text-slate-400 font-sans">{language === 'ar' ? 'الضريبي الحالي: ' : 'Current Tax: '}</span>
+                    {linkingTargetSupplier.tax_number || (language === 'ar' ? 'لا يوجد' : 'None')}
+                  </p>
+                  {linkingTargetSupplier.address && (
+                    <p className="flex items-start gap-1">
+                      <MapPin size={12} className="shrink-0 mt-0.5 text-emerald-500" />
+                      <span className="line-clamp-1">{linkingTargetSupplier.address}</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Checkboxes: Update Tax ID & Update Address */}
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+              <span className="text-xs font-black text-slate-700 block">
+                {language === 'ar' ? 'خيارات تحديث بيانات المورد بالنظام:' : 'Update Supplier Options:'}
+              </span>
+
+              {/* Tax Number Option */}
+              <label className="flex items-start gap-3 p-3 bg-white rounded-xl border border-slate-200/70 hover:border-blue-300 transition-all cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={updateTaxNumber}
+                  onChange={(e) => setUpdateTaxNumber(e.target.checked)}
+                  disabled={isLinking || !pendingEtaSupplierForLinking.taxNumber}
+                  className="w-5 h-5 rounded-lg text-blue-600 focus:ring-blue-500 border-slate-300 mt-0.5 cursor-pointer"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm text-slate-900">
+                      {language === 'ar' ? 'إضافة / تحديث الرقم الضريبي للمورد' : 'Add / Update Supplier Tax Number'}
+                    </span>
+                    <span className="font-mono text-xs font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                      {pendingEtaSupplierForLinking.taxNumber}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {linkingTargetSupplier.tax_number 
+                      ? (language === 'ar' ? `سيتم استبدال الرقم القديم (${linkingTargetSupplier.tax_number}) برقم البوابة.` : `Will replace existing (${linkingTargetSupplier.tax_number}).`)
+                      : (language === 'ar' ? 'سيتم تسجيل الرقم الضريبي في ملف المورد لأول مرة.' : 'Will add tax number to supplier record.')}
+                  </p>
+                </div>
+              </label>
+
+              {/* Address Option */}
+              {pendingEtaSupplierForLinking.address && (
+                <label className="flex items-start gap-3 p-3 bg-white rounded-xl border border-slate-200/70 hover:border-blue-300 transition-all cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={updateAddress}
+                    onChange={(e) => setUpdateAddress(e.target.checked)}
+                    disabled={isLinking}
+                    className="w-5 h-5 rounded-lg text-blue-600 focus:ring-blue-500 border-slate-300 mt-0.5 cursor-pointer"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-slate-900">
+                        {language === 'ar' ? 'إضافة / تحديث عنوان المورد' : 'Add / Update Supplier Address'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-700 font-medium mt-0.5">
+                      "{pendingEtaSupplierForLinking.address}"
+                    </p>
+                    {linkingTargetSupplier.address && (
+                      <p className="text-[11px] text-amber-600 mt-0.5">
+                        {language === 'ar' ? `العنوان الحالي: "${linkingTargetSupplier.address}"` : `Current: "${linkingTargetSupplier.address}"`}
+                      </p>
+                    )}
+                  </div>
+                </label>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setLinkingTargetSupplier(null)}
+                disabled={isLinking}
+                className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-black text-sm transition-all active:scale-95 disabled:opacity-50"
+              >
+                {language === 'ar' ? 'إلغاء' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmLinking}
+                disabled={isLinking}
+                className="flex-1 py-3.5 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-black text-sm transition-all shadow-xl shadow-blue-500/20 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isLinking ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    <span>{language === 'ar' ? 'جاري الربط والتحديث...' : 'Linking...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Link2 size={18} />
+                    <span>{language === 'ar' ? 'تأكيد الربط والتحديث' : 'Confirm Link & Update'}</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
