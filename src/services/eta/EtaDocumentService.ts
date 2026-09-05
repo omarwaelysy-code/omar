@@ -376,10 +376,11 @@ export class EtaDocumentService {
    */
   public static async saveDocumentsToDatabase(companyId: string, docs: EtaReceivedInvoiceDTO[]): Promise<number> {
     if (!companyId || !docs || docs.length === 0) return 0;
-    try {
-      let savedCount = 0;
-      for (const doc of docs) {
-        if (!doc.uuid) continue;
+    let savedCount = 0;
+    for (const doc of docs) {
+      if (!doc.uuid) continue;
+      try {
+        const docId = `eta_${doc.uuid}`.slice(0, 250);
         await pool.query(
           `INSERT INTO eta_documents (
             id, company_id, uuid, submission_uuid, long_id, internal_id,
@@ -402,7 +403,7 @@ export class EtaDocumentService {
           )
           ON CONFLICT (company_id, uuid) DO UPDATE SET
             long_id = COALESCE(EXCLUDED.long_id, eta_documents.long_id),
-            internal_id = EXCLUDED.internal_id,
+            internal_id = COALESCE(NULLIF(EXCLUDED.internal_id, ''), eta_documents.internal_id),
             status = EXCLUDED.status,
             type_name = EXCLUDED.type_name,
             document_type_name = EXCLUDED.document_type_name,
@@ -415,16 +416,20 @@ export class EtaDocumentService {
             net_amount = EXCLUDED.net_amount,
             tax_amount = EXCLUDED.tax_amount,
             total_amount = EXCLUDED.total_amount,
-            raw_data = COALESCE(EXCLUDED.raw_data, eta_documents.raw_data),
+            raw_data = CASE 
+              WHEN eta_documents.raw_data IS NOT NULL AND (eta_documents.raw_data::text LIKE '%invoiceLines%') AND NOT (EXCLUDED.raw_data::text LIKE '%invoiceLines%')
+              THEN eta_documents.raw_data
+              ELSE COALESCE(EXCLUDED.raw_data, eta_documents.raw_data)
+            END,
             last_synced_at = NOW(),
             updated_at = NOW()`,
           [
-            `eta_${doc.uuid}`,
+            docId,
             companyId,
-            doc.uuid,
-            doc.submissionUuid || null,
-            doc.longId || null,
-            doc.internalId || '',
+            String(doc.uuid).slice(0, 250),
+            doc.submissionUuid ? String(doc.submissionUuid).slice(0, 250) : null,
+            doc.longId ? String(doc.longId) : null,
+            doc.internalId ? String(doc.internalId).slice(0, 250) : '',
             doc.typeName || 'I',
             doc.documentTypeName || 'فاتورة',
             doc.typeVersionName || '1.0',
@@ -432,19 +437,19 @@ export class EtaDocumentService {
             doc.status || 'Valid',
             doc.dateTimeIssued ? new Date(doc.dateTimeIssued) : null,
             doc.dateTimeReceived ? new Date(doc.dateTimeReceived) : null,
-            doc.issuerId || null,
+            doc.issuerId ? String(doc.issuerId).slice(0, 50) : null,
             doc.issuerName || null,
             null,
             doc.issuerAddress || doc.address || null,
-            doc.receiverId || null,
+            doc.receiverId ? String(doc.receiverId).slice(0, 50) : null,
             doc.receiverName || null,
             null,
             doc.receiverAddress || null,
-            doc.totalSales || 0,
-            doc.totalDiscount || 0,
-            doc.netAmount || 0,
-            doc.taxAmount || 0,
-            doc.totalAmount || 0,
+            Number(doc.totalSales) || 0,
+            Number(doc.totalDiscount) || 0,
+            Number(doc.netAmount) || 0,
+            Number(doc.taxAmount) || 0,
+            Number(doc.totalAmount) || 0,
             0,
             0,
             doc.currency || 'EGP',
@@ -452,12 +457,11 @@ export class EtaDocumentService {
           ]
         );
         savedCount++;
+      } catch (docErr: any) {
+        console.warn(`[ETA Save] Error saving document ${doc.uuid}:`, docErr.message || docErr);
       }
-      return savedCount;
-    } catch (e: any) {
-      console.error('[ETA Save] Error saving documents to database:', e.message || e);
-      return 0;
     }
+    return savedCount;
   }
 
   private static portalCache: Map<string, { timestamp: number; data: EtaReceivedInvoiceDTO[]; lastSyncedAt?: string }> = new Map();

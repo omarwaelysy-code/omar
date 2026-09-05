@@ -8,6 +8,7 @@
 import crypto from 'crypto';
 import pool from '../../lib/postgres';
 import { cleanDuplicatedPartnerName } from '../../utils/formatUtils';
+import { EtaDocumentService } from './EtaDocumentService';
 
 export interface EtaPortalSupplierDTO {
   taxNumber: string;
@@ -55,11 +56,33 @@ export class EtaSupplierMappingService {
   /**
    * Get all ETA portal suppliers, their link status, and auto-match candidates
    */
-  public static async getSupplierMappings(companyId: string): Promise<{
+  public static async getSupplierMappings(
+    companyId: string,
+    options: { forceRefresh?: boolean } = {}
+  ): Promise<{
     success: boolean;
     suppliers: EtaPortalSupplierDTO[];
     summary: SupplierMappingSummaryDTO;
   }> {
+    // If forceRefresh requested, sync all documents from ETA portal
+    if (options.forceRefresh) {
+      await EtaDocumentService.fetchAllDocuments(companyId, { forceRefresh: true }).catch(err => {
+        console.warn('[ETA Supplier Mapping] forceRefresh fetch warning:', err.message || err);
+      });
+    } else {
+      // Check if eta_documents table is empty for received invoices; if so, populate it
+      const docCountRes = await pool.query(
+        `SELECT count(1) FROM eta_documents WHERE company_id = $1 AND direction = 'Received'`,
+        [companyId]
+      ).catch(() => ({ rows: [{ count: '0' }] }));
+
+      if (Number(docCountRes.rows[0]?.count || 0) === 0) {
+        await EtaDocumentService.fetchAllDocuments(companyId, { forceRefresh: false }).catch(err => {
+          console.warn('[ETA Supplier Mapping] initial fetch warning:', err.message || err);
+        });
+      }
+    }
+
     // 1. Fetch unique suppliers from eta_documents (direction = 'Received')
     const portalSuppliersRes = await pool.query(`
       SELECT 

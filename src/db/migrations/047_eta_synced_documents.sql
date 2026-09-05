@@ -2,12 +2,12 @@
 -- Persistent storage for synced Egyptian Tax Authority (ETA) e-Invoicing documents
 
 CREATE TABLE IF NOT EXISTS "eta_documents" (
-    "id" VARCHAR(50) PRIMARY KEY,
+    "id" VARCHAR(255) PRIMARY KEY,
     "company_id" VARCHAR(36) NOT NULL REFERENCES "companies"("id") ON DELETE CASCADE,
-    "uuid" VARCHAR(100) NOT NULL,
-    "submission_uuid" VARCHAR(100),
-    "long_id" VARCHAR(100),
-    "internal_id" VARCHAR(100) NOT NULL,
+    "uuid" VARCHAR(255) NOT NULL,
+    "submission_uuid" VARCHAR(255),
+    "long_id" TEXT,
+    "internal_id" VARCHAR(255) DEFAULT '',
     "type_name" VARCHAR(20) DEFAULT 'I',
     "document_type_name" VARCHAR(100) DEFAULT 'فاتورة',
     "document_type_version" VARCHAR(20) DEFAULT '1.0',

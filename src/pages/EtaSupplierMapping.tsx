@@ -135,7 +135,7 @@ export function EtaSupplierMapping() {
         success: boolean;
         suppliers: EtaPortalSupplier[];
         summary: SupplierMappingSummary;
-      }>('/eta/suppliers/mapping');
+      }>(isRefresh ? '/eta/suppliers/mapping?refresh=true' : '/eta/suppliers/mapping');
 
       if (res && res.success) {
         setSuppliers(res.suppliers || []);
@@ -433,11 +433,11 @@ export function EtaSupplierMapping() {
           <button
             onClick={() => loadMappings(true)}
             disabled={refreshing || loading}
-            className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-xl transition-all disabled:opacity-50"
-            title={isAr ? 'تحديث البيانات' : 'Refresh'}
+            className="flex items-center gap-2 px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-800/40 text-indigo-700 dark:text-indigo-300 text-sm font-semibold rounded-xl transition-all disabled:opacity-50 border border-indigo-200 dark:border-indigo-800 shadow-sm"
+            title={isAr ? 'تحديث ومزامنة موردي البوابة الإلكترونية' : 'Sync & Refresh from ETA Portal'}
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">{isAr ? 'تحديث' : 'Refresh'}</span>
+            <span>{isAr ? 'تحديث ومزامنة' : 'Sync & Refresh'}</span>
           </button>
 
           <button

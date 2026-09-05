@@ -217,7 +217,26 @@ async function startServer() {
       'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "allow_issue_fraction" BOOLEAN DEFAULT FALSE',
       'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "allow_receipt_fraction" BOOLEAN DEFAULT FALSE',
       'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "allow_issue_fraction_pct" DECIMAL(10, 2) DEFAULT 0',
-      'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "allow_receipt_fraction_pct" DECIMAL(10, 2) DEFAULT 0'
+      'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "allow_receipt_fraction_pct" DECIMAL(10, 2) DEFAULT 0',
+
+      // ETA E-Invoicing persistent tables and column schema enforcement
+      'CREATE TABLE IF NOT EXISTS "eta_settings" ("id" VARCHAR(36) PRIMARY KEY, "company_id" VARCHAR(36) NOT NULL UNIQUE REFERENCES "companies"("id") ON DELETE CASCADE, "environment" VARCHAR(20) NOT NULL DEFAULT \'preprod\', "activity_code" VARCHAR(50), "branch_id" VARCHAR(50) DEFAULT \'0\', "country_code" VARCHAR(10) DEFAULT \'EG\', "governorate" VARCHAR(100), "city" VARCHAR(100), "street" VARCHAR(255), "building_number" VARCHAR(50), "postal_code" VARCHAR(50), "client_id" TEXT, "client_secret" TEXT, "operating_key" TEXT, "last_notification_at" TIMESTAMP, "is_configured" BOOLEAN DEFAULT FALSE, "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)',
+      'ALTER TABLE "eta_settings" ADD COLUMN IF NOT EXISTS "operating_key" TEXT',
+      'ALTER TABLE "eta_settings" ADD COLUMN IF NOT EXISTS "last_notification_at" TIMESTAMP',
+      'CREATE TABLE IF NOT EXISTS "eta_documents" ("id" VARCHAR(255) PRIMARY KEY, "company_id" VARCHAR(36) NOT NULL, "uuid" VARCHAR(255) NOT NULL, "submission_uuid" VARCHAR(255), "long_id" TEXT, "internal_id" VARCHAR(255) DEFAULT \'\', "type_name" VARCHAR(20) DEFAULT \'I\', "document_type_name" VARCHAR(100) DEFAULT \'فاتورة\', "document_type_version" VARCHAR(20) DEFAULT \'1.0\', "direction" VARCHAR(20) NOT NULL DEFAULT \'Received\', "status" VARCHAR(50) DEFAULT \'Valid\', "date_time_issued" TIMESTAMP WITH TIME ZONE, "date_time_received" TIMESTAMP WITH TIME ZONE, "issuer_id" VARCHAR(50), "issuer_name" TEXT, "issuer_type" VARCHAR(20), "issuer_address" TEXT, "receiver_id" VARCHAR(50), "receiver_name" TEXT, "receiver_type" VARCHAR(20), "receiver_address" TEXT, "total_sales_amount" NUMERIC(18, 4) DEFAULT 0, "total_discount_amount" NUMERIC(18, 4) DEFAULT 0, "net_amount" NUMERIC(18, 4) DEFAULT 0, "tax_amount" NUMERIC(18, 4) DEFAULT 0, "total_amount" NUMERIC(18, 4) DEFAULT 0, "extra_discount_amount" NUMERIC(18, 4) DEFAULT 0, "total_items_discount_amount" NUMERIC(18, 4) DEFAULT 0, "currency" VARCHAR(10) DEFAULT \'EGP\', "raw_data" JSONB, "created_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, "last_synced_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "uq_eta_documents_company_uuid" UNIQUE ("company_id", "uuid"))',
+      'ALTER TABLE "eta_documents" ALTER COLUMN "id" TYPE VARCHAR(255)',
+      'ALTER TABLE "eta_documents" ALTER COLUMN "uuid" TYPE VARCHAR(255)',
+      'ALTER TABLE "eta_documents" ALTER COLUMN "submission_uuid" TYPE VARCHAR(255)',
+      'ALTER TABLE "eta_documents" ALTER COLUMN "long_id" TYPE TEXT',
+      'ALTER TABLE "eta_documents" ALTER COLUMN "internal_id" TYPE VARCHAR(255)',
+      'ALTER TABLE "eta_documents" ALTER COLUMN "internal_id" DROP NOT NULL',
+      'CREATE INDEX IF NOT EXISTS "idx_eta_documents_company_dir" ON "eta_documents"("company_id", "direction")',
+      'CREATE INDEX IF NOT EXISTS "idx_eta_documents_company_issued" ON "eta_documents"("company_id", "date_time_issued" DESC)',
+      'CREATE INDEX IF NOT EXISTS "idx_eta_documents_uuid" ON "eta_documents"("uuid")',
+      'CREATE TABLE IF NOT EXISTS "eta_supplier_mappings" ("id" VARCHAR(36) PRIMARY KEY, "company_id" VARCHAR(36) NOT NULL, "eta_tax_number" VARCHAR(50) NOT NULL, "eta_supplier_name" VARCHAR(255), "supplier_id" VARCHAR(36) NOT NULL, "notes" TEXT, "created_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "uq_eta_supplier_mappings_comp_tax" UNIQUE ("company_id", "eta_tax_number"))',
+      'CREATE INDEX IF NOT EXISTS "idx_eta_supplier_mappings_comp_tax" ON "eta_supplier_mappings"("company_id", "eta_tax_number")',
+      'CREATE INDEX IF NOT EXISTS "idx_eta_supplier_mappings_comp_sup" ON "eta_supplier_mappings"("company_id", "supplier_id")',
+      'CREATE TABLE IF NOT EXISTS "eta_partner_cache" ("tax_id" VARCHAR(50) PRIMARY KEY, "name" TEXT, "address" TEXT, "cached_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)'
     ];
     
     for (const q of syncQueries) {

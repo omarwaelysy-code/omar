@@ -11248,8 +11248,7 @@ router.post(['/company/eta-settings', '/eta/settings'], authenticateToken, async
     const existingSecret = existingRow?.client_secret || '';
     const existingOperatingKey = existingRow?.operating_key || '';
 
-    const isGeneralSave = Boolean(req.body?.is_general_save);
-    const isClearRequested = Boolean(req.body?.clear_credentials) || (!isGeneralSave && (client_id === '' || client_id === null));
+    const isClearRequested = Boolean(req.body?.clear_credentials);
 
     let clientIdToSave = existingClientId;
     let secretToSave = existingSecret;
@@ -11656,7 +11655,10 @@ router.get('/eta/suppliers/mapping', authenticateToken, async (req: AuthRequest,
   }
 
   try {
-    const result = await EtaSupplierMappingService.getSupplierMappings(companyId);
+    const { refresh } = req.query;
+    const result = await EtaSupplierMappingService.getSupplierMappings(companyId, {
+      forceRefresh: refresh === 'true'
+    });
     res.json(result);
   } catch (err: any) {
     console.error('Error fetching ETA supplier mappings:', err.message || err);
