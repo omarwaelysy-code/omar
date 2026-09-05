@@ -233,7 +233,7 @@ export function EtaReceivedInvoices() {
   ], []);
 
   // Data & State
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [invoices, setInvoices] = useState<EtaReceivedInvoice[]>([]);
   const [allPortalInvoices, setAllPortalInvoices] = useState<EtaReceivedInvoice[]>([]);
@@ -1443,8 +1443,8 @@ export function EtaReceivedInvoices() {
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                   <span>
                     {language === 'ar'
-                      ? `آخر مزامنة: ${new Date(lastSyncedAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`
-                      : `Last Synced: ${new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                      ? `آخر مزامنة: ${new Date(lastSyncedAt).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' })} - ${new Date(lastSyncedAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`
+                      : `Last Synced: ${new Date(lastSyncedAt).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' })} ${new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
                   </span>
                 </span>
               )}
@@ -1513,11 +1513,11 @@ export function EtaReceivedInvoices() {
           <button
             type="button"
             onClick={handleRefresh}
-            disabled={refreshing || loading || allLoading || !isConfigured}
+            disabled={refreshing || allLoading || (viewMode === 'period' && loading)}
             className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white border border-indigo-700 transition-all disabled:opacity-50 shadow-sm cursor-pointer"
             title={language === 'ar' ? 'مزامنة وحفظ الوثائق من منظومة مصلحة الضرائب' : 'Sync & Save documents from ETA'}
           >
-            <RefreshCw className={`w-4 h-4 text-white ${refreshing || allLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 text-white ${refreshing || allLoading || (viewMode === 'period' && loading) ? 'animate-spin' : ''}`} />
             <span>{language === 'ar' ? 'تحديث ومزامنة' : 'Refresh & Sync'}</span>
           </button>
         </div>
