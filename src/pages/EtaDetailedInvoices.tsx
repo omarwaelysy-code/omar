@@ -1897,12 +1897,12 @@ export function EtaDetailedInvoices() {
                   <Receipt className="w-8 h-8" />
                 </div>
                 <h3 className="font-bold text-base text-slate-800">
-                  {allLines.length === 0 && !appliedSearch && !dateFrom && !dateTo
+                  {detailedLines.length === 0 && !appliedSearch && !dateFrom && !dateTo
                     ? (language === 'ar' ? 'لا توجد بنود وثائق إلكترونية محفوظة حاليًا.' : 'No saved document lines found.')
                     : (language === 'ar' ? 'لا توجد بنود مطابقة' : 'No items found')}
                 </h3>
                 <p className="text-xs md:text-sm text-slate-400 max-w-md mx-auto mt-1 leading-relaxed">
-                  {allLines.length === 0 && !appliedSearch && !dateFrom && !dateTo
+                  {detailedLines.length === 0 && !appliedSearch && !dateFrom && !dateTo
                     ? (language === 'ar'
                         ? 'اضغط على زر "تحديث" لبدء المزامنة وجلب الوثائق الإلكترونية من منظومة مصلحة الضرائب المصرية وحفظها محليًا.'
                         : 'Click "Refresh" to sync electronic documents from ETA into local storage.')
