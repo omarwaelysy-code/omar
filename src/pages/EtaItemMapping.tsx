@@ -92,18 +92,6 @@ export interface ItemMappingSummary {
   totalInvoicedAmount: number;
 }
 
-interface ErpProductOption {
-  id: string;
-  name: string;
-  code: string;
-  barcode?: string;
-  tax_item_code?: string;
-  tax_code_type?: string;
-  unit?: string;
-  sale_price?: number;
-  cost_price?: number;
-}
-
 export function EtaItemMapping() {
   const { language } = useLanguage();
   const { showNotification } = useNotification();
@@ -125,13 +113,6 @@ export function EtaItemMapping() {
     totalDocumentsCount: 0,
     totalInvoicedAmount: 0
   });
-
-  // ERP Products List for Manual Select Modal
-  const [allErpProducts, setAllErpProducts] = useState<ErpProductOption[]>([]);
-  const [loadingErpProducts, setLoadingErpProducts] = useState(false);
-  const [manualLinkTarget, setManualLinkTarget] = useState<EtaPortalItem | null>(null);
-  const [productSearchQuery, setProductSearchQuery] = useState('');
-  const [selectedProductId, setSelectedProductId] = useState<string>('');
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -196,68 +177,16 @@ export function EtaItemMapping() {
   }, [loadMappings]);
 
   // Load ERP Products for manual picker modal
-  const loadErpProducts = async () => {
-    if (allErpProducts.length > 0) return;
-    try {
-      setLoadingErpProducts(true);
-      const res = await apiRequest<any[]>('/products');
-      if (Array.isArray(res)) {
-        setAllErpProducts(res.map(p => ({
-          id: p.id,
-          name: p.name,
-          code: p.code,
-          barcode: p.barcode,
-          tax_item_code: p.tax_item_code,
-          tax_code_type: p.tax_code_type,
-          unit: p.unit,
-          sale_price: p.sale_price,
-          cost_price: p.cost_price
-        })));
-      }
-    } catch (err) {
-      console.error('Error loading ERP products list:', err);
-    } finally {
-      setLoadingErpProducts(false);
-    }
-  };
-
-  const handleOpenManualLinkModal = (item: EtaPortalItem) => {
-    setManualLinkTarget(item);
-    setSelectedProductId(item.autoMatchedProduct?.id || '');
-    setProductSearchQuery(item.itemName || item.itemCode || '');
-    loadErpProducts();
-  };
-
-  // Confirm manual link from modal
-  const handleConfirmManualLink = async () => {
-    if (!manualLinkTarget || !selectedProductId) {
-      showNotification(isAr ? 'الرجاء اختيار صنف للربط' : 'Please select a product', 'warning');
-      return;
-    }
-
-    try {
-      setSavingLink(true);
-      const res = await apiRequest<{ success: boolean; message?: string }>('/eta/items/mapping/link', 'POST', {
-        etaItemCode: manualLinkTarget.itemCode,
-        productId: selectedProductId,
-        etaItemName: manualLinkTarget.itemName,
-        etaItemType: manualLinkTarget.itemType || 'EGS',
-        notes: isAr ? 'ربط يدوي عبر شاشة ربط الأصناف' : 'Manual link from item mapping screen'
-      });
-
-      if (res && res.success) {
-        showNotification(isAr ? 'تم ربط الصنف بنجاح' : 'Item linked successfully', 'success');
-        setManualLinkTarget(null);
-        setSelectedProductId('');
-        loadMappings(true);
-      } else {
-        showNotification(res.message || (isAr ? 'فشل إتمام الربط' : 'Failed to link'), 'error');
-      }
-    } catch (err: any) {
-      showNotification(err.message || (isAr ? 'خطأ في عملية الربط' : 'Error linking'), 'error');
-    } finally {
-      setSavingLink(false);
-    }
+  // Golden Rule: Switch to official Products screen to search and link with existing ERP product
+  const handleLinkInProductsScreen = (item: EtaPortalItem) => {
+    setPendingEtaProductForLinking(item);
+    openTab('products');
+    showNotification(
+      isAr 
+        ? `تم الانتقال لدليل الأصناف للبحث عن الصنف المناسب وربطه بكود الضرائب "${item.itemCode}".`
+        : `Switched to Products catalog to search and link with ETA code "${item.itemCode}".`,
+      'info'
+    );
   };
 
   // Quick link auto-matched item in 1-click
@@ -536,18 +465,6 @@ export function EtaItemMapping() {
     exportToExcel(dataToExport, `ETA_Item_Mappings_${new Date().toISOString().slice(0, 10)}`);
   };
 
-  // Filtered ERP Products for Modal Picker
-  const modalFilteredProducts = useMemo(() => {
-    if (!productSearchQuery.trim()) return allErpProducts.slice(0, 50);
-    const q = productSearchQuery.trim().toLowerCase();
-    return allErpProducts.filter(p => 
-      (p.name && p.name.toLowerCase().includes(q)) ||
-      (p.code && p.code.toLowerCase().includes(q)) ||
-      (p.barcode && p.barcode.toLowerCase().includes(q)) ||
-      (p.tax_item_code && p.tax_item_code.toLowerCase().includes(q))
-    ).slice(0, 50);
-  }, [allErpProducts, productSearchQuery]);
-
   // Helper to render an item table row
   const renderItemRow = (item: EtaPortalItem, showSupplierCols: boolean) => {
     const primaryTaxId = (item.supplierTaxNumber || item.sampleDocument?.issuerId || '').trim();
@@ -771,20 +688,19 @@ export function EtaItemMapping() {
 
                 <button
                   type="button"
-                  onClick={() => handleOpenManualLinkModal(item)}
+                  onClick={() => handleLinkInProductsScreen(item)}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1 border border-slate-200"
-                  title={isAr ? 'اختيار صنف موجود من المخزن' : 'Link with existing product'}
+                  title={isAr ? 'البحث عن الصنف في شاشة الأصناف وربطه' : 'Search and link in Products screen'}
                 >
                   <Link2 size={14} />
                   <span>{isAr ? 'ربط بصنف' : 'Link'}</span>
                 </button>
 
-                {/* Golden Rule: Opens official Products screen */}
                 <button
                   type="button"
                   onClick={() => handleOpenCreateInProducts(item)}
                   className="px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1 shadow-sm shadow-indigo-600/20 active:scale-95"
-                  title={isAr ? 'إنشاء صنف جديد بشاشة الأصناف وتطبيق القاعدة الذهبية' : 'Create new product via official screen'}
+                  title={isAr ? 'إنشاء صنف جديد بشاشة الأصناف' : 'Create new product in Products screen'}
                 >
                   <Plus size={14} />
                   <span>{isAr ? '+ إنشاء جديد' : '+ Create'}</span>
@@ -988,16 +904,6 @@ export function EtaItemMapping() {
               </span>
             </button>
           </div>
-
-          {/* Golden Rule Tip Banner */}
-          <div className="hidden lg:flex items-center gap-2 text-xs font-semibold text-emerald-800 bg-emerald-50/80 px-4 py-2 rounded-2xl border border-emerald-200">
-            <Info size={16} className="text-emerald-600 flex-shrink-0" />
-            <span>
-              {isAr 
-                ? 'القاعدة الذهبية: يتم إنشاء الصنف من خلال شاشة الأصناف المعتمدة لضمان تطبيق كافة القيود المحاسبية.'
-                : 'Golden Rule: Products are created via official Products screen to enforce all accounting rules.'}
-            </span>
-          </div>
         </div>
 
         {/* Search Input & Toggles */}
@@ -1187,6 +1093,18 @@ export function EtaItemMapping() {
                                 {isAr ? 'ضريبي:' : 'Tax:'} {group.taxNumber}
                               </span>
                             )}
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-xl text-xs font-black border transition-all ${
+                              isExpanded 
+                                ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs' 
+                                : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                            }`}>
+                              {isExpanded ? <ChevronUp size={13} className="stroke-[3]" /> : <ChevronDown size={13} className="stroke-[3]" />}
+                              <span>
+                                {isExpanded 
+                                  ? (isAr ? 'مفتوح (انقر للطي ▲)' : 'Open (Click to collapse ▲)') 
+                                  : (isAr ? 'مغلق (انقر للفتح ▼)' : 'Closed (Click to expand ▼)')}
+                              </span>
+                            </span>
                           </div>
                           <div className="text-xs text-slate-500 flex items-center gap-2 font-medium flex-wrap">
                             <span className="font-bold text-slate-700">{group.items.length} {isAr ? 'صنف' : 'items'}</span>
@@ -1216,12 +1134,13 @@ export function EtaItemMapping() {
                           )}
                         </div>
 
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-transform duration-200 border ${
+                        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-xs transition-all border shadow-2xs ${
                           isExpanded 
-                            ? 'rotate-180 bg-indigo-100 text-indigo-700 border-indigo-200' 
-                            : 'bg-slate-100 text-slate-400 border-slate-200'
+                            ? 'bg-indigo-600 text-white border-indigo-700' 
+                            : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50'
                         }`}>
-                          <ChevronDown size={16} />
+                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          <span>{isExpanded ? (isAr ? 'طي الأصناف ▲' : 'Collapse Items ▲') : (isAr ? 'عرض الأصناف ▼' : 'Show Items ▼')}</span>
                         </div>
                       </div>
                     </button>
@@ -1317,166 +1236,6 @@ export function EtaItemMapping() {
           </div>
         )}
       </div>
-
-      {/* Manual Link Modal (Select existing ERP Product) */}
-      <AnimatePresence>
-        {manualLinkTarget && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-3xl p-6 max-w-xl w-full shadow-2xl border border-slate-100 space-y-5 max-h-[90vh] flex flex-col"
-            >
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
-                    <Link2 size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-black text-slate-900">
-                      {isAr ? 'ربط صنف من الفاتورة بصنف في المخزن' : 'Link Item with ERP Product'}
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      {isAr ? 'اختر الصنف المطابق من قائمة أصناف الشركة الحالية' : 'Select the matching product from your ERP list'}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setManualLinkTarget(null)}
-                  className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {/* Target ETA Item Details */}
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-500">{isAr ? 'كود الصنف ETA:' : 'ETA Item Code:'}</span>
-                  <span className="font-mono font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
-                    {manualLinkTarget.itemCode}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-500">{isAr ? 'اسم الصنف بالبوابة:' : 'Portal Item Name:'}</span>
-                  <span className="font-black text-slate-900">{manualLinkTarget.itemName}</span>
-                </div>
-                {manualLinkTarget.lastUnitPrice > 0 && (
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-500">{isAr ? 'سعر الوحدة بالفاتورة:' : 'Price:'}</span>
-                    <span className="font-black text-slate-900 font-mono">
-                      {formatMoney(manualLinkTarget.lastUnitPrice)} {isAr ? 'ج.م' : 'EGP'}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Search in ERP Products */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 block">
-                  {isAr ? 'ابحث عن الصنف في المخزن:' : 'Search ERP Products:'}
-                </label>
-                <div className="relative">
-                  <Search size={16} className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={productSearchQuery}
-                    onChange={(e) => setProductSearchQuery(e.target.value)}
-                    placeholder={isAr ? 'اسم الصنف، الكود، الباركود...' : 'Product name, code, barcode...'}
-                    className="w-full ps-10 pe-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  />
-                </div>
-              </div>
-
-              {/* Products List */}
-              <div className="flex-1 overflow-y-auto max-h-64 border border-slate-100 rounded-2xl divide-y divide-slate-100 custom-scrollbar">
-                {loadingErpProducts ? (
-                  <div className="p-8 text-center text-xs text-slate-400 font-bold">
-                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-indigo-600" />
-                    <span>{isAr ? 'جاري تحميل الأصناف...' : 'Loading products...'}</span>
-                  </div>
-                ) : modalFilteredProducts.length === 0 ? (
-                  <div className="p-8 text-center text-xs text-slate-400 font-bold">
-                    {isAr ? 'لا توجد نتائج تطابق البحث' : 'No matching products found'}
-                  </div>
-                ) : (
-                  modalFilteredProducts.map(p => (
-                    <label
-                      key={p.id}
-                      className={`p-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-indigo-50/40 transition-colors ${
-                        selectedProductId === p.id ? 'bg-indigo-50 border-s-4 border-indigo-600' : ''
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="radio"
-                          name="selectedProduct"
-                          value={p.id}
-                          checked={selectedProductId === p.id}
-                          onChange={() => setSelectedProductId(p.id)}
-                          className="text-indigo-600 focus:ring-indigo-500"
-                        />
-                        <div>
-                          <div className="font-black text-slate-900 text-xs">{p.name}</div>
-                          <div className="text-[10px] text-slate-500 font-medium flex items-center gap-2 mt-0.5">
-                            <span className="font-mono">{p.code}</span>
-                            {p.barcode && <span>• {isAr ? 'باركود:' : 'Barcode:'} {p.barcode}</span>}
-                            {p.unit && <span>• {p.unit}</span>}
-                          </div>
-                        </div>
-                      </div>
-                      {p.sale_price !== undefined && (
-                        <div className="text-end font-mono font-bold text-xs text-slate-700">
-                          {formatMoney(p.sale_price)} <span className="text-[10px] text-slate-400">{isAr ? 'ج.م' : 'EGP'}</span>
-                        </div>
-                      )}
-                    </label>
-                  ))
-                )}
-              </div>
-
-              {/* Modal Buttons */}
-              <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (manualLinkTarget) {
-                      const t = manualLinkTarget;
-                      setManualLinkTarget(null);
-                      handleOpenCreateInProducts(t);
-                    }
-                  }}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5"
-                >
-                  <Plus size={14} />
-                  <span>{isAr ? 'إنشاء صنف جديد بدلاً من الربط' : 'Create new instead'}</span>
-                </button>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setManualLinkTarget(null)}
-                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-all"
-                  >
-                    {isAr ? 'إلغاء' : 'Cancel'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleConfirmManualLink}
-                    disabled={!selectedProductId || savingLink}
-                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs transition-all flex items-center gap-1.5 shadow-md shadow-indigo-600/30 disabled:opacity-50"
-                  >
-                    <Check size={14} />
-                    <span>{isAr ? 'تأكيد الربط' : 'Confirm Link'}</span>
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Unlink Confirmation Modal */}
       <AnimatePresence>

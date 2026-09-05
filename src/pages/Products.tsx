@@ -309,6 +309,14 @@ export const Products: React.FC = () => {
     }
   }, [pendingEtaProductForCreation, accounts, itemGroups]);
 
+  // When switching to Products screen to link with ETA item, pre-fill search with ETA item name and show products list
+  useEffect(() => {
+    if (pendingEtaProductForLinking) {
+      setSearchTerm(pendingEtaProductForLinking.itemName || pendingEtaProductForLinking.itemCode || '');
+      setIsModalOpen(false);
+    }
+  }, [pendingEtaProductForLinking]);
+
   // Handle linking existing product to ETA tax code
   const handleLinkExistingToEta = async (product: Product) => {
     if (!pendingEtaProductForLinking) return;
