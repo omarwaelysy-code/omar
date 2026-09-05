@@ -28,6 +28,7 @@ import { subscriptionService } from './subscription/SubscriptionService';
 import { isCompanyPosEnabled } from './subscription/FeatureService';
 import { EtaAuthService } from '../services/eta/EtaAuthService';
 import { EtaDocumentService } from '../services/eta/EtaDocumentService';
+import { EtaSupplierMappingService } from '../services/eta/EtaSupplierMappingService';
 
 export function getEffectiveModule(moduleName: string): string {
   const mapping: { [key: string]: string } = {
@@ -64,7 +65,7 @@ export function getInitialPermissionsState() {
     'balance_sheet', 'stock_card_report', 'stock_balances_report', 'general_stock_movements_report',
     'users', 'companies', 'activity_log', 'audit_logs', 'system_check', 'company_settings',
     'discount_settings', 'backup_restore', 'templates', 'create_template', 'operation_categories',
-    'operation_fields', 'operations', 'period_closing', 'eta_received_invoices', 'eta_detailed_invoices'
+    'operation_fields', 'operations', 'period_closing', 'eta_received_invoices', 'eta_detailed_invoices', 'eta_supplier_mapping'
   ];
   
   const specials: any = {
@@ -11631,6 +11632,110 @@ router.get('/eta/invoices/detailed', authenticateToken, async (req: AuthRequest,
       error: err.message || 'تعذر جلب بنود الوثائق الإلكترونية المفصلة.',
       code: err.code || 'ETA_ERROR'
     });
+  }
+});
+
+// =========================================================================
+// ETA SUPPLIER MAPPING APIS
+// =========================================================================
+
+// GET /api/erp/eta/suppliers/mapping
+router.get('/eta/suppliers/mapping', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  if (!companyId) {
+    return res.status(401).json({ error: 'Unauthorized: Company ID is required' });
+  }
+
+  const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
+  const isCompanyAdmin = req.user?.role === 'admin' || isSuperAdmin;
+  if (!isCompanyAdmin) {
+    const userPermissions = (req.user as any)?.permissions;
+    if (userPermissions && userPermissions['eta_supplier_mapping']?.view === false && userPermissions['eta_received_invoices']?.view === false) {
+      return res.status(403).json({ error: 'غير مصرح لك بعرض ربط الموردين.' });
+    }
+  }
+
+  try {
+    const result = await EtaSupplierMappingService.getSupplierMappings(companyId);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Error fetching ETA supplier mappings:', err.message || err);
+    res.status(500).json({ success: false, error: err.message || 'تعذر جلب بيانات ربط الموردين.' });
+  }
+});
+
+// POST /api/erp/eta/suppliers/mapping/link
+router.post('/eta/suppliers/mapping/link', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  if (!companyId) {
+    return res.status(401).json({ error: 'Unauthorized: Company ID is required' });
+  }
+
+  try {
+    const { etaTaxNumber, etaSupplierName, supplierId, notes } = req.body;
+    const result = await EtaSupplierMappingService.linkSupplier(companyId, etaTaxNumber, supplierId, etaSupplierName, notes);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Error linking ETA supplier:', err.message || err);
+    res.status(400).json({ success: false, error: err.message || 'تعذر ربط المورد.' });
+  }
+});
+
+// POST /api/erp/eta/suppliers/mapping/unlink
+router.post('/eta/suppliers/mapping/unlink', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  if (!companyId) {
+    return res.status(401).json({ error: 'Unauthorized: Company ID is required' });
+  }
+
+  try {
+    const { etaTaxNumber } = req.body;
+    const result = await EtaSupplierMappingService.unlinkSupplier(companyId, etaTaxNumber);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Error unlinking ETA supplier:', err.message || err);
+    res.status(400).json({ success: false, error: err.message || 'تعذر فك ارتباط المورد.' });
+  }
+});
+
+// POST /api/erp/eta/suppliers/mapping/quick-link-all
+router.post('/eta/suppliers/mapping/quick-link-all', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  if (!companyId) {
+    return res.status(401).json({ error: 'Unauthorized: Company ID is required' });
+  }
+
+  try {
+    const result = await EtaSupplierMappingService.quickLinkAllMatched(companyId);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Error in quickLinkAllMatched:', err.message || err);
+    res.status(500).json({ success: false, error: err.message || 'تعذر إجراء الربط التلقائي السريع.' });
+  }
+});
+
+// POST /api/erp/eta/suppliers/mapping/create-and-link
+router.post('/eta/suppliers/mapping/create-and-link', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  if (!companyId) {
+    return res.status(401).json({ error: 'Unauthorized: Company ID is required' });
+  }
+
+  try {
+    const { name, taxNumber, etaTaxNumber, address, mobile, phone, email } = req.body;
+    const resolvedTaxNumber = taxNumber || etaTaxNumber;
+    const resolvedMobile = mobile || phone;
+    const result = await EtaSupplierMappingService.createAndLinkSupplier(companyId, {
+      name,
+      taxNumber: resolvedTaxNumber,
+      address,
+      mobile: resolvedMobile,
+      email
+    });
+    res.json(result);
+  } catch (err: any) {
+    console.error('Error creating and linking supplier:', err.message || err);
+    res.status(400).json({ success: false, error: err.message || 'تعذر إنشاء وربط المورد الجديد.' });
   }
 });
 

@@ -194,6 +194,7 @@ export const ar = {
   'nav.eta_menu': 'ETA',
   'nav.eta_received_invoices': 'الوثائق الإلكترونية',
   'nav.eta_detailed_invoices': 'الوثائق الإلكترونية بالتفصيل',
+  'nav.eta_supplier_mapping': 'ربط الموردين (ETA)',
 
   // Operations System
   'operations.title': 'نظام العمليات',

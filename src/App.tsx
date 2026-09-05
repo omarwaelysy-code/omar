@@ -69,6 +69,7 @@ const PosBranchLinking = React.lazy(() => import('./pages/PosBranchLinking').the
 const PosConnectedBranches = React.lazy(() => import('./pages/PosConnectedBranches').then(m => ({ default: m.PosConnectedBranches })));
 const EtaReceivedInvoices = React.lazy(() => import('./pages/EtaReceivedInvoices').then(m => ({ default: m.EtaReceivedInvoices })));
 const EtaDetailedInvoices = React.lazy(() => import('./pages/EtaDetailedInvoices').then(m => ({ default: m.EtaDetailedInvoices })));
+const EtaSupplierMapping = React.lazy(() => import('./pages/EtaSupplierMapping').then(m => ({ default: m.EtaSupplierMapping })));
 
 import { useNavigation } from './contexts/NavigationContext';
 import { useLanguage } from './contexts/LanguageContext';
@@ -282,6 +283,7 @@ export default function App() {
       case 'pos_branch_linking': return <PosBranchLinking />;
       case 'eta_received_invoices': return <EtaReceivedInvoices />;
       case 'eta_detailed_invoices': return <EtaDetailedInvoices />;
+      case 'eta_supplier_mapping': return <EtaSupplierMapping />;
       default: return <Dashboard />;
     }
   }

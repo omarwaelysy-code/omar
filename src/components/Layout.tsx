@@ -55,7 +55,8 @@ import {
   Mail,
   Camera,
   Radio,
-  Laptop
+  Laptop,
+  Link2
 } from 'lucide-react';
 
 import { useAuth } from '../contexts/AuthContext';
@@ -126,6 +127,7 @@ const getTabIcon = (id: string) => {
     case 'receipts':
     case 'eta_received_invoices':
     case 'eta_detailed_invoices':
+    case 'eta_supplier_mapping':
       return <Receipt {...iconProps} />;
     case 'operations': return <List {...iconProps} />;
     case 'departments':
@@ -529,6 +531,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             id: 'eta_detailed_invoices', 
             label: language === 'ar' ? 'الوثائق الإلكترونية بالتفصيل' : 'Detailed Electronic Documents', 
             icon: Layers 
+          },
+          {
+            id: 'eta_supplier_mapping',
+            label: language === 'ar' ? 'ربط الموردين (ETA)' : 'ETA Supplier Mapping',
+            icon: Link2
           }
         ]
       }] : []),
@@ -699,7 +706,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       if (item.subItems) {
         const visibleSubItems = (item.subItems as any[]).filter((sub: any) => {
           if (sub.isDivider || sub.isHeader) return true;
-          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking' || sub.id === 'pos_connected_branches' || sub.id === 'eta_received_invoices' || sub.id === 'eta_detailed_invoices') return true;
+          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking' || sub.id === 'pos_connected_branches' || sub.id === 'eta_received_invoices' || sub.id === 'eta_detailed_invoices' || sub.id === 'eta_supplier_mapping') return true;
           return hasPermission(sub.id, 'view');
         });
         

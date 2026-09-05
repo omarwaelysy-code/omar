@@ -194,6 +194,7 @@ export const en = {
   'nav.eta_menu': 'ETA',
   'nav.eta_received_invoices': 'Received Electronic Invoices',
   'nav.eta_detailed_invoices': 'Detailed Electronic Documents',
+  'nav.eta_supplier_mapping': 'ETA Supplier Mapping',
 
   // Operations System
   'operations.title': 'Operations System',
