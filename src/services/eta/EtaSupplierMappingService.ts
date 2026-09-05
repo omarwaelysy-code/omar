@@ -7,6 +7,7 @@
 
 import crypto from 'crypto';
 import pool from '../../lib/postgres';
+import { cleanDuplicatedPartnerName } from '../../utils/formatUtils';
 
 export interface EtaPortalSupplierDTO {
   taxNumber: string;
@@ -165,7 +166,7 @@ export class EtaSupplierMappingService {
 
       suppliers.push({
         taxNumber: rawTax,
-        name: row.name,
+        name: cleanDuplicatedPartnerName(row.name),
         address: row.address,
         docCount: docCountNum,
         totalAmount: totalAmountNum,
@@ -207,6 +208,7 @@ export class EtaSupplierMappingService {
     }
 
     const id = crypto.randomUUID();
+    const cleanedSupplierName = cleanDuplicatedPartnerName(etaSupplierName) || null;
     await pool.query(`
       INSERT INTO eta_supplier_mappings (
         id, company_id, eta_tax_number, eta_supplier_name, supplier_id, notes, updated_at
@@ -218,7 +220,7 @@ export class EtaSupplierMappingService {
         eta_supplier_name = COALESCE(EXCLUDED.eta_supplier_name, eta_supplier_mappings.eta_supplier_name),
         notes = COALESCE(EXCLUDED.notes, eta_supplier_mappings.notes),
         updated_at = CURRENT_TIMESTAMP
-    `, [id, companyId, etaTaxNumber.trim(), etaSupplierName || null, supplierId, notes || null]);
+    `, [id, companyId, etaTaxNumber.trim(), cleanedSupplierName, supplierId, notes || null]);
 
     return {
       success: true,
@@ -370,6 +372,8 @@ export class EtaSupplierMappingService {
     const code = `supp ${nextNum.toString().padStart(5, '0')}`;
     const supplierId = crypto.randomUUID();
 
+    const cleanedName = cleanDuplicatedPartnerName(name);
+
     // Insert into suppliers WITH account_id and account_name
     await pool.query(`
       INSERT INTO suppliers (
@@ -380,7 +384,7 @@ export class EtaSupplierMappingService {
     `, [
       supplierId,
       companyId,
-      name.trim(),
+      cleanedName,
       code,
       taxNumber.trim(),
       address || '',
@@ -391,13 +395,13 @@ export class EtaSupplierMappingService {
     ]);
 
     // Link immediately in eta_supplier_mappings
-    await this.linkSupplier(companyId, taxNumber, supplierId, name);
+    await this.linkSupplier(companyId, taxNumber, supplierId, cleanedName);
 
     return {
       success: true,
       supplierId,
       code,
-      message: `تم إنشاء المورد "${name}" بالكود (${code}) وربطه بالحساب المحاسبي (${finalAccountName}) بنجاح.`
+      message: `تم إنشاء المورد "${cleanedName}" بالكود (${code}) وربطه بالحساب المحاسبي (${finalAccountName}) بنجاح.`
     };
   }
 }

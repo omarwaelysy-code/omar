@@ -18,7 +18,7 @@ import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { ExportButtons } from '../components/ExportButtons';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
-import { formatNumber } from '../utils/formatUtils';
+import { formatNumber, cleanDuplicatedPartnerName } from '../utils/formatUtils';
 import { useRef } from 'react';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { FormattedNumberInput } from '../components/FormattedNumberInput';
@@ -128,7 +128,7 @@ export const Suppliers: React.FC = () => {
       const defaultCounterAccount = accounts.find(a => a.account_usage === 'opening_balance');
       setEditingSupplier(null);
       setFormData({
-        name: pendingEtaSupplierForCreation.name || '',
+        name: cleanDuplicatedPartnerName(pendingEtaSupplierForCreation.name || ''),
         mobile: pendingEtaSupplierForCreation.phone || '',
         email: '',
         tax_number: pendingEtaSupplierForCreation.taxNumber || '',
@@ -190,6 +190,7 @@ export const Suppliers: React.FC = () => {
 
       const dataToSave = {
         ...formData,
+        name: cleanDuplicatedPartnerName(formData.name),
         account_id: finalAccountId,
         counter_account_id: finalCounterAccountId,
         account_name: selectedAccount?.name || '',

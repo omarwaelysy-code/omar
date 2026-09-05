@@ -15,6 +15,7 @@
 
 import pool from '../../lib/postgres';
 import { EtaAuthService } from './EtaAuthService';
+import { cleanDuplicatedPartnerName } from '../../utils/formatUtils';
 
 export interface EtaSearchDocumentsParams {
   pageSize?: number;
@@ -942,14 +943,14 @@ export class EtaDocumentService {
       if (issuerObj.id) {
         await this.savePartnerAddress({
           taxNumber: issuerObj.id,
-          name: issuerObj.name,
+          name: cleanDuplicatedPartnerName(issuerObj.name),
           addressObj: issuerObj.address
         });
       }
       if (receiverObj.id) {
         await this.savePartnerAddress({
           taxNumber: receiverObj.id,
-          name: receiverObj.name,
+          name: cleanDuplicatedPartnerName(receiverObj.name),
           addressObj: receiverObj.address
         });
       }
@@ -1030,7 +1031,7 @@ export class EtaDocumentService {
         portalHost,
         issuer: {
           ...issuerObj,
-          name: issuerObj.name || data?.issuer?.name,
+          name: cleanDuplicatedPartnerName(issuerObj.name || data?.issuer?.name),
           id: issuerObj.id || data?.issuer?.id,
           type: issuerType,
           typeName: issuerType,
@@ -1038,7 +1039,7 @@ export class EtaDocumentService {
         },
         receiver: {
           ...receiverObj,
-          name: receiverObj.name || data?.receiver?.name,
+          name: cleanDuplicatedPartnerName(receiverObj.name || data?.receiver?.name),
           id: receiverObj.id || data?.receiver?.id,
           type: receiverType,
           typeName: receiverType,
@@ -1210,7 +1211,7 @@ export class EtaDocumentService {
              updated_at = NOW()`,
         [
           taxNumber,
-          partner.name || null,
+          cleanDuplicatedPartnerName(partner.name) || null,
           formatted,
           partner.addressObj?.governate || null,
           partner.addressObj?.regionCity || null,
@@ -1373,10 +1374,10 @@ export class EtaDocumentService {
     const typeVersionName = String(item?.typeVersionName || '1.0').trim();
 
     const issuerId = String(item?.issuerId || item?.issuer?.id || '').trim();
-    const issuerName = String(item?.issuerName || item?.issuer?.name || 'مورد غير محدد').trim();
+    const issuerName = cleanDuplicatedPartnerName(String(item?.issuerName || item?.issuer?.name || 'مورد غير محدد').trim());
 
     const receiverId = String(item?.receiverId || item?.receiver?.id || '').trim();
-    const receiverName = String(item?.receiverName || item?.receiver?.name || '').trim();
+    const receiverName = cleanDuplicatedPartnerName(String(item?.receiverName || item?.receiver?.name || '').trim());
 
     const dateTimeIssued = String(item?.dateTimeIssued || item?.issueDate || '').trim();
     const dateTimeReceived = String(item?.dateTimeReceived || '').trim();

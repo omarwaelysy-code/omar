@@ -33,7 +33,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useNavigation } from '../contexts/NavigationContext';
 import { apiRequest } from '../services/dbService';
-import { formatMoney } from '../utils/formatUtils';
+import { formatMoney, cleanDuplicatedPartnerName } from '../utils/formatUtils';
 import { exportToExcel } from '../utils/excelUtils';
 
 export interface EtaPortalSupplier {
@@ -325,16 +325,17 @@ export function EtaSupplierMapping() {
 
   // Redirect to official Suppliers screen to create with all official accounting accounts and link immediately
   const handleOpenCreateInSuppliers = (supplier: EtaPortalSupplier) => {
+    const cleanedName = cleanDuplicatedPartnerName(supplier.name);
     setPendingEtaSupplierForCreation({
-      name: supplier.name,
+      name: cleanedName,
       taxNumber: supplier.taxNumber,
       address: supplier.address
     });
     openTab('suppliers', isAr ? 'الموردين' : 'Suppliers');
     showNotification(
       isAr 
-        ? `تم فتح شاشة الموردين لإنشاء المورد "${supplier.name}". اضغط "حفظ وربط مع منظومة ETA فوراً" بعد مراجعة البيانات.` 
-        : `Suppliers screen opened for "${supplier.name}". Review and click Save & Link to ETA.`,
+        ? `تم فتح شاشة الموردين لإنشاء المورد "${cleanedName}". اضغط "حفظ وربط مع منظومة ETA فوراً" بعد مراجعة البيانات.` 
+        : `Suppliers screen opened for "${cleanedName}". Review and click Save & Link to ETA.`,
       'info'
     );
   };

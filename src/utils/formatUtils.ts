@@ -70,3 +70,55 @@ export const isCustomerAccount = (accountId: string, customer: any, accountsList
 export const isSupplierAccount = (accountId: string, supplier: any, accountsList: any[]) => {
   return supplier?.account_id ? accountId === supplier.account_id : false;
 };
+
+/**
+ * Automatically cleans duplicated partner/supplier names caused by portal errors
+ * e.g. "شركه سويفت ايجيبت ليمتد شركه سويفت ايجيبت ليمتد" -> "شركه سويفت ايجيبت ليمتد"
+ * or "ABC Ltd - ABC Ltd" -> "ABC Ltd"
+ */
+export const cleanDuplicatedPartnerName = (rawName: string | null | undefined): string => {
+  if (!rawName) return '';
+  let name = String(rawName).trim().replace(/\s+/g, ' ');
+
+  // 1. Check if separated by common delimiters: " - ", " / ", " | ", " ، ", ", "
+  const delimiters = [' - ', ' / ', ' | ', ' ، ', ' , '];
+  for (const delim of delimiters) {
+    if (name.includes(delim)) {
+      const parts = name.split(delim).map(p => p.trim()).filter(Boolean);
+      if (parts.length === 2 && parts[0].toLowerCase() === parts[1].toLowerCase()) {
+        name = parts[0];
+        break;
+      }
+    }
+  }
+
+  // 2. Check for repeated phrase at word level
+  // e.g. words = ["شركه", "سويفت", "ايجيبت", "ليمتد", "شركه", "سويفت", "ايجيبت", "ليمتد"]
+  const words = name.split(' ');
+  if (words.length >= 2 && words.length % 2 === 0) {
+    const halfWords = words.length / 2;
+    const firstHalfWords = words.slice(0, halfWords).join(' ');
+    const secondHalfWords = words.slice(halfWords).join(' ');
+    if (firstHalfWords.toLowerCase() === secondHalfWords.toLowerCase()) {
+      name = firstHalfWords;
+    }
+  } else {
+    // 3. Fallback character-level half-check
+    const len = name.length;
+    const mid = Math.floor(len / 2);
+    for (let offset = -2; offset <= 2; offset++) {
+      const splitIdx = mid + offset;
+      if (splitIdx >= 3 && splitIdx < len - 2) {
+        const p1 = name.substring(0, splitIdx).trim();
+        const p2 = name.substring(splitIdx).trim();
+        if (p1.length >= 3 && p1.toLowerCase() === p2.toLowerCase()) {
+          name = p1;
+          break;
+        }
+      }
+    }
+  }
+
+  return name.trim();
+};
+
