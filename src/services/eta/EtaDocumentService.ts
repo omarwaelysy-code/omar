@@ -380,7 +380,7 @@ export class EtaDocumentService {
     for (const doc of docs) {
       if (!doc.uuid) continue;
       try {
-        const docId = `eta_${doc.uuid}`.slice(0, 250);
+        const docId = `eta_${companyId}_${doc.uuid}`.slice(0, 250);
         await pool.query(
           `INSERT INTO eta_documents (
             id, company_id, uuid, submission_uuid, long_id, internal_id,
@@ -402,6 +402,7 @@ export class EtaDocumentService {
             NOW(), NOW()
           )
           ON CONFLICT (company_id, uuid) DO UPDATE SET
+            id = EXCLUDED.id,
             long_id = COALESCE(EXCLUDED.long_id, eta_documents.long_id),
             internal_id = COALESCE(NULLIF(EXCLUDED.internal_id, ''), eta_documents.internal_id),
             status = EXCLUDED.status,
