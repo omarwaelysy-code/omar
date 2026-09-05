@@ -349,6 +349,10 @@ export interface Product {
   allow_receipt_fraction?: boolean;
   allow_issue_fraction_pct?: number;
   allow_receipt_fraction_pct?: number;
+  tax_item_code?: string;
+  tax_code_type?: 'EGS' | 'GS1' | 'GPC' | 'OTHER' | string;
+  eta_item_code?: string;
+  eta_code_type?: string;
   is_active?: boolean;
 }
 

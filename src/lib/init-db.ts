@@ -403,6 +403,10 @@ export async function initDatabase() {
         "allow_receipt_fraction" BOOLEAN DEFAULT FALSE,
         "allow_issue_fraction_pct" DECIMAL(10, 2) DEFAULT 0,
         "allow_receipt_fraction_pct" DECIMAL(10, 2) DEFAULT 0,
+        "tax_item_code" VARCHAR(100),
+        "tax_code_type" VARCHAR(50) DEFAULT 'EGS',
+        "eta_item_code" VARCHAR(100),
+        "eta_code_type" VARCHAR(50) DEFAULT 'EGS',
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `, 'products table');

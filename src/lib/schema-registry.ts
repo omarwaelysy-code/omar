@@ -33,7 +33,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   products: [
     'id', 'company_id', 'revenue_account_id', 'cost_account_id', 'revenue_account_name', 'cost_account_name', 'name', 'code', 'barcode',
     'type', 'description', 'image_url', 'category', 'unit', 'cost_price', 'sale_price', 'stock', 'min_stock', 
-    'current_stock', 'is_service', 'counter_account_id', 'inventory_account_id', 'inventory_account_name', 'vat_account_id', 'vat_account_name', 'vat_rate', 'inventory_cost_method', 'item_group_id', 'item_group_name', 'barcode_settings', 'allow_issue_fraction', 'allow_receipt_fraction', 'allow_issue_fraction_pct', 'allow_receipt_fraction_pct', 'created_at'
+    'current_stock', 'is_service', 'counter_account_id', 'inventory_account_id', 'inventory_account_name', 'vat_account_id', 'vat_account_name', 'vat_rate', 'inventory_cost_method', 'item_group_id', 'item_group_name', 'barcode_settings', 'allow_issue_fraction', 'allow_receipt_fraction', 'allow_issue_fraction_pct', 'allow_receipt_fraction_pct', 'tax_item_code', 'tax_code_type', 'eta_item_code', 'eta_code_type', 'created_at'
   ],
   item_groups: [
     'id', 'company_id', 'name', 'code', 'type', 'sequence_number', 'description', 'created_at'
