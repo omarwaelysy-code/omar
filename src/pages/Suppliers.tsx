@@ -7,7 +7,7 @@ import {
   Search, Plus, Trash2, Edit2, X, Truck, Phone, Mail, MapPin, 
   Wallet, Calendar, History, FileText, User, Hash, Box,
   LayoutGrid, List, ChevronRight, ChevronLeft, CreditCard, FileUp,
-  Link2, Sparkles
+  Link2, Sparkles, Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService, apiRequest } from '../services/dbService';
@@ -44,6 +44,7 @@ export const Suppliers: React.FC = () => {
   const [view, setView] = useViewPreference('suppliers', 'table');
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [linkWithEta, setLinkWithEta] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleExportExcel = () => {
     const headers = {
@@ -151,17 +152,37 @@ export const Suppliers: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || isSaving) return;
 
     try {
+      setIsSaving(true);
+
+      // Duplicate Tax Number Check (prevent creating duplicate suppliers)
+      const cleanTax = formData.tax_number?.trim();
+      if (cleanTax && !editingSupplier) {
+        const existingSupplier = suppliers.find(s => s.tax_number?.trim() === cleanTax);
+        if (existingSupplier) {
+          setIsSaving(false);
+          showNotification(
+            language === 'ar'
+              ? `المورد مسجل بالفعل باسم "${existingSupplier.name}" وكود (${existingSupplier.code})`
+              : `Supplier already exists as "${existingSupplier.name}" (${existingSupplier.code})`,
+            'error'
+          );
+          return;
+        }
+      }
+
       // Phone number validation: starts with 0 and exactly 11 digits
       const phoneRegex = /^0\d{10}$/;
       if (!phoneRegex.test(formData.mobile)) {
+        setIsSaving(false);
         showNotification('رقم الهاتف يجب أن يبدأ بـ 0 ويتكون من 11 رقم', 'error');
         return;
       }
 
       if (!formData.account_id) {
+        setIsSaving(false);
         showNotification('يجب اختيار الحساب المحاسبي للمورد', 'error');
         return;
       }
@@ -325,6 +346,8 @@ export const Suppliers: React.FC = () => {
     } catch (e: any) {
       console.error(e);
       showNotification(e.message || 'حدث خطأ أثناء حفظ البيانات', 'error');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -432,6 +455,7 @@ export const Suppliers: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingSupplier(null);
+    setIsSaving(false);
     if (pendingEtaSupplierForCreation) {
       setPendingEtaSupplierForCreation(null);
     }
@@ -1113,24 +1137,43 @@ export const Suppliers: React.FC = () => {
                       {pendingEtaSupplierForCreation && (
                         <button 
                           type="submit"
+                          disabled={isSaving}
                           onClick={() => setLinkWithEta(true)}
-                          className="flex-1 py-5 px-6 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white rounded-[2rem] font-black text-xl hover:from-emerald-700 hover:to-teal-800 transition-all shadow-xl shadow-emerald-600/30 active:scale-[0.98] border border-emerald-400/40 flex items-center justify-center gap-3"
+                          className="flex-1 py-5 px-6 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white rounded-[2rem] font-black text-xl hover:from-emerald-700 hover:to-teal-800 transition-all shadow-xl shadow-emerald-600/30 active:scale-[0.98] border border-emerald-400/40 flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                          <Link2 className="w-6 h-6" />
-                          <span>{language === 'ar' ? 'حفظ وربط مع منظومة ETA فوراً' : 'Save & Link to ETA'}</span>
+                          {isSaving && linkWithEta ? (
+                            <>
+                              <Loader2 className="w-6 h-6 animate-spin" />
+                              <span>{language === 'ar' ? 'جاري الحفظ والربط مع ETA...' : 'Saving & Linking to ETA...'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Link2 className="w-6 h-6" />
+                              <span>{language === 'ar' ? 'حفظ وربط مع منظومة ETA فوراً' : 'Save & Link to ETA'}</span>
+                            </>
+                          )}
                         </button>
                       )}
                       <button 
                         type="submit"
+                        disabled={isSaving}
                         onClick={() => setLinkWithEta(false)}
-                        className={`${pendingEtaSupplierForCreation ? 'px-8 font-bold text-lg' : 'flex-1 font-black text-2xl'} py-6 bg-zinc-900 text-white rounded-[2rem] hover:bg-zinc-800 transition-all shadow-2xl active:scale-[0.98] border border-white/10`}
+                        className={`${pendingEtaSupplierForCreation ? 'px-8 font-bold text-lg' : 'flex-1 font-black text-2xl'} py-6 bg-zinc-900 text-white rounded-[2rem] hover:bg-zinc-800 transition-all shadow-2xl active:scale-[0.98] border border-white/10 flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed`}
                       >
-                        {editingSupplier ? 'حفظ التعديلات' : (pendingEtaSupplierForCreation ? (language === 'ar' ? 'حفظ المورد فقط (بدون ربط)' : 'Save Only') : 'إضافة المورد')}
+                        {isSaving && (!pendingEtaSupplierForCreation || !linkWithEta) ? (
+                          <>
+                            <Loader2 className="w-6 h-6 animate-spin" />
+                            <span>{language === 'ar' ? 'جاري الحفظ...' : 'Saving...'}</span>
+                          </>
+                        ) : (
+                          editingSupplier ? 'حفظ التعديلات' : (pendingEtaSupplierForCreation ? (language === 'ar' ? 'حفظ المورد فقط (بدون ربط)' : 'Save Only') : 'إضافة المورد')
+                        )}
                       </button>
                       <button 
                         type="button"
+                        disabled={isSaving}
                         onClick={closeModal}
-                        className="px-12 py-6 bg-slate-50 text-slate-400 rounded-[2rem] font-black text-xl hover:bg-slate-100 hover:text-slate-600 transition-all active:scale-[0.98] border border-slate-200"
+                        className="px-12 py-6 bg-slate-50 text-slate-400 rounded-[2rem] font-black text-xl hover:bg-slate-100 hover:text-slate-600 transition-all active:scale-[0.98] border border-slate-200 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         تجاهل
                       </button>
