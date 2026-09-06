@@ -220,8 +220,12 @@ export function EtaReceivedInvoices() {
 
   const DOC_TYPES_LIST = useMemo(() => [
     { id: 'i', nameAr: 'فاتورة (Invoice)', nameEn: 'Invoice' },
+    { id: 'ii', nameAr: 'فاتورة استيراد (Import Invoice)', nameEn: 'Import Invoice' },
+    { id: 'ei', nameAr: 'فاتورة تصدير (Export Invoice)', nameEn: 'Export Invoice' },
     { id: 'c', nameAr: 'إشعار دائن (Credit Note)', nameEn: 'Credit Note' },
-    { id: 'd', nameAr: 'إشعار مدين (Debit Note)', nameEn: 'Debit Note' }
+    { id: 'd', nameAr: 'إشعار مدين (Debit Note)', nameEn: 'Debit Note' },
+    { id: 'ec', nameAr: 'إشعار دائن تصدير (Export Credit Note)', nameEn: 'Export Credit Note' },
+    { id: 'ed', nameAr: 'إشعار مدين تصدير (Export Debit Note)', nameEn: 'Export Debit Note' }
   ], []);
 
   const STATUSES_LIST = useMemo(() => [
@@ -604,11 +608,12 @@ export function EtaReceivedInvoices() {
 
   // Dynamic counts per document type
   const docTypeCounts = useMemo(() => {
-    const counts: Record<string, number> = { i: 0, c: 0, d: 0 };
+    const counts: Record<string, number> = { i: 0, ii: 0, ei: 0, c: 0, d: 0, ec: 0, ed: 0 };
     const source = viewMode === 'all_portal' ? allPortalInvoices : invoices;
     for (const inv of source) {
-      if (inv.typeName && counts[inv.typeName] !== undefined) {
-        counts[inv.typeName] = (counts[inv.typeName] || 0) + 1;
+      const code = String(inv.typeName || '').toLowerCase();
+      if (counts[code] !== undefined) {
+        counts[code] = (counts[code] || 0) + 1;
       }
     }
     return counts;
@@ -695,9 +700,10 @@ export function EtaReceivedInvoices() {
       list = list.filter(inv => inv.direction === 'Sent');
     }
     if (selectedDocTypes.length > 0) {
-      list = list.filter(inv => selectedDocTypes.includes(inv.typeName));
+      const lowerSelected = selectedDocTypes.map(s => s.toLowerCase());
+      list = list.filter(inv => lowerSelected.includes(String(inv.typeName || '').toLowerCase()));
     } else if (docTypeFilter !== 'all') {
-      list = list.filter(inv => inv.typeName === docTypeFilter);
+      list = list.filter(inv => String(inv.typeName || '').toLowerCase() === docTypeFilter.toLowerCase());
     }
     if (selectedStatuses.length > 0) {
       list = list.filter(inv => selectedStatuses.includes(inv.status));
@@ -729,9 +735,10 @@ export function EtaReceivedInvoices() {
   const filteredPeriodInvoices = useMemo(() => {
     let list = invoices;
     if (selectedDocTypes.length > 0) {
-      list = list.filter(inv => selectedDocTypes.includes(inv.typeName));
+      const lowerSelected = selectedDocTypes.map(s => s.toLowerCase());
+      list = list.filter(inv => lowerSelected.includes(String(inv.typeName || '').toLowerCase()));
     } else if (docTypeFilter !== 'all') {
-      list = list.filter(inv => inv.typeName === docTypeFilter);
+      list = list.filter(inv => String(inv.typeName || '').toLowerCase() === docTypeFilter.toLowerCase());
     }
     if (selectedStatuses.length > 0) {
       list = list.filter(inv => selectedStatuses.includes(inv.status));
@@ -1144,17 +1151,33 @@ export function EtaReceivedInvoices() {
 
   const renderDocTypeBadge = (typeName?: string, docTypeName?: string) => {
     const t = String(typeName || '').toLowerCase();
-    if (t === 'c' || (docTypeName && docTypeName.includes('دائن'))) {
+    const dtName = String(docTypeName || '');
+
+    if (t === 'ii' || dtName.includes('استيراد') || dtName.toLowerCase().includes('import')) {
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-          {language === 'ar' ? 'إشعار دائن' : 'Credit Note'}
+        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-teal-50 text-teal-700 border border-teal-200 shadow-2xs">
+          {language === 'ar' ? 'فاتورة استيراد' : 'Import Invoice'}
         </span>
       );
     }
-    if (t === 'd' || (docTypeName && docTypeName.includes('مدين'))) {
+    if (t === 'ei' || dtName.includes('تصدير') || dtName.toLowerCase().includes('export invoice')) {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-cyan-50 text-cyan-700 border border-cyan-200 shadow-2xs">
+          {language === 'ar' ? 'فاتورة تصدير' : 'Export Invoice'}
+        </span>
+      );
+    }
+    if (t === 'c' || t === 'ec' || dtName.includes('دائن') || dtName.toLowerCase().includes('credit')) {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+          {t === 'ec' ? (language === 'ar' ? 'إشعار دائن تصدير' : 'Export Credit Note') : (language === 'ar' ? 'إشعار دائن' : 'Credit Note')}
+        </span>
+      );
+    }
+    if (t === 'd' || t === 'ed' || dtName.includes('مدين') || dtName.toLowerCase().includes('debit')) {
       return (
         <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
-          {language === 'ar' ? 'إشعار مدين' : 'Debit Note'}
+          {t === 'ed' ? (language === 'ar' ? 'إشعار مدين تصدير' : 'Export Debit Note') : (language === 'ar' ? 'إشعار مدين' : 'Debit Note')}
         </span>
       );
     }

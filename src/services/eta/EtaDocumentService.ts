@@ -502,7 +502,7 @@ export class EtaDocumentService {
           filtered = filtered.filter(d => d.direction === options.direction);
         }
         if (options.documentType && options.documentType !== 'all') {
-          filtered = filtered.filter(d => d.typeName === options.documentType);
+          filtered = filtered.filter(d => String(d.typeName || '').toLowerCase() === options.documentType.toLowerCase());
         }
         if (options.status && options.status !== 'all') {
           filtered = filtered.filter(d => d.status === options.status);
@@ -542,7 +542,7 @@ export class EtaDocumentService {
           filtered = filtered.filter(d => d.direction === options.direction);
         }
         if (options.documentType && options.documentType !== 'all') {
-          filtered = filtered.filter(d => d.typeName === options.documentType);
+          filtered = filtered.filter(d => String(d.typeName || '').toLowerCase() === options.documentType.toLowerCase());
         }
         if (options.status && options.status !== 'all') {
           filtered = filtered.filter(d => d.status === options.status);
@@ -1101,7 +1101,7 @@ export class EtaDocumentService {
     }
 
     if (params.documentType && params.documentType !== 'all') {
-      conditions.push(`type_name = $${idx++}`);
+      conditions.push(`LOWER(type_name) = LOWER($${idx++})`);
       values.push(params.documentType);
     }
 
@@ -1520,7 +1520,17 @@ export class EtaDocumentService {
 
     const documentTypeName =
       item?.documentTypeNamePrimaryLang ||
-      (typeName === 'i' ? 'فاتورة' : typeName === 'c' ? 'إشعار دائن' : typeName === 'd' ? 'إشعار مدين' : typeName);
+      (() => {
+        const t = typeName.toLowerCase();
+        if (t === 'i') return 'فاتورة';
+        if (t === 'c') return 'إشعار دائن';
+        if (t === 'd') return 'إشعار مدين';
+        if (t === 'ii') return 'فاتورة استيراد';
+        if (t === 'ei') return 'فاتورة تصدير';
+        if (t === 'ec') return 'إشعار دائن تصدير';
+        if (t === 'ed') return 'إشعار مدين تصدير';
+        return typeName;
+      })();
 
     // Infer direction (Sent vs Received)
     let direction: 'Sent' | 'Received' = 'Received';
