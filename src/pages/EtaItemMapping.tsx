@@ -25,6 +25,7 @@ import {
   Building2,
   ChevronDown,
   ChevronUp
+} from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useNavigation } from '../contexts/NavigationContext';
