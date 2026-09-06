@@ -31,7 +31,11 @@ import {
   FileDown,
   List,
   LayoutGrid,
-  Layers
+  Layers,
+  ArrowLeft,
+  Ban,
+  ShieldCheck,
+  ExternalLink
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -250,6 +254,15 @@ export function EtaDetailedInvoices() {
   const [copiedShareUrl, setCopiedShareUrl] = useState(false);
   const [copiedUuid, setCopiedUuid] = useState<string | null>(null);
   const [modalDetailsLoading, setModalDetailsLoading] = useState(false);
+  const [isPdfLoading, setIsPdfLoading] = useState(false);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+
+  // Scroll to top when opening an invoice
+  useEffect(() => {
+    if (selectedInvoiceUuid) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [selectedInvoiceUuid]);
 
   // Top & Table synchronized horizontal scrollbar refs
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -737,6 +750,183 @@ export function EtaDetailedInvoices() {
     setTimeout(() => setCopiedUuid(null), 2000);
   };
 
+  // Selected document lines and metadata for embedded view
+  const selectedDocLines = useMemo(() => {
+    if (!selectedInvoiceUuid) return [];
+    return detailedLines.filter(l => l.uuid === selectedInvoiceUuid);
+  }, [selectedInvoiceUuid, detailedLines]);
+
+  const docMeta = useMemo(() => {
+    if (!selectedInvoiceUuid) return null;
+    const line = selectedDocLines[0];
+    return {
+      uuid: selectedInvoiceUuid,
+      internalId: fullInvoiceDetails?.internalId || fullInvoiceDetails?.document?.internalId || line?.internalId || selectedInvoiceUuid.slice(0, 10),
+      documentTypeName: fullInvoiceDetails?.documentTypeName || fullInvoiceDetails?.document?.typeName || line?.documentTypeName || 'فاتورة',
+      typeName: line?.typeName || 'i',
+      typeVersionName: fullInvoiceDetails?.typeVersionName || fullInvoiceDetails?.document?.typeVersionName || '1.0',
+      status: fullInvoiceDetails?.status || line?.status || 'Valid',
+      dateTimeIssued: fullInvoiceDetails?.dateTimeIssued || line?.dateTimeIssued || '',
+      dateTimeReceived: fullInvoiceDetails?.dateTimeReceived || line?.dateTimeReceived || '',
+      currency: fullInvoiceDetails?.currency || line?.currency || 'EGP',
+      direction: line?.direction || 'Received',
+      partnerName: line?.partnerName || '',
+      taxId: line?.taxId || '',
+      address: line?.address || '',
+      longId: fullInvoiceDetails?.longId || line?.longId
+    };
+  }, [selectedInvoiceUuid, selectedDocLines, fullInvoiceDetails]);
+
+  const invoiceTotals = useMemo(() => {
+    if (fullInvoiceDetails) {
+      const totalSales = Number(fullInvoiceDetails.totalSales ?? fullInvoiceDetails.totalSalesAmount ?? 0);
+      const totalDiscount = Number(fullInvoiceDetails.totalDiscount ?? fullInvoiceDetails.totalDiscountAmount ?? 0);
+      const netAmount = Number(fullInvoiceDetails.netAmount ?? (totalSales - totalDiscount));
+      const taxAmount = Number(fullInvoiceDetails.taxAmount ?? fullInvoiceDetails.taxTotals?.reduce((acc: number, t: any) => acc + (Number(t.amount) || 0), 0) ?? 0);
+      const totalAmount = Number(fullInvoiceDetails.totalAmount ?? (netAmount + taxAmount));
+      if (totalAmount > 0 || totalSales > 0) {
+        return { totalSales, totalDiscount, netAmount, taxAmount, totalAmount };
+      }
+    }
+    const sales = selectedDocLines.reduce((s, l) => s + (l.salesTotal || 0), 0);
+    const discount = selectedDocLines.reduce((s, l) => s + (l.discountAmount || 0), 0);
+    const tax = selectedDocLines.reduce((s, l) => s + (l.taxAmount || 0), 0);
+    const total = selectedDocLines.reduce((s, l) => s + (l.lineTotal || 0), 0);
+    return {
+      totalSales: sales,
+      totalDiscount: discount,
+      netAmount: sales - discount,
+      taxAmount: tax,
+      totalAmount: total
+    };
+  }, [fullInvoiceDetails, selectedDocLines]);
+
+  const formatCurrency = (val: number, curr = 'EGP') => {
+    const num = Number(val) || 0;
+    return `${num.toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${curr}`;
+  };
+
+  const getExternalShareUrl = useCallback(() => {
+    if (!selectedInvoiceUuid) return '';
+    const portalHost = fullInvoiceDetails?.portalHost || (environment === 'production' ? 'invoicing.eta.gov.eg' : 'preprod.invoicing.eta.gov.eg');
+    const longId = fullInvoiceDetails?.longId || docMeta?.longId;
+    if (fullInvoiceDetails?.shareUrl) return fullInvoiceDetails.shareUrl;
+    if (fullInvoiceDetails?.publicUrl) return fullInvoiceDetails.publicUrl;
+    if (longId) {
+      return `https://${portalHost}/documents/${encodeURIComponent(selectedInvoiceUuid)}/share/${longId}`;
+    }
+    return `https://${portalHost}/documents/${encodeURIComponent(selectedInvoiceUuid)}`;
+  }, [selectedInvoiceUuid, fullInvoiceDetails, environment, docMeta]);
+
+  const handleCopyShareLink = () => {
+    const shareUrl = getExternalShareUrl();
+    if (!shareUrl) return;
+    navigator.clipboard.writeText(shareUrl);
+    setCopiedShareUrl(true);
+    showNotification(
+      language === 'ar'
+        ? 'تم نسخ الرابط الخارجي المعتمد من مصلحة الضرائب المصرية بنجاح.'
+        : 'Official ETA external document share link copied to clipboard.',
+      'success'
+    );
+    setTimeout(() => setCopiedShareUrl(false), 3000);
+  };
+
+  const handlePrintInvoice = async () => {
+    if (!selectedInvoiceUuid) return;
+    setIsPdfLoading(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const activeCompanyId = user?.company_id || '';
+      const pdfUrl = `/api/erp/eta/invoices/${encodeURIComponent(selectedInvoiceUuid)}/pdf`;
+      const response = await fetch(pdfUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'x-company-id': activeCompanyId
+        }
+      });
+      if (response.ok) {
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const printWindow = window.open(blobUrl, '_blank');
+        if (!printWindow) {
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = `ETA_Invoice_${docMeta?.internalId || selectedInvoiceUuid.slice(0, 8)}.pdf`;
+          link.click();
+        }
+      } else {
+        window.print();
+      }
+    } catch (err) {
+      console.warn('Could not stream PDF, falling back to window.print():', err);
+      window.print();
+    } finally {
+      setIsPdfLoading(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!selectedInvoiceUuid) return;
+    setIsPdfLoading(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const activeCompanyId = user?.company_id || '';
+      const pdfUrl = `/api/erp/eta/invoices/${encodeURIComponent(selectedInvoiceUuid)}/pdf`;
+      const response = await fetch(pdfUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'x-company-id': activeCompanyId
+        }
+      });
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ETA_Invoice_${docMeta?.internalId || selectedInvoiceUuid.slice(0, 8)}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        showNotification(language === 'ar' ? 'تم بدء تحميل المستند بصيغة PDF' : 'Downloading PDF invoice', 'success');
+      } else {
+        showNotification(language === 'ar' ? 'تعذر جلب ملف PDF من منظومة الضرائب مباشرة، يمكنك استخدام زر الطباعة.' : 'PDF download failed, please use Print.', 'warning');
+      }
+    } catch (e) {
+      showNotification(language === 'ar' ? 'حدث خطأ أثناء تحميل ملف PDF' : 'Error downloading PDF', 'error');
+    } finally {
+      setIsPdfLoading(false);
+    }
+  };
+
+  const handleDownloadJson = () => {
+    if (!selectedInvoiceUuid) return;
+    const jsonSource = fullInvoiceDetails?.rawDocument || fullInvoiceDetails || docMeta;
+    const jsonStr = JSON.stringify(jsonSource, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ETA_Document_${docMeta?.internalId || selectedInvoiceUuid.slice(0, 8)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    showNotification(language === 'ar' ? 'تم تحميل ملف JSON الخام للمستند' : 'Downloaded raw JSON', 'success');
+  };
+
+  const handleRejectInvoicePrompt = () => {
+    const shareUrl = getExternalShareUrl();
+    if (window.confirm(
+      language === 'ar'
+        ? 'هل ترغب في فتح بوابة منظومة الوثائق الإلكترونية لمصلحة الضرائب المصرية لتسجيل رفض الوثيقة رسمياً؟'
+        : 'Do you want to open the official ETA Taxpayer Portal to reject this document?'
+    )) {
+      window.open(shareUrl, '_blank');
+    }
+  };
+
   // Export to Excel (.xlsx) with flattened items
   const handleExportExcel = useCallback((onlySelected = false) => {
     const listToExport = onlySelected
@@ -1069,9 +1259,11 @@ export function EtaDetailedInvoices() {
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-[1700px] mx-auto text-slate-800" dir={dir}>
-      {/* ========================================================================= */}
-      {/* 1. PAGE HEADER */}
-      {/* ========================================================================= */}
+      {!selectedInvoiceUuid ? (
+        <>
+          {/* ========================================================================= */}
+          {/* 1. PAGE HEADER */}
+          {/* ========================================================================= */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center shadow-md shadow-indigo-100 flex-shrink-0 mt-0.5">
@@ -2330,142 +2522,547 @@ export function EtaDetailedInvoices() {
           </div>
         );
       })()}
-
-      {/* ========================================================================= */}
-      {/* 5. DETAILS MODAL — ETA FULL DOCUMENT VIEW */}
-      {/* ========================================================================= */}
-      <AnimatePresence>
-        {selectedInvoiceUuid && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="bg-white rounded-3xl shadow-2xl border border-slate-200/80 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden my-auto"
+        </>
+      ) : (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Top Back Navigation Button */}
+          <div className="flex items-center justify-between gap-4">
+            <button
+              type="button"
+              onClick={() => { setSelectedInvoiceUuid(null); setFullInvoiceDetails(null); }}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-bold shadow-xs transition-colors cursor-pointer"
             >
-              {/* Modal Header */}
-              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between gap-3 bg-gradient-to-r from-slate-50 to-white">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                    <Receipt className="w-5 h-5" />
+              {dir === 'rtl' ? <ChevronRight className="w-4 h-4 text-indigo-600" /> : <ChevronLeft className="w-4 h-4 text-indigo-600" />}
+              <span>{language === 'ar' ? 'رجوع إلى قائمة البنود والوثائق التفصيلية' : 'Back to Detailed Lines & Documents'}</span>
+            </button>
+
+            <span className="text-xs text-slate-500 font-medium">
+              {language === 'ar' ? 'عرض تفصيلي معتمد للمستند الإلكتروني' : 'Official Electronic Document Detailed View'}
+            </span>
+          </div>
+
+          {/* Main Document View Card (Matching ETA Portal) */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            {/* Top Toolbar / Header */}
+            <div className="p-4 sm:p-6 border-b border-slate-200 bg-slate-50/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              {/* Right: Title, IDs and Status */}
+              <div className="flex items-start gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20 shrink-0 mt-0.5">
+                  <Receipt className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h2 className="font-extrabold text-lg sm:text-xl text-slate-900">
+                      {docMeta?.documentTypeName || (language === 'ar' ? 'فاتورة' : 'Invoice')} v{docMeta?.typeVersionName || '1.0'}
+                    </h2>
+                    {renderStatusBadge(docMeta?.status || 'Valid')}
+                    {renderDirectionBadge(docMeta?.direction)}
                   </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
-                      <span>{language === 'ar' ? 'مستند إلكتروني رقم:' : 'Document ID:'}</span>
-                      <span className="font-mono text-indigo-600">
-                        {fullInvoiceDetails?.internalId || fullInvoiceDetails?.document?.internalId || selectedInvoiceUuid.slice(0, 10)}
+                  <div className="flex items-center gap-2 text-xs text-slate-600 font-mono mt-1.5 flex-wrap">
+                    <span className="font-sans text-slate-500 font-medium">{language === 'ar' ? 'الرقم الإلكتروني:' : 'UUID:'}</span>
+                    <span className="font-bold text-slate-800">{docMeta?.uuid}</span>
+                    <span className="text-slate-300">|</span>
+                    <span className="font-sans text-slate-500 font-medium">{language === 'ar' ? 'الرقم الداخلي:' : 'Internal ID:'}</span>
+                    <span className="font-bold text-slate-800">{docMeta?.internalId}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-1.5 flex-wrap font-medium">
+                    {docMeta?.dateTimeIssued && (
+                      <span>{language === 'ar' ? 'تاريخ الإصدار:' : 'Issue Date:'} <strong className="text-slate-700">{formatDateTime(docMeta.dateTimeIssued)}</strong></span>
+                    )}
+                    {docMeta?.dateTimeReceived && (
+                      <>
+                        <span>•</span>
+                        <span>{language === 'ar' ? 'تاريخ التقديم:' : 'Submission Date:'} <strong className="text-slate-700">{formatDateTime(docMeta.dateTimeReceived)}</strong></span>
+                      </>
+                    )}
+                    {modalDetailsLoading && (
+                      <span className="inline-flex items-center gap-1.5 text-indigo-600 font-semibold ms-2">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>{language === 'ar' ? 'جاري جلب تفاصيل البنود من مصلحة الضرائب...' : 'Loading ETA lines...'}</span>
                       </span>
-                    </h3>
-                    <p className="text-xs text-slate-400 font-mono mt-0.5 truncate max-w-md">
-                      UUID: {selectedInvoiceUuid}
-                    </p>
+                    )}
                   </div>
                 </div>
+              </div>
 
+              {/* Left: Action Buttons (Print, Reject, External Link, Download As, Close) */}
+              <div className="flex items-center gap-2 flex-wrap self-end md:self-center shrink-0">
+                {/* Print Button */}
+                <button
+                  type="button"
+                  onClick={handlePrintInvoice}
+                  disabled={isPdfLoading}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  title={language === 'ar' ? 'طباعة الفاتورة الرسمية' : 'Print Official Invoice'}
+                >
+                  {isPdfLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-600" /> : <Printer className="w-3.5 h-3.5 text-slate-600" />}
+                  <span>{language === 'ar' ? 'طباعة' : 'Print'}</span>
+                </button>
+
+                {/* Reject Button */}
+                <button
+                  type="button"
+                  onClick={handleRejectInvoicePrompt}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  title={language === 'ar' ? 'رفض المستند على منظومة الضرائب' : 'Reject on ETA Portal'}
+                >
+                  <Ban className="w-3.5 h-3.5 text-red-600" />
+                  <span>{language === 'ar' ? 'رفض' : 'Reject'}</span>
+                </button>
+
+                {/* External Share Link Button */}
+                <button
+                  type="button"
+                  onClick={handleCopyShareLink}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  title={language === 'ar' ? 'الحصول على رابط خارجي معتمد للمشاركة' : 'Get External Share Link'}
+                >
+                  {copiedShareUrl ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Link2 className="w-3.5 h-3.5 text-indigo-600" />}
+                  <span>{language === 'ar' ? 'الحصول على رابط خارجي' : 'External Share Link'}</span>
+                </button>
+
+                {/* Download As Dropdown */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowDownloadMenu(prev => !prev)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5 text-slate-600" />
+                    <span>{language === 'ar' ? 'تحميل كـ' : 'Download as'}</span>
+                    <ChevronDown className="w-3 h-3 text-slate-400" />
+                  </button>
+                  {showDownloadMenu && (
+                    <div className="absolute top-full mt-1 end-0 w-48 bg-white border border-slate-200 rounded-2xl shadow-xl py-1 z-30 animate-in fade-in zoom-in-95">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDownloadMenu(false);
+                          handleDownloadPdf();
+                        }}
+                        className="w-full text-start px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                      >
+                        <FileDown className="w-4 h-4 text-red-600" />
+                        <span>{language === 'ar' ? 'تحميل PDF رسمي' : 'Download Official PDF'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDownloadMenu(false);
+                          handleDownloadJson();
+                        }}
+                        className="w-full text-start px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                      >
+                        <FileText className="w-4 h-4 text-indigo-600" />
+                        <span>{language === 'ar' ? 'تحميل JSON خام' : 'Download Raw JSON'}</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Close Button */}
                 <button
                   type="button"
                   onClick={() => { setSelectedInvoiceUuid(null); setFullInvoiceDetails(null); }}
-                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition-colors ms-1 cursor-pointer"
+                  title={language === 'ar' ? 'إغلاق والرجوع للقائمة' : 'Close'}
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
+            </div>
 
-              {/* Modal Body */}
-              <div className="p-5 overflow-y-auto space-y-4 text-xs md:text-sm">
-                {modalDetailsLoading ? (
-                  <div className="py-16 flex flex-col items-center justify-center gap-3">
-                    <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" />
-                    <p className="text-sm font-medium text-slate-500">
-                      {language === 'ar' ? 'جاري جلب تفاصيل المستند من منظومة مصلحة الضرائب...' : 'Loading document details from ETA...'}
-                    </p>
+            {/* Navigation Tabs Bar */}
+            <div className="px-5 border-b border-slate-200 bg-white flex items-center gap-4 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setModalActiveTab('summary')}
+                className={`py-3 border-b-2 transition-all cursor-pointer ${
+                  modalActiveTab === 'summary'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {language === 'ar' ? 'الملخص' : 'Summary'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalActiveTab('details')}
+                className={`py-3 border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+                  modalActiveTab === 'details'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <span>{language === 'ar' ? 'التفاصيل (الأصناف)' : 'Details (Items)'}</span>
+                {(() => {
+                  const count = (Array.isArray(fullInvoiceDetails?.invoiceLines) && fullInvoiceDetails.invoiceLines.length > 0)
+                    ? fullInvoiceDetails.invoiceLines.length
+                    : selectedDocLines.length;
+                  return count > 0 ? (
+                    <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full text-[10px]">
+                      {count}
+                    </span>
+                  ) : null;
+                })()}
+              </button>
+            </div>
+
+            {/* Invoice Body Content */}
+            <div className="p-4 sm:p-6 space-y-6">
+              {/* External Share Link Banner */}
+              <div className="p-3.5 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-blue-50/90 border border-blue-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <Globe className="w-4 h-4 text-blue-600 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <span className="text-slate-600 font-bold block text-[11px] mb-0.5">
+                      {language === 'ar' ? 'رابط المشاركة الخارجي المعتمد من مصلحة الضرائب المصرية:' : 'Official ETA External Share Link:'}
+                    </span>
+                    <span className="font-mono text-blue-800 break-all text-[11.5px] font-semibold select-all">
+                      {getExternalShareUrl()}
+                    </span>
                   </div>
-                ) : (
-                  <>
-                    {/* Share URL Banner */}
-                    <div className="p-3.5 bg-indigo-50/70 border border-indigo-100 rounded-2xl flex items-center justify-between gap-3 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <Link2 className="w-4 h-4 text-indigo-600 flex-shrink-0" />
-                        <span className="text-xs font-semibold text-indigo-900">
-                          {language === 'ar' ? 'رابط مشاركة المستند المعتمد على بوابة مصلحة الضرائب' : 'Official ETA Document Portal Share Link'}
+                </div>
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={handleCopyShareLink}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                  >
+                    {copiedShareUrl ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{language === 'ar' ? 'نسخ الرابط' : 'Copy Link'}</span>
+                  </button>
+                  <a
+                    href={getExternalShareUrl()}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 text-blue-700 border border-blue-300 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>{language === 'ar' ? 'فتح في المنظومة' : 'Open in ETA'}</span>
+                  </a>
+                </div>
+              </div>
+
+              {/* Parties (Seller & Buyer) */}
+              {(() => {
+                const formatPartnerType = (t: any) => {
+                  if (t === null || t === undefined || t === '') return language === 'ar' ? 'شركة' : 'Company';
+                  const s = String(t).trim().toUpperCase();
+                  if (s === '0' || s === 'B' || s === 'C' || s === 'BUSINESS' || s === 'COMPANY' || s === 'شركة') {
+                    return language === 'ar' ? 'شركة' : 'Company';
+                  }
+                  if (s === '1' || s === 'P' || s === 'PERSON' || s === 'INDIVIDUAL' || s === 'فرد') {
+                    return language === 'ar' ? 'فرد' : 'Individual';
+                  }
+                  if (s === '2' || s === 'F' || s === 'FOREIGNER' || s === 'أجنبي') {
+                    return language === 'ar' ? 'أجنبي' : 'Foreigner';
+                  }
+                  return language === 'ar' ? 'شركة' : 'Company';
+                };
+
+                const formatAddr = (addr: any) => {
+                  if (!addr) return '';
+                  if (typeof addr === 'string') return addr.trim();
+                  const parts = [
+                    addr.buildingNumber,
+                    addr.street,
+                    addr.regionCity,
+                    addr.city,
+                    addr.governate,
+                    addr.governorate,
+                    addr.country
+                  ].map((p: any) => (p ? String(p).trim() : '')).filter(Boolean);
+                  const uniqueParts: string[] = [];
+                  for (const p of parts) {
+                    if (!uniqueParts.includes(p)) uniqueParts.push(p);
+                  }
+                  return uniqueParts.join('، ');
+                };
+
+                const isSent = docMeta?.direction === 'Sent';
+
+                // Seller
+                const sellerName = isSent
+                  ? (fullInvoiceDetails?.issuer?.name || user?.company_name || 'شركتنا')
+                  : (fullInvoiceDetails?.issuer?.name || fullInvoiceDetails?.rawDocument?.issuer?.name || docMeta?.partnerName || '---');
+                const sellerTaxId = isSent
+                  ? (fullInvoiceDetails?.issuer?.id || '---')
+                  : (fullInvoiceDetails?.issuer?.id || fullInvoiceDetails?.rawDocument?.issuer?.id || docMeta?.taxId || '---');
+                const sellerActivity = fullInvoiceDetails?.taxpayerActivityCode || fullInvoiceDetails?.issuer?.activityCode || '---';
+                const sellerAddress = fullInvoiceDetails?.issuerAddress || formatAddr(fullInvoiceDetails?.issuer?.address) || (!isSent ? docMeta?.address : '') || '---';
+                const sellerType = formatPartnerType(fullInvoiceDetails?.issuerType || fullInvoiceDetails?.issuer?.type);
+
+                // Buyer
+                const buyerName = isSent
+                  ? (fullInvoiceDetails?.receiver?.name || fullInvoiceDetails?.rawDocument?.receiver?.name || docMeta?.partnerName || '---')
+                  : (fullInvoiceDetails?.receiver?.name || user?.company_name || 'شركتنا');
+                const buyerTaxId = isSent
+                  ? (fullInvoiceDetails?.receiver?.id || fullInvoiceDetails?.rawDocument?.receiver?.id || docMeta?.taxId || '---')
+                  : (fullInvoiceDetails?.receiver?.id || '---');
+                const buyerAddress = fullInvoiceDetails?.receiverAddress || formatAddr(fullInvoiceDetails?.receiver?.address) || (isSent ? docMeta?.address : '') || '---';
+                const buyerType = formatPartnerType(fullInvoiceDetails?.receiverType || fullInvoiceDetails?.receiver?.type);
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Seller / البائع */}
+                    <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-xs bg-white">
+                      <div className="bg-[#1e3a5f] text-white px-4 py-2 font-bold text-xs flex items-center justify-between">
+                        <span>{language === 'ar' ? 'البائع' : 'Seller / Issuer'}</span>
+                        <span className="text-[11px] opacity-90 font-medium bg-white/10 px-2 py-0.5 rounded">
+                          {sellerType}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const url = fullInvoiceDetails?.shareUrl || `https://invoicing.eta.gov.eg/documents/${selectedInvoiceUuid}`;
-                            navigator.clipboard.writeText(url);
-                            setCopiedShareUrl(true);
-                            setTimeout(() => setCopiedShareUrl(false), 2000);
-                          }}
-                          className="px-3 py-1.5 rounded-xl bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
-                        >
-                          {copiedShareUrl ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                          <span>{copiedShareUrl ? (language === 'ar' ? 'تم النسخ!' : 'Copied!') : (language === 'ar' ? 'نسخ الرابط' : 'Copy Link')}</span>
-                        </button>
-                        {fullInvoiceDetails?.shareUrl && (
-                          <a
-                            href={fullInvoiceDetails.shareUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5"
-                          >
-                            <Share2 className="w-3.5 h-3.5" />
-                            <span>{language === 'ar' ? 'فتح بالبوابة' : 'Open in Portal'}</span>
-                          </a>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Issuer & Receiver Summary */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Issuer */}
-                      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
-                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          {language === 'ar' ? 'بيانات المصدّر (البائع / المورد)' : 'Issuer Details'}
+                      <div className="p-4 space-y-2.5 text-xs">
+                        <div className="grid grid-cols-3 gap-2">
+                          <span className="text-slate-400 font-medium">{language === 'ar' ? 'الاسم:' : 'Name:'}</span>
+                          <span className="col-span-2 font-bold text-slate-900 leading-snug">
+                            {sellerName}
+                          </span>
                         </div>
-                        <div className="font-bold text-slate-900 text-sm">
-                          {fullInvoiceDetails?.issuer?.name || fullInvoiceDetails?.rawDocument?.issuer?.name || '---'}
+                        <div className="grid grid-cols-3 gap-2">
+                          <span className="text-slate-400 font-medium">{language === 'ar' ? 'رقم التسجيل:' : 'Tax ID:'}</span>
+                          <span className="col-span-2 font-mono font-bold text-slate-800">
+                            {sellerTaxId}
+                          </span>
                         </div>
-                        <div className="text-xs text-slate-600 font-mono">
-                          {language === 'ar' ? 'الرقم الضريبي: ' : 'Tax ID: '}
-                          {fullInvoiceDetails?.issuer?.id || fullInvoiceDetails?.rawDocument?.issuer?.id || '---'}
+                        <div className="grid grid-cols-3 gap-2">
+                          <span className="text-slate-400 font-medium">{language === 'ar' ? 'كود النشاط:' : 'Activity Code:'}</span>
+                          <span className="col-span-2 font-mono font-bold text-slate-800">
+                            {sellerActivity}
+                          </span>
                         </div>
-                      </div>
-
-                      {/* Receiver */}
-                      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
-                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          {language === 'ar' ? 'بيانات المستلم (المشتري / العميل)' : 'Receiver Details'}
-                        </div>
-                        <div className="font-bold text-slate-900 text-sm">
-                          {fullInvoiceDetails?.receiver?.name || fullInvoiceDetails?.rawDocument?.receiver?.name || '---'}
-                        </div>
-                        <div className="text-xs text-slate-600 font-mono">
-                          {language === 'ar' ? 'الرقم الضريبي: ' : 'Tax ID: '}
-                          {fullInvoiceDetails?.receiver?.id || fullInvoiceDetails?.rawDocument?.receiver?.id || '---'}
+                        <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100">
+                          <span className="text-slate-400 font-medium">{language === 'ar' ? 'عنوان الفرع:' : 'Address:'}</span>
+                          <span className="col-span-2 text-slate-700 leading-relaxed font-medium">
+                            {sellerAddress}
+                          </span>
                         </div>
                       </div>
                     </div>
-                  </>
-                )}
-              </div>
 
-              {/* Modal Footer */}
-              <div className="p-4 border-t border-slate-100 flex items-center justify-end gap-2 bg-slate-50/50">
-                <button
-                  type="button"
-                  onClick={() => { setSelectedInvoiceUuid(null); setFullInvoiceDetails(null); }}
-                  className="px-4 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold cursor-pointer"
-                >
-                  {language === 'ar' ? 'إغلاق' : 'Close'}
-                </button>
+                    {/* Buyer / المشتري */}
+                    <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-xs bg-white">
+                      <div className="bg-[#1e3a5f] text-white px-4 py-2 font-bold text-xs flex items-center justify-between">
+                        <span>{language === 'ar' ? 'المشتري' : 'Buyer / Recipient'}</span>
+                        <span className="text-[11px] opacity-90 font-medium bg-white/10 px-2 py-0.5 rounded">
+                          {buyerType}
+                        </span>
+                      </div>
+                      <div className="p-4 space-y-2.5 text-xs">
+                        <div className="grid grid-cols-3 gap-2">
+                          <span className="text-slate-400 font-medium">{language === 'ar' ? 'الاسم:' : 'Name:'}</span>
+                          <span className="col-span-2 font-bold text-slate-900 leading-snug">
+                            {buyerName}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <span className="text-slate-400 font-medium">{language === 'ar' ? 'رقم التسجيل:' : 'Tax ID:'}</span>
+                          <span className="col-span-2 font-mono font-bold text-slate-800">
+                            {buyerTaxId}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <span className="text-slate-400 font-medium">{language === 'ar' ? 'النوع:' : 'Type:'}</span>
+                          <span className="col-span-2 font-medium text-slate-800">
+                            {buyerType}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100">
+                          <span className="text-slate-400 font-medium">{language === 'ar' ? 'العنوان:' : 'Address:'}</span>
+                          <span className="col-span-2 text-slate-700 leading-relaxed font-medium">
+                            {buyerAddress}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Line Items Table (الأصناف) */}
+              {(() => {
+                const lines = (Array.isArray(fullInvoiceDetails?.invoiceLines) && fullInvoiceDetails.invoiceLines.length > 0)
+                  ? fullInvoiceDetails.invoiceLines
+                  : selectedDocLines;
+
+                return (
+                  <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-xs bg-white">
+                    <div className="bg-[#2c4c70] text-white px-4 py-2.5 font-bold text-xs flex items-center justify-between">
+                      <span className="text-sm">
+                        {language === 'ar' ? 'الأصناف' : 'Invoice Items'} | {language === 'ar' ? 'إجمالي المبلغ' : 'Total'}: ({docMeta?.currency || 'EGP'}) {formatCurrency(invoiceTotals.totalAmount, docMeta?.currency || 'EGP')}
+                      </span>
+                      <span className="text-xs opacity-90 font-mono">
+                        {lines.length} {language === 'ar' ? 'بند' : 'lines'}
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-start border-collapse">
+                        <thead className="bg-slate-100/80 text-slate-700 font-bold border-b border-slate-200">
+                          <tr>
+                            <th className="py-2.5 px-3 text-center w-10">#</th>
+                            <th className="py-2.5 px-3 text-start min-w-[130px]">{language === 'ar' ? 'اسم الكود' : 'Code Name'}</th>
+                            <th className="py-2.5 px-3 text-start min-w-[130px]">{language === 'ar' ? 'كود الصنف' : 'Item Code'}</th>
+                            <th className="py-2.5 px-3 text-start min-w-[180px]">{language === 'ar' ? 'الوصف' : 'Description'}</th>
+                            <th className="py-2.5 px-3 text-center min-w-[90px]">{language === 'ar' ? 'الكمية / الوحدة' : 'Qty / Unit'}</th>
+                            <th className="py-2.5 px-3 text-end min-w-[100px]">{language === 'ar' ? 'سعر الوحدة' : 'Unit Price'}</th>
+                            <th className="py-2.5 px-3 text-end min-w-[100px]">{language === 'ar' ? 'قيمة المبيعات' : 'Sales Total'}</th>
+                            <th className="py-2.5 px-3 text-end min-w-[80px]">{language === 'ar' ? 'الخصم' : 'Discount'}</th>
+                            <th className="py-2.5 px-3 text-end min-w-[90px]">{language === 'ar' ? 'الضرائب' : 'Taxes'}</th>
+                            <th className="py-2.5 px-3 text-end min-w-[110px]">{language === 'ar' ? 'إجمالي المبلغ' : 'Total Amount'}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {lines.length > 0 ? (
+                            lines.map((line: any, idx: number) => {
+                              const codeName = line.itemCodeName || line.itemPrimaryName || line.description || '---';
+                              const itemCode = line.itemCode || '---';
+                              const description = line.description || line.itemCodeName || '---';
+                              const unitPrice = Number(
+                                line?.unitPrice ||
+                                line?.unitValue?.amountEGP ||
+                                line?.unitValue?.amountSold ||
+                                0
+                              );
+                              const salesTotal = Number(line?.salesTotal ?? (line?.quantity * unitPrice) ?? 0);
+                              const discountAmount = Number(
+                                line?.discountAmount ??
+                                line?.itemsDiscount ??
+                                line?.discount?.amount ??
+                                0
+                              );
+                              const taxAmount = Number(
+                                line?.taxAmount ??
+                                (Array.isArray(line?.lineTaxableItems)
+                                  ? line.lineTaxableItems.reduce((acc: number, t: any) => acc + (Number(t?.amount) || 0), 0)
+                                  : Array.isArray(line?.taxableItems)
+                                  ? line.taxableItems.reduce((acc: number, t: any) => acc + (Number(t?.amount) || 0), 0)
+                                  : 0)
+                              );
+                              const lineTotal = Number(
+                                line?.lineTotal ??
+                                line?.total ??
+                                line?.netTotal ??
+                                (salesTotal - discountAmount + taxAmount)
+                              );
+
+                              return (
+                                <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                                  <td className="py-2.5 px-3 text-center text-slate-400 font-mono font-semibold">{idx + 1}</td>
+                                  <td className="py-2.5 px-3 font-semibold text-slate-800 leading-snug">{codeName}</td>
+                                  <td className="py-2.5 px-3 font-mono text-[11px] text-slate-700">
+                                    <span className="bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-[10px] text-slate-600 me-1">
+                                      {line.itemType || 'EGS'}
+                                    </span>
+                                    <span>{itemCode}</span>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-slate-700 leading-snug">{description}</td>
+                                  <td className="py-2.5 px-3 text-center font-bold text-slate-800">
+                                    {line.quantity ?? 1} <span className="text-[10px] font-normal text-slate-500">{line.unitType || ''}</span>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-end font-mono text-slate-800">{formatCurrency(unitPrice, docMeta?.currency || 'EGP')}</td>
+                                  <td className="py-2.5 px-3 text-end font-mono text-slate-800">{formatCurrency(salesTotal, docMeta?.currency || 'EGP')}</td>
+                                  <td className="py-2.5 px-3 text-end font-mono text-amber-700">
+                                    {discountAmount > 0 ? `- ${formatCurrency(discountAmount, docMeta?.currency || 'EGP')}` : '0.00'}
+                                  </td>
+                                  <td className="py-2.5 px-3 text-end font-mono text-blue-700">
+                                    {taxAmount > 0 ? formatCurrency(taxAmount, docMeta?.currency || 'EGP') : '0.00'}
+                                  </td>
+                                  <td className="py-2.5 px-3 text-end font-mono font-bold text-slate-900">{formatCurrency(lineTotal, docMeta?.currency || 'EGP')}</td>
+                                </tr>
+                              );
+                            })
+                          ) : modalDetailsLoading ? (
+                            <tr>
+                              <td colSpan={10} className="py-8 text-center text-slate-400">
+                                <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-indigo-600" />
+                                <span>{language === 'ar' ? 'جاري جلب بنود الفاتورة الرسمية من منظومة الضرائب المصرية...' : 'Loading official invoice lines from ETA...'}</span>
+                              </td>
+                            </tr>
+                          ) : (
+                            <tr>
+                              <td colSpan={10} className="py-6 text-center text-slate-500">
+                                {language === 'ar' ? 'تم جلب ملخص الفاتورة بنجاح. لا توجد بنود تفصيلية معروضة.' : 'Invoice summary loaded.'}
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Financial Summary Breakdown */}
+              <div className="flex flex-col md:flex-row items-stretch justify-between gap-4">
+                {/* Left: Tax Details */}
+                <div className="flex-1 rounded-2xl border border-slate-200 p-4 bg-slate-50/60 space-y-2 text-xs">
+                  <span className="font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                    {language === 'ar' ? 'تفصيل الضرائب والرسوم' : 'Tax Breakdown'}
+                  </span>
+                  {Array.isArray(fullInvoiceDetails?.taxTotals) && fullInvoiceDetails.taxTotals.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {fullInvoiceDetails.taxTotals.map((tax: any, tIdx: number) => (
+                        <div key={tIdx} className="flex justify-between text-slate-600">
+                          <span>{tax.taxType || (language === 'ar' ? 'ضريبة' : 'Tax')}:</span>
+                          <span className="font-mono font-bold text-slate-800">{formatCurrency(Number(tax.amount || 0), docMeta?.currency || 'EGP')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex justify-between text-slate-600">
+                      <span>{language === 'ar' ? 'إجمالي الضرائب:' : 'Total Taxes:'}</span>
+                      <span className="font-mono font-bold text-slate-800">{formatCurrency(invoiceTotals.taxAmount, docMeta?.currency || 'EGP')}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: Totals Box (Matching ETA Portal) */}
+                <div className="w-full md:w-80 rounded-2xl bg-[#1e293b] text-white p-4 space-y-2.5 text-xs shadow-lg">
+                  <div className="flex justify-between text-slate-300">
+                    <span>{language === 'ar' ? 'إجمالي المبيعات (ج.م):' : 'Total Sales:'}</span>
+                    <span className="font-mono font-bold text-slate-100">{formatCurrency(invoiceTotals.totalSales, docMeta?.currency || 'EGP')}</span>
+                  </div>
+                  {invoiceTotals.totalDiscount > 0 && (
+                    <div className="flex justify-between text-amber-300">
+                      <span>{language === 'ar' ? 'إجمالي الخصم (ج.م):' : 'Total Discount:'}</span>
+                      <span className="font-mono font-bold">- {formatCurrency(invoiceTotals.totalDiscount, docMeta?.currency || 'EGP')}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-slate-300">
+                    <span>{language === 'ar' ? 'صافي المبيعات (ج.م):' : 'Net Amount:'}</span>
+                    <span className="font-mono font-bold text-slate-100">{formatCurrency(invoiceTotals.netAmount, docMeta?.currency || 'EGP')}</span>
+                  </div>
+                  <div className="flex justify-between text-blue-300">
+                    <span>{language === 'ar' ? 'إجمالي الضريبة (ج.م):' : 'Total Tax:'}</span>
+                    <span className="font-mono font-bold">{formatCurrency(invoiceTotals.taxAmount, docMeta?.currency || 'EGP')}</span>
+                  </div>
+                  <div className="pt-2 border-t border-slate-700 flex justify-between font-extrabold text-sm sm:text-base text-emerald-400">
+                    <span>{language === 'ar' ? 'إجمالي المبلغ (ج.م):' : 'Total Amount:'}</span>
+                    <span className="font-mono">{formatCurrency(invoiceTotals.totalAmount, docMeta?.currency || 'EGP')}</span>
+                  </div>
+                </div>
               </div>
-            </motion.div>
+            </div>
+
+            {/* Document Bottom Footer */}
+            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{language === 'ar' ? 'بيانات معتمدة ومطابقة مباشرة مع خوادم مصلحة الضرائب المصرية.' : 'Directly certified & synchronized with ETA.'}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setSelectedInvoiceUuid(null); setFullInvoiceDetails(null); }}
+                className="px-5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold transition-colors cursor-pointer"
+              >
+                {language === 'ar' ? 'رجوع' : 'Back'}
+              </button>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 }
