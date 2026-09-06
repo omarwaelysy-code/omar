@@ -837,5 +837,253 @@ describe('SECURITY P0 — TENANT ISOLATION & ETA CREDENTIAL PROTECTION', () => {
     expect(queriedSql).toContain('"company_id"');
     expect(queriedParams).toContain(companyAId);
   });
+
+  // =========================================================================
+  // CRIT-01: PUBLIC REGISTRATION PRIVILEGE ESCALATION TESTS
+  // =========================================================================
+
+  // TEST 28: Unauthenticated registration cannot create super_admin
+  it('TEST 28: Unauthenticated registration cannot create super_admin (returns 401)', async () => {
+    const res = await fetch(`${baseUrl}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'attacker-super@evil.com',
+        password: 'Password123!',
+        company_id: companyAId,
+        role: 'super_admin'
+      })
+    });
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toContain('Access denied');
+  });
+
+  // TEST 29: Unauthenticated registration cannot create admin
+  it('TEST 29: Unauthenticated registration cannot create admin (returns 401)', async () => {
+    const res = await fetch(`${baseUrl}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'attacker-admin@evil.com',
+        password: 'Password123!',
+        company_id: companyAId,
+        role: 'admin'
+      })
+    });
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toContain('Access denied');
+  });
+
+  // TEST 30: Unauthenticated caller cannot assign arbitrary company_id
+  it('TEST 30: Unauthenticated caller cannot assign arbitrary company_id (returns 401)', async () => {
+    const res = await fetch(`${baseUrl}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'attacker-company@evil.com',
+        password: 'Password123!',
+        company_id: 'arbitrary-company-uuid-999',
+        role: 'user'
+      })
+    });
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toContain('Access denied');
+  });
+
+  // TEST 31: Unauthenticated caller cannot create a membership in an existing company
+  it('TEST 31: Unauthenticated caller cannot create a membership in an existing company (returns 401)', async () => {
+    const res = await fetch(`${baseUrl}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'attacker-member@evil.com',
+        password: 'Password123!',
+        company_id: companyAId,
+        role: 'user'
+      })
+    });
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toContain('Access denied');
+  });
+
+  // TEST 32: Authenticated non-admin user cannot register users (returns 403)
+  it('TEST 32: Authenticated regular user cannot register users (returns 403)', async () => {
+    const tokenRegularUser = jwt.sign(
+      { id: 'user-regular-1', email: 'regular@company-a.com', role: 'user', company_id: companyAId },
+      getJwtSecret()
+    );
+
+    const res = await fetch(`${baseUrl}/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${tokenRegularUser}`
+      },
+      body: JSON.stringify({
+        email: 'newuser@company-a.com',
+        password: 'Password123!',
+        company_id: companyAId,
+        role: 'user'
+      })
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toContain('Access denied');
+  });
+
+  // TEST 33: Authenticated admin cannot assign role super_admin (returns 403)
+  it('TEST 33: Authenticated admin cannot assign role super_admin (returns 403)', async () => {
+    const res = await fetch(`${baseUrl}/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${tokenCompanyA}`
+      },
+      body: JSON.stringify({
+        email: 'escalation@company-a.com',
+        password: 'Password123!',
+        company_id: companyAId,
+        role: 'super_admin'
+      })
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toContain('strictly prohibited');
+  });
+
+  // TEST 34: Authenticated admin cannot create user in unauthorized company (returns 403)
+  it('TEST 34: Authenticated admin cannot create user in unauthorized company (returns 403)', async () => {
+    const res = await fetch(`${baseUrl}/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${tokenCompanyA}`
+      },
+      body: JSON.stringify({
+        email: 'crosstenant@company-b.com',
+        password: 'Password123!',
+        company_id: companyBId, // Company A admin trying to add to Company B
+        role: 'user'
+      })
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toContain('unauthorized company');
+  });
+
+  // TEST 35: Legitimate authorized user creation works through the intended workflow
+  it('TEST 35: Legitimate authorized user creation works through intended workflow (returns 201)', async () => {
+    let insertedUser: any = null;
+    vi.spyOn(pool, 'query').mockImplementation(async (sql: any, params?: any[]) => {
+      if (typeof sql === 'string') {
+        if (sql.includes('FROM users WHERE LOWER(email) = LOWER($1) AND company_id = $2')) {
+          return { rows: [] } as any; // user not in company
+        }
+        if (sql.includes('FROM users WHERE LOWER(email) = LOWER($1) ORDER BY created_at')) {
+          return { rows: [] } as any; // new user overall
+        }
+        if (sql.includes('INSERT INTO users')) {
+          insertedUser = params;
+          return { rows: [] } as any;
+        }
+        if (sql.includes('companies')) {
+          return { rows: [{ subscription_status: 'ACTIVE', company_status: 'ACTIVE', subscription_end: '2099-01-01' }] } as any;
+        }
+      }
+      return { rows: [] } as any;
+    });
+
+    const res = await fetch(`${baseUrl}/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${tokenCompanyA}`
+      },
+      body: JSON.stringify({
+        email: 'legit-user@company-a.com',
+        password: 'Password123!',
+        company_id: companyAId,
+        role: 'user'
+      })
+    });
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.email).toBe('legit-user@company-a.com');
+    expect(body.company_id).toBe(companyAId);
+    expect(body.role).toBe('user');
+    expect(insertedUser).toBeDefined();
+    expect(insertedUser[5]).toBe(companyAId); // company_id in INSERT
+  });
+
+  // =========================================================================
+  // CRIT-02: PUBLIC DEBUG INFORMATION DISCLOSURE TESTS
+  // =========================================================================
+
+  // TEST 36: Anonymous GET /api/erp/debug/db-query is denied (returns 401)
+  it('TEST 36: Anonymous GET /api/erp/debug/db-query is denied (returns 401)', async () => {
+    const res = await fetch(`${baseUrl}/debug/db-query`);
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toContain('Access denied');
+    expect(body.companies).toBeUndefined();
+    expect(body.returns).toBeUndefined();
+    expect(body.journalEntries).toBeUndefined();
+  });
+
+  // TEST 37: Anonymous GET /api/erp/debug/latest-error is denied (returns 401)
+  it('TEST 37: Anonymous GET /api/erp/debug/latest-error is denied (returns 401)', async () => {
+    const res = await fetch(`${baseUrl}/debug/latest-error`);
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toContain('Access denied');
+    expect(body.stack).toBeUndefined();
+  });
+
+  // TEST 38: Regular company admin / user GET /api/erp/debug/* is denied (returns 403)
+  it('TEST 38: Regular company admin GET /api/erp/debug/* is denied (returns 403)', async () => {
+    const resQuery = await fetch(`${baseUrl}/debug/db-query`, {
+      headers: { Authorization: `Bearer ${tokenCompanyA}` }
+    });
+    expect(resQuery.status).toBe(403);
+
+    const resError = await fetch(`${baseUrl}/debug/latest-error`, {
+      headers: { Authorization: `Bearer ${tokenCompanyA}` }
+    });
+    expect(resError.status).toBe(403);
+  });
+
+  // TEST 39: Authorized super_admin can access debug endpoints (returns 200)
+  it('TEST 39: Authorized super_admin can access debug endpoints (returns 200)', async () => {
+    vi.spyOn(pool, 'query').mockImplementation(async (sql: any) => {
+      if (typeof sql === 'string' && sql.includes('FROM companies')) {
+        return { rows: [{ id: 'comp-1', name: 'Company 1' }] } as any;
+      }
+      return { rows: [] } as any;
+    });
+
+    const resQuery = await fetch(`${baseUrl}/debug/db-query`, {
+      headers: { Authorization: `Bearer ${tokenSuperAdmin}` }
+    });
+    expect(resQuery.status).toBe(200);
+    const bodyQuery = await resQuery.json();
+    expect(bodyQuery.companies).toBeDefined();
+
+    const resError = await fetch(`${baseUrl}/debug/latest-error`, {
+      headers: { Authorization: `Bearer ${tokenSuperAdmin}` }
+    });
+    expect(resError.status).toBe(200);
+  });
 });
 

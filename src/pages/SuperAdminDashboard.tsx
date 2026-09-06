@@ -308,9 +308,14 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
         const tempPassword = 'User@' + Math.floor(1000 + Math.random() * 9000);
         const cleanEmail = formData.email!.trim().toLowerCase();
         
+        const token = localStorage.getItem('auth_token');
         const regRes = await fetch('/api/erp/auth/register', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            'x-company-id': companyId
+          },
           body: JSON.stringify({
             username: cleanEmail,
             email: cleanEmail,

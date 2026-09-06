@@ -539,13 +539,11 @@ const router = Router();
 
 export let latestServerError: any = null;
 
-router.get('/debug/latest-error', (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+router.get('/debug/latest-error', authenticateToken, authorizeRoles('super_admin'), (req: AuthRequest, res) => {
   res.json(latestServerError || { message: 'No error recorded yet' });
 });
 
-router.get('/debug/db-query', async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+router.get('/debug/db-query', authenticateToken, authorizeRoles('super_admin'), async (req: AuthRequest, res) => {
   try {
     const r1 = await pool.query('SELECT id, name FROM companies');
     const r2 = await pool.query('SELECT id, return_number, date, company_id FROM returns ORDER BY date DESC, id DESC LIMIT 10');
@@ -1838,7 +1836,7 @@ const getList = async (table: string, filters: any) => {
 };
 
 // --- Authentication & Users ---
-router.post('/auth/register', UsersLimitMiddleware, async (req, res) => {
+router.post('/auth/register', authenticateToken, authorizeRoles('admin', 'super_admin'), UsersLimitMiddleware, async (req: AuthRequest, res) => {
   try {
     const { username, name, email, password, company_id, role } = req.body;
     const cleanEmail = (email || '').trim().toLowerCase();
@@ -1847,17 +1845,43 @@ router.post('/auth/register', UsersLimitMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'البريد الإلكتروني مطلوب' });
     }
 
-    // 1. Check if user already exists in THIS company
+    // 1. Tenant Scoping:
+    // A regular admin can only create users within their authorized companies.
+    const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
+    let targetCompanyId = (company_id || '').trim();
+
+    if (!isSuperAdmin) {
+      const authorizedCompanyIds = (req.user as any)?.authorized_company_ids || (req.user?.company_id ? [req.user.company_id] : []);
+      if (!targetCompanyId) {
+        targetCompanyId = req.user?.company_id || '';
+      } else if (!authorizedCompanyIds.includes(targetCompanyId)) {
+        return res.status(403).json({ error: 'Access denied. You cannot create users for an unauthorized company.' });
+      }
+    }
+
+    if (!targetCompanyId) {
+      return res.status(400).json({ error: 'معرف الشركة مطلوب' });
+    }
+
+    // 2. Privilege Escalation Protection:
+    // Under NO circumstances can ANY caller create a super_admin through this endpoint.
+    const requestedRole = (role || 'user').trim().toLowerCase();
+    if (requestedRole === 'super_admin') {
+      return res.status(403).json({ error: 'Creation of super_admin accounts is strictly prohibited.' });
+    }
+    const finalRole = requestedRole === 'admin' ? 'admin' : 'user';
+
+    // 3. Check if user already exists in THIS company
     const { rows: sameCompanyRows } = await pool.query(
       'SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND company_id = $2',
-      [cleanEmail, company_id]
+      [cleanEmail, targetCompanyId]
     );
 
     if (sameCompanyRows.length > 0) {
       return res.status(400).json({ error: 'المستخدم موجود بالفعل في هذه الشركة' });
     }
 
-    // 2. Check if user exists in ANY company in the database
+    // 4. Check if user exists in ANY company in the database
     const { rows: existingUserRows } = await pool.query(
       'SELECT id, password_hash, must_change_password FROM users WHERE LOWER(email) = LOWER($1) ORDER BY created_at ASC LIMIT 1',
       [cleanEmail]
@@ -1880,12 +1904,12 @@ router.post('/auth/register', UsersLimitMiddleware, async (req, res) => {
 
     await pool.query(
       'INSERT INTO users (id, username, name, email, password_hash, company_id, role, must_change_password) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-      [id, username || cleanEmail, name || username || cleanEmail, cleanEmail, finalPasswordHash, company_id, role || 'user', mustChangePassword]
+      [id, username || cleanEmail, name || username || cleanEmail, cleanEmail, finalPasswordHash, targetCompanyId, finalRole, mustChangePassword]
     );
 
     // Log registration
     logAudit({
-      company_id,
+      company_id: targetCompanyId,
       user_id: id,
       username: username || cleanEmail,
       user_email: cleanEmail,
@@ -1904,7 +1928,8 @@ router.post('/auth/register', UsersLimitMiddleware, async (req, res) => {
       username: username || cleanEmail, 
       name: name || username || cleanEmail, 
       email: cleanEmail, 
-      role: role || 'user',
+      company_id: targetCompanyId,
+      role: finalRole,
       existingUser: isExistingUser,
       message: isExistingUser 
         ? 'هذا البريد الإلكتروني مسجل سابقاً في النظام. تم ربط الحساب بشركتك مع الحفاظ على كلمة المرور الحالية بدون تغيير.'

@@ -273,9 +273,14 @@ export const Users: React.FC = () => {
 
     setLoading(true);
     try {
+      const token = localStorage.getItem('auth_token');
       const response = await fetch('/api/erp/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          'x-company-id': currentUser.company_id
+        },
         body: JSON.stringify({
           username: cleanEmail,
           email: cleanEmail,
