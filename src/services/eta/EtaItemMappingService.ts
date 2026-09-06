@@ -54,8 +54,10 @@ export interface EtaPortalItemDTO {
     code: string;
     taxItemCode?: string;
     taxCodeType?: string;
+    etaItemCode?: string;
+    etaCodeType?: string;
     barcode?: string;
-    matchReason: 'tax_item_code' | 'code' | 'barcode' | 'exact_name';
+    matchReason: 'tax_item_code' | 'eta_item_code' | 'code' | 'barcode' | 'exact_name';
   } | null;
 }
 
@@ -263,12 +265,13 @@ export class EtaItemMappingService {
 
     // 3. Fetch all ERP products to detect automatic matches
     const erpProductsRes = await pool.query(`
-      SELECT id, name, code, barcode, tax_item_code, tax_code_type, unit, sale_price, cost_price, stock
+      SELECT id, name, code, barcode, tax_item_code, tax_code_type, eta_item_code, eta_code_type, unit, sale_price, cost_price, stock
       FROM products
       WHERE company_id = $1
     `, [companyId]);
 
-    const erpProductsByTaxCode = new Map<string, any>();
+    const erpProductsByTaxCode = new Map<string, any>(); // Received mapping code
+    const erpProductsByEtaCode = new Map<string, any>(); // Upload/sales code
     const erpProductsByInternalCode = new Map<string, any>();
     const erpProductsByBarcode = new Map<string, any>();
     const erpProductsByName = new Map<string, any>();
@@ -277,6 +280,10 @@ export class EtaItemMappingService {
       if (p.tax_item_code && p.tax_item_code.trim()) {
         erpProductsByTaxCode.set(p.tax_item_code.trim(), p);
         erpProductsByTaxCode.set(this.normalizeCode(p.tax_item_code), p);
+      }
+      if (p.eta_item_code && p.eta_item_code.trim()) {
+        erpProductsByEtaCode.set(p.eta_item_code.trim(), p);
+        erpProductsByEtaCode.set(this.normalizeCode(p.eta_item_code), p);
       }
       if (p.code && p.code.trim()) {
         erpProductsByInternalCode.set(p.code.trim(), p);
@@ -327,7 +334,7 @@ export class EtaItemMappingService {
       } else {
         unlinkedCount++;
         // Auto-match attempt:
-        // Priority 1: tax_item_code match
+        // Priority 1: tax_item_code match (كود ربط الوثائق المستلمة)
         const norm = this.normalizeCode(itemCode);
         const matchByTax = erpProductsByTaxCode.get(itemCode) || erpProductsByTaxCode.get(norm);
         if (matchByTax) {
@@ -337,51 +344,76 @@ export class EtaItemMappingService {
             code: matchByTax.code,
             taxItemCode: matchByTax.tax_item_code,
             taxCodeType: matchByTax.tax_code_type,
+            etaItemCode: matchByTax.eta_item_code,
+            etaCodeType: matchByTax.eta_code_type,
             barcode: matchByTax.barcode,
             matchReason: 'tax_item_code' as const
           };
           autoMatchCount++;
         } else {
-          // Priority 2: internal product code match
-          const matchByCode = erpProductsByInternalCode.get(itemCode) || erpProductsByInternalCode.get(norm);
-          if (matchByCode) {
+          // Priority 2: eta_item_code match (كود رفع الوثائق المصدرة)
+          const matchByEta = erpProductsByEtaCode.get(itemCode) || erpProductsByEtaCode.get(norm);
+          if (matchByEta) {
             autoMatchedProduct = {
-              id: matchByCode.id,
-              name: matchByCode.name,
-              code: matchByCode.code,
-              taxItemCode: matchByCode.tax_item_code,
-              taxCodeType: matchByCode.tax_code_type,
-              barcode: matchByCode.barcode,
-              matchReason: 'code' as const
+              id: matchByEta.id,
+              name: matchByEta.name,
+              code: matchByEta.code,
+              taxItemCode: matchByEta.tax_item_code,
+              taxCodeType: matchByEta.tax_code_type,
+              etaItemCode: matchByEta.eta_item_code,
+              etaCodeType: matchByEta.eta_code_type,
+              barcode: matchByEta.barcode,
+              matchReason: 'eta_item_code' as const
             };
             autoMatchCount++;
           } else {
-            // Priority 3: barcode match
-            const matchByBarcode = erpProductsByBarcode.get(itemCode) || erpProductsByBarcode.get(norm);
-            if (matchByBarcode) {
+            // Priority 3: internal product code match
+            const matchByCode = erpProductsByInternalCode.get(itemCode) || erpProductsByInternalCode.get(norm);
+            if (matchByCode) {
               autoMatchedProduct = {
-                id: matchByBarcode.id,
-                name: matchByBarcode.name,
-                code: matchByBarcode.code,
-                taxItemCode: matchByBarcode.tax_item_code,
-                taxCodeType: matchByBarcode.tax_code_type,
-                barcode: matchByBarcode.barcode,
-                matchReason: 'barcode' as const
+                id: matchByCode.id,
+                name: matchByCode.name,
+                code: matchByCode.code,
+                taxItemCode: matchByCode.tax_item_code,
+                taxCodeType: matchByCode.tax_code_type,
+                etaItemCode: matchByCode.eta_item_code,
+                etaCodeType: matchByCode.eta_code_type,
+                barcode: matchByCode.barcode,
+                matchReason: 'code' as const
               };
               autoMatchCount++;
-            } else if (agg.itemName && erpProductsByName.get(agg.itemName.toLowerCase())) {
-              // Priority 4: Exact name match
-              const matchByName = erpProductsByName.get(agg.itemName.toLowerCase());
-              autoMatchedProduct = {
-                id: matchByName.id,
-                name: matchByName.name,
-                code: matchByName.code,
-                taxItemCode: matchByName.tax_item_code,
-                taxCodeType: matchByName.tax_code_type,
-                barcode: matchByName.barcode,
-                matchReason: 'exact_name' as const
-              };
-              autoMatchCount++;
+            } else {
+              // Priority 4: barcode match
+              const matchByBarcode = erpProductsByBarcode.get(itemCode) || erpProductsByBarcode.get(norm);
+              if (matchByBarcode) {
+                autoMatchedProduct = {
+                  id: matchByBarcode.id,
+                  name: matchByBarcode.name,
+                  code: matchByBarcode.code,
+                  taxItemCode: matchByBarcode.tax_item_code,
+                  taxCodeType: matchByBarcode.tax_code_type,
+                  etaItemCode: matchByBarcode.eta_item_code,
+                  etaCodeType: matchByBarcode.eta_code_type,
+                  barcode: matchByBarcode.barcode,
+                  matchReason: 'barcode' as const
+                };
+                autoMatchCount++;
+              } else if (agg.itemName && erpProductsByName.get(agg.itemName.toLowerCase())) {
+                // Priority 5: Exact name match
+                const matchByName = erpProductsByName.get(agg.itemName.toLowerCase());
+                autoMatchedProduct = {
+                  id: matchByName.id,
+                  name: matchByName.name,
+                  code: matchByName.code,
+                  taxItemCode: matchByName.tax_item_code,
+                  taxCodeType: matchByName.tax_code_type,
+                  etaItemCode: matchByName.eta_item_code,
+                  etaCodeType: matchByName.eta_code_type,
+                  barcode: matchByName.barcode,
+                  matchReason: 'exact_name' as const
+                };
+                autoMatchCount++;
+              }
             }
           }
         }
@@ -501,12 +533,12 @@ export class EtaItemMappingService {
         updated_at = CURRENT_TIMESTAMP
     `, [id, companyId, cleanItemCode, cleanItemName, cleanItemType, productId, notes || null]);
 
-    // 2. Sync tax_item_code and tax_code_type onto the product if not set
+    // 2. Sync tax_item_code (received documents code) onto product, and initialize eta_item_code only if unset
     await pool.query(`
       UPDATE products
       SET 
-        tax_item_code = COALESCE(NULLIF(tax_item_code, ''), $1),
-        tax_code_type = COALESCE(NULLIF(tax_code_type, ''), $2),
+        tax_item_code = $1,
+        tax_code_type = $2,
         eta_item_code = COALESCE(NULLIF(eta_item_code, ''), $1),
         eta_code_type = COALESCE(NULLIF(eta_code_type, ''), $2)
       WHERE id = $3 AND company_id = $4

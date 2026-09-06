@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Plus, Trash2, X, Package, History, ChevronRight, ChevronLeft, 
   Wallet, Layers, Hash, User, Calendar, Paperclip, LayoutGrid, List,
-  Lock, Camera, Printer, Download, FileText, RefreshCw, AlertCircle, Settings, FileUp, Percent,
+  Lock, Camera, Printer, Download, Upload, FileText, RefreshCw, AlertCircle, Settings, FileUp, Percent,
   Link2, Check, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -244,6 +244,8 @@ export const Products: React.FC = () => {
     item_group_id: '',
     tax_item_code: '',
     tax_code_type: 'EGS',
+    eta_item_code: '',
+    eta_code_type: 'EGS',
     barcode_settings: null as any,
     is_active: true
   });
@@ -329,12 +331,13 @@ export const Products: React.FC = () => {
         etaItemType: pendingEtaProductForLinking.itemType || 'EGS',
         notes: `ربط من شاشة الأصناف مع الصنف ${product.code}`
       });
-      // Update tax_item_code on product
+      // Update tax_item_code on product for received documents mapping
       await dbService.update('products', product.id, {
         tax_item_code: pendingEtaProductForLinking.itemCode,
         tax_code_type: pendingEtaProductForLinking.itemType || 'EGS',
-        eta_item_code: pendingEtaProductForLinking.itemCode,
-        eta_code_type: pendingEtaProductForLinking.itemType || 'EGS'
+        // Preserve existing upload code if already set, otherwise initialize it
+        eta_item_code: (product as any).eta_item_code || pendingEtaProductForLinking.itemCode,
+        eta_code_type: (product as any).eta_code_type || pendingEtaProductForLinking.itemType || 'EGS'
       });
       showNotification(
         language === 'ar'
@@ -544,8 +547,8 @@ export const Products: React.FC = () => {
         code: resolvedCode,
         tax_item_code: (formData.tax_item_code || '').trim(),
         tax_code_type: formData.tax_code_type || 'EGS',
-        eta_item_code: (formData.tax_item_code || '').trim(),
-        eta_code_type: formData.tax_code_type || 'EGS',
+        eta_item_code: (formData.eta_item_code || '').trim(),
+        eta_code_type: formData.eta_code_type || 'EGS',
         item_group_name: itemGroupObj?.name || '',
         revenue_account_name: revenueAccount?.name || '',
         cost_account_name: costAccount?.name || '',
@@ -615,6 +618,8 @@ export const Products: React.FC = () => {
       vat_rate: 0, counter_account_id: '', item_group_id: '', 
       tax_item_code: '',
       tax_code_type: 'EGS',
+      eta_item_code: '',
+      eta_code_type: 'EGS',
       barcode_settings: null as any, is_active: true
     });
     setDateFrom('');
@@ -648,8 +653,10 @@ export const Products: React.FC = () => {
         vat_rate: product.vat_rate || 0,
         counter_account_id: product.counter_account_id || '',
         item_group_id: product.item_group_id || '',
-        tax_item_code: product.tax_item_code || (product as any).eta_item_code || '',
-        tax_code_type: product.tax_code_type || (product as any).eta_code_type || 'EGS',
+        tax_item_code: product.tax_item_code || '',
+        tax_code_type: product.tax_code_type || 'EGS',
+        eta_item_code: product.eta_item_code || '',
+        eta_code_type: product.eta_code_type || 'EGS',
         barcode_settings: product.barcode_settings || null,
         is_active: product.is_active !== false
       } as any);
@@ -855,8 +862,10 @@ export const Products: React.FC = () => {
       'code': t('products.column_code'), 
       'name': t('products.column_name'), 
       'barcode': t('products.form_barcode'), 
-      'tax_item_code': language === 'ar' ? 'كود الضرائب (ETA)' : 'Tax Item Code',
-      'tax_code_type': language === 'ar' ? 'نوع كود الضرائب' : 'Tax Code Type',
+      'eta_item_code': language === 'ar' ? 'كود رفع الوثائق (المبيعات)' : 'Sales Upload Code',
+      'eta_code_type': language === 'ar' ? 'نوع كود الرفع' : 'Upload Code Type',
+      'tax_item_code': language === 'ar' ? 'كود ربط الوثائق المستلمة (المشتريات)' : 'Received Mapping Code',
+      'tax_code_type': language === 'ar' ? 'نوع كود الاستلام' : 'Received Code Type',
       'sale_price': t('products.column_sale_price'), 
       'cost_price': t('products.column_cost_price') 
     };
@@ -1017,7 +1026,8 @@ export const Products: React.FC = () => {
     (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
     (p.code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (p.barcode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.tax_item_code || (p as any).eta_item_code || '').toLowerCase().includes(searchTerm.toLowerCase())
+    (p.eta_item_code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (p.tax_item_code || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (!canView) return (
@@ -1227,9 +1237,14 @@ export const Products: React.FC = () => {
                                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${product.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
                                          {product.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
                                        </span>
-                                       {(product.tax_item_code || (product as any).eta_item_code) && (
-                                         <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200/60" title={language === 'ar' ? 'كود الضرائب (ETA)' : 'Tax Item Code'}>
-                                           ETA: {product.tax_item_code || (product as any).eta_item_code} ({product.tax_code_type || (product as any).eta_code_type || 'EGS'})
+                                       {product.eta_item_code && (
+                                         <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200/60 flex items-center gap-1" title={language === 'ar' ? 'كود رفع الوثائق (الفواتير المصدرة)' : 'Upload ETA Code (Issued)'}>
+                                           <span className="text-[8px] bg-purple-200/60 text-purple-800 px-1 rounded">{language === 'ar' ? 'رفع' : 'Up'}</span> {product.eta_item_code} ({product.eta_code_type || 'EGS'})
+                                         </span>
+                                       )}
+                                       {product.tax_item_code && (
+                                         <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200/60 flex items-center gap-1" title={language === 'ar' ? 'كود ربط الوثائق المستلمة (فواتير الموردين)' : 'Received ETA Code (Received)'}>
+                                           <span className="text-[8px] bg-blue-200/60 text-blue-800 px-1 rounded">{language === 'ar' ? 'استلام' : 'In'}</span> {product.tax_item_code} ({product.tax_code_type || 'EGS'})
                                          </span>
                                        )}
                                      </div>
@@ -1532,30 +1547,68 @@ export const Products: React.FC = () => {
                                 <option value="لتر">{t('products.unit_liter')}</option>
                               </select>
                            </div>
+                           {/* 1. كود رفع الوثائق (الفواتير المصدرة / المبيعات) */}
                            <div className="space-y-4">
-                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                                {language === 'ar' ? 'كود الصنف في منظومة الضرائب (ETA)' : 'Tax Item Code (ETA)'}
+                              <label className="block text-[10px] font-black text-purple-600 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                                <Upload size={14} className="text-purple-500" />
+                                {language === 'ar' ? 'كود رفع الوثائق بالمنظومة (فواتير المبيعات)' : 'Sales Upload ETA Code (Issued Invoices)'}
                               </label>
                               <div className="relative group">
-                                <FileText className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300`} size={24} />
+                                <FileText className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-purple-300`} size={24} />
                                 <input 
                                   type="text" 
-                                  placeholder={language === 'ar' ? 'مثل: EG-499151429-3' : 'e.g. EG-499151429-3'} 
-                                  className={`w-full ${dir === 'rtl' ? 'pr-16 pl-6' : 'pl-16 pr-6'} py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-mono font-black text-slate-900 outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 focus:border-emerald-500/50 transition-all shadow-inner`} 
-                                  value={formData.tax_item_code} 
+                                  placeholder={language === 'ar' ? 'مثل: EG-499151429-1 (كود الشركة برفع المبيعات)' : 'e.g. EG-499151429-1'} 
+                                  className={`w-full ${dir === 'rtl' ? 'pr-16 pl-6' : 'pl-16 pr-6'} py-5 bg-purple-50/20 border border-purple-100 rounded-[2rem] text-xl font-mono font-black text-slate-900 outline-none focus:bg-white focus:ring-8 focus:ring-purple-500/10 focus:border-purple-500/50 transition-all shadow-inner`} 
+                                  value={formData.eta_item_code || ''} 
+                                  onChange={(e) => setFormData({ ...formData, eta_item_code: e.target.value })} 
+                                />
+                              </div>
+                           </div>
+                           <div className="space-y-4">
+                              <label className="block text-[10px] font-black text-purple-600 uppercase tracking-widest px-1">
+                                {language === 'ar' ? 'نوع كود رفع الوثائق' : 'Upload Code Type'}
+                              </label>
+                              <div className="relative group">
+                                <Layers className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-purple-300`} size={24} />
+                                <select 
+                                  className={`w-full ${dir === 'rtl' ? 'pr-16 pl-6' : 'pl-16 pr-6'} py-5 bg-purple-50/20 border border-purple-100 rounded-[2rem] text-xl font-black text-slate-900 appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-purple-500/10 transition-all shadow-inner`} 
+                                  value={formData.eta_code_type || 'EGS'} 
+                                  onChange={(e) => setFormData({ ...formData, eta_code_type: e.target.value })}
+                                >
+                                  <option value="EGS">EGS (كود المعيار المصري)</option>
+                                  <option value="GS1">GS1 (كود الترقيم الدولي)</option>
+                                  <option value="GPC">GPC (كود التصنيف العالمي)</option>
+                                  <option value="OTHER">{language === 'ar' ? 'أخرى (Other)' : 'Other'}</option>
+                                </select>
+                              </div>
+                           </div>
+
+                           {/* 2. كود ربط الوثائق المستلمة (فواتير المشتريات / الموردين) */}
+                           <div className="space-y-4">
+                              <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                                <Link2 size={14} className="text-blue-500" />
+                                {language === 'ar' ? 'كود ربط الوثائق المستلمة (فواتير الموردين / المشتريات)' : 'Received ETA Code (Supplier Invoices)'}
+                              </label>
+                              <div className="relative group">
+                                <FileText className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-blue-300`} size={24} />
+                                <input 
+                                  type="text" 
+                                  placeholder={language === 'ar' ? 'كود الصنف الوارد من المورد لربط الفاتورة المستلمة' : 'Item code from supplier invoice'} 
+                                  className={`w-full ${dir === 'rtl' ? 'pr-16 pl-6' : 'pl-16 pr-6'} py-5 bg-blue-50/20 border border-blue-100 rounded-[2rem] text-xl font-mono font-black text-slate-900 outline-none focus:bg-white focus:ring-8 focus:ring-blue-500/10 focus:border-blue-500/50 transition-all shadow-inner`} 
+                                  value={formData.tax_item_code || ''} 
                                   onChange={(e) => setFormData({ ...formData, tax_item_code: e.target.value })} 
                                 />
                               </div>
                            </div>
                            <div className="space-y-4">
-                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                                {language === 'ar' ? 'نوع كود الصنف بالضرائب' : 'Tax Code Type'}
+                              <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">
+                                {language === 'ar' ? 'نوع كود الاستلام' : 'Received Code Type'}
                               </label>
                               <div className="relative group">
-                                <Layers className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300`} size={24} />
+                                <Layers className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-blue-300`} size={24} />
                                 <select 
-                                  className={`w-full ${dir === 'rtl' ? 'pr-16 pl-6' : 'pl-16 pr-6'} py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black text-slate-900 appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner`} 
-                                  value={formData.tax_code_type} 
+                                  className={`w-full ${dir === 'rtl' ? 'pr-16 pl-6' : 'pl-16 pr-6'} py-5 bg-blue-50/20 border border-blue-100 rounded-[2rem] text-xl font-black text-slate-900 appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-blue-500/10 transition-all shadow-inner`} 
+                                  value={formData.tax_code_type || 'EGS'} 
                                   onChange={(e) => setFormData({ ...formData, tax_code_type: e.target.value })}
                                 >
                                   <option value="EGS">EGS (كود المعيار المصري)</option>
