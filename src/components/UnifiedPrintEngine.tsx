@@ -724,10 +724,12 @@ export function UnifiedPrintEngine() {
     }
 
     try {
+      const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
       const response = await fetch('/api/erp/print/pdf', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
           templateName,

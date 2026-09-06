@@ -263,11 +263,13 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
   const templateName = isPurchase ? 'PurchaseInvoicePdf' : 'ReportTemplate';
 
   // 4. Send POST request to backend PDF service
+  const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
   try {
     const response = await fetch('/api/erp/print/pdf', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
       },
       body: JSON.stringify({
         templateName,
