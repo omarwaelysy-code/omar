@@ -491,6 +491,32 @@ export class EtaDocumentService {
   }> {
     const settings = await this.getCompanySettings(companyId);
     if (!settings || !settings.isConfigured) {
+      // If unconfigured or unlinked, check if there are previously registered documents in PostgreSQL
+      const dbResult = await this.getDocumentsFromDatabase(companyId);
+      if (dbResult.data && dbResult.data.length > 0) {
+        let filtered = dbResult.data || [];
+        if (options.year && options.year !== 'all') {
+          filtered = filtered.filter(d => (d.dateTimeIssued || '').slice(0, 4) === String(options.year));
+        }
+        if (options.direction && options.direction !== 'all') {
+          filtered = filtered.filter(d => d.direction === options.direction);
+        }
+        if (options.documentType && options.documentType !== 'all') {
+          filtered = filtered.filter(d => d.typeName === options.documentType);
+        }
+        if (options.status && options.status !== 'all') {
+          filtered = filtered.filter(d => d.status === options.status);
+        }
+        return {
+          success: true,
+          isConfigured: false,
+          environment: settings?.environment || 'preprod',
+          data: filtered,
+          totalCount: filtered.length,
+          lastSyncedAt: dbResult.lastSyncedAt
+        };
+      }
+
       return {
         success: false,
         isConfigured: false,
@@ -664,18 +690,10 @@ export class EtaDocumentService {
     lastSyncedAt?: string | null;
   }> {
     const settings = await this.getCompanySettings(companyId);
-    if (!settings || !settings.isConfigured) {
-      return {
-        success: false,
-        isConfigured: false,
-        environment: settings?.environment || 'preprod',
-        data: [],
-        totalCount: 0
-      };
-    }
+    const isConfigured = Boolean(settings && settings.isConfigured);
 
-    // If forceRefresh requested, sync all documents from ETA portal
-    if (options.forceRefresh) {
+    // If forceRefresh requested and integration is configured, sync all documents from ETA portal
+    if (options.forceRefresh && isConfigured) {
       await this.fetchAllDocuments(companyId, { forceRefresh: true });
     }
 
@@ -784,10 +802,20 @@ export class EtaDocumentService {
       }
     }
 
+    if (lines.length === 0 && !isConfigured) {
+      return {
+        success: false,
+        isConfigured: false,
+        environment: settings?.environment || 'preprod',
+        data: [],
+        totalCount: 0
+      };
+    }
+
     return {
       success: true,
-      isConfigured: true,
-      environment: settings.environment,
+      isConfigured,
+      environment: settings?.environment || 'preprod',
       data: lines,
       totalCount: lines.length,
       lastSyncedAt

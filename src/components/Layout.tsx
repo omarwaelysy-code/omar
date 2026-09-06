@@ -204,9 +204,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
     return localStorage.getItem(`user_avatar_${user.id}`);
   });
 
-  const [etaConfigured, setEtaConfigured] = React.useState<boolean>(() => {
+  const [etaVisible, setEtaVisible] = React.useState<boolean>(() => {
     if (!user?.company_id) return false;
-    return sessionStorage.getItem(`eta_configured_${user.company_id}`) === 'true';
+    return (
+      sessionStorage.getItem(`eta_visible_${user.company_id}`) === 'true' ||
+      sessionStorage.getItem(`eta_configured_${user.company_id}`) === 'true'
+    );
   });
 
   React.useEffect(() => {
@@ -214,7 +217,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
     const checkEtaStatus = async () => {
       if (!user?.company_id) {
-        if (isMounted) setEtaConfigured(false);
+        if (isMounted) setEtaVisible(false);
         return;
       }
       try {
@@ -225,13 +228,19 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             data &&
             data.client_id &&
             data.client_id.trim() !== '' &&
-            (data.is_configured === true || data.is_configured === 'true' || data.client_secret_configured)
+            (data.is_configured === true || data.is_configured === 'true' || data.client_secret_configured || data.client_secret)
           );
+          const hasSavedData = Boolean(
+            data?.has_documents ||
+            (data?.documents_count && Number(data.documents_count) > 0)
+          );
+          const shouldShow = isConfigured || hasSavedData;
           sessionStorage.setItem(`eta_configured_${user.company_id}`, String(isConfigured));
-          setEtaConfigured(isConfigured);
+          sessionStorage.setItem(`eta_visible_${user.company_id}`, String(shouldShow));
+          setEtaVisible(shouldShow);
         }
       } catch (err) {
-        if (isMounted) setEtaConfigured(false);
+        if (isMounted) setEtaVisible(false);
       }
     };
 
@@ -522,7 +531,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'supplier_settlements', label: t('nav.supplier_settlements') || 'تسويات الموردين', icon: Layers }
         ]
       },
-      ...(etaConfigured ? [{
+      ...(etaVisible ? [{
         id: 'eta_menu',
         label: 'ETA',
         icon: Building2,
@@ -743,7 +752,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       
       return canView ? item : null;
     }).filter(Boolean) as typeof navItems;
-  }, [user, isSuperAdmin, isCompanyAdmin, hasPermission, company, t, language, featuresLoaded, activeFeatures, etaConfigured]);
+  }, [user, isSuperAdmin, isCompanyAdmin, hasPermission, company, t, language, featuresLoaded, activeFeatures, etaVisible]);
 
 
   // Update nav item click to use openTab

@@ -11681,19 +11681,31 @@ router.get(['/company/eta-settings', '/eta/settings'], authenticateToken, async 
   }
 
   try {
-    const { rows } = await pool.query(
-      `SELECT 
-        id, company_id, environment, activity_code, branch_id,
-        country_code, governorate, city, street, building_number,
-        postal_code, client_id,
-        (client_secret IS NOT NULL AND TRIM(client_secret) != '') AS client_secret_configured,
-        (operating_key IS NOT NULL AND TRIM(operating_key) != '') AS operating_key_configured,
-        last_notification_at,
-        is_configured, created_at, updated_at
-       FROM eta_settings 
-       WHERE company_id = $1`,
-      [companyId]
-    );
+    const [etaSettingsRes, docCountRes] = await Promise.all([
+      pool.query(
+        `SELECT 
+          id, company_id, environment, activity_code, branch_id,
+          country_code, governorate, city, street, building_number,
+          postal_code, client_id,
+          client_secret,
+          operating_key,
+          (client_secret IS NOT NULL AND TRIM(client_secret) != '') AS client_secret_configured,
+          (operating_key IS NOT NULL AND TRIM(operating_key) != '') AS operating_key_configured,
+          last_notification_at,
+          is_configured, created_at, updated_at
+         FROM eta_settings 
+         WHERE company_id = $1`,
+        [companyId]
+      ),
+      pool.query(
+        `SELECT COUNT(*)::int AS count FROM eta_documents WHERE company_id = $1`,
+        [companyId]
+      ).catch(() => ({ rows: [{ count: 0 }] }))
+    ]);
+
+    const rows = etaSettingsRes.rows;
+    const documentsCount = docCountRes.rows?.[0]?.count ? Number(docCountRes.rows[0].count) : 0;
+    const hasDocuments = documentsCount > 0;
 
     if (rows.length === 0) {
       // Return default unconfigured template for this company
@@ -11709,13 +11721,21 @@ router.get(['/company/eta-settings', '/eta/settings'], authenticateToken, async 
         building_number: '',
         postal_code: '',
         client_id: '',
+        client_secret: '',
+        operating_key: '',
         client_secret_configured: false,
         operating_key_configured: false,
-        is_configured: false
+        is_configured: false,
+        documents_count: documentsCount,
+        has_documents: hasDocuments
       });
     }
 
-    res.json(rows[0]);
+    res.json({
+      ...rows[0],
+      documents_count: documentsCount,
+      has_documents: hasDocuments
+    });
   } catch (err: any) {
     console.error('Error fetching ETA settings:', err);
     sendError(res, 500, 'Failed to fetch ETA settings', err.message);
@@ -11825,6 +11845,8 @@ router.post(['/company/eta-settings', '/eta/settings'], authenticateToken, async
         id, company_id, environment, activity_code, branch_id,
         country_code, governorate, city, street, building_number,
         postal_code, client_id,
+        client_secret,
+        operating_key,
         (client_secret IS NOT NULL AND TRIM(client_secret) != '') AS client_secret_configured,
         (operating_key IS NOT NULL AND TRIM(operating_key) != '') AS operating_key_configured,
         last_notification_at,

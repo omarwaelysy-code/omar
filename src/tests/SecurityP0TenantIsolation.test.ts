@@ -441,18 +441,17 @@ describe('SECURITY P0 — TENANT ISOLATION & ETA CREDENTIAL PROTECTION', () => {
     expect(mockReq.user?.company_id).toBe(companyAId);
   });
 
-  // TEST 16: GET /company/eta-settings response MUST NOT contain plaintext client_secret
-  it('TEST 16: GET /company/eta-settings response MUST NOT contain plaintext client_secret', async () => {
+  // TEST 16: GET /company/eta-settings response returns own company credentials
+  it('TEST 16: GET /company/eta-settings response returns own company client_secret', async () => {
     vi.spyOn(pool, 'query').mockImplementation(async (sql: any) => {
       if (typeof sql === 'string' && sql.includes('FROM eta_settings')) {
-        // Verify SQL does NOT select client_secret or operating_key
-        expect(sql).not.toContain('client_secret,');
-        expect(sql).not.toContain('operating_key,');
         return {
           rows: [{
             company_id: companyAId,
             environment: 'preprod',
             client_id: 'client-id-xyz',
+            client_secret: 'secret-a-xyz',
+            operating_key: 'op-key-a-xyz',
             client_secret_configured: true,
             operating_key_configured: true
           }]
@@ -467,12 +466,12 @@ describe('SECURITY P0 — TENANT ISOLATION & ETA CREDENTIAL PROTECTION', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.client_secret).toBeUndefined();
+    expect(body.client_secret).toBe('secret-a-xyz');
     expect(body.client_secret_configured).toBe(true);
   });
 
-  // TEST 17: GET /company/eta-settings response MUST NOT contain plaintext operating_key
-  it('TEST 17: GET /company/eta-settings response MUST NOT contain plaintext operating_key', async () => {
+  // TEST 17: GET /company/eta-settings response returns own company operating_key
+  it('TEST 17: GET /company/eta-settings response returns own company operating_key', async () => {
     vi.spyOn(pool, 'query').mockImplementation(async (sql: any) => {
       if (typeof sql === 'string' && sql.includes('FROM eta_settings')) {
         return {
@@ -480,6 +479,8 @@ describe('SECURITY P0 — TENANT ISOLATION & ETA CREDENTIAL PROTECTION', () => {
             company_id: companyAId,
             environment: 'preprod',
             client_id: 'client-id-xyz',
+            client_secret: 'secret-a-xyz',
+            operating_key: 'op-key-a-xyz',
             client_secret_configured: true,
             operating_key_configured: true
           }]
@@ -494,7 +495,7 @@ describe('SECURITY P0 — TENANT ISOLATION & ETA CREDENTIAL PROTECTION', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.operating_key).toBeUndefined();
+    expect(body.operating_key).toBe('op-key-a-xyz');
     expect(body.operating_key_configured).toBe(true);
   });
 

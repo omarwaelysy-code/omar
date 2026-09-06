@@ -863,7 +863,7 @@ export function EtaReceivedInvoices() {
         setIsConfigured(res.isConfigured !== false);
         setEnvironment(res.environment || 'preprod');
 
-        if (res.isConfigured === false) {
+        if (res.isConfigured === false && (!res.data || res.data.length === 0)) {
           setInvoices([]);
           setNextToken(null);
         } else {
@@ -1646,12 +1646,18 @@ export function EtaReceivedInvoices() {
             <ShieldAlert className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
             <div>
               <h3 className="font-bold text-base text-amber-950">
-                {language === 'ar' ? 'لم يتم إعداد الربط مع منظومة ETA لهذه الشركة' : 'ETA Integration is not configured for this company'}
+                {(allPortalInvoices.length > 0 || invoices.length > 0)
+                  ? (language === 'ar' ? 'تم إلغاء الربط مع منظومة ETA (يتم استعراض البيانات المسجلة مسبقاً)' : 'ETA Integration Disconnected (Browsing previously recorded documents)')
+                  : (language === 'ar' ? 'لم يتم إعداد الربط مع منظومة ETA لهذه الشركة' : 'ETA Integration is not configured for this company')}
               </h3>
               <p className="text-xs md:text-sm text-amber-800 mt-1 leading-relaxed">
-                {language === 'ar'
-                  ? 'لعرض الوثائق الإلكترونية المستلمة، يرجى إدخال بيانات الاعتماد (Client ID و Client Secret) واختيار البيئة من إعدادات الشركة.'
-                  : 'To view incoming electronic documents, please provide ETA credentials (Client ID & Client Secret) in Company Settings.'}
+                {(allPortalInvoices.length > 0 || invoices.length > 0)
+                  ? (language === 'ar'
+                      ? 'يتم الآن استعراض الوثائق والفواتير الإلكترونية المسجلة والمحفوظة مسبقاً. لإجراء المزامنة المباشرة مع مصلحة الضرائب، يرجى تفعيل مفاتيح الربط من إعدادات الشركة.'
+                      : 'Displaying previously saved electronic documents. To perform live synchronization with ETA, please configure your credentials in Company Settings.')
+                  : (language === 'ar'
+                      ? 'لعرض الوثائق الإلكترونية المستلمة، يرجى إدخال بيانات الاعتماد (Client ID و Client Secret) واختيار البيئة من إعدادات الشركة.'
+                      : 'To view incoming electronic documents, please provide ETA credentials (Client ID & Client Secret) in Company Settings.')}
               </p>
             </div>
           </div>
@@ -1661,7 +1667,7 @@ export function EtaReceivedInvoices() {
             className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs md:text-sm font-bold shadow-sm transition-colors flex items-center gap-2 flex-shrink-0"
           >
             <Building2 className="w-4 h-4" />
-            <span>{language === 'ar' ? 'إعداد الربط الآن' : 'Configure ETA'}</span>
+            <span>{language === 'ar' ? 'إعدادات الربط' : 'Configure ETA'}</span>
           </button>
         </motion.div>
       )}
