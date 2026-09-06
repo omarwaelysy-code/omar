@@ -46,11 +46,43 @@ export interface SupplierMappingSummaryDTO {
 
 export class EtaSupplierMappingService {
   /**
-   * Normalize tax number for resilient matching (removes hyphens, spaces, leading/trailing whitespace)
+   * Normalize tax number for resilient matching:
+   * - Converts Arabic-Indic and Persian digits to standard ASCII digits
+   * - Strips leading country code prefix (e.g. EG, EG-)
+   * - Removes all non-alphanumeric characters (spaces, dashes, dots, slashes)
    */
-  private static normalizeTaxNumber(taxNum: string | null | undefined): string {
+  public static normalizeTaxNumber(taxNum: string | null | undefined): string {
     if (!taxNum) return '';
-    return String(taxNum).trim().replace(/[-\s]/g, '');
+    let str = String(taxNum)
+      .replace(/[\u0660-\u0669]/g, d => String(d.charCodeAt(0) - 0x0660))
+      .replace(/[\u06F0-\u06F9]/g, d => String(d.charCodeAt(0) - 0x06F0))
+      .trim();
+
+    str = str.replace(/^eg[-_\s]*/i, '');
+    str = str.replace(/[^0-9a-zA-Z]/g, '');
+
+    return str;
+  }
+
+  /**
+   * Generate tax number variations to handle leading zero variations (e.g., 63802520 vs 063802520)
+   */
+  public static getTaxVariations(taxNum: string | null | undefined): string[] {
+    const norm = this.normalizeTaxNumber(taxNum);
+    if (!norm) return [];
+    const variations = new Set<string>();
+    variations.add(norm);
+
+    if (/^\d+$/.test(norm)) {
+      const unpadded = norm.replace(/^0+/, '');
+      if (unpadded) variations.add(unpadded);
+
+      if (norm.length <= 9) {
+        variations.add(norm.padStart(9, '0'));
+      }
+    }
+
+    return Array.from(variations);
   }
 
   /**
@@ -74,7 +106,7 @@ export class EtaSupplierMappingService {
     // 1. Fetch unique suppliers from eta_documents (direction = 'Received')
     const portalSuppliersRes = await pool.query(`
       SELECT 
-        issuer_id as tax_number,
+        TRIM(issuer_id) as tax_number,
         COALESCE(NULLIF(MAX(issuer_name), ''), 'مورد غير محدد') as name,
         COALESCE(NULLIF(MAX(issuer_address), ''), '') as address,
         count(*)::int as doc_count,
@@ -85,7 +117,7 @@ export class EtaSupplierMappingService {
         AND direction = 'Received' 
         AND issuer_id IS NOT NULL 
         AND TRIM(issuer_id) != ''
-      GROUP BY issuer_id
+      GROUP BY TRIM(issuer_id)
       ORDER BY total_amount DESC, doc_count DESC
     `, [companyId]);
 
@@ -108,10 +140,13 @@ export class EtaSupplierMappingService {
 
     const mappingsByTaxNumber = new Map<string, any>();
     for (const row of mappingsRes.rows) {
-      mappingsByTaxNumber.set(this.normalizeTaxNumber(row.eta_tax_number), row);
+      const vars = this.getTaxVariations(row.eta_tax_number);
+      for (const v of vars) {
+        mappingsByTaxNumber.set(v, row);
+      }
     }
 
-    // 3. Fetch all ERP suppliers to detect automatic tax_number matches
+    // 3. Fetch all ERP suppliers to detect automatic tax_number matches and name matches
     const erpSuppliersRes = await pool.query(`
       SELECT id, name, code, tax_number, mobile, email, address
       FROM suppliers
@@ -119,10 +154,15 @@ export class EtaSupplierMappingService {
     `, [companyId]);
 
     const erpSuppliersByTaxNumber = new Map<string, any>();
+    const erpSuppliersByName = new Map<string, any>();
     for (const sup of erpSuppliersRes.rows) {
-      const norm = this.normalizeTaxNumber(sup.tax_number);
-      if (norm) {
-        erpSuppliersByTaxNumber.set(norm, sup);
+      const vars = this.getTaxVariations(sup.tax_number);
+      for (const v of vars) {
+        erpSuppliersByTaxNumber.set(v, sup);
+      }
+      const cleanName = cleanDuplicatedPartnerName(sup.name).trim().toLowerCase();
+      if (cleanName) {
+        erpSuppliersByName.set(cleanName, sup);
       }
     }
 
@@ -136,14 +176,20 @@ export class EtaSupplierMappingService {
 
     for (const row of portalSuppliersRes.rows) {
       const rawTax = String(row.tax_number).trim();
-      const normTax = this.normalizeTaxNumber(rawTax);
+      const taxVars = this.getTaxVariations(rawTax);
       const totalAmountNum = parseFloat(row.total_amount) || 0;
       const docCountNum = parseInt(row.doc_count, 10) || 0;
 
       totalDocs += docCountNum;
       totalAmt += totalAmountNum;
 
-      const mapping = mappingsByTaxNumber.get(normTax);
+      let mapping: any = null;
+      for (const v of taxVars) {
+        if (mappingsByTaxNumber.has(v)) {
+          mapping = mappingsByTaxNumber.get(v);
+          break;
+        }
+      }
       const isLinked = !!mapping;
 
       let linkedSupplier: EtaPortalSupplierDTO['linkedSupplier'] = null;
@@ -162,8 +208,22 @@ export class EtaSupplierMappingService {
         };
       } else {
         unlinkedCount++;
-        // Check for auto-match candidate in ERP suppliers
-        const candidate = erpSuppliersByTaxNumber.get(normTax);
+        // Check for auto-match candidate in ERP suppliers by tax number variations
+        let candidate: any = null;
+        for (const v of taxVars) {
+          if (erpSuppliersByTaxNumber.has(v)) {
+            candidate = erpSuppliersByTaxNumber.get(v);
+            break;
+          }
+        }
+        // Fallback: Check for auto-match candidate by clean supplier name
+        if (!candidate) {
+          const cleanEtaName = cleanDuplicatedPartnerName(row.name).trim().toLowerCase();
+          if (cleanEtaName && erpSuppliersByName.has(cleanEtaName)) {
+            candidate = erpSuppliersByName.get(cleanEtaName);
+          }
+        }
+
         if (candidate) {
           autoMatchCount++;
           autoMatchedSupplier = {
@@ -250,10 +310,11 @@ export class EtaSupplierMappingService {
       throw new Error('الرقم الضريبي مطلوب لفك الربط.');
     }
 
+    const variations = this.getTaxVariations(etaTaxNumber);
     await pool.query(`
       DELETE FROM eta_supplier_mappings
-      WHERE company_id = $1 AND eta_tax_number = $2
-    `, [companyId, etaTaxNumber.trim()]);
+      WHERE company_id = $1 AND (eta_tax_number = $2 OR eta_tax_number = ANY($3::text[]))
+    `, [companyId, etaTaxNumber.trim(), variations]);
 
     return {
       success: true,

@@ -178,14 +178,16 @@ function showPasswordModal(closingDate: string): Promise<string | null> {
 
 export async function apiRequest<T>(path: string, method: string = 'GET', body?: any, timeoutMs: number = 30000): Promise<T> {
   const token = localStorage.getItem('auth_token');
-  const authUserStr = localStorage.getItem('auth_user');
-  let activeCompanyId = '';
-  if (authUserStr) {
-    try {
-      const parsedUser = JSON.parse(authUserStr);
-      activeCompanyId = parsedUser.company_id || '';
-    } catch (e) {
-      console.error(e);
+  let activeCompanyId = localStorage.getItem('current_company_id') || '';
+  if (!activeCompanyId) {
+    const authUserStr = localStorage.getItem('auth_user');
+    if (authUserStr) {
+      try {
+        const parsedUser = JSON.parse(authUserStr);
+        activeCompanyId = parsedUser.company_id || '';
+      } catch (e) {
+        console.error(e);
+      }
     }
   }
 

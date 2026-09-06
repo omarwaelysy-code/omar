@@ -235,10 +235,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // If user is a super admin, switch automatically to super_admin workspace mode
             setWorkspaceMode('super_admin');
             const superAdminMem = memberships.find(m => m.role === 'super_admin' || m.company_id === 'system' || m.company_id === 'SYSTEM') || memberships[0];
-            setUser({
+            const finalSuperAdmin = {
               ...superAdminMem,
               must_change_password: superAdminMem.must_change_password || false
-            });
+            };
+            setUser(finalSuperAdmin);
+            localStorage.setItem('auth_user', JSON.stringify(finalSuperAdmin));
+            if (finalSuperAdmin.company_id) {
+              localStorage.setItem('current_company_id', finalSuperAdmin.company_id);
+            }
             setSubscriptionExpiredDetails({
               expired: false,
               expiryDate: '',
@@ -263,20 +268,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           reason: selectedExpiryCheck.reason
         });
 
-        setUser({ 
+        const finalUser = { 
           ...selectedMembership, 
           must_change_password: selectedMembership.must_change_password || false
-        });
+        };
+        setUser(finalUser);
+        localStorage.setItem('auth_user', JSON.stringify(finalUser));
+        if (finalUser.company_id) {
+          localStorage.setItem('current_company_id', finalUser.company_id);
+        }
       } else {
         // Fallback for super admin
-        setUser({ 
+        const superAdminFallback: User = { 
           id: userId, 
           username: email.split('@')[0], 
           role: 'super_admin', 
           company_id: '',
           status: 'active',
           created_at: new Date().toISOString()
-        });
+        };
+        setUser(superAdminFallback);
+        localStorage.setItem('auth_user', JSON.stringify(superAdminFallback));
+        localStorage.removeItem('current_company_id');
         if (hasSuperAdminRole) {
           setWorkspaceMode('super_admin');
         }
@@ -334,6 +347,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         setUser(updatedUser);
         localStorage.setItem('auth_user', JSON.stringify(updatedUser));
+        if (companyId) {
+          localStorage.setItem('current_company_id', companyId);
+        }
         
         const emailKey = (updatedUser.email || user.email || '').toLowerCase().trim();
         recordCompanyOpened(companyId, emailKey, user.id);
@@ -352,6 +368,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     }
   };
+
+  // Sync user state reliably with localStorage
+  useEffect(() => {
+    if (user) {
+      try {
+        if (user.company_id) {
+          localStorage.setItem('current_company_id', user.company_id);
+        }
+        const stored = localStorage.getItem('auth_user');
+        const parsed = stored ? JSON.parse(stored) : null;
+        if (!parsed || parsed.company_id !== user.company_id || parsed.id !== user.id) {
+          localStorage.setItem('auth_user', JSON.stringify(user));
+        }
+      } catch (e) {
+        console.error('AuthContext: Error syncing user to localStorage:', e);
+      }
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -394,6 +428,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     localStorage.removeItem('auth_user');
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('current_company_id');
     localStorage.removeItem('user_email');
     localStorage.removeItem('user_id');
     // Preserve preferred_company_ on logout so last opened company is remembered upon re-login

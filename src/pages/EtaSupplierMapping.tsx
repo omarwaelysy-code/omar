@@ -32,6 +32,7 @@ import {
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useNavigation } from '../contexts/NavigationContext';
+import { useAuth } from '../contexts/AuthContext';
 import { apiRequest } from '../services/dbService';
 import { formatMoney, cleanDuplicatedPartnerName } from '../utils/formatUtils';
 import { exportToExcel } from '../utils/excelUtils';
@@ -82,6 +83,7 @@ export function EtaSupplierMapping() {
   const { language } = useLanguage();
   const { showNotification } = useNotification();
   const { openTab, setPendingEtaSupplierForCreation, setPendingEtaSupplierForLinking } = useNavigation();
+  const { user } = useAuth();
   const isAr = language === 'ar';
 
   // Tabs: all = كل الموردين الواردة من البوابة, linked = الموردين المربوطة, unlinked = الموردين غير المربوطة
@@ -131,11 +133,17 @@ export function EtaSupplierMapping() {
     else setLoading(true);
 
     try {
+      const qParams = new URLSearchParams();
+      if (isRefresh) qParams.set('refresh', 'true');
+      if (user?.company_id) qParams.set('company_id', user.company_id);
+      const qStr = qParams.toString();
+      const path = qStr ? `/eta/suppliers/mapping?${qStr}` : '/eta/suppliers/mapping';
+
       const res = await apiRequest<{
         success: boolean;
         suppliers: EtaPortalSupplier[];
         summary: SupplierMappingSummary;
-      }>(isRefresh ? '/eta/suppliers/mapping?refresh=true' : '/eta/suppliers/mapping');
+      }>(path);
 
       if (res && res.success) {
         setSuppliers(res.suppliers || []);
@@ -150,15 +158,16 @@ export function EtaSupplierMapping() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [isAr, showNotification]);
+  }, [isAr, showNotification, user?.company_id]);
 
   // Load ERP Suppliers & Chart of Accounts for dropdowns
   const loadErpSuppliers = useCallback(async () => {
     try {
       setLoadingErpSuppliers(true);
+      const compParam = user?.company_id ? `&company_id=${encodeURIComponent(user.company_id)}` : '';
       const [supRes, accRes] = await Promise.all([
-        apiRequest<{ success: boolean; data: ErpSupplierOption[] }>('/suppliers?limit=1000'),
-        apiRequest<{ success: boolean; data: any[] }>('/accounts?limit=2000').catch(() => ({ success: true, data: [] }))
+        apiRequest<{ success: boolean; data: ErpSupplierOption[] }>(`/suppliers?limit=1000${compParam}`),
+        apiRequest<{ success: boolean; data: any[] }>(`/accounts?limit=2000${compParam}`).catch(() => ({ success: true, data: [] }))
       ]);
 
       if (supRes && supRes.data) {
@@ -179,7 +188,7 @@ export function EtaSupplierMapping() {
     } finally {
       setLoadingErpSuppliers(false);
     }
-  }, []);
+  }, [user?.company_id]);
 
   useEffect(() => {
     loadMappings();
@@ -199,6 +208,7 @@ export function EtaSupplierMapping() {
     try {
       setSavingLink(true);
       const res = await apiRequest<{ success: boolean; message?: string }>('/eta/suppliers/mapping/link', 'POST', {
+        company_id: user?.company_id,
         etaTaxNumber: supplier.taxNumber,
         supplierId: supplier.autoMatchedSupplier.id,
         etaSupplierName: supplier.name,
@@ -235,7 +245,7 @@ export function EtaSupplierMapping() {
       const res = await apiRequest<{ success: boolean; linkedCount: number; message?: string }>(
         '/eta/suppliers/mapping/quick-link-all',
         'POST',
-        {}
+        { company_id: user?.company_id }
       );
 
       if (res && res.success) {
@@ -280,6 +290,7 @@ export function EtaSupplierMapping() {
     try {
       setUnlinking(true);
       const res = await apiRequest<{ success: boolean; message?: string }>('/eta/suppliers/mapping/unlink', 'POST', {
+        company_id: user?.company_id,
         etaTaxNumber: unlinkSupplierTarget.taxNumber
       });
 

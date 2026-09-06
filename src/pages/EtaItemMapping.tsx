@@ -25,10 +25,10 @@ import {
   Building2,
   ChevronDown,
   ChevronUp
-} from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useNavigation } from '../contexts/NavigationContext';
+import { useAuth } from '../contexts/AuthContext';
 import { apiRequest } from '../services/dbService';
 import { formatMoney } from '../utils/formatUtils';
 import { exportToExcel } from '../utils/excelUtils';
@@ -96,6 +96,7 @@ export function EtaItemMapping() {
   const { language } = useLanguage();
   const { showNotification } = useNotification();
   const { openTab, setPendingEtaProductForCreation, setPendingEtaProductForLinking } = useNavigation();
+  const { user } = useAuth();
   const isAr = language === 'ar';
 
   // Tabs: all = كل الأصناف الواردة من البوابة, linked = الأصناف المربوطة, unlinked = الأصناف غير المربوطة
@@ -144,11 +145,17 @@ export function EtaItemMapping() {
     else setLoading(true);
 
     try {
+      const qParams = new URLSearchParams();
+      if (isRefresh) qParams.set('refresh', 'true');
+      if (user?.company_id) qParams.set('company_id', user.company_id);
+      const qStr = qParams.toString();
+      const path = qStr ? `/eta/items/mapping?${qStr}` : '/eta/items/mapping';
+
       const res = await apiRequest<{
         success: boolean;
         items: EtaPortalItem[];
         summary: ItemMappingSummary;
-      }>(isRefresh ? '/eta/items/mapping?refresh=true' : '/eta/items/mapping');
+      }>(path);
 
       if (res && res.success) {
         setItems(res.items || []);
@@ -170,7 +177,7 @@ export function EtaItemMapping() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [isAr, showNotification]);
+  }, [isAr, showNotification, user?.company_id]);
 
   useEffect(() => {
     loadMappings();
@@ -196,6 +203,7 @@ export function EtaItemMapping() {
     try {
       setSavingLink(true);
       const res = await apiRequest<{ success: boolean; message?: string }>('/eta/items/mapping/link', 'POST', {
+        company_id: user?.company_id,
         etaItemCode: item.itemCode,
         productId: item.autoMatchedProduct.id,
         etaItemName: item.itemName,
@@ -233,7 +241,7 @@ export function EtaItemMapping() {
       const res = await apiRequest<{ success: boolean; linkedCount: number; message?: string }>(
         '/eta/items/mapping/quick-link-all',
         'POST',
-        {}
+        { company_id: user?.company_id }
       );
 
       if (res && res.success) {
@@ -261,6 +269,7 @@ export function EtaItemMapping() {
     try {
       setUnlinking(true);
       const res = await apiRequest<{ success: boolean; message?: string }>('/eta/items/mapping/unlink', 'POST', {
+        company_id: user?.company_id,
         etaItemCode: unlinkItemTarget.itemCode
       });
 
