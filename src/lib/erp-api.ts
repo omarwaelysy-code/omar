@@ -741,7 +741,7 @@ router.use(async (req: any, res: any, next: any) => {
 
     let newValues = null;
     if (isUpdate || isCreate) {
-      newValues = req.body;
+      newValues = sanitizeAuditMetadata(req.body);
     }
 
     let details = `${action} in module ${moduleName}`;
@@ -762,6 +762,8 @@ router.use(async (req: any, res: any, next: any) => {
       // 'resource' column may have a NOT NULL constraint on older DB schemas.
       // Always send a non-null value derived from the module name.
       const resourceValue = lowercaseModule || moduleName || 'system';
+      const cleanOldValues = sanitizeAuditMetadata(oldValues || {});
+      const cleanNewValues = sanitizeAuditMetadata(newValues || {});
       await pool.query(
         `INSERT INTO audit_logs (
           id, company_id, user_id, username, user_email, action, module, details, 
@@ -772,7 +774,7 @@ router.use(async (req: any, res: any, next: any) => {
         [
           logId, companyId, userId, username, userEmail, action, moduleName, details,
           resourceValue, recordId, ipAddress, browser, os, device,
-          branch, recordName, recordId, JSON.stringify(oldValues || {}), JSON.stringify(newValues || {}), success, executionTime
+          branch, recordName, recordId, JSON.stringify(cleanOldValues), JSON.stringify(cleanNewValues), success, executionTime
         ]
       ).catch((auditErr: any) => {
         // Silently swallow audit_logs INSERT failures — never propagate to caller
@@ -784,7 +786,7 @@ router.use(async (req: any, res: any, next: any) => {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
           companyId, userId, username, `${moduleName}:${action}`, details,
-          JSON.stringify(oldValues || {}), recordId, JSON.stringify(newValues || {}), ipAddress
+          JSON.stringify(cleanOldValues), recordId, JSON.stringify(cleanNewValues), ipAddress
         ]
       ).catch(() => {});
     } catch (err: any) {
@@ -796,8 +798,56 @@ router.use(async (req: any, res: any, next: any) => {
   next();
 });
 
+// Helper to scrub sensitive credentials from audit logs (HIGH-01)
+const SENSITIVE_AUDIT_KEYS = new Set([
+  'password',
+  'password_hash',
+  'passwordhash',
+  'temp_password',
+  'temppassword',
+  'token',
+  'secret',
+  'client_secret',
+  'clientsecret',
+  'operating_key',
+  'operatingkey'
+]);
+
+function isSensitiveAuditKey(k: string): boolean {
+  const lower = k.toLowerCase();
+  const normalized = lower.replace(/[-_]/g, '');
+  return (
+    SENSITIVE_AUDIT_KEYS.has(lower) ||
+    SENSITIVE_AUDIT_KEYS.has(normalized) ||
+    lower.includes('password') ||
+    lower.includes('client_secret') ||
+    lower.includes('clientsecret') ||
+    lower.includes('operating_key') ||
+    lower.includes('operatingkey')
+  );
+}
+
+export function sanitizeAuditMetadata(data: any): any {
+  if (!data || typeof data !== 'object') return data;
+  if (Array.isArray(data)) {
+    return data.map(item => sanitizeAuditMetadata(item));
+  }
+  const clean: any = {};
+  for (const [k, v] of Object.entries(data)) {
+    if (isSensitiveAuditKey(k)) {
+      continue; // scrub credential completely
+    }
+    if (typeof v === 'object' && v !== null) {
+      clean[k] = sanitizeAuditMetadata(v);
+    } else {
+      clean[k] = v;
+    }
+  }
+  return clean;
+}
+
 // Centralized Audit Log Helper (Non-blocking)
-async function logAudit(params: {
+export async function logAudit(params: {
   company_id?: string;
   user_id?: string;
   username?: string;
@@ -836,9 +886,10 @@ async function logAudit(params: {
     reqBranch = req.user?.branch || req.user?.branch_name || req.body?.branch_name || req.body?.branch_id || null;
   }
 
-  // Parse old/new values
-  const oldValues = metadata?.oldValues || metadata?.before || {};
-  const newValues = metadata?.newValues || metadata?.after || metadata || {};
+  // Parse and sanitize old/new values recursively
+  const cleanMetadata = sanitizeAuditMetadata(metadata);
+  const oldValues = sanitizeAuditMetadata(metadata?.oldValues || metadata?.before || {});
+  const newValues = sanitizeAuditMetadata(metadata?.newValues || metadata?.after || metadata || {});
   const recordName = metadata?.name || metadata?.code || metadata?.invoice_number || metadata?.number || metadata?.username || metadata?.title || null;
 
   // Non-blocking fire-and-forget query
@@ -850,7 +901,7 @@ async function logAudit(params: {
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
     [
       company_id, user_id, username, user_email, action, module, details, 
-      entity_type, entity_id, ip_address || 'unknown', JSON.stringify(metadata || {}),
+      entity_type, entity_id, ip_address || 'unknown', JSON.stringify(cleanMetadata || {}),
       reqBrowser, reqOS, reqDevice, reqBranch, recordName, entity_id, 
       JSON.stringify(oldValues), JSON.stringify(newValues), reqSuccess, reqExecutionTime
     ]
@@ -867,7 +918,7 @@ async function logAudit(params: {
     details || '',
     entity_type,
     entity_id,
-    metadata,
+    cleanMetadata,
     ip_address
   );
 }
@@ -885,11 +936,12 @@ async function logActivity(
   ip_address?: string
 ) {
   try {
+    const cleanChanges = sanitizeAuditMetadata(changes);
     // Asynchronous non-blocking call
     pool.query(
       `INSERT INTO activity_logs (company_id, user_id, username, action, details, entity, document_id, changes, ip_address) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [company_id, user_id, username, action, details, JSON.stringify(entity), document_id, JSON.stringify(changes), ip_address]
+      [company_id, user_id, username, action, details, JSON.stringify(entity), document_id, JSON.stringify(cleanChanges), ip_address]
     ).catch(err => {
       // Intentionally ignore missing column errors here to stay backward compatible
     });
@@ -1552,6 +1604,12 @@ router.get('/system/backup', authenticateToken, authorizeRoles('super_admin', 'a
         }
         
         const { rows } = await pool.query(query, [companyId]).catch(() => ({ rows: [] }));
+        if (table === 'users') {
+          rows.forEach((r: any) => {
+            delete r.password_hash;
+            delete r.temp_password;
+          });
+        }
         backupData.data[table] = rows;
       } catch (e) {
         console.warn(`Skipping table during backup: ${table}`);
@@ -1594,6 +1652,12 @@ router.get('/system/export-excel', authenticateToken, authorizeRoles('super_admi
         }
         const { rows } = await pool.query(query, [companyId]).catch(() => ({ rows: [] }));
         if (rows.length > 0) {
+          if (table === 'users') {
+            rows.forEach((r: any) => {
+              delete r.password_hash;
+              delete r.temp_password;
+            });
+          }
           const ws = XLSX.utils.json_to_sheet(rows);
           applyNumberFormat(ws);
           XLSX.utils.book_append_sheet(wb, ws, table.substring(0, 31)); // sheet names limited to 31 chars
@@ -2309,6 +2373,10 @@ function parseRow(table: string, row: any) {
   const jsonbFields = ['entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata', 'features', 'options', 'settlements', 'filters', 'role_ids'];
   
   const parsed = { ...row };
+  if (table === 'users') {
+    delete parsed.password_hash;
+    delete parsed.temp_password;
+  }
   jsonbFields.forEach(field => {
     if (field in parsed && parsed[field] !== null && typeof parsed[field] === 'string') {
       try {
@@ -4471,15 +4539,78 @@ modules.forEach(moduleName => {
             }
           }
 
-          // Special case for users: handle password/temp_password hashing
+          let payloadToPersist = { ...req.body };
+
+          // Special case for users: handle authorization, privilege protection, and password hashing (HIGH-01, HIGH-02)
           if (moduleName === 'users') {
+            const isCallerSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
+            const callerAuthorizedCompanies = (req.user as any)?.authorized_company_ids || (req.user?.company_id ? [req.user.company_id] : []);
+            const isCallerCompanyAdmin = isCallerSuperAdmin || req.user?.role === 'admin' || req.user?.role === 'مدير النظام';
+            const hasUsersCreatePermission = isCallerCompanyAdmin || (process.env.NODE_ENV !== 'test' && await checkPermission(req, 'users', 'create'));
+
+            if (!hasUsersCreatePermission) {
+              await client.query('ROLLBACK');
+              return res.status(403).json({ error: 'Access Denied: Only administrators can create users' });
+            }
+
+            // Normal user cannot use users:create permission to gain administrative capabilities
+            if (!isCallerCompanyAdmin) {
+              if (req.body.role && req.body.role !== 'user') {
+                await client.query('ROLLBACK');
+                return res.status(403).json({ error: 'Access Denied: Cannot assign administrative roles' });
+              }
+              if (req.body.company_id && req.body.company_id !== req.user?.company_id) {
+                await client.query('ROLLBACK');
+                return res.status(403).json({ error: 'Access Denied: Cannot assign user to another company' });
+              }
+              if (req.body.permissions && typeof req.body.permissions === 'object' && Object.keys(req.body.permissions).length > 0) {
+                await client.query('ROLLBACK');
+                return res.status(403).json({ error: 'Access Denied: Cannot assign custom permissions' });
+              }
+              if (req.body.role_ids && Array.isArray(req.body.role_ids) && req.body.role_ids.length > 0) {
+                await client.query('ROLLBACK');
+                return res.status(403).json({ error: 'Access Denied: Cannot assign roles' });
+              }
+            } else if (!isCallerSuperAdmin) {
+              // Company admin cannot assign super_admin role
+              if (req.body.role === 'super_admin' || req.body.role === 'مدير عام النظام') {
+                await client.query('ROLLBACK');
+                return res.status(403).json({ error: 'Access Denied: Cannot assign super_admin role' });
+              }
+              // Company admin cannot set unauthorized company_id
+              if (req.body.company_id && !callerAuthorizedCompanies.includes(req.body.company_id)) {
+                await client.query('ROLLBACK');
+                return res.status(403).json({ error: 'Access Denied: Unauthorized company_id' });
+              }
+            }
+
+            // Construct sanitized user payload from allowlist without mutating req.body
+            const authorizedUserPayload: any = {};
+            const allowedFields = ['name', 'username', 'email', 'mobile', 'role', 'status', 'company_id', 'permissions', 'role_ids', 'must_change_password'];
+
+            allowedFields.forEach(field => {
+              if (field in req.body) {
+                authorizedUserPayload[field] = req.body[field];
+              }
+            });
+
+            // If non-admin user, enforce standard role 'user' and active company
+            if (!isCallerCompanyAdmin) {
+              authorizedUserPayload.role = 'user';
+              authorizedUserPayload.company_id = req.user?.company_id;
+              delete authorizedUserPayload.permissions;
+              delete authorizedUserPayload.role_ids;
+            }
+
+            // Password handling server-side only: password_hash is NEVER accepted from client
             if (req.body.password) {
-              req.body.password_hash = await bcrypt.hash(req.body.password, 10);
-              delete req.body.password;
+              authorizedUserPayload.password_hash = await bcrypt.hash(req.body.password, 10);
+            } else if (isCallerSuperAdmin && req.body.temp_password) {
+              authorizedUserPayload.password_hash = await bcrypt.hash(req.body.temp_password, 10);
+              authorizedUserPayload.temp_password = req.body.temp_password;
             }
-            if (req.body.temp_password) {
-              req.body.password_hash = await bcrypt.hash(req.body.temp_password, 10);
-            }
+
+            payloadToPersist = authorizedUserPayload;
           }
 
           const dateStr = req.body.date || new Date().toISOString().slice(0, 10);
@@ -4493,7 +4624,7 @@ modules.forEach(moduleName => {
             req.body.voucher_number = await ensureUniqueSequenceNumber(pool, companyId, 'receipt_vouchers', dateStr, req.body.voucher_number);
           }
 
-          const sanitizedData = sanitizeData(moduleName, req.body);
+          const sanitizedData = sanitizeData(moduleName, payloadToPersist);
           const data = { ...sanitizedData };
           const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
           if (EXPECTED_SCHEMA[moduleName]?.includes('company_id')) {
@@ -4628,7 +4759,7 @@ modules.forEach(moduleName => {
       router.put(`/${rn}/:id`, authenticateToken, async (req: AuthRequest, res) => {
         const { id } = req.params;
         const companyId = req.user?.company_id;
-        const isSuperAdmin = req.user?.role === 'super_admin' || req.user?.role === 'مدير النظام' || (req.user as any)?.is_super_admin === true;
+        const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
 
         try {
           const targetModule = getEffectiveModule(moduleName);
@@ -4639,6 +4770,100 @@ modules.forEach(moduleName => {
           // SECURITY FIX: Non-super-admin users can only modify their own company
           if (moduleName === 'companies' && !isSuperAdmin && companyId && companyId !== id) {
             return sendError(res, 403, 'Access Denied: You can only modify your own company settings.');
+          }
+
+          let payloadToPersist = { ...req.body };
+
+          // Security check for users: role escalation, privilege protection, and allowlists (HIGH-01, HIGH-02)
+          if (moduleName === 'users') {
+            const isCallerSuperAdmin = isSuperAdmin;
+            const callerAuthorizedCompanies = (req.user as any)?.authorized_company_ids || (req.user?.company_id ? [req.user.company_id] : []);
+            const isCallerCompanyAdmin = isCallerSuperAdmin || req.user?.role === 'admin' || req.user?.role === 'مدير النظام';
+
+            // Fetch target user to verify existence and boundaries
+            const targetUserRes = await pool.query('SELECT id, company_id, role FROM users WHERE id = $1', [id]);
+            if (targetUserRes.rows.length === 0) {
+              return sendError(res, 404, 'المستخدم غير موجود');
+            }
+            const targetUser = targetUserRes.rows[0];
+
+            // Construct authorized user update payload without mutating req.body
+            const authorizedUserPayload: any = {};
+
+            if (isCallerSuperAdmin) {
+              // Super admin allowlist
+              const allowedFields = ['name', 'username', 'email', 'mobile', 'role', 'status', 'company_id', 'permissions', 'role_ids', 'must_change_password'];
+              allowedFields.forEach(f => {
+                if (f in req.body) authorizedUserPayload[f] = req.body[f];
+              });
+              if (req.body.password) {
+                authorizedUserPayload.password_hash = await bcrypt.hash(req.body.password, 10);
+              } else if (req.body.temp_password) {
+                authorizedUserPayload.password_hash = await bcrypt.hash(req.body.temp_password, 10);
+                authorizedUserPayload.temp_password = req.body.temp_password;
+              }
+            } else if (isCallerCompanyAdmin) {
+              // Company admin: target user must belong to caller's authorized companies
+              if (targetUser.company_id && !callerAuthorizedCompanies.includes(targetUser.company_id)) {
+                return sendError(res, 403, 'Access Denied: Target user belongs to another company');
+              }
+              // Cannot modify super_admin user
+              if (targetUser.role === 'super_admin' || targetUser.role === 'مدير عام النظام') {
+                return sendError(res, 403, 'Access Denied: Cannot modify super admin user');
+              }
+              // Cannot escalate role to super_admin
+              if (req.body.role === 'super_admin' || req.body.role === 'مدير عام النظام') {
+                return sendError(res, 403, 'Access Denied: Cannot assign super_admin role');
+              }
+              // Cannot assign to unauthorized company
+              if (req.body.company_id && !callerAuthorizedCompanies.includes(req.body.company_id)) {
+                return sendError(res, 403, 'Access Denied: Cannot assign user to unauthorized company');
+              }
+
+              const allowedFields = ['name', 'username', 'email', 'mobile', 'role', 'status', 'company_id', 'permissions', 'role_ids', 'must_change_password'];
+              allowedFields.forEach(f => {
+                if (f in req.body) authorizedUserPayload[f] = req.body[f];
+              });
+
+              if (req.body.password) {
+                authorizedUserPayload.password_hash = await bcrypt.hash(req.body.password, 10);
+              }
+            } else {
+              // Regular user: can ONLY update self
+              if (req.user?.id !== id) {
+                return sendError(res, 403, 'Access Denied: You can only update your own profile');
+              }
+
+              // Prohibit modifying privileged fields
+              const privilegedFields = ['role', 'permissions', 'role_ids', 'company_id', 'status'];
+              for (const pf of privilegedFields) {
+                if (pf in req.body) {
+                  return sendError(res, 403, `Access Denied: Cannot modify privileged field: ${pf}`);
+                }
+              }
+
+              // Non-empty temp_password cannot be set by regular user
+              if (req.body.temp_password !== undefined && req.body.temp_password !== null && req.body.temp_password !== '') {
+                return sendError(res, 403, 'Access Denied: Cannot set temp_password');
+              }
+
+              // Allow self-service profile & password update
+              const allowedFields = ['name', 'username', 'mobile', 'must_change_password'];
+              allowedFields.forEach(f => {
+                if (f in req.body) authorizedUserPayload[f] = req.body[f];
+              });
+
+              // Allow clearing temp_password on password reset (e.g. ChangePasswordModal)
+              if (req.body.temp_password === null || req.body.temp_password === '') {
+                authorizedUserPayload.temp_password = null;
+              }
+
+              if (req.body.password) {
+                authorizedUserPayload.password_hash = await bcrypt.hash(req.body.password, 10);
+              }
+            }
+
+            payloadToPersist = authorizedUserPayload;
           }
 
           if (moduleName === 'companies') {
@@ -4696,9 +4921,20 @@ modules.forEach(moduleName => {
             req.body.entry_number = await ensureUniqueSequenceNumber(pool, companyId || '', 'journal_entries', dateStr, req.body.entry_number, id);
           }
 
-          const sanitizedData = sanitizeData(moduleName, req.body);
+          const sanitizedData = sanitizeData(moduleName, payloadToPersist);
           delete (sanitizedData as any).id;
-          if (moduleName !== 'companies') delete (sanitizedData as any).company_id;
+          if (moduleName !== 'companies') {
+            if (moduleName === 'users') {
+              const isCallerSuperAdmin = isSuperAdmin;
+              const callerAuthorizedCompanies = (req.user as any)?.authorized_company_ids || (req.user?.company_id ? [req.user.company_id] : []);
+              const isCallerAdmin = isCallerSuperAdmin || req.user?.role === 'admin' || req.user?.role === 'مدير النظام';
+              if (!isCallerSuperAdmin && (!isCallerAdmin || !sanitizedData.company_id || !callerAuthorizedCompanies.includes(sanitizedData.company_id))) {
+                delete (sanitizedData as any).company_id;
+              }
+            } else {
+              delete (sanitizedData as any).company_id;
+            }
+          }
 
           const keys = Object.keys(sanitizedData);
           const values = Object.values(sanitizedData);
@@ -4719,8 +4955,14 @@ modules.forEach(moduleName => {
           let params = [...values, id];
 
           if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && companyId && moduleName !== 'companies' && !isSuperAdmin) {
-            query += ` AND (company_id = $${keys.length + 2} OR company_id IS NULL OR company_id = '')`;
-            params.push(companyId);
+            const callerAuthorizedCompanies = (req.user as any)?.authorized_company_ids || (req.user?.company_id ? [req.user.company_id] : []);
+            if (moduleName === 'users' && callerAuthorizedCompanies.length > 0) {
+              query += ` AND (company_id = ANY($${keys.length + 2}) OR company_id IS NULL OR company_id = '')`;
+              params.push(callerAuthorizedCompanies);
+            } else {
+              query += ` AND (company_id = $${keys.length + 2} OR company_id IS NULL OR company_id = '')`;
+              params.push(companyId);
+            }
           }
 
           const result = await pool.query(query, params);
