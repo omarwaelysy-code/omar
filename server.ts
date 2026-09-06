@@ -12,6 +12,7 @@ import subscriptionRouter from "./src/lib/subscription/subscription-api";
 import importRouter from "./src/lib/import-router";
 import etaNotificationsRouter from "./src/routes/eta-notifications";
 import { generatePDF } from "./src/lib/pdf-generator";
+import { authenticateToken } from "./src/lib/auth-middleware";
 
 async function startServer() {
   // Initialize PostgreSQL FIRST
@@ -460,7 +461,7 @@ async function startServer() {
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // PDF Printing Endpoint
-  app.post("/api/erp/print/pdf", async (req, res, next) => {
+  app.post("/api/erp/print/pdf", authenticateToken, async (req, res, next) => {
     const { templateName, dto } = req.body;
     console.log('[PDF-ENDPOINT] ▶ ENTER POST /api/erp/print/pdf | template:', templateName);
     try {

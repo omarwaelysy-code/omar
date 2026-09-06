@@ -1,6 +1,13 @@
 // @vitest-environment node
-import { describe, it, expect } from 'vitest';
-import { generatePDF } from '../lib/pdf-generator';
+import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest';
+import express from 'express';
+import type { Server } from 'http';
+import jwt from 'jsonwebtoken';
+import { getJwtSecret } from '../lib/env';
+import pool from '../lib/postgres';
+import { authenticateToken } from '../lib/auth-middleware';
+import * as pdfGenModule from '../lib/pdf-generator';
+const { generatePDF } = pdfGenModule;
 
 describe('PDF Engine Architectural Tests', () => {
 
@@ -357,3 +364,284 @@ describe('PDF Engine Architectural Tests', () => {
     });
   });
 });
+
+describe('PDF Endpoint Security & Authentication (POST /api/erp/print/pdf)', () => {
+  let app: express.Express;
+  let server: Server;
+  let endpointUrl: string;
+  let generatePdfSpy: any;
+
+  const validCompanyId = 'company-test-123';
+  const alternateCompanyId = 'company-test-456';
+  const userId = 'user-test-001';
+  const userEmail = 'testuser@obrain.local';
+  let currentDbSessionToken: string | null = 'active-session-token-abc';
+
+  const validPayload = {
+    templateName: 'SalesInvoicePdf',
+    dto: {
+      company: {
+        name: 'شركة تجريبية لاختبار المصادقة',
+        taxNumber: '310123456700003'
+      },
+      invoice_number: 'INV-AUTH-2026',
+      date: '2026-07-08',
+      payment_method: 'نقدي',
+      customer_name: 'عميل الفحص الأمني',
+      items: [
+        {
+          product_code: 'SEC-01',
+          product_name: 'فحص الحماية الأمنية',
+          quantity: '1',
+          unit_price: '100.00',
+          total: '100.00'
+        }
+      ],
+      net_total: '100.00'
+    }
+  };
+
+  const createToken = (sessionToken: string = 'active-session-token-abc', companyId: string = validCompanyId) => {
+    return jwt.sign(
+      {
+        id: userId,
+        email: userEmail,
+        role: 'admin',
+        company_id: companyId,
+        session_token: sessionToken
+      },
+      getJwtSecret()
+    );
+  };
+
+  beforeAll(async () => {
+    app = express();
+    app.use(express.json({ limit: '50mb' }));
+
+    // Replicate exact endpoint configuration from server.ts
+    app.post("/api/erp/print/pdf", authenticateToken, async (req, res, next) => {
+      const { templateName, dto } = req.body;
+      try {
+        if (!templateName || !dto) {
+          return res.status(400).json({ error: "Missing templateName or dto" });
+        }
+        const pdfBuffer = await pdfGenModule.generatePDF(templateName, dto);
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", 'attachment; filename="document.pdf"');
+        res.send(pdfBuffer);
+      } catch (err: any) {
+        res.status(500).json({
+          error: "PDF Generation failed",
+          message: "An error occurred while generating the document"
+        });
+      }
+    });
+
+    await new Promise<void>((resolve) => {
+      server = app.listen(0, () => {
+        const addr = server.address() as any;
+        endpointUrl = `http://127.0.0.1:${addr.port}/api/erp/print/pdf`;
+        resolve();
+      });
+    });
+  });
+
+  afterAll(async () => {
+    if (server) {
+      if (typeof (server as any).closeAllConnections === 'function') {
+        (server as any).closeAllConnections();
+      }
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    currentDbSessionToken = 'active-session-token-abc';
+    generatePdfSpy = vi.spyOn(pdfGenModule, 'generatePDF');
+
+    // Mock PostgreSQL pool queries for authenticateToken
+    vi.spyOn(pool, 'query').mockImplementation(async (sql: any, params?: any[]) => {
+      const sqlStr = typeof sql === 'string' ? sql : ((sql && sql.text) || '');
+
+      // User session validation query
+      if (sqlStr.includes('active_session_token FROM users')) {
+        if (currentDbSessionToken === null) {
+          return { rows: [{ active_session_token: null }] } as any;
+        }
+        return { rows: [{ active_session_token: currentDbSessionToken }] } as any;
+      }
+
+      // User memberships query
+      if (sqlStr.includes('FROM users') && sqlStr.includes('LOWER(email)')) {
+        return {
+          rows: [
+            { id: userId, company_id: validCompanyId, role: 'admin', permissions: {}, role_ids: [] },
+            { id: userId, company_id: alternateCompanyId, role: 'admin', permissions: {}, role_ids: [] }
+          ]
+        } as any;
+      }
+
+      // Licensing & Subscription query
+      if (sqlStr.includes('companies')) {
+        return {
+          rows: [{
+            subscription_status: 'ACTIVE',
+            company_status: 'ACTIVE',
+            subscription_end: '2099-01-01',
+            subscription_expiry: '2099-01-01'
+          }]
+        } as any;
+      }
+
+      return { rows: [] } as any;
+    });
+  });
+
+  // A. Valid JWT
+  it('A. Valid JWT → 200, application/pdf, valid %PDF- (Real PDF generated)', async () => {
+    const token = createToken('active-session-token-abc');
+    const res = await fetch(endpointUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(validPayload)
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/pdf');
+    expect(res.headers.get('content-disposition')).toBe('attachment; filename="document.pdf"');
+
+    const arrayBuffer = await res.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    expect(buffer.length).toBeGreaterThan(100);
+    expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
+    expect(generatePdfSpy).toHaveBeenCalledTimes(1);
+  });
+
+  // B. No Authorization header
+  it('B. No Authorization header → 401, generatePDF must NOT be called', async () => {
+    const res = await fetch(endpointUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(validPayload)
+    });
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toContain('Access denied. No token provided');
+    expect(generatePdfSpy).not.toHaveBeenCalled();
+  });
+
+  // C. Invalid JWT
+  it('C. Invalid JWT → rejected (401/403), generatePDF must NOT be called', async () => {
+    const res = await fetch(endpointUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer totally.invalid.fakejwttoken'
+      },
+      body: JSON.stringify(validPayload)
+    });
+
+    expect([401, 403]).toContain(res.status);
+    expect(generatePdfSpy).not.toHaveBeenCalled();
+  });
+
+  // D. Expired/invalidated JWT
+  it('D. Expired/invalidated JWT session → 401, generatePDF must NOT be called', async () => {
+    const staleToken = createToken('old-expired-session-token');
+    const res = await fetch(endpointUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${staleToken}`
+      },
+      body: JSON.stringify(validPayload)
+    });
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe('SESSION_INVALIDATED');
+    expect(generatePdfSpy).not.toHaveBeenCalled();
+  });
+
+  // E. Existing valid session after Company Switch
+  it('E. Existing valid session after Company Switch → PDF continues to work (200, valid PDF)', async () => {
+    const token = createToken('active-session-token-abc', validCompanyId);
+    const res = await fetch(endpointUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'x-company-id': alternateCompanyId
+      },
+      body: JSON.stringify(validPayload)
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/pdf');
+    const buffer = Buffer.from(await res.arrayBuffer());
+    expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
+    expect(generatePdfSpy).toHaveBeenCalledTimes(1);
+  });
+
+  // F. After Logout
+  it('F. After Logout → old token rejected with 401, generatePDF must NOT be called', async () => {
+    const tokenBeforeLogout = createToken('active-session-token-abc');
+    currentDbSessionToken = null;
+
+    const res = await fetch(endpointUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tokenBeforeLogout}`
+      },
+      body: JSON.stringify(validPayload)
+    });
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe('SESSION_INVALIDATED');
+    expect(generatePdfSpy).not.toHaveBeenCalled();
+  });
+
+  // G. After Password Change
+  it('G. After Password Change → old token rejected (401), new valid token works (200, valid PDF)', async () => {
+    const oldToken = createToken('session-token-before-password-change');
+    currentDbSessionToken = 'session-token-after-password-change-new';
+    const newToken = createToken('session-token-after-password-change-new');
+
+    // 1. Old token rejected
+    const resOld = await fetch(endpointUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${oldToken}`
+      },
+      body: JSON.stringify(validPayload)
+    });
+    expect(resOld.status).toBe(401);
+    expect(generatePdfSpy).not.toHaveBeenCalled();
+
+    // 2. Newly issued token succeeds with real PDF
+    const resNew = await fetch(endpointUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${newToken}`
+      },
+      body: JSON.stringify(validPayload)
+    });
+    expect(resNew.status).toBe(200);
+    expect(resNew.headers.get('content-type')).toBe('application/pdf');
+    const buffer = Buffer.from(await resNew.arrayBuffer());
+    expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
+    expect(generatePdfSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
