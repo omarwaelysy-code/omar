@@ -499,14 +499,10 @@ async function startServer() {
       console.error(`- Stack Trace:\n${stack}`);
       console.error("==============================================================");
 
-      // Return the full structured error details back to the client
+      // Return generic safe error to client without leaking internal paths or stack traces
       res.status(500).json({
         error: "PDF Generation failed",
-        failedFile: fileName,
-        lineNumber: lineNumber,
-        exceptionName: err.name || 'Error',
-        exceptionMessage: err.message,
-        stackTrace: stack
+        message: "An error occurred while generating the document"
       });
     }
   });
