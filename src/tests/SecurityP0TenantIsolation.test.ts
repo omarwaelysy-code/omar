@@ -509,4 +509,277 @@ describe('SECURITY P0 — TENANT ISOLATION & ETA CREDENTIAL PROTECTION', () => {
     expect(res.status).toBe(200);
     expect(queriedCompanyId).toBe(companyBId);
   });
+
+  // =========================================================================
+  // MULTI-COMPANY AUTHORIZED SWITCHING TESTS
+  // =========================================================================
+
+  const tokenMultiUser = jwt.sign(
+    { id: 'user-multi-a', email: 'multi@company.com', role: 'admin', company_id: companyAId },
+    getJwtSecret()
+  );
+
+  const mockMultiUserMemberships = [
+    { id: 'user-multi-a', company_id: companyAId, role: 'admin', permissions: { all: true }, email: 'multi@company.com' },
+    { id: 'user-multi-b', company_id: companyBId, role: 'admin', permissions: { all: true }, email: 'multi@company.com' }
+  ];
+
+  // TEST 19: User with access to Company A and Company B can switch to Company A
+  it('TEST 19: Multi-company user can switch to Company A and reads use Company A', async () => {
+    let capturedParams: any = null;
+    vi.spyOn(pool, 'query').mockImplementation(async (sql: any, params?: any[]) => {
+      if (typeof sql === 'string' && sql.includes('FROM users WHERE LOWER(email)')) {
+        return { rows: mockMultiUserMemberships } as any;
+      }
+      if (typeof sql === 'string' && sql.includes('FROM "customers"')) {
+        capturedParams = params;
+        return { rows: [{ id: 'cust-1', name: 'Customer in A', company_id: companyAId }] } as any;
+      }
+      return { rows: [] } as any;
+    });
+
+    const res = await fetch(`${baseUrl}/customers`, {
+      headers: {
+        Authorization: `Bearer ${tokenMultiUser}`,
+        'x-company-id': companyAId
+      }
+    });
+
+    expect(res.status).toBe(200);
+    expect(capturedParams).toBeDefined();
+    expect(capturedParams).toContain(companyAId);
+    expect(capturedParams).not.toContain(companyBId);
+  });
+
+  // TEST 20: User with access to Company A and Company B can switch to Company B
+  it('TEST 20: Multi-company user can switch to Company B and reads use Company B', async () => {
+    let capturedParams: any = null;
+    vi.spyOn(pool, 'query').mockImplementation(async (sql: any, params?: any[]) => {
+      if (typeof sql === 'string' && sql.includes('FROM users')) {
+        return { rows: mockMultiUserMemberships } as any;
+      }
+      if (typeof sql === 'string' && sql.includes('companies')) {
+        return {
+          rows: [{
+            subscription_status: 'ACTIVE',
+            company_status: 'ACTIVE',
+            subscription_end: '2099-01-01',
+            subscription_expiry: '2099-01-01'
+          }]
+        } as any;
+      }
+      if (typeof sql === 'string' && sql.includes('FROM "customers"')) {
+        capturedParams = params;
+        return { rows: [{ id: 'cust-2', name: 'Customer in B', company_id: companyBId }] } as any;
+      }
+      return { rows: [] } as any;
+    });
+
+    const res = await fetch(`${baseUrl}/customers`, {
+      headers: {
+        Authorization: `Bearer ${tokenMultiUser}`,
+        'x-company-id': companyBId
+      }
+    });
+
+    expect(res.status).toBe(200);
+    expect(capturedParams).toBeDefined();
+    expect(capturedParams).toContain(companyBId);
+    expect(capturedParams).not.toContain(companyAId);
+  });
+
+  // TEST 21: User with access ONLY to Company A attempting to select Company B is rejected
+  it('TEST 21: User with access only to Company A cannot switch to Company B', async () => {
+    let capturedParams: any = null;
+    vi.spyOn(pool, 'query').mockImplementation(async (sql: any, params?: any[]) => {
+      if (typeof sql === 'string' && sql.includes('FROM users')) {
+        // User only has membership for Company A
+        return { rows: [{ id: 'user-a-1', company_id: companyAId, role: 'admin' }] } as any;
+      }
+      if (typeof sql === 'string' && sql.includes('companies')) {
+        return {
+          rows: [{
+            subscription_status: 'ACTIVE',
+            company_status: 'ACTIVE',
+            subscription_end: '2099-01-01',
+            subscription_expiry: '2099-01-01'
+          }]
+        } as any;
+      }
+      if (typeof sql === 'string' && sql.includes('FROM "customers"')) {
+        capturedParams = params;
+        return { rows: [] } as any;
+      }
+      return { rows: [] } as any;
+    });
+
+    const res = await fetch(`${baseUrl}/customers`, {
+      headers: {
+        Authorization: `Bearer ${tokenCompanyA}`,
+        'x-company-id': companyBId
+      }
+    });
+
+    expect(res.status).toBe(200);
+    expect(capturedParams).toBeDefined();
+    // Unauthorized companyBId was rejected; query forced to Company A
+    expect(capturedParams).toContain(companyAId);
+    expect(capturedParams).not.toContain(companyBId);
+  });
+
+  // TEST 22: User cannot bypass authorization through request body company_id
+  it('TEST 22: User cannot inject unauthorized company_id in request body on POST', async () => {
+    let capturedInsertParams: any = null;
+    vi.spyOn(pool, 'connect').mockResolvedValue({
+      query: vi.fn().mockImplementation(async (sql: any, params?: any[]) => {
+        if (typeof sql === 'string' && sql.includes('INSERT INTO "customers"')) {
+          capturedInsertParams = params;
+          return { rows: [{ id: 'new-cust', company_id: companyAId }] };
+        }
+        return { rows: [] };
+      }),
+      release: vi.fn()
+    } as any);
+
+    vi.spyOn(pool, 'query').mockImplementation(async (sql: any) => {
+      if (typeof sql === 'string' && sql.includes('FROM users')) {
+        return { rows: [{ id: 'user-a-1', company_id: companyAId, role: 'admin' }] } as any;
+      }
+      if (typeof sql === 'string' && sql.includes('companies')) {
+        return {
+          rows: [{
+            subscription_status: 'ACTIVE',
+            company_status: 'ACTIVE',
+            subscription_end: '2099-01-01',
+            subscription_expiry: '2099-01-01'
+          }]
+        } as any;
+      }
+      return { rows: [] } as any;
+    });
+
+    const res = await fetch(`${baseUrl}/customers`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${tokenCompanyA}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: 'Evil Customer',
+        account_id: 'acc-cust-001',
+        company_id: companyBId // Trying to inject into unauthorized company B
+      })
+    });
+
+    expect(res.status).toBe(201);
+    expect(capturedInsertParams).toBeDefined();
+    // Verify company_id was forced to companyAId, not companyBId
+    expect(capturedInsertParams).toContain(companyAId);
+    expect(capturedInsertParams).not.toContain(companyBId);
+  });
+
+  // TEST 23: Multi-company user can export backup for Company B
+  it('TEST 23: Multi-company user can export backup for authorized Company B', async () => {
+    let queriedCompanyIds: string[] = [];
+    vi.spyOn(pool, 'query').mockImplementation(async (sql: any, params?: any[]) => {
+      if (typeof sql === 'string' && sql.includes('FROM users')) {
+        return { rows: mockMultiUserMemberships } as any;
+      }
+      if (typeof sql === 'string' && sql.includes('companies')) {
+        return {
+          rows: [{
+            id: companyBId,
+            subscription_status: 'ACTIVE',
+            company_status: 'ACTIVE',
+            subscription_end: '2099-01-01',
+            subscription_expiry: '2099-01-01'
+          }]
+        } as any;
+      }
+      if (typeof sql === 'string' && sql.includes('WHERE company_id = $1') && params) {
+        queriedCompanyIds.push(params[0]);
+      }
+      return { rows: [] } as any;
+    });
+
+    const res = await fetch(`${baseUrl}/system/backup?company_id=${companyBId}`, {
+      headers: { Authorization: `Bearer ${tokenMultiUser}` }
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.company_id).toBe(companyBId);
+    expect(queriedCompanyIds.length).toBeGreaterThan(0);
+    expect(queriedCompanyIds.every(id => id === companyBId)).toBe(true);
+  });
+
+  // TEST 24: Single-company user exporting backup for Company B gets Company A only
+  it('TEST 24: Single-company user requesting Company B backup gets Company A only', async () => {
+    let queriedCompanyIds: string[] = [];
+    vi.spyOn(pool, 'query').mockImplementation(async (sql: any, params?: any[]) => {
+      if (typeof sql === 'string' && sql.includes('FROM users')) {
+        return { rows: [{ id: 'user-a-1', company_id: companyAId, role: 'admin' }] } as any;
+      }
+      if (typeof sql === 'string' && sql.includes('companies')) {
+        return {
+          rows: [{
+            id: companyAId,
+            subscription_status: 'ACTIVE',
+            company_status: 'ACTIVE',
+            subscription_end: '2099-01-01',
+            subscription_expiry: '2099-01-01'
+          }]
+        } as any;
+      }
+      if (typeof sql === 'string' && sql.includes('WHERE company_id = $1') && params) {
+        queriedCompanyIds.push(params[0]);
+      }
+      return { rows: [] } as any;
+    });
+
+    const res = await fetch(`${baseUrl}/system/backup?company_id=${companyBId}`, {
+      headers: { Authorization: `Bearer ${tokenCompanyA}` }
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.company_id).toBe(companyAId);
+    expect(queriedCompanyIds.every(id => id === companyAId)).toBe(true);
+    expect(queriedCompanyIds).not.toContain(companyBId);
+  });
+
+  // TEST 25: Multi-company user switched to Company B accesses Company B ETA documents
+  it('TEST 25: Multi-company user switched to Company B queries Company B ETA documents', async () => {
+    let searchCompanyId: any = null;
+    vi.spyOn(pool, 'query').mockImplementation(async (sql: any, params?: any[]) => {
+      if (typeof sql === 'string' && sql.includes('FROM users')) {
+        return { rows: mockMultiUserMemberships } as any;
+      }
+      if (typeof sql === 'string' && sql.includes('companies')) {
+        return {
+          rows: [{
+            subscription_status: 'ACTIVE',
+            company_status: 'ACTIVE',
+            subscription_end: '2099-01-01',
+            subscription_expiry: '2099-01-01'
+          }]
+        } as any;
+      }
+      if (typeof sql === 'string' && sql.includes('FROM eta_documents')) {
+        searchCompanyId = params?.[0];
+        return { rows: [{ total_count: 0 }] } as any;
+      }
+      return { rows: [] } as any;
+    });
+
+    const res = await fetch(`${baseUrl}/eta/invoices/received`, {
+      headers: {
+        Authorization: `Bearer ${tokenMultiUser}`,
+        'x-company-id': companyBId
+      }
+    });
+
+    expect(res.status).toBe(200);
+    expect(searchCompanyId).toBe(companyBId);
+  });
 });

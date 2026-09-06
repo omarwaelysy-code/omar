@@ -3844,10 +3844,15 @@ modules.forEach(moduleName => {
         }
 
         let rows;
-      const isSuperAdminUser = req.user?.role === 'super_admin';
+      const isSuperAdminUser = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
+      const authorizedCompanies = (req.user as any)?.authorized_company_ids || (req.user?.company_id ? [req.user.company_id] : []);
 
       if (moduleName === 'activity_logs') {
-        const targetCompanyId = isSuperAdminUser ? (req.query.company_id as string || req.user?.company_id) : req.user?.company_id;
+        const requested = typeof req.query.company_id === 'string' ? req.query.company_id.trim() : undefined;
+        const isRequestedAuthorized = requested && authorizedCompanies.includes(requested);
+        const targetCompanyId = isSuperAdminUser
+          ? (requested || req.user?.company_id)
+          : (isRequestedAuthorized ? requested : req.user?.company_id);
         
         if (targetCompanyId && typeof targetCompanyId !== 'string') return sendError(res, 400, 'Invalid company_id format');
 
@@ -3865,7 +3870,11 @@ modules.forEach(moduleName => {
         const queryResult = await pool.query(query, params);
         rows = queryResult.rows;
       } else if (moduleName === 'audit_logs') {
-        const targetCompanyId = isSuperAdminUser ? (req.query.company_id as string || req.user?.company_id) : req.user?.company_id;
+        const requested = typeof req.query.company_id === 'string' ? req.query.company_id.trim() : undefined;
+        const isRequestedAuthorized = requested && authorizedCompanies.includes(requested);
+        const targetCompanyId = isSuperAdminUser
+          ? (requested || req.user?.company_id)
+          : (isRequestedAuthorized ? requested : req.user?.company_id);
 
         let query = 'SELECT * FROM audit_logs';
         let params: any[] = [];
@@ -3886,19 +3895,28 @@ modules.forEach(moduleName => {
       } else {
         // For other tables, we apply company_id filter by default if present in schema
         const queryFilters = { ...req.query } as any;
-        const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
+        const isSuperAdmin = isSuperAdminUser;
         const isOwnEmailQuery = moduleName === 'users' && (
           queryFilters.email === req.user?.email || 
           (typeof queryFilters.email === 'string' && typeof req.user?.email === 'string' && queryFilters.email.toLowerCase() === req.user.email.toLowerCase())
         );
 
         if (EXPECTED_SCHEMA[moduleName]?.includes('company_id')) {
-          if (!isSuperAdmin && !isOwnEmailQuery) {
-            // SECURITY P0-3: Force authoritative req.user.company_id for non-super-admin.
-            // Client-provided ?company_id= is strictly overridden.
-            queryFilters.company_id = req.user?.company_id;
-          } else if (isSuperAdmin && !queryFilters.company_id && req.user?.company_id) {
-            queryFilters.company_id = req.user.company_id;
+          const requestedCompanyFilter = typeof queryFilters.company_id === 'string' ? queryFilters.company_id.trim() : undefined;
+          const isRequestedAuthorized = requestedCompanyFilter && authorizedCompanies.includes(requestedCompanyFilter);
+
+          if (isSuperAdmin) {
+            if (!queryFilters.company_id && req.user?.company_id) {
+              queryFilters.company_id = req.user.company_id;
+            }
+          } else if (!isOwnEmailQuery) {
+            // SECURITY: Allow client-requested company ONLY IF user is authorized for that company.
+            // If unauthorized or not specified, force active authorized company_id.
+            if (isRequestedAuthorized) {
+              queryFilters.company_id = requestedCompanyFilter;
+            } else {
+              queryFilters.company_id = req.user?.company_id;
+            }
           }
         }
 
@@ -4446,8 +4464,18 @@ modules.forEach(moduleName => {
 
           const sanitizedData = sanitizeData(moduleName, req.body);
           const data = { ...sanitizedData };
-          if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && !data.company_id) {
-            data.company_id = companyId;
+          const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
+          if (EXPECTED_SCHEMA[moduleName]?.includes('company_id')) {
+            const authorizedCompanies = (req.user as any)?.authorized_company_ids || (req.user?.company_id ? [req.user.company_id] : []);
+            if (!isSuperAdmin) {
+              if (data.company_id && authorizedCompanies.includes(data.company_id)) {
+                // allowed authorized company
+              } else {
+                data.company_id = companyId;
+              }
+            } else if (!data.company_id) {
+              data.company_id = companyId;
+            }
           }
 
           if (!data.id && moduleName !== 'activity_logs' && moduleName !== 'audit_logs') {

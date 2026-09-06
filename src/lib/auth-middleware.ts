@@ -13,6 +13,9 @@ export interface AuthRequest extends Request {
     company_id?: string;
     role: string;
     is_super_admin?: boolean;
+    authorized_company_ids?: string[];
+    permissions?: any;
+    role_ids?: string[];
   };
 }
 
@@ -28,18 +31,68 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     const decoded = jwt.verify(token, getJwtSecret()) as any;
     req.user = decoded;
 
+    let authorizedCompanyIds: string[] = [];
+    let isSuperAdminAccount = decoded.role === 'super_admin' || decoded.is_super_admin === true;
+
     if (decoded?.email) {
       try {
-        const superCheck = await pool.query(
-          "SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND (role = 'super_admin' OR company_id = 'system' OR company_id = 'SYSTEM') LIMIT 1",
+        const userMembershipsRes = await pool.query(
+          `SELECT id, company_id, role, permissions, role_ids 
+           FROM users 
+           WHERE LOWER(email) = LOWER($1) AND company_id IS NOT NULL`,
           [decoded.email]
         );
-        if (superCheck.rows.length > 0 || decoded.role === 'super_admin') {
+
+        authorizedCompanyIds = userMembershipsRes.rows
+          .map((r: any) => r.company_id)
+          .filter(Boolean);
+
+        if (decoded.company_id && !authorizedCompanyIds.includes(decoded.company_id)) {
+          authorizedCompanyIds.push(decoded.company_id);
+        }
+
+        if (
+          !isSuperAdminAccount &&
+          userMembershipsRes.rows.some((r: any) => r.role === 'super_admin' || r.company_id?.toLowerCase() === 'system')
+        ) {
+          isSuperAdminAccount = true;
+        }
+
+        (req.user as any).authorized_company_ids = authorizedCompanyIds;
+        if (isSuperAdminAccount) {
           (req.user as any).is_super_admin = true;
         }
+
+        // Resolve requested company context: prioritize header, then query, then body
+        const headerCompanyId = (req.headers['x-company-id'] as string)?.trim();
+        const queryCompanyId = (req.query?.company_id as string)?.trim();
+        const bodyCompanyId = (typeof req.body?.company_id === 'string' ? req.body.company_id : undefined)?.trim();
+        const requestedCompanyId = headerCompanyId || queryCompanyId || bodyCompanyId;
+
+        if (requestedCompanyId && requestedCompanyId !== decoded.company_id) {
+          if (isSuperAdminAccount) {
+            req.user.company_id = requestedCompanyId;
+            req.user.role = 'super_admin';
+          } else if (authorizedCompanyIds.includes(requestedCompanyId)) {
+            const membership = userMembershipsRes.rows.find((r: any) => r.company_id === requestedCompanyId);
+            req.user.company_id = requestedCompanyId;
+            if (membership) {
+              req.user.id = membership.id;
+              req.user.role = membership.role;
+              (req.user as any).permissions = membership.permissions;
+              (req.user as any).role_ids = membership.role_ids;
+            }
+          }
+          // If requestedCompanyId is NOT in authorizedCompanyIds:
+          // Tenant isolation is preserved: req.user.company_id remains decoded.company_id
+        }
       } catch (e) {
-        // silent catch
+        console.error('Error in user authorization/membership resolution:', e);
       }
+    }
+
+    if (!req.user.authorized_company_ids) {
+      (req.user as any).authorized_company_ids = decoded.company_id ? [decoded.company_id] : [];
     }
 
     // ================================================================
@@ -66,25 +119,6 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       } catch (sessionErr) {
         // Non-fatal: if DB check fails, allow request to proceed
         console.error('Session validation error (non-fatal):', sessionErr);
-      }
-    }
-
-    // Resolve company_id from 'x-company-id' header if present to support seamless workspace switching
-    const requestedCompanyId = req.headers['x-company-id'] as string;
-    if (requestedCompanyId && requestedCompanyId !== decoded.company_id) {
-      const isSuperAdminRole = decoded.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
-      
-      try {
-        const userRes = await pool.query('SELECT role FROM users WHERE email = $1 AND company_id = $2', [decoded.email, requestedCompanyId]);
-        if (userRes.rows.length > 0) {
-          req.user.company_id = requestedCompanyId;
-          req.user.role = isSuperAdminRole ? 'super_admin' : userRes.rows[0].role;
-        } else if (isSuperAdminRole) {
-          req.user.company_id = requestedCompanyId;
-          req.user.role = 'super_admin';
-        }
-      } catch (dbErr) {
-        console.error('Error switching company context in middleware:', dbErr);
       }
     }
     
@@ -114,12 +148,11 @@ export const authorizeRoles = (...roles: string[]) => {
 /**
  * SECURITY P0-1 / P0-13: Authoritative Tenant Resolution Helper
  * 
- * For non-super-admin: req.user.company_id is strictly authoritative.
- * Client-supplied headers (x-company-id), query parameters (?company_id=),
- * or body properties are NEVER trusted to switch tenant.
- * 
- * For verified super_admin: allows cross-company targeting if explicitly supplied.
- * Never mutates req.user.
+ * Resolves the active company ID safely:
+ * - For super_admin: allows cross-company targeting if explicitly supplied.
+ * - For normal users: allows switching ONLY to companies the user is explicitly authorized to access.
+ * - If client requests an unauthorized company (via header, query, or body), the request is rejected/ignored
+ *   and scoped strictly to the user's authenticated/authorized company.
  */
 export function getAuthenticatedCompanyId(req: AuthRequest, allowSuperAdminOverride: boolean = true): string | undefined {
   if (!req.user) return undefined;
@@ -130,6 +163,14 @@ export function getAuthenticatedCompanyId(req: AuthRequest, allowSuperAdminOverr
       return rawOverride.trim();
     }
   }
+
+  const authorizedCompanies: string[] = (req.user as any)?.authorized_company_ids || (req.user.company_id ? [req.user.company_id] : []);
+  const requested = ((req.headers?.['x-company-id'] as string) || (req.query?.company_id as string) || (req.body?.company_id as string))?.trim();
+  
+  if (requested && authorizedCompanies.includes(requested)) {
+    return requested;
+  }
+
   return req.user.company_id;
 }
 
