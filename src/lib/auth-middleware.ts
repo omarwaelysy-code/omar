@@ -110,3 +110,26 @@ export const authorizeRoles = (...roles: string[]) => {
     next();
   };
 };
+
+/**
+ * SECURITY P0-1 / P0-13: Authoritative Tenant Resolution Helper
+ * 
+ * For non-super-admin: req.user.company_id is strictly authoritative.
+ * Client-supplied headers (x-company-id), query parameters (?company_id=),
+ * or body properties are NEVER trusted to switch tenant.
+ * 
+ * For verified super_admin: allows cross-company targeting if explicitly supplied.
+ * Never mutates req.user.
+ */
+export function getAuthenticatedCompanyId(req: AuthRequest, allowSuperAdminOverride: boolean = true): string | undefined {
+  if (!req.user) return undefined;
+  const isSuperAdmin = req.user.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
+  if (isSuperAdmin && allowSuperAdminOverride) {
+    const rawOverride = (req.query?.company_id as string) || (req.headers?.['x-company-id'] as string) || (req.body?.company_id as string);
+    if (typeof rawOverride === 'string' && rawOverride.trim() !== '') {
+      return rawOverride.trim();
+    }
+  }
+  return req.user.company_id;
+}
+

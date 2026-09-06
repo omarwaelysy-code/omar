@@ -445,11 +445,11 @@ export function CompanySettings() {
                 building_number: etaRes.building_number || '',
                 postal_code: etaRes.postal_code || '',
                 client_id: etaRes.client_id || '',
-                client_secret: etaRes.client_secret || '',
-                client_secret_configured: Boolean(etaRes.client_secret_configured || etaRes.client_secret),
-                operating_key: etaRes.operating_key || '',
-                operating_key_configured: Boolean(etaRes.operating_key_configured || etaRes.operating_key),
-                is_configured: Boolean(etaRes.is_configured || (etaRes.client_id && (etaRes.client_secret || etaRes.client_secret_configured)))
+                client_secret: '',
+                client_secret_configured: Boolean(etaRes.client_secret_configured),
+                operating_key: '',
+                operating_key_configured: Boolean(etaRes.operating_key_configured),
+                is_configured: Boolean(etaRes.is_configured || (etaRes.client_id && etaRes.client_secret_configured))
               });
             }
           } catch (etaErr) {
@@ -496,11 +496,11 @@ export function CompanySettings() {
             ...prev,
             ...res.data,
             client_id: res.data.client_id || etaSettings.client_id,
-            client_secret: res.data.client_secret || etaSettings.client_secret,
-            client_secret_configured: Boolean(res.data.client_secret_configured || res.data.client_secret || etaSettings.client_secret),
-            operating_key: res.data.operating_key || etaSettings.operating_key,
-            operating_key_configured: Boolean(res.data.operating_key_configured || res.data.operating_key || etaSettings.operating_key),
-            is_configured: Boolean(res.data.is_configured || (res.data.client_id && (res.data.client_secret || res.data.client_secret_configured)))
+            client_secret: '',
+            client_secret_configured: Boolean(res.data.client_secret_configured ?? etaSettings.client_secret_configured),
+            operating_key: '',
+            operating_key_configured: Boolean(res.data.operating_key_configured ?? etaSettings.operating_key_configured),
+            is_configured: Boolean(res.data.is_configured ?? (res.data.client_id && res.data.client_secret_configured))
           }));
           showNotification(
             language === 'ar'

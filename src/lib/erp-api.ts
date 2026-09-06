@@ -5,7 +5,7 @@ import { getJwtSecret } from './env';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { authenticateToken, AuthRequest, authorizeRoles } from './auth-middleware';
+import { authenticateToken, AuthRequest, authorizeRoles, getAuthenticatedCompanyId } from './auth-middleware';
 import { EXPECTED_SCHEMA } from './schema-registry';
 import { DashboardService } from '../services/DashboardService';
 import { WIDGET_REGISTRY } from '../constants/widgets';
@@ -1076,7 +1076,7 @@ async function checkPeriodClosingMiddleware(req: AuthRequest, res: any, next: an
   }
 
   const id = req.params.id || pathParts[1];
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   if (!companyId) return next();
 
   const effectiveModule = getEffectiveModule(moduleName);
@@ -1536,7 +1536,7 @@ router.post('/system/fix', authenticateToken, authorizeRoles('super_admin'), asy
 // Export JSON
 router.get('/system/backup', authenticateToken, authorizeRoles('super_admin', 'admin'), async (req: AuthRequest, res) => {
   try {
-    const companyId = req.query.company_id || req.user?.company_id;
+    const companyId = getAuthenticatedCompanyId(req);
     if (!companyId) return res.status(400).json({ error: 'Company ID is required' });
 
     const backupData: any = {
@@ -1572,7 +1572,7 @@ router.get('/system/backup', authenticateToken, authorizeRoles('super_admin', 'a
 // Export Excel
 router.get('/system/export-excel', authenticateToken, authorizeRoles('super_admin', 'admin'), async (req: AuthRequest, res) => {
   try {
-    const companyId = req.query.company_id || req.user?.company_id;
+    const companyId = getAuthenticatedCompanyId(req);
     if (!companyId) return res.status(400).json({ error: 'Company ID is required' });
 
     const wb = XLSX.utils.book_new();
@@ -2724,8 +2724,7 @@ router.post('/utils/fix-duplicate-pinv', authenticateToken, async (req: any, res
 
 router.get('/detailed-journal-entries', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const isSuperAdmin = req.user?.role === 'super_admin';
-    const companyId = isSuperAdmin ? req.query.company_id : (req.query.company_id || req.user?.company_id);
+    const companyId = getAuthenticatedCompanyId(req);
     
     if (!companyId) return res.status(400).json({ error: 'company_id is required' });
 
@@ -3069,7 +3068,7 @@ async function createChequeJournalEntry(
 // 1. Dashboard Stats
 const chequeDashboardHandler = async (req: AuthRequest, res: any) => {
   try {
-    const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+    const companyId = getAuthenticatedCompanyId(req);
     if (!companyId) return sendError(res, 401, 'Unauthorized');
 
     if (!await checkPermission(req, 'issued_cheques', 'view')) {
@@ -3138,7 +3137,7 @@ router.get('/issued_cheques/dashboard-stats', authenticateToken, chequeDashboard
 // 2. Upcoming Cheques
 const chequeUpcomingHandler = async (req: AuthRequest, res: any) => {
   try {
-    const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+    const companyId = getAuthenticatedCompanyId(req);
     if (!companyId) return sendError(res, 401, 'Unauthorized');
 
     if (!await checkPermission(req, 'issued_cheques', 'view')) {
@@ -3176,13 +3175,20 @@ const chequeIssueHandler = async (req: AuthRequest, res: any) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const requestedCompanyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+    const companyId = getAuthenticatedCompanyId(req);
+    if (!companyId) {
+      await client.query('ROLLBACK');
+      return sendError(res, 401, 'Unauthorized');
+    }
+    const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
     const { id } = req.params;
 
-    const { rows: chequeRows } = await client.query(
-      `SELECT * FROM issued_cheques WHERE id = $1 FOR UPDATE`,
-      [id]
-    );
+    const chequeQuery = isSuperAdmin
+      ? `SELECT * FROM issued_cheques WHERE id = $1 FOR UPDATE`
+      : `SELECT * FROM issued_cheques WHERE id = $1 AND company_id = $2 FOR UPDATE`;
+    const chequeParams = isSuperAdmin ? [id] : [id, companyId];
+
+    const { rows: chequeRows } = await client.query(chequeQuery, chequeParams);
 
     if (chequeRows.length === 0) {
       await client.query('ROLLBACK');
@@ -3190,8 +3196,7 @@ const chequeIssueHandler = async (req: AuthRequest, res: any) => {
     }
 
     const cheque = chequeRows[0];
-    const companyId = cheque.company_id || requestedCompanyId;
-    if (req.user) req.user.company_id = companyId;
+    const targetCompanyId = isSuperAdmin ? (cheque.company_id || companyId) : companyId;
 
     if (!await checkPermission(req, 'issued_cheques', 'issue') && !await checkPermission(req, 'issued_cheques', 'edit')) {
       await client.query('ROLLBACK');
@@ -3306,14 +3311,21 @@ const chequePayHandler = async (req: AuthRequest, res: any) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const requestedCompanyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+    const companyId = getAuthenticatedCompanyId(req);
+    if (!companyId) {
+      await client.query('ROLLBACK');
+      return sendError(res, 401, 'Unauthorized');
+    }
+    const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
     const { id } = req.params;
     const { payment_date, notes } = req.body;
 
-    const { rows: chequeRows } = await client.query(
-      `SELECT * FROM issued_cheques WHERE id = $1 FOR UPDATE`,
-      [id]
-    );
+    const chequeQuery = isSuperAdmin
+      ? `SELECT * FROM issued_cheques WHERE id = $1 FOR UPDATE`
+      : `SELECT * FROM issued_cheques WHERE id = $1 AND company_id = $2 FOR UPDATE`;
+    const chequeParams = isSuperAdmin ? [id] : [id, companyId];
+
+    const { rows: chequeRows } = await client.query(chequeQuery, chequeParams);
 
     if (chequeRows.length === 0) {
       await client.query('ROLLBACK');
@@ -3321,8 +3333,7 @@ const chequePayHandler = async (req: AuthRequest, res: any) => {
     }
 
     const cheque = chequeRows[0];
-    const companyId = cheque.company_id || requestedCompanyId;
-    if (req.user) req.user.company_id = companyId;
+    const targetCompanyId = isSuperAdmin ? (cheque.company_id || companyId) : companyId;
 
     if (!await checkPermission(req, 'issued_cheques', 'pay') && !await checkPermission(req, 'issued_cheques', 'edit')) {
       await client.query('ROLLBACK');
@@ -3434,7 +3445,12 @@ const chequePostponeHandler = async (req: AuthRequest, res: any) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const requestedCompanyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+    const companyId = getAuthenticatedCompanyId(req);
+    if (!companyId) {
+      await client.query('ROLLBACK');
+      return sendError(res, 401, 'Unauthorized');
+    }
+    const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
     const { id } = req.params;
     const { new_due_date, reason } = req.body;
 
@@ -3443,10 +3459,12 @@ const chequePostponeHandler = async (req: AuthRequest, res: any) => {
       return sendError(res, 400, 'يرجى تحديد تاريخ الاستحقاق الجديد.');
     }
 
-    const { rows: chequeRows } = await client.query(
-      `SELECT * FROM issued_cheques WHERE id = $1 FOR UPDATE`,
-      [id]
-    );
+    const chequeQuery = isSuperAdmin
+      ? `SELECT * FROM issued_cheques WHERE id = $1 FOR UPDATE`
+      : `SELECT * FROM issued_cheques WHERE id = $1 AND company_id = $2 FOR UPDATE`;
+    const chequeParams = isSuperAdmin ? [id] : [id, companyId];
+
+    const { rows: chequeRows } = await client.query(chequeQuery, chequeParams);
 
     if (chequeRows.length === 0) {
       await client.query('ROLLBACK');
@@ -3454,8 +3472,7 @@ const chequePostponeHandler = async (req: AuthRequest, res: any) => {
     }
 
     const cheque = chequeRows[0];
-    const companyId = cheque.company_id || requestedCompanyId;
-    if (req.user) req.user.company_id = companyId;
+    const targetCompanyId = isSuperAdmin ? (cheque.company_id || companyId) : companyId;
 
     if (!await checkPermission(req, 'issued_cheques', 'postpone') && !await checkPermission(req, 'issued_cheques', 'edit')) {
       await client.query('ROLLBACK');
@@ -3515,14 +3532,21 @@ const chequeReturnHandler = async (req: AuthRequest, res: any) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const requestedCompanyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+    const companyId = getAuthenticatedCompanyId(req);
+    if (!companyId) {
+      await client.query('ROLLBACK');
+      return sendError(res, 401, 'Unauthorized');
+    }
+    const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
     const { id } = req.params;
     const { return_date, reason } = req.body;
 
-    const { rows: chequeRows } = await client.query(
-      `SELECT * FROM issued_cheques WHERE id = $1 FOR UPDATE`,
-      [id]
-    );
+    const chequeQuery = isSuperAdmin
+      ? `SELECT * FROM issued_cheques WHERE id = $1 FOR UPDATE`
+      : `SELECT * FROM issued_cheques WHERE id = $1 AND company_id = $2 FOR UPDATE`;
+    const chequeParams = isSuperAdmin ? [id] : [id, companyId];
+
+    const { rows: chequeRows } = await client.query(chequeQuery, chequeParams);
 
     if (chequeRows.length === 0) {
       await client.query('ROLLBACK');
@@ -3530,8 +3554,7 @@ const chequeReturnHandler = async (req: AuthRequest, res: any) => {
     }
 
     const cheque = chequeRows[0];
-    const companyId = cheque.company_id || requestedCompanyId;
-    if (req.user) req.user.company_id = companyId;
+    const targetCompanyId = isSuperAdmin ? (cheque.company_id || companyId) : companyId;
 
     if (!await checkPermission(req, 'issued_cheques', 'return') && !await checkPermission(req, 'issued_cheques', 'edit')) {
       await client.query('ROLLBACK');
@@ -3645,14 +3668,21 @@ const chequeCancelHandler = async (req: AuthRequest, res: any) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const requestedCompanyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+    const companyId = getAuthenticatedCompanyId(req);
+    if (!companyId) {
+      await client.query('ROLLBACK');
+      return sendError(res, 401, 'Unauthorized');
+    }
+    const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
     const { id } = req.params;
     const { reason } = req.body;
 
-    const { rows: chequeRows } = await client.query(
-      `SELECT * FROM issued_cheques WHERE id = $1 FOR UPDATE`,
-      [id]
-    );
+    const chequeQuery = isSuperAdmin
+      ? `SELECT * FROM issued_cheques WHERE id = $1 FOR UPDATE`
+      : `SELECT * FROM issued_cheques WHERE id = $1 AND company_id = $2 FOR UPDATE`;
+    const chequeParams = isSuperAdmin ? [id] : [id, companyId];
+
+    const { rows: chequeRows } = await client.query(chequeQuery, chequeParams);
 
     if (chequeRows.length === 0) {
       await client.query('ROLLBACK');
@@ -3660,8 +3690,7 @@ const chequeCancelHandler = async (req: AuthRequest, res: any) => {
     }
 
     const cheque = chequeRows[0];
-    const companyId = cheque.company_id || requestedCompanyId;
-    if (req.user) req.user.company_id = companyId;
+    const targetCompanyId = isSuperAdmin ? (cheque.company_id || companyId) : companyId;
 
     if (!await checkPermission(req, 'issued_cheques', 'cancel') && !await checkPermission(req, 'issued_cheques', 'delete')) {
       await client.query('ROLLBACK');
@@ -3818,7 +3847,7 @@ modules.forEach(moduleName => {
       const isSuperAdminUser = req.user?.role === 'super_admin';
 
       if (moduleName === 'activity_logs') {
-        const targetCompanyId = req.query.company_id || (!isSuperAdminUser ? req.user?.company_id : undefined);
+        const targetCompanyId = isSuperAdminUser ? (req.query.company_id as string || req.user?.company_id) : req.user?.company_id;
         
         if (targetCompanyId && typeof targetCompanyId !== 'string') return sendError(res, 400, 'Invalid company_id format');
 
@@ -3836,7 +3865,7 @@ modules.forEach(moduleName => {
         const queryResult = await pool.query(query, params);
         rows = queryResult.rows;
       } else if (moduleName === 'audit_logs') {
-        const targetCompanyId = req.query.company_id || (!isSuperAdminUser ? req.user?.company_id : undefined);
+        const targetCompanyId = isSuperAdminUser ? (req.query.company_id as string || req.user?.company_id) : req.user?.company_id;
 
         let query = 'SELECT * FROM audit_logs';
         let params: any[] = [];
@@ -3863,8 +3892,14 @@ modules.forEach(moduleName => {
           (typeof queryFilters.email === 'string' && typeof req.user?.email === 'string' && queryFilters.email.toLowerCase() === req.user.email.toLowerCase())
         );
 
-        if (EXPECTED_SCHEMA[moduleName]?.includes('company_id') && !queryFilters.company_id && req.user?.company_id && !isSuperAdmin && !isOwnEmailQuery) {
-          queryFilters.company_id = req.user.company_id;
+        if (EXPECTED_SCHEMA[moduleName]?.includes('company_id')) {
+          if (!isSuperAdmin && !isOwnEmailQuery) {
+            // SECURITY P0-3: Force authoritative req.user.company_id for non-super-admin.
+            // Client-provided ?company_id= is strictly overridden.
+            queryFilters.company_id = req.user?.company_id;
+          } else if (isSuperAdmin && !queryFilters.company_id && req.user?.company_id) {
+            queryFilters.company_id = req.user.company_id;
+          }
         }
 
         const isPaginated = queryFilters._page && queryFilters._limit;
@@ -4163,7 +4198,13 @@ modules.forEach(moduleName => {
           return sendError(res, 400, `Invalid ID format for ${moduleName}`);
         }
 
+        const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
+        const userCompanyId = req.user?.company_id;
+        const hasCompanyId = EXPECTED_SCHEMA[moduleName]?.includes('company_id');
+        const shouldFilterTenant = hasCompanyId && !isSuperAdmin && Boolean(userCompanyId);
+
         let queryStr;
+        const queryParams: any[] = [id];
         const journaledTables = [
           'invoices', 'purchase_invoices', 'receipt_vouchers', 'payment_vouchers',
           'returns', 'purchase_returns', 'cash_transfers', 'customer_discounts',
@@ -4171,11 +4212,21 @@ modules.forEach(moduleName => {
           'warehouse_transfers', 'issued_cheques'
         ];
         if (journaledTables.includes(moduleName)) {
-          queryStr = `SELECT t.*, (SELECT entry_number FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS entry_number FROM "${moduleName}" t WHERE t.id = $1`;
+          if (shouldFilterTenant) {
+            queryStr = `SELECT t.*, (SELECT entry_number FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS entry_number FROM "${moduleName}" t WHERE t.id = $1 AND t.company_id = $2`;
+            queryParams.push(userCompanyId);
+          } else {
+            queryStr = `SELECT t.*, (SELECT entry_number FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS entry_number FROM "${moduleName}" t WHERE t.id = $1`;
+          }
         } else {
-          queryStr = `SELECT * FROM "${moduleName}" WHERE id = $1`;
+          if (shouldFilterTenant) {
+            queryStr = `SELECT * FROM "${moduleName}" WHERE id = $1 AND company_id = $2`;
+            queryParams.push(userCompanyId);
+          } else {
+            queryStr = `SELECT * FROM "${moduleName}" WHERE id = $1`;
+          }
         }
-        const { rows }: any = await pool.query(queryStr, [id]);
+        const { rows }: any = await pool.query(queryStr, queryParams);
         const row = rows[0] || null;
         
         if (!row) {
@@ -4697,6 +4748,14 @@ modules.forEach(moduleName => {
 
   routeNames.forEach(rn => {
     router.delete(`/${rn}/:id`, authenticateToken, async (req: AuthRequest, res) => {
+      // SECURITY P0-6: ONLY verified super_admin may delete a tenant company
+      if (moduleName === 'companies') {
+        const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
+        if (!isSuperAdmin) {
+          return res.status(403).json({ error: 'Access Denied: Only super_admin can delete a company.' });
+        }
+      }
+
       const targetModule = getEffectiveModule(moduleName);
       if (!await checkPermission(req, targetModule, 'delete')) {
         return res.status(403).json({ error: 'Access Denied: No Delete Permission' });
@@ -10675,7 +10734,7 @@ router.delete('/contact-messages/:id', authenticateToken, authorizeRoles('super_
 
 // Helper middleware to check if POS is enabled for company
 async function ensurePosEnabled(req: AuthRequest, res: any, next: any) {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   if (!companyId) {
     return res.status(400).json({ error: 'Company ID is required' });
   }
@@ -10699,7 +10758,7 @@ async function ensurePosEnabled(req: AuthRequest, res: any, next: any) {
 
 // GET /api/erp/pos/branch-linking-codes
 router.get('/pos/branch-linking-codes', authenticateToken, ensurePosEnabled, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   try {
     // Auto-update expired pending codes
     await pool.query(
@@ -10731,7 +10790,7 @@ router.get('/pos/branch-linking-codes', authenticateToken, ensurePosEnabled, asy
 
 // POST /api/erp/pos/branch-linking-codes/generate
 router.post('/pos/branch-linking-codes/generate', authenticateToken, ensurePosEnabled, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   const { departmentId, warehouseId, validityHours = 24 } = req.body;
   const userId = req.user?.id;
 
@@ -10775,7 +10834,7 @@ router.post('/pos/branch-linking-codes/generate', authenticateToken, ensurePosEn
 
 // PUT /api/erp/pos/branch-linking-codes/:id/revoke
 router.put('/pos/branch-linking-codes/:id/revoke', authenticateToken, ensurePosEnabled, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   const { id } = req.params;
 
   try {
@@ -11094,7 +11153,7 @@ router.get('/pos/suppliers', authenticatePosTerminal, async (req: any, res) => {
 
 // GET /api/erp/pos/connected-branches
 router.get('/pos/connected-branches', authenticateToken, ensurePosEnabled, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
 
   try {
     const { rows } = await pool.query(
@@ -11165,7 +11224,7 @@ router.get('/pos/connected-branches', authenticateToken, ensurePosEnabled, async
 
 // GET /api/erp/company/eta-settings or /api/erp/eta/settings
 router.get(['/company/eta-settings', '/eta/settings'], authenticateToken, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   if (!companyId) {
     return sendError(res, 401, 'Unauthorized');
   }
@@ -11175,7 +11234,7 @@ router.get(['/company/eta-settings', '/eta/settings'], authenticateToken, async 
       `SELECT 
         id, company_id, environment, activity_code, branch_id,
         country_code, governorate, city, street, building_number,
-        postal_code, client_id, client_secret, operating_key,
+        postal_code, client_id,
         (client_secret IS NOT NULL AND TRIM(client_secret) != '') AS client_secret_configured,
         (operating_key IS NOT NULL AND TRIM(operating_key) != '') AS operating_key_configured,
         last_notification_at,
@@ -11214,7 +11273,7 @@ router.get(['/company/eta-settings', '/eta/settings'], authenticateToken, async 
 
 // POST /api/erp/company/eta-settings or /api/erp/eta/settings
 router.post(['/company/eta-settings', '/eta/settings'], authenticateToken, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   if (!companyId) {
     return sendError(res, 401, 'Unauthorized');
   }
@@ -11314,7 +11373,7 @@ router.post(['/company/eta-settings', '/eta/settings'], authenticateToken, async
       RETURNING 
         id, company_id, environment, activity_code, branch_id,
         country_code, governorate, city, street, building_number,
-        postal_code, client_id, client_secret, operating_key,
+        postal_code, client_id,
         (client_secret IS NOT NULL AND TRIM(client_secret) != '') AS client_secret_configured,
         (operating_key IS NOT NULL AND TRIM(operating_key) != '') AS operating_key_configured,
         last_notification_at,
@@ -11360,7 +11419,7 @@ router.post(['/company/eta-settings', '/eta/settings'], authenticateToken, async
 
 // POST /api/erp/company/eta-settings/test-connection or /api/erp/eta/test-connection
 router.post(['/company/eta-settings/test-connection', '/eta/test-connection'], authenticateToken, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   if (!companyId) {
     return sendError(res, 401, 'Unauthorized');
   }
@@ -11512,7 +11571,7 @@ router.get(['/eta/lookups/governorates', '/eta/governorates'], authenticateToken
 
 // GET /api/erp/eta/invoices/received - Local-First search from PostgreSQL
 router.get('/eta/invoices/received', authenticateToken, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   if (!companyId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -11582,7 +11641,7 @@ router.get('/eta/invoices/received', authenticateToken, async (req: AuthRequest,
 
 // GET /api/erp/eta/invoices/all - Multi-period full portal sync
 router.get('/eta/invoices/all', authenticateToken, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   if (!companyId) {
     return res.status(400).json({ error: 'Company ID is required' });
   }
@@ -11614,7 +11673,7 @@ router.get('/eta/invoices/all', authenticateToken, async (req: AuthRequest, res)
 
 // GET /api/erp/eta/invoices/detailed - Detailed Electronic Documents with line items
 router.get('/eta/invoices/detailed', authenticateToken, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   if (!companyId) {
     return res.status(400).json({ error: 'Company ID is required' });
   }
@@ -11650,7 +11709,7 @@ router.get('/eta/invoices/detailed', authenticateToken, async (req: AuthRequest,
 
 // GET /api/erp/eta/suppliers/mapping
 router.get('/eta/suppliers/mapping', authenticateToken, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   if (!companyId) {
     return res.status(401).json({ error: 'Unauthorized: Company ID is required' });
   }
@@ -11678,7 +11737,7 @@ router.get('/eta/suppliers/mapping', authenticateToken, async (req: AuthRequest,
 
 // POST /api/erp/eta/suppliers/mapping/link
 router.post('/eta/suppliers/mapping/link', authenticateToken, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   if (!companyId) {
     return res.status(401).json({ error: 'Unauthorized: Company ID is required' });
   }
@@ -11695,7 +11754,7 @@ router.post('/eta/suppliers/mapping/link', authenticateToken, async (req: AuthRe
 
 // POST /api/erp/eta/suppliers/mapping/unlink
 router.post('/eta/suppliers/mapping/unlink', authenticateToken, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   if (!companyId) {
     return res.status(401).json({ error: 'Unauthorized: Company ID is required' });
   }
@@ -11712,7 +11771,7 @@ router.post('/eta/suppliers/mapping/unlink', authenticateToken, async (req: Auth
 
 // POST /api/erp/eta/suppliers/mapping/quick-link-all
 router.post('/eta/suppliers/mapping/quick-link-all', authenticateToken, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   if (!companyId) {
     return res.status(401).json({ error: 'Unauthorized: Company ID is required' });
   }
@@ -11728,7 +11787,7 @@ router.post('/eta/suppliers/mapping/quick-link-all', authenticateToken, async (r
 
 // POST /api/erp/eta/suppliers/mapping/create-and-link
 router.post('/eta/suppliers/mapping/create-and-link', authenticateToken, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   if (!companyId) {
     return res.status(401).json({ error: 'Unauthorized: Company ID is required' });
   }
@@ -11762,7 +11821,7 @@ router.post('/eta/suppliers/mapping/create-and-link', authenticateToken, async (
 
 // GET /api/erp/eta/items/mapping
 router.get('/eta/items/mapping', authenticateToken, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   if (!companyId) {
     return res.status(401).json({ error: 'Unauthorized: Company ID is required' });
   }
@@ -11790,7 +11849,7 @@ router.get('/eta/items/mapping', authenticateToken, async (req: AuthRequest, res
 
 // POST /api/erp/eta/items/mapping/link
 router.post('/eta/items/mapping/link', authenticateToken, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   if (!companyId) {
     return res.status(401).json({ error: 'Unauthorized: Company ID is required' });
   }
@@ -11807,7 +11866,7 @@ router.post('/eta/items/mapping/link', authenticateToken, async (req: AuthReques
 
 // POST /api/erp/eta/items/mapping/unlink
 router.post('/eta/items/mapping/unlink', authenticateToken, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   if (!companyId) {
     return res.status(401).json({ error: 'Unauthorized: Company ID is required' });
   }
@@ -11824,7 +11883,7 @@ router.post('/eta/items/mapping/unlink', authenticateToken, async (req: AuthRequ
 
 // POST /api/erp/eta/items/mapping/quick-link-all
 router.post('/eta/items/mapping/quick-link-all', authenticateToken, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   if (!companyId) {
     return res.status(401).json({ error: 'Unauthorized: Company ID is required' });
   }
@@ -11840,7 +11899,7 @@ router.post('/eta/items/mapping/quick-link-all', authenticateToken, async (req: 
 
 // GET /api/erp/eta/invoices/:uuid/details
 router.get('/eta/invoices/:uuid/details', authenticateToken, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   if (!companyId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -11875,7 +11934,7 @@ router.get('/eta/invoices/:uuid/details', authenticateToken, async (req: AuthReq
 
 // GET /api/erp/eta/invoices/:uuid/pdf
 router.get('/eta/invoices/:uuid/pdf', authenticateToken, async (req: AuthRequest, res) => {
-  const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id;
+  const companyId = getAuthenticatedCompanyId(req);
   if (!companyId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
