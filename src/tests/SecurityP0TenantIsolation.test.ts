@@ -782,4 +782,60 @@ describe('SECURITY P0 — TENANT ISOLATION & ETA CREDENTIAL PROTECTION', () => {
     expect(res.status).toBe(200);
     expect(searchCompanyId).toBe(companyBId);
   });
+
+  // TEST 26: Own-email membership query for multi-company user (including super_admin) returns all memberships
+  it('TEST 26: Own-email membership query returns all authorized memberships without company scoping', async () => {
+    let queriedSql = '';
+    let queriedParams: any = null;
+
+    vi.spyOn(pool, 'query').mockImplementation(async (sql: any, params?: any[]) => {
+      if (typeof sql === 'string' && sql.includes('FROM "users"')) {
+        queriedSql = sql;
+        queriedParams = params;
+        return { rows: mockMultiUserMemberships } as any;
+      }
+      return { rows: [] } as any;
+    });
+
+    // Super-admin user querying their own email to populate company switcher
+    const res = await fetch(`${baseUrl}/users?email=multi@company.com`, {
+      headers: {
+        Authorization: `Bearer ${tokenMultiUser}`
+      }
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body)).toBe(true);
+    expect(body.length).toBe(2);
+    // Verified that company_id was NOT injected into WHERE clause
+    expect(queriedSql).not.toContain('company_id =');
+  });
+
+  // TEST 27: Querying another user's email across companies remains restricted / company-scoped
+  it('TEST 27: Querying another user email does not bypass company scoping', async () => {
+    let queriedSql = '';
+    let queriedParams: any = null;
+
+    vi.spyOn(pool, 'query').mockImplementation(async (sql: any, params?: any[]) => {
+      if (typeof sql === 'string' && sql.includes('FROM "users"')) {
+        queriedSql = sql;
+        queriedParams = params;
+        return { rows: [] } as any;
+      }
+      return { rows: [] } as any;
+    });
+
+    const res = await fetch(`${baseUrl}/users?email=victim@other.com`, {
+      headers: {
+        Authorization: `Bearer ${tokenMultiUser}`
+      }
+    });
+
+    expect(res.status).toBe(200);
+    // Verified that company_id was enforced
+    expect(queriedSql).toContain('"company_id"');
+    expect(queriedParams).toContain(companyAId);
+  });
 });
+

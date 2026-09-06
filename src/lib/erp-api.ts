@@ -3905,11 +3905,17 @@ modules.forEach(moduleName => {
           const requestedCompanyFilter = typeof queryFilters.company_id === 'string' ? queryFilters.company_id.trim() : undefined;
           const isRequestedAuthorized = requestedCompanyFilter && authorizedCompanies.includes(requestedCompanyFilter);
 
-          if (isSuperAdmin) {
+          if (isOwnEmailQuery) {
+            // Allow the authenticated user to retrieve their own membership
+            // records across all companies they belong to.
+            if (isRequestedAuthorized) {
+              queryFilters.company_id = requestedCompanyFilter;
+            }
+          } else if (isSuperAdmin) {
             if (!queryFilters.company_id && req.user?.company_id) {
               queryFilters.company_id = req.user.company_id;
             }
-          } else if (!isOwnEmailQuery) {
+          } else {
             // SECURITY: Allow client-requested company ONLY IF user is authorized for that company.
             // If unauthorized or not specified, force active authorized company_id.
             if (isRequestedAuthorized) {
