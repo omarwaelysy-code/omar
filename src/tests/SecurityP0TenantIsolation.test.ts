@@ -3,7 +3,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import { getJwtSecret } from '../lib/env';
 import pool from '../lib/postgres';
-import erpRouter, { logAudit } from '../lib/erp-api';
+import erpRouter, { logAudit, _resetLoginRateLimits } from '../lib/erp-api';
 import { getAuthenticatedCompanyId, AuthRequest } from '../lib/auth-middleware';
 import type { Server } from 'http';
 
@@ -1727,6 +1727,206 @@ describe('SECURITY P0 — TENANT ISOLATION & ETA CREDENTIAL PROTECTION', () => {
       })
     });
     expect(resCustomRoles.status).toBe(403);
+  });
+
+  describe('PHASE 1C: MED-01 & MED-02 — RATE LIMITING & SESSION INVALIDATION', () => {
+    const sessionTokenValid = 'session-token-valid-111';
+    const userSessionId = 'user-session-1';
+    const userSessionEmail = 'session-user@company-a.com';
+
+    const tokenWithSession = jwt.sign(
+      {
+        id: userSessionId,
+        email: userSessionEmail,
+        role: 'admin',
+        company_id: companyAId,
+        authorized_company_ids: [companyAId, companyBId],
+        session_token: sessionTokenValid
+      },
+      getJwtSecret()
+    );
+
+    beforeEach(() => {
+      _resetLoginRateLimits();
+    });
+
+    it('MED-02-A: Request succeeds when active_session_token in DB matches JWT session_token', async () => {
+      vi.spyOn(pool, 'query').mockImplementation(async (sql: any, params?: any[]) => {
+        if (typeof sql === 'string' && sql.includes('active_session_token FROM users WHERE id = $1')) {
+          return { rows: [{ active_session_token: sessionTokenValid }] } as any;
+        }
+        if (typeof sql === 'string' && sql.includes('SELECT id, username, name, email, role, company_id FROM users')) {
+          return { rows: [{ id: userSessionId, email: userSessionEmail, role: 'admin', company_id: companyAId }] } as any;
+        }
+        return { rows: [] } as any;
+      });
+
+      const res = await fetch(`${baseUrl}/auth/me`, {
+        headers: { Authorization: `Bearer ${tokenWithSession}` }
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('MED-02-A: JWT is rejected with 401 SESSION_INVALIDATED when active_session_token is NULL (e.g. after logout)', async () => {
+      vi.spyOn(pool, 'query').mockImplementation(async (sql: any, params?: any[]) => {
+        if (typeof sql === 'string' && sql.includes('active_session_token FROM users WHERE id = $1')) {
+          return { rows: [{ active_session_token: null }] } as any;
+        }
+        return { rows: [] } as any;
+      });
+
+      const res = await fetch(`${baseUrl}/auth/me`, {
+        headers: { Authorization: `Bearer ${tokenWithSession}` }
+      });
+      expect(res.status).toBe(401);
+      const body = await res.json();
+      expect(body.error).toBe('SESSION_INVALIDATED');
+    });
+
+    it('MED-02-A: Company Switcher continues to work seamlessly with active session', async () => {
+      vi.spyOn(pool, 'query').mockImplementation(async (sql: any, params?: any[]) => {
+        if (typeof sql === 'string' && sql.includes('active_session_token FROM users WHERE id = $1')) {
+          return { rows: [{ active_session_token: sessionTokenValid }] } as any;
+        }
+        if (typeof sql === 'string' && sql.includes('SELECT id, company_id, role, permissions, role_ids FROM users')) {
+          return {
+            rows: [
+              { id: userSessionId, company_id: companyAId, role: 'admin' },
+              { id: 'user-session-b', company_id: companyBId, role: 'admin' }
+            ]
+          } as any;
+        }
+        if (typeof sql === 'string' && sql.includes('FROM "customers"')) {
+          return { rows: [{ id: 'cust-b', name: 'Cust B', company_id: companyBId }] } as any;
+        }
+        return { rows: [] } as any;
+      });
+
+      const res = await fetch(`${baseUrl}/customers/cust-b`, {
+        headers: {
+          Authorization: `Bearer ${tokenWithSession}`,
+          'x-company-id': companyBId
+        }
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.company_id).toBe(companyBId);
+    });
+
+    it('MED-02-B: /auth/update-password synchronizes across all company records, rotates session, and invalidates old JWT', async () => {
+      let dbActiveSessionToken = sessionTokenValid;
+      let updatedQuerySql = '';
+      let updatedParams: any[] = [];
+
+      vi.spyOn(pool, 'query').mockImplementation(async (sql: any, params?: any[]) => {
+        if (typeof sql === 'string' && sql.includes('active_session_token FROM users WHERE id = $1')) {
+          return { rows: [{ active_session_token: dbActiveSessionToken }] } as any;
+        }
+        if (typeof sql === 'string' && sql.includes('UPDATE "users"')) {
+          updatedQuerySql = sql;
+          updatedParams = params || [];
+          dbActiveSessionToken = params?.[1];
+          return { rowCount: 2 } as any;
+        }
+        if (typeof sql === 'string' && sql.includes('SELECT id, username, name, email, role, company_id FROM users')) {
+          return { rows: [{ id: userSessionId, email: userSessionEmail, role: 'admin', company_id: companyAId }] } as any;
+        }
+        return { rows: [] } as any;
+      });
+
+      const res = await fetch(`${baseUrl}/auth/update-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${tokenWithSession}`
+        },
+        body: JSON.stringify({ newPassword: 'BrandNewPassword123' })
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.token).toBeDefined();
+      expect(body.sessionToken).toBeDefined();
+      expect(body.sessionToken).not.toBe(sessionTokenValid);
+
+      // Verify SQL updated all records for the email
+      expect(updatedQuerySql).toContain('WHERE LOWER(email) = LOWER($3)');
+      expect(updatedParams[2]).toBe(userSessionEmail);
+
+      // Verify OLD token is immediately rejected
+      const oldTokenRes = await fetch(`${baseUrl}/auth/me`, {
+        headers: { Authorization: `Bearer ${tokenWithSession}` }
+      });
+      expect(oldTokenRes.status).toBe(401);
+      const oldBody = await oldTokenRes.json();
+      expect(oldBody.error).toBe('SESSION_INVALIDATED');
+
+      // Verify NEW token works
+      const newTokenRes = await fetch(`${baseUrl}/auth/me`, {
+        headers: { Authorization: `Bearer ${body.token}` }
+      });
+      expect(newTokenRes.status).toBe(200);
+    });
+
+    it('MED-02-C: Redundant unauthenticated /auth/logout is removed; only primary authenticated route responds', async () => {
+      // 1. Unauthenticated call to /auth/logout must fail with 401
+      const resUnauth = await fetch(`${baseUrl}/auth/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      expect(resUnauth.status).toBe(401);
+
+      // 2. Authenticated call to /auth/logout succeeds and clears session
+      let logoutSqlCalled = false;
+      vi.spyOn(pool, 'query').mockImplementation(async (sql: any, params?: any[]) => {
+        if (typeof sql === 'string' && sql.includes('active_session_token FROM users WHERE id = $1')) {
+          return { rows: [{ active_session_token: sessionTokenValid }] } as any;
+        }
+        if (typeof sql === 'string' && sql.includes('UPDATE users SET active_session_token = NULL')) {
+          logoutSqlCalled = true;
+          return { rowCount: 1 } as any;
+        }
+        return { rows: [] } as any;
+      });
+
+      const resAuth = await fetch(`${baseUrl}/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${tokenWithSession}`
+        }
+      });
+      expect(resAuth.status).toBe(200);
+      expect(logoutSqlCalled).toBe(true);
+    });
+
+    it('MED-01-A: Login rate limiter allows normal requests then blocks brute-force after threshold', async () => {
+      const targetEmail = 'brute_target@company-a.com';
+
+      // Mock users query returning empty to simulate failed attempts
+      vi.spyOn(pool, 'query').mockResolvedValue({ rows: [] } as any);
+
+      // First 7 failed attempts should return 401 (not 429)
+      for (let i = 0; i < 7; i++) {
+        const res = await fetch(`${baseUrl}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: targetEmail, password: `wrong-pass-${i}` })
+        });
+        expect(res.status).toBe(401);
+      }
+
+      // 8th attempt should be blocked by rate limiter with 429
+      const blockedRes = await fetch(`${baseUrl}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: targetEmail, password: 'wrong-pass-again' })
+      });
+      expect(blockedRes.status).toBe(429);
+      const blockedBody = await blockedRes.json();
+      expect(blockedBody.error).toBe('TOO_MANY_ATTEMPTS');
+      expect(blockedRes.headers.get('Retry-After')).toBeDefined();
+    });
   });
 });
 

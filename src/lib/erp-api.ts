@@ -2004,13 +2004,107 @@ router.post('/auth/register', authenticateToken, authorizeRoles('admin', 'super_
   }
 });
 
+// ============================================================================
+// MED-01-A: Login Rate Limiting & Brute-Force Protection
+// ============================================================================
+interface LoginAttemptRecord {
+  count: number;
+  firstAttemptAt: number;
+  lastAttemptAt: number;
+}
+
+const loginAttemptsByIpEmail = new Map<string, LoginAttemptRecord>();
+const loginAttemptsByIp = new Map<string, LoginAttemptRecord>();
+
+const LOGIN_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes window
+const MAX_FAILED_ATTEMPTS_PER_ACCOUNT = 7; // Max failed attempts per (IP + Email)
+const MAX_FAILED_ATTEMPTS_PER_IP = 35; // Max failed attempts across all accounts per IP (protects NATs/office networks)
+
+export function checkLoginRateLimit(ip: string, email: string): { allowed: boolean; retryAfterSeconds: number } {
+  const now = Date.now();
+  const normalizedEmail = (email || '').trim().toLowerCase();
+  const cleanIp = (ip || 'unknown').split(',')[0].trim();
+
+  // 1. Check IP + Email
+  const keyAccount = `${cleanIp}:${normalizedEmail}`;
+  const accountRec = loginAttemptsByIpEmail.get(keyAccount);
+  if (accountRec && accountRec.count >= MAX_FAILED_ATTEMPTS_PER_ACCOUNT) {
+    const elapsed = now - accountRec.lastAttemptAt;
+    if (elapsed < LOGIN_RATE_LIMIT_WINDOW_MS) {
+      return { allowed: false, retryAfterSeconds: Math.ceil((LOGIN_RATE_LIMIT_WINDOW_MS - elapsed) / 1000) };
+    } else {
+      loginAttemptsByIpEmail.delete(keyAccount);
+    }
+  }
+
+  // 2. Check general IP bucket (protects against account spraying from a single IP)
+  const ipRec = loginAttemptsByIp.get(cleanIp);
+  if (ipRec && ipRec.count >= MAX_FAILED_ATTEMPTS_PER_IP) {
+    const elapsed = now - ipRec.lastAttemptAt;
+    if (elapsed < LOGIN_RATE_LIMIT_WINDOW_MS) {
+      return { allowed: false, retryAfterSeconds: Math.ceil((LOGIN_RATE_LIMIT_WINDOW_MS - elapsed) / 1000) };
+    } else {
+      loginAttemptsByIp.delete(cleanIp);
+    }
+  }
+
+  return { allowed: true, retryAfterSeconds: 0 };
+}
+
+export function recordFailedLoginAttempt(ip: string, email: string) {
+  const now = Date.now();
+  const normalizedEmail = (email || '').trim().toLowerCase();
+  const cleanIp = (ip || 'unknown').split(',')[0].trim();
+
+  const keyAccount = `${cleanIp}:${normalizedEmail}`;
+  const accountRec = loginAttemptsByIpEmail.get(keyAccount);
+  if (!accountRec || (now - accountRec.lastAttemptAt) > LOGIN_RATE_LIMIT_WINDOW_MS) {
+    loginAttemptsByIpEmail.set(keyAccount, { count: 1, firstAttemptAt: now, lastAttemptAt: now });
+  } else {
+    accountRec.count += 1;
+    accountRec.lastAttemptAt = now;
+  }
+
+  const ipRec = loginAttemptsByIp.get(cleanIp);
+  if (!ipRec || (now - ipRec.lastAttemptAt) > LOGIN_RATE_LIMIT_WINDOW_MS) {
+    loginAttemptsByIp.set(cleanIp, { count: 1, firstAttemptAt: now, lastAttemptAt: now });
+  } else {
+    ipRec.count += 1;
+    ipRec.lastAttemptAt = now;
+  }
+}
+
+export function recordSuccessfulLogin(ip: string, email: string) {
+  const normalizedEmail = (email || '').trim().toLowerCase();
+  const cleanIp = (ip || 'unknown').split(',')[0].trim();
+  loginAttemptsByIpEmail.delete(`${cleanIp}:${normalizedEmail}`);
+}
+
+export function _resetLoginRateLimits() {
+  loginAttemptsByIpEmail.clear();
+  loginAttemptsByIp.clear();
+}
+
 router.post('/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     const cleanEmail = email ? String(email).trim().toLowerCase() : '';
+    const clientIp = getIp(req);
+
+    // MED-01-A: Enforce login rate limit before querying DB or executing bcrypt
+    const rateLimitCheck = checkLoginRateLimit(clientIp, cleanEmail);
+    if (!rateLimitCheck.allowed) {
+      res.setHeader('Retry-After', String(rateLimitCheck.retryAfterSeconds));
+      return res.status(429).json({
+        error: 'TOO_MANY_ATTEMPTS',
+        message: 'تم تجاوز الحد المسموح به من محاولات تسجيل الدخول. يرجى المحاولة لاحقاً بعد ' + Math.ceil(rateLimitCheck.retryAfterSeconds / 60) + ' دقيقة.'
+      });
+    }
+
     const { rows }: any = await pool.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
     
     if (rows.length === 0) {
+      recordFailedLoginAttempt(clientIp, cleanEmail);
       return res.status(401).json({ error: 'حدث خطأ في البيانات المدخلة، يرجى التأكد من البريد الإلكتروني وكلمة المرور' });
     }
 
@@ -2031,14 +2125,18 @@ router.post('/auth/login', async (req, res) => {
     }
 
     if (!validUser) {
+      recordFailedLoginAttempt(clientIp, cleanEmail);
       logAudit({
         action: 'LOGIN_FAILED',
         module: 'AUTH',
         details: `Login failure for: ${cleanEmail}`,
-        ip_address: getIp(req)
+        ip_address: clientIp
       });
       return res.status(401).json({ error: 'حدث خطأ في البيانات المدخلة، يرجى التأكد من البريد الإلكتروني وكلمة المرور' });
     }
+
+    // Reset failed login attempt counter on successful credentials
+    recordSuccessfulLogin(clientIp, cleanEmail);
 
     const isSuperAdminUser = validUser.role === 'super_admin';
 
@@ -2214,10 +2312,6 @@ router.get('/auth/me', authenticateToken, async (req: AuthRequest, res) => {
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
-});
-
-router.post('/auth/logout', (req, res) => {
-  res.json({ message: 'Logged out successfully' });
 });
 
 // --- Generic CRUD Factory ---
@@ -4967,6 +5061,27 @@ modules.forEach(moduleName => {
 
           const result = await pool.query(query, params);
           if (result.rowCount === 0) return sendError(res, 404, 'Not found or permission denied');
+
+          // MED-02-B: If user password was updated, sync password_hash across all company records for this email and invalidate active sessions
+          if (moduleName === 'users' && (sanitizedData as any).password_hash) {
+            try {
+              const emailRes = await pool.query('SELECT email FROM users WHERE id = $1', [id]);
+              const targetEmail = emailRes.rows[0]?.email || (req.user?.id === id ? req.user?.email : '');
+              if (targetEmail) {
+                await pool.query(
+                  `UPDATE users 
+                   SET password_hash = $1, 
+                       temp_password = NULL, 
+                       active_session_token = NULL, 
+                       last_active_at = NULL 
+                   WHERE LOWER(email) = LOWER($2)`,
+                  [(sanitizedData as any).password_hash, targetEmail.trim().toLowerCase()]
+                );
+              }
+            } catch (syncErr) {
+              console.error('Failed to sync password/session invalidation across user records:', syncErr);
+            }
+          }
 
           // Audit Log
           logAudit({
@@ -7813,7 +7928,7 @@ router.put('/journal_entries/:id', authenticateToken, async (req: AuthRequest, r
   }
 });
 
-// Update password
+// Update password (MED-02-B: Multi-company password synchronization and session rotation)
 router.post('/auth/update-password', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { newPassword } = req.body;
@@ -7822,10 +7937,45 @@ router.post('/auth/update-password', authenticateToken, async (req: AuthRequest,
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await pool.query('UPDATE "users" SET "password_hash" = $1 WHERE id = $2', [hashedPassword, req.user?.id]);
+    const cleanEmail = req.user?.email ? req.user.email.trim().toLowerCase() : '';
+    if (!cleanEmail) {
+      return res.status(400).json({ error: 'User email not found in session' });
+    }
 
-    res.json({ message: 'Password updated successfully' });
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const newSessionToken = uuidv4();
+
+    // MED-02-B: Sync new password_hash, clear must_change_password & temp_password, and rotate active_session_token across all accounts for this email
+    await pool.query(
+      `UPDATE "users" 
+       SET "password_hash" = $1, 
+           "must_change_password" = false, 
+           "temp_password" = NULL, 
+           "active_session_token" = $2, 
+           "last_active_at" = CURRENT_TIMESTAMP 
+       WHERE LOWER(email) = LOWER($3)`,
+      [hashedPassword, newSessionToken, cleanEmail]
+    );
+
+    // Issue rotated JWT containing the new session token
+    const token = jwt.sign(
+      {
+        id: req.user?.id,
+        email: req.user?.email,
+        company_id: req.user?.company_id,
+        role: req.user?.role,
+        username: (req.user as any)?.username || req.user?.email,
+        session_token: newSessionToken
+      },
+      getJwtSecret(),
+      { expiresIn: '24h' }
+    );
+
+    res.json({ 
+      message: 'Password updated successfully',
+      token,
+      sessionToken: newSessionToken
+    });
   } catch (error) {
     console.error('Update password error:', error);
     res.status(500).json({ error: 'Failed to update password' });

@@ -108,13 +108,18 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
         );
         if (sessionRes.rows.length > 0) {
           const dbToken = sessionRes.rows[0].active_session_token;
-          // If DB has a token and it doesn't match our JWT's token → session was invalidated
-          if (dbToken && dbToken !== decoded.session_token) {
+          // MED-02-A: If DB token is null (logged out) or doesn't match our JWT's token → session was invalidated
+          if (!dbToken || dbToken !== decoded.session_token) {
             return res.status(401).json({ 
               error: 'SESSION_INVALIDATED',
-              message: 'تم تسجيل دخولك من مكان آخر. تم إنهاء هذه الجلسة.'
+              message: 'تم إنهاء الجلسة أو تسجيل دخولك من مكان آخر. يرجى تسجيل الدخول مجدداً.'
             });
           }
+        } else {
+          return res.status(401).json({ 
+            error: 'SESSION_INVALIDATED',
+            message: 'تم إنهاء الجلسة أو تسجيل الخروج. يرجى تسجيل الدخول مجدداً.'
+          });
         }
       } catch (sessionErr) {
         // Non-fatal: if DB check fails, allow request to proceed

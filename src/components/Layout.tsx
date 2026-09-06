@@ -387,9 +387,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         body: JSON.stringify({ newPassword })
       });
 
+      const data = await response.json();
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.error || t('common.password_change_failed'));
+      }
+
+      if (data.token) {
+        localStorage.setItem('auth_token', data.token);
       }
 
       await dbService.update('users', user!.id, { must_change_password: false });
