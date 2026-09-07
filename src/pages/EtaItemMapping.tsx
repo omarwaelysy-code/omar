@@ -93,12 +93,17 @@ export interface ItemMappingSummary {
   totalInvoicedAmount: number;
 }
 
-export function EtaItemMapping() {
+export interface EtaItemMappingProps {
+  direction?: 'Received' | 'Sent';
+}
+
+export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps = {}) {
   const { language } = useLanguage();
   const { showNotification } = useNotification();
   const { openTab, setPendingEtaProductForCreation, setPendingEtaProductForLinking } = useNavigation();
   const { user } = useAuth();
   const isAr = language === 'ar';
+  const isSent = direction === 'Sent';
 
   // Tabs: all = كل الأصناف الواردة من البوابة, linked = الأصناف المربوطة, unlinked = الأصناف غير المربوطة
   const [activeTab, setActiveTab] = useState<'all' | 'linked' | 'unlinked'>('all');
@@ -148,6 +153,7 @@ export function EtaItemMapping() {
     try {
       const qParams = new URLSearchParams();
       if (isRefresh) qParams.set('refresh', 'true');
+      qParams.set('direction', direction);
       if (user?.company_id) qParams.set('company_id', user.company_id);
       const qStr = qParams.toString();
       const path = qStr ? `/eta/items/mapping?${qStr}` : '/eta/items/mapping';
@@ -178,7 +184,7 @@ export function EtaItemMapping() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [isAr, showNotification, user?.company_id]);
+  }, [isAr, showNotification, user?.company_id, direction]);
 
   useEffect(() => {
     loadMappings();
@@ -209,6 +215,7 @@ export function EtaItemMapping() {
         productId: item.autoMatchedProduct.id,
         etaItemName: item.itemName,
         etaItemType: item.itemType || 'EGS',
+        direction,
         notes: isAr ? `ربط تلقائي مطابق لـ ${item.autoMatchedProduct.matchReason}` : 'Auto-linked'
       });
 
@@ -242,7 +249,7 @@ export function EtaItemMapping() {
       const res = await apiRequest<{ success: boolean; linkedCount: number; message?: string }>(
         '/eta/items/mapping/quick-link-all',
         'POST',
-        { company_id: user?.company_id }
+        { company_id: user?.company_id, direction }
       );
 
       if (res && res.success) {
@@ -374,7 +381,8 @@ export function EtaItemMapping() {
 
     for (const item of filteredItems) {
       const taxNumber = (item.supplierTaxNumber || item.sampleDocument?.issuerId || '').trim();
-      const name = (item.supplierName || item.sampleDocument?.issuerName || (isAr ? 'مورد غير محدد' : 'Unknown Supplier')).trim();
+      const defaultUnknownPartner = isAr ? (isSent ? 'عميل غير محدد' : 'مورد غير محدد') : (isSent ? 'Unknown Customer' : 'Unknown Supplier');
+      const name = (item.supplierName || item.sampleDocument?.issuerName || defaultUnknownPartner).trim();
       const key = taxNumber || name || 'unknown';
 
       let group = groupsMap.get(key);
@@ -405,7 +413,7 @@ export function EtaItemMapping() {
     }
 
     return Array.from(groupsMap.values()).sort((a, b) => b.totalAmount - a.totalAmount || b.items.length - a.items.length);
-  }, [filteredItems, groupBySupplier, isAr]);
+  }, [filteredItems, groupBySupplier, isAr, isSent]);
 
   // Paginated Groups
   const totalGroupPages = pageSize === -1 ? 1 : Math.ceil(supplierGroups.length / pageSize);
@@ -459,8 +467,8 @@ export function EtaItemMapping() {
       [isAr ? 'كود الصنف ETA' : 'ETA Item Code']: i.itemCode,
       [isAr ? 'نوع الكود' : 'Code Type']: i.itemType,
       [isAr ? 'اسم الصنف بالبوابة' : 'Portal Item Name']: i.itemName,
-      [isAr ? 'اسم المورد' : 'Supplier Name']: i.supplierName || (i.sampleDocument?.issuerName || ''),
-      [isAr ? 'الرقم الضريبي للمورد' : 'Supplier Tax ID']: i.supplierTaxNumber || (i.sampleDocument?.issuerId || ''),
+      [isAr ? (isSent ? 'اسم العميل' : 'اسم المورد') : (isSent ? 'Customer Name' : 'Supplier Name')]: i.supplierName || (i.sampleDocument?.issuerName || ''),
+      [isAr ? (isSent ? 'الرقم الضريبي للعميل' : 'الرقم الضريبي للمورد') : (isSent ? 'Customer Tax ID' : 'Supplier Tax ID')]: i.supplierTaxNumber || (i.sampleDocument?.issuerId || ''),
       [isAr ? 'الوحدة' : 'Unit']: i.unitType,
       [isAr ? 'آخر سعر وحدة' : 'Last Unit Price']: i.lastUnitPrice,
       [isAr ? 'عدد الفواتير' : 'Doc Count']: i.docCount,
@@ -472,7 +480,7 @@ export function EtaItemMapping() {
       [isAr ? 'كود الصنف الداخلي' : 'ERP Product Code']: i.linkedProduct?.code || ''
     }));
 
-    exportToExcel(dataToExport, `ETA_Item_Mappings_${new Date().toISOString().slice(0, 10)}`);
+    exportToExcel(dataToExport, `${isSent ? 'ETA_Sent_Item_Mappings' : 'ETA_Received_Item_Mappings'}_${new Date().toISOString().slice(0, 10)}`);
   };
 
   // Helper to render an item table row
@@ -512,7 +520,7 @@ export function EtaItemMapping() {
             </div>
             {!showSupplierCols && primarySupplierName && (
               <div className="text-[11px] text-slate-500 truncate max-w-xs font-medium">
-                {isAr ? 'المورد:' : 'Supplier:'} {primarySupplierName}
+                {isAr ? (isSent ? 'العميل:' : 'المورد:') : (isSent ? 'Customer:' : 'Supplier:')} {primarySupplierName}
               </div>
             )}
           </div>
@@ -532,19 +540,19 @@ export function EtaItemMapping() {
           </div>
         </td>
 
-        {/* Supplier Name Column (Only in Flat View) */}
+        {/* Partner Name Column (Only in Flat View) */}
         {showSupplierCols && (
           <td className="p-4">
             <div className="space-y-1">
               <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
                 <Building2 size={15} className="text-indigo-500 flex-shrink-0" />
-                <span className="truncate max-w-[170px]" title={primarySupplierName || (isAr ? 'غير محدد' : '---')}>
-                  {primarySupplierName || (isAr ? 'مورد غير محدد' : '---')}
+                <span className="truncate max-w-[170px]" title={primarySupplierName || (isAr ? (isSent ? 'عميل غير محدد' : 'مورد غير محدد') : '---')}>
+                  {primarySupplierName || (isAr ? (isSent ? 'عميل غير محدد' : 'مورد غير محدد') : '---')}
                 </span>
               </div>
               {item.suppliers && item.suppliers.length > 1 && (
                 <span className="inline-block text-[10px] font-bold px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200">
-                  +{item.suppliers.length - 1} {isAr ? 'موردين آخرين' : 'other suppliers'}
+                  +{item.suppliers.length - 1} {isAr ? (isSent ? 'عملاء آخرين' : 'موردين آخرين') : (isSent ? 'other customers' : 'other suppliers')}
                 </span>
               )}
             </div>
@@ -733,15 +741,23 @@ export function EtaItemMapping() {
           </div>
           <div>
             <h1 className="text-2xl font-black text-slate-900 flex items-center gap-3">
-              <span>{isAr ? 'ربط الأصناف مع منظومة الضرائب (ETA)' : 'ETA Item Mapping'}</span>
+              <span>
+                {isAr 
+                  ? (isSent ? 'ربط أصناف الفواتير الصادرة (ETA)' : 'ربط أصناف الفواتير المستلمة (ETA)') 
+                  : (isSent ? 'ETA Issued Items Mapping' : 'ETA Received Items Mapping')}
+              </span>
               <span className="text-xs font-bold px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-200">
-                {summary.totalPortalItems} {isAr ? 'صنف مستخرج' : 'Extracted Items'}
+                {summary.totalPortalItems} {isAr ? (isSent ? 'صنف صادر مستخرج' : 'صنف مستلم مستخرج') : (isSent ? 'Issued Items' : 'Received Items')}
               </span>
             </h1>
             <p className="text-sm font-medium text-slate-500 mt-1">
               {isAr 
-                ? 'مطابقة وربط بنود الأصناف الواردة من وثائق الفاتورة الإلكترونية مع دليل أصناف المخزن الحالي.'
-                : 'Map incoming electronic portal items with your existing ERP product catalog.'}
+                ? (isSent 
+                    ? 'مطابقة وربط بنود الأصناف الصادرة للعملاء من فواتير المبيعات الإلكترونية مع دليل أصناف المخزن الحالي.'
+                    : 'مطابقة وربط بنود الأصناف الواردة من وثائق وفواتير الموردين مع دليل أصناف المخزن الحالي.')
+                : (isSent
+                    ? 'Map outgoing electronic portal items issued to customers with your existing ERP product catalog.'
+                    : 'Map incoming electronic portal items received from suppliers with your existing ERP product catalog.')}
             </p>
           </div>
         </div>
@@ -777,7 +793,7 @@ export function EtaItemMapping() {
             onClick={() => loadMappings(true)}
             disabled={refreshing || loading}
             className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl font-bold text-sm border border-slate-200 transition-all flex items-center gap-2 disabled:opacity-60"
-            title={isAr ? 'تحديث البيانات من الفواتير المستلمة' : 'Refresh from synced documents'}
+            title={isAr ? (isSent ? 'تحديث البيانات من الفواتير الصادرة' : 'تحديث البيانات من الفواتير المستلمة') : 'Refresh from synced documents'}
           >
             <RefreshCw size={16} className={refreshing ? 'animate-spin text-indigo-600' : ''} />
             <span>{isAr ? 'تحديث' : 'Refresh'}</span>
@@ -791,7 +807,9 @@ export function EtaItemMapping() {
         <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex items-center justify-between">
           <div>
             <span className="text-xs font-bold text-slate-400 block mb-1">
-              {isAr ? 'إجمالي أصناف البوابة' : 'Total Portal Items'}
+              {isAr 
+                ? (isSent ? 'إجمالي الأصناف الصادرة' : 'إجمالي أصناف البوابة') 
+                : (isSent ? 'Total Issued Items' : 'Total Portal Items')}
             </span>
             <div className="text-3xl font-black text-slate-900">{summary.totalPortalItems}</div>
             <div className="text-xs text-slate-500 mt-2 flex items-center gap-1 font-medium">
@@ -876,7 +894,11 @@ export function EtaItemMapping() {
               }`}
             >
               <Package size={16} />
-              <span>{isAr ? 'كل الأصناف الواردة من البوابة' : 'All Portal Items'}</span>
+              <span>
+                {isAr 
+                  ? (isSent ? 'كل الأصناف الصادرة من البوابة' : 'كل الأصناف الواردة من البوابة') 
+                  : (isSent ? 'All Issued Items' : 'All Portal Items')}
+              </span>
               <span className={`text-xs px-2 py-0.5 rounded-full ${activeTab === 'all' ? 'bg-slate-100 text-slate-800' : 'bg-slate-200 text-slate-600'}`}>
                 {items.length}
               </span>
@@ -962,7 +984,7 @@ export function EtaItemMapping() {
               </button>
             )}
 
-            {/* Group By Supplier Toggle */}
+            {/* Group By Partner Toggle */}
             <button
               type="button"
               onClick={() => setGroupBySupplier(prev => !prev)}
@@ -971,13 +993,15 @@ export function EtaItemMapping() {
                   ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-600/20'
                   : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
               }`}
-              title={isAr ? 'تجميع الأصناف حسب المورد مع إمكانية فتح وطي المجموعات' : 'Group items by supplier with collapsible accordions'}
+              title={isAr 
+                ? (isSent ? 'تجميع الأصناف حسب العميل مع إمكانية فتح وطي المجموعات' : 'تجميع الأصناف حسب المورد مع إمكانية فتح وطي المجموعات')
+                : (isSent ? 'Group items by customer with collapsible accordions' : 'Group items by supplier with collapsible accordions')}
             >
               <Layers size={14} className={groupBySupplier ? 'text-white' : 'text-indigo-600'} />
               <span>
                 {groupBySupplier 
-                  ? (isAr ? 'عرض مجمع (حسب المورد)' : 'Grouped by Supplier') 
-                  : (isAr ? 'تجميع حسب المورد (ضم وفتح)' : 'Group by Supplier')}
+                  ? (isAr ? (isSent ? 'عرض مجمع (حسب العميل)' : 'عرض مجمع (حسب المورد)') : (isSent ? 'Grouped by Customer' : 'Grouped by Supplier')) 
+                  : (isAr ? (isSent ? 'تجميع حسب العميل (ضم وفتح)' : 'تجميع حسب المورد (ضم وفتح)') : (isSent ? 'Group by Customer' : 'Group by Supplier'))}
               </span>
             </button>
 
@@ -1039,8 +1063,8 @@ export function EtaItemMapping() {
                 <div>
                   <span className="font-black text-slate-900 text-sm block">
                     {isAr 
-                      ? `مجموعات الموردين (${supplierGroups.length} مورد)` 
-                      : `Supplier Groups (${supplierGroups.length} suppliers)`}
+                      ? (isSent ? `مجموعات العملاء (${supplierGroups.length} عميل)` : `مجموعات الموردين (${supplierGroups.length} مورد)`) 
+                      : (isSent ? `Customer Groups (${supplierGroups.length} customers)` : `Supplier Groups (${supplierGroups.length} suppliers)`)}
                   </span>
                   <span className="text-xs text-slate-500 font-medium">
                     {filteredItems.length} {isAr ? 'صنف مستخرج من الفواتير' : 'extracted items'}
@@ -1188,7 +1212,7 @@ export function EtaItemMapping() {
                 <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 text-xs font-black uppercase tracking-wider">
                   <th className="p-4 text-start">{isAr ? 'كود الصنف بالضرائب (ETA)' : 'ETA Item Code'}</th>
                   <th className="p-4 text-start">{isAr ? 'اسم الصنف بالبوابة والوصف' : 'Portal Item Name & Description'}</th>
-                  <th className="p-4 text-start">{isAr ? 'اسم المورد' : 'Supplier Name'}</th>
+                  <th className="p-4 text-start">{isAr ? (isSent ? 'اسم العميل' : 'اسم المورد') : (isSent ? 'Customer Name' : 'Supplier Name')}</th>
                   <th className="p-4 text-start">{isAr ? 'الرقم الضريبي' : 'Tax ID'}</th>
                   <th className="p-4 text-center">{isAr ? 'الوحدة والسعر' : 'Unit & Price'}</th>
                   <th className="p-4 text-center">{isAr ? 'الوثائق والكميات' : 'Docs & Quantity'}</th>
@@ -1216,7 +1240,7 @@ export function EtaItemMapping() {
                 {groupBySupplier ? supplierGroups.length : filteredItems.length}
               </span>{' '}
               {groupBySupplier 
-                ? (isAr ? 'مورد' : 'suppliers') 
+                ? (isAr ? (isSent ? 'عميل' : 'مورد') : (isSent ? 'customers' : 'suppliers')) 
                 : (isAr ? 'صنف' : 'items')}
             </div>
 

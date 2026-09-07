@@ -66,7 +66,7 @@ export function getInitialPermissionsState() {
     'balance_sheet', 'stock_card_report', 'stock_balances_report', 'general_stock_movements_report',
     'users', 'companies', 'activity_log', 'audit_logs', 'system_check', 'company_settings',
     'discount_settings', 'backup_restore', 'templates', 'create_template', 'operation_categories',
-    'operation_fields', 'operations', 'period_closing', 'eta_received_invoices', 'eta_detailed_invoices', 'eta_supplier_mapping', 'eta_item_mapping'
+    'operation_fields', 'operations', 'period_closing', 'eta_received_invoices', 'eta_detailed_invoices', 'eta_supplier_mapping', 'eta_item_mapping', 'eta_sent_item_mapping'
   ];
   
   const specials: any = {
@@ -12303,15 +12303,22 @@ router.get('/eta/items/mapping', authenticateToken, async (req: AuthRequest, res
   const isCompanyAdmin = req.user?.role === 'admin' || isSuperAdmin;
   if (!isCompanyAdmin) {
     const userPermissions = (req.user as any)?.permissions;
-    if (userPermissions && userPermissions['eta_item_mapping']?.view === false && userPermissions['eta_received_invoices']?.view === false) {
+    if (
+      userPermissions &&
+      userPermissions['eta_item_mapping']?.view === false &&
+      userPermissions['eta_received_invoices']?.view === false &&
+      userPermissions['eta_sent_item_mapping']?.view === false
+    ) {
       return res.status(403).json({ error: 'غير مصرح لك بعرض ربط الأصناف.' });
     }
   }
 
   try {
-    const { refresh } = req.query;
+    const { refresh, direction } = req.query;
+    const dir = direction === 'Sent' ? 'Sent' : 'Received';
     const result = await EtaItemMappingService.getItemMappings(companyId, {
-      forceRefresh: refresh === 'true'
+      forceRefresh: refresh === 'true',
+      direction: dir
     });
     res.json(result);
   } catch (err: any) {
@@ -12328,8 +12335,9 @@ router.post('/eta/items/mapping/link', authenticateToken, async (req: AuthReques
   }
 
   try {
-    const { etaItemCode, productId, etaItemName, etaItemType, notes } = req.body;
-    const result = await EtaItemMappingService.linkItem(companyId, etaItemCode, productId, etaItemName, etaItemType, notes);
+    const { etaItemCode, productId, etaItemName, etaItemType, notes, direction } = req.body;
+    const dir = direction === 'Sent' ? 'Sent' : 'Received';
+    const result = await EtaItemMappingService.linkItem(companyId, etaItemCode, productId, etaItemName, etaItemType, notes, dir);
     res.json(result);
   } catch (err: any) {
     console.error('Error linking ETA item:', err.message || err);
@@ -12362,7 +12370,9 @@ router.post('/eta/items/mapping/quick-link-all', authenticateToken, async (req: 
   }
 
   try {
-    const result = await EtaItemMappingService.bulkLinkAutoMatched(companyId);
+    const { direction } = req.body;
+    const dir = direction === 'Sent' ? 'Sent' : 'Received';
+    const result = await EtaItemMappingService.bulkLinkAutoMatched(companyId, dir);
     res.json(result);
   } catch (err: any) {
     console.error('Error in quickLinkAllMatched items:', err.message || err);

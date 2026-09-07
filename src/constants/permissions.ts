@@ -81,7 +81,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     id: 'eta',
     nameAr: 'الفاتورة الإلكترونية (ETA)',
     nameEn: 'ETA e-Invoicing',
-    modules: ['eta_received_invoices', 'eta_detailed_invoices', 'eta_supplier_mapping', 'eta_item_mapping']
+    modules: ['eta_received_invoices', 'eta_detailed_invoices', 'eta_supplier_mapping', 'eta_item_mapping', 'eta_sent_item_mapping']
   }
 ];
 
@@ -329,7 +329,8 @@ export const MODULE_PERMISSIONS_META: { [moduleId: string]: { labelAr: string; l
   eta_received_invoices: { labelAr: 'الوثائق الإلكترونية (ETA)', labelEn: 'ETA Electronic Documents', hasCrud: true, special: ['print', 'export_pdf', 'export_excel'] },
   eta_detailed_invoices: { labelAr: 'الوثائق الإلكترونية بالتفصيل (ETA)', labelEn: 'ETA Detailed Electronic Documents', hasCrud: true, special: ['print', 'export_pdf', 'export_excel'] },
   eta_supplier_mapping: { labelAr: 'ربط الموردين (ETA)', labelEn: 'ETA Supplier Mapping', hasCrud: true, special: ['print', 'export_pdf', 'export_excel'] },
-  eta_item_mapping: { labelAr: 'ربط الأصناف (ETA)', labelEn: 'ETA Item Mapping', hasCrud: true, special: ['print', 'export_pdf', 'export_excel'] }
+  eta_item_mapping: { labelAr: 'ربط الأصناف المستلمة (ETA)', labelEn: 'ETA Received Item Mapping', hasCrud: true, special: ['print', 'export_pdf', 'export_excel'] },
+  eta_sent_item_mapping: { labelAr: 'ربط الأصناف الصادرة (ETA)', labelEn: 'ETA Issued Item Mapping', hasCrud: true, special: ['print', 'export_pdf', 'export_excel'] }
 };
 
 export interface BusinessPermissionMeta {

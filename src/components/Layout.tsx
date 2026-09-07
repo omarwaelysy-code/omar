@@ -129,6 +129,7 @@ const getTabIcon = (id: string) => {
     case 'eta_detailed_invoices':
     case 'eta_supplier_mapping':
     case 'eta_item_mapping':
+    case 'eta_sent_item_mapping':
       return <Receipt {...iconProps} />;
     case 'operations': return <List {...iconProps} />;
     case 'departments':
@@ -553,8 +554,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           },
           {
             id: 'eta_item_mapping',
-            label: language === 'ar' ? 'ربط الأصناف (ETA)' : 'ETA Item Mapping',
+            label: language === 'ar' ? 'ربط الأصناف المستلمة (ETA)' : 'ETA Received Items Mapping',
             icon: Package
+          },
+          {
+            id: 'eta_sent_item_mapping',
+            label: language === 'ar' ? 'ربط الأصناف الصادرة (ETA)' : 'ETA Issued Items Mapping',
+            icon: PackageCheck
           }
         ]
       }] : []),
@@ -725,7 +731,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       if (item.subItems) {
         const visibleSubItems = (item.subItems as any[]).filter((sub: any) => {
           if (sub.isDivider || sub.isHeader) return true;
-          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking' || sub.id === 'pos_connected_branches' || sub.id === 'eta_received_invoices' || sub.id === 'eta_detailed_invoices' || sub.id === 'eta_supplier_mapping' || sub.id === 'eta_item_mapping') return true;
+          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking' || sub.id === 'pos_connected_branches' || sub.id === 'eta_received_invoices' || sub.id === 'eta_detailed_invoices' || sub.id === 'eta_supplier_mapping' || sub.id === 'eta_item_mapping' || sub.id === 'eta_sent_item_mapping') return true;
           return hasPermission(sub.id, 'view');
         });
         

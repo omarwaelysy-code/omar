@@ -84,12 +84,15 @@ export class EtaItemMappingService {
    */
   public static async getItemMappings(
     companyId: string,
-    options: { forceRefresh?: boolean } = {}
+    options: { forceRefresh?: boolean; direction?: 'Received' | 'Sent' } = {}
   ): Promise<{
     success: boolean;
     items: EtaPortalItemDTO[];
     summary: ItemMappingSummaryDTO;
   }> {
+    const direction = options.direction === 'Sent' ? 'Sent' : 'Received';
+    const isSent = direction === 'Sent';
+
     // If forceRefresh requested, sync documents from ETA portal
     if (options.forceRefresh) {
       await EtaDocumentService.fetchAllDocuments(companyId, { forceRefresh: true }).catch(err => {
@@ -97,15 +100,17 @@ export class EtaItemMappingService {
       });
     }
 
-    // 1. Fetch received documents with raw_data to extract item lines
+    // 1. Fetch documents with raw_data to extract item lines for the specified direction
     const docsRes = await pool.query(`
       SELECT 
-        id, uuid, internal_id, date_time_issued, issuer_id, issuer_name, total_amount, raw_data
+        id, uuid, internal_id, date_time_issued, 
+        issuer_id, issuer_name, receiver_id, receiver_name, 
+        total_amount, raw_data
       FROM eta_documents
       WHERE company_id = $1 
-        AND direction = 'Received'
+        AND direction = $2
       ORDER BY date_time_issued DESC
-    `, [companyId]);
+    `, [companyId, direction]);
 
     // Aggregate unique item lines from raw_data
     const aggregatedItems = new Map<string, {
@@ -140,8 +145,15 @@ export class EtaItemMappingService {
       const rawDataObj = row.raw_data;
       if (!rawDataObj) continue;
 
-      const docIssuerId = (row.issuer_id || rawDataObj?.issuer?.id || '').trim();
-      const docIssuerName = (row.issuer_name || rawDataObj?.issuer?.name || '').trim();
+      const docPartnerId = (isSent 
+        ? (row.receiver_id || rawDataObj?.receiver?.id || '')
+        : (row.issuer_id || rawDataObj?.issuer?.id || '')).trim();
+      const docPartnerName = (isSent
+        ? (row.receiver_name || rawDataObj?.receiver?.name || '')
+        : (row.issuer_name || rawDataObj?.issuer?.name || '')).trim();
+
+      const docIssuerId = docPartnerId;
+      const docIssuerName = docPartnerName;
 
       const rawLines: any[] = Array.isArray(rawDataObj?.invoiceLines)
         ? rawDataObj.invoiceLines
@@ -334,86 +346,89 @@ export class EtaItemMappingService {
       } else {
         unlinkedCount++;
         // Auto-match attempt:
-        // Priority 1: tax_item_code match (كود ربط الوثائق المستلمة)
         const norm = this.normalizeCode(itemCode);
         const matchByTax = erpProductsByTaxCode.get(itemCode) || erpProductsByTaxCode.get(norm);
-        if (matchByTax) {
+        const matchByEta = erpProductsByEtaCode.get(itemCode) || erpProductsByEtaCode.get(norm);
+
+        const firstMatch = isSent ? matchByEta : matchByTax;
+        const firstReason = isSent ? ('eta_item_code' as const) : ('tax_item_code' as const);
+
+        const secondMatch = isSent ? matchByTax : matchByEta;
+        const secondReason = isSent ? ('tax_item_code' as const) : ('eta_item_code' as const);
+
+        if (firstMatch) {
           autoMatchedProduct = {
-            id: matchByTax.id,
-            name: matchByTax.name,
-            code: matchByTax.code,
-            taxItemCode: matchByTax.tax_item_code,
-            taxCodeType: matchByTax.tax_code_type,
-            etaItemCode: matchByTax.eta_item_code,
-            etaCodeType: matchByTax.eta_code_type,
-            barcode: matchByTax.barcode,
-            matchReason: 'tax_item_code' as const
+            id: firstMatch.id,
+            name: firstMatch.name,
+            code: firstMatch.code,
+            taxItemCode: firstMatch.tax_item_code,
+            taxCodeType: firstMatch.tax_code_type,
+            etaItemCode: firstMatch.eta_item_code,
+            etaCodeType: firstMatch.eta_code_type,
+            barcode: firstMatch.barcode,
+            matchReason: firstReason
+          };
+          autoMatchCount++;
+        } else if (secondMatch) {
+          autoMatchedProduct = {
+            id: secondMatch.id,
+            name: secondMatch.name,
+            code: secondMatch.code,
+            taxItemCode: secondMatch.tax_item_code,
+            taxCodeType: secondMatch.tax_code_type,
+            etaItemCode: secondMatch.eta_item_code,
+            etaCodeType: secondMatch.eta_code_type,
+            barcode: secondMatch.barcode,
+            matchReason: secondReason
           };
           autoMatchCount++;
         } else {
-          // Priority 2: eta_item_code match (كود رفع الوثائق المصدرة)
-          const matchByEta = erpProductsByEtaCode.get(itemCode) || erpProductsByEtaCode.get(norm);
-          if (matchByEta) {
+          // Priority 3: internal product code match
+          const matchByCode = erpProductsByInternalCode.get(itemCode) || erpProductsByInternalCode.get(norm);
+          if (matchByCode) {
             autoMatchedProduct = {
-              id: matchByEta.id,
-              name: matchByEta.name,
-              code: matchByEta.code,
-              taxItemCode: matchByEta.tax_item_code,
-              taxCodeType: matchByEta.tax_code_type,
-              etaItemCode: matchByEta.eta_item_code,
-              etaCodeType: matchByEta.eta_code_type,
-              barcode: matchByEta.barcode,
-              matchReason: 'eta_item_code' as const
+              id: matchByCode.id,
+              name: matchByCode.name,
+              code: matchByCode.code,
+              taxItemCode: matchByCode.tax_item_code,
+              taxCodeType: matchByCode.tax_code_type,
+              etaItemCode: matchByCode.eta_item_code,
+              etaCodeType: matchByCode.eta_code_type,
+              barcode: matchByCode.barcode,
+              matchReason: 'code' as const
             };
             autoMatchCount++;
           } else {
-            // Priority 3: internal product code match
-            const matchByCode = erpProductsByInternalCode.get(itemCode) || erpProductsByInternalCode.get(norm);
-            if (matchByCode) {
+            // Priority 4: barcode match
+            const matchByBarcode = erpProductsByBarcode.get(itemCode) || erpProductsByBarcode.get(norm);
+            if (matchByBarcode) {
               autoMatchedProduct = {
-                id: matchByCode.id,
-                name: matchByCode.name,
-                code: matchByCode.code,
-                taxItemCode: matchByCode.tax_item_code,
-                taxCodeType: matchByCode.tax_code_type,
-                etaItemCode: matchByCode.eta_item_code,
-                etaCodeType: matchByCode.eta_code_type,
-                barcode: matchByCode.barcode,
-                matchReason: 'code' as const
+                id: matchByBarcode.id,
+                name: matchByBarcode.name,
+                code: matchByBarcode.code,
+                taxItemCode: matchByBarcode.tax_item_code,
+                taxCodeType: matchByBarcode.tax_code_type,
+                etaItemCode: matchByBarcode.eta_item_code,
+                etaCodeType: matchByBarcode.eta_code_type,
+                barcode: matchByBarcode.barcode,
+                matchReason: 'barcode' as const
               };
               autoMatchCount++;
-            } else {
-              // Priority 4: barcode match
-              const matchByBarcode = erpProductsByBarcode.get(itemCode) || erpProductsByBarcode.get(norm);
-              if (matchByBarcode) {
-                autoMatchedProduct = {
-                  id: matchByBarcode.id,
-                  name: matchByBarcode.name,
-                  code: matchByBarcode.code,
-                  taxItemCode: matchByBarcode.tax_item_code,
-                  taxCodeType: matchByBarcode.tax_code_type,
-                  etaItemCode: matchByBarcode.eta_item_code,
-                  etaCodeType: matchByBarcode.eta_code_type,
-                  barcode: matchByBarcode.barcode,
-                  matchReason: 'barcode' as const
-                };
-                autoMatchCount++;
-              } else if (agg.itemName && erpProductsByName.get(agg.itemName.toLowerCase())) {
-                // Priority 5: Exact name match
-                const matchByName = erpProductsByName.get(agg.itemName.toLowerCase());
-                autoMatchedProduct = {
-                  id: matchByName.id,
-                  name: matchByName.name,
-                  code: matchByName.code,
-                  taxItemCode: matchByName.tax_item_code,
-                  taxCodeType: matchByName.tax_code_type,
-                  etaItemCode: matchByName.eta_item_code,
-                  etaCodeType: matchByName.eta_code_type,
-                  barcode: matchByName.barcode,
-                  matchReason: 'exact_name' as const
-                };
-                autoMatchCount++;
-              }
+            } else if (agg.itemName && erpProductsByName.get(agg.itemName.toLowerCase())) {
+              // Priority 5: Exact name match
+              const matchByName = erpProductsByName.get(agg.itemName.toLowerCase());
+              autoMatchedProduct = {
+                id: matchByName.id,
+                name: matchByName.name,
+                code: matchByName.code,
+                taxItemCode: matchByName.tax_item_code,
+                taxCodeType: matchByName.tax_code_type,
+                etaItemCode: matchByName.eta_item_code,
+                etaCodeType: matchByName.eta_code_type,
+                barcode: matchByName.barcode,
+                matchReason: 'exact_name' as const
+              };
+              autoMatchCount++;
             }
           }
         }
@@ -450,8 +465,8 @@ export class EtaItemMappingService {
           itemCode: code,
           itemType: row.eta_item_type || 'EGS',
           itemName: row.eta_item_name || row.product_name || code,
-          description: '',
-          unitType: row.product_unit || '',
+          description: row.notes || '',
+          unitType: row.product_unit || 'قطعة',
           lastUnitPrice: Number(row.product_cost_price || 0),
           docCount: 0,
           totalQuantity: 0,
@@ -507,7 +522,8 @@ export class EtaItemMappingService {
     productId: string,
     etaItemName?: string,
     etaItemType: string = 'EGS',
-    notes?: string
+    notes?: string,
+    direction: 'Received' | 'Sent' = 'Received'
   ): Promise<{ success: boolean; message: string }> {
     if (!companyId || !etaItemCode || !productId) {
       throw new Error('بيانات الربط غير مكتملة (كود الصنف ومعرف المنتج مطلوبان).');
@@ -516,6 +532,7 @@ export class EtaItemMappingService {
     const cleanItemCode = etaItemCode.trim();
     const cleanItemType = (etaItemType || 'EGS').trim().toUpperCase();
     const cleanItemName = (etaItemName || '').trim() || null;
+    const isSent = direction === 'Sent';
     const id = crypto.randomUUID();
 
     // 1. Insert or update in eta_item_mappings
@@ -533,16 +550,28 @@ export class EtaItemMappingService {
         updated_at = CURRENT_TIMESTAMP
     `, [id, companyId, cleanItemCode, cleanItemName, cleanItemType, productId, notes || null]);
 
-    // 2. Sync tax_item_code (received documents code) onto product, and initialize eta_item_code only if unset
-    await pool.query(`
-      UPDATE products
-      SET 
-        tax_item_code = $1,
-        tax_code_type = $2,
-        eta_item_code = COALESCE(NULLIF(eta_item_code, ''), $1),
-        eta_code_type = COALESCE(NULLIF(eta_code_type, ''), $2)
-      WHERE id = $3 AND company_id = $4
-    `, [cleanItemCode, cleanItemType, productId, companyId]);
+    // 2. Update product based on direction
+    if (isSent) {
+      await pool.query(`
+        UPDATE products
+        SET 
+          eta_item_code = $1,
+          eta_code_type = $2,
+          tax_item_code = COALESCE(NULLIF(tax_item_code, ''), $1),
+          tax_code_type = COALESCE(NULLIF(tax_code_type, ''), $2)
+        WHERE id = $3 AND company_id = $4
+      `, [cleanItemCode, cleanItemType, productId, companyId]);
+    } else {
+      await pool.query(`
+        UPDATE products
+        SET 
+          tax_item_code = $1,
+          tax_code_type = $2,
+          eta_item_code = COALESCE(NULLIF(eta_item_code, ''), $1),
+          eta_code_type = COALESCE(NULLIF(eta_code_type, ''), $2)
+        WHERE id = $3 AND company_id = $4
+      `, [cleanItemCode, cleanItemType, productId, companyId]);
+    }
 
     return {
       success: true,
@@ -575,12 +604,15 @@ export class EtaItemMappingService {
   /**
    * Bulk quick-link all unlinked ETA items that have an auto-matched product
    */
-  public static async bulkLinkAutoMatched(companyId: string): Promise<{
+  public static async bulkLinkAutoMatched(
+    companyId: string,
+    direction: 'Received' | 'Sent' = 'Received'
+  ): Promise<{
     success: boolean;
     linkedCount: number;
     message: string;
   }> {
-    const { items } = await this.getItemMappings(companyId);
+    const { items } = await this.getItemMappings(companyId, { direction });
 
     const candidates = items.filter(i => !i.isLinked && i.autoMatchedProduct);
     if (candidates.length === 0) {
@@ -601,7 +633,8 @@ export class EtaItemMappingService {
           item.autoMatchedProduct.id,
           item.itemName,
           item.itemType,
-          `ربط تلقائي مطابق لـ ${item.autoMatchedProduct.matchReason}`
+          `ربط تلقائي مطابق لـ ${item.autoMatchedProduct.matchReason}`,
+          direction
         );
         linkedCount++;
       } catch (err) {
