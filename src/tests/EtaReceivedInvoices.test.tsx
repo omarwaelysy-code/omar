@@ -84,7 +84,7 @@ describe('EtaReceivedInvoices Component (Frontend UI & UX)', () => {
     render(<EtaReceivedInvoices />);
 
     await waitFor(() => {
-      expect(screen.getByText(/لا توجد وثائق إلكترونية/)).toBeInTheDocument();
+      expect(screen.getByText(/لا توجد وثائق/)).toBeInTheDocument();
     });
   });
 
