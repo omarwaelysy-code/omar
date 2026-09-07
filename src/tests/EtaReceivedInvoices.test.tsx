@@ -198,4 +198,69 @@ describe('EtaReceivedInvoices Component (Frontend UI & UX)', () => {
 
     expect(screen.getAllByText('إعادة المحاولة').length).toBeGreaterThan(0);
   });
+
+  it('6. should calculate and display tax rate (tax / net) and filter invoices by tax rate', async () => {
+    const mockInvoices = [
+      {
+        uuid: 'UUID-TAX-14',
+        internalId: 'INV-14-PERCENT',
+        typeName: 'i',
+        documentTypeName: 'فاتورة ضريبية',
+        issuerId: '11111111',
+        issuerName: 'شركة ضريبة 14',
+        receiverId: '99999999',
+        receiverName: 'شركتنا',
+        dateTimeIssued: '2026-08-20T10:00:00Z',
+        dateTimeReceived: '2026-08-20T10:05:00Z',
+        totalSales: 1000,
+        totalDiscount: 0,
+        netAmount: 1000,
+        taxAmount: 140, // 140 / 1000 = 14%
+        totalAmount: 1140,
+        currency: 'EGP',
+        status: 'Valid'
+      },
+      {
+        uuid: 'UUID-TAX-0',
+        internalId: 'INV-0-PERCENT',
+        typeName: 'i',
+        documentTypeName: 'فاتورة ضريبية',
+        issuerId: '22222222',
+        issuerName: 'شركة معفاة 0',
+        receiverId: '99999999',
+        receiverName: 'شركتنا',
+        dateTimeIssued: '2026-08-20T10:00:00Z',
+        dateTimeReceived: '2026-08-20T10:05:00Z',
+        totalSales: 2000,
+        totalDiscount: 0,
+        netAmount: 2000,
+        taxAmount: 0, // 0 / 2000 = 0%
+        totalAmount: 2000,
+        currency: 'EGP',
+        status: 'Valid'
+      }
+    ];
+
+    vi.spyOn(dbServiceModule, 'apiRequest').mockResolvedValue({
+      success: true,
+      isConfigured: true,
+      environment: 'preprod',
+      data: mockInvoices,
+      pagination: { pageSize: 20 }
+    });
+
+    render(<EtaReceivedInvoices />);
+
+    await waitFor(() => {
+      expect(screen.getByText('INV-14-PERCENT')).toBeInTheDocument();
+      expect(screen.getByText('INV-0-PERCENT')).toBeInTheDocument();
+    });
+
+    // Check tax percentage badge displayed for both
+    expect(screen.getByText('14%')).toBeInTheDocument();
+    expect(screen.getByText('0%')).toBeInTheDocument();
+
+    // Check filter button for tax rate is present
+    expect(screen.getByText('نسبة الضريبة (الضريبة ÷ الصافي)')).toBeInTheDocument();
+  });
 });
