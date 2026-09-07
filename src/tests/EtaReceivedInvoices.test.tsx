@@ -65,7 +65,7 @@ describe('EtaReceivedInvoices Component (Frontend UI & UX)', () => {
       expect(screen.getByText('لم يتم إعداد الربط مع منظومة ETA لهذه الشركة')).toBeInTheDocument();
     });
 
-    const configureBtn = screen.getByText('إعداد الربط الآن');
+    const configureBtn = screen.getByText('إعدادات الربط');
     expect(configureBtn).toBeInTheDocument();
 
     fireEvent.click(configureBtn);
@@ -128,7 +128,7 @@ describe('EtaReceivedInvoices Component (Frontend UI & UX)', () => {
     expect(screen.getByText('شركة الإخلاص للتوريدات')).toBeInTheDocument();
     expect(screen.getByText('772681716')).toBeInTheDocument();
     expect(screen.getByText('صحيحة')).toBeInTheDocument();
-    expect(screen.getByText('التفاصيل')).toBeInTheDocument();
+    expect(screen.getByTitle('عرض تفاصيل المستند بالكامل كما بالمنظومة')).toBeInTheDocument();
   });
 
   it('4. should open Read-Only details modal when clicking details button', async () => {
@@ -169,7 +169,7 @@ describe('EtaReceivedInvoices Component (Frontend UI & UX)', () => {
       expect(screen.getByText('INV-MODAL-TEST')).toBeInTheDocument();
     });
 
-    const detailsBtn = screen.getByText('التفاصيل');
+    const detailsBtn = screen.getByTitle('عرض تفاصيل المستند بالكامل كما بالمنظومة');
     fireEvent.click(detailsBtn);
 
     // Verify modal appeared
