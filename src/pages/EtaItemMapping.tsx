@@ -60,6 +60,8 @@ export interface EtaPortalItem {
     date: string;
   };
   isLinked: boolean;
+  status?: string;
+  activeFrom?: string | null;
   linkedProduct: {
     id: string;
     name: string;
@@ -505,6 +507,19 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
               <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 border border-indigo-200">
                 {item.itemType || 'EGS'}
               </span>
+              {item.status && (
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  item.status === 'Approved'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : item.status === 'Rejected'
+                      ? 'bg-rose-50 text-rose-700 border-rose-200'
+                      : 'bg-amber-50 text-amber-700 border-amber-200'
+                }`}>
+                  {isAr 
+                    ? (item.status === 'Approved' ? 'معتمد' : (item.status === 'Rejected' ? 'مرفوض' : item.status))
+                    : item.status}
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => handleCopyCode(item.itemCode)}
@@ -743,20 +758,20 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
             <h1 className="text-2xl font-black text-slate-900 flex items-center gap-3">
               <span>
                 {isAr 
-                  ? (isSent ? 'ربط أصناف الفواتير الصادرة (ETA)' : 'ربط أصناف الفواتير المستلمة (ETA)') 
-                  : (isSent ? 'ETA Issued Items Mapping' : 'ETA Received Items Mapping')}
+                  ? (isSent ? 'ربط أكواد الأصناف المسجلة (ETA)' : 'ربط أصناف الفواتير المستلمة (ETA)') 
+                  : (isSent ? 'ETA Registered Codes Mapping' : 'ETA Received Items Mapping')}
               </span>
               <span className="text-xs font-bold px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-200">
-                {summary.totalPortalItems} {isAr ? (isSent ? 'صنف صادر مستخرج' : 'صنف مستلم مستخرج') : (isSent ? 'Issued Items' : 'Received Items')}
+                {summary.totalPortalItems} {isAr ? (isSent ? 'كود مسجل بالبوابة' : 'صنف مستلم مستخرج') : (isSent ? 'Registered Codes' : 'Received Items')}
               </span>
             </h1>
             <p className="text-sm font-medium text-slate-500 mt-1">
               {isAr 
                 ? (isSent 
-                    ? 'مطابقة وربط بنود الأصناف الصادرة للعملاء من فواتير المبيعات الإلكترونية مع دليل أصناف المخزن الحالي.'
+                    ? 'مطابقة وربط أكواد الأصناف المحفوظة والمسجلة على بوابة الضرائب (Codes Usage Requests) مع دليل أصناف المخزن الحالي.'
                     : 'مطابقة وربط بنود الأصناف الواردة من وثائق وفواتير الموردين مع دليل أصناف المخزن الحالي.')
                 : (isSent
-                    ? 'Map outgoing electronic portal items issued to customers with your existing ERP product catalog.'
+                    ? 'Map registered EGS code usage requests from ETA portal with your existing ERP product catalog.'
                     : 'Map incoming electronic portal items received from suppliers with your existing ERP product catalog.')}
             </p>
           </div>
@@ -793,10 +808,10 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
             onClick={() => loadMappings(true)}
             disabled={refreshing || loading}
             className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl font-bold text-sm border border-slate-200 transition-all flex items-center gap-2 disabled:opacity-60"
-            title={isAr ? (isSent ? 'تحديث البيانات من الفواتير الصادرة' : 'تحديث البيانات من الفواتير المستلمة') : 'Refresh from synced documents'}
+            title={isAr ? (isSent ? 'تحديث ومزامنة الأكواد المسجلة من البوابة' : 'تحديث البيانات من الفواتير المستلمة') : 'Refresh from synced documents'}
           >
             <RefreshCw size={16} className={refreshing ? 'animate-spin text-indigo-600' : ''} />
-            <span>{isAr ? 'تحديث' : 'Refresh'}</span>
+            <span>{isAr ? 'تحديث ومزامنة الأكواد' : 'Refresh & Sync'}</span>
           </button>
         </div>
       </div>
@@ -808,8 +823,8 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
           <div>
             <span className="text-xs font-bold text-slate-400 block mb-1">
               {isAr 
-                ? (isSent ? 'إجمالي الأصناف الصادرة' : 'إجمالي أصناف البوابة') 
-                : (isSent ? 'Total Issued Items' : 'Total Portal Items')}
+                ? (isSent ? 'إجمالي الأكواد المسجلة' : 'إجمالي أصناف البوابة') 
+                : (isSent ? 'Total Registered Codes' : 'Total Portal Items')}
             </span>
             <div className="text-3xl font-black text-slate-900">{summary.totalPortalItems}</div>
             <div className="text-xs text-slate-500 mt-2 flex items-center gap-1 font-medium">
@@ -896,8 +911,8 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
               <Package size={16} />
               <span>
                 {isAr 
-                  ? (isSent ? 'كل الأصناف الصادرة من البوابة' : 'كل الأصناف الواردة من البوابة') 
-                  : (isSent ? 'All Issued Items' : 'All Portal Items')}
+                  ? (isSent ? 'كل الأكواد المسجلة بالبوابة' : 'كل الأصناف الواردة من البوابة') 
+                  : (isSent ? 'All Registered Codes' : 'All Portal Items')}
               </span>
               <span className={`text-xs px-2 py-0.5 rounded-full ${activeTab === 'all' ? 'bg-slate-100 text-slate-800' : 'bg-slate-200 text-slate-600'}`}>
                 {items.length}

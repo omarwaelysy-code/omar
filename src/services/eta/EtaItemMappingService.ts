@@ -8,6 +8,7 @@
 import crypto from 'crypto';
 import pool from '../../lib/postgres';
 import { EtaDocumentService } from './EtaDocumentService';
+import { EtaAuthService } from './EtaAuthService';
 
 export interface EtaPortalItemDTO {
   itemCode: string;
@@ -35,6 +36,8 @@ export interface EtaPortalItemDTO {
     date: string;
   };
   isLinked: boolean;
+  status?: string;
+  activeFrom?: string | null;
   linkedProduct: {
     id: string;
     name: string;
@@ -80,6 +83,113 @@ export class EtaItemMappingService {
   }
 
   /**
+   * Sync registered item codes from ETA portal (Codes Usage Requests)
+   */
+  public static async syncRegisteredCodesFromEta(companyId: string): Promise<{
+    success: boolean;
+    count: number;
+    message?: string;
+  }> {
+    try {
+      const settings = await EtaDocumentService.getCompanySettings(companyId);
+      if (!settings || !settings.clientId || !settings.clientSecret) {
+        return { success: false, count: 0, message: 'بيانات الاعتماد للضرائب غير متوفرة.' };
+      }
+
+      const token = await EtaAuthService.getValidAccessToken({
+        companyId,
+        environment: settings.environment,
+        clientId: settings.clientId,
+        clientSecret: settings.clientSecret
+      });
+
+      const baseUrl = EtaDocumentService.getApiBaseUrl(settings.environment);
+
+      // Fetch first page using ETA parameters Ps=100 & Pn=1
+      const firstUrl = `${baseUrl}/api/v1.0/codetypes/requests/my?Ps=100&Pn=1`;
+      const firstRes = await fetch(firstUrl, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!firstRes.ok) {
+        const errText = await firstRes.text().catch(() => '');
+        console.warn('[ETA Registered Codes] Fetch failed:', firstRes.status, errText);
+        return { success: false, count: 0, message: `تعذر جلب الأكواد من المنظومة (${firstRes.status}).` };
+      }
+
+      const firstData = await firstRes.json();
+      const allCodeRequests: any[] = Array.isArray(firstData.result) ? [...firstData.result] : [];
+      const totalPages = Number(firstData.metadata?.totalPages || 1);
+
+      for (let p = 2; p <= totalPages; p++) {
+        await new Promise(r => setTimeout(r, 550));
+        const pUrl = `${baseUrl}/api/v1.0/codetypes/requests/my?Ps=100&Pn=${p}`;
+        const pRes = await fetch(pUrl, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (pRes.ok) {
+          const pData = await pRes.json();
+          if (Array.isArray(pData.result)) {
+            allCodeRequests.push(...pData.result);
+          }
+        }
+      }
+
+      let insertedCount = 0;
+      for (const item of allCodeRequests) {
+        const itemCode = (item.itemCode || '').trim();
+        if (!itemCode) continue;
+
+        const codeType = (item.codeTypeName || 'EGS').trim().toUpperCase();
+        const codeNameAr = (item.codeNameSecondaryLang || item.codeNamePrimaryLang || item.descriptionSecondaryLang || itemCode).trim();
+        const codeNameEn = (item.codeNamePrimaryLang || item.codeNameSecondaryLang || item.descriptionPrimaryLang || itemCode).trim();
+        const descriptionAr = (item.descriptionSecondaryLang || item.descriptionPrimaryLang || '').trim();
+        const descriptionEn = (item.descriptionPrimaryLang || item.descriptionSecondaryLang || '').trim();
+        const parentItemCode = (item.parentItemCode || '').trim();
+        const parentCodeName = (item.parentCodeNameSecondaryLang || item.parentCodeNamePrimaryLang || '').trim();
+        const status = (item.status || 'Approved').trim();
+        const activeFrom = item.activeFrom ? new Date(item.activeFrom) : null;
+        const activeTo = item.activeTo ? new Date(item.activeTo) : null;
+        const active = item.active !== false;
+
+        const id = crypto.randomUUID();
+        await pool.query(`
+          INSERT INTO eta_registered_codes (
+            id, company_id, item_code, code_type, code_name_ar, code_name_en,
+            description_ar, description_en, parent_item_code, parent_code_name,
+            status, active_from, active_to, active, raw_data, updated_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP)
+          ON CONFLICT (company_id, item_code)
+          DO UPDATE SET
+            code_name_ar = EXCLUDED.code_name_ar,
+            code_name_en = EXCLUDED.code_name_en,
+            description_ar = EXCLUDED.description_ar,
+            description_en = EXCLUDED.description_en,
+            parent_item_code = EXCLUDED.parent_item_code,
+            parent_code_name = EXCLUDED.parent_code_name,
+            status = EXCLUDED.status,
+            active_from = EXCLUDED.active_from,
+            active_to = EXCLUDED.active_to,
+            active = EXCLUDED.active,
+            raw_data = EXCLUDED.raw_data,
+            updated_at = CURRENT_TIMESTAMP
+        `, [
+          id, companyId, itemCode, codeType, codeNameAr, codeNameEn,
+          descriptionAr, descriptionEn, parentItemCode, parentCodeName,
+          status, activeFrom, activeTo, active, JSON.stringify(item)
+        ]);
+        insertedCount++;
+      }
+
+      return { success: true, count: insertedCount };
+    } catch (err: any) {
+      console.error('[ETA Registered Codes] Error syncing from ETA:', err.message || err);
+      return { success: false, count: 0, message: err.message };
+    }
+  }
+
+  /**
    * Get all ETA portal items, their link status, and auto-match candidates
    */
   public static async getItemMappings(
@@ -93,14 +203,29 @@ export class EtaItemMappingService {
     const direction = options.direction === 'Sent' ? 'Sent' : 'Received';
     const isSent = direction === 'Sent';
 
-    // If forceRefresh requested, sync documents from ETA portal
-    if (options.forceRefresh) {
-      await EtaDocumentService.fetchAllDocuments(companyId, { forceRefresh: true }).catch(err => {
-        console.warn('[ETA Item Mapping] forceRefresh fetch warning:', err.message || err);
-      });
+    // If Sent: sync registered EGS codes from portal
+    if (isSent) {
+      const regCountRes = await pool.query(
+        'SELECT count(*) FROM eta_registered_codes WHERE company_id = $1',
+        [companyId]
+      ).catch(() => ({ rows: [{ count: '0' }] }));
+      const hasNoRegisteredCodes = Number(regCountRes.rows[0]?.count || 0) === 0;
+
+      if (options.forceRefresh || hasNoRegisteredCodes) {
+        await this.syncRegisteredCodesFromEta(companyId).catch(err => {
+          console.warn('[ETA Item Mapping] syncRegisteredCodes warning:', err.message || err);
+        });
+      }
+    } else {
+      // If Received and forceRefresh requested, sync documents from ETA portal
+      if (options.forceRefresh) {
+        await EtaDocumentService.fetchAllDocuments(companyId, { forceRefresh: true }).catch(err => {
+          console.warn('[ETA Item Mapping] forceRefresh fetch warning:', err.message || err);
+        });
+      }
     }
 
-    // 1. Fetch documents with raw_data to extract item lines for the specified direction
+    // 1. Fetch documents with raw_data to extract item lines / usage stats
     const docsRes = await pool.query(`
       SELECT 
         id, uuid, internal_id, date_time_issued, 
@@ -112,7 +237,7 @@ export class EtaItemMappingService {
       ORDER BY date_time_issued DESC
     `, [companyId, direction]);
 
-    // Aggregate unique item lines from raw_data
+    // Aggregate unique item lines
     const aggregatedItems = new Map<string, {
       itemCode: string;
       itemType: string;
@@ -134,10 +259,52 @@ export class EtaItemMappingService {
         issuerId?: string;
         date: string;
       };
+      status?: string;
+      activeFrom?: string | null;
     }>();
 
     let totalDocsInvoiced = docsRes.rows.length;
     let totalInvoicedAmount = 0;
+
+    // IF isSent: load all registered codes from portal first so all 39/40 codes appear!
+    if (isSent) {
+      const regRes = await pool.query(`
+        SELECT 
+          item_code, code_type, code_name_ar, code_name_en,
+          description_ar, description_en, parent_item_code, parent_code_name,
+          status, active_from, raw_data
+        FROM eta_registered_codes
+        WHERE company_id = $1
+        ORDER BY active_from DESC NULLS LAST, item_code ASC
+      `, [companyId]);
+
+      for (const row of regRes.rows) {
+        const itemCode = row.item_code.trim();
+        const itemName = (row.code_name_en || row.code_name_ar || itemCode).trim();
+        const description = (row.description_en || row.description_ar || row.parent_code_name || '').trim();
+        const itemType = (row.code_type || 'EGS').trim().toUpperCase();
+        const status = (row.status || 'Approved').trim();
+        const activeFrom = row.active_from ? new Date(row.active_from).toISOString() : null;
+
+        aggregatedItems.set(itemCode, {
+          itemCode,
+          itemType,
+          itemName,
+          description,
+          unitType: 'قطعة',
+          lastUnitPrice: 0,
+          docUuids: new Set<string>(),
+          totalQuantity: 0,
+          totalAmount: 0,
+          lastDocDate: activeFrom,
+          supplierTaxNumber: row.raw_data?.ownerTaxpayer?.rin || '',
+          supplierName: status === 'Approved' ? 'كود معتمد بالمنظومة (EGS)' : `كود ${status} بالمنظومة`,
+          suppliersMap: new Map(),
+          status,
+          activeFrom
+        });
+      }
+    }
 
     for (const row of docsRes.rows) {
       totalInvoicedAmount += Number(row.total_amount || 0);
@@ -214,9 +381,7 @@ export class EtaItemMappingService {
           existing.docUuids.add(row.uuid);
           existing.totalQuantity += quantity;
           existing.totalAmount += lineTotal;
-          if (!existing.itemName && itemName) existing.itemName = itemName;
-          if (!existing.description && description) existing.description = description;
-          if (!existing.unitType && unitType) existing.unitType = unitType;
+          if (unitType) existing.unitType = unitType;
           if (unitPrice > 0) existing.lastUnitPrice = unitPrice;
 
           if (docIssuerId || docIssuerName) {
@@ -241,6 +406,16 @@ export class EtaItemMappingService {
               if (docIssuerId) existing.supplierTaxNumber = docIssuerId;
               if (docIssuerName) existing.supplierName = docIssuerName;
             }
+          }
+
+          if (!existing.sampleDocument) {
+            existing.sampleDocument = {
+              uuid: row.uuid,
+              internalId: row.internal_id || '',
+              issuerName: row.issuer_name || '',
+              issuerId: row.issuer_id || '',
+              date: row.date_time_issued ? new Date(row.date_time_issued).toISOString() : ''
+            };
           }
         }
       }
@@ -384,7 +559,18 @@ export class EtaItemMappingService {
           autoMatchCount++;
         } else {
           // Priority 3: internal product code match
-          const matchByCode = erpProductsByInternalCode.get(itemCode) || erpProductsByInternalCode.get(norm);
+          let suffix = '';
+          if (itemCode.startsWith('EG-')) {
+            const parts = itemCode.split('-');
+            if (parts.length >= 3) {
+              suffix = parts.slice(2).join('-');
+            }
+          }
+
+          const matchByCode = erpProductsByInternalCode.get(itemCode) || 
+            erpProductsByInternalCode.get(norm) ||
+            (suffix ? (erpProductsByInternalCode.get(suffix) || erpProductsByInternalCode.get(this.normalizeCode(suffix))) : null);
+
           if (matchByCode) {
             autoMatchedProduct = {
               id: matchByCode.id,
@@ -400,7 +586,10 @@ export class EtaItemMappingService {
             autoMatchCount++;
           } else {
             // Priority 4: barcode match
-            const matchByBarcode = erpProductsByBarcode.get(itemCode) || erpProductsByBarcode.get(norm);
+            const matchByBarcode = erpProductsByBarcode.get(itemCode) || 
+              erpProductsByBarcode.get(norm) ||
+              (suffix ? (erpProductsByBarcode.get(suffix) || erpProductsByBarcode.get(this.normalizeCode(suffix))) : null);
+
             if (matchByBarcode) {
               autoMatchedProduct = {
                 id: matchByBarcode.id,
@@ -451,7 +640,9 @@ export class EtaItemMappingService {
         sampleDocument: agg.sampleDocument,
         isLinked,
         linkedProduct,
-        autoMatchedProduct
+        autoMatchedProduct,
+        status: agg.status,
+        activeFrom: agg.activeFrom
       });
     }
 
