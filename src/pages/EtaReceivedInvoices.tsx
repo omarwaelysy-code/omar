@@ -111,7 +111,7 @@ const defaultVisibleColumns: Record<string, boolean> = {
   currency: true,
   net_amount: true,
   tax_amount: true,
-  tax_rate: false,
+  tax_rate: true,
   total_amount: true,
   status: true,
   uuid: true,
@@ -1640,7 +1640,7 @@ export function EtaReceivedInvoices() {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-[1600px] mx-auto text-slate-800" dir={dir}>
+    <div className="space-y-6 w-full text-slate-800" dir={dir}>
       {/* ========================================================================= */}
       {/* 1. PAGE HEADER */}
       {/* ========================================================================= */}
@@ -3010,17 +3010,7 @@ export function EtaReceivedInvoices() {
                         {/* Tax Amount */}
                         {visibleColumns.tax_amount && (
                           <td className="py-3.5 px-4 text-end font-medium text-slate-600 whitespace-nowrap">
-                            <div className="flex flex-col items-end gap-0.5">
-                              <span>{formatAmount(inv.taxAmount)}</span>
-                              {Number(inv.netAmount) > 0 && (
-                                <span
-                                  className="text-[10px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-md inline-block cursor-help"
-                                  title={language === 'ar' ? `نسبة الضريبة: ${inv.taxAmount} ÷ ${inv.netAmount}` : `Tax Rate: ${inv.taxAmount} ÷ ${inv.netAmount}`}
-                                >
-                                  {getInvoiceTaxRate(inv)}%
-                                </span>
-                              )}
-                            </div>
+                            {formatAmount(inv.taxAmount)}
                           </td>
                         )}
 

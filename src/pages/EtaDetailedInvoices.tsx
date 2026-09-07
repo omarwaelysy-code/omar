@@ -6,6 +6,7 @@ import {
   Search,
   Calendar,
   Filter,
+  Percent,
   CheckCircle2,
   XCircle,
   Clock,
@@ -97,6 +98,7 @@ const defaultVisibleColumns: Record<string, boolean> = {
   item_sales_total: true,
   item_discount: true,
   item_tax: true,
+  tax_rate: true,
   item_total: true,
   status: true,
   uuid: true
@@ -122,6 +124,7 @@ const columnLabels: Record<string, { ar: string; en: string }> = {
   item_sales_total: { ar: 'قيمة المبيعات', en: 'Sales Total' },
   item_discount: { ar: 'الخصم', en: 'Discount' },
   item_tax: { ar: 'الضرائب', en: 'Taxes' },
+  tax_rate: { ar: 'نسبة الضريبة', en: 'Tax Rate' },
   item_total: { ar: 'إجمالي المبلغ', en: 'Total Amount' },
   status: { ar: 'الحالة', en: 'Status' },
   uuid: { ar: 'UUID', en: 'UUID' }
@@ -186,6 +189,9 @@ export function EtaDetailedInvoices() {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [showDocTypeDropdown, setShowDocTypeDropdown] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [taxRateFilter, setTaxRateFilter] = useState<string>('all');
+  const [selectedTaxRates, setSelectedTaxRates] = useState<string[]>([]);
+  const [showTaxRateDropdown, setShowTaxRateDropdown] = useState(false);
   const [directionFilter, setDirectionFilter] = useState<'all' | 'Received' | 'Sent'>('all');
   const [selectedYears, setSelectedYears] = useState<string[]>([]);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
@@ -195,8 +201,18 @@ export function EtaDetailedInvoices() {
   const [searchQuery, setSearchQuery] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
 
+  // Standard Egyptian Tax Rates presets (نسب الضريبة الشائعة)
+  const STANDARD_TAX_RATES = useMemo(() => [
+    { id: '14', nameAr: '14% (القيمة المضافة العامة - VAT)', nameEn: '14% (Standard VAT)' },
+    { id: '0', nameAr: '0% (معفاة / خاضعة بسعر صفر)', nameEn: '0% (Zero / Exempt)' },
+    { id: '5', nameAr: '5% (ضريبة 5%)', nameEn: '5% Tax' },
+    { id: '8', nameAr: '8% (ضريبة جدول)', nameEn: '8% Schedule Tax' },
+    { id: '10', nameAr: '10% (خدمات مهنية واستشارات)', nameEn: '10% Professional Services' },
+    { id: '1', nameAr: '1% (خصم وتوريد / أرباح تجارية)', nameEn: '1% Withholding' },
+  ], []);
+
   // Amount filter state
-  const [amountField, setAmountField] = useState<'line_total' | 'sales_total' | 'tax_amount' | 'unit_price'>('line_total');
+  const [amountField, setAmountField] = useState<'line_total' | 'sales_total' | 'tax_amount' | 'tax_rate' | 'unit_price'>('line_total');
   const [amountOperator, setAmountOperator] = useState<'all' | 'eq' | 'between' | 'gt' | 'lt'>('all');
   const [amountValueFrom, setAmountValueFrom] = useState<string>('');
   const [amountValueTo, setAmountValueTo] = useState<string>('');
@@ -466,6 +482,69 @@ export function EtaDetailedInvoices() {
     return Array.from(set).sort((a, b) => Number(b) - Number(a));
   }, [yearCounts]);
 
+  // Helper to compute line tax rate (نسبة الضريبة = الضريبة ÷ الصافي)
+  const getLineTaxRate = useCallback((line: { taxAmount?: number; salesTotal?: number; discountAmount?: number; lineTotal?: number }): number => {
+    const tax = Number(line.taxAmount) || 0;
+    let net = (Number(line.salesTotal) || 0) - (Number(line.discountAmount) || 0);
+    if (net <= 0) {
+      net = (Number(line.lineTotal) || 0) - tax;
+    }
+    if (net <= 0) {
+      net = Number(line.salesTotal) || 0;
+    }
+    if (net <= 0 || tax <= 0) return 0;
+    const raw = (tax / net) * 100;
+    return Math.round(raw * 10) / 10;
+  }, []);
+
+  // Dynamic counts per tax rate across lines
+  const taxRateCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const line of detailedLines) {
+      const r = getLineTaxRate(line);
+      const key = r % 1 === 0 ? String(r) : r.toFixed(1);
+      counts[key] = (counts[key] || 0) + 1;
+    }
+    return counts;
+  }, [detailedLines, getLineTaxRate]);
+
+  // Combined available tax rates
+  const availableTaxRates = useMemo(() => {
+    const detectedKeys = Object.keys(taxRateCounts);
+    const standardKeys = STANDARD_TAX_RATES.map(s => s.id);
+    const allKeys = Array.from(new Set([...standardKeys, ...detectedKeys]));
+
+    return allKeys.map(key => {
+      const std = STANDARD_TAX_RATES.find(s => s.id === key);
+      return {
+        id: key,
+        nameAr: std ? std.nameAr : `${key}%`,
+        nameEn: std ? std.nameEn : `${key}%`,
+        count: taxRateCounts[key] || 0
+      };
+    }).sort((a, b) => {
+      if (a.id === '14') return -1;
+      if (b.id === '14') return 1;
+      if (a.id === '0') return -1;
+      if (b.id === '0') return 1;
+      if (b.count !== a.count) return b.count - a.count;
+      return Number(b.id) - Number(a.id);
+    });
+  }, [STANDARD_TAX_RATES, taxRateCounts]);
+
+  // Helper to match tax rate filter (تصفية نسبة الضريبة)
+  const matchesTaxRateFilter = useCallback((line: DetailedInvoiceLine) => {
+    if (selectedTaxRates.length === 0 && taxRateFilter === 'all') return true;
+    const lineRate = getLineTaxRate(line);
+    const targets = selectedTaxRates.length > 0 ? selectedTaxRates : (taxRateFilter !== 'all' ? [taxRateFilter] : []);
+    if (targets.length === 0) return true;
+    return targets.some(tgt => {
+      const numTgt = parseFloat(tgt);
+      if (isNaN(numTgt)) return false;
+      return Math.abs(lineRate - numTgt) <= 0.25;
+    });
+  }, [selectedTaxRates, taxRateFilter, getLineTaxRate]);
+
   // Amount match helper
   const matchesAmountFilter = useCallback((line: DetailedInvoiceLine) => {
     if (amountOperator === 'all') return true;
@@ -476,13 +555,17 @@ export function EtaDetailedInvoices() {
       ? (Number(line.salesTotal) || 0)
       : amountField === 'tax_amount'
       ? (Number(line.taxAmount) || 0)
+      : amountField === 'tax_rate'
+      ? getLineTaxRate(line)
       : amountField === 'unit_price'
       ? (Number(line.unitPrice) || 0)
       : (Number(line.lineTotal) || 0);
 
+    const tolerance = amountField === 'tax_rate' ? 0.25 : 0.01;
+
     if (amountOperator === 'eq') {
       if (fromVal === null || isNaN(fromVal)) return true;
-      return Math.abs(amt - fromVal) < 0.01;
+      return Math.abs(amt - fromVal) <= tolerance;
     }
     if (amountOperator === 'gt') {
       if (fromVal === null || isNaN(fromVal)) return true;
@@ -501,7 +584,7 @@ export function EtaDetailedInvoices() {
       return true;
     }
     return true;
-  }, [amountField, amountOperator, amountValueFrom, amountValueTo]);
+  }, [amountField, amountOperator, amountValueFrom, amountValueTo, getLineTaxRate]);
 
   // Filtered detailed lines
   const filteredLines = useMemo(() => {
@@ -543,6 +626,9 @@ export function EtaDetailedInvoices() {
     } else if (statusFilter !== 'all') {
       list = list.filter(l => l.status === statusFilter);
     }
+    if (selectedTaxRates.length > 0 || taxRateFilter !== 'all') {
+      list = list.filter(matchesTaxRateFilter);
+    }
     if (amountOperator !== 'all') {
       list = list.filter(matchesAmountFilter);
     }
@@ -558,7 +644,7 @@ export function EtaDetailedInvoices() {
       (l.itemCode && l.itemCode.toLowerCase().includes(q)) ||
       (l.itemCodeName && l.itemCodeName.toLowerCase().includes(q))
     );
-  }, [detailedLines, viewMode, dateFrom, dateTo, selectedYears, selectedMonths, directionFilter, docTypeFilter, statusFilter, selectedDocTypes, selectedStatuses, amountOperator, matchesAmountFilter, appliedSearch]);
+  }, [detailedLines, viewMode, dateFrom, dateTo, selectedYears, selectedMonths, directionFilter, docTypeFilter, statusFilter, selectedDocTypes, selectedStatuses, selectedTaxRates, taxRateFilter, matchesTaxRateFilter, amountOperator, matchesAmountFilter, appliedSearch]);
 
   const totalPages = Math.ceil(filteredLines.length / clientPageSize) || 1;
   const paginatedLines = useMemo(() => {
@@ -966,6 +1052,7 @@ export function EtaDetailedInvoices() {
       [language === 'ar' ? 'قيمة المبيعات' : 'Sales Total']: line.salesTotal ?? 0,
       [language === 'ar' ? 'الخصم' : 'Discount']: line.discountAmount ?? 0,
       [language === 'ar' ? 'الضرائب' : 'Taxes']: line.taxAmount ?? 0,
+      [language === 'ar' ? 'نسبة الضريبة %' : 'Tax Rate %']: `${getLineTaxRate(line)}%`,
       [language === 'ar' ? 'إجمالي المبلغ' : 'Total Amount']: line.lineTotal ?? 0,
       [language === 'ar' ? 'الحالة' : 'Status']: line.status || '',
       'UUID': line.uuid || ''
@@ -1060,6 +1147,7 @@ export function EtaDetailedInvoices() {
             setShowStatusDropdown(false);
             setShowYearDropdown(false);
             setShowMonthDropdown(false);
+            setShowTaxRateDropdown(false);
           }}
           className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-50 hover:bg-white border border-slate-200 focus:border-indigo-500 text-xs md:text-sm font-semibold text-slate-800 transition-all text-start cursor-pointer"
         >
@@ -1172,6 +1260,7 @@ export function EtaDetailedInvoices() {
             setShowDocTypeDropdown(false);
             setShowYearDropdown(false);
             setShowMonthDropdown(false);
+            setShowTaxRateDropdown(false);
           }}
           className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-50 hover:bg-white border border-slate-200 focus:border-indigo-500 text-xs md:text-sm font-semibold text-slate-800 transition-all text-start cursor-pointer"
         >
@@ -1257,8 +1346,121 @@ export function EtaDetailedInvoices() {
     );
   };
 
+  const renderTaxRateFilter = () => {
+    const isFiltered = selectedTaxRates.length > 0 || taxRateFilter !== 'all';
+    return (
+      <div className="relative">
+        <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center justify-between">
+          <span className="flex items-center gap-1.5">
+            <Percent className="w-3.5 h-3.5 text-indigo-600" />
+            <span>{language === 'ar' ? 'نسبة الضريبة (الضريبة ÷ الصافي)' : 'Tax Rate (Tax ÷ Net)'}</span>
+          </span>
+          {isFiltered && (
+            <button
+              type="button"
+              onClick={() => { setSelectedTaxRates([]); setTaxRateFilter('all'); setClientPage(1); }}
+              className="text-[10px] text-indigo-600 hover:underline font-bold cursor-pointer"
+            >
+              {language === 'ar' ? 'إعادة تعيين' : 'Reset'}
+            </button>
+          )}
+        </label>
+
+        <button
+          type="button"
+          onClick={() => {
+            setShowTaxRateDropdown(p => !p);
+            setShowStatusDropdown(false);
+            setShowDocTypeDropdown(false);
+            setShowYearDropdown(false);
+            setShowMonthDropdown(false);
+          }}
+          className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-50 hover:bg-white border border-slate-200 focus:border-indigo-500 text-xs md:text-sm font-semibold text-slate-800 transition-all text-start cursor-pointer"
+        >
+          <span className="truncate">
+            {selectedTaxRates.length === 0
+              ? (taxRateFilter !== 'all'
+                  ? (availableTaxRates.find(x => x.id === taxRateFilter)?.[language === 'ar' ? 'nameAr' : 'nameEn'] || `${taxRateFilter}%`)
+                  : (language === 'ar' ? 'كافة النسب' : 'All Tax Rates'))
+              : selectedTaxRates.length === 1
+              ? (() => {
+                  const tr = availableTaxRates.find(x => x.id === selectedTaxRates[0]);
+                  return language === 'ar' ? tr?.nameAr : tr?.nameEn;
+                })()
+              : (language === 'ar' ? `${selectedTaxRates.length} نسب محددة` : `${selectedTaxRates.length} Rates Selected`)}
+          </span>
+          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showTaxRateDropdown ? 'rotate-180' : ''}`} />
+        </button>
+
+        {showTaxRateDropdown && (
+          <>
+            <div className="fixed inset-0 z-20" onClick={() => setShowTaxRateDropdown(false)} />
+            <div className="absolute top-full right-0 mt-1.5 w-72 bg-white rounded-2xl border border-slate-200 shadow-xl z-30 p-2 space-y-1 max-h-72 overflow-y-auto">
+              <div className="flex items-center justify-between pb-2 mb-1 border-b border-slate-100 px-2 pt-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => { setSelectedTaxRates([]); setTaxRateFilter('all'); setClientPage(1); }}
+                  className={`font-bold cursor-pointer ${selectedTaxRates.length === 0 && taxRateFilter === 'all' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
+                >
+                  {language === 'ar' ? 'تحديد كافة النسب' : 'Select All Rates'}
+                </button>
+                {isFiltered && (
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedTaxRates([]); setTaxRateFilter('all'); setClientPage(1); }}
+                    className="text-[11px] text-rose-500 hover:underline font-semibold cursor-pointer"
+                  >
+                    {language === 'ar' ? 'مسح' : 'Clear'}
+                  </button>
+                )}
+              </div>
+
+              {availableTaxRates.map(tr => {
+                const count = tr.count;
+                const isChecked = selectedTaxRates.length > 0 ? selectedTaxRates.includes(tr.id) : (taxRateFilter === tr.id);
+                return (
+                  <label
+                    key={tr.id}
+                    className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl hover:bg-slate-50 cursor-pointer text-xs select-none transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          let newSelected = selectedTaxRates.length > 0
+                            ? [...selectedTaxRates]
+                            : (taxRateFilter !== 'all' ? [taxRateFilter] : []);
+                          if (e.target.checked) {
+                            if (!newSelected.includes(tr.id)) newSelected.push(tr.id);
+                          } else {
+                            newSelected = newSelected.filter(x => x !== tr.id);
+                          }
+                          setSelectedTaxRates(newSelected);
+                          setTaxRateFilter(newSelected.length === 1 ? newSelected[0] : 'all');
+                          setClientPage(1);
+                        }}
+                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                      />
+                      <span className="font-semibold text-slate-800">{language === 'ar' ? tr.nameAr : tr.nameEn}</span>
+                    </div>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
+                      count > 0 ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-400'
+                    }`}>
+                      {count} {language === 'ar' ? 'بند' : (count === 1 ? 'line' : 'lines')}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-[1700px] mx-auto text-slate-800" dir={dir}>
+    <div className="space-y-6 w-full text-slate-800" dir={dir}>
       {!selectedInvoiceUuid ? (
         <>
           {/* ========================================================================= */}
@@ -1467,7 +1669,7 @@ export function EtaDetailedInvoices() {
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
         {viewMode === 'period' ? (
           /* Period Mode Date Pickers */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-indigo-600" />
@@ -1499,6 +1701,9 @@ export function EtaDetailedInvoices() {
 
             {/* Status Filter */}
             {renderStatusFilter()}
+
+            {/* Tax Rate Filter */}
+            {renderTaxRateFilter()}
 
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
@@ -1534,7 +1739,7 @@ export function EtaDetailedInvoices() {
           </div>
         ) : (
           /* All Portal Mode Filters */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
             {/* Fiscal Years */}
             <div className="relative">
               <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center justify-between">
@@ -1716,6 +1921,9 @@ export function EtaDetailedInvoices() {
             {/* Status Filter */}
             {renderStatusFilter()}
 
+            {/* Tax Rate Filter */}
+            {renderTaxRateFilter()}
+
             {/* Quick Search */}
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
@@ -1771,6 +1979,7 @@ export function EtaDetailedInvoices() {
                 <option value="line_total">{language === 'ar' ? 'إجمالي المبلغ' : 'Total Amount'}</option>
                 <option value="sales_total">{language === 'ar' ? 'قيمة المبيعات' : 'Sales Total'}</option>
                 <option value="tax_amount">{language === 'ar' ? 'الضرائب' : 'Taxes'}</option>
+                <option value="tax_rate">{language === 'ar' ? 'نسبة الضريبة % (الضريبة ÷ الصافي)' : 'Tax Rate % (Tax ÷ Net)'}</option>
                 <option value="unit_price">{language === 'ar' ? 'سعر الوحدة' : 'Unit Price'}</option>
               </select>
             </div>
@@ -1796,37 +2005,49 @@ export function EtaDetailedInvoices() {
                 {amountOperator === 'between' ? (
                   <>
                     <div className="flex items-center gap-1">
-                      <span className="text-xs text-slate-500 font-medium">{language === 'ar' ? 'من:' : 'From:'}</span>
+                      <span className="text-xs text-slate-500 font-medium">
+                        {amountField === 'tax_rate'
+                          ? (language === 'ar' ? 'من نسبة %:' : 'From Rate %:')
+                          : (language === 'ar' ? 'من:' : 'From:')}
+                      </span>
                       <input
                         type="number"
                         step="any"
                         value={amountValueFrom}
                         onChange={(e) => { setAmountValueFrom(e.target.value); setClientPage(1); }}
-                        placeholder="0.00"
+                        placeholder={amountField === 'tax_rate' ? '0' : '0.00'}
                         className="w-28 px-2.5 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-hidden shadow-2xs"
                       />
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="text-xs text-slate-500 font-medium">{language === 'ar' ? 'إلى:' : 'To:'}</span>
+                      <span className="text-xs text-slate-500 font-medium">
+                        {amountField === 'tax_rate'
+                          ? (language === 'ar' ? 'إلى نسبة %:' : 'To Rate %:')
+                          : (language === 'ar' ? 'إلى:' : 'To:')}
+                      </span>
                       <input
                         type="number"
                         step="any"
                         value={amountValueTo}
                         onChange={(e) => { setAmountValueTo(e.target.value); setClientPage(1); }}
-                        placeholder="0.00"
+                        placeholder={amountField === 'tax_rate' ? '14' : '0.00'}
                         className="w-28 px-2.5 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-hidden shadow-2xs"
                       />
                     </div>
                   </>
                 ) : (
                   <div className="flex items-center gap-1">
-                    <span className="text-xs text-slate-500 font-medium">{language === 'ar' ? 'المبلغ:' : 'Amount:'}</span>
+                    <span className="text-xs text-slate-500 font-medium">
+                      {amountField === 'tax_rate'
+                        ? (language === 'ar' ? 'نسبة %:' : 'Rate %:')
+                        : (language === 'ar' ? 'المبلغ:' : 'Amount:')}
+                    </span>
                     <input
                       type="number"
                       step="any"
                       value={amountValueFrom}
                       onChange={(e) => { setAmountValueFrom(e.target.value); setClientPage(1); }}
-                      placeholder="0.00"
+                      placeholder={amountField === 'tax_rate' ? '14' : '0.00'}
                       className="w-32 px-2.5 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-hidden shadow-2xs"
                     />
                   </div>
@@ -1855,8 +2076,8 @@ export function EtaDetailedInvoices() {
           {amountOperator !== 'all' && (amountValueFrom || amountValueTo) && (
             <div className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100 self-start lg:self-center">
               {language === 'ar'
-                ? `تصفية حسب: ${amountField === 'sales_total' ? 'قيمة المبيعات' : amountField === 'tax_amount' ? 'الضرائب' : amountField === 'unit_price' ? 'سعر الوحدة' : 'إجمالي المبلغ'}`
-                : `Filtering by amount`}
+                ? `تصفية حسب: ${amountField === 'sales_total' ? 'قيمة المبيعات' : amountField === 'tax_amount' ? 'الضرائب' : amountField === 'tax_rate' ? 'نسبة الضريبة (%)' : amountField === 'unit_price' ? 'سعر الوحدة' : 'إجمالي المبلغ'}`
+                : `Filtering by: ${amountField === 'sales_total' ? 'Sales Total' : amountField === 'tax_amount' ? 'Tax' : amountField === 'tax_rate' ? 'Tax Rate (%)' : amountField === 'unit_price' ? 'Unit Price' : 'Total Amount'}`}
             </div>
           )}
         </div>
@@ -2222,7 +2443,12 @@ export function EtaDetailedInvoices() {
                             </div>
                             <div>
                               <span className="text-slate-400 block text-[10px]">{language === 'ar' ? 'الضرائب' : 'Tax'}</span>
-                              <span className="font-semibold text-slate-600">{formatAmount(line.taxAmount)}</span>
+                              <div className="flex items-center gap-1">
+                                <span className="font-semibold text-slate-600">{formatAmount(line.taxAmount)}</span>
+                                <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1 py-0.5 rounded border border-indigo-100 font-mono">
+                                  {getLineTaxRate(line)}%
+                                </span>
+                              </div>
                             </div>
                             <div className="text-end">
                               <span className="text-slate-400 block text-[10px] flex items-center justify-end gap-1">
@@ -2293,6 +2519,7 @@ export function EtaDetailedInvoices() {
                         {visibleColumns.item_sales_total && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'قيمة المبيعات' : 'Sales Total'}</th>}
                         {visibleColumns.item_discount && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الخصم' : 'Discount'}</th>}
                         {visibleColumns.item_tax && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الضرائب' : 'Taxes'}</th>}
+                        {visibleColumns.tax_rate && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'نسبة الضريبة' : 'Tax Rate'}</th>}
                         {visibleColumns.item_total && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'إجمالي المبلغ' : 'Total Amount'}</th>}
                         {visibleColumns.status && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الحالة' : 'Status'}</th>}
                         {visibleColumns.uuid && <th className="py-3 px-4 text-center whitespace-nowrap">UUID</th>}
@@ -2461,6 +2688,15 @@ export function EtaDetailedInvoices() {
                             {visibleColumns.item_tax && (
                               <td className="py-3.5 px-4 text-end font-medium text-amber-700 whitespace-nowrap">
                                 {formatAmount(line.taxAmount)}
+                              </td>
+                            )}
+
+                            {/* Dedicated Tax Rate Column (نسبة الضريبة %) */}
+                            {visibleColumns.tax_rate && (
+                              <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                                <span className="inline-block px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 font-mono text-xs font-bold border border-indigo-100">
+                                  {getLineTaxRate(line)}%
+                                </span>
                               </td>
                             )}
 

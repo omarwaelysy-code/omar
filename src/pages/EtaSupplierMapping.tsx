@@ -400,7 +400,7 @@ export function EtaSupplierMapping() {
 
 
   return (
-    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 p-4 md:p-6 lg:p-8 space-y-6">
+    <div className="w-full space-y-6 text-slate-800 dark:text-slate-100 pb-12">
       
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm">
