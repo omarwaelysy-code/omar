@@ -117,96 +117,103 @@ export const Expenses: React.FC = () => {
   );
 
   return (
-    <div className="h-full flex flex-col space-y-8 animate-in fade-in duration-700 overflow-hidden" dir={dir}>
+    <div className="h-full flex flex-col space-y-2 animate-in fade-in duration-500 overflow-hidden w-full px-1 sm:px-3 py-1" dir={dir}>
       <AnimatePresence mode="wait">
         {!isModalOpen ? (
           <motion.div 
             key="list"
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="flex-1 flex flex-col space-y-8 overflow-hidden max-w-7xl mx-auto w-full p-4"
+            exit={{ opacity: 0, y: -10 }}
+            className="flex-1 flex flex-col space-y-2 overflow-hidden w-full"
           >
             {/* Header */}
-            <div className="flex flex-col md:flex-row items-center justify-between gap-8 pb-6 border-b border-slate-100">
-              <div className={dir === 'rtl' ? 'text-right' : 'text-left'}>
-                <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter mb-3 leading-none italic serif">
-                  {t('expenses.title') || 'بنود المصروفات'}
-                </h1>
-                <p className="text-slate-400 font-bold uppercase tracking-[0.3em] text-xs">
-                  {t('expenses.subtitle') || 'تنظيم وتصنيف النفقات التشغيلية'}
-                </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 bg-rose-600 text-white rounded-xl flex items-center justify-center shadow-md shadow-rose-500/20 shrink-0">
+                  <Wallet size={18} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-black tracking-tight text-slate-900 leading-none">{t('expenses.title') || 'بنود المصروفات'}</h2>
+                    <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">
+                      {categories.length} {language === 'ar' ? 'بند' : 'items'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-medium leading-tight mt-0.5">{t('expenses.subtitle') || 'تنظيم وتصنيف النفقات التشغيلية'}</p>
+                </div>
               </div>
-              <div className="flex items-center gap-4">
-                <button onClick={() => setIsActivityLogOpen(true)} className="w-14 h-14 bg-white text-slate-400 border border-slate-100 rounded-2xl flex items-center justify-center shadow-sm hover:text-rose-600 hover:border-rose-100 transition-all active:scale-95">
-                  <History size={24} />
+              <div className="flex items-center gap-1.5">
+                <button 
+                  onClick={() => setIsActivityLogOpen(true)} 
+                  className="flex items-center justify-center gap-1 px-2.5 py-1.5 bg-white text-slate-600 border border-slate-200 rounded-lg font-bold text-xs hover:bg-slate-50 transition-all active:scale-95 shadow-xs"
+                  title={language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
+                >
+                  <History size={14} />
+                  <span className="hidden sm:inline">{language === 'ar' ? 'سجل النشاط' : 'Activity Log'}</span>
                 </button>
                 <button 
                   onClick={() => openModal()}
-                  className="group relative px-8 py-4 bg-zinc-900 text-white rounded-[1.5rem] shadow-xl overflow-hidden transition-all hover:bg-zinc-800 active:scale-95"
+                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-zinc-900 text-white rounded-lg font-bold text-xs hover:bg-zinc-800 transition-all shadow-sm active:scale-95"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-tr from-rose-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <div className="relative z-10 flex items-center gap-3 font-black uppercase tracking-widest text-sm">
-                    <Plus size={20} className="group-hover:rotate-90 transition-transform" />
-                    {t('expenses.add') || 'بند جديد'}
-                  </div>
+                  <Plus size={15} />
+                  <span>{t('expenses.add') || 'بند جديد'}</span>
                 </button>
               </div>
             </div>
 
             {/* List Control */}
-            <div className="flex-1 bg-white rounded-[3.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden flex flex-col transition-all duration-500">
-              <div className="p-8 border-b border-slate-50 flex items-center justify-between gap-4 bg-slate-50/20">
+            <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col transition-all duration-300">
+              <div className="p-2 border-b border-slate-100 flex items-center justify-between gap-2 bg-slate-50/30">
                 <div className="relative flex-1 group">
-                  <Search className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-4 text-slate-300 group-focus-within:text-rose-500 transition-colors pointer-events-none`} size={24} />
+                  <Search className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2 text-slate-400 group-focus-within:text-rose-500 transition-colors pointer-events-none`} size={15} />
                   <input
                     type="text"
                     placeholder={t('expenses.search_placeholder') || 'البحث باسم البند أو الكود...'}
-                    className={`w-full ${dir === 'rtl' ? 'pr-16 pl-6' : 'pl-16 pr-6'} py-4 bg-white border border-slate-100 rounded-[2rem] outline-none font-bold text-slate-900 placeholder:text-slate-300 focus:ring-8 focus:ring-rose-500/5 focus:border-rose-500/50 transition-all shadow-inner`}
+                    className={`w-full ${dir === 'rtl' ? 'pr-8 pl-3' : 'pl-8 pr-3'} py-1.5 bg-white border border-slate-200 rounded-lg outline-none font-bold text-xs text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all shadow-xs`}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
-                <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200/50 shadow-inner w-fit">
+                <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 shadow-inner w-fit">
                   <button
                     onClick={() => setView('table')}
-                    className={`p-2 px-3 rounded-xl transition-all flex items-center gap-2 font-bold text-sm ${view === 'table' ? 'bg-white text-rose-600 shadow-sm border border-slate-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+                    className={`p-1 px-2 rounded-md transition-all flex items-center gap-1 font-bold text-xs ${view === 'table' ? 'bg-white text-rose-600 shadow-xs border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}
                     title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
                   >
-                    <List size={18} />
-                    <span className="hidden md:inline">{language === 'ar' ? 'مسرد' : 'Table'}</span>
+                    <List size={14} />
+                    <span className="hidden sm:inline">{language === 'ar' ? 'مسرد' : 'Table'}</span>
                   </button>
                   <button
                     onClick={() => setView('card')}
-                    className={`p-2 px-3 rounded-xl transition-all flex items-center gap-2 font-bold text-sm ${view === 'card' ? 'bg-white text-rose-600 shadow-sm border border-slate-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+                    className={`p-1 px-2 rounded-md transition-all flex items-center gap-1 font-bold text-xs ${view === 'card' ? 'bg-white text-rose-600 shadow-xs border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}
                     title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
                   >
-                    <LayoutGrid size={18} />
-                    <span className="hidden md:inline">{language === 'ar' ? 'بطاقات' : 'Cards'}</span>
+                    <LayoutGrid size={14} />
+                    <span className="hidden sm:inline">{language === 'ar' ? 'بطاقات' : 'Cards'}</span>
                   </button>
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar p-10">
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {loading ? (
-                  <div className="py-20 text-center">
-                    <div className="w-12 h-12 border-4 border-rose-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                  <div className="py-12 text-center">
+                    <div className="w-8 h-8 border-3 border-rose-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
                   </div>
                 ) : view === 'card' ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 p-3">
                     {filteredCategories.map((category) => (
                       <motion.div
                         layout
-                        initial={{ opacity: 0, scale: 0.9 }}
+                        initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        whileHover={{ y: -5 }}
                         key={category.id}
                         onClick={() => openModal(category)}
-                        className="p-8 space-y-6 rounded-[3rem] border bg-white border-slate-100 hover:border-rose-200 hover:shadow-2xl transition-all cursor-pointer group relative overflow-hidden"
+                        className="p-3 space-y-2 rounded-xl border bg-white border-slate-100 hover:border-rose-200 hover:shadow-md transition-all cursor-pointer group relative overflow-hidden"
                       >
                         <div className="flex items-start justify-between">
-                           <div className="w-20 h-20 bg-slate-50 rounded-[2rem] shadow-inner border border-slate-100 flex items-center justify-center text-slate-300 group-hover:text-rose-600 transition-all duration-500">
-                             <Wallet size={32} />
+                           <div className="w-8 h-8 bg-slate-50 rounded-lg shadow-inner border border-slate-100 flex items-center justify-center text-slate-400 group-hover:text-rose-600 group-hover:bg-rose-50 transition-all">
+                             <Wallet size={16} />
                            </div>
                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
                               <button onClick={async (e) => {
@@ -215,70 +222,70 @@ export const Expenses: React.FC = () => {
                                   await dbService.delete('expense_categories', category.id);
                                   showNotification(t('common.deleted_successfully'), 'success');
                                 }
-                              }} className="p-3 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"><Trash2 size={20} /></button>
+                              }} className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"><Trash2 size={14} /></button>
                            </div>
                         </div>
 
-                        <div className="space-y-3">
-                           <h3 className="text-2xl font-black text-slate-900 italic serif tracking-tighter group-hover:text-rose-700 transition-colors uppercase line-clamp-1">{category.name}</h3>
-                           <span className="inline-block px-3 py-1 bg-slate-100 text-slate-400 rounded-lg text-[10px] font-black uppercase tracking-widest border border-slate-200">{category.code}</span>
-                           <p className="text-sm text-slate-500 font-medium line-clamp-2 leading-relaxed h-[40px]">
-                              {category.description || 'لا يوجد وصف متاح لهذا البند...'}
+                        <div className="space-y-1">
+                           <h3 className="text-sm font-bold text-slate-900 group-hover:text-rose-700 transition-colors line-clamp-1">{category.name}</h3>
+                           <span className="inline-block px-1.5 py-0.2 bg-slate-100 text-slate-500 rounded text-[10px] font-bold border border-slate-200 font-mono">{category.code}</span>
+                           <p className="text-[11px] text-slate-400 line-clamp-1 leading-tight">
+                              {category.description || 'لا يوجد وصف متاح'}
                            </p>
                         </div>
 
-                        <div className="pt-6 border-t border-slate-50 flex items-center justify-between">
-                           <div className="space-y-1">
-                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{language === 'ar' ? 'الحساب المطبق' : 'Linked Account'}</p>
-                              <p className="text-xs font-black text-slate-600 uppercase tracking-tighter truncate max-w-[150px]">{category.account_name}</p>
+                        <div className="pt-1.5 border-t border-slate-50 flex items-center justify-between">
+                           <div className="space-y-0.5">
+                              <p className="text-[9px] font-bold text-slate-400 uppercase">{language === 'ar' ? 'الحساب' : 'Account'}</p>
+                              <p className="text-[11px] font-bold text-slate-700 truncate max-w-[130px]">{category.account_name}</p>
                            </div>
-                           <div className="p-3 bg-slate-50 rounded-2xl text-slate-300 group-hover:bg-rose-600 group-hover:text-white transition-all">
-                              {dir === 'rtl' ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}
+                           <div className="p-1 bg-slate-50 rounded-md text-slate-300 group-hover:bg-rose-600 group-hover:text-white transition-all">
+                              {dir === 'rtl' ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
                            </div>
                         </div>
                       </motion.div>
                     ))}
                     {filteredCategories.length === 0 && (
-                      <div className="col-span-full py-12 text-center text-slate-400 font-bold">{language === 'ar' ? 'لا توجد بنود مصاريف حالياً' : 'No expenses found.'}</div>
+                      <div className="col-span-full py-8 text-center text-slate-400 font-bold text-xs">{language === 'ar' ? 'لا توجد بنود مصاريف حالياً' : 'No expenses found.'}</div>
                     )}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto rounded-3xl border border-slate-150">
+                  <div className="overflow-x-auto h-full">
                     <table className="w-full text-right border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-100">
-                          <th className="px-6 py-4">{language === 'ar' ? 'كود البند' : 'Code'}</th>
-                          <th className="px-6 py-4">{language === 'ar' ? 'اسم البند' : 'Name'}</th>
-                          <th className="px-6 py-4">{language === 'ar' ? 'الحساب المطبق' : 'Linked Account'}</th>
-                          <th className="px-6 py-4">{language === 'ar' ? 'الوصف' : 'Description'}</th>
-                          <th className="px-6 py-4 text-left">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
+                      <thead className="sticky top-0 bg-white/90 backdrop-blur-md z-10 border-b border-slate-100">
+                        <tr className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">
+                          <th className="px-4 py-2">{language === 'ar' ? 'كود البند' : 'Code'}</th>
+                          <th className="px-4 py-2">{language === 'ar' ? 'اسم البند' : 'Name'}</th>
+                          <th className="px-4 py-2">{language === 'ar' ? 'الحساب المطبق' : 'Linked Account'}</th>
+                          <th className="px-4 py-2">{language === 'ar' ? 'الوصف' : 'Description'}</th>
+                          <th className="px-4 py-2 text-left">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
                         {filteredCategories.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">{language === 'ar' ? 'لا توجد بنود مصاريف حالياً' : 'No expenses found.'}</td>
+                            <td colSpan={5} className="px-4 py-8 text-center text-slate-400 text-xs italic">{language === 'ar' ? 'لا توجد بنود مصاريف حالياً' : 'No expenses found.'}</td>
                           </tr>
                         ) : filteredCategories.map((category) => (
                           <tr 
                             key={category.id} 
-                            className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
+                            className="hover:bg-slate-50/50 transition-colors group cursor-pointer text-xs"
                             onClick={() => openModal(category)}
                           >
-                            <td className="px-6 py-4">
-                              <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded text-slate-600 font-bold border border-slate-200">{category.code}</span>
+                            <td className="px-4 py-2">
+                              <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold border border-slate-200">{category.code}</span>
                             </td>
-                            <td className="px-6 py-4 font-bold text-slate-900">{category.name}</td>
-                            <td className="px-6 py-4 text-slate-600 font-semibold">{category.account_name}</td>
-                            <td className="px-6 py-4 text-slate-400 max-w-xs truncate">{category.description || '-'}</td>
-                            <td className="px-6 py-4 text-left" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <td className="px-4 py-2 font-bold text-slate-900">{category.name}</td>
+                            <td className="px-4 py-2 text-slate-600 font-medium">{category.account_name}</td>
+                            <td className="px-4 py-2 text-slate-400 max-w-xs truncate">{category.description || '-'}</td>
+                            <td className="px-4 py-2 text-left" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center justify-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button 
                                   onClick={() => openModal(category)}
-                                  className="p-2 text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
+                                  className="p-1 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
                                   title={language === 'ar' ? 'تعديل' : 'Edit'}
                                 >
-                                  <FileText size={18} />
+                                  <FileText size={14} />
                                 </button>
                                 <button 
                                   onClick={async (e) => {
@@ -288,10 +295,10 @@ export const Expenses: React.FC = () => {
                                       showNotification(t('common.deleted_successfully'), 'success');
                                     }
                                   }}
-                                  className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                                  className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
                                   title={language === 'ar' ? 'حذف' : 'Delete'}
                                 >
-                                  <Trash2 size={18} />
+                                  <Trash2 size={14} />
                                 </button>
                               </div>
                             </td>
@@ -307,75 +314,62 @@ export const Expenses: React.FC = () => {
         ) : (
           <motion.div 
             key="form"
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="flex-1 flex flex-col space-y-8 overflow-hidden max-w-7xl mx-auto w-full p-4"
+            exit={{ opacity: 0, y: -10 }}
+            className="flex-1 flex flex-col space-y-2 overflow-hidden w-full"
           >
-            <div className="bg-white flex-1 rounded-[3.5rem] shadow-xl shadow-slate-200/40 flex flex-col md:flex-row overflow-hidden border border-slate-100 transition-all duration-500">
+            <div className="bg-white flex-1 rounded-2xl shadow-sm flex flex-col md:flex-row overflow-hidden border border-slate-200 transition-all duration-300">
               {/* Form Side */}
               <div className="flex-1 flex flex-col h-full overflow-hidden bg-white">
-                <div className="p-10 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-20">
-                  <div className={`flex items-center gap-6 ${dir === 'rtl' ? 'flex-row' : 'flex-row'}`}>
-                    <div className="w-16 h-16 bg-rose-600 text-white rounded-[2rem] flex items-center justify-center shadow-xl shadow-rose-500/20">
-                       <Wallet size={32} />
+                <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-20">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 bg-rose-600 text-white rounded-lg flex items-center justify-center shadow-xs">
+                       <Wallet size={15} />
                     </div>
-                    <div className={dir === 'rtl' ? 'text-right' : 'text-left'}>
-                       <h3 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-1 font-serif italic">
+                    <div>
+                       <h3 className="text-sm font-black text-slate-900 tracking-tight leading-none">
                          {editingCategory ? (language === 'ar' ? 'تعديل بند المصروف' : 'Edit Expense') : (language === 'ar' ? 'إضافة بند مصروف' : 'New Expense')}
                        </h3>
-                       <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em] leading-none">{editingCategory?.code || 'EXPENSE FLOW : NEW'}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <button type="submit" form="expense-form" className="px-10 py-5 bg-zinc-900 text-white rounded-[1.5rem] font-black hover:bg-zinc-800 transition-all active:scale-95 shadow-xl">
-                       {editingCategory ? t('common.save') : t('common.add')}
+                  <div className="flex items-center gap-2">
+                    <button onClick={closeModal} className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg font-bold text-xs hover:bg-slate-200 transition-all active:scale-95 border border-slate-200">
+                       {t('common.cancel')}
                     </button>
-                    <button onClick={closeModal} className="w-14 h-14 flex items-center justify-center bg-slate-50 text-slate-400 rounded-[1.5rem] hover:bg-rose-50 hover:text-rose-500 transition-all">
-                       <X size={28} />
+                    <button type="submit" form="expense-form" className="px-4 py-1.5 bg-zinc-900 text-white rounded-lg font-bold text-xs hover:bg-zinc-800 transition-all active:scale-95 shadow-xs">
+                       {editingCategory ? t('common.save') : t('common.add')}
                     </button>
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-10 md:p-14">
-                  <form id="expense-form" onSubmit={handleSubmit} className="space-y-16" dir={dir}>
-                     {/* Base Info Section */}
-                     <div className="space-y-12">
-                        <div className="flex items-center gap-4 border-b border-slate-50 pb-8">
-                           <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center shadow-inner">
-                              <Layers size={24} />
-                           </div>
-                           <h2 className="text-2xl font-black text-slate-900 leading-none tracking-tight uppercase">
-                              {language === 'ar' ? 'المعلومات الأساسية' : 'Primary Information'}
-                           </h2>
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-4">
+                  <form id="expense-form" onSubmit={handleSubmit} className="space-y-3" dir={dir}>
+                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-right">
+                        <div className="sm:col-span-2">
+                           <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">{language === 'ar' ? 'اسم البند' : 'Expense Name'}</label>
+                           <input required type="text" placeholder="اسم بند المصروف" className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all shadow-xs" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
                         </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-right">
-                           <div className="md:col-span-2 space-y-4">
-                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'اسم البند' : 'Expense Name'}</label>
-                              <input required type="text" placeholder="..." className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black text-slate-900 outline-none focus:bg-white focus:ring-8 focus:ring-rose-500/5 transition-all shadow-inner" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+                        <div>
+                           <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">{language === 'ar' ? 'كود البند' : 'Expense Code'}</label>
+                           <div className="relative group">
+                             <Hash className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={13} />
+                             <input required type="text" placeholder="EXP-01" className="w-full pr-7 pl-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono text-xs font-bold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 shadow-xs" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} />
                            </div>
-                           <div className="space-y-4">
-                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'كود البند' : 'Expense Code'}</label>
-                              <div className="relative group">
-                                <Hash className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300 group-focus-within:text-rose-500 transition-colors`} size={24} />
-                                <input required type="text" placeholder="EXP-01" className="w-full pr-16 pl-6 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] font-mono text-xl font-black text-slate-900 outline-none shadow-inner tracking-widest" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} />
-                              </div>
+                        </div>
+                        <div>
+                           <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">{language === 'ar' ? 'الحساب المحاسبي' : 'Linked Account'}</label>
+                           <div className="relative group">
+                             <Box className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={13} />
+                             <select required className="w-full pr-7 pl-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 appearance-none outline-none focus:bg-white focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all shadow-xs" value={formData.account_id} onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}>
+                               <option value="">{language === 'ar' ? 'اختر الحساب...' : 'Select Account...'}</option>
+                               {accounts.filter(a => ['operating_expense', 'administrative_expense', 'marketing_expense', 'selling_expense', 'financial_expense', 'depreciation_expense'].includes(a.account_usage || '')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                             </select>
                            </div>
-                           <div className="space-y-4">
-                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'الحساب المحاسبي' : 'Linked Account'}</label>
-                              <div className="relative group">
-                                <Box className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300 group-focus-within:text-rose-500 transition-colors`} size={24} />
-                                <select required className="w-full pr-16 pl-6 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black text-slate-900 appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-rose-500/5 transition-all shadow-inner" value={formData.account_id} onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}>
-                                  <option value="">Select Account...</option>
-                                  {accounts.filter(a => ['operating_expense', 'administrative_expense', 'marketing_expense', 'selling_expense', 'financial_expense', 'depreciation_expense'].includes(a.account_usage || '')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
-                                </select>
-                              </div>
-                           </div>
-                           <div className="md:col-span-2 space-y-4">
-                              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'الوصف' : 'Description'}</label>
-                              <textarea placeholder="..." className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black outline-none focus:bg-white focus:ring-8 focus:ring-rose-500/5 transition-all shadow-inner min-h-[150px]" rows={4} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
-                           </div>
+                        </div>
+                        <div className="sm:col-span-2 lg:col-span-4">
+                           <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">{language === 'ar' ? 'الوصف' : 'Description'}</label>
+                           <textarea placeholder="وصف تفصيلي للبند..." className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all shadow-xs min-h-[60px]" rows={2} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
                         </div>
                      </div>
                   </form>
@@ -384,19 +378,14 @@ export const Expenses: React.FC = () => {
 
               {/* Activity Side */}
               {editingCategory && (
-                <div className="hidden lg:flex w-[400px] flex-col bg-slate-50 border-s border-slate-100 overflow-hidden shadow-inner">
-                  <div className="p-10 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10 text-right">
-                     <div className="flex items-center gap-4">
-                         <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-400">
-                           <History size={24} />
-                         </div>
-                         <div>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">النشاط الأخير</span>
-                            <h3 className="font-black text-slate-900 text-lg">سجل التعديلات</h3>
-                         </div>
-                      </div>
+                <div className="hidden lg:flex w-72 flex-col bg-slate-50/70 border-s border-slate-100 overflow-hidden">
+                  <div className="p-2.5 border-b border-slate-100 bg-white/60 backdrop-blur-sm sticky top-0 z-10 flex items-center gap-2">
+                     <div className="w-6 h-6 bg-white rounded-md shadow-xs flex items-center justify-center text-slate-400">
+                       <History size={13} />
+                     </div>
+                     <span className="font-bold text-slate-900 text-xs">سجل التعديلات</span>
                   </div>
-                  <div className="flex-1 overflow-y-auto custom-scrollbar">
+                  <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
                      <InlineActivityLog category="expense_categories" documentId={editingCategory.id} />
                   </div>
                 </div>

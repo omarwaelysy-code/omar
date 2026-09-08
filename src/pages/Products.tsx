@@ -1046,7 +1046,7 @@ export const Products: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="flex-1 flex flex-col space-y-8 overflow-hidden max-w-7xl mx-auto w-full p-4"
+            className="flex-1 flex flex-col space-y-6 overflow-hidden w-full p-2 sm:p-4"
           >
             {/* ETA Linking Banner when navigated from EtaItemMapping */}
             {pendingEtaProductForLinking && (
