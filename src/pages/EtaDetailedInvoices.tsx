@@ -89,6 +89,7 @@ export interface DetailedInvoiceLine {
 
 export const getDetailedLineTaxBreakdown = (line: Partial<DetailedInvoiceLine>) => {
   const lineTaxes = Array.isArray(line.taxTotals) ? line.taxTotals : [];
+  const hasLineTaxes = lineTaxes.length > 0;
   const taxableFees = line.taxableFees !== undefined
     ? Number(line.taxableFees)
     : lineTaxes.filter(t => ['T5','T6','T7','T8','T9','T10','T11','T12'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
@@ -97,7 +98,9 @@ export const getDetailedLineTaxBreakdown = (line: Partial<DetailedInvoiceLine>) 
     : lineTaxes.filter(t => ['T2','T3'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
   const vatAmount = line.vatAmount !== undefined
     ? Number(line.vatAmount)
-    : (lineTaxes.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0) || (lineTaxes.length === 0 ? Number(line.taxAmount || 0) : 0));
+    : (hasLineTaxes
+        ? lineTaxes.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0)
+        : Number(line.taxAmount || 0));
   const nonTaxableFees = line.nonTaxableFees !== undefined
     ? Number(line.nonTaxableFees)
     : lineTaxes.filter(t => ['T13','T14','T15','T16','T17','T18','T19','T20'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
@@ -759,8 +762,9 @@ export function EtaDetailedInvoices() {
     fetchDetailedData(true);
   };
 
-  const formatAmount = (val: number) => {
+  const formatAmount = (val: number, dashIfZero = false) => {
     const num = Number(val) || 0;
+    if (dashIfZero && Math.abs(num) < 0.001) return '-';
     return num.toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
@@ -2777,35 +2781,35 @@ export function EtaDetailedInvoices() {
                             {/* Taxable Fees (ضرائب ورسوم تدخل فى الوعاء) */}
                             {visibleColumns.taxable_fees && (
                               <td className="py-3.5 px-4 text-end font-medium text-emerald-700 whitespace-nowrap">
-                                {formatAmount(b.taxableFees)}
+                                {formatAmount(b.taxableFees, true)}
                               </td>
                             )}
 
                             {/* Table Tax (ضرائب جدول) */}
                             {visibleColumns.table_tax && (
                               <td className="py-3.5 px-4 text-end font-medium text-amber-700 whitespace-nowrap">
-                                {formatAmount(b.tableTax)}
+                                {formatAmount(b.tableTax, true)}
                               </td>
                             )}
 
                             {/* 14% VAT (14% القيمة المضافة) */}
                             {visibleColumns.vat_amount && (
                               <td className="py-3.5 px-4 text-end font-semibold text-indigo-700 whitespace-nowrap">
-                                {formatAmount(b.vatAmount)}
+                                {formatAmount(b.vatAmount, true)}
                               </td>
                             )}
 
                             {/* Non-Taxable Fees (ضرائب ورسوم لا تدخل فى الوعاء) */}
                             {visibleColumns.non_taxable_fees && (
                               <td className="py-3.5 px-4 text-end font-medium text-slate-600 whitespace-nowrap">
-                                {formatAmount(b.nonTaxableFees)}
+                                {formatAmount(b.nonTaxableFees, true)}
                               </td>
                             )}
 
                             {/* WHT (الخصم والتحصيل تحت حساب الضريبة) */}
                             {visibleColumns.wht_amount && (
                               <td className="py-3.5 px-4 text-end font-medium text-rose-600 whitespace-nowrap">
-                                {formatAmount(b.whtAmount)}
+                                {formatAmount(b.whtAmount, true)}
                               </td>
                             )}
 

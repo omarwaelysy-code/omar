@@ -84,8 +84,18 @@ export interface EtaReceivedInvoice {
   whtAmount?: number;
 }
 
-export const getInvoiceTaxBreakdown = (inv: Partial<EtaReceivedInvoice>) => {
-  const taxTotals = Array.isArray(inv.taxTotals) ? inv.taxTotals : [];
+export const getInvoiceTaxBreakdown = (inv: Partial<EtaReceivedInvoice> & { raw_data?: any }) => {
+  let taxTotals = Array.isArray(inv.taxTotals) ? inv.taxTotals : [];
+  if (taxTotals.length === 0 && inv.raw_data) {
+    try {
+      const raw = typeof inv.raw_data === 'string' ? JSON.parse(inv.raw_data) : inv.raw_data;
+      if (Array.isArray(raw?.taxTotals)) taxTotals = raw.taxTotals;
+      else if (Array.isArray(raw?.details?.taxTotals)) taxTotals = raw.details.taxTotals;
+      else if (Array.isArray(raw?.rawDocument?.taxTotals)) taxTotals = raw.rawDocument.taxTotals;
+    } catch {}
+  }
+
+  const hasTaxTotals = taxTotals.length > 0;
   const taxableFees = inv.taxableFees !== undefined
     ? Number(inv.taxableFees)
     : taxTotals.filter(t => ['T5','T6','T7','T8','T9','T10','T11','T12'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
@@ -94,7 +104,9 @@ export const getInvoiceTaxBreakdown = (inv: Partial<EtaReceivedInvoice>) => {
     : taxTotals.filter(t => ['T2','T3'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
   const vatAmount = inv.vatAmount !== undefined
     ? Number(inv.vatAmount)
-    : (taxTotals.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0) || (taxTotals.length === 0 ? Number(inv.taxAmount || 0) : 0));
+    : (hasTaxTotals
+        ? taxTotals.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0)
+        : Number(inv.taxAmount || 0));
   const nonTaxableFees = inv.nonTaxableFees !== undefined
     ? Number(inv.nonTaxableFees)
     : taxTotals.filter(t => ['T13','T14','T15','T16','T17','T18','T19','T20'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
@@ -1341,8 +1353,9 @@ export function EtaReceivedInvoices() {
     );
   };
 
-  const formatAmount = (val: number) => {
+  const formatAmount = (val: number, dashIfZero = false) => {
     const num = Number(val) || 0;
+    if (dashIfZero && Math.abs(num) < 0.001) return '-';
     return num.toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
@@ -3087,42 +3100,35 @@ export function EtaReceivedInvoices() {
                         {/* Taxable Fees (ضرائب ورسوم تدخل في الوعاء) */}
                         {visibleColumns.taxable_fees && (
                           <td className="py-3.5 px-4 text-end font-medium text-emerald-700 whitespace-nowrap">
-                            {formatAmount(b.taxableFees)}
+                            {formatAmount(b.taxableFees, true)}
                           </td>
                         )}
 
                         {/* Table Tax (ضرائب جدول) */}
                         {visibleColumns.table_tax && (
                           <td className="py-3.5 px-4 text-end font-medium text-amber-700 whitespace-nowrap">
-                            {formatAmount(b.tableTax)}
+                            {formatAmount(b.tableTax, true)}
                           </td>
                         )}
 
                         {/* VAT 14% (14% القيمة المضافة) */}
                         {visibleColumns.vat_amount && (
-                          <td className="py-3.5 px-4 text-end font-medium text-indigo-700 whitespace-nowrap">
-                            <div className="flex items-center justify-end gap-1">
-                              <span>{formatAmount(b.vatAmount)}</span>
-                              {Number(b.netAmount) > 0 && (
-                                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded font-mono">
-                                  {getInvoiceTaxRate(inv)}%
-                                </span>
-                              )}
-                            </div>
+                          <td className="py-3.5 px-4 text-end font-semibold text-indigo-700 whitespace-nowrap">
+                            {formatAmount(b.vatAmount, true)}
                           </td>
                         )}
 
                         {/* Non-Taxable Fees (ضرائب ورسوم لا تدخل في الوعاء) */}
                         {visibleColumns.non_taxable_fees && (
                           <td className="py-3.5 px-4 text-end font-medium text-slate-600 whitespace-nowrap">
-                            {formatAmount(b.nonTaxableFees)}
+                            {formatAmount(b.nonTaxableFees, true)}
                           </td>
                         )}
 
                         {/* WHT (الخصم والتحصيل تحت حساب الضريبة) */}
                         {visibleColumns.wht_amount && (
                           <td className="py-3.5 px-4 text-end font-medium text-rose-700 whitespace-nowrap">
-                            {formatAmount(b.whtAmount)}
+                            {formatAmount(b.whtAmount, true)}
                           </td>
                         )}
 

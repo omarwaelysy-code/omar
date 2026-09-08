@@ -352,6 +352,29 @@ export class EtaDocumentService {
         if (!lastSyncedAt && row.last_synced_at) {
           lastSyncedAt = new Date(row.last_synced_at).toISOString();
         }
+
+        let rawDataObj: any = null;
+        if (row.raw_data) {
+          try {
+            rawDataObj = typeof row.raw_data === 'string' ? JSON.parse(row.raw_data) : row.raw_data;
+          } catch {}
+        }
+        const taxTotals: any[] = Array.isArray(rawDataObj?.taxTotals)
+          ? rawDataObj.taxTotals
+          : (Array.isArray(rawDataObj?.details?.taxTotals)
+              ? rawDataObj.details.taxTotals
+              : (Array.isArray(rawDataObj?.rawDocument?.taxTotals) ? rawDataObj.rawDocument.taxTotals : []));
+
+        const taxAmount = Number(row.tax_amount || 0);
+        const hasTaxTotals = taxTotals.length > 0;
+        const taxableFees = taxTotals.filter(t => ['T5','T6','T7','T8','T9','T10','T11','T12'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
+        const tableTax = taxTotals.filter(t => ['T2','T3'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
+        const vatAmount = hasTaxTotals
+          ? taxTotals.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0)
+          : taxAmount;
+        const nonTaxableFees = taxTotals.filter(t => ['T13','T14','T15','T16','T17','T18','T19','T20'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
+        const whtAmount = taxTotals.filter(t => t.taxType === 'T4').reduce((s, t) => s + (Number(t.amount) || 0), 0);
+
         return {
           uuid: row.uuid,
           submissionUuid: row.submission_uuid || undefined,
@@ -367,16 +390,23 @@ export class EtaDocumentService {
           totalSales: Number(row.total_sales_amount || 0),
           totalDiscount: Number(row.total_discount_amount || 0),
           netAmount: Number(row.net_amount || 0),
-          taxAmount: Number(row.tax_amount || 0),
+          taxAmount,
           totalAmount: Number(row.total_amount || 0),
           currency: row.currency || 'EGP',
           issuerId: row.issuer_id || '',
-          issuerName: row.issuer_name || '',
+          issuerName: cleanDuplicatedPartnerName(row.issuer_name || 'مورد غير محدد'),
           issuerAddress: row.issuer_address || '',
           receiverId: row.receiver_id || '',
-          receiverName: row.receiver_name || '',
+          receiverName: cleanDuplicatedPartnerName(row.receiver_name || 'عميل غير محدد'),
           receiverAddress: row.receiver_address || '',
-          address: (row.direction === 'Sent' ? row.receiver_address : row.issuer_address) || row.issuer_address || row.receiver_address || ''
+          address: (row.direction === 'Sent' ? row.receiver_address : row.issuer_address) || row.issuer_address || row.receiver_address || '',
+          taxTotals,
+          taxableFees,
+          tableTax,
+          vatAmount,
+          nonTaxableFees,
+          whtAmount,
+          raw_data: rawDataObj
         };
       });
       return { data, lastSyncedAt };
@@ -784,9 +814,12 @@ export class EtaDocumentService {
                 ? l.lineTaxableItems
                 : (Array.isArray(l.taxesList) ? l.taxesList : []));
 
+          const hasLineTaxes = lineTaxes.length > 0;
           const taxableFees = lineTaxes.filter(t => ['T5','T6','T7','T8','T9','T10','T11','T12'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
           const tableTax = lineTaxes.filter(t => ['T2','T3'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-          const vatAmount = lineTaxes.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0) || (lineTaxes.length === 0 ? Number(l.taxAmount || 0) : 0);
+          const vatAmount = hasLineTaxes
+            ? lineTaxes.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0)
+            : Number(l.taxAmount || 0);
           const nonTaxableFees = lineTaxes.filter(t => ['T13','T14','T15','T16','T17','T18','T19','T20'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
           const whtAmount = lineTaxes.filter(t => t.taxType === 'T4').reduce((s, t) => s + (Number(t.amount) || 0), 0);
           const netTotal = Number(l.netTotal ?? (salesTotal - discountAmount));
@@ -820,9 +853,12 @@ export class EtaDocumentService {
         // Fallback: 1 line with document totals
         const docTaxTotals: any[] = Array.isArray(rawDataObj?.taxTotals) ? rawDataObj.taxTotals : [];
         const docTaxAmount = Number(row.tax_amount || 0);
+        const hasDocTaxTotals = docTaxTotals.length > 0;
         const taxableFees = docTaxTotals.filter(t => ['T5','T6','T7','T8','T9','T10','T11','T12'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
         const tableTax = docTaxTotals.filter(t => ['T2','T3'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-        const vatAmount = docTaxTotals.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0) || (docTaxTotals.length === 0 ? docTaxAmount : 0);
+        const vatAmount = hasDocTaxTotals
+          ? docTaxTotals.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0)
+          : docTaxAmount;
         const nonTaxableFees = docTaxTotals.filter(t => ['T13','T14','T15','T16','T17','T18','T19','T20'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
         const whtAmount = docTaxTotals.filter(t => t.taxType === 'T4').reduce((s, t) => s + (Number(t.amount) || 0), 0);
         const salesTotal = Number(row.total_sales_amount || row.net_amount || 0);
@@ -1239,9 +1275,12 @@ export class EtaDocumentService {
       }
       const taxTotals: any[] = Array.isArray(rawDataObj?.taxTotals) ? rawDataObj.taxTotals : [];
       const taxAmount = Number(row.tax_amount || 0);
+      const hasTaxTotals = taxTotals.length > 0;
       const taxableFees = taxTotals.filter(t => ['T5','T6','T7','T8','T9','T10','T11','T12'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
       const tableTax = taxTotals.filter(t => ['T2','T3'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-      const vatAmount = taxTotals.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0) || (taxTotals.length === 0 ? taxAmount : 0);
+      const vatAmount = hasTaxTotals
+        ? taxTotals.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0)
+        : taxAmount;
       const nonTaxableFees = taxTotals.filter(t => ['T13','T14','T15','T16','T17','T18','T19','T20'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
       const whtAmount = taxTotals.filter(t => t.taxType === 'T4').reduce((s, t) => s + (Number(t.amount) || 0), 0);
 
@@ -1590,9 +1629,12 @@ export class EtaDocumentService {
       taxAmount = Math.max(0, Math.round((totalAmount - netAmount) * 10000) / 10000);
     }
 
+    const hasTaxTotals = taxTotals.length > 0;
     const taxableFees = taxTotals.filter(t => ['T5','T6','T7','T8','T9','T10','T11','T12'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
     const tableTax = taxTotals.filter(t => ['T2','T3'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-    const vatAmount = taxTotals.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0) || (taxTotals.length === 0 ? taxAmount : 0);
+    const vatAmount = hasTaxTotals
+      ? taxTotals.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0)
+      : taxAmount;
     const nonTaxableFees = taxTotals.filter(t => ['T13','T14','T15','T16','T17','T18','T19','T20'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
     const whtAmount = taxTotals.filter(t => t.taxType === 'T4').reduce((s, t) => s + (Number(t.amount) || 0), 0);
 
