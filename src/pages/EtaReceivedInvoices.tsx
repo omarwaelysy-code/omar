@@ -2827,6 +2827,9 @@ export function EtaReceivedInvoices() {
                 {/* CARD VIEW */}
                 {view === 'card' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-slate-50/50">
+                    {currentDisplayInvoices.map((inv) => {
+                      const isSelected = selectedUuids.includes(inv.uuid);
+                      return (
                         <div
                           key={inv.uuid}
                           data-uuid={inv.uuid}
@@ -3169,7 +3172,8 @@ export function EtaReceivedInvoices() {
                           </td>
                         )}
                       </tr>
-                    ))}
+                    );
+                  })}
                   </tbody>
                 </table>
               </div>
