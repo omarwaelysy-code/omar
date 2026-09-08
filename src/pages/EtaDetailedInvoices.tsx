@@ -74,9 +74,43 @@ export interface DetailedInvoiceLine {
   unitPrice: number;
   salesTotal: number;
   discountAmount: number;
+  netTotal?: number;
   taxAmount: number;
   lineTotal: number;
+
+  // Breakdown Taxes & Fees
+  taxTotals?: Array<{ taxType: string; amount: number }>;
+  taxableFees?: number;
+  tableTax?: number;
+  vatAmount?: number;
+  nonTaxableFees?: number;
+  whtAmount?: number;
 }
+
+export const getDetailedLineTaxBreakdown = (line: Partial<DetailedInvoiceLine>) => {
+  const lineTaxes = Array.isArray(line.taxTotals) ? line.taxTotals : [];
+  const taxableFees = line.taxableFees !== undefined
+    ? Number(line.taxableFees)
+    : lineTaxes.filter(t => ['T5','T6','T7','T8','T9','T10','T11','T12'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  const tableTax = line.tableTax !== undefined
+    ? Number(line.tableTax)
+    : lineTaxes.filter(t => ['T2','T3'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  const vatAmount = line.vatAmount !== undefined
+    ? Number(line.vatAmount)
+    : (lineTaxes.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0) || (lineTaxes.length === 0 ? Number(line.taxAmount || 0) : 0));
+  const nonTaxableFees = line.nonTaxableFees !== undefined
+    ? Number(line.nonTaxableFees)
+    : lineTaxes.filter(t => ['T13','T14','T15','T16','T17','T18','T19','T20'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  const whtAmount = line.whtAmount !== undefined
+    ? Number(line.whtAmount)
+    : lineTaxes.filter(t => t.taxType === 'T4').reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  const salesTotal = Number(line.salesTotal || 0);
+  const discountAmount = Number(line.discountAmount || 0);
+  const netAmount = Number(line.netTotal ?? (salesTotal - discountAmount));
+  const totalAmount = Number(line.lineTotal || 0);
+
+  return { salesTotal, discountAmount, netAmount, taxableFees, tableTax, vatAmount, nonTaxableFees, whtAmount, totalAmount };
+};
 
 const defaultVisibleColumns: Record<string, boolean> = {
   internal_id: true,
@@ -97,8 +131,12 @@ const defaultVisibleColumns: Record<string, boolean> = {
   item_unit_price: true,
   item_sales_total: true,
   item_discount: true,
-  item_tax: true,
-  tax_rate: true,
+  net_amount: true,
+  taxable_fees: true,
+  table_tax: true,
+  vat_amount: true,
+  non_taxable_fees: true,
+  wht_amount: true,
   item_total: true,
   status: true,
   uuid: true
@@ -121,11 +159,15 @@ const columnLabels: Record<string, { ar: string; en: string }> = {
   item_quantity: { ar: 'الكمية', en: 'Quantity' },
   item_unit: { ar: 'الوحدة', en: 'Unit' },
   item_unit_price: { ar: 'سعر الوحدة', en: 'Unit Price' },
-  item_sales_total: { ar: 'قيمة المبيعات', en: 'Sales Total' },
+  item_sales_total: { ar: 'الإجمالي', en: 'Sales Total' },
   item_discount: { ar: 'الخصم', en: 'Discount' },
-  item_tax: { ar: 'الضرائب', en: 'Taxes' },
-  tax_rate: { ar: 'نسبة الضريبة', en: 'Tax Rate' },
-  item_total: { ar: 'إجمالي المبلغ', en: 'Total Amount' },
+  net_amount: { ar: 'الصافي', en: 'Net Amount' },
+  taxable_fees: { ar: 'ضرائب ورسوم تدخل فى الوعاء', en: 'Taxable Fees (T5–T12)' },
+  table_tax: { ar: 'ضرائب جدول', en: 'Table Tax (T2–T3)' },
+  vat_amount: { ar: '14% القيمة المضافة', en: '14% VAT (T1)' },
+  non_taxable_fees: { ar: 'ضرائب ورسوم لا تدخل فى الوعاء', en: 'Non-Taxable Fees (T13–T20)' },
+  wht_amount: { ar: 'الخصم والتحصيل تحت حساب الضريبة', en: 'WHT (T4)' },
+  item_total: { ar: 'القيمة النهائية', en: 'Total Amount' },
   status: { ar: 'الحالة', en: 'Status' },
   uuid: { ar: 'UUID', en: 'UUID' }
 };
@@ -153,6 +195,12 @@ export function EtaDetailedInvoices() {
           parsed.item_unit = parsed.item_unit ?? parsed.item_quantity_unit;
           delete parsed.item_quantity_unit;
         }
+        if (parsed.net_amount === undefined) parsed.net_amount = true;
+        if (parsed.vat_amount === undefined) parsed.vat_amount = true;
+        if (parsed.taxable_fees === undefined) parsed.taxable_fees = true;
+        if (parsed.table_tax === undefined) parsed.table_tax = true;
+        if (parsed.non_taxable_fees === undefined) parsed.non_taxable_fees = true;
+        if (parsed.wht_amount === undefined) parsed.wht_amount = true;
         return { ...defaultVisibleColumns, ...parsed };
       } catch (e) {
         console.error(e);
@@ -1024,39 +1072,46 @@ export function EtaDetailedInvoices() {
       return;
     }
 
-    const exportData = listToExport.map((line, idx) => ({
-      '#': idx + 1,
-      [language === 'ar' ? 'رقم الفاتورة' : 'Invoice ID']: line.internalId || '',
-      [language === 'ar' ? 'الاتجاه' : 'Direction']:
-        line.direction === 'Sent'
-          ? (language === 'ar' ? 'صادرة' : 'Sent')
-          : (language === 'ar' ? 'واردة' : 'Received'),
-      [language === 'ar' ? 'نوع الوثيقة' : 'Document Type']: line.documentTypeName || line.typeName || '',
-      [language === 'ar' ? 'المورد / العميل' : 'Partner Name']: line.partnerName || '',
-      [language === 'ar' ? 'الرقم الضريبي' : 'Tax ID']: line.taxId || '-',
-      [language === 'ar' ? 'العنوان' : 'Address']: line.address || '-',
-      [language === 'ar' ? 'تاريخ الإصدار' : 'Issue Date']: line.dateTimeIssued
-        ? new Date(line.dateTimeIssued).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')
-        : '-',
-      [language === 'ar' ? 'تاريخ الاستلام' : 'Received Date']: line.dateTimeReceived
-        ? new Date(line.dateTimeReceived).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')
-        : '-',
-      [language === 'ar' ? 'العملة' : 'Currency']: line.currency || 'EGP',
-      [language === 'ar' ? 'اسم الكود' : 'Code Name']: line.itemCodeName || '---',
-      [language === 'ar' ? 'كود الصنف' : 'Item Code']: line.itemCode || '---',
-      [language === 'ar' ? 'نوع الكود' : 'Code Type']: line.itemType || 'EGS',
-      [language === 'ar' ? 'الوصف' : 'Description']: line.description || '---',
-      [language === 'ar' ? 'الكمية' : 'Quantity']: line.quantity ?? 1,
-      [language === 'ar' ? 'الوحدة' : 'Unit']: line.unitType || '',
-      [language === 'ar' ? 'سعر الوحدة' : 'Unit Price']: line.unitPrice ?? 0,
-      [language === 'ar' ? 'قيمة المبيعات' : 'Sales Total']: line.salesTotal ?? 0,
-      [language === 'ar' ? 'الخصم' : 'Discount']: line.discountAmount ?? 0,
-      [language === 'ar' ? 'الضرائب' : 'Taxes']: line.taxAmount ?? 0,
-      [language === 'ar' ? 'نسبة الضريبة %' : 'Tax Rate %']: `${getLineTaxRate(line)}%`,
-      [language === 'ar' ? 'إجمالي المبلغ' : 'Total Amount']: line.lineTotal ?? 0,
-      [language === 'ar' ? 'الحالة' : 'Status']: line.status || '',
-      'UUID': line.uuid || ''
-    }));
+    const exportData = listToExport.map((line, idx) => {
+      const b = getDetailedLineTaxBreakdown(line);
+      return {
+        '#': idx + 1,
+        [language === 'ar' ? 'رقم الفاتورة' : 'Invoice ID']: line.internalId || '',
+        [language === 'ar' ? 'الاتجاه' : 'Direction']:
+          line.direction === 'Sent'
+            ? (language === 'ar' ? 'صادرة' : 'Sent')
+            : (language === 'ar' ? 'واردة' : 'Received'),
+        [language === 'ar' ? 'نوع الوثيقة' : 'Document Type']: line.documentTypeName || line.typeName || '',
+        [language === 'ar' ? 'المورد / العميل' : 'Partner Name']: line.partnerName || '',
+        [language === 'ar' ? 'الرقم الضريبي' : 'Tax ID']: line.taxId || '-',
+        [language === 'ar' ? 'العنوان' : 'Address']: line.address || '-',
+        [language === 'ar' ? 'تاريخ الإصدار' : 'Issue Date']: line.dateTimeIssued
+          ? new Date(line.dateTimeIssued).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')
+          : '-',
+        [language === 'ar' ? 'تاريخ الاستلام' : 'Received Date']: line.dateTimeReceived
+          ? new Date(line.dateTimeReceived).toLocaleString(language === 'ar' ? 'ar-EG' : 'en-US')
+          : '-',
+        [language === 'ar' ? 'العملة' : 'Currency']: line.currency || 'EGP',
+        [language === 'ar' ? 'اسم الكود' : 'Code Name']: line.itemCodeName || '---',
+        [language === 'ar' ? 'كود الصنف' : 'Item Code']: line.itemCode || '---',
+        [language === 'ar' ? 'نوع الكود' : 'Code Type']: line.itemType || 'EGS',
+        [language === 'ar' ? 'الوصف' : 'Description']: line.description || '---',
+        [language === 'ar' ? 'الكمية' : 'Quantity']: line.quantity ?? 1,
+        [language === 'ar' ? 'الوحدة' : 'Unit']: line.unitType || '',
+        [language === 'ar' ? 'سعر الوحدة' : 'Unit Price']: line.unitPrice ?? 0,
+        [language === 'ar' ? 'الإجمالي' : 'Gross Sales']: b.salesTotal,
+        [language === 'ar' ? 'الخصم' : 'Discount']: b.discountAmount,
+        [language === 'ar' ? 'الصافي' : 'Net Amount']: b.netAmount,
+        [language === 'ar' ? 'ضرائب ورسوم تدخل فى الوعاء' : 'Taxable Fees (T5–T12)']: b.taxableFees,
+        [language === 'ar' ? 'ضرائب جدول' : 'Table Tax (T2–T3)']: b.tableTax,
+        [language === 'ar' ? '14% القيمة المضافة' : '14% VAT (T1)']: b.vatAmount,
+        [language === 'ar' ? 'ضرائب ورسوم لا تدخل فى الوعاء' : 'Non-Taxable Fees (T13–T20)']: b.nonTaxableFees,
+        [language === 'ar' ? 'الخصم والتحصيل تحت حساب الضريبة' : 'WHT (T4)']: b.whtAmount,
+        [language === 'ar' ? 'القيمة النهائية' : 'Total Amount']: b.totalAmount,
+        [language === 'ar' ? 'الحالة' : 'Status']: line.status || '',
+        'UUID': line.uuid || ''
+      };
+    });
 
     const now = new Date();
     const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -2436,28 +2491,51 @@ export function EtaDetailedInvoices() {
                           </div>
 
                           {/* Amounts */}
-                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                            <div>
-                              <span className="text-slate-400 block text-[10px]">{language === 'ar' ? 'سعر الوحدة' : 'Unit Price'}</span>
-                              <span className="font-semibold text-slate-700">{formatAmount(line.unitPrice)}</span>
-                            </div>
-                            <div>
-                              <span className="text-slate-400 block text-[10px]">{language === 'ar' ? 'الضرائب' : 'Tax'}</span>
-                              <div className="flex items-center gap-1">
-                                <span className="font-semibold text-slate-600">{formatAmount(line.taxAmount)}</span>
-                                <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1 py-0.5 rounded border border-indigo-100 font-mono">
-                                  {getLineTaxRate(line)}%
-                                </span>
+                          {(() => {
+                            const b = getDetailedLineTaxBreakdown(line);
+                            return (
+                              <div className="pt-2 border-t border-slate-100 space-y-1 text-xs">
+                                <div className="grid grid-cols-2 gap-1 text-[11px]">
+                                  <div className="flex justify-between bg-slate-50 px-2 py-1 rounded">
+                                    <span className="text-slate-500">{language === 'ar' ? 'سعر الوحدة:' : 'Unit Price:'}</span>
+                                    <span className="font-semibold text-slate-700">{formatAmount(line.unitPrice)}</span>
+                                  </div>
+                                  <div className="flex justify-between bg-slate-50 px-2 py-1 rounded">
+                                    <span className="text-slate-500">{language === 'ar' ? 'الإجمالي:' : 'Gross:'}</span>
+                                    <span className="font-semibold text-slate-700">{formatAmount(b.salesTotal)}</span>
+                                  </div>
+                                  <div className="flex justify-between bg-slate-50 px-2 py-1 rounded">
+                                    <span className="text-slate-500">{language === 'ar' ? 'الصافي:' : 'Net:'}</span>
+                                    <span className="font-semibold text-slate-700">{formatAmount(b.netAmount)}</span>
+                                  </div>
+                                  <div className="flex justify-between bg-emerald-50/50 px-2 py-1 rounded">
+                                    <span className="text-emerald-700">{language === 'ar' ? 'رسوم وعاء:' : 'Taxable:'}</span>
+                                    <span className="font-semibold text-emerald-800">{formatAmount(b.taxableFees)}</span>
+                                  </div>
+                                  <div className="flex justify-between bg-amber-50/50 px-2 py-1 rounded">
+                                    <span className="text-amber-700">{language === 'ar' ? 'جدول:' : 'Table:'}</span>
+                                    <span className="font-semibold text-amber-800">{formatAmount(b.tableTax)}</span>
+                                  </div>
+                                  <div className="flex justify-between bg-indigo-50/50 px-2 py-1 rounded">
+                                    <span className="text-indigo-700">{language === 'ar' ? '14% VAT:' : 'VAT:'}</span>
+                                    <span className="font-semibold text-indigo-800">{formatAmount(b.vatAmount)}</span>
+                                  </div>
+                                  <div className="flex justify-between bg-rose-50/50 px-2 py-1 rounded">
+                                    <span className="text-rose-700">{language === 'ar' ? 'خصم WHT:' : 'WHT:'}</span>
+                                    <span className="font-semibold text-rose-800">{formatAmount(b.whtAmount)}</span>
+                                  </div>
+                                  <div className="flex justify-between bg-slate-100 px-2 py-1 rounded">
+                                    <span className="text-slate-600">{language === 'ar' ? 'رسوم خارج:' : 'Non-Tax:'}</span>
+                                    <span className="font-semibold text-slate-800">{formatAmount(b.nonTaxableFees)}</span>
+                                  </div>
+                                </div>
+                                <div className="flex justify-between items-center pt-1 border-t border-slate-100 text-xs font-bold">
+                                  <span className="text-slate-600">{language === 'ar' ? 'القيمة النهائية:' : 'Final Total:'}</span>
+                                  <span className="text-slate-900 text-sm font-bold">{formatAmount(b.totalAmount)} {line.currency || 'EGP'}</span>
+                                </div>
                               </div>
-                            </div>
-                            <div className="text-end">
-                              <span className="text-slate-400 block text-[10px] flex items-center justify-end gap-1">
-                                <span>{language === 'ar' ? 'إجمالي البند' : 'Line Total'}</span>
-                                <span className="text-indigo-600 font-mono font-bold">({line.currency || 'EGP'})</span>
-                              </span>
-                              <span className="font-bold text-slate-900 text-sm">{formatAmount(line.lineTotal)}</span>
-                            </div>
-                          </div>
+                            );
+                          })()}
 
                           {/* Footer UUID */}
                           <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
@@ -2516,11 +2594,15 @@ export function EtaDetailedInvoices() {
                         {visibleColumns.item_quantity && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الكمية' : 'Quantity'}</th>}
                         {visibleColumns.item_unit && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الوحدة' : 'Unit'}</th>}
                         {visibleColumns.item_unit_price && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'سعر الوحدة' : 'Unit Price'}</th>}
-                        {visibleColumns.item_sales_total && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'قيمة المبيعات' : 'Sales Total'}</th>}
+                        {visibleColumns.item_sales_total && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الإجمالي' : 'Gross Sales'}</th>}
                         {visibleColumns.item_discount && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الخصم' : 'Discount'}</th>}
-                        {visibleColumns.item_tax && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الضرائب' : 'Taxes'}</th>}
-                        {visibleColumns.tax_rate && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'نسبة الضريبة' : 'Tax Rate'}</th>}
-                        {visibleColumns.item_total && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'إجمالي المبلغ' : 'Total Amount'}</th>}
+                        {visibleColumns.net_amount && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الصافي' : 'Net Amount'}</th>}
+                        {visibleColumns.taxable_fees && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'ضرائب ورسوم تدخل فى الوعاء' : 'Taxable Fees'}</th>}
+                        {visibleColumns.table_tax && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'ضرائب جدول' : 'Table Tax'}</th>}
+                        {visibleColumns.vat_amount && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? '14% القيمة المضافة' : '14% VAT'}</th>}
+                        {visibleColumns.non_taxable_fees && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'ضرائب ورسوم لا تدخل فى الوعاء' : 'Non-Taxable Fees'}</th>}
+                        {visibleColumns.wht_amount && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الخصم والتحصيل تحت حساب الضريبة' : 'WHT (T4)'}</th>}
+                        {visibleColumns.item_total && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'القيمة النهائية' : 'Total Amount'}</th>}
                         {visibleColumns.status && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الحالة' : 'Status'}</th>}
                         {visibleColumns.uuid && <th className="py-3 px-4 text-center whitespace-nowrap">UUID</th>}
                       </tr>
@@ -2528,6 +2610,7 @@ export function EtaDetailedInvoices() {
                     <tbody className="divide-y divide-slate-100">
                       {paginatedLines.map((line) => {
                         const isSelected = selectedRowKeys.includes(line.rowKey);
+                        const b = getDetailedLineTaxBreakdown(line);
                         return (
                           <tr
                             key={line.rowKey}
@@ -2670,40 +2753,66 @@ export function EtaDetailedInvoices() {
                               </td>
                             )}
 
-                            {/* Sales Total (قيمة المبيعات) */}
+                            {/* Sales Total (الإجمالي) */}
                             {visibleColumns.item_sales_total && (
                               <td className="py-3.5 px-4 text-end font-medium text-slate-700 whitespace-nowrap">
-                                {formatAmount(line.salesTotal)}
+                                {formatAmount(b.salesTotal)}
                               </td>
                             )}
 
                             {/* Discount (الخصم) */}
                             {visibleColumns.item_discount && (
                               <td className="py-3.5 px-4 text-end font-medium text-red-600 whitespace-nowrap">
-                                {formatAmount(line.discountAmount)}
+                                {formatAmount(b.discountAmount)}
                               </td>
                             )}
 
-                            {/* Taxes (الضرائب) */}
-                            {visibleColumns.item_tax && (
+                            {/* Net Amount (الصافي) */}
+                            {visibleColumns.net_amount && (
+                              <td className="py-3.5 px-4 text-end font-medium text-slate-800 whitespace-nowrap">
+                                {formatAmount(b.netAmount)}
+                              </td>
+                            )}
+
+                            {/* Taxable Fees (ضرائب ورسوم تدخل فى الوعاء) */}
+                            {visibleColumns.taxable_fees && (
+                              <td className="py-3.5 px-4 text-end font-medium text-emerald-700 whitespace-nowrap">
+                                {formatAmount(b.taxableFees)}
+                              </td>
+                            )}
+
+                            {/* Table Tax (ضرائب جدول) */}
+                            {visibleColumns.table_tax && (
                               <td className="py-3.5 px-4 text-end font-medium text-amber-700 whitespace-nowrap">
-                                {formatAmount(line.taxAmount)}
+                                {formatAmount(b.tableTax)}
                               </td>
                             )}
 
-                            {/* Dedicated Tax Rate Column (نسبة الضريبة %) */}
-                            {visibleColumns.tax_rate && (
-                              <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                                <span className="inline-block px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 font-mono text-xs font-bold border border-indigo-100">
-                                  {getLineTaxRate(line)}%
-                                </span>
+                            {/* 14% VAT (14% القيمة المضافة) */}
+                            {visibleColumns.vat_amount && (
+                              <td className="py-3.5 px-4 text-end font-semibold text-indigo-700 whitespace-nowrap">
+                                {formatAmount(b.vatAmount)}
                               </td>
                             )}
 
-                            {/* Total Amount (إجمالي المبلغ) */}
+                            {/* Non-Taxable Fees (ضرائب ورسوم لا تدخل فى الوعاء) */}
+                            {visibleColumns.non_taxable_fees && (
+                              <td className="py-3.5 px-4 text-end font-medium text-slate-600 whitespace-nowrap">
+                                {formatAmount(b.nonTaxableFees)}
+                              </td>
+                            )}
+
+                            {/* WHT (الخصم والتحصيل تحت حساب الضريبة) */}
+                            {visibleColumns.wht_amount && (
+                              <td className="py-3.5 px-4 text-end font-medium text-rose-600 whitespace-nowrap">
+                                {formatAmount(b.whtAmount)}
+                              </td>
+                            )}
+
+                            {/* Total Amount (القيمة النهائية) */}
                             {visibleColumns.item_total && (
                               <td className="py-3.5 px-4 text-end font-bold text-slate-900 whitespace-nowrap">
-                                {formatAmount(line.lineTotal)}
+                                {formatAmount(b.totalAmount)}
                               </td>
                             )}
 

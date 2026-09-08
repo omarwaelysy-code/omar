@@ -56,7 +56,8 @@ import {
   Camera,
   Radio,
   Laptop,
-  Link2
+  Link2,
+  HelpCircle
 } from 'lucide-react';
 
 import { useAuth } from '../contexts/AuthContext';
@@ -131,6 +132,8 @@ const getTabIcon = (id: string) => {
     case 'eta_item_mapping':
     case 'eta_sent_item_mapping':
       return <Receipt {...iconProps} />;
+    case 'eta_tax_types':
+      return <HelpCircle {...iconProps} />;
     case 'operations': return <List {...iconProps} />;
     case 'departments':
     case 'company_settings':
@@ -561,6 +564,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             id: 'eta_sent_item_mapping',
             label: language === 'ar' ? 'ربط الأصناف الصادرة (ETA)' : 'ETA Issued Items Mapping',
             icon: PackageCheck
+          },
+          {
+            id: 'eta_tax_types',
+            label: language === 'ar' ? 'دليل أنواع الضرائب والرسوم (ETA)' : 'ETA Tax Types Guide',
+            icon: HelpCircle
           }
         ]
       }] : []),
@@ -731,7 +739,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       if (item.subItems) {
         const visibleSubItems = (item.subItems as any[]).filter((sub: any) => {
           if (sub.isDivider || sub.isHeader) return true;
-          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking' || sub.id === 'pos_connected_branches' || sub.id === 'eta_received_invoices' || sub.id === 'eta_detailed_invoices' || sub.id === 'eta_supplier_mapping' || sub.id === 'eta_item_mapping' || sub.id === 'eta_sent_item_mapping') return true;
+          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking' || sub.id === 'pos_connected_branches' || sub.id === 'eta_received_invoices' || sub.id === 'eta_detailed_invoices' || sub.id === 'eta_supplier_mapping' || sub.id === 'eta_item_mapping' || sub.id === 'eta_sent_item_mapping' || sub.id === 'eta_tax_types') return true;
           return hasPermission(sub.id, 'view');
         });
         

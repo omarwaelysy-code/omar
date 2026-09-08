@@ -72,6 +72,7 @@ const EtaDetailedInvoices = React.lazy(() => import('./pages/EtaDetailedInvoices
 const EtaSupplierMapping = React.lazy(() => import('./pages/EtaSupplierMapping').then(m => ({ default: m.EtaSupplierMapping })));
 const EtaItemMapping = React.lazy(() => import('./pages/EtaItemMapping').then(m => ({ default: m.EtaItemMapping })));
 const EtaSentItemMapping = React.lazy(() => import('./pages/EtaSentItemMapping').then(m => ({ default: m.EtaSentItemMapping })));
+const EtaTaxTypesGuide = React.lazy(() => import('./pages/EtaTaxTypesGuide').then(m => ({ default: m.EtaTaxTypesGuide })));
 
 import { useNavigation } from './contexts/NavigationContext';
 import { useLanguage } from './contexts/LanguageContext';
@@ -288,6 +289,7 @@ export default function App() {
       case 'eta_supplier_mapping': return <EtaSupplierMapping />;
       case 'eta_item_mapping': return <EtaItemMapping />;
       case 'eta_sent_item_mapping': return <EtaSentItemMapping />;
+      case 'eta_tax_types': return <EtaTaxTypesGuide />;
       default: return <Dashboard />;
     }
   }

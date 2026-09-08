@@ -197,6 +197,7 @@ export const ar = {
   'nav.eta_supplier_mapping': 'ربط الموردين (ETA)',
   'nav.eta_item_mapping': 'ربط الأصناف المستلمة (ETA)',
   'nav.eta_sent_item_mapping': 'ربط الأصناف الصادرة (ETA)',
+  'nav.eta_tax_types': 'دليل أنواع الضرائب والرسوم (ETA)',
 
   // Operations System
   'operations.title': 'نظام العمليات',

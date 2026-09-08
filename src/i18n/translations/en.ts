@@ -197,6 +197,7 @@ export const en = {
   'nav.eta_supplier_mapping': 'ETA Supplier Mapping',
   'nav.eta_item_mapping': 'ETA Received Item Mapping',
   'nav.eta_sent_item_mapping': 'ETA Issued Item Mapping',
+  'nav.eta_tax_types': 'ETA Tax Types Guide',
 
   // Operations System
   'operations.title': 'Operations System',

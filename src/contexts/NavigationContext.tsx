@@ -135,6 +135,7 @@ export const pageLabels: { [key: string]: string } = {
   'eta_supplier_mapping': 'ربط الموردين (ETA)',
   'eta_item_mapping': 'ربط الأصناف المستلمة (ETA)',
   'eta_sent_item_mapping': 'ربط الأصناف الصادرة (ETA)',
+  'eta_tax_types': 'دليل أنواع الضرائب والرسوم (ETA)',
 };
 
 export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
