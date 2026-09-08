@@ -332,7 +332,7 @@ export function EtaTaxTypesGuide() {
   };
 
   const handlePrint = () => {
-    printElement('eta-tax-guide-table-container');
+    printElement(document.getElementById('eta-tax-guide-table-container'), language === 'ar' ? 'دليل أنواع الضرائب والرسوم (ETA)' : 'ETA Tax Types Guide');
   };
 
   return (
