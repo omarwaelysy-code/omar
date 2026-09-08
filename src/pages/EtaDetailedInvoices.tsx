@@ -85,6 +85,8 @@ export interface DetailedInvoiceLine {
   vatAmount?: number;
   nonTaxableFees?: number;
   whtAmount?: number;
+  taxableItemsNet?: number;
+  nonTaxableItemsNet?: number;
   taxableVatBase?: number;
   nonTaxableVatBase?: number;
 }
@@ -114,20 +116,25 @@ export const getDetailedLineTaxBreakdown = (line: Partial<DetailedInvoiceLine>) 
   const netAmount = Number(line.netTotal ?? (salesTotal - discountAmount));
   const totalAmount = Number(line.lineTotal || 0);
 
-  let taxableVatBase = line.taxableVatBase !== undefined ? Number(line.taxableVatBase) : 0;
-  let nonTaxableVatBase = line.nonTaxableVatBase !== undefined ? Number(line.nonTaxableVatBase) : 0;
+  let taxableItemsNet = line.taxableItemsNet !== undefined ? Number(line.taxableItemsNet) : 0;
+  let nonTaxableItemsNet = line.nonTaxableItemsNet !== undefined ? Number(line.nonTaxableItemsNet) : 0;
 
-  if (line.taxableVatBase === undefined) {
+  if (line.taxableItemsNet === undefined) {
     if (vatAmount > 0) {
-      taxableVatBase = netAmount;
-      nonTaxableVatBase = 0;
+      taxableItemsNet = netAmount;
+      nonTaxableItemsNet = 0;
     } else {
-      taxableVatBase = 0;
-      nonTaxableVatBase = netAmount;
+      taxableItemsNet = 0;
+      nonTaxableItemsNet = netAmount;
     }
   }
 
-  return { salesTotal, discountAmount, netAmount, taxableFees, tableTax, vatAmount, nonTaxableFees, whtAmount, totalAmount, taxableVatBase, nonTaxableVatBase };
+  const taxableVatBase = line.taxableVatBase !== undefined
+    ? Number(line.taxableVatBase)
+    : (vatAmount > 0 ? Math.round((taxableItemsNet + taxableFees) * 100) / 100 : 0);
+  const nonTaxableVatBase = nonTaxableItemsNet;
+
+  return { salesTotal, discountAmount, netAmount, taxableItemsNet, nonTaxableItemsNet, taxableFees, tableTax, taxableVatBase, vatAmount, nonTaxableFees, whtAmount, totalAmount, nonTaxableVatBase };
 };
 
 const defaultVisibleColumns: Record<string, boolean> = {
@@ -150,10 +157,11 @@ const defaultVisibleColumns: Record<string, boolean> = {
   item_sales_total: true,
   item_discount: true,
   net_amount: true,
-  taxable_vat_base: true,
-  non_taxable_vat_base: true,
+  taxable_items_net: true,
+  non_taxable_items_net: true,
   taxable_fees: true,
   table_tax: true,
+  taxable_vat_base: true,
   vat_amount: true,
   non_taxable_fees: true,
   wht_amount: true,
@@ -182,10 +190,11 @@ const columnLabels: Record<string, { ar: string; en: string }> = {
   item_sales_total: { ar: 'الإجمالي', en: 'Sales Total' },
   item_discount: { ar: 'الخصم', en: 'Discount' },
   net_amount: { ar: 'الصافي', en: 'Net Amount' },
-  taxable_vat_base: { ar: 'الصافي الخاضع لـ 14% (الوعاء)', en: '14% Taxable Base' },
-  non_taxable_vat_base: { ar: 'الصافي غير الخاضع / المعفى', en: 'Non-Taxable Base' },
+  taxable_items_net: { ar: 'الأصناف الخاضعة لـ 14%', en: '14% Taxable Items' },
+  non_taxable_items_net: { ar: 'الأصناف غير الخاضعة / المعفاة', en: 'Non-Taxable / Exempt Items' },
   taxable_fees: { ar: 'ضرائب ورسوم تدخل فى الوعاء', en: 'Taxable Fees (T5–T12)' },
   table_tax: { ar: 'ضرائب جدول', en: 'Table Tax (T2–T3)' },
+  taxable_vat_base: { ar: 'إجمالي الوعاء الضريبي لـ 14%', en: '14% Taxable Base' },
   vat_amount: { ar: '14% القيمة المضافة', en: '14% VAT (T1)' },
   non_taxable_fees: { ar: 'ضرائب ورسوم لا تدخل فى الوعاء', en: 'Non-Taxable Fees (T13–T20)' },
   wht_amount: { ar: 'الخصم والتحصيل تحت حساب الضريبة', en: 'WHT (T4)' },
@@ -218,11 +227,12 @@ export function EtaDetailedInvoices() {
           delete parsed.item_quantity_unit;
         }
         if (parsed.net_amount === undefined) parsed.net_amount = true;
+        if (parsed.taxable_items_net === undefined) parsed.taxable_items_net = parsed.taxable_vat_base ?? true;
+        if (parsed.non_taxable_items_net === undefined) parsed.non_taxable_items_net = parsed.non_taxable_vat_base ?? true;
         if (parsed.taxable_vat_base === undefined) parsed.taxable_vat_base = true;
-        if (parsed.non_taxable_vat_base === undefined) parsed.non_taxable_vat_base = true;
-        if (parsed.vat_amount === undefined) parsed.vat_amount = true;
         if (parsed.taxable_fees === undefined) parsed.taxable_fees = true;
         if (parsed.table_tax === undefined) parsed.table_tax = true;
+        if (parsed.vat_amount === undefined) parsed.vat_amount = true;
         if (parsed.non_taxable_fees === undefined) parsed.non_taxable_fees = true;
         if (parsed.wht_amount === undefined) parsed.wht_amount = true;
         return { ...defaultVisibleColumns, ...parsed };
@@ -1127,10 +1137,11 @@ export function EtaDetailedInvoices() {
         [language === 'ar' ? 'الإجمالي' : 'Gross Sales']: b.salesTotal,
         [language === 'ar' ? 'الخصم' : 'Discount']: b.discountAmount,
         [language === 'ar' ? 'الصافي' : 'Net Amount']: b.netAmount,
-        [language === 'ar' ? 'الصافي الخاضع لـ 14% (الوعاء)' : '14% Taxable Base']: b.taxableVatBase,
-        [language === 'ar' ? 'الصافي غير الخاضع / المعفى' : 'Non-Taxable Base']: b.nonTaxableVatBase,
+        [language === 'ar' ? 'الأصناف الخاضعة لـ 14%' : '14% Taxable Items']: b.taxableItemsNet,
+        [language === 'ar' ? 'الأصناف غير الخاضعة / المعفاة' : 'Non-Taxable / Exempt Items']: b.nonTaxableItemsNet,
         [language === 'ar' ? 'ضرائب ورسوم تدخل فى الوعاء' : 'Taxable Fees (T5–T12)']: b.taxableFees,
         [language === 'ar' ? 'ضرائب جدول' : 'Table Tax (T2–T3)']: b.tableTax,
+        [language === 'ar' ? 'إجمالي الوعاء الضريبي لـ 14%' : '14% Taxable Base']: b.taxableVatBase,
         [language === 'ar' ? '14% القيمة المضافة' : '14% VAT (T1)']: b.vatAmount,
         [language === 'ar' ? 'ضرائب ورسوم لا تدخل فى الوعاء' : 'Non-Taxable Fees (T13–T20)']: b.nonTaxableFees,
         [language === 'ar' ? 'الخصم والتحصيل تحت حساب الضريبة' : 'WHT (T4)']: b.whtAmount,
@@ -2536,20 +2547,24 @@ export function EtaDetailedInvoices() {
                                     <span className="font-semibold text-slate-700">{formatAmount(b.netAmount)}</span>
                                   </div>
                                   <div className="flex justify-between bg-blue-50/50 px-2 py-1 rounded">
-                                    <span className="text-blue-700">{language === 'ar' ? 'وعاء 14%:' : 'Tax Base:'}</span>
-                                    <span className="font-semibold text-blue-800">{formatAmount(b.taxableVatBase)}</span>
+                                    <span className="text-blue-700">{language === 'ar' ? 'أصناف 14%:' : 'Items 14%:'}</span>
+                                    <span className="font-semibold text-blue-800">{formatAmount(b.taxableItemsNet)}</span>
                                   </div>
                                   <div className="flex justify-between bg-slate-100/70 px-2 py-1 rounded">
                                     <span className="text-slate-600">{language === 'ar' ? 'غير خاضع:' : 'Non-Tax:'}</span>
-                                    <span className="font-semibold text-slate-700">{formatAmount(b.nonTaxableVatBase)}</span>
+                                    <span className="font-semibold text-slate-700">{formatAmount(b.nonTaxableItemsNet)}</span>
                                   </div>
                                   <div className="flex justify-between bg-emerald-50/50 px-2 py-1 rounded">
-                                    <span className="text-emerald-700">{language === 'ar' ? 'رسوم وعاء:' : 'Taxable:'}</span>
+                                    <span className="text-emerald-700">{language === 'ar' ? 'رسوم وعاء:' : 'Fees:'}</span>
                                     <span className="font-semibold text-emerald-800">{formatAmount(b.taxableFees)}</span>
                                   </div>
                                   <div className="flex justify-between bg-amber-50/50 px-2 py-1 rounded">
                                     <span className="text-amber-700">{language === 'ar' ? 'جدول:' : 'Table:'}</span>
                                     <span className="font-semibold text-amber-800">{formatAmount(b.tableTax)}</span>
+                                  </div>
+                                  <div className="flex justify-between bg-indigo-50/70 px-2 py-1 rounded">
+                                    <span className="text-indigo-800 font-bold">{language === 'ar' ? 'وعاء 14%:' : 'Base 14%:'}</span>
+                                    <span className="font-bold text-indigo-900">{formatAmount(b.taxableVatBase)}</span>
                                   </div>
                                   <div className="flex justify-between bg-indigo-50/50 px-2 py-1 rounded">
                                     <span className="text-indigo-700">{language === 'ar' ? '14% VAT:' : 'VAT:'}</span>
@@ -2632,10 +2647,11 @@ export function EtaDetailedInvoices() {
                         {visibleColumns.item_sales_total && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الإجمالي' : 'Gross Sales'}</th>}
                         {visibleColumns.item_discount && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الخصم' : 'Discount'}</th>}
                         {visibleColumns.net_amount && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الصافي' : 'Net Amount'}</th>}
-                        {visibleColumns.taxable_vat_base && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الصافي الخاضع لـ 14% (الوعاء)' : '14% Taxable Base'}</th>}
-                        {visibleColumns.non_taxable_vat_base && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الصافي غير الخاضع / المعفى' : 'Non-Taxable Base'}</th>}
+                        {visibleColumns.taxable_items_net && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الأصناف الخاضعة لـ 14%' : '14% Taxable Items'}</th>}
+                        {visibleColumns.non_taxable_items_net && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الأصناف غير الخاضعة / المعفاة' : 'Non-Taxable / Exempt Items'}</th>}
                         {visibleColumns.taxable_fees && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'ضرائب ورسوم تدخل فى الوعاء' : 'Taxable Fees'}</th>}
                         {visibleColumns.table_tax && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'ضرائب جدول' : 'Table Tax'}</th>}
+                        {visibleColumns.taxable_vat_base && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'إجمالي الوعاء الضريبي لـ 14%' : '14% Taxable Base'}</th>}
                         {visibleColumns.vat_amount && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? '14% القيمة المضافة' : '14% VAT'}</th>}
                         {visibleColumns.non_taxable_fees && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'ضرائب ورسوم لا تدخل فى الوعاء' : 'Non-Taxable Fees'}</th>}
                         {visibleColumns.wht_amount && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الخصم والتحصيل تحت حساب الضريبة' : 'WHT (T4)'}</th>}
@@ -2811,17 +2827,17 @@ export function EtaDetailedInvoices() {
                               </td>
                             )}
 
-                            {/* Taxable VAT Base (الصافي الخاضع لـ 14%) */}
-                            {visibleColumns.taxable_vat_base && (
-                              <td className="py-3.5 px-4 text-end font-semibold text-blue-700 whitespace-nowrap" title={language === 'ar' ? 'الوعاء الخاضع لضريبة القيمة المضافة 14%' : '14% Taxable Base'}>
-                                {formatAmount(b.taxableVatBase, true)}
+                            {/* 14% Taxable Items Net (الأصناف الخاضعة لـ 14%) */}
+                            {visibleColumns.taxable_items_net && (
+                              <td className="py-3.5 px-4 text-end font-medium text-blue-700 whitespace-nowrap" title={language === 'ar' ? 'صافي قيمة الأصناف الخاضعة لضريبة القيمة المضافة 14%' : '14% Taxable Items Net'}>
+                                {formatAmount(b.taxableItemsNet, true)}
                               </td>
                             )}
 
-                            {/* Non Taxable VAT Base (الصافي غير الخاضع / المعفى) */}
-                            {visibleColumns.non_taxable_vat_base && (
-                              <td className="py-3.5 px-4 text-end font-medium text-slate-500 whitespace-nowrap" title={language === 'ar' ? 'المبلغ غير الخاضع أو المعفى من ضريبة 14%' : 'Non-Taxable or Exempt Base'}>
-                                {formatAmount(b.nonTaxableVatBase, true)}
+                            {/* Non Taxable Items Net (الأصناف غير الخاضعة / المعفاة) */}
+                            {visibleColumns.non_taxable_items_net && (
+                              <td className="py-3.5 px-4 text-end font-medium text-slate-500 whitespace-nowrap" title={language === 'ar' ? 'صافي قيمة الأصناف غير الخاضعة أو المعفاة من ضريبة 14%' : 'Non-Taxable / Exempt Items Net'}>
+                                {formatAmount(b.nonTaxableItemsNet, true)}
                               </td>
                             )}
 
@@ -2839,9 +2855,16 @@ export function EtaDetailedInvoices() {
                               </td>
                             )}
 
+                            {/* Total 14% Taxable VAT Base (إجمالي الوعاء الضريبي لـ 14%) */}
+                            {visibleColumns.taxable_vat_base && (
+                              <td className="py-3.5 px-4 text-end font-bold text-indigo-900 bg-indigo-50/30 whitespace-nowrap" title={language === 'ar' ? 'إجمالي وعاء الـ 14% (الأصناف الخاضعة + ضرائب ورسوم الوعاء)' : 'Total 14% VAT Base'}>
+                                {formatAmount(b.taxableVatBase, true)}
+                              </td>
+                            )}
+
                             {/* 14% VAT (14% القيمة المضافة) */}
                             {visibleColumns.vat_amount && (
-                              <td className="py-3.5 px-4 text-end font-semibold text-indigo-700 whitespace-nowrap">
+                              <td className="py-3.5 px-4 text-end font-bold text-indigo-700 whitespace-nowrap">
                                 {formatAmount(b.vatAmount, true)}
                               </td>
                             )}
