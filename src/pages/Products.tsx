@@ -1350,25 +1350,50 @@ export const Products: React.FC = () => {
                             <p className="text-slate-400 text-[10px] uppercase font-black tracking-[0.2em] mb-2">{t('products.column_sale_price')}</p>
                             <p className="font-black text-3xl tracking-tighter leading-none text-emerald-600">{formatNumber(product.sale_price || 0)} <span className="text-xs font-normal text-slate-300 italic serif">{t('invoices.currency')}</span></p>
                           </div>
-                          <div className="flex gap-2">
-                            {pendingEtaProductForLinking && (
-                              <button
-                                type="button"
+                            <div className="flex gap-2">
+                              {pendingEtaProductForLinking && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleLinkExistingToEta(product);
+                                  }}
+                                  disabled={isLinkingDirect}
+                                  className="px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-2xl text-xs font-black transition-all flex items-center gap-1 shadow-md shadow-indigo-600/20 active:scale-95 disabled:opacity-50"
+                                  title={language === 'ar' ? 'ربط هذا الصنف مع كود الضرائب' : 'Link with ETA'}
+                                >
+                                  <Link2 size={14} />
+                                  <span>{language === 'ar' ? 'ربط مع ETA' : 'Link ETA'}</span>
+                                </button>
+                              )}
+                              <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleLinkExistingToEta(product);
-                                }}
-                                disabled={isLinkingDirect}
-                                className="px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-2xl text-xs font-black transition-all flex items-center gap-1 shadow-md shadow-indigo-600/20 active:scale-95 disabled:opacity-50"
-                                title={language === 'ar' ? 'ربط هذا الصنف مع كود الضرائب' : 'Link with ETA'}
+                                  setPendingViewDoc({ type: 'stock_card', idOrNumber: product.id });
+                                  setCurrentPage('stock_card_report');
+                                }} 
+                                className="p-3 bg-slate-50 border border-slate-100 rounded-2xl text-slate-400 hover:bg-emerald-50 hover:text-emerald-500 transition-all"
+                                title={language === 'ar' ? 'تقرير حركة وتكلفة الصنف (كارت الصنف)' : 'Product stock card report'}
                               >
-                                <Link2 size={14} />
-                                <span>{language === 'ar' ? 'ربط مع ETA' : 'Link ETA'}</span>
+                                <History size={20} />
                               </button>
-                            )}
-                            <button 
-                          <motion.div 
-            key="form"
+                              <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl text-slate-300 group-hover:bg-emerald-600 group-hover:text-white transition-all">{dir === 'rtl' ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}</div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-8 border-t border-slate-50 bg-white sticky bottom-0">
+                  <PaginationControls page={1} limit={100} total={filteredProducts.length} onPageChange={() => {}} onLimitChange={() => {}} />
+                </div>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div 
+              key="form"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
@@ -2082,44 +2107,6 @@ export const Products: React.FC = () => {
                       </div>
                   </div>
                   <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
-                     <InlineActivityLog category="products" documentId={editingProduct.id} />
-                  </div>
-                </div>
-              )}
-            </div>
-          </motion.div> text-xl hover:from-emerald-700 hover:to-teal-800 transition-all shadow-xl shadow-emerald-600/30 active:scale-[0.98] border border-emerald-400/40 flex items-center justify-center gap-3"
-                          >
-                            <Link2 className="w-6 h-6" />
-                            <span>{language === 'ar' ? 'حفظ وربط مع منظومة ETA فوراً' : 'Save & Link to ETA'}</span>
-                          </button>
-                        )}
-                        <button 
-                          type="submit"
-                          onClick={() => setLinkWithEta(false)}
-                          className={`${pendingEtaProductForCreation ? 'px-8 font-bold text-lg' : 'flex-1 font-black text-2xl'} py-5 bg-zinc-900 text-white rounded-[2rem] hover:bg-zinc-800 transition-all shadow-2xl active:scale-[0.98] border border-white/10 flex items-center justify-center gap-3`}
-                        >
-                          {editingProduct ? t('common.save') : (pendingEtaProductForCreation ? (language === 'ar' ? 'حفظ عادي' : 'Save Normal') : t('common.add'))}
-                        </button>
-                      </div>
-                   </form>
-                </div>
-              </div>
-
-              {/* Activity Side (Visible when editing) */}
-              {editingProduct && (
-                <div className="hidden lg:flex w-[400px] flex-col bg-slate-50 border-s border-slate-100 overflow-hidden shadow-inner">
-                  <div className="p-10 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10 text-right">
-                     <div className="flex items-center gap-4">
-                         <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-400">
-                           <History size={24} />
-                         </div>
-                         <div>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">النشاط الأخير</span>
-                            <h3 className="font-black text-slate-900 text-lg">سجل التعديلات</h3>
-                         </div>
-                      </div>
-                  </div>
-                  <div className="flex-1 overflow-y-auto custom-scrollbar">
                      <InlineActivityLog category="products" documentId={editingProduct.id} />
                   </div>
                 </div>
