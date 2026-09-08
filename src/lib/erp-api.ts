@@ -12396,6 +12396,8 @@ router.post('/eta/items/mapping/quick-link-all', authenticateToken, async (req: 
     console.error('Error in quickLinkAllMatched items:', err.message || err);
     res.status(500).json({ success: false, error: err.message || 'تعذر إجراء الربط التلقائي للأصناف.' });
   }
+});
+
 // GET /api/erp/eta/company-tax-info
 router.get('/eta/company-tax-info', authenticateToken, async (req: AuthRequest, res) => {
   const companyId = getAuthenticatedCompanyId(req);
