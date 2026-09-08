@@ -353,6 +353,10 @@ export interface Product {
   tax_code_type?: 'EGS' | 'GS1' | 'GPC' | 'OTHER' | string;
   eta_item_code?: string;
   eta_code_type?: string;
+  eta_code_status?: 'Draft' | 'Submitted' | 'Approved' | 'Rejected';
+  eta_gpc_brick?: string;
+  eta_rejection_reason?: string;
+  eta_registered_at?: string;
   is_active?: boolean;
 }
 

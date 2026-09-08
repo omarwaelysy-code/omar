@@ -3,7 +3,7 @@ import {
   Search, Plus, Trash2, X, Package, History, ChevronRight, ChevronLeft, 
   Wallet, Layers, Hash, User, Calendar, Paperclip, LayoutGrid, List,
   Lock, Camera, Printer, Download, Upload, FileText, RefreshCw, AlertCircle, Settings, FileUp, Percent,
-  Link2, Check, Sparkles
+  Link2, Check, Sparkles, CheckCircle, Clock, ShieldCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Barcode from 'react-barcode';
@@ -25,6 +25,7 @@ import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
 import { formatNumber, formatMoney } from '../utils/formatUtils';
 import { FormattedNumberInput } from '../components/FormattedNumberInput';
 import { ExcelImportWizard } from '../components/ExcelImportWizard';
+import { EtaCodeRegistrationModal } from '../components/EtaCodeRegistrationModal';
 
 interface ItemGroup {
   id: string;
@@ -246,6 +247,9 @@ export const Products: React.FC = () => {
     tax_code_type: 'EGS',
     eta_item_code: '',
     eta_code_type: 'EGS',
+    eta_code_status: 'Draft' as 'Draft' | 'Submitted' | 'Approved' | 'Rejected',
+    eta_gpc_brick: '',
+    eta_rejection_reason: '',
     barcode_settings: null as any,
     is_active: true
   });
@@ -549,6 +553,9 @@ export const Products: React.FC = () => {
         tax_code_type: formData.tax_code_type || 'EGS',
         eta_item_code: (formData.eta_item_code || '').trim(),
         eta_code_type: formData.eta_code_type || 'EGS',
+        eta_code_status: formData.eta_code_status || 'Draft',
+        eta_gpc_brick: formData.eta_gpc_brick || null,
+        eta_rejection_reason: formData.eta_rejection_reason || null,
         item_group_name: itemGroupObj?.name || '',
         revenue_account_name: revenueAccount?.name || '',
         cost_account_name: costAccount?.name || '',
@@ -620,6 +627,9 @@ export const Products: React.FC = () => {
       tax_code_type: 'EGS',
       eta_item_code: '',
       eta_code_type: 'EGS',
+      eta_code_status: 'Draft',
+      eta_gpc_brick: '',
+      eta_rejection_reason: '',
       barcode_settings: null as any, is_active: true
     });
     setDateFrom('');
@@ -657,6 +667,9 @@ export const Products: React.FC = () => {
         tax_code_type: product.tax_code_type || 'EGS',
         eta_item_code: product.eta_item_code || '',
         eta_code_type: product.eta_code_type || 'EGS',
+        eta_code_status: product.eta_code_status || 'Draft',
+        eta_gpc_brick: product.eta_gpc_brick || '',
+        eta_rejection_reason: product.eta_rejection_reason || '',
         barcode_settings: product.barcode_settings || null,
         is_active: product.is_active !== false
       } as any);
@@ -670,6 +683,40 @@ export const Products: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     resetForm();
+  };
+
+  // ETA Code Registration States & Check Status Handler
+  const [isEtaRegModalOpen, setIsEtaRegModalOpen] = useState(false);
+  const [isCheckingEtaStatus, setIsCheckingEtaStatus] = useState(false);
+
+  const handleCheckEtaStatus = async () => {
+    if (!formData.eta_item_code) {
+      showNotification('لا يوجد كود ضرائب مسجل للاستعلام عنه', 'warning');
+      return;
+    }
+    setIsCheckingEtaStatus(true);
+    try {
+      const res = await apiRequest<{
+        success: boolean;
+        status: 'Draft' | 'Submitted' | 'Approved' | 'Rejected';
+        message: string;
+      }>('/eta/items/check-status', 'POST', {
+        itemCode: formData.eta_item_code,
+        productId: editingProduct?.id
+      });
+
+      if (res.success) {
+        setFormData(prev => ({
+          ...prev,
+          eta_code_status: res.status
+        }));
+        showNotification(res.message, res.status === 'Approved' ? 'success' : 'info');
+      }
+    } catch (err: any) {
+      showNotification(err.message || 'فشل التحقق من حالة الكود بالضرائب', 'error');
+    } finally {
+      setIsCheckingEtaStatus(false);
+    }
   };
 
   // Barcode Handlers
@@ -1593,42 +1640,116 @@ export const Products: React.FC = () => {
                               </select>
                            </div>
 
-                           {/* 1. كود رفع الوثائق (الفواتير المصدرة / المبيعات) */}
-                           <div className="space-y-0.5">
-                              <label className="block text-[10px] font-bold text-purple-700 px-0.5 flex items-center gap-1">
-                                <Upload size={12} className="text-purple-500" />
-                                <span>{language === 'ar' ? 'كود رفع المبيعات بالضرائب' : 'Sales Upload ETA Code'}</span>
-                              </label>
-                              <div className="relative group">
-                                <FileText className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-purple-400`} size={14} />
-                                <input 
-                                  type="text" 
-                                  placeholder={language === 'ar' ? 'مثل: EG-499151429-1' : 'e.g. EG-499151429-1'} 
-                                  className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-purple-50/30 border border-purple-200 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none focus:bg-white focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all`} 
-                                  value={formData.eta_item_code || ''} 
-                                  onChange={(e) => setFormData({ ...formData, eta_item_code: e.target.value })} 
-                                />
-                              </div>
-                           </div>
+                           {/* 1. كود رفع الوثائق (الفواتير المصدرة / المبيعات) مع إمكانية الرفع والتسجيل بالضرائب */}
+                           <div className="space-y-1 md:col-span-2 bg-purple-50/40 p-2.5 rounded-xl border border-purple-100">
+                             <div className="flex items-center justify-between gap-1 flex-wrap">
+                               <label className="text-[10px] font-bold text-purple-900 flex items-center gap-1">
+                                 <Upload size={12} className="text-purple-600" />
+                                 <span>{language === 'ar' ? 'كود رفع المبيعات بالضرائب (ETA)' : 'Sales Upload ETA Code'}</span>
+                               </label>
+                               <div className="flex items-center gap-1.5 flex-wrap">
+                                 {/* Status badge */}
+                                 {formData.eta_code_status === 'Approved' ? (
+                                   <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-0.5">
+                                     <CheckCircle size={10} className="text-emerald-600" />
+                                     <span>{language === 'ar' ? 'معتمد بالضرائب' : 'Approved'}</span>
+                                   </span>
+                                 ) : formData.eta_code_status === 'Submitted' ? (
+                                   <div className="flex items-center gap-1">
+                                     <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-0.5">
+                                       <Clock size={10} className="text-amber-600 animate-pulse" />
+                                       <span>{language === 'ar' ? 'قيد مراجعة الضرائب' : 'Under Review'}</span>
+                                     </span>
+                                     <button
+                                       type="button"
+                                       onClick={handleCheckEtaStatus}
+                                       disabled={isCheckingEtaStatus}
+                                       title={language === 'ar' ? 'تحديث حالة الكود من منظومة الضرائب' : 'Refresh ETA status'}
+                                       className="p-1 rounded-md bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 text-[10px] transition-all"
+                                     >
+                                       <RefreshCw size={10} className={isCheckingEtaStatus ? 'animate-spin' : ''} />
+                                     </button>
+                                   </div>
+                                 ) : formData.eta_code_status === 'Rejected' ? (
+                                   <span 
+                                     className="px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-0.5 cursor-help"
+                                     title={formData.eta_rejection_reason || 'كود مرفوض من مصلحة الضرائب'}
+                                   >
+                                     <AlertCircle size={10} className="text-rose-600" />
+                                     <span>{language === 'ar' ? 'مرفوض بالضرائب' : 'Rejected'}</span>
+                                   </span>
+                                 ) : (
+                                   <span className="px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-slate-100 text-slate-500 border border-slate-200">
+                                     {language === 'ar' ? 'مسودة / غير مرفوع' : 'Draft'}
+                                   </span>
+                                 )}
 
-                           {/* نوع كود رفع الوثائق */}
-                           <div className="space-y-0.5">
-                              <label className="block text-[10px] font-bold text-purple-700 px-0.5">
-                                {language === 'ar' ? 'نوع كود الرفع' : 'Upload Code Type'}
-                              </label>
-                              <div className="relative group">
-                                <Layers className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-purple-400`} size={14} />
-                                <select 
-                                  className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-purple-50/30 border border-purple-200 rounded-lg text-xs font-bold text-slate-900 appearance-none outline-none focus:bg-white focus:ring-1 focus:ring-purple-500 transition-all`} 
-                                  value={formData.eta_code_type || 'EGS'} 
-                                  onChange={(e) => setFormData({ ...formData, eta_code_type: e.target.value })}
-                                >
-                                  <option value="EGS">EGS (المعيار المصري)</option>
-                                  <option value="GS1">GS1 (الترقيم الدولي)</option>
-                                  <option value="GPC">GPC (التصنيف العالمي)</option>
-                                  <option value="OTHER">{language === 'ar' ? 'أخرى' : 'Other'}</option>
-                                </select>
-                              </div>
+                                 {/* Direct Register Button */}
+                                 <button
+                                   type="button"
+                                   onClick={() => setIsEtaRegModalOpen(true)}
+                                   className="px-2.5 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:scale-95 text-white rounded-lg text-[10px] font-black flex items-center gap-1 shadow-sm transition-all"
+                                 >
+                                   <Sparkles size={11} className="text-amber-300" />
+                                   <span>{language === 'ar' ? '⚡ تسجيل/رفع للضرائب' : '⚡ Register with ETA'}</span>
+                                 </button>
+                               </div>
+                             </div>
+
+                             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-1.5">
+                               {/* Item Code Input */}
+                               <div className="md:col-span-2 relative group">
+                                 <FileText className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-purple-400`} size={14} />
+                                 <input 
+                                   type="text" 
+                                   placeholder={language === 'ar' ? 'مثل: EG-672574845-PRD01' : 'e.g. EG-672574845-PRD01'} 
+                                   className={`w-full ${dir === 'rtl' ? 'pr-7 pl-16' : 'pl-7 pr-16'} py-1.5 bg-white border border-purple-200 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all`} 
+                                   value={formData.eta_item_code || ''} 
+                                   onChange={(e) => setFormData({ ...formData, eta_item_code: e.target.value })} 
+                                 />
+                                 {/* Quick Auto-EGS helper button */}
+                                 {formData.eta_code_type === 'EGS' && company?.tax_number && (
+                                   <button
+                                     type="button"
+                                     onClick={() => {
+                                       const cleanTax = (company.tax_number || '').replace(/\D/g, '');
+                                       const suffix = (formData.code || 'ITEM01').trim();
+                                       setFormData(prev => ({ ...prev, eta_item_code: `EG-${cleanTax}-${suffix}` }));
+                                     }}
+                                     title="تركيب كود EGS تلقائياً برقم التسجيل الضريبي"
+                                     className={`absolute ${dir === 'rtl' ? 'left-1.5' : 'right-1.5'} top-1 px-1.5 py-0.5 rounded bg-purple-100 hover:bg-purple-200 text-purple-800 text-[9px] font-black transition-all`}
+                                   >
+                                     {language === 'ar' ? 'توليد تلقائي' : 'Auto'}
+                                   </button>
+                                 )}
+                               </div>
+
+                               {/* Code Type Select */}
+                               <div className="relative group">
+                                 <Layers className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-purple-400`} size={14} />
+                                 <select 
+                                   className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-white border border-purple-200 rounded-lg text-xs font-bold text-slate-900 appearance-none outline-none focus:ring-1 focus:ring-purple-500 transition-all`} 
+                                   value={formData.eta_code_type || 'EGS'} 
+                                   onChange={(e) => setFormData({ ...formData, eta_code_type: e.target.value })}
+                                 >
+                                   <option value="EGS">EGS (المعيار المصري)</option>
+                                   <option value="GS1">GS1 (الترقيم الدولي)</option>
+                                   <option value="GPC">GPC (التصنيف العالمي)</option>
+                                   <option value="OTHER">{language === 'ar' ? 'أخرى' : 'Other'}</option>
+                                 </select>
+                               </div>
+                             </div>
+
+                             {/* Rejection notice if rejected */}
+                             {formData.eta_code_status === 'Rejected' && formData.eta_rejection_reason && (
+                               <div className="p-1.5 bg-rose-50 border border-rose-200 rounded-lg text-[10px] text-rose-800 flex items-start gap-1 mt-1">
+                                 <AlertCircle size={12} className="text-rose-600 mt-0.5 flex-shrink-0" />
+                                 <div>
+                                   <span className="font-bold">سبب رفض الضرائب: </span>
+                                   <span>{formData.eta_rejection_reason}</span>
+                                 </div>
+                               </div>
+                             )}
                            </div>
 
                            {/* 2. كود ربط الوثائق المستلمة (فواتير المشتريات / الموردين) */}
@@ -2115,7 +2236,32 @@ export const Products: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Standalone Stock Card Report Dialog (خارج الشاشة) */}
+      {/* ETA Code Registration Modal */}
+      <EtaCodeRegistrationModal
+        isOpen={isEtaRegModalOpen}
+        onClose={() => setIsEtaRegModalOpen(false)}
+        itemCode={formData.code || ''}
+        itemNameAr={formData.name || ''}
+        itemDescriptionAr={formData.description || ''}
+        companyTaxNumber={company?.tax_number || ''}
+        productId={editingProduct?.id}
+        initialCodeType={formData.eta_code_type === 'GS1' ? 'GS1' : 'EGS'}
+        onRegistered={(regData) => {
+          setFormData(prev => ({
+            ...prev,
+            eta_item_code: regData.fullItemCode,
+            eta_code_type: regData.codeType,
+            eta_code_status: regData.status,
+            eta_gpc_brick: regData.gpcBrick || prev.eta_gpc_brick
+          }));
+          showNotification(
+            language === 'ar'
+              ? 'تم تقديم كود الصنف بنجاح لمنظومة الضرائب المصرية!'
+              : 'Item code submitted to ETA successfully!',
+            'success'
+          );
+        }}
+      />
       <AnimatePresence>
         {isReportOpen && reportProduct && (
           <motion.div 

@@ -931,4 +931,373 @@ export class EtaItemMappingService {
       message: `تم ربط ${linkedCount} صنف بنجاح وتحديث بيانات الضرائب`
     };
   }
+
+  /**
+   * Get company tax info for ETA code auto-generation
+   */
+  public static async getCompanyTaxInfo(companyId: string): Promise<{
+    taxNumber: string;
+    companyName: string;
+    environment: 'preprod' | 'production';
+    isConfigured: boolean;
+  }> {
+    const compRes = await pool.query(
+      'SELECT id, name, tax_number FROM companies WHERE id = $1',
+      [companyId]
+    );
+    const company = compRes.rows[0];
+
+    const settings = await EtaDocumentService.getCompanySettings(companyId);
+
+    return {
+      taxNumber: (company?.tax_number || '').trim(),
+      companyName: company?.name || '',
+      environment: (settings?.environment as any) || 'production',
+      isConfigured: !!(settings?.clientId && settings?.clientSecret)
+    };
+  }
+
+  /**
+   * Search GPC (Global Product Classification) Bricks catalog
+   */
+  public static async searchGpcBricks(query?: string): Promise<Array<{
+    code: string;
+    name_ar: string;
+    name_en: string;
+    category: string;
+  }>> {
+    const q = (query || '').trim();
+    if (!q) {
+      const res = await pool.query(
+        'SELECT code, name_ar, name_en, category FROM eta_gpc_bricks WHERE is_active = true ORDER BY category, name_ar LIMIT 50'
+      );
+      return res.rows;
+    }
+
+    const res = await pool.query(
+      `SELECT code, name_ar, name_en, category 
+       FROM eta_gpc_bricks 
+       WHERE is_active = true 
+         AND (code ILIKE $1 OR name_ar ILIKE $1 OR name_en ILIKE $1 OR category ILIKE $1)
+       ORDER BY 
+         CASE WHEN code ILIKE $1 THEN 1 ELSE 2 END,
+         name_ar
+       LIMIT 50`,
+      [`%${q}%`]
+    );
+    return res.rows;
+  }
+
+  /**
+   * Register a new item code (EGS / GS1) directly with the Egyptian Tax Authority (ETA)
+   * Official API: POST /api/v1.0/codetypes/requests/codes
+   */
+  public static async registerCodeWithEta(
+    companyId: string,
+    payload: {
+      codeType: 'EGS' | 'GS1';
+      itemCode: string;
+      parentCode?: string; // GPC Brick (Mandatory for EGS)
+      codeNameAr: string;
+      codeNameEn: string;
+      descriptionAr?: string;
+      descriptionEn?: string;
+      activeFrom?: string;
+      activeTo?: string;
+      productId?: string;
+      requestReason?: string;
+    }
+  ): Promise<{
+    success: boolean;
+    status: 'Submitted' | 'Approved' | 'Rejected';
+    itemCode: string;
+    message: string;
+    etaResponse?: any;
+  }> {
+    const codeType = payload.codeType || 'EGS';
+    const cleanItemCode = (payload.itemCode || '').trim();
+
+    if (!cleanItemCode) {
+      return {
+        success: false,
+        status: 'Rejected',
+        itemCode: cleanItemCode,
+        message: 'كود الصنف مطلوب.'
+      };
+    }
+
+    if (codeType === 'EGS' && !payload.parentCode?.trim()) {
+      return {
+        success: false,
+        status: 'Rejected',
+        itemCode: cleanItemCode,
+        message: 'كود فئة GPC Brick مطلوب إجبارياً لتسجيل أكواد EGS المعيار المصري.'
+      };
+    }
+
+    const settings = await EtaDocumentService.getCompanySettings(companyId);
+    if (!settings || !settings.clientId || !settings.clientSecret) {
+      return {
+        success: false,
+        status: 'Rejected',
+        itemCode: cleanItemCode,
+        message: 'بيانات الربط مع منظومة الفاتورة الإلكترونية غير مكتملة في إعدادات ETA.'
+      };
+    }
+
+    try {
+      const token = await EtaAuthService.getValidAccessToken({
+        companyId,
+        environment: settings.environment,
+        clientId: settings.clientId,
+        clientSecret: settings.clientSecret
+      });
+
+      const baseUrl = EtaDocumentService.getApiBaseUrl(settings.environment);
+      const endpoint = `${baseUrl}/api/v1.0/codetypes/requests/codes`;
+
+      const codeNameAr = (payload.codeNameAr || payload.codeNameEn || cleanItemCode).trim();
+      const codeNameEn = (payload.codeNameEn || payload.codeNameAr || cleanItemCode).trim();
+      const descAr = (payload.descriptionAr || payload.descriptionEn || codeNameAr).trim();
+      const descEn = (payload.descriptionEn || payload.descriptionAr || codeNameEn).trim();
+      const activeFrom = payload.activeFrom ? new Date(payload.activeFrom).toISOString() : new Date().toISOString();
+      const activeTo = payload.activeTo ? new Date(payload.activeTo).toISOString() : null;
+
+      const etaItemObject: any = {
+        codeType,
+        itemCode: cleanItemCode,
+        codeName: codeNameEn,
+        codeNameAr: codeNameAr,
+        activeFrom,
+        activeTo,
+        description: descEn,
+        descriptionAr: descAr,
+        requestReason: (payload.requestReason || 'طلب تسجيل كود جديد من نظام ERP').trim()
+      };
+
+      if (codeType === 'EGS') {
+        etaItemObject.parentCode = (payload.parentCode || '').trim();
+      }
+
+      const requestBody = {
+        items: [etaItemObject]
+      };
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      const resData: any = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        let errMsg = `فشل إرسال الكود إلى مصلحة الضرائب (رمز: ${response.status}).`;
+        if (resData?.errors && Array.isArray(resData.errors) && resData.errors.length > 0) {
+          errMsg = resData.errors.map((e: any) => e.message || e.error || e.details || JSON.stringify(e)).join(' | ');
+        } else if (resData?.message) {
+          errMsg = resData.message;
+        } else if (resData?.error) {
+          errMsg = resData.error;
+        }
+
+        if (payload.productId) {
+          await pool.query(
+            `UPDATE products 
+             SET eta_code_status = 'Rejected', eta_rejection_reason = $1, updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $2`,
+            [errMsg, payload.productId]
+          );
+        }
+
+        return {
+          success: false,
+          status: 'Rejected',
+          itemCode: cleanItemCode,
+          message: errMsg,
+          etaResponse: resData
+        };
+      }
+
+      // Check if item failed inside 200 OK response
+      if (resData?.failedItemsCount > 0 || (resData?.passedItemsCount === 0 && resData?.errors?.length > 0)) {
+        const firstError = resData.errors?.[0];
+        const errMsg = firstError?.message || firstError?.details || 'رفضت منظومة الضرائب الكود المرسل.';
+        
+        if (payload.productId) {
+          await pool.query(
+            `UPDATE products 
+             SET eta_code_status = 'Rejected', eta_rejection_reason = $1, updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $2`,
+            [errMsg, payload.productId]
+          );
+        }
+
+        return {
+          success: false,
+          status: 'Rejected',
+          itemCode: cleanItemCode,
+          message: errMsg,
+          etaResponse: resData
+        };
+      }
+
+      // Success: GS1 is immediately Approved, EGS is Submitted for review
+      const assignedStatus: 'Submitted' | 'Approved' = codeType === 'GS1' ? 'Approved' : 'Submitted';
+
+      // Insert or update in eta_registered_codes
+      const regId = crypto.randomUUID();
+      await pool.query(`
+        INSERT INTO eta_registered_codes (
+          id, company_id, item_code, code_type, code_name_ar, code_name_en,
+          description_ar, description_en, parent_item_code, status,
+          active_from, active_to, active, raw_data, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, true, $13, CURRENT_TIMESTAMP)
+        ON CONFLICT (company_id, item_code)
+        DO UPDATE SET
+          code_name_ar = EXCLUDED.code_name_ar,
+          code_name_en = EXCLUDED.code_name_en,
+          description_ar = EXCLUDED.description_ar,
+          description_en = EXCLUDED.description_en,
+          parent_item_code = EXCLUDED.parent_item_code,
+          status = EXCLUDED.status,
+          active_from = EXCLUDED.active_from,
+          active_to = EXCLUDED.active_to,
+          raw_data = EXCLUDED.raw_data,
+          updated_at = CURRENT_TIMESTAMP
+      `, [
+        regId, companyId, cleanItemCode, codeType, codeNameAr, codeNameEn,
+        descAr, descEn, payload.parentCode || null, assignedStatus,
+        activeFrom, activeTo, JSON.stringify(resData)
+      ]);
+
+      // Update product if productId is provided
+      if (payload.productId) {
+        await pool.query(`
+          UPDATE products 
+          SET 
+            eta_item_code = $1,
+            eta_code_type = $2,
+            eta_code_status = $3,
+            eta_gpc_brick = $4,
+            eta_registered_at = CURRENT_TIMESTAMP,
+            eta_rejection_reason = NULL,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = $5
+        `, [
+          cleanItemCode,
+          codeType,
+          assignedStatus,
+          payload.parentCode || null,
+          payload.productId
+        ]);
+      }
+
+      const successMsg = codeType === 'GS1'
+        ? `تم تسجيل استخدام كود GS1 بنجاح واعتماده في منظومة الضرائب!`
+        : `تم إرسال طلب اعتماد كود EGS لمصلحة الضرائب بنجاح (الحالة: قيد المراجعة).`;
+
+      return {
+        success: true,
+        status: assignedStatus,
+        itemCode: cleanItemCode,
+        message: successMsg,
+        etaResponse: resData
+      };
+
+    } catch (err: any) {
+      console.error('[ETA Register Code] Error:', err.message || err);
+      return {
+        success: false,
+        status: 'Rejected',
+        itemCode: cleanItemCode,
+        message: err.message || 'حدث خطأ أثناء الاتصال بمنظومة الضرائب.'
+      };
+    }
+  }
+
+  /**
+   * Check ETA code registration status (queries local cache & syncs from ETA portal)
+   */
+  public static async checkCodeStatus(
+    companyId: string,
+    itemCode: string,
+    productId?: string
+  ): Promise<{
+    itemCode: string;
+    status: 'Draft' | 'Submitted' | 'Approved' | 'Rejected';
+    details?: any;
+    message: string;
+  }> {
+    const cleanItemCode = (itemCode || '').trim();
+    if (!cleanItemCode) {
+      return {
+        itemCode: '',
+        status: 'Draft',
+        message: 'كود الصنف غير محدد.'
+      };
+    }
+
+    // 1. Check local registered codes table first
+    const localRes = await pool.query(
+      'SELECT * FROM eta_registered_codes WHERE company_id = $1 AND item_code = $2',
+      [companyId, cleanItemCode]
+    );
+
+    let status: 'Draft' | 'Submitted' | 'Approved' | 'Rejected' = 'Draft';
+    let row = localRes.rows[0];
+
+    if (row) {
+      const rawStatus = (row.status || '').toUpperCase();
+      if (rawStatus === 'APPROVED') status = 'Approved';
+      else if (rawStatus === 'REJECTED') status = 'Rejected';
+      else status = 'Submitted';
+    }
+
+    // 2. If Submitted or not found, try syncing from ETA portal requests
+    if (status === 'Submitted' || !row) {
+      try {
+        await this.syncRegisteredCodesFromEta(companyId);
+        const refreshedRes = await pool.query(
+          'SELECT * FROM eta_registered_codes WHERE company_id = $1 AND item_code = $2',
+          [companyId, cleanItemCode]
+        );
+        if (refreshedRes.rows[0]) {
+          row = refreshedRes.rows[0];
+          const rawStatus = (row.status || '').toUpperCase();
+          if (rawStatus === 'APPROVED') status = 'Approved';
+          else if (rawStatus === 'REJECTED') status = 'Rejected';
+          else status = 'Submitted';
+        }
+      } catch (e) {
+        console.warn('[CheckCodeStatus] ETA sync failed:', e);
+      }
+    }
+
+    // 3. Update product table if productId is provided
+    if (productId) {
+      await pool.query(
+        'UPDATE products SET eta_code_status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [status, productId]
+      );
+    }
+
+    const messages = {
+      Approved: 'الكود معتمد رسمياً لدى مصلحة الضرائب وصالح للفوترة ✅',
+      Submitted: 'الكود قيد المراجعة والاعتماد بمصلحة الضرائب ⏳',
+      Rejected: `الكود مرفوض من مصلحة الضرائب: ${row?.description_ar || 'يرجى مراجعة السبب'} ❌`,
+      Draft: 'الكود لم يتم رفعه أو تسجيله بالضرائب بعد ⚪'
+    };
+
+    return {
+      itemCode: cleanItemCode,
+      status,
+      details: row,
+      message: messages[status]
+    };
+  }
 }

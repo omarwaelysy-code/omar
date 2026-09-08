@@ -12396,6 +12396,58 @@ router.post('/eta/items/mapping/quick-link-all', authenticateToken, async (req: 
     console.error('Error in quickLinkAllMatched items:', err.message || err);
     res.status(500).json({ success: false, error: err.message || 'تعذر إجراء الربط التلقائي للأصناف.' });
   }
+// GET /api/erp/eta/company-tax-info
+router.get('/eta/company-tax-info', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = getAuthenticatedCompanyId(req);
+  if (!companyId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    const info = await EtaItemMappingService.getCompanyTaxInfo(companyId);
+    res.json({ success: true, ...info });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'تعذر جلب بيانات الضرائب للشركة.' });
+  }
+});
+
+// GET /api/erp/eta/gpc-bricks
+router.get('/eta/gpc-bricks', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const query = typeof req.query.q === 'string' ? req.query.q : '';
+    const bricks = await EtaItemMappingService.searchGpcBricks(query);
+    res.json({ success: true, data: bricks });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'تعذر جلب تصنيفات GPC.' });
+  }
+});
+
+// POST /api/erp/eta/items/register-code
+router.post('/eta/items/register-code', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = getAuthenticatedCompanyId(req);
+  if (!companyId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    const result = await EtaItemMappingService.registerCodeWithEta(companyId, req.body);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message || 'فشل إرسال طلب تسجيل الكود للضرائب.' });
+  }
+});
+
+// POST /api/erp/eta/items/check-status
+router.post('/eta/items/check-status', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = getAuthenticatedCompanyId(req);
+  if (!companyId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    const { itemCode, productId } = req.body;
+    const result = await EtaItemMappingService.checkCodeStatus(companyId, itemCode, productId);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message || 'تعذر الاستعلام عن حالة الكود.' });
+  }
 });
 
 // GET /api/erp/eta/invoices/:uuid/details
