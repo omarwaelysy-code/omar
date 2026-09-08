@@ -25,15 +25,17 @@ import {
   Building2,
   ChevronDown,
   ChevronUp,
-  XCircle
+  XCircle,
+  BookOpen
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useAuth } from '../contexts/AuthContext';
-import { apiRequest } from '../services/dbService';
+import { dbService, apiRequest } from '../services/dbService';
 import { formatMoney } from '../utils/formatUtils';
 import { exportToExcel } from '../utils/excelUtils';
+import { Account } from '../types';
 
 export interface EtaPortalItem {
   itemCode: string;
@@ -63,6 +65,7 @@ export interface EtaPortalItem {
   isLinked: boolean;
   status?: string;
   activeFrom?: string | null;
+  mappingType?: 'product' | 'account';
   linkedProduct: {
     id: string;
     name: string;
@@ -74,6 +77,13 @@ export interface EtaPortalItem {
     salePrice?: number;
     costPrice?: number;
     stock?: number;
+    linkedAt?: string;
+  } | null;
+  linkedAccount?: {
+    id: string;
+    name: string;
+    code: string;
+    typeName?: string;
     linkedAt?: string;
   } | null;
   autoMatchedProduct: {
@@ -147,6 +157,64 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
 
   // Bulk Quick-Link State
   const [bulkLinking, setBulkLinking] = useState(false);
+
+  // Accounts for Chart of Accounts linking
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [linkAccountTarget, setLinkAccountTarget] = useState<EtaPortalItem | null>(null);
+  const [accountSearchQuery, setAccountSearchQuery] = useState('');
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [savingAccountLink, setSavingAccountLink] = useState(false);
+
+  useEffect(() => {
+    if (!user?.company_id) return;
+    const unsub = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
+  }, [user?.company_id]);
+
+  const filteredAccounts = useMemo(() => {
+    if (!accountSearchQuery.trim()) return accounts;
+    const q = accountSearchQuery.trim().toLowerCase();
+    return accounts.filter(acc => 
+      (acc.name && acc.name.toLowerCase().includes(q)) ||
+      (acc.code && acc.code.toLowerCase().includes(q)) ||
+      (acc.type_name && acc.type_name.toLowerCase().includes(q))
+    );
+  }, [accounts, accountSearchQuery]);
+
+  const handleConfirmAccountLink = async () => {
+    if (!linkAccountTarget || !selectedAccountId) return;
+
+    try {
+      setSavingAccountLink(true);
+      const res = await apiRequest<{ success: boolean; message?: string }>(
+        '/eta/items/mapping/link-account',
+        'POST',
+        {
+          company_id: user?.company_id,
+          etaItemCode: linkAccountTarget.itemCode,
+          accountId: selectedAccountId,
+          etaItemName: linkAccountTarget.itemName,
+          etaItemType: linkAccountTarget.itemType || 'EGS'
+        }
+      );
+
+      if (res && res.success) {
+        showNotification(res.message || (isAr ? 'تم ربط الصنف بالحساب بنجاح' : 'Item linked to account'), 'success');
+        setLinkAccountTarget(null);
+        setSelectedAccountId('');
+        setAccountSearchQuery('');
+        loadMappings(true);
+      } else {
+        showNotification(res.message || (isAr ? 'فشل إتمام ربط الحساب' : 'Failed to link account'), 'error');
+      }
+    } catch (err: any) {
+      showNotification(err.message || (isAr ? 'خطأ في عملية الربط' : 'Error linking account'), 'error');
+    } finally {
+      setSavingAccountLink(false);
+    }
+  };
 
   // Load items mappings from backend
   const loadMappings = useCallback(async (isRefresh = false) => {
@@ -568,48 +636,48 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
           }`}
         >
           {/* 1. كود الصنف بالضرائب (ETA) */}
-          <td className="p-4">
-            <div className="flex items-center gap-2">
-              <span className="font-mono font-black text-slate-900 text-sm bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
+          <td className="py-1.5 px-2.5">
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono font-black text-slate-900 text-xs bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
                 {item.itemCode}
               </span>
               <button
                 type="button"
                 onClick={() => handleCopyCode(item.itemCode)}
-                className="text-slate-400 hover:text-slate-700 transition-colors p-1"
+                className="text-slate-400 hover:text-slate-700 transition-colors p-0.5"
                 title={isAr ? 'نسخ كود الصنف' : 'Copy item code'}
               >
                 {copiedCode === item.itemCode ? (
-                  <Check size={14} className="text-emerald-600" />
+                  <Check size={13} className="text-emerald-600" />
                 ) : (
-                  <Copy size={14} />
+                  <Copy size={13} />
                 )}
               </button>
             </div>
           </td>
 
           {/* 2. نوع الكود */}
-          <td className="p-4 text-center">
-            <span className="text-xs font-black uppercase px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200">
+          <td className="py-1.5 px-2.5 text-center">
+            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-indigo-50 text-indigo-800 border border-indigo-200">
               {item.itemType || 'EGS'}
             </span>
           </td>
 
           {/* 3. الحالة */}
-          <td className="p-4 text-center">
-            <span className={`inline-flex items-center gap-1.5 text-xs font-black px-3 py-1 rounded-full border ${
+          <td className="py-1.5 px-2.5 text-center">
+            <span className={`inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-0.5 rounded-full border ${
               item.status === 'Approved'
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-2xs'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                 : item.status === 'Rejected'
-                  ? 'bg-rose-50 text-rose-700 border-rose-200 shadow-2xs'
-                  : 'bg-amber-50 text-amber-700 border-amber-200 shadow-2xs'
+                  ? 'bg-rose-50 text-rose-700 border-rose-200'
+                  : 'bg-amber-50 text-amber-700 border-amber-200'
             }`}>
               {item.status === 'Approved' ? (
-                <CheckCircle2 size={13} className="text-emerald-600" />
+                <CheckCircle2 size={12} className="text-emerald-600" />
               ) : item.status === 'Rejected' ? (
-                <XCircle size={13} className="text-rose-600" />
+                <XCircle size={12} className="text-rose-600" />
               ) : (
-                <AlertCircle size={13} className="text-amber-600" />
+                <AlertCircle size={12} className="text-amber-600" />
               )}
               <span>
                 {isAr 
@@ -620,13 +688,13 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
           </td>
 
           {/* 4. اسم الصنف بالبوابة والوصف */}
-          <td className="p-4">
-            <div className="space-y-1 max-w-md">
-              <div className="font-black text-slate-900 text-sm leading-snug">
+          <td className="py-1.5 px-2.5">
+            <div className="space-y-0.5 max-w-sm">
+              <div className="font-bold text-slate-900 text-xs leading-snug">
                 {item.itemName}
               </div>
               {item.description && item.description !== item.itemName && (
-                <div className="text-xs text-slate-500 line-clamp-1 font-medium">
+                <div className="text-[11px] text-slate-500 line-clamp-1 font-medium">
                   {item.description}
                 </div>
               )}
@@ -634,33 +702,57 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
           </td>
 
           {/* 5. تاريخ التفعيل */}
-          <td className="p-4 text-center">
+          <td className="py-1.5 px-2.5 text-center">
             {item.activeFrom ? (
-              <span className="font-mono text-xs font-bold text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
+              <span className="font-mono text-[11px] font-bold text-slate-700 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
                 {item.activeFrom.slice(0, 10)}
               </span>
             ) : (
-              <span className="text-xs text-slate-400 font-mono">---</span>
+              <span className="text-[11px] text-slate-400 font-mono">---</span>
             )}
           </td>
 
           {/* 6. حالة الربط والصنف المقترن */}
-          <td className="p-4">
-            {item.isLinked && item.linkedProduct ? (
-              <div className="flex items-start gap-2.5">
-                <div className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg mt-0.5">
-                  <CheckCircle2 size={16} />
+          <td className="py-1.5 px-2.5">
+            {item.isLinked && item.linkedAccount ? (
+              <div className="flex items-start gap-1.5">
+                <div className="p-1 bg-blue-100 text-blue-700 rounded mt-0.5 flex-shrink-0">
+                  <BookOpen size={13} />
                 </div>
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-black text-emerald-900 text-sm">
+                <div className="space-y-0.5 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-bold text-blue-900 text-xs truncate max-w-[150px]" title={item.linkedAccount.name}>
+                      {item.linkedAccount.name}
+                    </span>
+                    <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                      {item.linkedAccount.code}
+                    </span>
+                    <span className="text-[9px] font-bold text-blue-600 bg-blue-50/70 px-1 rounded">
+                      {isAr ? 'حساب' : 'Account'}
+                    </span>
+                  </div>
+                  {item.linkedAccount.typeName && (
+                    <div className="text-[10px] text-slate-500 font-medium truncate max-w-[150px]">
+                      {item.linkedAccount.typeName}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : item.isLinked && item.linkedProduct ? (
+              <div className="flex items-start gap-1.5">
+                <div className="p-1 bg-emerald-100 text-emerald-700 rounded mt-0.5 flex-shrink-0">
+                  <CheckCircle2 size={13} />
+                </div>
+                <div className="space-y-0.5 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-bold text-emerald-900 text-xs truncate max-w-[150px]" title={item.linkedProduct.name}>
                       {item.linkedProduct.name}
                     </span>
-                    <span className="font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                    <span className="font-mono text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                       {item.linkedProduct.code}
                     </span>
                   </div>
-                  <div className="text-xs text-slate-500 flex items-center gap-2 font-medium">
+                  <div className="text-[10px] text-slate-500 flex items-center gap-1.5 font-medium">
                     {item.linkedProduct.barcode && (
                       <span>{isAr ? 'باركود:' : 'Barcode:'} {item.linkedProduct.barcode}</span>
                     )}
@@ -671,47 +763,47 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
                 </div>
               </div>
             ) : item.autoMatchedProduct ? (
-              <div className="p-2.5 bg-purple-50 rounded-2xl border border-purple-200/80 space-y-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-bold text-purple-700 flex items-center gap-1">
-                    <Sparkles size={12} className="text-purple-600" />
+              <div className="p-1.5 bg-purple-50 rounded-xl border border-purple-200/80 space-y-0.5">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[10px] font-bold text-purple-700 flex items-center gap-1">
+                    <Sparkles size={11} className="text-purple-600" />
                     <span>
                       {item.autoMatchedProduct.matchReason === 'tax_item_code' 
-                        ? (isAr ? 'تطابق كود الضرائب' : 'Tax Code Match')
+                        ? (isAr ? 'تطابق كود الضرائب' : 'Tax Code')
                         : (item.autoMatchedProduct.matchReason === 'code'
-                          ? (isAr ? 'تطابق كود الصنف' : 'Product Code Match')
+                          ? (isAr ? 'تطابق كود الصنف' : 'Product Code')
                           : (item.autoMatchedProduct.matchReason === 'barcode'
-                            ? (isAr ? 'تطابق الباركود' : 'Barcode Match')
-                            : (isAr ? 'تطابق الاسم بدقة' : 'Exact Name Match')))}
+                            ? (isAr ? 'تطابق الباركود' : 'Barcode')
+                            : (isAr ? 'تطابق الاسم' : 'Exact Name')))}
                     </span>
                   </span>
-                  <span className="text-[10px] font-mono font-bold bg-white text-purple-900 px-1.5 py-0.5 rounded border border-purple-200">
+                  <span className="text-[9px] font-mono font-bold bg-white text-purple-900 px-1 py-0.2 rounded border border-purple-200">
                     {item.autoMatchedProduct.code}
                   </span>
                 </div>
-                <div className="font-black text-slate-900 text-xs">
+                <div className="font-bold text-slate-900 text-xs truncate max-w-[160px]" title={item.autoMatchedProduct.name}>
                   {item.autoMatchedProduct.name}
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-amber-600 font-bold text-xs bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 w-fit">
-                <AlertCircle size={14} />
+              <div className="flex items-center gap-1.5 text-amber-600 font-bold text-[11px] bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200 w-fit">
+                <AlertCircle size={12} />
                 <span>{isAr ? 'غير مربوط (يحتاج ربط أو إنشاء)' : 'Unlinked'}</span>
               </div>
             )}
           </td>
 
           {/* 7. الإجراءات */}
-          <td className="p-4 text-center">
-            <div className="flex items-center justify-center gap-2 flex-wrap">
+          <td className="py-1.5 px-2.5 text-center">
+            <div className="flex items-center justify-center gap-1 flex-wrap">
               {item.isLinked ? (
                 <button
                   type="button"
                   onClick={() => setUnlinkItemTarget(item)}
-                  className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-rose-200"
-                  title={isAr ? 'إلغاء ربط الصنف' : 'Unlink product'}
+                  className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 border border-rose-200"
+                  title={isAr ? 'إلغاء ربط الصنف أو الحساب' : 'Unlink'}
                 >
-                  <Unlink size={14} />
+                  <Unlink size={12} />
                   <span>{isAr ? 'إلغاء الربط' : 'Unlink'}</span>
                 </button>
               ) : (
@@ -721,10 +813,10 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
                       type="button"
                       onClick={() => handleQuickLinkAutoMatch(item)}
                       disabled={savingLink}
-                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm shadow-emerald-600/30 active:scale-95 disabled:opacity-60"
+                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-black transition-all flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-60"
                       title={isAr ? 'تأكيد الربط مع الصنف المقترح فوراً' : 'Confirm link'}
                     >
-                      <Check size={14} />
+                      <Check size={12} />
                       <span>{isAr ? 'تأكيد الربط' : 'Confirm'}</span>
                     </button>
                   )}
@@ -732,20 +824,34 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
                   <button
                     type="button"
                     onClick={() => handleLinkInProductsScreen(item)}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1 border border-slate-200"
+                    className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 border border-slate-200"
                     title={isAr ? 'البحث عن الصنف في شاشة الأصناف وربطه' : 'Search and link in Products screen'}
                   >
-                    <Link2 size={14} />
+                    <Link2 size={12} />
                     <span>{isAr ? 'ربط بصنف' : 'Link'}</span>
                   </button>
 
                   <button
                     type="button"
+                    onClick={() => {
+                      setLinkAccountTarget(item);
+                      setSelectedAccountId('');
+                      setAccountSearchQuery('');
+                    }}
+                    className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 border border-blue-200"
+                    title={isAr ? 'ربط الصنف مباشرة بحساب من دليل الحسابات (مصروفات / خدمات / أصول)' : 'Link to Chart of Accounts'}
+                  >
+                    <BookOpen size={12} />
+                    <span>{isAr ? 'ربط بحساب' : 'Account'}</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => handleOpenCreateInProducts(item)}
-                    className="px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1 shadow-sm shadow-indigo-600/20 active:scale-95"
+                    className="px-2.5 py-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg text-[11px] font-black transition-all flex items-center gap-1 shadow-xs active:scale-95"
                     title={isAr ? 'إنشاء صنف جديد بشاشة الأصناف' : 'Create new product in Products screen'}
                   >
-                    <Plus size={14} />
+                    <Plus size={12} />
                     <span>{isAr ? '+ إنشاء جديد' : '+ Create'}</span>
                   </button>
                 </>
@@ -765,30 +871,30 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
         }`}
       >
         {/* ETA Item Code & Type */}
-        <td className="p-4">
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-mono font-black text-slate-900 text-sm bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+        <td className="py-1.5 px-2.5">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-mono font-black text-slate-900 text-xs bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
                 {item.itemCode}
               </span>
-              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 border border-indigo-200">
+              <span className="text-[10px] font-black uppercase px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-800 border border-indigo-200">
                 {item.itemType || 'EGS'}
               </span>
               <button
                 type="button"
                 onClick={() => handleCopyCode(item.itemCode)}
-                className="text-slate-400 hover:text-slate-700 transition-colors p-1"
+                className="text-slate-400 hover:text-slate-700 transition-colors p-0.5"
                 title={isAr ? 'نسخ كود الصنف' : 'Copy item code'}
               >
                 {copiedCode === item.itemCode ? (
-                  <Check size={14} className="text-emerald-600" />
+                  <Check size={13} className="text-emerald-600" />
                 ) : (
-                  <Copy size={14} />
+                  <Copy size={13} />
                 )}
               </button>
             </div>
             {!showSupplierCols && primarySupplierName && (
-              <div className="text-[11px] text-slate-500 truncate max-w-xs font-medium">
+              <div className="text-[10px] text-slate-500 truncate max-w-xs font-medium">
                 {isAr ? 'المورد:' : 'Supplier:'} {primarySupplierName}
               </div>
             )}
@@ -796,13 +902,13 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
         </td>
 
         {/* Portal Item Name & Description */}
-        <td className="p-4">
-          <div className="space-y-1 max-w-md">
-            <div className="font-black text-slate-900 text-sm leading-snug">
+        <td className="py-1.5 px-2.5">
+          <div className="space-y-0.5 max-w-sm">
+            <div className="font-bold text-slate-900 text-xs leading-snug">
               {item.itemName}
             </div>
             {item.description && item.description !== item.itemName && (
-              <div className="text-xs text-slate-500 line-clamp-1 font-medium">
+              <div className="text-[11px] text-slate-500 line-clamp-1 font-medium">
                 {item.description}
               </div>
             )}
@@ -811,16 +917,16 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
 
         {/* Partner Name Column (Only in Flat View) */}
         {showSupplierCols && (
-          <td className="p-4">
-            <div className="space-y-1">
-              <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                <Building2 size={15} className="text-indigo-500 flex-shrink-0" />
-                <span className="truncate max-w-[170px]" title={primarySupplierName || (isAr ? 'مورد غير محدد' : '---')}>
+          <td className="py-1.5 px-2.5">
+            <div className="space-y-0.5">
+              <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                <Building2 size={13} className="text-indigo-500 flex-shrink-0" />
+                <span className="truncate max-w-[150px]" title={primarySupplierName || (isAr ? 'مورد غير محدد' : '---')}>
                   {primarySupplierName || (isAr ? 'مورد غير محدد' : '---')}
                 </span>
               </div>
               {item.suppliers && item.suppliers.length > 1 && (
-                <span className="inline-block text-[10px] font-bold px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200">
+                <span className="inline-block text-[9px] font-bold px-1.5 py-0.2 bg-blue-50 text-blue-700 rounded border border-blue-200">
                   +{item.suppliers.length - 1} {isAr ? 'موردين آخرين' : 'other suppliers'}
                 </span>
               )}
@@ -830,41 +936,41 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
 
         {/* Supplier Tax ID Column (Only in Flat View) */}
         {showSupplierCols && (
-          <td className="p-4">
+          <td className="py-1.5 px-2.5">
             {primaryTaxId ? (
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono text-xs font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
+              <div className="flex items-center gap-1">
+                <span className="font-mono text-[11px] font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
                   {primaryTaxId}
                 </span>
                 <button
                   type="button"
                   onClick={() => handleCopyCode(primaryTaxId)}
-                  className="text-slate-400 hover:text-slate-700 p-1"
+                  className="text-slate-400 hover:text-slate-700 p-0.5"
                   title={isAr ? 'نسخ الرقم الضريبي' : 'Copy Tax ID'}
                 >
                   {copiedCode === primaryTaxId ? (
-                    <Check size={13} className="text-emerald-600" />
+                    <Check size={12} className="text-emerald-600" />
                   ) : (
-                    <Copy size={13} />
+                    <Copy size={12} />
                   )}
                 </button>
               </div>
             ) : (
-              <span className="text-xs text-slate-400 font-mono">---</span>
+              <span className="text-[11px] text-slate-400 font-mono">---</span>
             )}
           </td>
         )}
 
         {/* Unit & Unit Price */}
-        <td className="p-4 text-center">
-          <div className="space-y-1">
+        <td className="py-1.5 px-2.5 text-center">
+          <div className="space-y-0.5">
             {item.lastUnitPrice > 0 && (
-              <div className="font-black text-slate-900 text-sm font-mono">
-                {formatMoney(item.lastUnitPrice)} <span className="text-[10px] font-bold text-slate-400">{isAr ? 'ج.م' : 'EGP'}</span>
+              <div className="font-bold text-slate-900 text-xs font-mono">
+                {formatMoney(item.lastUnitPrice)} <span className="text-[9px] font-bold text-slate-400">{isAr ? 'ج.م' : 'EGP'}</span>
               </div>
             )}
             {item.unitType && (
-              <span className="inline-block text-[11px] font-bold px-2 py-0.5 bg-slate-100 text-slate-600 rounded">
+              <span className="inline-block text-[10px] font-bold px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded">
                 {item.unitType}
               </span>
             )}
@@ -872,39 +978,63 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
         </td>
 
         {/* Docs & Quantity */}
-        <td className="p-4 text-center">
-          <div className="space-y-1">
-            <div className="font-black text-slate-900 text-sm">
+        <td className="py-1.5 px-2.5 text-center">
+          <div className="space-y-0.5">
+            <div className="font-bold text-slate-900 text-xs">
               {item.docCount} {isAr ? 'فاتورة' : 'docs'}
             </div>
-            <div className="text-xs text-slate-500 font-medium">
+            <div className="text-[11px] text-slate-500 font-medium">
               {formatMoney(item.totalAmount)} {isAr ? 'ج.م' : 'EGP'}
             </div>
             {item.lastDocDate && (
-              <div className="text-[10px] text-slate-400 font-medium">
+              <div className="text-[9px] text-slate-400 font-medium">
                 {item.lastDocDate.slice(0, 10)}
               </div>
             )}
           </div>
         </td>
 
-        {/* Link Status & Mapped Product */}
-        <td className="p-4">
-          {item.isLinked && item.linkedProduct ? (
-            <div className="flex items-start gap-2.5">
-              <div className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg mt-0.5">
-                <CheckCircle2 size={16} />
+        {/* Link Status & Mapped Product / Account */}
+        <td className="py-1.5 px-2.5">
+          {item.isLinked && item.linkedAccount ? (
+            <div className="flex items-start gap-1.5">
+              <div className="p-1 bg-blue-100 text-blue-700 rounded mt-0.5 flex-shrink-0">
+                <BookOpen size={13} />
               </div>
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <span className="font-black text-emerald-900 text-sm">
+              <div className="space-y-0.5 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-bold text-blue-900 text-xs truncate max-w-[150px]" title={item.linkedAccount.name}>
+                    {item.linkedAccount.name}
+                  </span>
+                  <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                    {item.linkedAccount.code}
+                  </span>
+                  <span className="text-[9px] font-bold text-blue-600 bg-blue-50/70 px-1 rounded">
+                    {isAr ? 'حساب' : 'Account'}
+                  </span>
+                </div>
+                {item.linkedAccount.typeName && (
+                  <div className="text-[10px] text-slate-500 font-medium truncate max-w-[150px]">
+                    {item.linkedAccount.typeName}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : item.isLinked && item.linkedProduct ? (
+            <div className="flex items-start gap-1.5">
+              <div className="p-1 bg-emerald-100 text-emerald-700 rounded mt-0.5 flex-shrink-0">
+                <CheckCircle2 size={13} />
+              </div>
+              <div className="space-y-0.5 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-bold text-emerald-900 text-xs truncate max-w-[150px]" title={item.linkedProduct.name}>
                     {item.linkedProduct.name}
                   </span>
-                  <span className="font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                  <span className="font-mono text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                     {item.linkedProduct.code}
                   </span>
                 </div>
-                <div className="text-xs text-slate-500 flex items-center gap-2 font-medium">
+                <div className="text-[10px] text-slate-500 flex items-center gap-1 font-medium">
                   {item.linkedProduct.barcode && (
                     <span>{isAr ? 'باركود:' : 'Barcode:'} {item.linkedProduct.barcode}</span>
                   )}
@@ -915,47 +1045,47 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
               </div>
             </div>
           ) : item.autoMatchedProduct ? (
-            <div className="p-2.5 bg-purple-50 rounded-2xl border border-purple-200/80 space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-bold text-purple-700 flex items-center gap-1">
-                  <Sparkles size={12} className="text-purple-600" />
+            <div className="p-1.5 bg-purple-50 rounded-xl border border-purple-200/80 space-y-0.5">
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[10px] font-bold text-purple-700 flex items-center gap-1">
+                  <Sparkles size={11} className="text-purple-600" />
                   <span>
                     {item.autoMatchedProduct.matchReason === 'tax_item_code' 
-                      ? (isAr ? 'تطابق كود الضرائب' : 'Tax Code Match')
+                      ? (isAr ? 'تطابق كود الضرائب' : 'Tax Code')
                       : (item.autoMatchedProduct.matchReason === 'code'
-                        ? (isAr ? 'تطابق كود الصنف' : 'Product Code Match')
+                        ? (isAr ? 'تطابق كود الصنف' : 'Product Code')
                         : (item.autoMatchedProduct.matchReason === 'barcode'
-                          ? (isAr ? 'تطابق الباركود' : 'Barcode Match')
-                          : (isAr ? 'تطابق الاسم بدقة' : 'Exact Name Match')))}
+                          ? (isAr ? 'تطابق الباركود' : 'Barcode')
+                          : (isAr ? 'تطابق الاسم' : 'Exact Name')))}
                   </span>
                 </span>
-                <span className="text-[10px] font-mono font-bold bg-white text-purple-900 px-1.5 py-0.5 rounded border border-purple-200">
+                <span className="text-[9px] font-mono font-bold bg-white text-purple-900 px-1 py-0.2 rounded border border-purple-200">
                   {item.autoMatchedProduct.code}
                 </span>
               </div>
-              <div className="font-black text-slate-900 text-xs">
+              <div className="font-bold text-slate-900 text-xs truncate max-w-[160px]" title={item.autoMatchedProduct.name}>
                 {item.autoMatchedProduct.name}
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-2 text-amber-600 font-bold text-xs bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 w-fit">
-              <AlertCircle size={14} />
+            <div className="flex items-center gap-1.5 text-amber-600 font-bold text-[11px] bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200 w-fit">
+              <AlertCircle size={12} />
               <span>{isAr ? 'غير مربوط (يحتاج ربط أو إنشاء)' : 'Unlinked'}</span>
             </div>
           )}
         </td>
 
         {/* Actions */}
-        <td className="p-4 text-center">
-          <div className="flex items-center justify-center gap-2 flex-wrap">
+        <td className="py-1.5 px-2.5 text-center">
+          <div className="flex items-center justify-center gap-1 flex-wrap">
             {item.isLinked ? (
               <button
                 type="button"
                 onClick={() => setUnlinkItemTarget(item)}
-                className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-rose-200"
-                title={isAr ? 'إلغاء ربط الصنف' : 'Unlink product'}
+                className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 border border-rose-200"
+                title={isAr ? 'إلغاء ربط الصنف أو الحساب' : 'Unlink'}
               >
-                <Unlink size={14} />
+                <Unlink size={12} />
                 <span>{isAr ? 'إلغاء الربط' : 'Unlink'}</span>
               </button>
             ) : (
@@ -965,10 +1095,10 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
                     type="button"
                     onClick={() => handleQuickLinkAutoMatch(item)}
                     disabled={savingLink}
-                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm shadow-emerald-600/30 active:scale-95 disabled:opacity-60"
+                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-black transition-all flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-60"
                     title={isAr ? 'تأكيد الربط مع الصنف المقترح فوراً' : 'Confirm link'}
                   >
-                    <Check size={14} />
+                    <Check size={12} />
                     <span>{isAr ? 'تأكيد الربط' : 'Confirm'}</span>
                   </button>
                 )}
@@ -976,20 +1106,34 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
                 <button
                   type="button"
                   onClick={() => handleLinkInProductsScreen(item)}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1 border border-slate-200"
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 border border-slate-200"
                   title={isAr ? 'البحث عن الصنف في شاشة الأصناف وربطه' : 'Search and link in Products screen'}
                 >
-                  <Link2 size={14} />
+                  <Link2 size={12} />
                   <span>{isAr ? 'ربط بصنف' : 'Link'}</span>
                 </button>
 
                 <button
                   type="button"
+                  onClick={() => {
+                    setLinkAccountTarget(item);
+                    setSelectedAccountId('');
+                    setAccountSearchQuery('');
+                  }}
+                  className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 border border-blue-200"
+                  title={isAr ? 'ربط الصنف مباشرة بحساب من دليل الحسابات (مصروفات / خدمات / أصول)' : 'Link to Chart of Accounts'}
+                >
+                  <BookOpen size={12} />
+                  <span>{isAr ? 'ربط بحساب' : 'Account'}</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => handleOpenCreateInProducts(item)}
-                  className="px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1 shadow-sm shadow-indigo-600/20 active:scale-95"
+                  className="px-2.5 py-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg text-[11px] font-black transition-all flex items-center gap-1 shadow-xs active:scale-95"
                   title={isAr ? 'إنشاء صنف جديد بشاشة الأصناف' : 'Create new product in Products screen'}
                 >
-                  <Plus size={14} />
+                  <Plus size={12} />
                   <span>{isAr ? '+ إنشاء جديد' : '+ Create'}</span>
                 </button>
               </>
@@ -999,6 +1143,7 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
       </tr>
     );
   };
+
 
   return (
     <div className="space-y-6 pb-16">
@@ -1476,27 +1621,27 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
                         <table className="w-full text-start border-collapse">
                           <thead>
                             {isSent ? (
-                              <tr className="bg-slate-50/60 border-b border-slate-100 text-slate-500 text-xs font-black uppercase tracking-wider">
-                                <th className="p-4 text-start">{isAr ? 'كود الصنف بالضرائب (ETA)' : 'ETA Item Code'}</th>
-                                <th className="p-4 text-center">{isAr ? 'نوع الكود' : 'Code Type'}</th>
-                                <th className="p-4 text-center">{isAr ? 'الحالة' : 'Status'}</th>
-                                <th className="p-4 text-start">{isAr ? 'اسم الصنف بالبوابة والوصف' : 'Portal Item Name & Description'}</th>
-                                <th className="p-4 text-center">{isAr ? 'تاريخ التفعيل' : 'Active Date'}</th>
-                                <th className="p-4 text-start">{isAr ? 'حالة الربط والصنف المقترن' : 'Link Status & Mapped Product'}</th>
-                                <th className="p-4 text-center">{isAr ? 'الإجراءات' : 'Actions'}</th>
+                              <tr className="bg-slate-50/70 border-b border-slate-100 text-slate-500 text-[11px] font-black uppercase tracking-wider">
+                                <th className="py-2 px-2.5 text-start">{isAr ? 'كود الصنف بالضرائب (ETA)' : 'ETA Item Code'}</th>
+                                <th className="py-2 px-2.5 text-center">{isAr ? 'نوع الكود' : 'Code Type'}</th>
+                                <th className="py-2 px-2.5 text-center">{isAr ? 'الحالة' : 'Status'}</th>
+                                <th className="py-2 px-2.5 text-start">{isAr ? 'اسم الصنف بالبوابة والوصف' : 'Portal Item Name & Description'}</th>
+                                <th className="py-2 px-2.5 text-center">{isAr ? 'تاريخ التفعيل' : 'Active Date'}</th>
+                                <th className="py-2 px-2.5 text-start">{isAr ? 'حالة الربط والصنف المقترن' : 'Link Status & Mapped'}</th>
+                                <th className="py-2 px-2.5 text-center">{isAr ? 'الإجراءات' : 'Actions'}</th>
                               </tr>
                             ) : (
-                              <tr className="bg-slate-50/60 border-b border-slate-100 text-slate-500 text-xs font-black uppercase tracking-wider">
-                                <th className="p-4 text-start">{isAr ? 'كود الصنف بالضرائب (ETA)' : 'ETA Item Code'}</th>
-                                <th className="p-4 text-start">{isAr ? 'اسم الصنف بالبوابة والوصف' : 'Portal Item Name & Description'}</th>
-                                <th className="p-4 text-center">{isAr ? 'الوحدة والسعر' : 'Unit & Price'}</th>
-                                <th className="p-4 text-center">{isAr ? 'الوثائق والكميات' : 'Docs & Quantity'}</th>
-                                <th className="p-4 text-start">{isAr ? 'حالة الربط والصنف المقترن' : 'Link Status & Mapped Product'}</th>
-                                <th className="p-4 text-center">{isAr ? 'الإجراءات' : 'Actions'}</th>
+                              <tr className="bg-slate-50/70 border-b border-slate-100 text-slate-500 text-[11px] font-black uppercase tracking-wider">
+                                <th className="py-2 px-2.5 text-start">{isAr ? 'كود الصنف بالضرائب (ETA)' : 'ETA Item Code'}</th>
+                                <th className="py-2 px-2.5 text-start">{isAr ? 'اسم الصنف بالبوابة والوصف' : 'Portal Item Name & Description'}</th>
+                                <th className="py-2 px-2.5 text-center">{isAr ? 'الوحدة والسعر' : 'Unit & Price'}</th>
+                                <th className="py-2 px-2.5 text-center">{isAr ? 'الوثائق والكميات' : 'Docs & Quantity'}</th>
+                                <th className="py-2 px-2.5 text-start">{isAr ? 'حالة الربط والصنف المقترن' : 'Link Status & Mapped'}</th>
+                                <th className="py-2 px-2.5 text-center">{isAr ? 'الإجراءات' : 'Actions'}</th>
                               </tr>
                             )}
                           </thead>
-                          <tbody className="divide-y divide-slate-100 text-sm">
+                          <tbody className="divide-y divide-slate-100 text-xs">
                             {group.items.map((item) => renderItemRow(item, false))}
                           </tbody>
                         </table>
@@ -1513,29 +1658,29 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
             <table className="w-full text-start border-collapse">
               <thead>
                 {isSent ? (
-                  <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 text-xs font-black uppercase tracking-wider">
-                    <th className="p-4 text-start">{isAr ? 'كود الصنف بالضرائب (ETA)' : 'ETA Item Code'}</th>
-                    <th className="p-4 text-center">{isAr ? 'نوع الكود' : 'Code Type'}</th>
-                    <th className="p-4 text-center">{isAr ? 'الحالة' : 'Status'}</th>
-                    <th className="p-4 text-start">{isAr ? 'اسم الصنف بالبوابة والوصف' : 'Portal Item Name & Description'}</th>
-                    <th className="p-4 text-center">{isAr ? 'تاريخ التفعيل' : 'Active Date'}</th>
-                    <th className="p-4 text-start">{isAr ? 'حالة الربط والصنف المقترن' : 'Link Status & Mapped Product'}</th>
-                    <th className="p-4 text-center">{isAr ? 'الإجراءات' : 'Actions'}</th>
+                  <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 text-[11px] font-black uppercase tracking-wider">
+                    <th className="py-2 px-2.5 text-start">{isAr ? 'كود الصنف بالضرائب (ETA)' : 'ETA Item Code'}</th>
+                    <th className="py-2 px-2.5 text-center">{isAr ? 'نوع الكود' : 'Code Type'}</th>
+                    <th className="py-2 px-2.5 text-center">{isAr ? 'الحالة' : 'Status'}</th>
+                    <th className="py-2 px-2.5 text-start">{isAr ? 'اسم الصنف بالبوابة والوصف' : 'Portal Item Name & Description'}</th>
+                    <th className="py-2 px-2.5 text-center">{isAr ? 'تاريخ التفعيل' : 'Active Date'}</th>
+                    <th className="py-2 px-2.5 text-start">{isAr ? 'حالة الربط والصنف المقترن' : 'Link Status & Mapped'}</th>
+                    <th className="py-2 px-2.5 text-center">{isAr ? 'الإجراءات' : 'Actions'}</th>
                   </tr>
                 ) : (
-                  <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 text-xs font-black uppercase tracking-wider">
-                    <th className="p-4 text-start">{isAr ? 'كود الصنف بالضرائب (ETA)' : 'ETA Item Code'}</th>
-                    <th className="p-4 text-start">{isAr ? 'اسم الصنف بالبوابة والوصف' : 'Portal Item Name & Description'}</th>
-                    <th className="p-4 text-start">{isAr ? 'اسم المورد' : 'Supplier Name'}</th>
-                    <th className="p-4 text-start">{isAr ? 'الرقم الضريبي' : 'Tax ID'}</th>
-                    <th className="p-4 text-center">{isAr ? 'الوحدة والسعر' : 'Unit & Price'}</th>
-                    <th className="p-4 text-center">{isAr ? 'الوثائق والكميات' : 'Docs & Quantity'}</th>
-                    <th className="p-4 text-start">{isAr ? 'حالة الربط والصنف المقترن' : 'Link Status & Mapped Product'}</th>
-                    <th className="p-4 text-center">{isAr ? 'الإجراءات' : 'Actions'}</th>
+                  <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 text-[11px] font-black uppercase tracking-wider">
+                    <th className="py-2 px-2.5 text-start">{isAr ? 'كود الصنف بالضرائب (ETA)' : 'ETA Item Code'}</th>
+                    <th className="py-2 px-2.5 text-start">{isAr ? 'اسم الصنف بالبوابة والوصف' : 'Portal Item Name & Description'}</th>
+                    <th className="py-2 px-2.5 text-start">{isAr ? 'اسم المورد' : 'Supplier Name'}</th>
+                    <th className="py-2 px-2.5 text-start">{isAr ? 'الرقم الضريبي' : 'Tax ID'}</th>
+                    <th className="py-2 px-2.5 text-center">{isAr ? 'الوحدة والسعر' : 'Unit & Price'}</th>
+                    <th className="py-2 px-2.5 text-center">{isAr ? 'الوثائق والكميات' : 'Docs & Quantity'}</th>
+                    <th className="py-2 px-2.5 text-start">{isAr ? 'حالة الربط والصنف المقترن' : 'Link Status & Mapped'}</th>
+                    <th className="py-2 px-2.5 text-center">{isAr ? 'الإجراءات' : 'Actions'}</th>
                   </tr>
                 )}
               </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
+              <tbody className="divide-y divide-slate-100 text-xs">
                 {paginatedItems.map((item) => renderItemRow(item, true))}
               </tbody>
             </table>
@@ -1586,6 +1731,143 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
         )}
       </div>
 
+      {/* Account Linking Modal */}
+      <AnimatePresence>
+        {linkAccountTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-slate-100 space-y-4 text-start"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-blue-100 text-blue-700 rounded-xl">
+                    <BookOpen size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-slate-900">
+                      {isAr ? 'ربط الصنف بحساب من دليل الحسابات' : 'Link Item to Account'}
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium">
+                      {isAr ? 'اختر حساب المصروفات أو التكلفة أو الأصول المناسب لهذا البند' : 'Select an expense, cost or asset account'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLinkAccountTarget(null)}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Selected Item Details */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs font-black bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-800">
+                    {linkAccountTarget.itemCode}
+                  </span>
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded border border-indigo-200">
+                    {linkAccountTarget.itemType || 'EGS'}
+                  </span>
+                </div>
+                <div className="text-sm font-black text-slate-900 leading-snug">
+                  {linkAccountTarget.itemName}
+                </div>
+                {linkAccountTarget.description && linkAccountTarget.description !== linkAccountTarget.itemName && (
+                  <div className="text-xs text-slate-500 line-clamp-1">
+                    {linkAccountTarget.description}
+                  </div>
+                )}
+              </div>
+
+              {/* Search Accounts */}
+              <div className="relative">
+                <Search size={16} className="absolute top-1/2 -translate-y-1/2 right-3 text-slate-400" />
+                <input
+                  type="text"
+                  value={accountSearchQuery}
+                  onChange={(e) => setAccountSearchQuery(e.target.value)}
+                  placeholder={isAr ? 'ابحث باسم أو كود الحساب (مثال: مصروفات، صيانة، نقل)...' : 'Search by account name or code...'}
+                  className="w-full pr-9 pl-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
+              </div>
+
+              {/* Accounts List */}
+              <div className="max-h-60 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-2xl">
+                {filteredAccounts.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400 font-bold">
+                    {isAr ? 'لا توجد حسابات مطابقة للبحث' : 'No matching accounts'}
+                  </div>
+                ) : (
+                  filteredAccounts.map((acc) => {
+                    const isSelected = selectedAccountId === acc.id;
+                    return (
+                      <button
+                        key={acc.id}
+                        type="button"
+                        onClick={() => setSelectedAccountId(acc.id)}
+                        className={`w-full text-start p-2.5 transition-colors flex items-center justify-between gap-3 ${
+                          isSelected ? 'bg-blue-50/80 hover:bg-blue-50' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-black text-blue-700 bg-blue-100/50 px-1.5 py-0.5 rounded border border-blue-200">
+                              {acc.code}
+                            </span>
+                            <span className="text-xs font-black text-slate-900 truncate">
+                              {acc.name}
+                            </span>
+                          </div>
+                          {acc.type_name && (
+                            <div className="text-[10px] text-slate-500 mt-0.5">
+                              {acc.type_name}
+                            </div>
+                          )}
+                        </div>
+                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${
+                          isSelected ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'
+                        }`}>
+                          {isSelected && <Check size={12} className="stroke-[3]" />}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Footer Actions */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setLinkAccountTarget(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-all"
+                >
+                  {isAr ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmAccountLink}
+                  disabled={!selectedAccountId || savingAccountLink}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs transition-all shadow-md shadow-blue-600/30 disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {savingAccountLink ? (
+                    <RefreshCw size={14} className="animate-spin" />
+                  ) : (
+                    <Check size={14} />
+                  )}
+                  <span>{isAr ? 'تأكيد الربط بالحساب' : 'Confirm Link'}</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Unlink Confirmation Modal */}
       <AnimatePresence>
         {unlinkItemTarget && (
@@ -1604,7 +1886,11 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
               </h3>
               <p className="text-xs text-slate-500 leading-relaxed">
                 {isAr 
-                  ? `هل أنت متأكد من فك ارتباط كود الصنف "${unlinkItemTarget.itemCode}" مع الصنف "${unlinkItemTarget.linkedProduct?.name}"؟ يمكنك إعادة ربطه في أي وقت.`
+                  ? `هل أنت متأكد من فك ارتباط كود الضرائب "${unlinkItemTarget.itemCode}" مع ${
+                      unlinkItemTarget.linkedAccount 
+                        ? `الحساب "${unlinkItemTarget.linkedAccount.name}"` 
+                        : `الصنف "${unlinkItemTarget.linkedProduct?.name}"`
+                    }؟ يمكنك إعادة ربطه في أي وقت.`
                   : `Are you sure you want to unlink "${unlinkItemTarget.itemCode}"?`}
               </p>
 
@@ -1629,6 +1915,7 @@ export function EtaItemMapping({ direction = 'Received' }: EtaItemMappingProps =
           </div>
         )}
       </AnimatePresence>
+
     </div>
   );
 }

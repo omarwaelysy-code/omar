@@ -12345,6 +12345,24 @@ router.post('/eta/items/mapping/link', authenticateToken, async (req: AuthReques
   }
 });
 
+// POST /api/erp/eta/items/mapping/link-account
+router.post('/eta/items/mapping/link-account', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = getAuthenticatedCompanyId(req);
+  if (!companyId) {
+    return res.status(401).json({ error: 'Unauthorized: Company ID is required' });
+  }
+
+  try {
+    const { etaItemCode, accountId, etaItemName, etaItemType, notes } = req.body;
+    const result = await EtaItemMappingService.linkAccount(companyId, etaItemCode, accountId, etaItemName, etaItemType, notes);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Error linking ETA item to account:', err.message || err);
+    res.status(400).json({ success: false, error: err.message || 'تعذر ربط الصنف بالحساب.' });
+  }
+});
+
+
 // POST /api/erp/eta/items/mapping/unlink
 router.post('/eta/items/mapping/unlink', authenticateToken, async (req: AuthRequest, res) => {
   const companyId = getAuthenticatedCompanyId(req);

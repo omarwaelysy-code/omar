@@ -38,6 +38,7 @@ export interface EtaPortalItemDTO {
   isLinked: boolean;
   status?: string;
   activeFrom?: string | null;
+  mappingType?: 'product' | 'account';
   linkedProduct: {
     id: string;
     name: string;
@@ -49,6 +50,13 @@ export interface EtaPortalItemDTO {
     salePrice?: number;
     costPrice?: number;
     stock?: number;
+    linkedAt?: string;
+  } | null;
+  linkedAccount?: {
+    id: string;
+    name: string;
+    code: string;
+    typeName?: string;
     linkedAt?: string;
   } | null;
   autoMatchedProduct: {
@@ -427,9 +435,11 @@ export class EtaItemMappingService {
         m.eta_item_code,
         m.eta_item_name,
         m.eta_item_type,
+        m.product_id,
+        m.account_id,
+        m.mapping_type,
         m.notes,
         m.created_at,
-        p.id as product_id,
         p.name as product_name,
         p.code as product_code,
         p.barcode as product_barcode,
@@ -438,9 +448,14 @@ export class EtaItemMappingService {
         p.unit as product_unit,
         p.sale_price as product_sale_price,
         p.cost_price as product_cost_price,
-        p.stock as product_stock
+        p.stock as product_stock,
+        a.name as account_name,
+        a.code as account_code,
+        at.name as account_type_name
       FROM eta_item_mappings m
-      JOIN products p ON m.product_id = p.id
+      LEFT JOIN products p ON m.product_id = p.id
+      LEFT JOIN accounts a ON m.account_id = a.id
+      LEFT JOIN account_types at ON a.type_id = at.id
       WHERE m.company_id = $1
     `, [companyId]);
 
@@ -498,26 +513,40 @@ export class EtaItemMappingService {
       processedCodes.add(itemCode);
 
       const mapping = mappingsByCode.get(itemCode) || mappingsByCode.get(this.normalizeCode(itemCode));
-      const isLinked = !!mapping;
+      const isLinked = !!(mapping && (mapping.product_id || mapping.account_id));
 
       let linkedProduct = null;
+      let linkedAccount = null;
+      let mappingType: 'product' | 'account' | undefined = undefined;
       let autoMatchedProduct = null;
 
       if (isLinked) {
         linkedCount++;
-        linkedProduct = {
-          id: mapping.product_id,
-          name: mapping.product_name,
-          code: mapping.product_code,
-          barcode: mapping.product_barcode,
-          taxItemCode: mapping.product_tax_item_code,
-          taxCodeType: mapping.product_tax_code_type,
-          unit: mapping.product_unit,
-          salePrice: Number(mapping.product_sale_price || 0),
-          costPrice: Number(mapping.product_cost_price || 0),
-          stock: Number(mapping.product_stock || 0),
-          linkedAt: mapping.created_at ? new Date(mapping.created_at).toISOString() : undefined
-        };
+        if (mapping.account_id) {
+          mappingType = 'account';
+          linkedAccount = {
+            id: mapping.account_id,
+            name: mapping.account_name || 'حساب من الدليل',
+            code: mapping.account_code || '',
+            typeName: mapping.account_type_name,
+            linkedAt: mapping.created_at ? new Date(mapping.created_at).toISOString() : undefined
+          };
+        } else if (mapping.product_id) {
+          mappingType = 'product';
+          linkedProduct = {
+            id: mapping.product_id,
+            name: mapping.product_name,
+            code: mapping.product_code,
+            barcode: mapping.product_barcode,
+            taxItemCode: mapping.product_tax_item_code,
+            taxCodeType: mapping.product_tax_code_type,
+            unit: mapping.product_unit,
+            salePrice: Number(mapping.product_sale_price || 0),
+            costPrice: Number(mapping.product_cost_price || 0),
+            stock: Number(mapping.product_stock || 0),
+            linkedAt: mapping.created_at ? new Date(mapping.created_at).toISOString() : undefined
+          };
+        }
       } else {
         unlinkedCount++;
         // Auto-match attempt:
@@ -639,7 +668,9 @@ export class EtaItemMappingService {
         suppliers: Array.from(agg.suppliersMap.values()),
         sampleDocument: agg.sampleDocument,
         isLinked,
+        mappingType,
         linkedProduct,
+        linkedAccount,
         autoMatchedProduct,
         status: agg.status,
         activeFrom: agg.activeFrom
@@ -652,12 +683,13 @@ export class EtaItemMappingService {
       if (!processedCodes.has(code)) {
         processedCodes.add(code);
         linkedCount++;
+        const isAccountMapping = !!row.account_id;
         items.push({
           itemCode: code,
           itemType: row.eta_item_type || 'EGS',
-          itemName: row.eta_item_name || row.product_name || code,
+          itemName: row.eta_item_name || (isAccountMapping ? row.account_name : row.product_name) || code,
           description: row.notes || '',
-          unitType: row.product_unit || 'قطعة',
+          unitType: isAccountMapping ? 'خدمة' : (row.product_unit || 'قطعة'),
           lastUnitPrice: Number(row.product_cost_price || 0),
           docCount: 0,
           totalQuantity: 0,
@@ -667,7 +699,8 @@ export class EtaItemMappingService {
           supplierName: '',
           suppliers: [],
           isLinked: true,
-          linkedProduct: {
+          mappingType: isAccountMapping ? 'account' : 'product',
+          linkedProduct: isAccountMapping ? null : {
             id: row.product_id,
             name: row.product_name,
             code: row.product_code,
@@ -680,6 +713,13 @@ export class EtaItemMappingService {
             stock: Number(row.product_stock || 0),
             linkedAt: row.created_at ? new Date(row.created_at).toISOString() : undefined
           },
+          linkedAccount: isAccountMapping ? {
+            id: row.account_id,
+            name: row.account_name || 'حساب من الدليل',
+            code: row.account_code || '',
+            typeName: row.account_type_name,
+            linkedAt: row.created_at ? new Date(row.created_at).toISOString() : undefined
+          } : null,
           autoMatchedProduct: null
         });
       }
@@ -729,12 +769,14 @@ export class EtaItemMappingService {
     // 1. Insert or update in eta_item_mappings
     await pool.query(`
       INSERT INTO eta_item_mappings (
-        id, company_id, eta_item_code, eta_item_name, eta_item_type, product_id, notes, updated_at
+        id, company_id, eta_item_code, eta_item_name, eta_item_type, product_id, account_id, mapping_type, notes, updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+      VALUES ($1, $2, $3, $4, $5, $6, NULL, 'product', $7, CURRENT_TIMESTAMP)
       ON CONFLICT (company_id, eta_item_code)
       DO UPDATE SET
         product_id = EXCLUDED.product_id,
+        account_id = NULL,
+        mapping_type = 'product',
         eta_item_name = COALESCE(EXCLUDED.eta_item_name, eta_item_mappings.eta_item_name),
         eta_item_type = COALESCE(EXCLUDED.eta_item_type, eta_item_mappings.eta_item_type),
         notes = COALESCE(EXCLUDED.notes, eta_item_mappings.notes),
@@ -767,6 +809,56 @@ export class EtaItemMappingService {
     return {
       success: true,
       message: 'تم ربط الصنف بنجاح'
+    };
+  }
+
+  /**
+   * Link an ETA item code to an internal Account from Chart of Accounts (دليل الحسابات)
+   */
+  public static async linkAccount(
+    companyId: string,
+    etaItemCode: string,
+    accountId: string,
+    etaItemName?: string,
+    etaItemType: string = 'EGS',
+    notes?: string
+  ): Promise<{ success: boolean; message: string }> {
+    if (!companyId || !etaItemCode || !accountId) {
+      throw new Error('بيانات الربط غير مكتملة (كود الصنف ومعرف الحساب مطلوبان).');
+    }
+
+    const cleanItemCode = etaItemCode.trim();
+    const cleanItemType = (etaItemType || 'EGS').trim().toUpperCase();
+    const cleanItemName = (etaItemName || '').trim() || null;
+    const id = crypto.randomUUID();
+
+    const accCheck = await pool.query(
+      'SELECT id, name, code FROM accounts WHERE id = $1 AND company_id = $2',
+      [accountId, companyId]
+    );
+    if (accCheck.rows.length === 0) {
+      throw new Error('الحساب المحدد غير موجود في دليل الحسابات.');
+    }
+
+    await pool.query(`
+      INSERT INTO eta_item_mappings (
+        id, company_id, eta_item_code, eta_item_name, eta_item_type, product_id, account_id, mapping_type, notes, updated_at
+      )
+      VALUES ($1, $2, $3, $4, $5, NULL, $6, 'account', $7, CURRENT_TIMESTAMP)
+      ON CONFLICT (company_id, eta_item_code)
+      DO UPDATE SET
+        product_id = NULL,
+        account_id = EXCLUDED.account_id,
+        mapping_type = 'account',
+        eta_item_name = COALESCE(EXCLUDED.eta_item_name, eta_item_mappings.eta_item_name),
+        eta_item_type = COALESCE(EXCLUDED.eta_item_type, eta_item_mappings.eta_item_type),
+        notes = COALESCE(EXCLUDED.notes, eta_item_mappings.notes),
+        updated_at = CURRENT_TIMESTAMP
+    `, [id, companyId, cleanItemCode, cleanItemName, cleanItemType, accountId, notes || null]);
+
+    return {
+      success: true,
+      message: `تم ربط كود الضرائب بنجاح مع الحساب: ${accCheck.rows[0].name}`
     };
   }
 
