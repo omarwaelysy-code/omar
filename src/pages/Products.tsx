@@ -2240,16 +2240,17 @@ export const Products: React.FC = () => {
       <EtaCodeRegistrationModal
         isOpen={isEtaRegModalOpen}
         onClose={() => setIsEtaRegModalOpen(false)}
-        itemCode={formData.code || ''}
-        itemNameAr={formData.name || ''}
-        itemDescriptionAr={formData.description || ''}
+        initialCode={formData.code || ''}
+        initialName={formData.name || ''}
+        initialDescription={formData.description || ''}
         companyTaxNumber={company?.tax_number || ''}
         productId={editingProduct?.id}
         initialCodeType={formData.eta_code_type === 'GS1' ? 'GS1' : 'EGS'}
-        onRegistered={(regData) => {
+        initialGpcBrick={formData.eta_gpc_brick || ''}
+        onSuccess={(regData) => {
           setFormData(prev => ({
             ...prev,
-            eta_item_code: regData.fullItemCode,
+            eta_item_code: regData.itemCode,
             eta_code_type: regData.codeType,
             eta_code_status: regData.status,
             eta_gpc_brick: regData.gpcBrick || prev.eta_gpc_brick
