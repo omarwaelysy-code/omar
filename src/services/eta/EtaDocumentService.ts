@@ -66,6 +66,8 @@ export interface EtaReceivedInvoiceDTO {
   vatAmount?: number;
   nonTaxableFees?: number;
   whtAmount?: number;
+  taxableVatBase?: number;
+  nonTaxableVatBase?: number;
 }
 
 export interface EtaSearchDocumentsResponse {
@@ -124,6 +126,8 @@ export interface EtaDetailedInvoiceLineDTO {
   vatAmount?: number;
   nonTaxableFees?: number;
   whtAmount?: number;
+  taxableVatBase?: number;
+  nonTaxableVatBase?: number;
 }
 
 export class EtaDocumentService {
@@ -374,6 +378,48 @@ export class EtaDocumentService {
           : taxAmount;
         const nonTaxableFees = taxTotals.filter(t => ['T13','T14','T15','T16','T17','T18','T19','T20'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
         const whtAmount = taxTotals.filter(t => t.taxType === 'T4').reduce((s, t) => s + (Number(t.amount) || 0), 0);
+        const netAmount = Number(row.net_amount || 0);
+
+        // حساب الوعاء الخاضع لـ 14% والوعاء غير الخاضع/المعفى
+        const rawLines: any[] = Array.isArray(rawDataObj?.invoiceLines)
+          ? rawDataObj.invoiceLines
+          : (Array.isArray(rawDataObj?.details?.invoiceLines)
+              ? rawDataObj.details.invoiceLines
+              : (Array.isArray(rawDataObj?.rawDocument?.invoiceLines) ? rawDataObj.rawDocument.invoiceLines : []));
+
+        let taxableVatBase = 0;
+        let nonTaxableVatBase = 0;
+
+        if (rawLines.length > 0) {
+          rawLines.forEach(l => {
+            const lTaxes: any[] = Array.isArray(l.taxableItems) && l.taxableItems.length > 0
+              ? l.taxableItems
+              : (Array.isArray(l.lineTaxableItems) && l.lineTaxableItems.length > 0
+                  ? l.lineTaxableItems
+                  : (Array.isArray(l.taxesList) ? l.taxesList : []));
+            const lNet = Number(l.netTotal ?? ((Number(l.quantity || 1) * Number(l.unitPrice || 0)) - Number(l.discountAmount || 0)));
+            const hasT1 = lTaxes.some(t => t.taxType === 'T1' && Number(t.amount || 0) > 0);
+            if (hasT1) {
+              taxableVatBase += lNet;
+            } else {
+              nonTaxableVatBase += lNet;
+            }
+          });
+          taxableVatBase = Math.round(taxableVatBase * 100) / 100;
+          nonTaxableVatBase = Math.round(nonTaxableVatBase * 100) / 100;
+        } else if (vatAmount > 0) {
+          const approxVatBase = Math.round((vatAmount / 0.14) * 100) / 100;
+          if (approxVatBase <= netAmount + 1) {
+            taxableVatBase = Math.min(netAmount, approxVatBase);
+            nonTaxableVatBase = Math.max(0, Math.round((netAmount - taxableVatBase) * 100) / 100);
+          } else {
+            taxableVatBase = netAmount;
+            nonTaxableVatBase = 0;
+          }
+        } else {
+          taxableVatBase = 0;
+          nonTaxableVatBase = netAmount;
+        }
 
         return {
           uuid: row.uuid,
@@ -389,7 +435,7 @@ export class EtaDocumentService {
           dateTimeReceived: row.date_time_received ? new Date(row.date_time_received).toISOString() : '',
           totalSales: Number(row.total_sales_amount || 0),
           totalDiscount: Number(row.total_discount_amount || 0),
-          netAmount: Number(row.net_amount || 0),
+          netAmount,
           taxAmount,
           totalAmount: Number(row.total_amount || 0),
           currency: row.currency || 'EGP',
@@ -406,6 +452,8 @@ export class EtaDocumentService {
           vatAmount,
           nonTaxableFees,
           whtAmount,
+          taxableVatBase,
+          nonTaxableVatBase,
           raw_data: rawDataObj
         };
       });
@@ -826,6 +874,10 @@ export class EtaDocumentService {
           const taxAmount = Number(l.taxAmount ?? (lineTaxes.length > 0 ? (taxableFees + tableTax + vatAmount + nonTaxableFees) : 0));
           const lineTotal = Number(l.lineTotal ?? l.total ?? (netTotal + taxableFees + tableTax + vatAmount + nonTaxableFees - whtAmount));
 
+          const hasT1OnLine = lineTaxes.some(t => t.taxType === 'T1' && Number(t.amount || 0) > 0);
+          const taxableVatBase = hasT1OnLine ? netTotal : 0;
+          const nonTaxableVatBase = hasT1OnLine ? 0 : netTotal;
+
           lines.push({
             ...baseDocInfo,
             rowKey: `${row.uuid}_${idx}`,
@@ -846,7 +898,9 @@ export class EtaDocumentService {
             tableTax,
             vatAmount,
             nonTaxableFees,
-            whtAmount
+            whtAmount,
+            taxableVatBase,
+            nonTaxableVatBase
           });
         });
       } else {
@@ -864,6 +918,10 @@ export class EtaDocumentService {
         const salesTotal = Number(row.total_sales_amount || row.net_amount || 0);
         const discountAmount = Number(row.total_discount_amount || 0);
         const netTotal = Number(row.net_amount || (salesTotal - discountAmount));
+
+        const approxBase = vatAmount > 0 ? Math.round((vatAmount / 0.14) * 100) / 100 : 0;
+        const taxableVatBase = approxBase <= netTotal + 1 ? Math.min(netTotal, approxBase) : netTotal;
+        const nonTaxableVatBase = Math.max(0, Math.round((netTotal - taxableVatBase) * 100) / 100);
 
         lines.push({
           ...baseDocInfo,
@@ -885,7 +943,9 @@ export class EtaDocumentService {
           tableTax,
           vatAmount,
           nonTaxableFees,
-          whtAmount
+          whtAmount,
+          taxableVatBase,
+          nonTaxableVatBase
         });
       }
     }
@@ -1283,6 +1343,47 @@ export class EtaDocumentService {
         : taxAmount;
       const nonTaxableFees = taxTotals.filter(t => ['T13','T14','T15','T16','T17','T18','T19','T20'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
       const whtAmount = taxTotals.filter(t => t.taxType === 'T4').reduce((s, t) => s + (Number(t.amount) || 0), 0);
+      const netAmount = Number(row.net_amount || 0);
+
+      const rawLines: any[] = Array.isArray(rawDataObj?.invoiceLines)
+        ? rawDataObj.invoiceLines
+        : (Array.isArray(rawDataObj?.details?.invoiceLines)
+            ? rawDataObj.details.invoiceLines
+            : (Array.isArray(rawDataObj?.rawDocument?.invoiceLines) ? rawDataObj.rawDocument.invoiceLines : []));
+
+      let taxableVatBase = 0;
+      let nonTaxableVatBase = 0;
+
+      if (rawLines.length > 0) {
+        rawLines.forEach(l => {
+          const lTaxes: any[] = Array.isArray(l.taxableItems) && l.taxableItems.length > 0
+            ? l.taxableItems
+            : (Array.isArray(l.lineTaxableItems) && l.lineTaxableItems.length > 0
+                ? l.lineTaxableItems
+                : (Array.isArray(l.taxesList) ? l.taxesList : []));
+          const lNet = Number(l.netTotal ?? ((Number(l.quantity || 1) * Number(l.unitPrice || 0)) - Number(l.discountAmount || 0)));
+          const hasT1 = lTaxes.some(t => t.taxType === 'T1' && Number(t.amount || 0) > 0);
+          if (hasT1) {
+            taxableVatBase += lNet;
+          } else {
+            nonTaxableVatBase += lNet;
+          }
+        });
+        taxableVatBase = Math.round(taxableVatBase * 100) / 100;
+        nonTaxableVatBase = Math.round(nonTaxableVatBase * 100) / 100;
+      } else if (vatAmount > 0) {
+        const approxVatBase = Math.round((vatAmount / 0.14) * 100) / 100;
+        if (approxVatBase <= netAmount + 1) {
+          taxableVatBase = Math.min(netAmount, approxVatBase);
+          nonTaxableVatBase = Math.max(0, Math.round((netAmount - taxableVatBase) * 100) / 100);
+        } else {
+          taxableVatBase = netAmount;
+          nonTaxableVatBase = 0;
+        }
+      } else {
+        taxableVatBase = 0;
+        nonTaxableVatBase = netAmount;
+      }
 
       return {
         uuid: row.uuid,
@@ -1301,7 +1402,7 @@ export class EtaDocumentService {
         dateTimeReceived: row.date_time_received ? new Date(row.date_time_received).toISOString() : '',
         totalSales: Number(row.total_sales_amount || 0),
         totalDiscount: Number(row.total_discount_amount || 0),
-        netAmount: Number(row.net_amount || 0),
+        netAmount,
         taxAmount,
         totalAmount: Number(row.total_amount || 0),
         currency: row.currency || 'EGP',
@@ -1316,7 +1417,9 @@ export class EtaDocumentService {
         tableTax,
         vatAmount,
         nonTaxableFees,
-        whtAmount
+        whtAmount,
+        taxableVatBase,
+        nonTaxableVatBase
       };
     });
 
