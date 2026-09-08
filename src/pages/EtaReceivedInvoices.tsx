@@ -297,14 +297,11 @@ export function EtaReceivedInvoices() {
   const [searchQuery, setSearchQuery] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
 
-  // Standard Egyptian Tax Rates presets (نسب الضريبة الشائعة)
+  // Standard Egyptian Tax Categories presets (14% / صفر / جدول)
   const STANDARD_TAX_RATES = useMemo(() => [
-    { id: '14', nameAr: '14% (القيمة المضافة العامة - VAT)', nameEn: '14% (Standard VAT)' },
-    { id: '0', nameAr: '0% (معفاة / خاضعة بسعر صفر)', nameEn: '0% (Zero / Exempt)' },
-    { id: '5', nameAr: '5% (ضريبة 5%)', nameEn: '5% Tax' },
-    { id: '8', nameAr: '8% (ضريبة جدول)', nameEn: '8% Schedule Tax' },
-    { id: '10', nameAr: '10% (خدمات مهنية واستشارات)', nameEn: '10% Professional Services' },
-    { id: '1', nameAr: '1% (خصم وتوريد / أرباح تجارية)', nameEn: '1% Withholding' },
+    { id: '14', nameAr: '14%', nameEn: '14%' },
+    { id: '0', nameAr: 'صفر', nameEn: 'Zero' },
+    { id: 'table', nameAr: 'جدول', nameEn: 'Schedule Tax' },
   ], []);
 
   // Amount filter state (البحث في القيمة المالية)
@@ -763,54 +760,48 @@ export function EtaReceivedInvoices() {
     return Math.round(raw * 10) / 10;
   }, []);
 
-  // Dynamic counts per tax rate
-  const taxRateCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
+  // Dynamic counts per tax category: 14%, صفر, جدول
+  const taxCategoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { '14': 0, '0': 0, 'table': 0 };
     const source = viewMode === 'all_portal' ? allPortalInvoices : invoices;
     for (const inv of source) {
-      const r = getInvoiceTaxRate(inv);
-      const key = r % 1 === 0 ? String(r) : r.toFixed(1);
-      counts[key] = (counts[key] || 0) + 1;
+      const b = getInvoiceTaxBreakdown(inv);
+      const has14 = (b.vatAmount > 0) || (inv.taxTotals && inv.taxTotals.some(t => t.taxType === 'T1' && t.amount > 0));
+      const hasTable = (b.tableTax > 0) || (inv.taxTotals && inv.taxTotals.some(t => (t.taxType === 'T2' || t.taxType === 'T3') && t.amount > 0));
+      const hasZero = (!has14 && !hasTable) || (b.nonTaxableItemsNet > 0);
+
+      if (has14) counts['14']++;
+      if (hasZero) counts['0']++;
+      if (hasTable) counts['table']++;
     }
     return counts;
-  }, [allPortalInvoices, invoices, viewMode, getInvoiceTaxRate]);
+  }, [allPortalInvoices, invoices, viewMode]);
 
-  // Combined list of tax rates (presets + detected in documents)
-  const availableTaxRates = useMemo(() => {
-    const detectedKeys = Object.keys(taxRateCounts);
-    const standardKeys = STANDARD_TAX_RATES.map(s => s.id);
-    const allKeys = Array.from(new Set([...standardKeys, ...detectedKeys]));
+  // Combined list of tax rates: exactly 14%, صفر, جدول
+  const availableTaxRates = useMemo(() => [
+    { id: '14', nameAr: '14%', nameEn: '14%', count: taxCategoryCounts['14'] || 0 },
+    { id: '0', nameAr: 'صفر', nameEn: 'Zero', count: taxCategoryCounts['0'] || 0 },
+    { id: 'table', nameAr: 'جدول', nameEn: 'Schedule Tax', count: taxCategoryCounts['table'] || 0 },
+  ], [taxCategoryCounts]);
 
-    return allKeys.map(key => {
-      const std = STANDARD_TAX_RATES.find(s => s.id === key);
-      return {
-        id: key,
-        nameAr: std ? std.nameAr : `${key}%`,
-        nameEn: std ? std.nameEn : `${key}%`,
-        count: taxRateCounts[key] || 0
-      };
-    }).sort((a, b) => {
-      if (a.id === '14') return -1;
-      if (b.id === '14') return 1;
-      if (a.id === '0') return -1;
-      if (b.id === '0') return 1;
-      if (b.count !== a.count) return b.count - a.count;
-      return Number(b.id) - Number(a.id);
-    });
-  }, [STANDARD_TAX_RATES, taxRateCounts]);
-
-  // Helper to match tax rate filter (تصفية نسبة الضريبة)
+  // Helper to match tax rate filter (تصفية الضريبة: 14% / صفر / جدول)
   const matchesTaxRateFilter = useCallback((inv: EtaReceivedInvoice) => {
     if (selectedTaxRates.length === 0 && taxRateFilter === 'all') return true;
-    const invRate = getInvoiceTaxRate(inv);
     const targets = selectedTaxRates.length > 0 ? selectedTaxRates : (taxRateFilter !== 'all' ? [taxRateFilter] : []);
     if (targets.length === 0) return true;
+
+    const b = getInvoiceTaxBreakdown(inv);
+    const has14 = (b.vatAmount > 0) || (inv.taxTotals && inv.taxTotals.some(t => t.taxType === 'T1' && t.amount > 0));
+    const hasTable = (b.tableTax > 0) || (inv.taxTotals && inv.taxTotals.some(t => (t.taxType === 'T2' || t.taxType === 'T3') && t.amount > 0));
+    const hasZero = (!has14 && !hasTable) || (b.nonTaxableItemsNet > 0);
+
     return targets.some(tgt => {
-      const numTgt = parseFloat(tgt);
-      if (isNaN(numTgt)) return false;
-      return Math.abs(invRate - numTgt) <= 0.25;
+      if (tgt === '14') return has14;
+      if (tgt === '0') return hasZero;
+      if (tgt === 'table') return hasTable;
+      return false;
     });
-  }, [selectedTaxRates, taxRateFilter, getInvoiceTaxRate]);
+  }, [selectedTaxRates, taxRateFilter]);
 
   // Helper to match financial amount filter
   const matchesAmountFilter = useCallback((inv: EtaReceivedInvoice) => {
@@ -1639,7 +1630,7 @@ export function EtaReceivedInvoices() {
         <label className="block text-xs font-semibold text-slate-600 mb-1.5 flex items-center justify-between">
           <span className="flex items-center gap-1.5">
             <Percent className="w-3.5 h-3.5 text-indigo-600" />
-            <span>{language === 'ar' ? 'نسبة الضريبة (الضريبة ÷ الصافي)' : 'Tax Rate (Tax ÷ Net)'}</span>
+            <span>{language === 'ar' ? 'الضريبة' : 'Tax'}</span>
           </span>
           {isFiltered && (
             <button
@@ -1667,13 +1658,13 @@ export function EtaReceivedInvoices() {
             {selectedTaxRates.length === 0
               ? (taxRateFilter !== 'all'
                   ? (availableTaxRates.find(x => x.id === taxRateFilter)?.[language === 'ar' ? 'nameAr' : 'nameEn'] || `${taxRateFilter}%`)
-                  : (language === 'ar' ? 'كافة النسب' : 'All Tax Rates'))
+                  : (language === 'ar' ? 'كافة الضرائب' : 'All Taxes'))
               : selectedTaxRates.length === 1
               ? (() => {
                   const tr = availableTaxRates.find(x => x.id === selectedTaxRates[0]);
                   return language === 'ar' ? tr?.nameAr : tr?.nameEn;
                 })()
-              : (language === 'ar' ? `${selectedTaxRates.length} نسب محددة` : `${selectedTaxRates.length} Rates Selected`)}
+              : (language === 'ar' ? `${selectedTaxRates.length} ضرائب محددة` : `${selectedTaxRates.length} Taxes Selected`)}
           </span>
           <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showTaxRateDropdown ? 'rotate-180' : ''}`} />
         </button>
@@ -1688,7 +1679,7 @@ export function EtaReceivedInvoices() {
                   onClick={() => { setSelectedTaxRates([]); setTaxRateFilter('all'); setClientPage(1); }}
                   className={`font-bold cursor-pointer ${selectedTaxRates.length === 0 && taxRateFilter === 'all' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
                 >
-                  {language === 'ar' ? 'تحديد كافة النسب' : 'Select All Rates'}
+                  {language === 'ar' ? 'تحديد كافة الضرائب' : 'Select All Taxes'}
                 </button>
                 {isFiltered && (
                   <button
