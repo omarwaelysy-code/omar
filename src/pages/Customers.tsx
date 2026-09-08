@@ -645,7 +645,7 @@ export const Customers: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ type: 'spring', damping: 32, stiffness: 280 }}
-            className="w-full flex flex-col h-full bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden relative z-[40]"
+            className="w-full flex flex-col md:flex-row h-full bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden relative z-[40]"
           >
               {/* Form Side */}
               <div className="flex-1 flex flex-col overflow-hidden bg-white">
@@ -1079,11 +1079,9 @@ export const Customers: React.FC = () => {
                   </div>
                 </div>
               )}
-            </div>
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (

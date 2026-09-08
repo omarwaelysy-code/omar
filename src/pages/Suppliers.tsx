@@ -885,7 +885,7 @@ export const Suppliers: React.FC = () => {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: dir === 'rtl' ? -500 : 500, opacity: 0 }}
             transition={{ type: 'spring', damping: 32, stiffness: 280 }}
-            className="w-full flex flex-col h-full bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden relative z-[40]"
+            className="w-full flex flex-col md:flex-row h-full bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden relative z-[40]"
           >
               <div className="flex-1 flex flex-col overflow-hidden bg-white">
                 <div className={`px-4 py-2 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-20 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
@@ -1338,6 +1338,7 @@ export const Suppliers: React.FC = () => {
                 </div>
               )}
           </motion.div>
+        )}
       </AnimatePresence>
     </div>
 

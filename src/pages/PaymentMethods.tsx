@@ -825,6 +825,7 @@ export const PaymentMethods: React.FC = () => {
               )}
             </div>
           </motion.div>
+        )}
       </AnimatePresence>
 
       <PageActivityLog category="payment_methods" isOpen={isActivityLogOpen} onClose={() => setIsActivityLogOpen(false)} />
