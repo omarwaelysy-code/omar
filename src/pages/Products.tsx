@@ -1402,29 +1402,29 @@ export const Products: React.FC = () => {
             <div className="bg-white flex-1 rounded-2xl md:rounded-3xl shadow-lg shadow-slate-200/50 flex flex-col md:flex-row overflow-hidden border border-slate-200 transition-all">
               <div className="flex-1 flex flex-col h-full overflow-hidden bg-white">
                 {/* Header */}
-                <div className="px-6 py-3.5 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-20">
-                  <div className={`flex items-center gap-3.5 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                    <div className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-md shadow-emerald-600/20 flex-shrink-0">
-                       <Package size={20} />
+                <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-20">
+                  <div className={`flex items-center gap-2.5 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                    <div className="w-7 h-7 bg-emerald-600 text-white rounded-lg flex items-center justify-center shadow-xs flex-shrink-0">
+                       <Package size={15} />
                     </div>
                     <div className={dir === 'rtl' ? 'text-right' : 'text-left'}>
-                       <h3 className="text-lg font-black text-slate-900 tracking-tight leading-none mb-1">
+                       <h3 className="text-sm font-black text-slate-900 tracking-tight leading-none mb-0.5">
                          {editingProduct ? t('products.edit') : t('products.add')}
                        </h3>
-                       <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none">
+                       <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider leading-none">
                          {editingProduct?.code || 'SYSTEM FLOW : NEW'}
                        </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     {pendingEtaProductForCreation && (
                       <button 
                         type="submit" 
                         form="product-form"
                         onClick={() => setLinkWithEta(true)}
-                        className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl font-black hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 shadow-sm flex items-center gap-1.5 border border-emerald-400/40 text-xs"
+                        className="px-3 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg font-bold hover:from-emerald-700 hover:to-teal-700 transition-all active:scale-95 shadow-xs flex items-center gap-1 border border-emerald-400/40 text-xs"
                       >
-                        <Link2 size={15} />
+                        <Link2 size={13} />
                         <span>{language === 'ar' ? 'حفظ وربط مع منظومة ETA فوراً' : 'Save & Link to ETA'}</span>
                       </button>
                     )}
@@ -1432,7 +1432,7 @@ export const Products: React.FC = () => {
                       type="submit" 
                       form="product-form" 
                       onClick={() => setLinkWithEta(false)}
-                      className="px-5 py-2 bg-zinc-900 text-white rounded-xl font-bold hover:bg-zinc-800 transition-all active:scale-95 shadow-sm text-xs"
+                      className="px-4 py-1 bg-zinc-900 text-white rounded-lg font-bold hover:bg-zinc-800 transition-all active:scale-95 shadow-xs text-xs"
                     >
                        {editingProduct ? t('common.save') : (pendingEtaProductForCreation ? (language === 'ar' ? 'حفظ عادي' : 'Save Normal') : t('common.add'))}
                     </button>
@@ -1442,21 +1442,21 @@ export const Products: React.FC = () => {
                         if (pendingEtaProductForCreation) setPendingEtaProductForCreation(null);
                         closeModal();
                       }} 
-                      className="w-9 h-9 flex items-center justify-center bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-500 transition-all border border-slate-200/60"
+                      className="w-7 h-7 flex items-center justify-center bg-slate-50 text-slate-400 rounded-lg hover:bg-rose-50 hover:text-rose-500 transition-all border border-slate-200/60"
                       title={language === 'ar' ? 'إغلاق' : 'Close'}
                     >
-                       <X size={18} />
+                       <X size={15} />
                     </button>
                   </div>
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-5 md:p-6">
-                  <form id="product-form" onSubmit={handleSubmit} className="space-y-5" dir={dir}>
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-4">
+                  <form id="product-form" onSubmit={handleSubmit} className="space-y-3" dir={dir}>
                      {/* ETA Linked Banner */}
                      {pendingEtaProductForCreation && (
-                       <div className="p-3.5 bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/30 rounded-xl flex items-center justify-between gap-3 shadow-2xs">
-                         <div className="flex items-center gap-3">
+                       <div className="p-2.5 bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/30 rounded-xl flex items-center justify-between gap-2.5 shadow-2xs">
+                         <div className="flex items-center gap-2.5">
                            <div className="p-2 bg-emerald-600 text-white rounded-lg shadow-sm shadow-emerald-600/20 flex-shrink-0">
                              <Link2 className="w-5 h-5" />
                            </div>
@@ -1484,31 +1484,31 @@ export const Products: React.FC = () => {
                      )}
 
                      {/* Base Data Section */}
-                     <div className="space-y-3">
-                        <div className="flex items-center gap-2.5 border-b border-slate-100 pb-2">
-                           <div className="w-7 h-7 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center">
-                              <Package size={15} />
+                     <div className="space-y-2">
+                        <div className="flex items-center gap-1.5 border-b border-slate-100 pb-1">
+                           <div className="w-5 h-5 bg-emerald-50 text-emerald-600 rounded flex items-center justify-center">
+                              <Package size={12} />
                            </div>
-                           <h2 className="text-sm font-black text-slate-900 leading-none uppercase">
+                           <h2 className="text-xs font-bold text-slate-800 leading-none uppercase">
                               {language === 'ar' ? 'المعلومات الأساسية' : 'Primary Information'}
                            </h2>
                         </div>
                         
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-right">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-right">
                            {/* مجموعة الصنف */}
-                           <div className="sm:col-span-2 space-y-1">
-                              <label className="block text-[11px] font-bold text-slate-500 px-0.5">
+                           <div className="sm:col-span-2 space-y-0.5">
+                              <label className="block text-[10px] font-bold text-slate-500 px-0.5">
                                 {language === 'ar' ? 'مجموعة الصنف *' : 'Item Group *'}
                               </label>
                               <div className="relative group">
-                                <Layers className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 text-slate-400`} size={16} />
+                                <Layers className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
                                 <select 
                                   required 
-                                  className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 appearance-none outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all`}
+                                  className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 appearance-none outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all`}
                                   value={formData.item_group_id} 
                                   onChange={(e) => setFormData({ ...formData, item_group_id: e.target.value })}
                                 >
-                                  <option value="">{language === 'ar' ? '-- الرجاء اختيار مجموعة الصنف --' : '-- Please select item group --'}</option>
+                                  <option value="">{language === 'ar' ? '-- اختيار مجموعة الصنف --' : '-- Select item group --'}</option>
                                   {itemGroups.map(group => (
                                     <option key={group.id} value={group.id}>
                                       {group.name} ({group.code})
@@ -1519,41 +1519,41 @@ export const Products: React.FC = () => {
                            </div>
 
                            {/* اسم الصنف */}
-                           <div className="sm:col-span-2 space-y-1">
-                              <label className="block text-[11px] font-bold text-slate-500 px-0.5">{t('products.form_name')}</label>
+                           <div className="sm:col-span-2 space-y-0.5">
+                              <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_name')}</label>
                               <input 
                                 required 
                                 type="text" 
                                 placeholder="..." 
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" 
+                                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all" 
                                 value={formData.name} 
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
                               />
                            </div>
 
                            {/* كود الصنف */}
-                           <div className="space-y-1">
-                              <label className="block text-[11px] font-bold text-slate-500 px-0.5">{t('products.form_code')}</label>
+                           <div className="space-y-0.5">
+                              <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_code')}</label>
                               <div className="relative group">
-                                <Hash className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 text-slate-400`} size={16} />
+                                <Hash className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
                                 <input 
                                   required 
                                   readOnly 
                                   type="text" 
-                                  className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2 bg-slate-100 border border-slate-200 rounded-xl font-mono text-sm font-black text-slate-500 outline-none tracking-wider`} 
+                                  className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-slate-100 border border-slate-200 rounded-lg font-mono text-xs font-bold text-slate-500 outline-none tracking-wider`} 
                                   value={formData.code} 
                                 />
                               </div>
                            </div>
 
                            {/* نوع الصنف */}
-                           <div className="space-y-1">
-                              <label className="block text-[11px] font-bold text-slate-500 px-0.5">{t('products.form_type')}</label>
+                           <div className="space-y-0.5">
+                              <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_type')}</label>
                               <div className="relative group">
-                                <LayoutGrid className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 text-slate-400`} size={16} />
+                                <LayoutGrid className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
                                 <select 
                                   required 
-                                  className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 appearance-none outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all`} 
+                                  className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 appearance-none outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all`} 
                                   value={formData.type} 
                                   onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
                                 >
@@ -1568,21 +1568,21 @@ export const Products: React.FC = () => {
                            </div>
 
                            {/* التصنيف */}
-                           <div className="space-y-1">
-                              <label className="block text-[11px] font-bold text-slate-500 px-0.5">{t('products.form_category')}</label>
+                           <div className="space-y-0.5">
+                              <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_category')}</label>
                               <input 
                                 type="text" 
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" 
+                                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all" 
                                 value={formData.category} 
                                 onChange={(e) => setFormData({ ...formData, category: e.target.value })} 
                               />
                            </div>
 
                            {/* الوحدة */}
-                           <div className="space-y-1">
-                              <label className="block text-[11px] font-bold text-slate-500 px-0.5">{t('products.form_unit')}</label>
+                           <div className="space-y-0.5">
+                              <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_unit')}</label>
                               <select 
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold appearance-none outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" 
+                                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold appearance-none outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all" 
                                 value={formData.unit} 
                                 onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                               >
@@ -1594,17 +1594,17 @@ export const Products: React.FC = () => {
                            </div>
 
                            {/* 1. كود رفع الوثائق (الفواتير المصدرة / المبيعات) */}
-                           <div className="space-y-1">
-                              <label className="block text-[11px] font-bold text-purple-700 px-0.5 flex items-center gap-1">
-                                <Upload size={13} className="text-purple-500" />
+                           <div className="space-y-0.5">
+                              <label className="block text-[10px] font-bold text-purple-700 px-0.5 flex items-center gap-1">
+                                <Upload size={12} className="text-purple-500" />
                                 <span>{language === 'ar' ? 'كود رفع المبيعات بالضرائب' : 'Sales Upload ETA Code'}</span>
                               </label>
                               <div className="relative group">
-                                <FileText className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 text-purple-400`} size={16} />
+                                <FileText className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-purple-400`} size={14} />
                                 <input 
                                   type="text" 
                                   placeholder={language === 'ar' ? 'مثل: EG-499151429-1' : 'e.g. EG-499151429-1'} 
-                                  className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2 bg-purple-50/30 border border-purple-200 rounded-xl text-sm font-mono font-bold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all`} 
+                                  className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-purple-50/30 border border-purple-200 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none focus:bg-white focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all`} 
                                   value={formData.eta_item_code || ''} 
                                   onChange={(e) => setFormData({ ...formData, eta_item_code: e.target.value })} 
                                 />
@@ -1612,14 +1612,14 @@ export const Products: React.FC = () => {
                            </div>
 
                            {/* نوع كود رفع الوثائق */}
-                           <div className="space-y-1">
-                              <label className="block text-[11px] font-bold text-purple-700 px-0.5">
+                           <div className="space-y-0.5">
+                              <label className="block text-[10px] font-bold text-purple-700 px-0.5">
                                 {language === 'ar' ? 'نوع كود الرفع' : 'Upload Code Type'}
                               </label>
                               <div className="relative group">
-                                <Layers className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 text-purple-400`} size={16} />
+                                <Layers className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-purple-400`} size={14} />
                                 <select 
-                                  className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2 bg-purple-50/30 border border-purple-200 rounded-xl text-sm font-bold text-slate-900 appearance-none outline-none focus:bg-white focus:ring-2 focus:ring-purple-500/20 transition-all`} 
+                                  className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-purple-50/30 border border-purple-200 rounded-lg text-xs font-bold text-slate-900 appearance-none outline-none focus:bg-white focus:ring-1 focus:ring-purple-500 transition-all`} 
                                   value={formData.eta_code_type || 'EGS'} 
                                   onChange={(e) => setFormData({ ...formData, eta_code_type: e.target.value })}
                                 >
@@ -1632,17 +1632,17 @@ export const Products: React.FC = () => {
                            </div>
 
                            {/* 2. كود ربط الوثائق المستلمة (فواتير المشتريات / الموردين) */}
-                           <div className="space-y-1">
-                              <label className="block text-[11px] font-bold text-blue-700 px-0.5 flex items-center gap-1">
-                                <Link2 size={13} className="text-blue-500" />
+                           <div className="space-y-0.5">
+                              <label className="block text-[10px] font-bold text-blue-700 px-0.5 flex items-center gap-1">
+                                <Link2 size={12} className="text-blue-500" />
                                 <span>{language === 'ar' ? 'كود ربط المشتريات بالضرائب' : 'Received ETA Code'}</span>
                               </label>
                               <div className="relative group">
-                                <FileText className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 text-blue-400`} size={16} />
+                                <FileText className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-blue-400`} size={14} />
                                 <input 
                                   type="text" 
                                   placeholder={language === 'ar' ? 'كود الوارد من المورد' : 'Code from supplier'} 
-                                  className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2 bg-blue-50/30 border border-blue-200 rounded-xl text-sm font-mono font-bold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all`} 
+                                  className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-blue-50/30 border border-blue-200 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all`} 
                                   value={formData.tax_item_code || ''} 
                                   onChange={(e) => setFormData({ ...formData, tax_item_code: e.target.value })} 
                                 />
@@ -1650,14 +1650,14 @@ export const Products: React.FC = () => {
                            </div>
 
                            {/* نوع كود الاستلام */}
-                           <div className="space-y-1">
-                              <label className="block text-[11px] font-bold text-blue-700 px-0.5">
+                           <div className="space-y-0.5">
+                              <label className="block text-[10px] font-bold text-blue-700 px-0.5">
                                 {language === 'ar' ? 'نوع كود الاستلام' : 'Received Code Type'}
                               </label>
                               <div className="relative group">
-                                <Layers className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 text-blue-400`} size={16} />
+                                <Layers className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-blue-400`} size={14} />
                                 <select 
-                                  className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2 bg-blue-50/30 border border-blue-200 rounded-xl text-sm font-bold text-slate-900 appearance-none outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 transition-all`} 
+                                  className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-blue-50/30 border border-blue-200 rounded-lg text-xs font-bold text-slate-900 appearance-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 transition-all`} 
                                   value={formData.tax_code_type || 'EGS'} 
                                   onChange={(e) => setFormData({ ...formData, tax_code_type: e.target.value })}
                                 >
@@ -1672,25 +1672,25 @@ export const Products: React.FC = () => {
                      </div>
 
                      {/* Pricing Section */}
-                     <div className="space-y-3">
-                        <div className="flex items-center gap-2.5 border-b border-slate-100 pb-2">
-                           <div className="w-7 h-7 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center">
-                              <Wallet size={15} />
+                     <div className="space-y-2">
+                        <div className="flex items-center gap-1.5 border-b border-slate-100 pb-1">
+                           <div className="w-5 h-5 bg-emerald-50 text-emerald-600 rounded flex items-center justify-center">
+                              <Wallet size={12} />
                            </div>
-                           <h2 className="text-sm font-black text-slate-900 leading-none uppercase">
+                           <h2 className="text-xs font-bold text-slate-800 leading-none uppercase">
                               {language === 'ar' ? 'التسعير والمخزون' : 'Pricing & Inventory'}
                            </h2>
                         </div>
-                        <div className="p-3.5 bg-slate-50/70 rounded-2xl border border-slate-200/70 space-y-3 text-right">
-                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div className="p-2.5 bg-slate-50/70 rounded-xl border border-slate-200/70 space-y-2 text-right">
+                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                               {/* سعر البيع */}
-                              <div className="space-y-1">
-                                <label className="block text-[11px] font-bold text-slate-600 px-0.5">{t('products.form_sale_price')}</label>
+                              <div className="space-y-0.5">
+                                <label className="block text-[10px] font-bold text-slate-600 px-0.5">{t('products.form_sale_price')}</label>
                                 <div className="relative group">
-                                  <Wallet className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 text-emerald-500`} size={16} />
+                                  <Wallet className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-emerald-500`} size={14} />
                                   <FormattedNumberInput 
                                     required 
-                                    className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2 bg-white border border-emerald-200 rounded-xl text-base font-black text-emerald-700 outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all`} 
+                                    className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-white border border-emerald-200 rounded-lg text-sm font-black text-emerald-700 outline-none focus:ring-1 focus:ring-emerald-500 transition-all`} 
                                     value={formData.sale_price || 0} 
                                     onChange={(val) => setFormData({ ...formData, sale_price: val })} 
                                   />
@@ -1699,14 +1699,14 @@ export const Products: React.FC = () => {
 
                               {/* سعر التكلفة */}
                               {canViewCost && (
-                                <div className="space-y-1">
-                                  <label className="block text-[11px] font-bold text-slate-600 px-0.5">{t('products.form_cost_price')}</label>
+                                <div className="space-y-0.5">
+                                  <label className="block text-[10px] font-bold text-slate-600 px-0.5">{t('products.form_cost_price')}</label>
                                   <div className="relative group">
-                                    <Wallet className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 text-slate-400`} size={16} />
+                                    <Wallet className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
                                     <FormattedNumberInput 
                                       required 
                                       disabled={!canEditCostPrice || isReadOnly} 
-                                      className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2 bg-white border border-slate-200 rounded-xl text-base font-black text-slate-800 outline-none focus:ring-2 focus:ring-slate-500/20 transition-all`} 
+                                      className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-black text-slate-800 outline-none focus:ring-1 focus:ring-slate-500 transition-all`} 
                                       value={formData.cost_price || 0} 
                                       onChange={(val) => setFormData({ ...formData, cost_price: val })} 
                                     />
@@ -1717,21 +1717,21 @@ export const Products: React.FC = () => {
                               {formData.type !== 'service' && (
                                 <>
                                   {/* كمية المخزون */}
-                                  <div className="space-y-1">
-                                     <label className="block text-[11px] font-bold text-slate-600 px-0.5">{t('products.form_stock_quantity')}</label>
+                                  <div className="space-y-0.5">
+                                     <label className="block text-[10px] font-bold text-slate-600 px-0.5">{t('products.form_stock_quantity')}</label>
                                      <FormattedNumberInput 
                                        disabled 
-                                       className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 outline-none opacity-80 cursor-not-allowed" 
+                                       className="w-full px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 outline-none opacity-80 cursor-not-allowed" 
                                        value={formData.stock || 0} 
                                        onChange={(val) => setFormData({ ...formData, stock: val })} 
                                      />
                                   </div>
 
                                   {/* حد الطلب الأدنى */}
-                                  <div className="space-y-1">
-                                     <label className="block text-[11px] font-bold text-slate-600 px-0.5">{t('products.form_min_stock')}</label>
+                                  <div className="space-y-0.5">
+                                     <label className="block text-[10px] font-bold text-slate-600 px-0.5">{t('products.form_min_stock')}</label>
                                      <FormattedNumberInput 
-                                       className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-rose-500/20 transition-all" 
+                                       className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none focus:ring-1 focus:ring-rose-500 transition-all" 
                                        value={formData.min_stock || 0} 
                                        onChange={(val) => setFormData({ ...formData, min_stock: val })} 
                                      />
@@ -1742,43 +1742,43 @@ export const Products: React.FC = () => {
 
                            {/* Fractional Allowance Settings */}
                            {formData.type !== 'service' && (
-                             <div className="pt-2 border-t border-slate-200/60 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                               <div className="px-3 py-1.5 bg-white rounded-xl border border-slate-200/70 flex items-center justify-between gap-2">
+                             <div className="pt-1.5 border-t border-slate-200/60 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                               <div className="px-2.5 py-1 bg-white rounded-lg border border-slate-200/70 flex items-center justify-between gap-2">
                                  <div className="min-w-0">
-                                   <h4 className="text-xs font-bold text-slate-800 leading-tight">
+                                   <h4 className="text-[11px] font-bold text-slate-800 leading-tight">
                                      {t('products.allow_issue_fraction')}
                                    </h4>
-                                   <p className="text-[10px] text-slate-400 font-medium truncate">
+                                   <p className="text-[9px] text-slate-400 font-medium truncate">
                                      {t('products.allow_issue_fraction_desc')}
                                    </p>
                                  </div>
                                  <button
                                    type="button"
                                    onClick={() => setFormData({ ...formData, allow_issue_fraction: !formData.allow_issue_fraction })}
-                                   className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none ${formData.allow_issue_fraction ? 'bg-emerald-600' : 'bg-slate-200'}`}
+                                   className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors focus:outline-none ${formData.allow_issue_fraction ? 'bg-emerald-600' : 'bg-slate-200'}`}
                                  >
                                    <span
-                                     className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${formData.allow_issue_fraction ? (dir === 'rtl' ? '-translate-x-4.5' : 'translate-x-4.5') : (dir === 'rtl' ? '-translate-x-0.5' : 'translate-x-0.5')}`}
+                                     className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${formData.allow_issue_fraction ? (dir === 'rtl' ? '-translate-x-3.5' : 'translate-x-3.5') : (dir === 'rtl' ? '-translate-x-0.5' : 'translate-x-0.5')}`}
                                    />
                                  </button>
                                </div>
 
-                               <div className="px-3 py-1.5 bg-white rounded-xl border border-slate-200/70 flex items-center justify-between gap-2">
+                               <div className="px-2.5 py-1 bg-white rounded-lg border border-slate-200/70 flex items-center justify-between gap-2">
                                  <div className="min-w-0">
-                                   <h4 className="text-xs font-bold text-slate-800 leading-tight">
+                                   <h4 className="text-[11px] font-bold text-slate-800 leading-tight">
                                      {t('products.allow_receipt_fraction')}
                                    </h4>
-                                   <p className="text-[10px] text-slate-400 font-medium truncate">
+                                   <p className="text-[9px] text-slate-400 font-medium truncate">
                                      {t('products.allow_receipt_fraction_desc')}
                                    </p>
                                  </div>
                                  <button
                                    type="button"
                                    onClick={() => setFormData({ ...formData, allow_receipt_fraction: !formData.allow_receipt_fraction })}
-                                   className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none ${formData.allow_receipt_fraction ? 'bg-emerald-600' : 'bg-slate-200'}`}
+                                   className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors focus:outline-none ${formData.allow_receipt_fraction ? 'bg-emerald-600' : 'bg-slate-200'}`}
                                  >
                                    <span
-                                     className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${formData.allow_receipt_fraction ? (dir === 'rtl' ? '-translate-x-4.5' : 'translate-x-4.5') : (dir === 'rtl' ? '-translate-x-0.5' : 'translate-x-0.5')}`}
+                                     className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${formData.allow_receipt_fraction ? (dir === 'rtl' ? '-translate-x-3.5' : 'translate-x-3.5') : (dir === 'rtl' ? '-translate-x-0.5' : 'translate-x-0.5')}`}
                                    />
                                  </button>
                                </div>
@@ -1789,17 +1789,17 @@ export const Products: React.FC = () => {
 
                      {/* Stock Ledger Report Shortcut Banner */}
                      {editingProduct && formData.type !== 'service' && (
-                       <div className="p-3.5 bg-emerald-50/50 rounded-2xl border border-emerald-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-right">
-                         <div className="flex items-center gap-3">
-                           <div className="w-8 h-8 bg-emerald-100 text-emerald-700 rounded-lg flex items-center justify-center flex-shrink-0">
-                             <History size={16} />
+                       <div className="p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-right">
+                         <div className="flex items-center gap-2">
+                           <div className="w-6 h-6 bg-emerald-100 text-emerald-700 rounded flex items-center justify-center flex-shrink-0">
+                             <History size={13} />
                            </div>
                            <div>
-                             <h3 className="text-xs font-black text-slate-900 leading-none">
+                             <h3 className="text-[11px] font-bold text-slate-900 leading-none">
                                {language === 'ar' ? 'كارت حركة وتكلفة الصنف' : 'Product Stock Card'}
                              </h3>
-                             <p className="text-slate-500 text-[11px] font-medium mt-0.5">
-                               {language === 'ar' ? 'تحليل تفصيلي للحركات الواردة والمصروفة والأسعار والقيم المالية' : 'Detailed movement history and costing'}
+                             <p className="text-slate-500 text-[10px] font-medium mt-0.5">
+                               {language === 'ar' ? 'تحليل تفصيلي للحركات الواردة والمصروفة والأسعار' : 'Detailed movement history'}
                              </p>
                            </div>
                          </div>
@@ -1810,54 +1810,53 @@ export const Products: React.FC = () => {
                              setPendingViewDoc({ type: 'stock_card', idOrNumber: editingProduct.id });
                              setCurrentPage('stock_card_report');
                            }}
-                           className="px-4 py-1.5 bg-emerald-600 text-white hover:bg-emerald-700 rounded-xl transition-all font-bold text-xs flex items-center gap-1.5 shadow-2xs flex-shrink-0"
+                           className="px-3 py-1 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg transition-all font-bold text-[10px] flex items-center gap-1 shadow-2xs flex-shrink-0"
                          >
-                           <History size={14} />
+                           <History size={12} />
                            <span>{language === 'ar' ? 'عرض كارت الصنف الكامل 📊' : 'View Stock Card'}</span>
                          </button>
                        </div>
                      )}
 
                      {/* Media & Barcode Section */}
-                     <div className="space-y-3">
-                        <div className="flex items-center gap-2.5 border-b border-slate-100 pb-2">
-                           <div className="w-7 h-7 bg-sky-50 text-sky-600 rounded-lg flex items-center justify-center">
-                              <Camera size={15} />
+                     <div className="space-y-2">
+                        <div className="flex items-center gap-1.5 border-b border-slate-100 pb-1">
+                           <div className="w-5 h-5 bg-sky-50 text-sky-600 rounded flex items-center justify-center">
+                              <Camera size={12} />
                            </div>
-                           <h2 className="text-sm font-black text-slate-900 leading-none uppercase">
+                           <h2 className="text-xs font-bold text-slate-800 leading-none uppercase">
                               {language === 'ar' ? 'الوسائط والباركود' : 'Media & Barcode'}
                            </h2>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-right">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-right">
                            <div>
-                              <label className="block text-[11px] font-bold text-slate-500 mb-1 px-0.5">{t('products.form_attachment')}</label>
+                              <label className="block text-[10px] font-bold text-slate-500 mb-0.5 px-0.5">{t('products.form_attachment')}</label>
                               <div className="relative group">
                                 <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" id="product-attachment" />
                                 <label 
                                   htmlFor="product-attachment" 
-                                  className="relative flex flex-col items-center justify-center gap-2 w-full h-24 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:bg-slate-100 hover:border-emerald-300 transition-all overflow-hidden"
+                                  className="relative flex flex-col items-center justify-center gap-1 w-full h-16 bg-slate-50 border border-dashed border-slate-200 rounded-lg cursor-pointer hover:bg-slate-100 hover:border-emerald-300 transition-all overflow-hidden"
                                 >
                                   {formData.image_url ? (
                                     <>
                                       <img 
                                         src={formData.image_url} 
                                         alt="Product preview" 
-                                        className="absolute inset-0 w-full h-full object-cover rounded-xl" 
+                                        className="absolute inset-0 w-full h-full object-cover rounded-lg" 
                                         referrerPolicy="no-referrer"
                                       />
-                                      <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white rounded-xl">
-                                        <Camera size={16} />
-                                        <span className="text-xs font-bold">{t('common.edit')}</span>
+                                      <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white rounded-lg">
+                                        <Camera size={14} />
+                                        <span className="text-[10px] font-bold">{t('common.edit')}</span>
                                       </div>
                                     </>
                                   ) : (
                                     <>
-                                      <div className="w-8 h-8 bg-white rounded-lg shadow-2xs flex items-center justify-center text-slate-400 group-hover:text-emerald-500 transition-all">
-                                        <Camera size={16} />
+                                      <div className="w-6 h-6 bg-white rounded shadow-2xs flex items-center justify-center text-slate-400 group-hover:text-emerald-500 transition-all">
+                                        <Camera size={13} />
                                       </div>
                                       <div className="text-center">
-                                        <span className="text-xs font-bold text-slate-600 block leading-tight">اضغط لإضافة صورة</span>
-                                        <span className="text-[10px] text-slate-400">JPG, PNG, WEBP (Max 2MB)</span>
+                                        <span className="text-[10px] font-bold text-slate-600 block leading-tight">إضافة صورة (JPG, PNG)</span>
                                       </div>
                                     </>
                                   )}
@@ -1865,57 +1864,57 @@ export const Products: React.FC = () => {
                               </div>
                            </div>
 
-                           <div className="space-y-2">
-                              <div className="space-y-1">
-                                 <label className="block text-[11px] font-bold text-slate-500 px-0.5">{t('products.form_barcode')}</label>
-                                 <div className="flex items-center gap-2">
+                           <div className="space-y-1.5">
+                              <div className="space-y-0.5">
+                                 <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_barcode')}</label>
+                                 <div className="flex items-center gap-1.5">
                                    <input 
                                      type="text" 
-                                     className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-bold outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all" 
+                                     className="flex-1 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-bold outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all" 
                                      value={formData.barcode} 
                                      onChange={(e) => setFormData({ ...formData, barcode: e.target.value })} 
                                    />
                                    <button 
                                      type="button" 
                                      onClick={handleOpenBarcodeSettings} 
-                                     className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-xl transition-all flex items-center justify-center" 
+                                     className="p-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg transition-all flex items-center justify-center" 
                                      title={language === 'ar' ? 'إعدادات الباركود' : 'Barcode Settings'}
                                    >
-                                     <Settings size={16} />
+                                     <Settings size={13} />
                                    </button>
                                    <button 
                                      type="button" 
                                      disabled={!formData.barcode} 
                                      onClick={handleOpenPrintBarcode} 
-                                     className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-xl transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed" 
+                                     className="p-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed" 
                                      title={language === 'ar' ? 'طباعة الباركود' : 'Print Barcode'}
                                    >
-                                     <Printer size={16} />
+                                     <Printer size={13} />
                                    </button>
                                  </div>
                               </div>
                               {formData.barcode && (
-                                <div className="p-2 bg-white border border-slate-200 rounded-xl flex justify-center shadow-2xs overflow-hidden">
+                                <div className="p-1.5 bg-white border border-slate-200 rounded-lg flex justify-center shadow-2xs overflow-hidden">
                                    {(() => {
                                      const s = getProductBarcodeSettings(formData);
                                      const isValid = isValidBarcodeValue(formData.barcode, s.type);
                                      if (!isValid) {
-                                       return <div className="text-rose-500 font-bold text-xs text-center">{language === 'ar' ? 'رمز باركود غير صالح لهذا النوع' : 'Invalid barcode'}</div>;
+                                       return <div className="text-rose-500 font-bold text-[10px] text-center">{language === 'ar' ? 'رمز باركود غير صالح لهذا النوع' : 'Invalid barcode'}</div>;
                                      }
                                      return s.type === 'QR_CODE' ? (
-                                       <QRCode value={formData.barcode} size={Math.min(Number(s.height) || 40, 48)} />
+                                       <QRCode value={formData.barcode} size={Math.min(Number(s.height) || 32, 36)} />
                                      ) : (
                                        <Barcode 
                                          value={formData.barcode} 
                                          format={s.type as any} 
-                                         width={Number(s.width) || 1.4} 
-                                         height={Math.min(Number(s.height) || 30, 36)} 
-                                         fontSize={9} 
+                                         width={Number(s.width) || 1.2} 
+                                         height={Math.min(Number(s.height) || 24, 26)} 
+                                         fontSize={8} 
                                          displayValue={s.displayValue}
-                                         marginTop={2}
-                                         marginBottom={2}
-                                         marginLeft={3}
-                                         marginRight={3}
+                                         marginTop={1}
+                                         marginBottom={1}
+                                         marginLeft={2}
+                                         marginRight={2}
                                        />
                                      );
                                    })()}
@@ -1926,22 +1925,22 @@ export const Products: React.FC = () => {
                      </div>
 
                      {/* Accounting Section */}
-                     <div className="space-y-3">
-                        <div className="flex items-center gap-2.5 border-b border-slate-100 pb-2">
-                           <div className="w-7 h-7 bg-slate-100 text-slate-600 rounded-lg flex items-center justify-center">
-                              <LayoutGrid size={15} />
+                     <div className="space-y-2">
+                        <div className="flex items-center gap-1.5 border-b border-slate-100 pb-1">
+                           <div className="w-5 h-5 bg-slate-100 text-slate-600 rounded flex items-center justify-center">
+                              <LayoutGrid size={12} />
                            </div>
-                           <h2 className="text-sm font-black text-slate-900 leading-none uppercase">
+                           <h2 className="text-xs font-bold text-slate-800 leading-none uppercase">
                               {language === 'ar' ? 'الإعدادات المحاسبية' : 'Accounting Setup'}
                            </h2>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-right">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-right">
                            {/* حساب الإيرادات */}
-                           <div className="space-y-1">
-                              <label className="block text-[11px] font-bold text-slate-500 px-0.5">{t('products.form_revenue_account')}</label>
+                           <div className="space-y-0.5">
+                              <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_revenue_account')}</label>
                               <select 
                                 required 
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold appearance-none outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all" 
+                                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold appearance-none outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all" 
                                 value={formData.revenue_account_id} 
                                 onChange={(e) => setFormData({ ...formData, revenue_account_id: e.target.value })}
                               >
@@ -1951,11 +1950,11 @@ export const Products: React.FC = () => {
                            </div>
 
                            {/* حساب تكلفة المبيعات */}
-                           <div className="space-y-1">
-                              <label className="block text-[11px] font-bold text-slate-500 px-0.5">{t('products.form_cost_account')}</label>
+                           <div className="space-y-0.5">
+                              <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_cost_account')}</label>
                               <select 
                                 required 
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold appearance-none outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all" 
+                                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold appearance-none outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all" 
                                 value={formData.cost_account_id} 
                                 onChange={(e) => setFormData({ ...formData, cost_account_id: e.target.value })}
                               >
@@ -1967,13 +1966,13 @@ export const Products: React.FC = () => {
                            {/* حساب المخزون */}
                            {['finished_good', 'raw_material', 'commodity', 'consumable'].includes(formData.type) && (
                              <>
-                               <div className="space-y-1">
-                                 <label className="block text-[11px] font-bold text-slate-500 px-0.5">
+                               <div className="space-y-0.5">
+                                 <label className="block text-[10px] font-bold text-slate-500 px-0.5">
                                    {t('products.form_inventory_account')} <span className="text-rose-500 font-bold">*</span>
                                  </label>
                                  <select 
                                    required
-                                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold appearance-none outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all" 
+                                   className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold appearance-none outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all" 
                                    value={formData.inventory_account_id} 
                                    onChange={(e) => setFormData({ ...formData, inventory_account_id: e.target.value })}
                                  >
@@ -1983,12 +1982,12 @@ export const Products: React.FC = () => {
                                </div>
 
                                {/* طريقة تقييم المخزون */}
-                               <div className="space-y-1">
-                                 <label className="block text-[11px] font-bold text-slate-500 px-0.5">
+                               <div className="space-y-0.5">
+                                 <label className="block text-[10px] font-bold text-slate-500 px-0.5">
                                    {t('company_settings.inventory_cost_method')}
                                  </label>
                                  <select 
-                                   className={`w-full px-3 py-2 border rounded-xl text-sm font-bold appearance-none outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all ${
+                                   className={`w-full px-2.5 py-1.5 border rounded-lg text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all ${
                                      editingProduct 
                                        ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' 
                                        : 'bg-slate-50 text-slate-900 border-slate-200 focus:bg-white'
@@ -2008,12 +2007,12 @@ export const Products: React.FC = () => {
                            {/* VAT Fields if Company is VAT registered */}
                            {isVatEnabled && (
                              <>
-                               <div className="space-y-1">
-                                 <label className="block text-[11px] font-bold text-slate-500 px-0.5">
+                               <div className="space-y-0.5">
+                                 <label className="block text-[10px] font-bold text-slate-500 px-0.5">
                                    {t('products.form_vat_account')}
                                  </label>
                                  <select 
-                                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold appearance-none outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all" 
+                                   className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold appearance-none outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all" 
                                    value={formData.vat_account_id} 
                                    onChange={(e) => setFormData({ ...formData, vat_account_id: e.target.value })}
                                  >
@@ -2022,8 +2021,8 @@ export const Products: React.FC = () => {
                                  </select>
                                </div>
 
-                               <div className="space-y-1">
-                                 <label className="block text-[11px] font-bold text-slate-500 px-0.5">
+                               <div className="space-y-0.5">
+                                 <label className="block text-[10px] font-bold text-slate-500 px-0.5">
                                    {t('products.form_vat_rate')}
                                  </label>
                                  <div className="relative">
@@ -2033,11 +2032,11 @@ export const Products: React.FC = () => {
                                      min="0" 
                                      max="100" 
                                      placeholder="0" 
-                                     className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all text-left" 
+                                     className="w-full pl-2.5 pr-6 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all text-left" 
                                      value={formData.vat_rate || ''} 
                                      onChange={(e) => setFormData({ ...formData, vat_rate: parseFloat(e.target.value) || 0 })} 
                                    />
-                                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-rose-500 font-extrabold text-sm select-none pointer-events-none">
+                                   <span className="absolute right-2 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs select-none pointer-events-none">
                                      %
                                    </span>
                                  </div>
@@ -2046,22 +2045,22 @@ export const Products: React.FC = () => {
                            )}
 
                            {/* Active / Inactive Status Toggle */}
-                           <div className="sm:col-span-2 lg:col-span-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+                           <div className="sm:col-span-2 lg:col-span-3 pt-1.5 border-t border-slate-100 flex items-center justify-between">
                              <div>
-                               <h4 className="text-xs font-bold text-slate-800 leading-none mb-0.5">
+                               <h4 className="text-[11px] font-bold text-slate-800 leading-none">
                                  {language === 'ar' ? 'حالة النشاط' : 'Active Status'}
                                </h4>
-                               <p className="text-[10px] text-slate-400 font-medium">
+                               <p className="text-[9px] text-slate-400 font-medium">
                                  {language === 'ar' ? 'تحديد ما إذا كان الصنف نشطاً في النظام أم لا' : 'Specify if the product is active in the system'}
                                </p>
                              </div>
                              <button
                                type="button"
                                onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
-                               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${formData.is_active ? 'bg-emerald-600' : 'bg-slate-200'}`}
+                               className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors focus:outline-none ${formData.is_active ? 'bg-emerald-600' : 'bg-slate-200'}`}
                              >
                                <span
-                                 className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${formData.is_active ? (dir === 'rtl' ? '-translate-x-4.5' : 'translate-x-4.5') : (dir === 'rtl' ? '-translate-x-0.5' : 'translate-x-0.5')}`}
+                                 className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${formData.is_active ? (dir === 'rtl' ? '-translate-x-3.5' : 'translate-x-3.5') : (dir === 'rtl' ? '-translate-x-0.5' : 'translate-x-0.5')}`}
                                />
                              </button>
                            </div>
@@ -2069,21 +2068,21 @@ export const Products: React.FC = () => {
                      </div>
 
                      {/* Sticky Bottom Actions */}
-                     <div className="px-4 py-3 flex flex-wrap items-center justify-end gap-2.5 sticky bottom-0 bg-white/95 backdrop-blur-md z-30 border-t border-slate-100 mt-4">
+                     <div className="px-3 py-2 flex flex-wrap items-center justify-end gap-2 sticky bottom-0 bg-white/95 backdrop-blur-md z-30 border-t border-slate-100 mt-2">
                        {pendingEtaProductForCreation && (
                          <button 
                            type="submit" 
                            onClick={() => setLinkWithEta(true)}
-                           className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl font-bold text-xs hover:from-emerald-700 hover:to-teal-700 transition-all shadow-sm active:scale-[0.98] border border-emerald-400/40 flex items-center gap-1.5"
+                           className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg font-bold text-xs hover:from-emerald-700 hover:to-teal-700 transition-all shadow-xs active:scale-[0.98] border border-emerald-400/40 flex items-center gap-1"
                          >
-                           <Link2 className="w-4 h-4" />
+                           <Link2 className="w-3.5 h-3.5" />
                            <span>{language === 'ar' ? 'حفظ وربط مع منظومة ETA فوراً' : 'Save & Link to ETA'}</span>
                          </button>
                        )}
                        <button 
                          type="submit" 
                          onClick={() => setLinkWithEta(false)}
-                         className="px-6 py-2 bg-zinc-900 text-white rounded-xl font-bold text-xs hover:bg-zinc-800 transition-all shadow-sm active:scale-[0.98]"
+                         className="px-5 py-1.5 bg-zinc-900 text-white rounded-lg font-bold text-xs hover:bg-zinc-800 transition-all shadow-xs active:scale-[0.98]"
                        >
                          {editingProduct ? t('common.save') : (pendingEtaProductForCreation ? (language === 'ar' ? 'حفظ عادي' : 'Save Normal') : t('common.add'))}
                        </button>
