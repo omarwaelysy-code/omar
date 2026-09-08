@@ -766,7 +766,21 @@ export const Employees: React.FC = () => {
                                   <Trash2 size={12} />
                                 </button>
                               )}
-               ) : (
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {filteredEmployees.length === 0 && !loading && (
+                        <div className="col-span-full py-8 text-center text-slate-400 font-bold text-xs italic">{t('common.no_data')}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden animate-in slide-in-from-bottom-2 duration-300 flex flex-col flex-1 relative w-full">
           {/* Form Header */}
           <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-[70]">
