@@ -1338,46 +1338,6 @@ export const Suppliers: React.FC = () => {
                 </div>
               )}
           </motion.div>
-        )}
-      </AnimatePresence>ي الحفظ...' : 'Saving...'}</span>
-                          </>
-                        ) : (
-                          editingSupplier ? 'حفظ التعديلات' : (pendingEtaSupplierForCreation ? (language === 'ar' ? 'حفظ المورد فقط (بدون ربط)' : 'Save Only') : 'إضافة المورد')
-                        )}
-                      </button>
-                      <button 
-                        type="button"
-                        disabled={isSaving}
-                        onClick={closeModal}
-                        className="px-12 py-6 bg-slate-50 text-slate-400 rounded-[2rem] font-black text-xl hover:bg-slate-100 hover:text-slate-600 transition-all active:scale-[0.98] border border-slate-200 disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        تجاهل
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-
-              {editingSupplier && (
-                <div className="hidden xl:block w-[450px] border-s border-slate-100 bg-white overflow-hidden flex flex-col">
-                  <div className="p-8 border-b border-slate-50 bg-white">
-                    <div className="flex items-center gap-4">
-                       <div className="w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center shadow-lg">
-                          <History size={24} />
-                       </div>
-                       <div>
-                          <h4 className="text-xl font-black text-slate-900 tracking-tight">سجل الرقابة</h4>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">تتبع التغييرات لهذا المورد</p>
-                       </div>
-                    </div>
-                  </div>
-                  <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
-                    <InlineActivityLog category="suppliers" documentId={editingSupplier.id} />
-                  </div>
-                </div>
-              )}
-          </motion.div>
-        )}
       </AnimatePresence>
     </div>
 

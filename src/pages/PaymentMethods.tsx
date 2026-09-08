@@ -825,27 +825,6 @@ export const PaymentMethods: React.FC = () => {
               )}
             </div>
           </motion.div>
-        )}
-      </AnimatePresence>g:flex w-[400px] flex-col bg-slate-50 border-s border-slate-100 overflow-hidden shadow-inner">
-                  <div className="p-10 border-b border-slate-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10 text-right">
-                     <div className="flex items-center gap-4">
-                         <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-400">
-                           <History size={24} />
-                         </div>
-                         <div>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">النشاط الأخير</span>
-                            <h3 className="font-black text-slate-900 text-lg">سجل التعديلات</h3>
-                         </div>
-                      </div>
-                  </div>
-                  <div className="flex-1 overflow-y-auto custom-scrollbar">
-                     <InlineActivityLog category="payment_methods" documentId={editingMethod.id} />
-                  </div>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
       </AnimatePresence>
 
       <PageActivityLog category="payment_methods" isOpen={isActivityLogOpen} onClose={() => setIsActivityLogOpen(false)} />

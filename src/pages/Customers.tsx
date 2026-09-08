@@ -617,11 +617,27 @@ export const Customers: React.FC = () => {
                            <Wallet size={15} />
                         </div>
                       </div>
-                      
                       <div className="pt-2 border-t border-slate-100 flex justify-between items-end relative z-10">
                         <div>
                           <p className="text-slate-400 text-[9px] uppercase font-bold">الرصيد الحالي</p>
-                          <p className={`font-black text-base leading-tight ${getCustomerBalance(customer.id) >= 0 ? 'text-emerald-600' : 'text-ro      {/* Integrated Side Panel Form */}
+                          <p className={`font-black text-base leading-tight ${getCustomerBalance(customer.id) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {formatBalance(getCustomerBalance(customer.id))}
+                          </p>
+                        </div>
+                        <div className="p-1 text-slate-300 group-hover:text-emerald-600 transition-colors">
+                          {dir === 'rtl' ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Integrated Side Panel Form */}
       <AnimatePresence mode="wait">
         {isModalOpen && (
           <motion.div 
