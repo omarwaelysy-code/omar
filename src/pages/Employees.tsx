@@ -486,29 +486,29 @@ export const Employees: React.FC = () => {
   }
 
   return (
-    <div className="h-full flex flex-col space-y-6 animate-in fade-in duration-500 overflow-hidden" dir={dir}>
+    <div className="h-full flex flex-col space-y-2 animate-in fade-in duration-500 overflow-hidden w-full px-1 sm:px-3 py-1" dir={dir}>
       {!isModalOpen ? (
         <>
           {/* Header Panel */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-emerald-600 text-white rounded-3xl flex items-center justify-center shadow-xl shadow-emerald-500/20">
-                <User size={28} />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 px-1 py-1">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-md shadow-emerald-500/20 flex-shrink-0">
+                <User size={18} />
               </div>
               <div>
-                <h2 className="text-3xl font-black tracking-tight text-slate-900 italic serif">{t('employees.title')}</h2>
-                <p className="text-slate-500 font-medium">{t('employees.subtitle')}</p>
+                <h2 className="text-xl font-black tracking-tight text-slate-900 leading-tight">{t('employees.title')}</h2>
+                <p className="text-slate-500 font-medium text-xs">{t('employees.subtitle')}</p>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <button 
                 onClick={() => {
                   setActivityLogDocumentId(undefined);
                   setIsActivityLogOpen(true);
                 }}
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+                className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white text-slate-600 border border-slate-200 rounded-lg font-bold text-xs hover:bg-slate-50 transition-all active:scale-95 shadow-xs"
               >
-                <History size={20} />
+                <History size={15} />
                 <span className="hidden md:inline">{language === 'ar' ? 'سجل النشاط' : 'Activity Log'}</span>
               </button>
               <ExportButtons 
@@ -517,18 +517,18 @@ export const Employees: React.FC = () => {
               />
               <button
                 onClick={() => setShowImportWizard(true)}
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-emerald-700 border border-emerald-300 rounded-2xl font-bold hover:bg-emerald-50 transition-all active:scale-95 shadow-sm"
+                className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white text-emerald-700 border border-emerald-300 rounded-lg font-bold text-xs hover:bg-emerald-50 transition-all active:scale-95 shadow-xs"
                 title="استيراد من Excel"
               >
-                <FileUp size={18} />
+                <FileUp size={15} />
                 <span className="hidden md:inline">استيراد Excel</span>
               </button>
               {canCreate && (
                 <button 
                   onClick={() => openModal()}
-                  className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95 border border-emerald-500/50"
+                  className="flex items-center justify-center gap-1.5 px-4 py-1.5 bg-emerald-600 text-white rounded-lg font-bold text-xs hover:bg-emerald-700 transition-all shadow-md shadow-emerald-500/20 active:scale-95 border border-emerald-500/50"
                 >
-                  <Plus size={20} />
+                  <Plus size={16} />
                   {t('employees.add_new')}
                 </button>
               )}
@@ -536,46 +536,46 @@ export const Employees: React.FC = () => {
           </div>
 
           {/* Main List Area */}
-          <div className="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden pb-4">
-            <div className="flex-1 flex flex-col w-full">
+          <div className="flex-1 flex flex-col gap-2 overflow-hidden pb-1">
+            <div className="flex-1 flex flex-col w-full overflow-hidden">
               {/* Filters and Search Bar */}
-              <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full">
-                <div className="p-6 border-b border-slate-100 flex flex-col gap-4 bg-slate-50/30">
-                  <div className="flex flex-col md:flex-row gap-4 items-center">
+              <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col h-full">
+                <div className="p-2 border-b border-slate-100 flex flex-col gap-2 bg-slate-50/30">
+                  <div className="flex flex-col md:flex-row gap-2 items-center">
                     {/* Search */}
                     <div className="relative flex-1 w-full group">
-                      <Search className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors pointer-events-none`} size={20} />
+                      <Search className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2 text-slate-400 group-focus-within:text-emerald-500 transition-colors pointer-events-none`} size={15} />
                       <input
                         type="text"
                         placeholder={t('employees.search_placeholder')}
-                        className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none transition-all font-bold text-slate-900 placeholder:text-slate-400 shadow-sm`}
+                        className={`w-full ${dir === 'rtl' ? 'pr-8 pl-3' : 'pl-8 pr-3'} py-1.5 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-emerald-500 outline-none transition-all font-bold text-xs text-slate-900 placeholder:text-slate-400`}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                       />
                     </div>
 
                     {/* View Switch */}
-                    <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
+                    <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 shadow-inner">
                       <button
                         onClick={() => setView('table')}
-                        className={`p-2 rounded-xl transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`p-1.5 rounded-md transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-xs border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}
                       >
-                        <List size={22} />
+                        <List size={16} />
                       </button>
                       <button
                         onClick={() => setView('card')}
-                        className={`p-2 rounded-xl transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`p-1.5 rounded-md transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-xs border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}
                       >
-                        <LayoutGrid size={22} />
+                        <LayoutGrid size={16} />
                       </button>
                     </div>
                   </div>
 
                   {/* Advanced Filter Pills */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <div>
                       <select
-                        className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none font-bold text-xs bg-white"
+                        className="w-full px-2.5 py-1 border border-slate-200 rounded-lg outline-none font-bold text-xs bg-white"
                         value={filterGender}
                         onChange={(e) => setFilterGender(e.target.value)}
                       >
@@ -586,7 +586,7 @@ export const Employees: React.FC = () => {
                     </div>
                     <div>
                       <select
-                        className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none font-bold text-xs bg-white"
+                        className="w-full px-2.5 py-1 border border-slate-200 rounded-lg outline-none font-bold text-xs bg-white"
                         value={filterContractType}
                         onChange={(e) => setFilterContractType(e.target.value)}
                       >
@@ -597,7 +597,7 @@ export const Employees: React.FC = () => {
                     </div>
                     <div>
                       <select
-                        className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none font-bold text-xs bg-white"
+                        className="w-full px-2.5 py-1 border border-slate-200 rounded-lg outline-none font-bold text-xs bg-white"
                         value={filterNationality}
                         onChange={(e) => setFilterNationality(e.target.value)}
                       >
@@ -615,19 +615,19 @@ export const Employees: React.FC = () => {
                   {view === 'table' ? (
                     <div className="hidden md:block overflow-x-auto h-full">
                       <table ref={tableRef} className="w-full">
-                        <thead className="sticky top-0 bg-white/80 backdrop-blur-md z-10 border-b border-slate-100">
-                          <tr className="text-slate-500 text-[10px] uppercase font-black tracking-[0.2em]">
-                            <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_code')}</th>
-                            <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_name')}</th>
-                            <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الوظيفة' : 'Job Title'}</th>
-                            <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الإدارة' : 'Department'}</th>
-                            <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_nationality')}</th>
-                            <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_national_id')}</th>
-                            <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_contract_type')}</th>
-                            <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.actions')}</th>
+                        <thead className="sticky top-0 bg-white/90 backdrop-blur-md z-10 border-b border-slate-100">
+                          <tr className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">
+                            <th className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_code')}</th>
+                            <th className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_name')}</th>
+                            <th className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الوظيفة' : 'Job Title'}</th>
+                            <th className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الإدارة' : 'Department'}</th>
+                            <th className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_nationality')}</th>
+                            <th className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_national_id')}</th>
+                            <th className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('employees.column_contract_type')}</th>
+                            <th className={`px-4 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.actions')}</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-50">
+                        <tbody className="divide-y divide-slate-100">
                           {filteredEmployees.map((emp) => {
                             const nat = COUNTRIES.find(c => c.code === emp.nationality);
                             return (
@@ -636,60 +636,60 @@ export const Employees: React.FC = () => {
                                 onClick={() => setViewingEmployee(emp)}
                                 className="hover:bg-emerald-50/40 transition-all group cursor-pointer"
                               >
-                                <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                  <span className="font-mono text-[10px] bg-slate-100 px-3 py-1 rounded-lg text-slate-500 font-black border border-slate-200 group-hover:border-emerald-200 group-hover:text-emerald-600 transition-all">
+                                <td className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  <span className="font-mono text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-bold border border-slate-200 group-hover:border-emerald-200 group-hover:text-emerald-700 transition-all">
                                     {emp.employee_code}
                                   </span>
                                 </td>
-                                <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                  <div className="flex items-center gap-3">
+                                <td className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  <div className="flex items-center gap-2">
                                     {emp.photo_url ? (
-                                      <img src={emp.photo_url} alt="" className="w-10 h-10 rounded-xl object-cover border border-slate-200" />
+                                      <img src={emp.photo_url} alt="" className="w-7 h-7 rounded-lg object-cover border border-slate-200" />
                                     ) : (
-                                      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-500">
+                                      <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center font-bold text-slate-500 text-xs">
                                         {emp.name[0]}
                                       </div>
                                     )}
-                                    <span className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors">{emp.name}</span>
+                                    <span className="font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors">{emp.name}</span>
                                   </div>
                                 </td>
-                                <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                  <span className="text-sm font-bold text-slate-700">{emp.job_title || '-'}</span>
+                                <td className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  <span className="text-xs font-medium text-slate-700">{emp.job_title || '-'}</span>
                                 </td>
-                                <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                  <span className="text-sm font-bold text-slate-700">
+                                <td className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  <span className="text-xs font-medium text-slate-700">
                                     {departments.find(d => d.id === emp.department_id)?.name || '-'}
                                   </span>
                                 </td>
-                                <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                  <span className="text-sm font-bold">
+                                <td className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  <span className="text-xs font-bold">
                                     {nat?.flag} {language === 'ar' ? nat?.name_ar : nat?.name_en}
                                   </span>
                                 </td>
-                                <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                  <span className="text-sm font-bold font-mono text-slate-500">{emp.national_id || '-'}</span>
+                                <td className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  <span className="text-xs font-medium font-mono text-slate-500">{emp.national_id || '-'}</span>
                                 </td>
-                                <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${emp.contract_type === 'permanent' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                <td className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${emp.contract_type === 'permanent' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
                                     {emp.contract_type === 'permanent' ? t('employees.contract_permanent') : t('employees.contract_temporary')}
                                   </span>
                                 </td>
-                                <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                                  <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-all`}>
+                                <td className={`px-4 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                                  <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1 opacity-0 group-hover:opacity-100 transition-all`}>
                                     {canEdit && (
                                       <button
                                         onClick={(e) => { e.stopPropagation(); openModal(emp); }}
-                                        className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                                        className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
                                       >
-                                        <Edit2 size={18} />
+                                        <Edit2 size={14} />
                                       </button>
                                     )}
                                     {canDelete && (
                                       <button 
                                         onClick={(e) => { e.stopPropagation(); handleDelete(emp.id); }}
-                                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
                                       >
-                                        <Trash2 size={18} />
+                                        <Trash2 size={14} />
                                       </button>
                                     )}
                                   </div>
@@ -700,97 +700,83 @@ export const Employees: React.FC = () => {
                         </tbody>
                       </table>
                       {filteredEmployees.length === 0 && !loading && (
-                        <div className="p-20 text-center flex flex-col items-center gap-4">
-                          <div className="w-20 h-20 bg-slate-50 text-slate-200 rounded-full flex items-center justify-center">
-                            <Search size={40} />
+                        <div className="p-8 text-center flex flex-col items-center gap-2">
+                          <div className="w-12 h-12 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center">
+                            <Search size={24} />
                           </div>
-                          <p className="text-slate-400 font-black text-lg italic tracking-tighter">{t('common.no_data')}</p>
+                          <p className="text-slate-400 font-bold text-xs italic">{t('common.no_data')}</p>
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="p-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                    <div className="p-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
                       {filteredEmployees.map((emp) => {
                         const nat = COUNTRIES.find(c => c.code === emp.nationality);
                         return (
                           <div 
                             key={emp.id} 
                             onClick={() => setViewingEmployee(emp)}
-                            className="p-6 space-y-4 rounded-3xl border border-slate-100 bg-slate-50/30 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 hover:bg-white transition-all cursor-pointer group relative overflow-hidden"
+                            className="p-3 space-y-2 rounded-xl border border-slate-100 bg-slate-50/30 hover:border-emerald-200 hover:shadow-md hover:bg-white transition-all cursor-pointer group relative overflow-hidden"
                           >
                             <div className="flex justify-between items-start">
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2">
                                 {emp.photo_url ? (
-                                  <img src={emp.photo_url} alt="" className="w-14 h-14 rounded-2xl object-cover border border-slate-200" />
+                                  <img src={emp.photo_url} alt="" className="w-9 h-9 rounded-xl object-cover border border-slate-200" />
                                 ) : (
-                                  <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center font-bold text-slate-500 text-xl">
+                                  <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-500 text-sm">
                                     {emp.name[0]}
                                   </div>
                                 )}
                                 <div>
-                                  <h4 className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors text-lg leading-tight">{emp.name}</h4>
-                                  <p className="text-xs text-slate-500 font-bold mt-1">
+                                  <h4 className="font-bold text-slate-900 group-hover:text-emerald-700 transition-colors text-xs leading-tight">{emp.name}</h4>
+                                  <p className="text-[10px] text-slate-500 font-medium mt-0.5">
                                     {emp.job_title ? `${emp.job_title} | ` : ''}
                                     {departments.find(d => d.id === emp.department_id)?.name || ''}
                                   </p>
-                                  <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded text-slate-400 font-black border border-slate-200 inline-block mt-1">
+                                  <span className="font-mono text-[9px] bg-white px-1.5 py-0.2 rounded text-slate-400 font-bold border border-slate-200 inline-block mt-0.5">
                                     {emp.employee_code}
                                   </span>
                                 </div>
                               </div>
-                              <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${emp.contract_type === 'permanent' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${emp.contract_type === 'permanent' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
                                 {emp.contract_type === 'permanent' ? t('employees.contract_permanent') : t('employees.contract_temporary')}
                               </span>
                             </div>
 
-                            <div className="pt-4 border-t border-slate-200/50 flex justify-between items-center text-xs text-slate-500 font-bold">
+                            <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-500 font-medium">
                               <span>{nat?.flag} {language === 'ar' ? nat?.name_ar : nat?.name_en}</span>
                               <span className="font-mono">{emp.national_id || '-'}</span>
                             </div>
 
                             {/* Card Hover Action Buttons Overlay */}
-                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all bg-white/90 backdrop-blur rounded-xl p-1 shadow-sm">
+                            <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-all bg-white/95 backdrop-blur rounded-lg p-0.5 shadow-xs border border-slate-100">
                               {canEdit && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); openModal(emp); }}
-                                  className="p-1.5 text-slate-500 hover:text-emerald-600 rounded-lg"
+                                  className="p-1 text-slate-500 hover:text-emerald-600 rounded"
                                 >
-                                  <Edit2 size={14} />
+                                  <Edit2 size={12} />
                                 </button>
                               )}
                               {canDelete && (
                                 <button 
                                   onClick={(e) => { e.stopPropagation(); handleDelete(emp.id); }}
-                                  className="p-1.5 text-slate-500 hover:text-rose-600 rounded-lg"
+                                  className="p-1 text-slate-500 hover:text-rose-600 rounded"
                                 >
-                                  <Trash2 size={14} />
+                                  <Trash2 size={12} />
                                 </button>
                               )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {filteredEmployees.length === 0 && !loading && (
-                        <div className="col-span-full py-20 text-center text-slate-400 font-black italic tracking-tighter">{t('common.no_data')}</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      ) : (
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
+               ) : (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden animate-in slide-in-from-bottom-2 duration-300 flex flex-col flex-1 relative w-full">
           {/* Form Header */}
-          <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[70]">
-            <div className="flex items-center gap-3">
+          <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-[70]">
+            <div className="flex items-center gap-2">
               <button 
                 type="button"
                 onClick={closeModal} 
-                className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all font-black text-sm"
+                className="flex items-center gap-1 px-3 py-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all font-bold text-xs"
               >
-                {dir === 'rtl' ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+                {dir === 'rtl' ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
                 <span>{language === 'ar' ? 'العودة للقائمة' : 'Back to List'}</span>
               </button>
             </div>
@@ -802,54 +788,54 @@ export const Employees: React.FC = () => {
                   setActivityLogDocumentId(editingEmployee?.id || undefined);
                   setIsActivityLogOpen(true);
                 }}
-                className="flex items-center gap-3 px-6 py-2.5 rounded-2xl text-sm font-black transition-all border shadow-sm bg-white text-slate-700 border-slate-200 hover:bg-zinc-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border shadow-xs bg-white text-slate-700 border-slate-200 hover:bg-zinc-50"
               >
-                <History size={18} />
+                <History size={14} />
                 <span>{language === 'ar' ? 'سجل النشاط والتعديلات' : 'Activity Log'}</span>
               </button>
             </div>
 
             <div>
-              <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
+              <h3 className="text-sm font-black text-slate-900 tracking-tight">
                 {editingEmployee ? t('employees.edit') : t('employees.add_new')}
               </h3>
             </div>
           </div>
 
           {/* Form Content */}
-          <div className="flex-grow overflow-y-auto custom-scrollbar p-6">
-            <form id="employee-form" onSubmit={handleSubmit} className="space-y-8 max-w-4xl mx-auto">
+          <div className="flex-grow overflow-y-auto custom-scrollbar p-3 md:p-4">
+            <form id="employee-form" onSubmit={handleSubmit} className="space-y-3 w-full">
               
               {/* Section 1: الصورة والبيانات الشخصية */}
-              <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50/50 px-3 py-1 rounded-full border border-emerald-100">
-                  <User className="w-4 h-4" />
-                  <span className="text-xs font-bold">{language === 'ar' ? 'البيانات الشخصية والصورة' : 'Personal Details & Photo'}</span>
+              <section className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs space-y-3 relative pt-8">
+                <div className="absolute top-2 right-2 flex items-center gap-1.5 text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 text-[10px] font-bold">
+                  <User className="w-3.5 h-3.5" />
+                  <span>{language === 'ar' ? 'البيانات الشخصية والصورة' : 'Personal Details & Photo'}</span>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   {/* Photo Uploader */}
-                  <div className="flex flex-col items-center justify-center border-b md:border-b-0 md:border-l border-slate-100 pb-6 md:pb-0 md:pl-6">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block self-start px-1">{t('employees.form_photo')}</span>
+                  <div className="flex flex-col items-center justify-center border-b md:border-b-0 md:border-l border-slate-100 pb-3 md:pb-0 md:pl-3">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block self-start px-0.5">{t('employees.form_photo')}</span>
                     <div 
                       onClick={() => fileInputRef.current?.click()}
-                      className="relative w-32 h-32 rounded-3xl border-2 border-dashed border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/10 cursor-pointer transition-all flex flex-col items-center justify-center overflow-hidden group shadow-sm"
+                      className="relative w-20 h-20 rounded-xl border border-dashed border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/10 cursor-pointer transition-all flex flex-col items-center justify-center overflow-hidden group shadow-xs"
                     >
                       {photoBase64 ? (
                         <>
                           <img src={photoBase64} alt="" className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold transition-opacity">
-                            {language === 'ar' ? 'تغيير الصورة' : 'Change Photo'}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] font-bold transition-opacity">
+                            {language === 'ar' ? 'تغيير' : 'Change'}
                           </div>
                         </>
                       ) : (
-                        <div className="flex flex-col items-center text-slate-400 gap-1.5 p-4 text-center">
+                        <div className="flex flex-col items-center text-slate-400 gap-1 p-2 text-center">
                           {uploadingPhoto ? (
-                            <RefreshCw size={24} className="animate-spin text-emerald-600" />
+                            <RefreshCw size={18} className="animate-spin text-emerald-600" />
                           ) : (
                             <>
-                              <Upload size={24} />
-                              <span className="text-[10px] font-bold leading-tight">{t('employees.drop_photo_here')}</span>
+                              <Upload size={18} />
+                              <span className="text-[9px] font-bold leading-tight">{t('employees.drop_photo_here')}</span>
                             </>
                           )}
                         </div>
@@ -865,24 +851,24 @@ export const Employees: React.FC = () => {
                   </div>
 
                   {/* Rest of Personal Details */}
-                  <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('employees.form_name')}</label>
+                  <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    <div className="sm:col-span-2 lg:col-span-3">
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5 px-0.5 uppercase">{t('employees.form_name')}</label>
                       <input
                         required
                         type="text"
                         placeholder="John Doe"
-                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-sm rounded-2xl"
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-slate-800 text-xs rounded-lg"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('employees.form_nationality')}</label>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5 px-0.5 uppercase">{t('employees.form_nationality')}</label>
                       <div className="relative">
                         <select
-                          className="w-full py-3 px-4 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm"
+                          className="w-full py-1.5 px-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-slate-800 appearance-none cursor-pointer text-xs"
                           value={formData.nationality}
                           onChange={(e) => setFormData({ ...formData, nationality: e.target.value })}
                         >
@@ -890,60 +876,60 @@ export const Employees: React.FC = () => {
                             <option key={c.code} value={c.code}>{c.flag} {language === 'ar' ? c.name_ar : c.name_en}</option>
                           ))}
                         </select>
-                        <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                        <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-2.5' : 'right-2.5'} top-2 w-4 h-4 text-slate-400 pointer-events-none`} />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('employees.form_national_id')}</label>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5 px-0.5 uppercase">{t('employees.form_national_id')}</label>
                       <input
                         type="text"
-                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-sm rounded-2xl font-mono"
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-slate-800 text-xs rounded-lg font-mono"
                         value={formData.national_id}
                         onChange={(e) => setFormData({ ...formData, national_id: e.target.value })}
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('employees.form_gender')}</label>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5 px-0.5 uppercase">{t('employees.form_gender')}</label>
                       <div className="relative">
                         <select
-                          className="w-full py-3 px-4 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm"
+                          className="w-full py-1.5 px-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-slate-800 appearance-none cursor-pointer text-xs"
                           value={formData.gender}
                           onChange={(e) => setFormData({ ...formData, gender: e.target.value as any })}
                         >
                           <option value="male">{t('employees.gender_male')}</option>
                           <option value="female">{t('employees.gender_female')}</option>
                         </select>
-                        <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                        <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-2.5' : 'right-2.5'} top-2 w-4 h-4 text-slate-400 pointer-events-none`} />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('employees.form_marital_status')}</label>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5 px-0.5 uppercase">{t('employees.form_marital_status')}</label>
                       <div className="relative">
                         <select
-                          className="w-full py-3 px-4 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm"
+                          className="w-full py-1.5 px-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-slate-800 appearance-none cursor-pointer text-xs"
                           value={formData.marital_status}
                           onChange={(e) => setFormData({ ...formData, marital_status: e.target.value as any })}
                         >
                           <option value="single">{t('employees.marital_single')}</option>
                           <option value="married">{t('employees.marital_married')}</option>
                         </select>
-                        <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                        <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-2.5' : 'right-2.5'} top-2 w-4 h-4 text-slate-400 pointer-events-none`} />
                       </div>
                     </div>
 
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('employees.form_birth_date')}</label>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5 px-0.5 uppercase">{t('employees.form_birth_date')}</label>
                       <div className="relative">
                         <input
                           type="date"
-                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-sm rounded-2xl"
+                          className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-slate-800 text-xs rounded-lg"
                           value={formData.birth_date}
                           onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
                         />
-                        <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                        <Calendar className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 w-4 h-4 text-slate-400 pointer-events-none`} />
                       </div>
                     </div>
                   </div>
@@ -951,61 +937,61 @@ export const Employees: React.FC = () => {
               </section>
 
               {/* Section 2: بيانات الوظيفة والعقد */}
-              <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50/50 px-3 py-1 rounded-full border border-emerald-100">
-                  <FileText className="w-4 h-4" />
-                  <span className="text-xs font-bold">{language === 'ar' ? 'التعيين والتعاقد' : 'Job & Contract Details'}</span>
+              <section className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs space-y-3 relative pt-8">
+                <div className="absolute top-2 right-2 flex items-center gap-1.5 text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 text-[10px] font-bold">
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>{language === 'ar' ? 'التعيين والتعاقد' : 'Job & Contract Details'}</span>
                 </div>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                   {/* Code */}
                   <div>
-                    <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('employees.column_code')}</label>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5 px-0.5 uppercase">{t('employees.column_code')}</label>
                     <input
                       readOnly
                       type="text"
-                      className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-2xl font-mono font-bold text-slate-400 cursor-not-allowed outline-none text-sm"
+                      className="w-full px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-lg font-mono font-bold text-slate-400 cursor-not-allowed outline-none text-xs"
                       value={editingEmployee ? editingEmployee.employee_code : (language === 'ar' ? 'تلقائي' : 'Auto')}
                     />
                   </div>
 
                   {/* Hire Date */}
                   <div>
-                    <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('employees.form_hire_date')}</label>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5 px-0.5 uppercase">{t('employees.form_hire_date')}</label>
                     <div className="relative">
                       <input
                         type="date"
-                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-sm rounded-2xl"
+                        className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-slate-800 text-xs rounded-lg"
                         value={formData.hire_date}
                         onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
                       />
-                      <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                      <Calendar className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 w-4 h-4 text-slate-400 pointer-events-none`} />
                     </div>
                   </div>
 
                   {/* Contract Type */}
                   <div>
-                    <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('employees.form_contract_type')}</label>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5 px-0.5 uppercase">{t('employees.form_contract_type')}</label>
                     <div className="relative">
                       <select
-                        className="w-full py-3 px-4 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm"
+                        className="w-full py-1.5 px-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-slate-800 appearance-none cursor-pointer text-xs"
                         value={formData.contract_type}
                         onChange={(e) => setFormData({ ...formData, contract_type: e.target.value as any })}
                       >
                         <option value="permanent">{t('employees.contract_permanent')}</option>
                         <option value="temporary">{t('employees.contract_temporary')}</option>
                       </select>
-                      <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                      <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-2.5' : 'right-2.5'} top-2 w-4 h-4 text-slate-400 pointer-events-none`} />
                     </div>
                   </div>
 
                   {/* Job Title */}
                   <div>
-                    <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'الوظيفة' : 'Job Title'}</label>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5 px-0.5 uppercase">{language === 'ar' ? 'الوظيفة' : 'Job Title'}</label>
                     <input
                       type="text"
                       placeholder={language === 'ar' ? 'أدخل الوظيفة' : 'Enter Job Title'}
-                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-sm rounded-2xl"
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-slate-800 text-xs rounded-lg"
                       value={formData.job_title}
                       onChange={(e) => setFormData({ ...formData, job_title: e.target.value })}
                     />
@@ -1013,10 +999,10 @@ export const Employees: React.FC = () => {
 
                   {/* Manager */}
                   <div>
-                    <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'المدير' : 'Manager'}</label>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5 px-0.5 uppercase">{language === 'ar' ? 'المدير' : 'Manager'}</label>
                     <div className="relative">
                       <select
-                        className="w-full py-3 px-4 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm"
+                        className="w-full py-1.5 px-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-slate-800 appearance-none cursor-pointer text-xs"
                         value={formData.manager_id}
                         onChange={(e) => setFormData({ ...formData, manager_id: e.target.value })}
                       >
@@ -1027,16 +1013,16 @@ export const Employees: React.FC = () => {
                             <option key={emp.id} value={emp.id}>{emp.name} ({emp.employee_code})</option>
                           ))}
                       </select>
-                      <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                      <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-2.5' : 'right-2.5'} top-2 w-4 h-4 text-slate-400 pointer-events-none`} />
                     </div>
                   </div>
 
                   {/* Department */}
                   <div>
-                    <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'الإدارة' : 'Department'}</label>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5 px-0.5 uppercase">{language === 'ar' ? 'الإدارة' : 'Department'}</label>
                     <div className="relative">
                       <select
-                        className="w-full py-3 px-4 rounded-2xl bg-zinc-50 border border-zinc-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 appearance-none cursor-pointer text-sm"
+                        className="w-full py-1.5 px-2.5 rounded-lg bg-slate-50 border border-slate-200 focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-slate-800 appearance-none cursor-pointer text-xs"
                         value={formData.department_id}
                         onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
                       >
@@ -1045,23 +1031,23 @@ export const Employees: React.FC = () => {
                           <option key={dept.id} value={dept.id}>{dept.name}</option>
                         ))}
                       </select>
-                      <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                      <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-2.5' : 'right-2.5'} top-2 w-4 h-4 text-slate-400 pointer-events-none`} />
                     </div>
                   </div>
 
                   {/* Contract Expiry Date (Only if temporary) */}
                   {formData.contract_type === 'temporary' && (
                     <div className="sm:col-span-2 lg:col-span-3 animate-in slide-in-from-top duration-300">
-                      <label className="block text-xs font-bold text-rose-600 tracking-tighter mb-2 px-2 uppercase">{t('employees.form_contract_expiry_date')}</label>
+                      <label className="block text-[10px] font-bold text-rose-600 mb-0.5 px-0.5 uppercase">{t('employees.form_contract_expiry_date')}</label>
                       <div className="relative">
                         <input
                           required
                           type="date"
-                          className="w-full px-4 py-3 bg-white border border-rose-200 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 rounded-2xl font-bold text-zinc-800 outline-none transition-all shadow-sm text-sm"
+                          className="w-full px-2.5 py-1.5 bg-white border border-rose-200 focus:ring-1 focus:ring-rose-500 focus:border-rose-500 rounded-lg font-bold text-slate-800 outline-none transition-all shadow-xs text-xs"
                           value={formData.contract_expiry_date}
                           onChange={(e) => setFormData({ ...formData, contract_expiry_date: e.target.value })}
                         />
-                        <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-rose-400 pointer-events-none`} />
+                        <Calendar className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 w-4 h-4 text-rose-400 pointer-events-none`} />
                       </div>
                     </div>
                   )}
@@ -1069,23 +1055,23 @@ export const Employees: React.FC = () => {
               </section>
 
               {/* Section 3: المستندات والمرفقات */}
-              <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50/50 px-3 py-1 rounded-full border border-emerald-100">
-                  <Paperclip className="w-4 h-4" />
-                  <span className="text-xs font-bold">{t('employees.form_documents')}</span>
+              <section className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs space-y-2 relative pt-8">
+                <div className="absolute top-2 right-2 flex items-center gap-1.5 text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 text-[10px] font-bold">
+                  <Paperclip className="w-3.5 h-3.5" />
+                  <span>{t('employees.form_documents')}</span>
                 </div>
                 
-                <div className="space-y-4">
+                <div className="space-y-2">
                   <div 
                     onClick={() => docInputRef.current?.click()}
-                    className="border-2 border-dashed border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/10 cursor-pointer rounded-2xl p-6 text-center transition-all flex flex-col items-center justify-center gap-2 group"
+                    className="border border-dashed border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/10 cursor-pointer rounded-lg p-3 text-center transition-all flex items-center justify-center gap-2 group"
                   >
                     {uploadingDoc ? (
-                      <RefreshCw size={24} className="animate-spin text-emerald-600" />
+                      <RefreshCw size={18} className="animate-spin text-emerald-600" />
                     ) : (
                       <>
-                        <Upload size={24} className="text-slate-400 group-hover:text-emerald-600" />
-                        <span className="text-xs font-bold text-slate-500">{t('employees.drop_docs_here')}</span>
+                        <Upload size={16} className="text-slate-400 group-hover:text-emerald-600" />
+                        <span className="text-[10px] font-bold text-slate-500">{t('employees.drop_docs_here')}</span>
                       </>
                     )}
                   </div>
@@ -1098,19 +1084,19 @@ export const Employees: React.FC = () => {
                   />
 
                   {/* List of uploaded documents in Form */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto custom-scrollbar">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto custom-scrollbar">
                     {attachedDocs.map((doc, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-2xl shadow-sm">
-                        <div className="flex items-center gap-2 truncate">
-                          <File size={16} className="text-slate-400 flex-shrink-0" />
+                      <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-100 rounded-lg shadow-2xs">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <File size={14} className="text-slate-400 flex-shrink-0" />
                           <span className="text-xs font-bold text-slate-700 truncate" title={doc.name}>{doc.name}</span>
                         </div>
                         <button 
                           type="button"
                           onClick={() => handleRemoveDoc(idx)}
-                          className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 transition-colors"
+                          className="p-1 text-slate-400 hover:text-rose-500 rounded hover:bg-rose-50 transition-colors"
                         >
-                          <X size={16} />
+                          <X size={14} />
                         </button>
                       </div>
                     ))}
@@ -1121,21 +1107,21 @@ export const Employees: React.FC = () => {
           </div>
 
           {/* Form Footer */}
-          <div className="p-4 md:p-6 border-t border-slate-100 bg-white/80 backdrop-blur-md sticky bottom-0 z-[70] flex items-center justify-between gap-4">
+          <div className="px-4 py-2 border-t border-slate-100 bg-white/95 backdrop-blur-md sticky bottom-0 z-[70] flex items-center justify-end gap-2">
             <button 
               type="button"
               onClick={closeModal}
-              className="flex-1 max-w-[200px] py-4 rounded-2xl bg-zinc-100 text-zinc-600 font-black hover:bg-zinc-200 transition-all flex items-center justify-center gap-3 active:scale-95 text-sm"
+              className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-all flex items-center justify-center gap-1.5 active:scale-95 text-xs border border-slate-200"
             >
-              <RotateCcw size={20} />
+              <RotateCcw size={14} />
               {t('common.cancel')}
             </button>
             <button 
               type="submit"
               form="employee-form"
-              className="flex-1 py-4 rounded-2xl bg-emerald-600 text-white font-black hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 shadow-xl shadow-emerald-600/20 active:scale-95 text-sm"
+              className="px-4 py-1.5 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-1.5 shadow-xs active:scale-95 text-xs"
             >
-              <Save size={20} />
+              <Save size={14} />
               {t('common.save')}
             </button>
           </div>
@@ -1146,59 +1132,59 @@ export const Employees: React.FC = () => {
       <AnimatePresence>
         {viewingEmployee && (
           <>
-            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200]" onClick={() => setViewingEmployee(null)} />
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-[200]" onClick={() => setViewingEmployee(null)} />
             <motion.div
-              initial={{ x: dir === 'rtl' ? -500 : 500 }}
+              initial={{ x: dir === 'rtl' ? -400 : 400 }}
               animate={{ x: 0 }}
-              exit={{ x: dir === 'rtl' ? -500 : 500 }}
+              exit={{ x: dir === 'rtl' ? -400 : 400 }}
               transition={{ type: 'spring', damping: 30 }}
-              className={`fixed top-0 bottom-0 ${dir === 'rtl' ? 'left-0' : 'right-0'} w-full max-w-xl bg-white border-l border-slate-200 shadow-2xl z-[210] flex flex-col`}
+              className={`fixed top-0 bottom-0 ${dir === 'rtl' ? 'left-0' : 'right-0'} w-full max-w-md bg-white border-l border-slate-200 shadow-xl z-[210] flex flex-col`}
             >
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="text-xl font-bold flex items-center gap-2">
-                  <User size={20} className="text-emerald-600" />
+              <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="text-sm font-black flex items-center gap-1.5 text-slate-900">
+                  <User size={16} className="text-emerald-600" />
                   <span>{t('employees.print_profile')}</span>
                 </h3>
-                <div className="flex gap-2">
+                <div className="flex gap-1">
                   <button 
                     onClick={handlePrintProfile}
-                    className="p-2.5 hover:bg-slate-50 rounded-xl border border-slate-200 text-slate-600"
+                    className="p-1.5 hover:bg-slate-50 rounded-lg border border-slate-200 text-slate-600 transition-all"
                   >
-                    <Printer size={18} />
+                    <Printer size={15} />
                   </button>
-                  <button onClick={() => setViewingEmployee(null)} className="p-2.5 hover:bg-slate-50 rounded-xl text-slate-400">
-                    <X size={18} />
+                  <button onClick={() => setViewingEmployee(null)} className="p-1.5 hover:bg-slate-50 rounded-lg text-slate-400 hover:text-slate-600 transition-all">
+                    <X size={15} />
                   </button>
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
                 {/* Header profile */}
-                <div className="flex flex-col items-center text-center space-y-4">
+                <div className="flex flex-col items-center text-center space-y-2">
                   {viewingEmployee.photo_url ? (
-                    <img src={viewingEmployee.photo_url} alt="" className="w-28 h-28 rounded-3xl object-cover border border-slate-200 shadow-md" />
+                    <img src={viewingEmployee.photo_url} alt="" className="w-16 h-16 rounded-2xl object-cover border border-slate-200 shadow-xs" />
                   ) : (
-                    <div className="w-28 h-28 rounded-3xl bg-slate-100 flex items-center justify-center font-bold text-slate-400 text-4xl border border-slate-200">
+                    <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center font-bold text-slate-400 text-2xl border border-slate-200">
                       {viewingEmployee.name[0]}
                     </div>
                   )}
                   <div>
-                    <h3 className="text-2xl font-black text-slate-900">{viewingEmployee.name}</h3>
-                    <p className="font-mono text-xs text-slate-500 font-bold bg-slate-50 border border-slate-200 rounded px-2.5 py-1 inline-block mt-2">
+                    <h3 className="text-base font-black text-slate-900">{viewingEmployee.name}</h3>
+                    <p className="font-mono text-[10px] text-slate-500 font-bold bg-slate-50 border border-slate-200 rounded px-2 py-0.5 inline-block mt-1">
                       {viewingEmployee.employee_code}
                     </p>
                   </div>
                 </div>
 
                 {/* Details Section */}
-                <div className="space-y-6">
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-1">
                     {t('employees.personal_details')}
                   </h4>
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">{t('employees.form_nationality')}</span>
-                      <span className="font-bold text-slate-900">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">{t('employees.form_nationality')}</span>
+                      <span className="font-bold text-slate-900 text-xs">
                         {(() => {
                           const nat = COUNTRIES.find(c => c.code === viewingEmployee.nationality);
                           return `${nat?.flag || ''} ${language === 'ar' ? nat?.name_ar : nat?.name_en}`;
@@ -1206,75 +1192,75 @@ export const Employees: React.FC = () => {
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">{t('employees.form_national_id')}</span>
-                      <span className="font-bold text-slate-900 font-mono">{viewingEmployee.national_id || '-'}</span>
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">{t('employees.form_national_id')}</span>
+                      <span className="font-bold text-slate-900 font-mono text-xs">{viewingEmployee.national_id || '-'}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">{t('employees.form_gender')}</span>
-                      <span className="font-bold text-slate-900">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">{t('employees.form_gender')}</span>
+                      <span className="font-bold text-slate-900 text-xs">
                         {viewingEmployee.gender === 'male' ? t('employees.gender_male') : t('employees.gender_female')}
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">{t('employees.form_marital_status')}</span>
-                      <span className="font-bold text-slate-900">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">{t('employees.form_marital_status')}</span>
+                      <span className="font-bold text-slate-900 text-xs">
                         {viewingEmployee.marital_status === 'married' ? t('employees.marital_married') : t('employees.marital_single')}
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">{t('employees.form_birth_date')}</span>
-                      <span className="font-bold text-slate-900">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">{t('employees.form_birth_date')}</span>
+                      <span className="font-bold text-slate-900 text-xs">
                         {viewingEmployee.birth_date ? new Date(viewingEmployee.birth_date).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US') : '-'}
                       </span>
                     </div>
                   </div>
 
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2 pt-4">
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-1 pt-2">
                     {t('employees.contract_details')}
                   </h4>
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">{t('employees.form_hire_date')}</span>
-                      <span className="font-bold text-slate-900">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">{t('employees.form_hire_date')}</span>
+                      <span className="font-bold text-slate-900 text-xs">
                         {viewingEmployee.hire_date ? new Date(viewingEmployee.hire_date).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US') : '-'}
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">{t('employees.form_contract_type')}</span>
-                      <span className={`px-2.5 py-0.5 rounded text-xs font-bold inline-block ${viewingEmployee.contract_type === 'permanent' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">{t('employees.form_contract_type')}</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold inline-block ${viewingEmployee.contract_type === 'permanent' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
                         {viewingEmployee.contract_type === 'permanent' ? t('employees.contract_permanent') : t('employees.contract_temporary')}
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">{language === 'ar' ? 'الوظيفة' : 'Job Title'}</span>
-                      <span className="font-bold text-slate-900">{viewingEmployee.job_title || '-'}</span>
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">{language === 'ar' ? 'الوظيفة' : 'Job Title'}</span>
+                      <span className="font-bold text-slate-900 text-xs">{viewingEmployee.job_title || '-'}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">{language === 'ar' ? 'المدير' : 'Manager'}</span>
-                      <span className="font-bold text-slate-900">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">{language === 'ar' ? 'المدير' : 'Manager'}</span>
+                      <span className="font-bold text-slate-900 text-xs">
                         {employees.find(e => e.id === viewingEmployee.manager_id)?.name || '-'}
                       </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">{language === 'ar' ? 'الإدارة' : 'Department'}</span>
-                      <span className="font-bold text-slate-900">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">{language === 'ar' ? 'الإدارة' : 'Department'}</span>
+                      <span className="font-bold text-slate-900 text-xs">
                         {departments.find(d => d.id === viewingEmployee.department_id)?.name || '-'}
                       </span>
                     </div>
                     {viewingEmployee.contract_type === 'temporary' && (
                       <div>
-                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">{t('employees.form_contract_expiry_date')}</span>
-                        <span className="font-bold text-rose-600">
+                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">{t('employees.form_contract_expiry_date')}</span>
+                        <span className="font-bold text-rose-600 text-xs">
                           {viewingEmployee.contract_expiry_date ? new Date(viewingEmployee.contract_expiry_date).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US') : '-'}
                         </span>
                       </div>
                     )}
                   </div>
 
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2 pt-4">
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-1 pt-2">
                     {t('employees.form_documents')}
                   </h4>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     {(() => {
                       let docsList: EmployeeDocument[] = [];
                       if (viewingEmployee.documents) {
@@ -1284,21 +1270,21 @@ export const Employees: React.FC = () => {
                       }
 
                       if (docsList.length === 0) {
-                        return <p className="text-sm text-slate-400 font-medium italic">{t('employees.no_documents')}</p>;
+                        return <p className="text-xs text-slate-400 font-medium italic">{t('employees.no_documents')}</p>;
                       }
 
                       return docsList.map((doc, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
-                          <div className="flex items-center gap-2 truncate">
-                            <File size={18} className="text-slate-400 flex-shrink-0" />
-                            <span className="text-sm font-bold text-slate-800 truncate" title={doc.name}>{doc.name}</span>
+                        <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <File size={14} className="text-slate-400 flex-shrink-0" />
+                            <span className="text-xs font-bold text-slate-800 truncate" title={doc.name}>{doc.name}</span>
                           </div>
                           <a 
                             href={doc.data} 
                             download={doc.name}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50"
+                            className="flex items-center gap-1 px-2.5 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-50"
                           >
-                            <Download size={14} />
+                            <Download size={12} />
                             <span>{language === 'ar' ? 'تحميل' : 'Download'}</span>
                           </a>
                         </div>
@@ -1317,30 +1303,30 @@ export const Employees: React.FC = () => {
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
         {isDeleteModalOpen && (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white max-w-md w-full rounded-3xl p-8 border border-slate-100 shadow-2xl space-y-6 text-center"
+              className="bg-white max-w-sm w-full rounded-2xl p-5 border border-slate-200 shadow-xl space-y-4 text-center"
             >
-              <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center text-rose-500 mx-auto border border-rose-100">
-                <AlertCircle size={28} />
+              <div className="w-10 h-10 bg-rose-50 rounded-full flex items-center justify-center text-rose-500 mx-auto border border-rose-100 shadow-xs">
+                <AlertCircle size={20} />
               </div>
-              <div className="space-y-2">
-                <h3 className="text-xl font-bold text-slate-900">{t('common.delete_confirm_title')}</h3>
-                <p className="text-sm text-slate-500 font-bold leading-relaxed">{t('common.delete_confirm_msg')}</p>
+              <div className="space-y-1">
+                <h3 className="text-base font-black text-slate-900">{t('common.delete_confirm_title')}</h3>
+                <p className="text-xs text-slate-500 font-medium leading-relaxed">{t('common.delete_confirm_msg')}</p>
               </div>
-              <div className="flex gap-3 justify-center">
+              <div className="flex gap-2 justify-center pt-1">
                 <button
                   onClick={() => { setIsDeleteModalOpen(false); setEmployeeToDelete(null); }}
-                  className="px-6 py-3 border border-slate-200 text-slate-500 rounded-2xl font-bold hover:bg-slate-50"
+                  className="flex-1 py-1.5 border border-slate-200 text-slate-600 rounded-lg font-bold text-xs hover:bg-slate-50 transition-all"
                 >
                   {t('common.cancel')}
                 </button>
                 <button
                   onClick={confirmDelete}
-                  className="px-6 py-3 bg-rose-600 text-white rounded-2xl font-bold hover:bg-rose-700 shadow-lg shadow-rose-500/20"
+                  className="flex-1 py-1.5 bg-rose-600 text-white rounded-lg font-bold text-xs hover:bg-rose-700 shadow-xs transition-all"
                 >
                   {t('common.delete')}
                 </button>
