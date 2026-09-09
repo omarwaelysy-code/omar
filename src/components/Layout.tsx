@@ -126,6 +126,8 @@ const getTabIcon = (id: string) => {
     case 'purchase_invoices': return <ArrowDownToLine {...iconProps} />;
     case 'goods_receipts': return <PackageCheck {...iconProps} />;
     case 'receipts':
+    case 'eta_dashboard':
+      return <LayoutDashboard {...iconProps} />;
     case 'eta_received_invoices':
     case 'eta_detailed_invoices':
     case 'eta_supplier_mapping':
@@ -541,6 +543,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         icon: Building2,
         subItems: [
           { 
+            id: 'eta_dashboard', 
+            label: language === 'ar' ? 'نظرة عامة (Dashboard)' : 'Dashboard (Overview)', 
+            icon: LayoutDashboard 
+          },
+          { 
             id: 'eta_received_invoices', 
             label: language === 'ar' ? 'الوثائق الإلكترونية' : 'Electronic Documents', 
             icon: ArrowDownToLine 
@@ -739,7 +746,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       if (item.subItems) {
         const visibleSubItems = (item.subItems as any[]).filter((sub: any) => {
           if (sub.isDivider || sub.isHeader) return true;
-          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking' || sub.id === 'pos_connected_branches' || sub.id === 'eta_received_invoices' || sub.id === 'eta_detailed_invoices' || sub.id === 'eta_supplier_mapping' || sub.id === 'eta_item_mapping' || sub.id === 'eta_sent_item_mapping' || sub.id === 'eta_tax_types') return true;
+          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking' || sub.id === 'pos_connected_branches' || sub.id === 'eta_dashboard' || sub.id === 'eta_received_invoices' || sub.id === 'eta_detailed_invoices' || sub.id === 'eta_supplier_mapping' || sub.id === 'eta_item_mapping' || sub.id === 'eta_sent_item_mapping' || sub.id === 'eta_tax_types') return true;
           return hasPermission(sub.id, 'view');
         });
         

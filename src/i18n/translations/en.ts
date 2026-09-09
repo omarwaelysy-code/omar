@@ -192,6 +192,7 @@ export const en = {
   'nav.operation_categories': 'Operation Categories',
   'nav.operation_fields': 'Data Fields',
   'nav.eta_menu': 'ETA',
+  'nav.eta_dashboard': 'Dashboard (Overview)',
   'nav.eta_received_invoices': 'Received Electronic Invoices',
   'nav.eta_detailed_invoices': 'Detailed Electronic Documents',
   'nav.eta_supplier_mapping': 'ETA Supplier Mapping',

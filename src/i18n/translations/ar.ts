@@ -192,6 +192,7 @@ export const ar = {
   'nav.operation_categories': 'تصنيفات العمليات',
   'nav.operation_fields': 'حقول البيانات',
   'nav.eta_menu': 'ETA',
+  'nav.eta_dashboard': 'نظرة عامة (Dashboard)',
   'nav.eta_received_invoices': 'الوثائق الإلكترونية',
   'nav.eta_detailed_invoices': 'الوثائق الإلكترونية بالتفصيل',
   'nav.eta_supplier_mapping': 'ربط الموردين (ETA)',

@@ -130,6 +130,7 @@ export const pageLabels: { [key: string]: string } = {
   'quotations': 'عروض الأسعار',
   'pos_connected_branches': 'الفروع المتصلة',
   'pos_branch_linking': 'ربط الفرع',
+  'eta_dashboard': 'نظرة عامة (ETA Dashboard)',
   'eta_received_invoices': 'الوثائق الإلكترونية',
   'eta_detailed_invoices': 'الوثائق الإلكترونية بالتفصيل',
   'eta_supplier_mapping': 'ربط الموردين (ETA)',

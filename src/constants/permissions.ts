@@ -81,7 +81,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     id: 'eta',
     nameAr: 'الفاتورة الإلكترونية (ETA)',
     nameEn: 'ETA e-Invoicing',
-    modules: ['eta_received_invoices', 'eta_detailed_invoices', 'eta_supplier_mapping', 'eta_item_mapping', 'eta_sent_item_mapping', 'eta_tax_types']
+    modules: ['eta_dashboard', 'eta_received_invoices', 'eta_detailed_invoices', 'eta_supplier_mapping', 'eta_item_mapping', 'eta_sent_item_mapping', 'eta_tax_types']
   }
 ];
 
@@ -326,6 +326,7 @@ export const MODULE_PERMISSIONS_META: { [moduleId: string]: { labelAr: string; l
   operation_fields: { labelAr: 'تعريف الحقول الإضافية', labelEn: 'Custom Operation Fields', hasCrud: true },
   operations: { labelAr: 'حركات الحسابات الإدارية', labelEn: 'Operation Transactions', hasCrud: true },
   // ETA e-Invoicing
+  eta_dashboard: { labelAr: 'لوحة المؤشرات ونظرة عامة (ETA)', labelEn: 'ETA Overview Dashboard', hasCrud: true, special: ['print', 'export_pdf', 'export_excel'] },
   eta_received_invoices: { labelAr: 'الوثائق الإلكترونية (ETA)', labelEn: 'ETA Electronic Documents', hasCrud: true, special: ['print', 'export_pdf', 'export_excel'] },
   eta_detailed_invoices: { labelAr: 'الوثائق الإلكترونية بالتفصيل (ETA)', labelEn: 'ETA Detailed Electronic Documents', hasCrud: true, special: ['print', 'export_pdf', 'export_excel'] },
   eta_supplier_mapping: { labelAr: 'ربط الموردين (ETA)', labelEn: 'ETA Supplier Mapping', hasCrud: true, special: ['print', 'export_pdf', 'export_excel'] },
