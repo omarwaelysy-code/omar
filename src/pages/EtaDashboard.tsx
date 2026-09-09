@@ -30,7 +30,9 @@ import {
   ArrowRightLeft,
   ShieldCheck,
   Search,
-  X
+  X,
+  FileSpreadsheet,
+  Check
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -289,7 +291,6 @@ export const EtaDashboard: React.FC = () => {
     let whtAmount = 0;
     let totalAmount = 0;
 
-    // Breakdown map by type key
     const typeMap: Record<string, {
       key: string;
       nameAr: string;
@@ -353,31 +354,18 @@ export const EtaDashboard: React.FC = () => {
 
   // 11. The Difference / Financial Reconciliation (جزء الفرق)
   const diffMetrics = useMemo(() => {
-    // Net Margin = Sent Net (Sales) - Received Net (Purchases)
     const netDiff = sentTotals.netAmount - receivedTotals.netAmount;
-    
-    // Net VAT = Output VAT (Sales Tax) - Input VAT (Purchase Tax)
     const vatDiff = sentTotals.vatAmount - receivedTotals.vatAmount;
-    
-    // Grand Total Diff
     const totalAmountDiff = sentTotals.totalAmount - receivedTotals.totalAmount;
-    
-    // Doc Count Diff
     const countDiff = sentTotals.count - receivedTotals.count;
 
-    // Margin Percentage: (Sales - Purchases) / Sales * 100
     const marginPct = sentTotals.netAmount > 0 
       ? Math.round((netDiff / sentTotals.netAmount) * 1000) / 10 
       : 0;
 
-    // Proportions for visual progress bars
     const combinedNet = (sentTotals.netAmount + receivedTotals.netAmount) || 1;
     const sentNetRatio = Math.round((sentTotals.netAmount / combinedNet) * 100);
     const receivedNetRatio = Math.round((receivedTotals.netAmount / combinedNet) * 100);
-
-    const combinedVat = (sentTotals.vatAmount + receivedTotals.vatAmount) || 1;
-    const sentVatRatio = Math.round((sentTotals.vatAmount / combinedVat) * 100);
-    const receivedVatRatio = Math.round((receivedTotals.vatAmount / combinedVat) * 100);
 
     return {
       netDiff,
@@ -386,18 +374,13 @@ export const EtaDashboard: React.FC = () => {
       countDiff,
       marginPct,
       sentNetRatio,
-      receivedNetRatio,
-      sentVatRatio,
-      receivedVatRatio
+      receivedNetRatio
     };
   }, [sentTotals, receivedTotals]);
 
-  // 12. Monthly Timeline Schedule (التوزيع الشهري للمبيعات والمشتريات والضرائب)
-  const monthlyBreakdown = useMemo(() => {
+  // 12. Monthly Timeline Schedule (Transposed: Months are columns across the top header)
+  const monthlyDataMap = useMemo(() => {
     const map: Record<string, {
-      monthId: string;
-      nameAr: string;
-      nameEn: string;
       sentCount: number;
       sentNet: number;
       sentVat: number;
@@ -412,9 +395,6 @@ export const EtaDashboard: React.FC = () => {
 
     MONTHS_LIST.forEach(m => {
       map[m.id] = {
-        monthId: m.id,
-        nameAr: m.shortAr,
-        nameEn: m.shortEn,
         sentCount: 0,
         sentNet: 0,
         sentVat: 0,
@@ -446,32 +426,34 @@ export const EtaDashboard: React.FC = () => {
       }
     });
 
-    return Object.values(map).map(row => ({
-      ...row,
-      netDiff: row.sentNet - row.receivedNet,
-      vatDiff: row.sentVat - row.receivedVat
-    }));
+    Object.keys(map).forEach(key => {
+      map[key].netDiff = map[key].sentNet - map[key].receivedNet;
+      map[key].vatDiff = map[key].sentVat - map[key].receivedVat;
+    });
+
+    return map;
   }, [filteredInvoices, MONTHS_LIST]);
 
-  // 13. Export to Excel
+  // 13. Export to Excel (both summary and monthly matrix)
   const handleExportExcel = () => {
+    // 1. Executive Summary Sheet
     const summaryData = [
       {
-        [language === 'ar' ? 'البند' : 'Metric']: language === 'ar' ? 'الوثائق الصادرة (المبيعات)' : 'Issued Documents (Sales)',
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'الوثائق الصادرة (المبيعات)' : 'Issued Documents (Sales)',
         [language === 'ar' ? 'عدد الوثائق' : 'Count']: sentTotals.count,
         [language === 'ar' ? 'صافي القيمة' : 'Net Amount']: sentTotals.netAmount,
         [language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT Amount']: sentTotals.vatAmount,
         [language === 'ar' ? 'الإجمالي الكلي' : 'Total Amount']: sentTotals.totalAmount
       },
       {
-        [language === 'ar' ? 'البند' : 'Metric']: language === 'ar' ? 'الوثائق المستلمة (المشتريات)' : 'Received Documents (Purchases)',
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'الوثائق المستلمة (المشتريات)' : 'Received Documents (Purchases)',
         [language === 'ar' ? 'عدد الوثائق' : 'Count']: receivedTotals.count,
         [language === 'ar' ? 'صافي القيمة' : 'Net Amount']: receivedTotals.netAmount,
         [language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT Amount']: receivedTotals.vatAmount,
         [language === 'ar' ? 'الإجمالي الكلي' : 'Total Amount']: receivedTotals.totalAmount
       },
       {
-        [language === 'ar' ? 'البند' : 'Metric']: language === 'ar' ? 'صافي الفروق (الصادر - المستلم)' : 'Net Difference (Sent - Received)',
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'صافي الفروق (الصادر - المستلم)' : 'Net Difference (Sent - Received)',
         [language === 'ar' ? 'عدد الوثائق' : 'Count']: diffMetrics.countDiff,
         [language === 'ar' ? 'صافي القيمة' : 'Net Amount']: diffMetrics.netDiff,
         [language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT Amount']: diffMetrics.vatDiff,
@@ -479,13 +461,67 @@ export const EtaDashboard: React.FC = () => {
       }
     ];
 
-    exportToExcel(summaryData, {
-      filename: `ETA_Dashboard_Summary_${selectedYears.join('_') || 'All'}`,
-      sheetName: language === 'ar' ? 'مؤشرات الضرائب' : 'ETA Dashboard'
+    // 2. Transposed Monthly Matrix Sheet
+    const matrixRows = [
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المبيعات الصادرة - عدد الوثائق' : 'Sales - Docs Count',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.sentCount || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: sentTotals.count
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المبيعات الصادرة - صافي القيمة' : 'Sales - Net Amount',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.sentNet || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: sentTotals.netAmount
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المبيعات الصادرة - ضريبة المخرجات 14%' : 'Sales - Output VAT',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.sentVat || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: sentTotals.vatAmount
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المبيعات الصادرة - الإجمالي شامل الضريبة' : 'Sales - Grand Total',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.sentTotal || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: sentTotals.totalAmount
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المشتريات المستلمة - عدد الوثائق' : 'Purchases - Docs Count',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.receivedCount || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: receivedTotals.count
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المشتريات المستلمة - صافي القيمة' : 'Purchases - Net Amount',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.receivedNet || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: receivedTotals.netAmount
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المشتريات المستلمة - ضريبة المدخلات 14%' : 'Purchases - Input VAT',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.receivedVat || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: receivedTotals.vatAmount
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المشتريات المستلمة - الإجمالي شامل الضريبة' : 'Purchases - Grand Total',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.receivedTotal || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: receivedTotals.totalAmount
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'صافي فرق القيمة (مبيعات - مشتريات)' : 'Net Margin (Sales - Purchases)',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.netDiff || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: diffMetrics.netDiff
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'موقف ضريبة القيمة المضافة (سداد/دائن)' : 'VAT Position (Payable/Credit)',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.vatDiff || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: diffMetrics.vatDiff
+      }
+    ];
+
+    exportToExcel(matrixRows, {
+      filename: `ETA_Dashboard_Matrix_${selectedYears.join('_') || 'All'}`,
+      sheetName: language === 'ar' ? 'جدول الشهور الضريبي' : 'Monthly Tax Matrix'
     });
 
     showNotification(
-      language === 'ar' ? 'تم تصدير تقرير المؤشرات إلى ملف إكسيل بنجاح.' : 'Exported ETA Dashboard to Excel successfully.',
+      language === 'ar' ? 'تم تصدير جدول الشهور والمؤشرات إلى إكسيل بنجاح.' : 'Exported ETA Matrix to Excel successfully.',
       'success'
     );
   };
@@ -493,18 +529,18 @@ export const EtaDashboard: React.FC = () => {
   // 14. Print Report
   const handlePrint = () => {
     if (dashboardRef.current) {
-      printElement(dashboardRef.current, language === 'ar' ? 'تقرير مؤشرات الفاتورة الإلكترونية (ETA)' : 'ETA e-Invoicing Dashboard');
+      printElement(dashboardRef.current, language === 'ar' ? 'لوحة مؤشرات الفاتورة الإلكترونية (ETA)' : 'ETA e-Invoicing Dashboard');
     }
   };
 
   return (
-    <div className="space-y-6 w-full text-slate-800 pb-12" dir={dir} ref={dashboardRef}>
+    <div className="space-y-6 w-full text-slate-800 pb-16" dir={dir} ref={dashboardRef}>
       {/* ========================================================================= */}
-      {/* 1. TOP HEADER & CONTROLS */}
+      {/* 1. TOP HEADER & CONTROLS (Clean, Light, Elegant) */}
       {/* ========================================================================= */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs">
         <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-800 text-white flex items-center justify-center shadow-md shadow-indigo-100 flex-shrink-0 mt-0.5">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-700 text-white flex items-center justify-center shadow-md shadow-indigo-100 flex-shrink-0 mt-0.5">
             <LayoutDashboard className="w-6 h-6" />
           </div>
           <div>
@@ -573,7 +609,7 @@ export const EtaDashboard: React.FC = () => {
       {/* ========================================================================= */}
       {/* 2. FILTERS BAR (YEARS + MONTHS + STATUSES + SEARCH) */}
       {/* ========================================================================= */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-indigo-600" />
@@ -587,7 +623,7 @@ export const EtaDashboard: React.FC = () => {
             <button
               type="button"
               onClick={() => handleQuickStatusChange('all')}
-              className={`px-2.5 py-1 rounded-lg transition-all ${
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
                 quickStatusPreset === 'all'
                   ? 'bg-white text-indigo-700 shadow-2xs border border-indigo-200'
                   : 'text-slate-600 hover:text-slate-900'
@@ -598,7 +634,7 @@ export const EtaDashboard: React.FC = () => {
             <button
               type="button"
               onClick={() => handleQuickStatusChange('valid')}
-              className={`px-2.5 py-1 rounded-lg flex items-center gap-1 transition-all ${
+              className={`px-2.5 py-1 rounded-lg flex items-center gap-1 transition-all cursor-pointer ${
                 quickStatusPreset === 'valid'
                   ? 'bg-emerald-600 text-white shadow-2xs'
                   : 'text-slate-600 hover:text-emerald-700'
@@ -610,7 +646,7 @@ export const EtaDashboard: React.FC = () => {
             <button
               type="button"
               onClick={() => handleQuickStatusChange('cancelled_rejected')}
-              className={`px-2.5 py-1 rounded-lg flex items-center gap-1 transition-all ${
+              className={`px-2.5 py-1 rounded-lg flex items-center gap-1 transition-all cursor-pointer ${
                 quickStatusPreset === 'cancelled_rejected'
                   ? 'bg-rose-600 text-white shadow-2xs'
                   : 'text-slate-600 hover:text-rose-700'
@@ -634,7 +670,7 @@ export const EtaDashboard: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setSelectedYears([])}
-                  className="text-[10px] text-indigo-600 hover:underline font-bold"
+                  className="text-[10px] text-indigo-600 hover:underline font-bold cursor-pointer"
                 >
                   {language === 'ar' ? 'الكل' : 'All'}
                 </button>
@@ -647,7 +683,7 @@ export const EtaDashboard: React.FC = () => {
                 setShowMonthDropdown(false);
                 setShowStatusDropdown(false);
               }}
-              className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-50 hover:bg-white border border-slate-200 focus:border-indigo-500 text-xs font-bold text-slate-800 transition-all text-start"
+              className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-50 hover:bg-white border border-slate-200 focus:border-indigo-500 text-xs font-bold text-slate-800 transition-all text-start cursor-pointer"
             >
               <span className="truncate">
                 {selectedYears.length === 0
@@ -667,7 +703,7 @@ export const EtaDashboard: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setSelectedYears([])}
-                      className={`font-bold ${selectedYears.length === 0 ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
+                      className={`font-bold cursor-pointer ${selectedYears.length === 0 ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
                     >
                       {language === 'ar' ? 'تحديد كافة الأعوام' : 'Select All Years'}
                     </button>
@@ -675,7 +711,7 @@ export const EtaDashboard: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setSelectedYears([])}
-                        className="text-[11px] text-rose-500 hover:underline font-semibold"
+                        className="text-[11px] text-rose-500 hover:underline font-semibold cursor-pointer"
                       >
                         {language === 'ar' ? 'مسح' : 'Clear'}
                       </button>
@@ -697,7 +733,7 @@ export const EtaDashboard: React.FC = () => {
                               if (e.target.checked) setSelectedYears(prev => [...prev, yr]);
                               else setSelectedYears(prev => prev.filter(y => y !== yr));
                             }}
-                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
                           />
                           <span className="font-bold text-slate-800">{yr}</span>
                         </div>
@@ -725,7 +761,7 @@ export const EtaDashboard: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setSelectedMonths([])}
-                  className="text-[10px] text-indigo-600 hover:underline font-bold"
+                  className="text-[10px] text-indigo-600 hover:underline font-bold cursor-pointer"
                 >
                   {language === 'ar' ? 'الكل' : 'All'}
                 </button>
@@ -738,7 +774,7 @@ export const EtaDashboard: React.FC = () => {
                 setShowYearDropdown(false);
                 setShowStatusDropdown(false);
               }}
-              className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-50 hover:bg-white border border-slate-200 focus:border-indigo-500 text-xs font-bold text-slate-800 transition-all text-start"
+              className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-50 hover:bg-white border border-slate-200 focus:border-indigo-500 text-xs font-bold text-slate-800 transition-all text-start cursor-pointer"
             >
               <span className="truncate">
                 {selectedMonths.length === 0
@@ -758,7 +794,7 @@ export const EtaDashboard: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setSelectedMonths([])}
-                      className={`font-bold ${selectedMonths.length === 0 ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
+                      className={`font-bold cursor-pointer ${selectedMonths.length === 0 ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
                     >
                       {language === 'ar' ? 'تحديد كافة الشهور' : 'Select All Months'}
                     </button>
@@ -766,7 +802,7 @@ export const EtaDashboard: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setSelectedMonths([])}
-                        className="text-[11px] text-rose-500 hover:underline font-semibold"
+                        className="text-[11px] text-rose-500 hover:underline font-semibold cursor-pointer"
                       >
                         {language === 'ar' ? 'مسح' : 'Clear'}
                       </button>
@@ -788,7 +824,7 @@ export const EtaDashboard: React.FC = () => {
                               if (e.target.checked) setSelectedMonths(prev => [...prev, m.id]);
                               else setSelectedMonths(prev => prev.filter(x => x !== m.id));
                             }}
-                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
                           />
                           <span className="font-bold text-slate-800">{language === 'ar' ? m.nameAr : m.nameEn}</span>
                         </div>
@@ -816,7 +852,7 @@ export const EtaDashboard: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => { setSelectedStatuses([]); setQuickStatusPreset('all'); }}
-                  className="text-[10px] text-indigo-600 hover:underline font-bold"
+                  className="text-[10px] text-indigo-600 hover:underline font-bold cursor-pointer"
                 >
                   {language === 'ar' ? 'الكل' : 'All'}
                 </button>
@@ -829,7 +865,7 @@ export const EtaDashboard: React.FC = () => {
                 setShowYearDropdown(false);
                 setShowMonthDropdown(false);
               }}
-              className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-50 hover:bg-white border border-slate-200 focus:border-indigo-500 text-xs font-bold text-slate-800 transition-all text-start"
+              className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-50 hover:bg-white border border-slate-200 focus:border-indigo-500 text-xs font-bold text-slate-800 transition-all text-start cursor-pointer"
             >
               <span className="truncate">
                 {selectedStatuses.length === 0
@@ -849,7 +885,7 @@ export const EtaDashboard: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => { setSelectedStatuses([]); setQuickStatusPreset('all'); }}
-                      className={`font-bold ${selectedStatuses.length === 0 ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
+                      className={`font-bold cursor-pointer ${selectedStatuses.length === 0 ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-900'}`}
                     >
                       {language === 'ar' ? 'كافة الحالات' : 'Select All'}
                     </button>
@@ -857,7 +893,7 @@ export const EtaDashboard: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => { setSelectedStatuses([]); setQuickStatusPreset('all'); }}
-                        className="text-[11px] text-rose-500 hover:underline font-semibold"
+                        className="text-[11px] text-rose-500 hover:underline font-semibold cursor-pointer"
                       >
                         {language === 'ar' ? 'مسح' : 'Clear'}
                       </button>
@@ -880,7 +916,7 @@ export const EtaDashboard: React.FC = () => {
                               if (e.target.checked) setSelectedStatuses(prev => [...prev, st.id]);
                               else setSelectedStatuses(prev => prev.filter(x => x.toLowerCase() !== st.id.toLowerCase()));
                             }}
-                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
                           />
                           <span className="font-bold text-slate-800">{language === 'ar' ? st.nameAr : st.nameEn}</span>
                         </div>
@@ -908,7 +944,7 @@ export const EtaDashboard: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="text-[10px] text-indigo-600 hover:underline font-bold"
+                  className="text-[10px] text-indigo-600 hover:underline font-bold cursor-pointer"
                 >
                   {language === 'ar' ? 'مسح' : 'Clear'}
                 </button>
@@ -937,512 +973,496 @@ export const EtaDashboard: React.FC = () => {
       </div>
 
       {/* ========================================================================= */}
-      {/* 3. EXECUTIVE DIFFERENCE SECTION (جزء الفرق) */}
+      {/* 3. THREE MASTER PILLARS IN ONE ROW: SENT, RECEIVED, AND DIFFERENCES */}
+      {/* (خلى المستلم اكبر فى صف واحد وكذلك الصادر والفرق - بدون أسود) */}
       {/* ========================================================================= */}
-      <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 shadow-xl border border-indigo-900/40 relative overflow-hidden">
-        {/* Background decorative glows */}
-        <div className="absolute top-0 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
-
-        <div className="relative z-10 space-y-6">
-          {/* Header of Section */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-800/40 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center font-black shadow-md shadow-amber-500/20">
-                <Scale className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="text-lg md:text-xl font-black text-white flex items-center gap-2">
-                  <span>{language === 'ar' ? 'جزء الفروق والموقف الضريبي والمحاسبي' : 'Executive Differences & VAT Position'}</span>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                    {language === 'ar' ? 'المقاصة الضريبية' : 'Tax Clearance'}
-                  </span>
-                </h2>
-                <p className="text-xs text-indigo-200/70 mt-0.5">
-                  {language === 'ar'
-                    ? 'المقارنة المباشرة بين المبيعات الصادرة والمشتريات المستلمة وحساب صافي الضريبة المستحقة / الدائنة'
-                    : 'Direct comparison between issued sales and received purchases for VAT filing position'}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs font-bold text-indigo-200 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10">
-              <span className="text-slate-400">{language === 'ar' ? 'عدد الوثائق المدرجة:' : 'Docs Count:'}</span>
-              <span className="text-white font-black">{filteredInvoices.length}</span>
-              <span className="text-slate-500">|</span>
-              <span className="text-sky-300">{sentTotals.count} {language === 'ar' ? 'صادرة' : 'Sent'}</span>
-              <span className="text-slate-500">vs</span>
-              <span className="text-emerald-300">{receivedTotals.count} {language === 'ar' ? 'مستلمة' : 'Recv'}</span>
-            </div>
-          </div>
-
-          {/* Master 4 Difference KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Card 1: Net Margin / Sales vs Purchases Difference */}
-            <div className="bg-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:border-white/20 transition-all">
-              <div className="flex items-center justify-between text-xs font-bold text-indigo-200/80 mb-2">
-                <span>{language === 'ar' ? 'فرق صافي القيمة (المبيعات - المشتريات)' : 'Net Value Difference'}</span>
-                <div className={`p-1.5 rounded-lg ${diffMetrics.netDiff >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
-                  {diffMetrics.netDiff >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                </div>
-              </div>
-              <div className="text-xl md:text-2xl font-black tracking-tight text-white">
-                {formatMoney(Math.abs(diffMetrics.netDiff))} <span className="text-xs font-bold text-slate-400">EGP</span>
-              </div>
-              <div className="mt-2 flex items-center gap-2 text-xs font-bold">
-                <span className={`px-2 py-0.5 rounded-md ${diffMetrics.netDiff >= 0 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}`}>
-                  {diffMetrics.netDiff >= 0 ? (language === 'ar' ? '🟢 فائض مبيعات' : 'Sales Surplus') : (language === 'ar' ? '🔴 عجز / مشتريات أعلى' : 'Purchase Deficit')}
-                </span>
-                {diffMetrics.marginPct !== 0 && (
-                  <span className="text-indigo-300/80 text-[11px]">
-                    {diffMetrics.marginPct > 0 ? `+${diffMetrics.marginPct}%` : `${diffMetrics.marginPct}%`}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Card 2: VAT Position (ضريبة المخرجات - ضريبة المدخلات) */}
-            <div className={`backdrop-blur-md rounded-2xl p-4 border transition-all ${
-              diffMetrics.vatDiff >= 0 
-                ? 'bg-gradient-to-br from-amber-500/15 via-white/5 to-white/5 border-amber-500/30 hover:border-amber-500/50' 
-                : 'bg-gradient-to-br from-teal-500/15 via-white/5 to-white/5 border-teal-500/30 hover:border-teal-500/50'
-            }`}>
-              <div className="flex items-center justify-between text-xs font-bold text-indigo-200/80 mb-2">
-                <span className="flex items-center gap-1.5">
-                  <Percent className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{language === 'ar' ? 'موقف ضريبة القيمة المضافة (14%)' : 'Net VAT Position (14%)'}</span>
-                </span>
-                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${diffMetrics.vatDiff >= 0 ? 'bg-amber-400 text-slate-950' : 'bg-teal-400 text-slate-950'}`}>
-                  {diffMetrics.vatDiff >= 0 ? (language === 'ar' ? 'سداد' : 'Payable') : (language === 'ar' ? 'دائن' : 'Credit')}
-                </span>
-              </div>
-              <div className="text-xl md:text-2xl font-black tracking-tight text-white">
-                {formatMoney(Math.abs(diffMetrics.vatDiff))} <span className="text-xs font-bold text-slate-400">EGP</span>
-              </div>
-              <div className="mt-2 text-xs font-bold">
-                {diffMetrics.vatDiff >= 0 ? (
-                  <span className="text-amber-300 flex items-center gap-1">
-                    <span>⚡ {language === 'ar' ? 'صافي ضريبة مستحقة السداد للضرائب' : 'Net Tax Payable to ETA'}</span>
-                  </span>
-                ) : (
-                  <span className="text-teal-300 flex items-center gap-1">
-                    <span>🛡️ {language === 'ar' ? 'رصيد ضريبة دائن (مسترد / يرحل)' : 'Tax Credit / Refundable'}</span>
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Card 3: Grand Total Cash Difference */}
-            <div className="bg-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:border-white/20 transition-all">
-              <div className="flex items-center justify-between text-xs font-bold text-indigo-200/80 mb-2">
-                <span>{language === 'ar' ? 'فرق الإجمالي شامل الضريبة' : 'Grand Total Difference'}</span>
-                <Receipt className="w-4 h-4 text-indigo-400" />
-              </div>
-              <div className="text-xl md:text-2xl font-black tracking-tight text-white">
-                {formatMoney(Math.abs(diffMetrics.totalAmountDiff))} <span className="text-xs font-bold text-slate-400">EGP</span>
-              </div>
-              <div className="mt-2 text-xs font-bold text-indigo-200/70">
-                <span>{language === 'ar' ? 'صادر: ' : 'Sent: '}</span>
-                <span className="text-sky-300 font-mono">{formatMoney(sentTotals.totalAmount)}</span>
-                <span className="mx-1">/</span>
-                <span>{language === 'ar' ? 'مستلم: ' : 'Recv: '}</span>
-                <span className="text-emerald-300 font-mono">{formatMoney(receivedTotals.totalAmount)}</span>
-              </div>
-            </div>
-
-            {/* Card 4: Volume & Transaction Counts Difference */}
-            <div className="bg-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/10 hover:border-white/20 transition-all">
-              <div className="flex items-center justify-between text-xs font-bold text-indigo-200/80 mb-2">
-                <span>{language === 'ar' ? 'فرق عدد المعاملات والوثائق' : 'Transaction Volume Difference'}</span>
-                <ArrowRightLeft className="w-4 h-4 text-purple-400" />
-              </div>
-              <div className="text-xl md:text-2xl font-black tracking-tight text-white">
-                {Math.abs(diffMetrics.countDiff)} <span className="text-xs font-bold text-slate-400">{language === 'ar' ? 'وثيقة' : 'Docs'}</span>
-              </div>
-              <div className="mt-2 text-xs font-bold text-indigo-200/70">
-                <span className="text-sky-300">{sentTotals.count} {language === 'ar' ? 'مبيعات' : 'Sales'}</span>
-                <span className="mx-1">مقابل</span>
-                <span className="text-emerald-300">{receivedTotals.count} {language === 'ar' ? 'مشتريات' : 'Purchases'}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Visual Comparison Bars (Progress Ratio) */}
-          <div className="bg-white/5 rounded-2xl p-4 border border-white/10 space-y-3">
-            <div className="flex items-center justify-between text-xs font-bold">
-              <span className="text-indigo-200 flex items-center gap-1.5">
-                <PieChart className="w-3.5 h-3.5 text-indigo-400" />
-                <span>{language === 'ar' ? 'النسبة المئوية للمبيعات الصادرة مقابل المشتريات المستلمة' : 'Sales vs Purchases Distribution'}</span>
-              </span>
-              <div className="flex items-center gap-3 text-xs">
-                <span className="flex items-center gap-1 text-sky-300">
-                  <span className="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
-                  <span>{language === 'ar' ? 'صادرة (مبيعات):' : 'Sent:'} {diffMetrics.sentNetRatio}%</span>
-                </span>
-                <span className="flex items-center gap-1 text-emerald-300">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
-                  <span>{language === 'ar' ? 'مستلمة (مشتريات):' : 'Received:'} {diffMetrics.receivedNetRatio}%</span>
-                </span>
-              </div>
-            </div>
-
-            {/* Value Progress Bar */}
-            <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden flex">
-              <div
-                style={{ width: `${diffMetrics.sentNetRatio}%` }}
-                className="bg-gradient-to-r from-sky-500 to-blue-600 transition-all duration-500"
-                title={`${language === 'ar' ? 'صادرة:' : 'Sent:'} ${diffMetrics.sentNetRatio}%`}
-              ></div>
-              <div
-                style={{ width: `${diffMetrics.receivedNetRatio}%` }}
-                className="bg-gradient-to-r from-emerald-500 to-teal-600 transition-all duration-500"
-                title={`${language === 'ar' ? 'مستلمة:' : 'Received:'} ${diffMetrics.receivedNetRatio}%`}
-              ></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 4. TWO-COLUMN SECTIONS: RECEIVED (مستلم) & ISSUED (صادر) WITH TYPES */}
-      {/* ========================================================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* ========================================================= */}
-        {/* A. جزء المستلم - إظهار الأنواع (RECEIVED DOCUMENTS SECTION) */}
+        {/* PILLAR 1: الوثائق الصادرة (المبيعات) - Sky/Blue Theme */}
         {/* ========================================================= */}
-        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-5">
-          <div className="space-y-4">
-            {/* Header */}
-            <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+        <div className="bg-white rounded-3xl p-5 border-2 border-sky-200/90 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2 border-b border-sky-100 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
-                  <ArrowDownLeft className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base md:text-lg font-black text-slate-900 flex items-center gap-2">
-                    <span>{language === 'ar' ? 'الوثائق المستلمة (المشتريات والمصروفات)' : 'Received Documents (Purchases)'}</span>
-                  </h3>
-                  <p className="text-[11px] text-slate-500 font-medium">
-                    {language === 'ar' ? 'فواتير وإشعارات الموردين المسجلة بالضرائب' : 'Supplier invoices & notes from ETA'}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setCurrentPage('eta_received_invoices')}
-                className="flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-xl transition-all cursor-pointer"
-              >
-                <span>{language === 'ar' ? 'عرض السجل' : 'View Docs'}</span>
-                <ChevronRight className={`w-3.5 h-3.5 ${dir === 'rtl' ? 'rotate-180' : ''}`} />
-              </button>
-            </div>
-
-            {/* Received Metric 4-Card Summary */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                <span className="text-[10px] font-bold text-slate-500 block mb-0.5">{language === 'ar' ? 'عدد الوثائق' : 'Docs Count'}</span>
-                <span className="text-base font-black text-slate-900">{receivedTotals.count}</span>
-              </div>
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                <span className="text-[10px] font-bold text-slate-500 block mb-0.5">{language === 'ar' ? 'صافي المشتريات' : 'Net Purchases'}</span>
-                <span className="text-xs font-black text-slate-900 font-mono">{formatMoney(receivedTotals.netAmount)}</span>
-              </div>
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                <span className="text-[10px] font-bold text-emerald-700 block mb-0.5">{language === 'ar' ? 'ضريبة المدخلات (T1)' : 'Input VAT (T1)'}</span>
-                <span className="text-xs font-black text-emerald-700 font-mono">{formatMoney(receivedTotals.vatAmount)}</span>
-              </div>
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                <span className="text-[10px] font-bold text-slate-500 block mb-0.5">{language === 'ar' ? 'الإجمالي الكلي' : 'Total Amount'}</span>
-                <span className="text-xs font-black text-slate-900 font-mono">{formatMoney(receivedTotals.totalAmount)}</span>
-              </div>
-            </div>
-
-            {/* Types Breakdown Table / List */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-black text-slate-700 px-1">
-                <span>{language === 'ar' ? 'تفصيل الأنواع المستلمة (Types Breakdown):' : 'Received Types Breakdown:'}</span>
-                <span className="text-[10px] text-slate-400 font-bold">{receivedTotals.typesList.length} {language === 'ar' ? 'أنواع مسجلة' : 'types'}</span>
-              </div>
-
-              {receivedTotals.typesList.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 text-xs font-bold bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                  {language === 'ar' ? 'لا توجد وثائق مستلمة تطابق خيارات التصفية الحالية.' : 'No received documents match current filters.'}
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden bg-white">
-                  {receivedTotals.typesList.map(typeItem => {
-                    const ratio = receivedTotals.totalAmount > 0 
-                      ? Math.round((typeItem.totalAmount / receivedTotals.totalAmount) * 100) 
-                      : 0;
-
-                    return (
-                      <div key={typeItem.key} className="p-3 hover:bg-slate-50/80 transition-colors flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
-                            typeItem.isCredit 
-                              ? 'bg-amber-100 text-amber-800 border border-amber-200' 
-                              : typeItem.isDebit 
-                              ? 'bg-orange-100 text-orange-800 border border-orange-200'
-                              : typeItem.key === 'ii'
-                              ? 'bg-teal-100 text-teal-800 border border-teal-200'
-                              : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                          }`}>
-                            {typeItem.key.toUpperCase()}
-                          </span>
-                          <div className="truncate">
-                            <h4 className="text-xs font-bold text-slate-900 truncate">
-                              {language === 'ar' ? typeItem.nameAr : typeItem.nameEn}
-                            </h4>
-                            <span className="text-[10px] text-slate-400 font-medium">
-                              {typeItem.count} {language === 'ar' ? 'وثيقة' : 'docs'} ({ratio}%)
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Financials for this type */}
-                        <div className="text-end flex-shrink-0">
-                          <div className="text-xs font-black text-slate-900 font-mono">
-                            {formatMoney(typeItem.totalAmount)} EGP
-                          </div>
-                          <div className="text-[10px] text-slate-500 font-medium flex items-center justify-end gap-1.5">
-                            <span>{language === 'ar' ? 'الصافي: ' : 'Net: '}{formatMoney(typeItem.netAmount)}</span>
-                            <span>•</span>
-                            <span className="text-emerald-700 font-bold">{language === 'ar' ? 'ضريبة: ' : 'VAT: '}{formatMoney(typeItem.vatAmount)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* ========================================================= */}
-        {/* B. جزء الصادرة - إظهار الأنواع (SENT DOCUMENTS SECTION) */}
-        {/* ========================================================= */}
-        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-5">
-          <div className="space-y-4">
-            {/* Header */}
-            <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center font-bold">
+                <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center font-black shadow-xs">
                   <ArrowUpRight className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base md:text-lg font-black text-slate-900 flex items-center gap-2">
-                    <span>{language === 'ar' ? 'الوثائق الصادرة (المبيعات والإيرادات)' : 'Issued Documents (Sales & Revenue)'}</span>
-                  </h3>
-                  <p className="text-[11px] text-slate-500 font-medium">
-                    {language === 'ar' ? 'فواتير وإشعارات المبيعات المصدرة للعملاء' : 'Customer sales invoices & notes on ETA'}
-                  </p>
+                  <h2 className="text-base md:text-lg font-black text-slate-900 leading-tight">
+                    {language === 'ar' ? 'الوثائق الصادرة (المبيعات)' : 'Issued Documents (Sales)'}
+                  </h2>
+                  <span className="text-[11px] text-sky-700 font-bold">
+                    {sentTotals.count} {language === 'ar' ? 'وثيقة صادرة مسجلة' : 'docs issued'}
+                  </span>
                 </div>
               </div>
-
               <button
                 type="button"
                 onClick={() => setCurrentPage('eta_received_invoices')}
-                className="flex items-center gap-1 text-xs font-bold text-sky-700 hover:text-sky-800 bg-sky-50 hover:bg-sky-100 px-2.5 py-1.5 rounded-xl transition-all cursor-pointer"
+                className="text-[11px] font-bold text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer"
               >
-                <span>{language === 'ar' ? 'عرض السجل' : 'View Docs'}</span>
-                <ChevronRight className={`w-3.5 h-3.5 ${dir === 'rtl' ? 'rotate-180' : ''}`} />
+                <span>{language === 'ar' ? 'السجل' : 'View'}</span>
+                <ChevronRight className={`w-3 h-3 ${dir === 'rtl' ? 'rotate-180' : ''}`} />
               </button>
             </div>
 
-            {/* Sent Metric 4-Card Summary */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                <span className="text-[10px] font-bold text-slate-500 block mb-0.5">{language === 'ar' ? 'عدد الوثائق' : 'Docs Count'}</span>
-                <span className="text-base font-black text-slate-900">{sentTotals.count}</span>
-              </div>
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                <span className="text-[10px] font-bold text-slate-500 block mb-0.5">{language === 'ar' ? 'صافي المبيعات' : 'Net Sales'}</span>
-                <span className="text-xs font-black text-slate-900 font-mono">{formatMoney(sentTotals.netAmount)}</span>
-              </div>
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                <span className="text-[10px] font-bold text-sky-700 block mb-0.5">{language === 'ar' ? 'ضريبة المخرجات (T1)' : 'Output VAT (T1)'}</span>
-                <span className="text-xs font-black text-sky-700 font-mono">{formatMoney(sentTotals.vatAmount)}</span>
-              </div>
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                <span className="text-[10px] font-bold text-slate-500 block mb-0.5">{language === 'ar' ? 'الإجمالي الكلي' : 'Total Amount'}</span>
-                <span className="text-xs font-black text-slate-900 font-mono">{formatMoney(sentTotals.totalAmount)}</span>
+            {/* Big Headline Number */}
+            <div className="bg-gradient-to-br from-sky-50/70 to-blue-50/40 p-4 rounded-2xl border border-sky-100/80">
+              <span className="text-xs font-bold text-slate-500 block mb-1">
+                {language === 'ar' ? 'إجمالي المبيعات شامل الضريبة' : 'Grand Total Sales (with Tax)'}
+              </span>
+              <div className="text-2xl md:text-3xl font-black text-sky-950 font-mono tracking-tight">
+                {formatMoney(sentTotals.totalAmount)} <span className="text-xs font-bold text-slate-500">EGP</span>
               </div>
             </div>
 
-            {/* Types Breakdown Table / List */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-black text-slate-700 px-1">
-                <span>{language === 'ar' ? 'تفصيل الأنواع الصادرة (Types Breakdown):' : 'Issued Types Breakdown:'}</span>
-                <span className="text-[10px] text-slate-400 font-bold">{sentTotals.typesList.length} {language === 'ar' ? 'أنواع مسجلة' : 'types'}</span>
+            {/* Breakdown Sub-metrics */}
+            <div className="grid grid-cols-2 gap-2.5 text-xs">
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] font-bold text-slate-500 block mb-0.5">{language === 'ar' ? 'صافي المبيعات' : 'Net Sales'}</span>
+                <span className="text-sm font-black text-slate-900 font-mono">{formatMoney(sentTotals.netAmount)}</span>
               </div>
+              <div className="p-2.5 rounded-xl bg-sky-50/70 border border-sky-100">
+                <span className="text-[10px] font-bold text-sky-800 block mb-0.5">{language === 'ar' ? 'ضريبة المخرجات (T1)' : 'Output VAT (T1)'}</span>
+                <span className="text-sm font-black text-sky-900 font-mono">{formatMoney(sentTotals.vatAmount)}</span>
+              </div>
+            </div>
+          </div>
 
+          {/* Types breakdown inside this pillar */}
+          <div className="border-t border-slate-100 pt-3 space-y-2">
+            <span className="text-[11px] font-bold text-slate-600 block">{language === 'ar' ? 'تفصيل أنواع الصادر:' : 'Issued Types:'}</span>
+            <div className="space-y-1.5">
               {sentTotals.typesList.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 text-xs font-bold bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                  {language === 'ar' ? 'لا توجد وثائق صادرة تطابق خيارات التصفية الحالية.' : 'No issued documents match current filters.'}
-                </div>
+                <span className="text-[11px] text-slate-400 block py-1">{language === 'ar' ? 'لا توجد وثائق صادرة مطابقة' : 'No docs'}</span>
               ) : (
-                <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden bg-white">
-                  {sentTotals.typesList.map(typeItem => {
-                    const ratio = sentTotals.totalAmount > 0 
-                      ? Math.round((typeItem.totalAmount / sentTotals.totalAmount) * 100) 
-                      : 0;
-
-                    return (
-                      <div key={typeItem.key} className="p-3 hover:bg-slate-50/80 transition-colors flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
-                            typeItem.isCredit 
-                              ? 'bg-amber-100 text-amber-800 border border-amber-200' 
-                              : typeItem.isDebit 
-                              ? 'bg-orange-100 text-orange-800 border border-orange-200'
-                              : typeItem.key === 'ei'
-                              ? 'bg-cyan-100 text-cyan-800 border border-cyan-200'
-                              : 'bg-sky-100 text-sky-800 border border-sky-200'
-                          }`}>
-                            {typeItem.key.toUpperCase()}
-                          </span>
-                          <div className="truncate">
-                            <h4 className="text-xs font-bold text-slate-900 truncate">
-                              {language === 'ar' ? typeItem.nameAr : typeItem.nameEn}
-                            </h4>
-                            <span className="text-[10px] text-slate-400 font-medium">
-                              {typeItem.count} {language === 'ar' ? 'وثيقة' : 'docs'} ({ratio}%)
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Financials for this type */}
-                        <div className="text-end flex-shrink-0">
-                          <div className="text-xs font-black text-slate-900 font-mono">
-                            {formatMoney(typeItem.totalAmount)} EGP
-                          </div>
-                          <div className="text-[10px] text-slate-500 font-medium flex items-center justify-end gap-1.5">
-                            <span>{language === 'ar' ? 'الصافي: ' : 'Net: '}{formatMoney(typeItem.netAmount)}</span>
-                            <span>•</span>
-                            <span className="text-sky-700 font-bold">{language === 'ar' ? 'ضريبة: ' : 'VAT: '}{formatMoney(typeItem.vatAmount)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                sentTotals.typesList.map(t => (
+                  <div key={t.key} className="flex items-center justify-between text-xs p-1.5 rounded-lg bg-slate-50 hover:bg-sky-50/50 transition-colors">
+                    <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-sky-100 text-sky-800 uppercase">{t.key}</span>
+                      <span>{language === 'ar' ? t.nameAr : t.nameEn} ({t.count})</span>
+                    </span>
+                    <span className="font-mono font-black text-slate-900">{formatMoney(t.totalAmount)}</span>
+                  </div>
+                ))
               )}
+            </div>
+          </div>
+        </div>
+
+        {/* ========================================================= */}
+        {/* PILLAR 2: الوثائق المستلمة (المشتريات) - Emerald/Green Theme */}
+        {/* ========================================================= */}
+        <div className="bg-white rounded-3xl p-5 border-2 border-emerald-200/90 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2 border-b border-emerald-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black shadow-xs">
+                  <ArrowDownLeft className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base md:text-lg font-black text-slate-900 leading-tight">
+                    {language === 'ar' ? 'الوثائق المستلمة (المشتريات)' : 'Received Documents (Purchases)'}
+                  </h2>
+                  <span className="text-[11px] text-emerald-700 font-bold">
+                    {receivedTotals.count} {language === 'ar' ? 'وثيقة مستلمة مسجلة' : 'docs received'}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCurrentPage('eta_received_invoices')}
+                className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+              >
+                <span>{language === 'ar' ? 'السجل' : 'View'}</span>
+                <ChevronRight className={`w-3 h-3 ${dir === 'rtl' ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
+
+            {/* Big Headline Number */}
+            <div className="bg-gradient-to-br from-emerald-50/70 to-teal-50/40 p-4 rounded-2xl border border-emerald-100/80">
+              <span className="text-xs font-bold text-slate-500 block mb-1">
+                {language === 'ar' ? 'إجمالي المشتريات شامل الضريبة' : 'Grand Total Purchases (with Tax)'}
+              </span>
+              <div className="text-2xl md:text-3xl font-black text-emerald-950 font-mono tracking-tight">
+                {formatMoney(receivedTotals.totalAmount)} <span className="text-xs font-bold text-slate-500">EGP</span>
+              </div>
+            </div>
+
+            {/* Breakdown Sub-metrics */}
+            <div className="grid grid-cols-2 gap-2.5 text-xs">
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] font-bold text-slate-500 block mb-0.5">{language === 'ar' ? 'صافي المشتريات' : 'Net Purchases'}</span>
+                <span className="text-sm font-black text-slate-900 font-mono">{formatMoney(receivedTotals.netAmount)}</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-100">
+                <span className="text-[10px] font-bold text-emerald-800 block mb-0.5">{language === 'ar' ? 'ضريبة المدخلات (T1)' : 'Input VAT (T1)'}</span>
+                <span className="text-sm font-black text-emerald-900 font-mono">{formatMoney(receivedTotals.vatAmount)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Types breakdown inside this pillar */}
+          <div className="border-t border-slate-100 pt-3 space-y-2">
+            <span className="text-[11px] font-bold text-slate-600 block">{language === 'ar' ? 'تفصيل أنواع المستلم:' : 'Received Types:'}</span>
+            <div className="space-y-1.5">
+              {receivedTotals.typesList.length === 0 ? (
+                <span className="text-[11px] text-slate-400 block py-1">{language === 'ar' ? 'لا توجد وثائق مستلمة مطابقة' : 'No docs'}</span>
+              ) : (
+                receivedTotals.typesList.map(t => (
+                  <div key={t.key} className="flex items-center justify-between text-xs p-1.5 rounded-lg bg-slate-50 hover:bg-emerald-50/50 transition-colors">
+                    <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
+                        t.key === 'ii' ? 'bg-teal-100 text-teal-800' : 'bg-emerald-100 text-emerald-800'
+                      }`}>{t.key}</span>
+                      <span>{language === 'ar' ? t.nameAr : t.nameEn} ({t.count})</span>
+                    </span>
+                    <span className="font-mono font-black text-slate-900">{formatMoney(t.totalAmount)}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ========================================================= */}
+        {/* PILLAR 3: صافي الفروق والموقف الضريبي - Purple/Amber Theme */}
+        {/* ========================================================= */}
+        <div className="bg-white rounded-3xl p-5 border-2 border-indigo-200/90 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2 border-b border-indigo-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-black shadow-xs">
+                  <Scale className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base md:text-lg font-black text-slate-900 leading-tight">
+                    {language === 'ar' ? 'صافي الفروق والموقف الضريبي' : 'Net Differences & Tax Clearance'}
+                  </h2>
+                  <span className="text-[11px] text-indigo-700 font-bold">
+                    {language === 'ar' ? 'المقاصة الضريبية والمالية' : 'Financial Reconciliation'}
+                  </span>
+                </div>
+              </div>
+              <span className={`text-[11px] font-black px-2.5 py-1 rounded-lg border ${
+                diffMetrics.vatDiff >= 0
+                  ? 'bg-amber-50 text-amber-800 border-amber-300'
+                  : 'bg-teal-50 text-teal-800 border-teal-300'
+              }`}>
+                {diffMetrics.vatDiff >= 0 ? (language === 'ar' ? '⚡ سداد للضرائب' : 'Tax Payable') : (language === 'ar' ? '🛡️ رصيد دائن' : 'Tax Credit')}
+              </span>
+            </div>
+
+            {/* Big Headline Number for VAT Position */}
+            <div className={`p-4 rounded-2xl border transition-all ${
+              diffMetrics.vatDiff >= 0 
+                ? 'bg-gradient-to-br from-amber-50/80 via-white to-amber-50/40 border-amber-200' 
+                : 'bg-gradient-to-br from-teal-50/80 via-white to-teal-50/40 border-teal-200'
+            }`}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                  <Percent className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>{language === 'ar' ? 'صافي ضريبة القيمة المضافة 14%' : 'Net VAT Clearance (14%)'}</span>
+                </span>
+                <span className="text-[10px] font-bold text-slate-400">
+                  {diffMetrics.vatDiff >= 0 ? (language === 'ar' ? 'مستحق السداد' : 'Payable') : (language === 'ar' ? 'رصيد مرحل' : 'Credit')}
+                </span>
+              </div>
+              <div className="text-2xl md:text-3xl font-black text-slate-900 font-mono tracking-tight">
+                {formatMoney(Math.abs(diffMetrics.vatDiff))} <span className="text-xs font-bold text-slate-500">EGP</span>
+              </div>
+              <p className="text-[11px] font-bold mt-1.5 text-slate-600">
+                {diffMetrics.vatDiff >= 0
+                  ? (language === 'ar' ? '🟢 ضريبة المبيعات تفوق المشتريات بمقدار هذا المبلغ' : 'Output VAT exceeds Input VAT')
+                  : (language === 'ar' ? '🔵 ضريبة المشتريات تفوق المبيعات (رصيد مسترد/يرحل)' : 'Input VAT exceeds Output VAT')}
+              </p>
+            </div>
+
+            {/* Breakdown Sub-metrics */}
+            <div className="grid grid-cols-2 gap-2.5 text-xs">
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] font-bold text-slate-500 block mb-0.5">{language === 'ar' ? 'فرق صافي القيمة' : 'Net Sales Margin'}</span>
+                <span className={`text-sm font-black font-mono ${diffMetrics.netDiff >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                  {diffMetrics.netDiff > 0 ? '+' : ''}{formatMoney(diffMetrics.netDiff)}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] font-bold text-slate-500 block mb-0.5">{language === 'ar' ? 'فرق الإجمالي الكلي' : 'Cash Total Diff'}</span>
+                <span className={`text-sm font-black font-mono ${diffMetrics.totalAmountDiff >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                  {diffMetrics.totalAmountDiff > 0 ? '+' : ''}{formatMoney(diffMetrics.totalAmountDiff)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Distribution Ratio Bar */}
+          <div className="border-t border-slate-100 pt-3 space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+              <span>{language === 'ar' ? 'نسبة الصادر إلى المستلم:' : 'Sales vs Purchases Ratio:'}</span>
+              <span>{diffMetrics.sentNetRatio}% صادر / {diffMetrics.receivedNetRatio}% مستلم</span>
+            </div>
+            <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden flex">
+              <div style={{ width: `${diffMetrics.sentNetRatio}%` }} className="bg-sky-500 transition-all duration-500" />
+              <div style={{ width: `${diffMetrics.receivedNetRatio}%` }} className="bg-emerald-500 transition-all duration-500" />
             </div>
           </div>
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* 5. MONTHLY TAX TIMELINE & RECONCILIATION TABLE (الجدول الشهري الشامل) */}
+      {/* 4. THE MONTHLY TIMELINE TABLE (الشهور من فوق - HORIZONTAL MATRIX) */}
+      {/* (الجدول اللي تحت خلى الشهور من فوق) */}
       {/* ========================================================================= */}
-      <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs space-y-4">
+      <div className="bg-white rounded-3xl p-5 border border-slate-200/90 shadow-xs space-y-4">
         <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3 flex-wrap">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
-              <Calendar className="w-4 h-4" />
+            <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center font-bold shadow-xs">
+              <Calendar className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm md:text-base font-black text-slate-900">
-                {language === 'ar' ? 'التوزيع الشهري للمبيعات والمشتريات والفروق الضريبية' : 'Monthly Sales, Purchases & Tax Breakdown'}
+              <h3 className="text-base md:text-lg font-black text-slate-900">
+                {language === 'ar' ? 'الجدول المالي والضريبي الشهري (شهور السنة في الأعمدة العليا)' : 'Monthly Financial & Tax Matrix (Months Across Columns)'}
               </h3>
               <p className="text-[11px] text-slate-500 font-medium">
-                {language === 'ar' ? 'متابعة شهرية تفصيلية مطابقة لنموذج 10 ضريبة القيمة المضافة' : 'Detailed monthly track matching Egyptian VAT Return Model 10'}
+                {language === 'ar' ? 'عرض مصفوفي متكامل لشهور السنة الـ 12 مطابق لنموذج 10 ضريبة القيمة المضافة' : '12-Month Matrix matching Egyptian VAT Return Model 10'}
               </p>
             </div>
           </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-all cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>{language === 'ar' ? 'تصدير جدول الشهور لإكسيل' : 'Export Matrix Excel'}</span>
+            </button>
+          </div>
         </div>
 
-        {/* Scrollable Responsive Table */}
-        <div className="overflow-x-auto rounded-2xl border border-slate-200">
-          <table className="w-full text-xs text-center divide-y divide-slate-200">
-            <thead className="bg-slate-50/90 text-slate-700 font-black text-[11px] select-none">
-              <tr>
-                <th className="py-3 px-3 border-r border-slate-200">{language === 'ar' ? 'الشهر' : 'Month'}</th>
-                <th colSpan={3} className="py-2 px-3 border-r border-slate-200 bg-sky-50 text-sky-800">
-                  {language === 'ar' ? 'المبيعات الصادرة (Sent)' : 'Issued Sales'}
+        {/* Scrollable Matrix Table */}
+        <div className="overflow-x-auto rounded-2xl border border-slate-200/90 custom-scrollbar">
+          <table className="w-full text-xs border-collapse text-center">
+            {/* Header: Months Across The Top */}
+            <thead>
+              <tr className="bg-slate-100/90 text-slate-800 border-b border-slate-200">
+                <th className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-slate-100 py-3 px-3.5 text-start font-black text-xs border-x border-slate-200 min-w-[210px]`}>
+                  {language === 'ar' ? 'البيان / البند المالي والضريبي' : 'Financial Metric'}
                 </th>
-                <th colSpan={3} className="py-2 px-3 border-r border-slate-200 bg-emerald-50 text-emerald-800">
-                  {language === 'ar' ? 'المشتريات المستلمة (Received)' : 'Received Purchases'}
+                {MONTHS_LIST.map(m => (
+                  <th key={m.id} className="py-3 px-2 text-center font-black text-xs border-r border-slate-200 min-w-[95px] whitespace-nowrap">
+                    {language === 'ar' ? m.shortAr : m.shortEn}
+                  </th>
+                ))}
+                <th className={`py-3 px-3 text-center font-black text-xs bg-indigo-100 text-indigo-950 border-r border-slate-200 min-w-[130px] whitespace-nowrap`}>
+                  {language === 'ar' ? 'الإجمالي الكلي' : 'Total'}
                 </th>
-                <th colSpan={2} className="py-2 px-3 bg-indigo-50 text-indigo-900">
-                  {language === 'ar' ? 'الفروق والموقف الضريبي (Differences)' : 'Net Differences'}
-                </th>
-              </tr>
-              <tr className="bg-slate-100/70 text-[10px] text-slate-600 border-t border-slate-200">
-                <th className="py-2 px-2 border-r border-slate-200">#</th>
-                {/* Sent */}
-                <th className="py-1.5 px-2 border-r border-slate-200">{language === 'ar' ? 'العدد' : 'Qty'}</th>
-                <th className="py-1.5 px-2 border-r border-slate-200">{language === 'ar' ? 'صافي المبيعات' : 'Net Sales'}</th>
-                <th className="py-1.5 px-2 border-r border-slate-200">{language === 'ar' ? 'ضريبة (14%)' : 'Output VAT'}</th>
-                {/* Received */}
-                <th className="py-1.5 px-2 border-r border-slate-200">{language === 'ar' ? 'العدد' : 'Qty'}</th>
-                <th className="py-1.5 px-2 border-r border-slate-200">{language === 'ar' ? 'صافي المشتريات' : 'Net Purchases'}</th>
-                <th className="py-1.5 px-2 border-r border-slate-200">{language === 'ar' ? 'ضريبة (14%)' : 'Input VAT'}</th>
-                {/* Differences */}
-                <th className="py-1.5 px-2 border-r border-slate-200">{language === 'ar' ? 'فرق القيمة (Net Diff)' : 'Net Margin'}</th>
-                <th className="py-1.5 px-2">{language === 'ar' ? 'موقف الضريبة (VAT Net)' : 'Tax Position'}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-mono text-[11px] bg-white">
-              {monthlyBreakdown.map(row => {
-                const hasData = row.sentCount > 0 || row.receivedCount > 0;
-                return (
-                  <tr key={row.monthId} className={`hover:bg-slate-50/80 transition-colors ${!hasData ? 'opacity-45' : ''}`}>
-                    <td className="py-2.5 px-3 font-sans font-black text-slate-800 border-r border-slate-200">
-                      {language === 'ar' ? row.nameAr : row.nameEn}
-                    </td>
-                    {/* Sent columns */}
-                    <td className="py-2.5 px-2 border-r border-slate-200 font-bold text-sky-900">{row.sentCount || '—'}</td>
-                    <td className="py-2.5 px-2 border-r border-slate-200">{row.sentNet ? formatMoney(row.sentNet) : '—'}</td>
-                    <td className="py-2.5 px-2 border-r border-slate-200 font-bold text-sky-700">{row.sentVat ? formatMoney(row.sentVat) : '—'}</td>
-                    {/* Received columns */}
-                    <td className="py-2.5 px-2 border-r border-slate-200 font-bold text-emerald-900">{row.receivedCount || '—'}</td>
-                    <td className="py-2.5 px-2 border-r border-slate-200">{row.receivedNet ? formatMoney(row.receivedNet) : '—'}</td>
-                    <td className="py-2.5 px-2 border-r border-slate-200 font-bold text-emerald-700">{row.receivedVat ? formatMoney(row.receivedVat) : '—'}</td>
-                    {/* Differences */}
-                    <td className={`py-2.5 px-2 border-r border-slate-200 font-bold ${
-                      row.netDiff > 0 ? 'text-emerald-700' : row.netDiff < 0 ? 'text-rose-700' : 'text-slate-400'
-                    }`}>
-                      {row.netDiff !== 0 ? formatMoney(row.netDiff) : '—'}
-                    </td>
-                    <td className="py-2.5 px-2 font-bold font-sans">
-                      {row.vatDiff > 0 ? (
-                        <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded font-mono text-[10px]">
-                          +{formatMoney(row.vatDiff)} ({language === 'ar' ? 'سداد' : 'Pay'})
-                        </span>
-                      ) : row.vatDiff < 0 ? (
-                        <span className="text-teal-700 bg-teal-50 px-2 py-0.5 rounded font-mono text-[10px]">
-                          {formatMoney(row.vatDiff)} ({language === 'ar' ? 'دائن' : 'Credit'})
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot className="bg-slate-100 font-mono font-black text-xs border-t-2 border-slate-300">
-              <tr>
-                <td className="py-3 px-3 font-sans border-r border-slate-200 text-slate-900">{language === 'ar' ? 'المجموع الإجمالي' : 'Total'}</td>
-                <td className="py-3 px-2 border-r border-slate-200 text-sky-900">{sentTotals.count}</td>
-                <td className="py-3 px-2 border-r border-slate-200 text-sky-900">{formatMoney(sentTotals.netAmount)}</td>
-                <td className="py-3 px-2 border-r border-slate-200 text-sky-900">{formatMoney(sentTotals.vatAmount)}</td>
-                <td className="py-3 px-2 border-r border-slate-200 text-emerald-900">{receivedTotals.count}</td>
-                <td className="py-3 px-2 border-r border-slate-200 text-emerald-900">{formatMoney(receivedTotals.netAmount)}</td>
-                <td className="py-3 px-2 border-r border-slate-200 text-emerald-900">{formatMoney(receivedTotals.vatAmount)}</td>
-                <td className={`py-3 px-2 border-r border-slate-200 ${diffMetrics.netDiff >= 0 ? 'text-emerald-800' : 'text-rose-800'}`}>
-                  {formatMoney(diffMetrics.netDiff)}
-                </td>
-                <td className="py-3 px-2">
-                  <span className={`px-2 py-1 rounded text-xs ${diffMetrics.vatDiff >= 0 ? 'bg-amber-200/80 text-amber-950' : 'bg-teal-200/80 text-teal-950'}`}>
-                    {formatMoney(diffMetrics.vatDiff)}
-                  </span>
+
+            <tbody className="divide-y divide-slate-200 font-mono text-[11px] bg-white">
+              {/* ------------------------------------------------------------- */}
+              {/* GROUP 1: الوثائق الصادرة (المبيعات) */}
+              {/* ------------------------------------------------------------- */}
+              <tr className="bg-sky-100/60 font-sans font-black text-sky-950 text-xs">
+                <td colSpan={14} className={`py-2 px-3 text-start border-y border-sky-200 ${dir === 'rtl' ? 'pr-4' : 'pl-4'} flex items-center gap-2`}>
+                  <ArrowUpRight className="w-4 h-4 text-sky-700" />
+                  <span>{language === 'ar' ? 'أولاً: الوثائق الصادرة (المبيعات والإيرادات - Sales)' : '1. Issued Documents (Sales)'}</span>
                 </td>
               </tr>
-            </tfoot>
+
+              <tr className="hover:bg-sky-50/30 transition-colors">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-bold text-slate-700 py-2.5 px-3 text-start border-x border-slate-200`}>
+                  {language === 'ar' ? '• عدد الفواتير الصادرة' : '• Issued Docs Count'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 text-slate-700">
+                    {monthlyDataMap[m.id]?.sentCount || '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-bold bg-sky-50/50 text-sky-900">
+                  {sentTotals.count}
+                </td>
+              </tr>
+
+              <tr className="hover:bg-sky-50/30 transition-colors">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-bold text-slate-700 py-2.5 px-3 text-start border-x border-slate-200`}>
+                  {language === 'ar' ? '• صافي المبيعات (الوعاء الضريبي)' : '• Net Sales Amount'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 text-slate-800">
+                    {monthlyDataMap[m.id]?.sentNet ? formatMoney(monthlyDataMap[m.id].sentNet) : '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-bold bg-sky-50/50 text-sky-900">
+                  {formatMoney(sentTotals.netAmount)}
+                </td>
+              </tr>
+
+              <tr className="hover:bg-sky-50/30 transition-colors bg-sky-50/20">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-black text-sky-800 py-2.5 px-3 text-start border-x border-slate-200`}>
+                  {language === 'ar' ? '• ضريبة المخرجات 14% (T1)' : '• Output VAT 14% (T1)'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 font-bold text-sky-800">
+                    {monthlyDataMap[m.id]?.sentVat ? formatMoney(monthlyDataMap[m.id].sentVat) : '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-black bg-sky-100/60 text-sky-950">
+                  {formatMoney(sentTotals.vatAmount)}
+                </td>
+              </tr>
+
+              <tr className="hover:bg-sky-50/30 transition-colors">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-bold text-slate-900 py-2.5 px-3 text-start border-x border-slate-200`}>
+                  {language === 'ar' ? '• إجمالي الصادر شامل الضريبة' : '• Total Sales with Tax'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 font-semibold text-slate-900">
+                    {monthlyDataMap[m.id]?.sentTotal ? formatMoney(monthlyDataMap[m.id].sentTotal) : '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-black bg-sky-50/50 text-sky-900">
+                  {formatMoney(sentTotals.totalAmount)}
+                </td>
+              </tr>
+
+              {/* ------------------------------------------------------------- */}
+              {/* GROUP 2: الوثائق المستلمة (المشتريات) */}
+              {/* ------------------------------------------------------------- */}
+              <tr className="bg-emerald-100/60 font-sans font-black text-emerald-950 text-xs">
+                <td colSpan={14} className={`py-2 px-3 text-start border-y border-emerald-200 ${dir === 'rtl' ? 'pr-4' : 'pl-4'} flex items-center gap-2`}>
+                  <ArrowDownLeft className="w-4 h-4 text-emerald-700" />
+                  <span>{language === 'ar' ? 'ثانياً: الوثائق المستلمة (المشتريات والمصروفات - Purchases)' : '2. Received Documents (Purchases)'}</span>
+                </td>
+              </tr>
+
+              <tr className="hover:bg-emerald-50/30 transition-colors">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-bold text-slate-700 py-2.5 px-3 text-start border-x border-slate-200`}>
+                  {language === 'ar' ? '• عدد الفواتير المستلمة' : '• Received Docs Count'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 text-slate-700">
+                    {monthlyDataMap[m.id]?.receivedCount || '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-bold bg-emerald-50/50 text-emerald-900">
+                  {receivedTotals.count}
+                </td>
+              </tr>
+
+              <tr className="hover:bg-emerald-50/30 transition-colors">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-bold text-slate-700 py-2.5 px-3 text-start border-x border-slate-200`}>
+                  {language === 'ar' ? '• صافي المشتريات (الوعاء الضريبي)' : '• Net Purchases Amount'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 text-slate-800">
+                    {monthlyDataMap[m.id]?.receivedNet ? formatMoney(monthlyDataMap[m.id].receivedNet) : '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-bold bg-emerald-50/50 text-emerald-900">
+                  {formatMoney(receivedTotals.netAmount)}
+                </td>
+              </tr>
+
+              <tr className="hover:bg-emerald-50/30 transition-colors bg-emerald-50/20">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-black text-emerald-800 py-2.5 px-3 text-start border-x border-slate-200`}>
+                  {language === 'ar' ? '• ضريبة المدخلات 14% (T1)' : '• Input VAT 14% (T1)'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 font-bold text-emerald-800">
+                    {monthlyDataMap[m.id]?.receivedVat ? formatMoney(monthlyDataMap[m.id].receivedVat) : '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-black bg-emerald-100/60 text-emerald-950">
+                  {formatMoney(receivedTotals.vatAmount)}
+                </td>
+              </tr>
+
+              <tr className="hover:bg-emerald-50/30 transition-colors">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-bold text-slate-900 py-2.5 px-3 text-start border-x border-slate-200`}>
+                  {language === 'ar' ? '• إجمالي المستلم شامل الضريبة' : '• Total Purchases with Tax'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 font-semibold text-slate-900">
+                    {monthlyDataMap[m.id]?.receivedTotal ? formatMoney(monthlyDataMap[m.id].receivedTotal) : '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-black bg-emerald-50/50 text-emerald-900">
+                  {formatMoney(receivedTotals.totalAmount)}
+                </td>
+              </tr>
+
+              {/* ------------------------------------------------------------- */}
+              {/* GROUP 3: صافي الفروق والموقف الضريبي (المقاصة) */}
+              {/* ------------------------------------------------------------- */}
+              <tr className="bg-indigo-100/70 font-sans font-black text-indigo-950 text-xs">
+                <td colSpan={14} className={`py-2 px-3 text-start border-y border-indigo-200 ${dir === 'rtl' ? 'pr-4' : 'pl-4'} flex items-center gap-2`}>
+                  <Scale className="w-4 h-4 text-indigo-700" />
+                  <span>{language === 'ar' ? 'ثالثاً: صافي الفروق والمقاصة الضريبية (Differences & Tax Clearance)' : '3. Net Differences & VAT Clearance'}</span>
+                </td>
+              </tr>
+
+              <tr className="hover:bg-slate-50 transition-colors bg-slate-50/30">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-black text-slate-900 py-2.5 px-3 text-start border-x border-slate-200`}>
+                  {language === 'ar' ? '• فرق صافي القيمة (مبيعات - مشتريات)' : '• Net Value Margin (Sales - Purchases)'}
+                </td>
+                {MONTHS_LIST.map(m => {
+                  const val = monthlyDataMap[m.id]?.netDiff || 0;
+                  return (
+                    <td key={m.id} className={`py-2 px-2 border-r border-slate-200 font-bold ${
+                      val > 0 ? 'text-emerald-700' : val < 0 ? 'text-rose-700' : 'text-slate-400'
+                    }`}>
+                      {val !== 0 ? (val > 0 ? `+${formatMoney(val)}` : formatMoney(val)) : '—'}
+                    </td>
+                  );
+                })}
+                <td className={`py-2 px-2 border-r border-slate-200 font-black bg-indigo-50/70 ${
+                  diffMetrics.netDiff >= 0 ? 'text-emerald-800' : 'text-rose-800'
+                }`}>
+                  {diffMetrics.netDiff > 0 ? `+${formatMoney(diffMetrics.netDiff)}` : formatMoney(diffMetrics.netDiff)}
+                </td>
+              </tr>
+
+              <tr className="hover:bg-slate-50 transition-colors bg-amber-50/30">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-black text-amber-900 py-3 px-3 text-start border-x border-slate-200`}>
+                  {language === 'ar' ? '• موقف ضريبة القيمة المضافة (سداد / دائن)' : '• Net VAT Clearance (Payable / Credit)'}
+                </td>
+                {MONTHS_LIST.map(m => {
+                  const vat = monthlyDataMap[m.id]?.vatDiff || 0;
+                  return (
+                    <td key={m.id} className="py-2.5 px-1.5 border-r border-slate-200 font-sans font-bold">
+                      {vat > 0 ? (
+                        <div className="flex flex-col items-center">
+                          <span className="text-amber-800 font-mono font-bold">+{formatMoney(vat)}</span>
+                          <span className="text-[9px] bg-amber-100 text-amber-900 px-1 rounded">{language === 'ar' ? 'سداد' : 'Pay'}</span>
+                        </div>
+                      ) : vat < 0 ? (
+                        <div className="flex flex-col items-center">
+                          <span className="text-teal-800 font-mono font-bold">{formatMoney(vat)}</span>
+                          <span className="text-[9px] bg-teal-100 text-teal-900 px-1 rounded">{language === 'ar' ? 'دائن' : 'Credit'}</span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 font-mono">—</span>
+                      )}
+                    </td>
+                  );
+                })}
+                <td className="py-3 px-2 border-r border-slate-200 font-sans font-black bg-indigo-100/80">
+                  <div className="flex flex-col items-center">
+                    <span className={`font-mono text-xs ${diffMetrics.vatDiff >= 0 ? 'text-amber-950' : 'text-teal-950'}`}>
+                      {formatMoney(Math.abs(diffMetrics.vatDiff))}
+                    </span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-black ${
+                      diffMetrics.vatDiff >= 0 ? 'bg-amber-200 text-amber-950' : 'bg-teal-200 text-teal-950'
+                    }`}>
+                      {diffMetrics.vatDiff >= 0 ? (language === 'ar' ? 'صافي سداد' : 'Total Payable') : (language === 'ar' ? 'رصيد دائن' : 'Total Credit')}
+                    </span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
           </table>
         </div>
       </div>
