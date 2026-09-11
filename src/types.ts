@@ -338,6 +338,10 @@ export interface Product {
   inventory_account_name?: string;
   vat_account_id?: string;
   vat_account_name?: string;
+  sales_vat_account_id?: string;
+  sales_vat_account_name?: string;
+  purchase_vat_account_id?: string;
+  purchase_vat_account_name?: string;
   vat_rate?: number;
   inventory_cost_method?: 'wac' | 'fifo' | 'lifo';
   counter_account_id?: string;

@@ -103,12 +103,12 @@ export class PostingService {
       });
     });
 
-    // VAT / Tax credit line (grouped by item product's vat_account_id)
+    // VAT / Tax credit line (grouped by item product's sales_vat_account_id or vat_account_id)
     const vatGroup: Record<string, { account_id: string; account_name: string; amount: number }> = {};
     invoice.items?.forEach(item => {
       const prod = products.find(p => p.id === item.product_id);
-      const vatAccountId = prod?.vat_account_id || '';
-      const vatAccountName = prod?.vat_account_name || 'حساب ضريبة القيمة المضافة';
+      const vatAccountId = prod?.sales_vat_account_id || prod?.vat_account_id || '';
+      const vatAccountName = prod?.sales_vat_account_name || prod?.vat_account_name || 'حساب ضريبة القيمة المضافة (مبيعات)';
       const rateVal = item.vat_rate !== undefined ? item.vat_rate : (prod?.vat_rate || 0);
       const itemTotal = Number(item.total) || 0;
       const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
@@ -248,12 +248,12 @@ export class PostingService {
       });
     });
 
-    // VAT / Tax debit line for returns (grouped by item product's vat_account_id)
+    // VAT / Tax debit line for returns (grouped by item product's sales_vat_account_id or vat_account_id)
     const vatGroup: Record<string, { account_id: string; account_name: string; amount: number }> = {};
     doc.items?.forEach(item => {
       const prod = products.find(p => p.id === item.product_id);
-      const vatAccountId = prod?.vat_account_id || '';
-      const vatAccountName = prod?.vat_account_name || 'حساب ضريبة القيمة المضافة';
+      const vatAccountId = prod?.sales_vat_account_id || prod?.vat_account_id || '';
+      const vatAccountName = prod?.sales_vat_account_name || prod?.vat_account_name || 'حساب ضريبة القيمة المضافة (مبيعات)';
       const rateVal = prod?.vat_rate || 0;
       const itemTotal = Number(item.total) || 0;
       const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
@@ -393,12 +393,12 @@ export class PostingService {
       });
     });
 
-    // VAT / Tax debit line (grouped by item product's vat_account_id)
+    // VAT / Tax debit line (grouped by item product's purchase_vat_account_id or vat_account_id)
     const vatGroup: Record<string, { account_id: string; account_name: string; amount: number }> = {};
     doc.items?.forEach(item => {
       const prod = products.find(p => p.id === item.product_id);
-      const vatAccountId = prod?.vat_account_id || '';
-      const vatAccountName = prod?.vat_account_name || 'حساب ضريبة القيمة المضافة';
+      const vatAccountId = prod?.purchase_vat_account_id || prod?.vat_account_id || '';
+      const vatAccountName = prod?.purchase_vat_account_name || prod?.vat_account_name || 'حساب ضريبة القيمة المضافة (مشتريات)';
       const rateVal = item.vat_rate !== undefined ? item.vat_rate : (prod?.vat_rate || 0);
       const itemTotal = Number(item.total) || 0;
       const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
@@ -582,12 +582,12 @@ export class PostingService {
       });
     });
 
-    // VAT / Tax credit line for purchase returns (grouped by item product's vat_account_id)
+    // VAT / Tax credit line for purchase returns (grouped by item product's purchase_vat_account_id or vat_account_id)
     const vatGroup: Record<string, { account_id: string; account_name: string; amount: number }> = {};
     doc.items?.forEach(item => {
       const prod = products.find(p => p.id === item.product_id);
-      const vatAccountId = prod?.vat_account_id || '';
-      const vatAccountName = prod?.vat_account_name || 'حساب ضريبة القيمة المضافة';
+      const vatAccountId = prod?.purchase_vat_account_id || prod?.vat_account_id || '';
+      const vatAccountName = prod?.purchase_vat_account_name || prod?.vat_account_name || 'حساب ضريبة القيمة المضافة (مشتريات)';
       const rateVal = prod?.vat_rate || 0;
       const itemTotal = Number(item.total) || 0;
       const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));

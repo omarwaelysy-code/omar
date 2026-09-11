@@ -240,6 +240,8 @@ export const Products: React.FC = () => {
     inventory_account_id: '',
     inventory_cost_method: 'wac',
     vat_account_id: '',
+    sales_vat_account_id: '',
+    purchase_vat_account_id: '',
     vat_rate: 0,
     counter_account_id: '',
     item_group_id: '',
@@ -289,6 +291,8 @@ export const Products: React.FC = () => {
       const defaultCost = accounts.find(a => a.account_usage === 'cost_of_sales') || accounts.find(a => ['cost_of_sales', 'purchases'].includes(a.account_usage || ''));
       const defaultInventory = accounts.find(a => ['inventory', 'raw_materials', 'finished_goods'].includes(a.account_usage || ''));
       const defaultVat = accounts.find(a => a.account_usage === 'vat');
+      const defaultSalesVat = accounts.find(a => a.account_usage === 'output_vat') || defaultVat || accounts.find(a => a.code?.startsWith('222'));
+      const defaultPurchaseVat = accounts.find(a => a.account_usage === 'input_vat') || defaultVat || accounts.find(a => a.code?.startsWith('118') || a.code?.startsWith('222'));
       const defaultGroup = itemGroups[0]?.id || '';
 
       setEditingProduct(null);
@@ -305,7 +309,9 @@ export const Products: React.FC = () => {
         revenue_account_id: defaultRevenue?.id || '',
         cost_account_id: defaultCost?.id || '',
         inventory_account_id: defaultInventory?.id || '',
-        vat_account_id: defaultVat?.id || '',
+        vat_account_id: defaultSalesVat?.id || defaultPurchaseVat?.id || defaultVat?.id || '',
+        sales_vat_account_id: defaultSalesVat?.id || defaultVat?.id || '',
+        purchase_vat_account_id: defaultPurchaseVat?.id || defaultVat?.id || '',
         vat_rate: defaultVat ? 14 : 0,
         type: 'finished_good',
         is_active: true
@@ -514,7 +520,9 @@ export const Products: React.FC = () => {
       const revenueAccount = accounts.find(a => a.id === formData.revenue_account_id);
       const costAccount = accounts.find(a => a.id === formData.cost_account_id);
       const inventoryAccount = accounts.find(a => a.id === formData.inventory_account_id);
-      const vatAccount = accounts.find(a => a.id === formData.vat_account_id);
+      const salesVatAccount = accounts.find(a => a.id === formData.sales_vat_account_id);
+      const purchaseVatAccount = accounts.find(a => a.id === formData.purchase_vat_account_id);
+      const vatAccount = accounts.find(a => a.id === formData.vat_account_id) || salesVatAccount || purchaseVatAccount;
       const itemGroupObj = itemGroups.find(g => g.id === formData.item_group_id);
 
       const validRevenueUsages = ['sales_revenue', 'service_revenue', 'other_revenue', 'financial_revenue', 'sales_returns', 'earned_discounts'];
@@ -536,11 +544,6 @@ export const Products: React.FC = () => {
         return;
       }
 
-      if (vatAccount && vatAccount.account_usage !== 'vat') {
-        showNotification('خطأ: حساب ضريبة القيمة المضافة يلزم أن يكون من قسم (الضرائب) بـ استخدام (ضريبة قيمة مضافة)', 'error');
-        return;
-      }
-      
       let resolvedCode = (formData.code || '').trim();
       if (!resolvedCode) {
         resolvedCode = `PRD-${Date.now().toString().slice(-6)}`;
@@ -560,7 +563,12 @@ export const Products: React.FC = () => {
         revenue_account_name: revenueAccount?.name || '',
         cost_account_name: costAccount?.name || '',
         inventory_account_name: inventoryAccount?.name || '',
-        vat_account_name: vatAccount?.name || ''
+        sales_vat_account_id: formData.sales_vat_account_id || null,
+        sales_vat_account_name: salesVatAccount?.name || '',
+        purchase_vat_account_id: formData.purchase_vat_account_id || null,
+        purchase_vat_account_name: purchaseVatAccount?.name || '',
+        vat_account_id: formData.sales_vat_account_id || formData.purchase_vat_account_id || formData.vat_account_id || null,
+        vat_account_name: salesVatAccount?.name || purchaseVatAccount?.name || vatAccount?.name || ''
       };
 
       if (editingProduct) {
@@ -607,6 +615,8 @@ export const Products: React.FC = () => {
     const defaultCost = accounts.find(a => ['cost_of_sales', 'purchases', 'purchase_returns', 'granted_discounts'].includes(a.account_usage || ''));
     const defaultInventory = accounts.find(a => ['inventory', 'raw_materials', 'work_in_progress', 'finished_goods'].includes(a.account_usage || ''));
     const defaultVat = accounts.find(a => a.account_usage === 'vat');
+    const defaultSalesVat = accounts.find(a => a.account_usage === 'output_vat') || defaultVat || accounts.find(a => a.code?.startsWith('222'));
+    const defaultPurchaseVat = accounts.find(a => a.account_usage === 'input_vat') || defaultVat || accounts.find(a => a.code?.startsWith('118') || a.code?.startsWith('222'));
 
     setEditingProduct(null);
     setFormData({ 
@@ -621,7 +631,9 @@ export const Products: React.FC = () => {
       cost_account_id: defaultCost?.id || '', 
       inventory_account_id: defaultInventory?.id || '', 
       inventory_cost_method: 'wac', 
-      vat_account_id: defaultVat?.id || '',
+      vat_account_id: defaultSalesVat?.id || defaultPurchaseVat?.id || defaultVat?.id || '',
+      sales_vat_account_id: defaultSalesVat?.id || defaultVat?.id || '',
+      purchase_vat_account_id: defaultPurchaseVat?.id || defaultVat?.id || '',
       vat_rate: 0, counter_account_id: '', item_group_id: '', 
       tax_item_code: '',
       tax_code_type: 'EGS',
@@ -659,7 +671,9 @@ export const Products: React.FC = () => {
         cost_account_id: product.cost_account_id || '',
         inventory_account_id: product.inventory_account_id || '',
         inventory_cost_method: product.inventory_cost_method || 'wac',
-        vat_account_id: product.vat_account_id || '',
+        vat_account_id: product.vat_account_id || product.sales_vat_account_id || product.purchase_vat_account_id || '',
+        sales_vat_account_id: product.sales_vat_account_id || product.vat_account_id || '',
+        purchase_vat_account_id: product.purchase_vat_account_id || product.vat_account_id || '',
         vat_rate: product.vat_rate || 0,
         counter_account_id: product.counter_account_id || '',
         item_group_id: product.item_group_id || '',
@@ -1530,633 +1544,427 @@ export const Products: React.FC = () => {
                        </div>
                      )}
 
-                     {/* Base Data Section */}
-                     <div className="space-y-2">
-                        <div className="flex items-center gap-1.5 border-b border-slate-100 pb-1">
-                           <div className="w-5 h-5 bg-emerald-50 text-emerald-600 rounded flex items-center justify-center">
-                              <Package size={12} />
-                           </div>
-                           <h2 className="text-xs font-bold text-slate-800 leading-none uppercase">
-                              {language === 'ar' ? 'المعلومات الأساسية' : 'Primary Information'}
-                           </h2>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-right">
-                           {/* مجموعة الصنف */}
-                           <div className="sm:col-span-2 space-y-0.5">
-                              <label className="block text-[10px] font-bold text-slate-500 px-0.5">
-                                {language === 'ar' ? 'مجموعة الصنف *' : 'Item Group *'}
-                              </label>
-                              <div className="relative group">
-                                <Layers className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
-                                <select 
-                                  required 
-                                  className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 appearance-none outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all`}
-                                  value={formData.item_group_id} 
-                                  onChange={(e) => setFormData({ ...formData, item_group_id: e.target.value })}
-                                >
-                                  <option value="">{language === 'ar' ? '-- اختيار مجموعة الصنف --' : '-- Select item group --'}</option>
-                                  {itemGroups.map(group => (
-                                    <option key={group.id} value={group.id}>
-                                      {group.name} ({group.code})
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                           </div>
+                      {/* Main Form Body: 2-Column Responsive Grid */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 items-start">
+                         {/* Column 1 (Right in RTL): Base Information & Pricing */}
+                         <div className="space-y-2.5">
+                            {/* Base Data Section */}
+                            <div className="space-y-1.5 p-2 bg-slate-50/50 rounded-xl border border-slate-200/60">
+                               <div className="flex items-center gap-1.5 border-b border-slate-200/60 pb-1">
+                                  <div className="w-4 h-4 bg-emerald-50 text-emerald-600 rounded flex items-center justify-center">
+                                     <Package size={11} />
+                                  </div>
+                                  <h2 className="text-[11px] font-bold text-slate-800 leading-none uppercase">
+                                     {language === 'ar' ? 'المعلومات الأساسية' : 'Primary Information'}
+                                  </h2>
+                               </div>
+                               
+                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-right">
+                                  {/* مجموعة الصنف */}
+                                  <div className="sm:col-span-2 space-y-0.5">
+                                     <label className="block text-[10px] font-bold text-slate-500 px-0.5">
+                                       {language === 'ar' ? 'مجموعة الصنف *' : 'Item Group *'}
+                                     </label>
+                                     <div className="relative group">
+                                       <Layers className={`absolute ${dir === 'rtl' ? 'right-2' : 'left-2'} top-1.5 text-slate-400`} size={13} />
+                                       <select 
+                                         required 
+                                         className={`w-full ${dir === 'rtl' ? 'pr-6 pl-2' : 'pl-6 pr-2'} py-1 bg-white border border-slate-200 rounded-md text-xs font-bold text-slate-900 appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all`}
+                                         value={formData.item_group_id} 
+                                         onChange={(e) => setFormData({ ...formData, item_group_id: e.target.value })}
+                                       >
+                                         <option value="">{language === 'ar' ? '-- اختيار مجموعة الصنف --' : '-- Select item group --'}</option>
+                                         {itemGroups.map(group => (
+                                           <option key={group.id} value={group.id}>
+                                             {group.name} ({group.code})
+                                           </option>
+                                         ))}
+                                       </select>
+                                     </div>
+                                  </div>
 
-                           {/* اسم الصنف */}
-                           <div className="sm:col-span-2 space-y-0.5">
-                              <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_name')}</label>
-                              <input 
-                                required 
-                                type="text" 
-                                placeholder="..." 
-                                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all" 
-                                value={formData.name} 
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
-                              />
-                           </div>
+                                  {/* اسم الصنف */}
+                                  <div className="sm:col-span-2 space-y-0.5">
+                                     <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_name')}</label>
+                                     <input 
+                                       required 
+                                       type="text" 
+                                       placeholder="..." 
+                                       className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500 transition-all" 
+                                       value={formData.name} 
+                                       onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
+                                     />
+                                  </div>
 
-                           {/* كود الصنف */}
-                           <div className="space-y-0.5">
-                              <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_code')}</label>
-                              <div className="relative group">
-                                <Hash className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
-                                <input 
-                                  required 
-                                  readOnly 
-                                  type="text" 
-                                  className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-slate-100 border border-slate-200 rounded-lg font-mono text-xs font-bold text-slate-500 outline-none tracking-wider`} 
-                                  value={formData.code} 
-                                />
-                              </div>
-                           </div>
+                                  {/* كود الصنف */}
+                                  <div className="space-y-0.5">
+                                     <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_code')}</label>
+                                     <div className="relative group">
+                                       <Hash className={`absolute ${dir === 'rtl' ? 'right-2' : 'left-2'} top-1.5 text-slate-400`} size={13} />
+                                       <input 
+                                         required 
+                                         readOnly 
+                                         type="text" 
+                                         className={`w-full ${dir === 'rtl' ? 'pr-6 pl-2' : 'pl-6 pr-2'} py-1 bg-slate-100 border border-slate-200 rounded-md font-mono text-xs font-bold text-slate-500 outline-none tracking-wider`} 
+                                         value={formData.code} 
+                                       />
+                                     </div>
+                                  </div>
 
-                           {/* نوع الصنف */}
-                           <div className="space-y-0.5">
-                              <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_type')}</label>
-                              <div className="relative group">
-                                <LayoutGrid className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
-                                <select 
-                                  required 
-                                  className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 appearance-none outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all`} 
-                                  value={formData.type} 
-                                  onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
-                                >
-                                  <option value="finished_good">{t('products.type_finished_good')}</option>
-                                  <option value="service">{t('products.type_service')}</option>
-                                  <option value="raw_material">{t('products.type_raw_material')}</option>
-                                  <option value="commodity">{t('products.type_commodity')}</option>
-                                  <option value="consumable">{t('products.type_consumable')}</option>
-                                  <option value="packaging">{t('products.type_packaging')}</option>
-                                </select>
-                              </div>
-                           </div>
+                                  {/* نوع الصنف */}
+                                  <div className="space-y-0.5">
+                                     <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_type')}</label>
+                                     <div className="relative group">
+                                       <LayoutGrid className={`absolute ${dir === 'rtl' ? 'right-2' : 'left-2'} top-1.5 text-slate-400`} size={13} />
+                                       <select 
+                                         required 
+                                         className={`w-full ${dir === 'rtl' ? 'pr-6 pl-2' : 'pl-6 pr-2'} py-1 bg-white border border-slate-200 rounded-md text-xs font-bold text-slate-900 appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all`} 
+                                         value={formData.type} 
+                                         onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
+                                       >
+                                         <option value="finished_good">{t('products.type_finished_good')}</option>
+                                         <option value="service">{t('products.type_service')}</option>
+                                         <option value="raw_material">{t('products.type_raw_material')}</option>
+                                         <option value="commodity">{t('products.type_commodity')}</option>
+                                         <option value="consumable">{t('products.type_consumable')}</option>
+                                         <option value="packaging">{t('products.type_packaging')}</option>
+                                       </select>
+                                     </div>
+                                  </div>
 
-                           {/* التصنيف */}
-                           <div className="space-y-0.5">
-                              <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_category')}</label>
-                              <input 
-                                type="text" 
-                                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all" 
-                                value={formData.category} 
-                                onChange={(e) => setFormData({ ...formData, category: e.target.value })} 
-                              />
-                           </div>
+                                  {/* التصنيف */}
+                                  <div className="space-y-0.5">
+                                     <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_category')}</label>
+                                     <input 
+                                       type="text" 
+                                       className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500 transition-all" 
+                                       value={formData.category} 
+                                       onChange={(e) => setFormData({ ...formData, category: e.target.value })} 
+                                     />
+                                  </div>
 
-                           {/* الوحدة */}
-                           <div className="space-y-0.5">
-                              <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_unit')}</label>
-                              <select 
-                                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold appearance-none outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all" 
-                                value={formData.unit} 
-                                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                              >
-                                <option value="قطعة">{t('products.unit_piece')}</option>
-                                <option value="كيلو">{t('products.unit_kg')}</option>
-                                <option value="متر">{t('products.unit_meter')}</option>
-                                <option value="لتر">{t('products.unit_liter')}</option>
-                              </select>
-                           </div>
-
-                           {/* 1. كود رفع الوثائق (الفواتير المصدرة / المبيعات) مع إمكانية الرفع والتسجيل بالضرائب */}
-                           <div className="space-y-1 md:col-span-2 bg-purple-50/40 p-2.5 rounded-xl border border-purple-100">
-                             <div className="flex items-center justify-between gap-1 flex-wrap">
-                               <label className="text-[10px] font-bold text-purple-900 flex items-center gap-1">
-                                 <Upload size={12} className="text-purple-600" />
-                                 <span>{language === 'ar' ? 'كود رفع المبيعات بالضرائب (ETA)' : 'Sales Upload ETA Code'}</span>
-                               </label>
-                               <div className="flex items-center gap-1.5 flex-wrap">
-                                 {/* Status badge */}
-                                 {formData.eta_code_status === 'Approved' ? (
-                                   <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-0.5">
-                                     <CheckCircle size={10} className="text-emerald-600" />
-                                     <span>{language === 'ar' ? 'معتمد بالضرائب' : 'Approved'}</span>
-                                   </span>
-                                 ) : formData.eta_code_status === 'Submitted' ? (
-                                   <div className="flex items-center gap-1">
-                                     <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-0.5">
-                                       <Clock size={10} className="text-amber-600 animate-pulse" />
-                                       <span>{language === 'ar' ? 'قيد مراجعة الضرائب' : 'Under Review'}</span>
-                                     </span>
-                                     <button
-                                       type="button"
-                                       onClick={handleCheckEtaStatus}
-                                       disabled={isCheckingEtaStatus}
-                                       title={language === 'ar' ? 'تحديث حالة الكود من منظومة الضرائب' : 'Refresh ETA status'}
-                                       className="p-1 rounded-md bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 text-[10px] transition-all"
+                                  {/* الوحدة */}
+                                  <div className="space-y-0.5">
+                                     <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_unit')}</label>
+                                     <select 
+                                       className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all" 
+                                       value={formData.unit} 
+                                       onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                                      >
-                                       <RefreshCw size={10} className={isCheckingEtaStatus ? 'animate-spin' : ''} />
-                                     </button>
-                                   </div>
-                                 ) : formData.eta_code_status === 'Rejected' ? (
-                                   <span 
-                                     className="px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-0.5 cursor-help"
-                                     title={formData.eta_rejection_reason || 'كود مرفوض من مصلحة الضرائب'}
-                                   >
-                                     <AlertCircle size={10} className="text-rose-600" />
-                                     <span>{language === 'ar' ? 'مرفوض بالضرائب' : 'Rejected'}</span>
-                                   </span>
-                                 ) : (
-                                   <span className="px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-slate-100 text-slate-500 border border-slate-200">
-                                     {language === 'ar' ? 'مسودة / غير مرفوع' : 'Draft'}
-                                   </span>
-                                 )}
-
-                                 {/* Direct Register Button */}
-                                 <button
-                                   type="button"
-                                   onClick={() => setIsEtaRegModalOpen(true)}
-                                   className="px-2.5 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:scale-95 text-white rounded-lg text-[10px] font-black flex items-center gap-1 shadow-sm transition-all"
-                                 >
-                                   <Sparkles size={11} className="text-amber-300" />
-                                   <span>{language === 'ar' ? '⚡ تسجيل/رفع للضرائب' : '⚡ Register with ETA'}</span>
-                                 </button>
-                               </div>
-                             </div>
-
-                             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-1.5">
-                               {/* Item Code Input */}
-                               <div className="md:col-span-2 relative group">
-                                 <FileText className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-purple-400`} size={14} />
-                                 <input 
-                                   type="text" 
-                                   placeholder={language === 'ar' ? 'مثل: EG-672574845-PRD01' : 'e.g. EG-672574845-PRD01'} 
-                                   className={`w-full ${dir === 'rtl' ? 'pr-7 pl-16' : 'pl-7 pr-16'} py-1.5 bg-white border border-purple-200 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all`} 
-                                   value={formData.eta_item_code || ''} 
-                                   onChange={(e) => setFormData({ ...formData, eta_item_code: e.target.value })} 
-                                 />
-                                 {/* Quick Auto-EGS helper button */}
-                                 {formData.eta_code_type === 'EGS' && company?.tax_number && (
-                                   <button
-                                     type="button"
-                                     onClick={() => {
-                                       const cleanTax = (company.tax_number || '').replace(/\D/g, '');
-                                       const suffix = (formData.code || 'ITEM01').trim();
-                                       setFormData(prev => ({ ...prev, eta_item_code: `EG-${cleanTax}-${suffix}` }));
-                                     }}
-                                     title="تركيب كود EGS تلقائياً برقم التسجيل الضريبي"
-                                     className={`absolute ${dir === 'rtl' ? 'left-1.5' : 'right-1.5'} top-1 px-1.5 py-0.5 rounded bg-purple-100 hover:bg-purple-200 text-purple-800 text-[9px] font-black transition-all`}
-                                   >
-                                     {language === 'ar' ? 'توليد تلقائي' : 'Auto'}
-                                   </button>
-                                 )}
-                               </div>
-
-                               {/* Code Type Select */}
-                               <div className="relative group">
-                                 <Layers className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-purple-400`} size={14} />
-                                 <select 
-                                   className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-white border border-purple-200 rounded-lg text-xs font-bold text-slate-900 appearance-none outline-none focus:ring-1 focus:ring-purple-500 transition-all`} 
-                                   value={formData.eta_code_type || 'EGS'} 
-                                   onChange={(e) => setFormData({ ...formData, eta_code_type: e.target.value })}
-                                 >
-                                   <option value="EGS">EGS (المعيار المصري)</option>
-                                   <option value="GS1">GS1 (الترقيم الدولي)</option>
-                                   <option value="GPC">GPC (التصنيف العالمي)</option>
-                                   <option value="OTHER">{language === 'ar' ? 'أخرى' : 'Other'}</option>
-                                 </select>
-                               </div>
-                             </div>
-
-                             {/* Rejection notice if rejected */}
-                             {formData.eta_code_status === 'Rejected' && formData.eta_rejection_reason && (
-                               <div className="p-1.5 bg-rose-50 border border-rose-200 rounded-lg text-[10px] text-rose-800 flex items-start gap-1 mt-1">
-                                 <AlertCircle size={12} className="text-rose-600 mt-0.5 flex-shrink-0" />
-                                 <div>
-                                   <span className="font-bold">سبب رفض الضرائب: </span>
-                                   <span>{formData.eta_rejection_reason}</span>
-                                 </div>
-                               </div>
-                             )}
-                           </div>
-
-                           {/* 2. كود ربط الوثائق المستلمة (فواتير المشتريات / الموردين) */}
-                           <div className="space-y-0.5">
-                              <label className="block text-[10px] font-bold text-blue-700 px-0.5 flex items-center gap-1">
-                                <Link2 size={12} className="text-blue-500" />
-                                <span>{language === 'ar' ? 'كود ربط المشتريات بالضرائب' : 'Received ETA Code'}</span>
-                              </label>
-                              <div className="relative group">
-                                <FileText className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-blue-400`} size={14} />
-                                <input 
-                                  type="text" 
-                                  placeholder={language === 'ar' ? 'كود الوارد من المورد' : 'Code from supplier'} 
-                                  className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-blue-50/30 border border-blue-200 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all`} 
-                                  value={formData.tax_item_code || ''} 
-                                  onChange={(e) => setFormData({ ...formData, tax_item_code: e.target.value })} 
-                                />
-                              </div>
-                           </div>
-
-                           {/* نوع كود الاستلام */}
-                           <div className="space-y-0.5">
-                              <label className="block text-[10px] font-bold text-blue-700 px-0.5">
-                                {language === 'ar' ? 'نوع كود الاستلام' : 'Received Code Type'}
-                              </label>
-                              <div className="relative group">
-                                <Layers className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-blue-400`} size={14} />
-                                <select 
-                                  className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-blue-50/30 border border-blue-200 rounded-lg text-xs font-bold text-slate-900 appearance-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 transition-all`} 
-                                  value={formData.tax_code_type || 'EGS'} 
-                                  onChange={(e) => setFormData({ ...formData, tax_code_type: e.target.value })}
-                                >
-                                  <option value="EGS">EGS (المعيار المصري)</option>
-                                  <option value="GS1">GS1 (الترقيم الدولي)</option>
-                                  <option value="GPC">GPC (التصنيف العالمي)</option>
-                                  <option value="OTHER">{language === 'ar' ? 'أخرى' : 'Other'}</option>
-                                </select>
-                              </div>
-                           </div>
-                        </div>
-                     </div>
-
-                     {/* Pricing Section */}
-                     <div className="space-y-2">
-                        <div className="flex items-center gap-1.5 border-b border-slate-100 pb-1">
-                           <div className="w-5 h-5 bg-emerald-50 text-emerald-600 rounded flex items-center justify-center">
-                              <Wallet size={12} />
-                           </div>
-                           <h2 className="text-xs font-bold text-slate-800 leading-none uppercase">
-                              {language === 'ar' ? 'التسعير والمخزون' : 'Pricing & Inventory'}
-                           </h2>
-                        </div>
-                        <div className="p-2.5 bg-slate-50/70 rounded-xl border border-slate-200/70 space-y-2 text-right">
-                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                              {/* سعر البيع */}
-                              <div className="space-y-0.5">
-                                <label className="block text-[10px] font-bold text-slate-600 px-0.5">{t('products.form_sale_price')}</label>
-                                <div className="relative group">
-                                  <Wallet className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-emerald-500`} size={14} />
-                                  <FormattedNumberInput 
-                                    required 
-                                    className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-white border border-emerald-200 rounded-lg text-sm font-black text-emerald-700 outline-none focus:ring-1 focus:ring-emerald-500 transition-all`} 
-                                    value={formData.sale_price || 0} 
-                                    onChange={(val) => setFormData({ ...formData, sale_price: val })} 
-                                  />
-                                </div>
-                              </div>
-
-                              {/* سعر التكلفة */}
-                              {canViewCost && (
-                                <div className="space-y-0.5">
-                                  <label className="block text-[10px] font-bold text-slate-600 px-0.5">{t('products.form_cost_price')}</label>
-                                  <div className="relative group">
-                                    <Wallet className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
-                                    <FormattedNumberInput 
-                                      required 
-                                      disabled={!canEditCostPrice || isReadOnly} 
-                                      className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-black text-slate-800 outline-none focus:ring-1 focus:ring-slate-500 transition-all`} 
-                                      value={formData.cost_price || 0} 
-                                      onChange={(val) => setFormData({ ...formData, cost_price: val })} 
-                                    />
+                                       <option value="قطعة">{t('products.unit_piece')}</option>
+                                       <option value="كيلو">{t('products.unit_kg')}</option>
+                                       <option value="متر">{t('products.unit_meter')}</option>
+                                       <option value="لتر">{t('products.unit_liter')}</option>
+                                     </select>
                                   </div>
-                                </div>
-                              )}
 
-                              {formData.type !== 'service' && (
-                                <>
-                                  {/* كمية المخزون */}
+                                  {/* كود رفع المبيعات بالضرائب (ETA) */}
+                                  <div className="space-y-1 sm:col-span-2 bg-purple-50/40 p-2 rounded-lg border border-purple-100">
+                                    <div className="flex items-center justify-between gap-1 flex-wrap">
+                                      <label className="text-[10px] font-bold text-purple-900 flex items-center gap-1">
+                                        <Upload size={11} className="text-purple-600" />
+                                        <span>{language === 'ar' ? 'كود رفع المبيعات بالضرائب (ETA)' : 'Sales Upload ETA Code'}</span>
+                                      </label>
+                                      <div className="flex items-center gap-1 flex-wrap">
+                                        {formData.eta_code_status === 'Approved' ? (
+                                          <span className="px-1.5 py-0.5 rounded-full text-[8.5px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-0.5">
+                                            <CheckCircle size={9} className="text-emerald-600" />
+                                            <span>{language === 'ar' ? 'معتمد' : 'Approved'}</span>
+                                          </span>
+                                        ) : formData.eta_code_status === 'Submitted' ? (
+                                          <div className="flex items-center gap-0.5">
+                                            <span className="px-1.5 py-0.5 rounded-full text-[8.5px] font-black bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-0.5">
+                                              <Clock size={9} className="text-amber-600 animate-pulse" />
+                                              <span>{language === 'ar' ? 'مراجعة' : 'Review'}</span>
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={handleCheckEtaStatus}
+                                              disabled={isCheckingEtaStatus}
+                                              className="p-0.5 rounded bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 text-[9px]"
+                                            >
+                                              <RefreshCw size={9} className={isCheckingEtaStatus ? 'animate-spin' : ''} />
+                                            </button>
+                                          </div>
+                                        ) : formData.eta_code_status === 'Rejected' ? (
+                                          <span className="px-1.5 py-0.5 rounded-full text-[8.5px] font-black bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-0.5" title={formData.eta_rejection_reason || ''}>
+                                            <AlertCircle size={9} className="text-rose-600" />
+                                            <span>{language === 'ar' ? 'مرفوض' : 'Rejected'}</span>
+                                          </span>
+                                        ) : (
+                                          <span className="px-1.5 py-0.5 rounded-full text-[8.5px] font-medium bg-slate-100 text-slate-500 border border-slate-200">
+                                            {language === 'ar' ? 'مسودة' : 'Draft'}
+                                          </span>
+                                        )}
+
+                                        <button
+                                          type="button"
+                                          onClick={() => setIsEtaRegModalOpen(true)}
+                                          className="px-2 py-0.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded text-[9.5px] font-black flex items-center gap-1 shadow-xs"
+                                        >
+                                          <Sparkles size={10} className="text-amber-300" />
+                                          <span>{language === 'ar' ? 'تسجيل/رفع' : 'Register'}</span>
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 mt-1">
+                                      <div className="sm:col-span-2 relative group">
+                                        <FileText className={`absolute ${dir === 'rtl' ? 'right-2' : 'left-2'} top-1.5 text-purple-400`} size={13} />
+                                        <input 
+                                          type="text" 
+                                          placeholder={language === 'ar' ? 'مثل: EG-672574845-PRD01' : 'e.g. EG-672574845-PRD01'} 
+                                          className={`w-full ${dir === 'rtl' ? 'pr-6 pl-14' : 'pl-6 pr-14'} py-1 bg-white border border-purple-200 rounded-md text-xs font-mono font-bold text-slate-900 outline-none focus:ring-1 focus:ring-purple-500 transition-all`} 
+                                          value={formData.eta_item_code || ''} 
+                                          onChange={(e) => setFormData({ ...formData, eta_item_code: e.target.value })} 
+                                        />
+                                        {formData.eta_code_type === 'EGS' && company?.tax_number && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const cleanTax = (company.tax_number || '').replace(/\D/g, '');
+                                              const suffix = (formData.code || 'ITEM01').trim();
+                                              setFormData(prev => ({ ...prev, eta_item_code: `EG-${cleanTax}-${suffix}` }));
+                                            }}
+                                            className={`absolute ${dir === 'rtl' ? 'left-1' : 'right-1'} top-1 px-1 py-0.5 rounded bg-purple-100 hover:bg-purple-200 text-purple-800 text-[8.5px] font-black`}
+                                          >
+                                            {language === 'ar' ? 'توليد' : 'Auto'}
+                                          </button>
+                                        )}
+                                      </div>
+
+                                      <div className="relative group">
+                                        <Layers className={`absolute ${dir === 'rtl' ? 'right-2' : 'left-2'} top-1.5 text-purple-400`} size={13} />
+                                        <select 
+                                          className={`w-full ${dir === 'rtl' ? 'pr-6 pl-2' : 'pl-6 pr-2'} py-1 bg-white border border-purple-200 rounded-md text-xs font-bold text-slate-900 appearance-none outline-none focus:ring-1 focus:ring-purple-500 transition-all`} 
+                                          value={formData.eta_code_type || 'EGS'} 
+                                          onChange={(e) => setFormData({ ...formData, eta_code_type: e.target.value })}
+                                        >
+                                          <option value="EGS">EGS (المعيار المصري)</option>
+                                          <option value="GS1">GS1 (الترقيم الدولي)</option>
+                                          <option value="GPC">GPC (التصنيف العالمي)</option>
+                                          <option value="OTHER">{language === 'ar' ? 'أخرى' : 'Other'}</option>
+                                        </select>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* كود ربط المشتريات بالضرائب */}
+                                  <div className="space-y-0.5 sm:col-span-1">
+                                     <label className="block text-[10px] font-bold text-blue-700 px-0.5 flex items-center gap-1">
+                                       <Link2 size={11} className="text-blue-500" />
+                                       <span>{language === 'ar' ? 'كود ربط المشتريات (ETA)' : 'Received ETA Code'}</span>
+                                     </label>
+                                     <div className="relative group">
+                                       <FileText className={`absolute ${dir === 'rtl' ? 'right-2' : 'left-2'} top-1.5 text-blue-400`} size={13} />
+                                       <input 
+                                         type="text" 
+                                         placeholder={language === 'ar' ? 'كود الوارد من المورد' : 'Supplier code'} 
+                                         className={`w-full ${dir === 'rtl' ? 'pr-6 pl-2' : 'pl-6 pr-2'} py-1 bg-blue-50/40 border border-blue-200 rounded-md text-xs font-mono font-bold text-slate-900 outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 transition-all`} 
+                                         value={formData.tax_item_code || ''} 
+                                         onChange={(e) => setFormData({ ...formData, tax_item_code: e.target.value })} 
+                                       />
+                                     </div>
+                                  </div>
+
+                                  {/* نوع كود الاستلام */}
+                                  <div className="space-y-0.5 sm:col-span-1">
+                                     <label className="block text-[10px] font-bold text-blue-700 px-0.5">
+                                       {language === 'ar' ? 'نوع كود الاستلام' : 'Received Code Type'}
+                                     </label>
+                                     <div className="relative group">
+                                       <Layers className={`absolute ${dir === 'rtl' ? 'right-2' : 'left-2'} top-1.5 text-blue-400`} size={13} />
+                                       <select 
+                                         className={`w-full ${dir === 'rtl' ? 'pr-6 pl-2' : 'pl-6 pr-2'} py-1 bg-blue-50/40 border border-blue-200 rounded-md text-xs font-bold text-slate-900 appearance-none outline-none focus:bg-white focus:ring-1 focus:ring-blue-500 transition-all`} 
+                                         value={formData.tax_code_type || 'EGS'} 
+                                         onChange={(e) => setFormData({ ...formData, tax_code_type: e.target.value })}
+                                       >
+                                         <option value="EGS">EGS (المعيار المصري)</option>
+                                         <option value="GS1">GS1 (الترقيم الدولي)</option>
+                                         <option value="GPC">GPC (التصنيف العالمي)</option>
+                                         <option value="OTHER">{language === 'ar' ? 'أخرى' : 'Other'}</option>
+                                       </select>
+                                     </div>
+                                  </div>
+                               </div>
+                            </div>
+
+                            {/* Pricing Section */}
+                            <div className="space-y-1.5 p-2 bg-slate-50/50 rounded-xl border border-slate-200/60">
+                               <div className="flex items-center gap-1.5 border-b border-slate-200/60 pb-1">
+                                  <div className="w-4 h-4 bg-emerald-50 text-emerald-600 rounded flex items-center justify-center">
+                                     <Wallet size={11} />
+                                  </div>
+                                  <h2 className="text-[11px] font-bold text-slate-800 leading-none uppercase">
+                                     {language === 'ar' ? 'التسعير والمخزون' : 'Pricing & Inventory'}
+                                  </h2>
+                               </div>
+                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-right">
+                                  {/* سعر البيع */}
                                   <div className="space-y-0.5">
-                                     <label className="block text-[10px] font-bold text-slate-600 px-0.5">{t('products.form_stock_quantity')}</label>
-                                     <FormattedNumberInput 
-                                       disabled 
-                                       className="w-full px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 outline-none opacity-80 cursor-not-allowed" 
-                                       value={formData.stock || 0} 
-                                       onChange={(val) => setFormData({ ...formData, stock: val })} 
-                                     />
-                                  </div>
-
-                                  {/* حد الطلب الأدنى */}
-                                  <div className="space-y-0.5">
-                                     <label className="block text-[10px] font-bold text-slate-600 px-0.5">{t('products.form_min_stock')}</label>
-                                     <FormattedNumberInput 
-                                       className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none focus:ring-1 focus:ring-rose-500 transition-all" 
-                                       value={formData.min_stock || 0} 
-                                       onChange={(val) => setFormData({ ...formData, min_stock: val })} 
-                                     />
-                                  </div>
-                                </>
-                              )}
-                           </div>
-
-                           {/* Fractional Allowance Settings */}
-                           {formData.type !== 'service' && (
-                             <div className="pt-1.5 border-t border-slate-200/60 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                               <div className="px-2.5 py-1 bg-white rounded-lg border border-slate-200/70 flex items-center justify-between gap-2">
-                                 <div className="min-w-0">
-                                   <h4 className="text-[11px] font-bold text-slate-800 leading-tight">
-                                     {t('products.allow_issue_fraction')}
-                                   </h4>
-                                   <p className="text-[9px] text-slate-400 font-medium truncate">
-                                     {t('products.allow_issue_fraction_desc')}
-                                   </p>
-                                 </div>
-                                 <button
-                                   type="button"
-                                   onClick={() => setFormData({ ...formData, allow_issue_fraction: !formData.allow_issue_fraction })}
-                                   className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors focus:outline-none ${formData.allow_issue_fraction ? 'bg-emerald-600' : 'bg-slate-200'}`}
-                                 >
-                                   <span
-                                     className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${formData.allow_issue_fraction ? (dir === 'rtl' ? '-translate-x-3.5' : 'translate-x-3.5') : (dir === 'rtl' ? '-translate-x-0.5' : 'translate-x-0.5')}`}
-                                   />
-                                 </button>
-                               </div>
-
-                               <div className="px-2.5 py-1 bg-white rounded-lg border border-slate-200/70 flex items-center justify-between gap-2">
-                                 <div className="min-w-0">
-                                   <h4 className="text-[11px] font-bold text-slate-800 leading-tight">
-                                     {t('products.allow_receipt_fraction')}
-                                   </h4>
-                                   <p className="text-[9px] text-slate-400 font-medium truncate">
-                                     {t('products.allow_receipt_fraction_desc')}
-                                   </p>
-                                 </div>
-                                 <button
-                                   type="button"
-                                   onClick={() => setFormData({ ...formData, allow_receipt_fraction: !formData.allow_receipt_fraction })}
-                                   className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors focus:outline-none ${formData.allow_receipt_fraction ? 'bg-emerald-600' : 'bg-slate-200'}`}
-                                 >
-                                   <span
-                                     className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${formData.allow_receipt_fraction ? (dir === 'rtl' ? '-translate-x-3.5' : 'translate-x-3.5') : (dir === 'rtl' ? '-translate-x-0.5' : 'translate-x-0.5')}`}
-                                   />
-                                 </button>
-                               </div>
-                             </div>
-                           )}
-                        </div>
-                     </div>
-
-                     {/* Stock Ledger Report Shortcut Banner */}
-                     {editingProduct && formData.type !== 'service' && (
-                       <div className="p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-right">
-                         <div className="flex items-center gap-2">
-                           <div className="w-6 h-6 bg-emerald-100 text-emerald-700 rounded flex items-center justify-center flex-shrink-0">
-                             <History size={13} />
-                           </div>
-                           <div>
-                             <h3 className="text-[11px] font-bold text-slate-900 leading-none">
-                               {language === 'ar' ? 'كارت حركة وتكلفة الصنف' : 'Product Stock Card'}
-                             </h3>
-                             <p className="text-slate-500 text-[10px] font-medium mt-0.5">
-                               {language === 'ar' ? 'تحليل تفصيلي للحركات الواردة والمصروفة والأسعار' : 'Detailed movement history'}
-                             </p>
-                           </div>
-                         </div>
-                         <button 
-                           type="button"
-                           onClick={() => {
-                             setIsModalOpen(false);
-                             setPendingViewDoc({ type: 'stock_card', idOrNumber: editingProduct.id });
-                             setCurrentPage('stock_card_report');
-                           }}
-                           className="px-3 py-1 bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg transition-all font-bold text-[10px] flex items-center gap-1 shadow-2xs flex-shrink-0"
-                         >
-                           <History size={12} />
-                           <span>{language === 'ar' ? 'عرض كارت الصنف الكامل 📊' : 'View Stock Card'}</span>
-                         </button>
-                       </div>
-                     )}
-
-                     {/* Media & Barcode Section */}
-                     <div className="space-y-2">
-                        <div className="flex items-center gap-1.5 border-b border-slate-100 pb-1">
-                           <div className="w-5 h-5 bg-sky-50 text-sky-600 rounded flex items-center justify-center">
-                              <Camera size={12} />
-                           </div>
-                           <h2 className="text-xs font-bold text-slate-800 leading-none uppercase">
-                              {language === 'ar' ? 'الوسائط والباركود' : 'Media & Barcode'}
-                           </h2>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-right">
-                           <div>
-                              <label className="block text-[10px] font-bold text-slate-500 mb-0.5 px-0.5">{t('products.form_attachment')}</label>
-                              <div className="relative group">
-                                <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" id="product-attachment" />
-                                <label 
-                                  htmlFor="product-attachment" 
-                                  className="relative flex flex-col items-center justify-center gap-1 w-full h-16 bg-slate-50 border border-dashed border-slate-200 rounded-lg cursor-pointer hover:bg-slate-100 hover:border-emerald-300 transition-all overflow-hidden"
-                                >
-                                  {formData.image_url ? (
-                                    <>
-                                      <img 
-                                        src={formData.image_url} 
-                                        alt="Product preview" 
-                                        className="absolute inset-0 w-full h-full object-cover rounded-lg" 
-                                        referrerPolicy="no-referrer"
+                                    <label className="block text-[10px] font-bold text-slate-600 px-0.5">{t('products.form_sale_price')}</label>
+                                    <div className="relative group">
+                                      <Wallet className={`absolute ${dir === 'rtl' ? 'right-2' : 'left-2'} top-1.5 text-emerald-500`} size={13} />
+                                      <FormattedNumberInput 
+                                        required 
+                                        className={`w-full ${dir === 'rtl' ? 'pr-6 pl-2' : 'pl-6 pr-2'} py-1 bg-white border border-emerald-200 rounded-md text-xs font-black text-emerald-700 outline-none focus:ring-1 focus:ring-emerald-500 transition-all`} 
+                                        value={formData.sale_price || 0} 
+                                        onChange={(val) => setFormData({ ...formData, sale_price: val })} 
                                       />
-                                      <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white rounded-lg">
-                                        <Camera size={14} />
-                                        <span className="text-[10px] font-bold">{t('common.edit')}</span>
+                                    </div>
+                                  </div>
+
+                                  {/* سعر التكلفة */}
+                                  {canViewCost && (
+                                    <div className="space-y-0.5">
+                                      <label className="block text-[10px] font-bold text-slate-600 px-0.5">{t('products.form_cost_price')}</label>
+                                      <div className="relative group">
+                                        <Wallet className={`absolute ${dir === 'rtl' ? 'right-2' : 'left-2'} top-1.5 text-slate-400`} size={13} />
+                                        <FormattedNumberInput 
+                                          required 
+                                          disabled={!canEditCostPrice || isReadOnly} 
+                                          className={`w-full ${dir === 'rtl' ? 'pr-6 pl-2' : 'pl-6 pr-2'} py-1 bg-white border border-slate-200 rounded-md text-xs font-black text-slate-800 outline-none focus:ring-1 focus:ring-slate-500 transition-all`} 
+                                          value={formData.cost_price || 0} 
+                                          onChange={(val) => setFormData({ ...formData, cost_price: val })} 
+                                        />
                                       </div>
-                                    </>
-                                  ) : (
+                                    </div>
+                                  )}
+
+                                  {/* المخزون الحالي */}
+                                  {formData.type !== 'service' && (
                                     <>
-                                      <div className="w-6 h-6 bg-white rounded shadow-2xs flex items-center justify-center text-slate-400 group-hover:text-emerald-500 transition-all">
-                                        <Camera size={13} />
+                                      <div className="space-y-0.5">
+                                         <label className="block text-[10px] font-bold text-slate-600 px-0.5">{t('products.form_stock')}</label>
+                                         <FormattedNumberInput 
+                                           disabled={!canEditStock || isReadOnly} 
+                                           className="w-full px-2 py-1 bg-slate-100 border border-slate-200 rounded-md text-xs font-black text-slate-500 outline-none" 
+                                           value={formData.stock || 0} 
+                                           onChange={(val) => setFormData({ ...formData, stock: val })} 
+                                         />
                                       </div>
-                                      <div className="text-center">
-                                        <span className="text-[10px] font-bold text-slate-600 block leading-tight">إضافة صورة (JPG, PNG)</span>
+
+                                      {/* حد الطلب */}
+                                      <div className="space-y-0.5">
+                                         <label className="block text-[10px] font-bold text-slate-600 px-0.5">{t('products.form_min_stock')}</label>
+                                         <FormattedNumberInput 
+                                           disabled={isReadOnly} 
+                                           className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-black text-slate-800 outline-none focus:ring-1 focus:ring-slate-500 transition-all" 
+                                           value={formData.min_stock || 0} 
+                                           onChange={(val) => setFormData({ ...formData, min_stock: val })} 
+                                         />
                                       </div>
                                     </>
                                   )}
-                                </label>
-                              </div>
-                           </div>
 
-                           <div className="space-y-1.5">
-                              <div className="space-y-0.5">
-                                 <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_barcode')}</label>
-                                 <div className="flex items-center gap-1.5">
-                                   <input 
-                                     type="text" 
-                                     className="flex-1 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-bold outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all" 
-                                     value={formData.barcode} 
-                                     onChange={(e) => setFormData({ ...formData, barcode: e.target.value })} 
-                                   />
-                                   <button 
-                                     type="button" 
-                                     onClick={handleOpenBarcodeSettings} 
-                                     className="p-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg transition-all flex items-center justify-center" 
-                                     title={language === 'ar' ? 'إعدادات الباركود' : 'Barcode Settings'}
-                                   >
-                                     <Settings size={13} />
-                                   </button>
-                                   <button 
-                                     type="button" 
-                                     disabled={!formData.barcode} 
-                                     onClick={handleOpenPrintBarcode} 
-                                     className="p-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-lg transition-all flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed" 
-                                     title={language === 'ar' ? 'طباعة الباركود' : 'Print Barcode'}
-                                   >
-                                     <Printer size={13} />
-                                   </button>
-                                 </div>
-                              </div>
-                              {formData.barcode && (
-                                <div className="p-1.5 bg-white border border-slate-200 rounded-lg flex justify-center shadow-2xs overflow-hidden">
-                                   {(() => {
-                                     const s = getProductBarcodeSettings(formData);
-                                     const isValid = isValidBarcodeValue(formData.barcode, s.type);
-                                     if (!isValid) {
-                                       return <div className="text-rose-500 font-bold text-[10px] text-center">{language === 'ar' ? 'رمز باركود غير صالح لهذا النوع' : 'Invalid barcode'}</div>;
-                                     }
-                                     return s.type === 'QR_CODE' ? (
-                                       <QRCode value={formData.barcode} size={Math.min(Number(s.height) || 32, 36)} />
-                                     ) : (
-                                       <Barcode 
-                                         value={formData.barcode} 
-                                         format={s.type as any} 
-                                         width={Number(s.width) || 1.2} 
-                                         height={Math.min(Number(s.height) || 24, 26)} 
-                                         fontSize={8} 
-                                         displayValue={s.displayValue}
-                                         marginTop={1}
-                                         marginBottom={1}
-                                         marginLeft={2}
-                                         marginRight={2}
-                                       />
-                                     );
-                                   })()}
+                                  {/* خيارات التجزئة */}
+                                  {formData.type !== 'service' && (
+                                    <div className="sm:col-span-2 pt-1 border-t border-slate-200/60 grid grid-cols-2 gap-1.5">
+                                      <div className="px-2 py-0.5 bg-white rounded-md border border-slate-200 flex items-center justify-between gap-1">
+                                        <span className="text-[10px] font-bold text-slate-700 truncate">{t('products.allow_issue_fraction')}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setFormData({ ...formData, allow_issue_fraction: !formData.allow_issue_fraction })}
+                                          className={`relative inline-flex h-3.5 w-6 shrink-0 items-center rounded-full transition-colors ${formData.allow_issue_fraction ? 'bg-emerald-600' : 'bg-slate-200'}`}
+                                        >
+                                          <span className={`inline-block h-2 w-2 transform rounded-full bg-white transition-transform ${formData.allow_issue_fraction ? (dir === 'rtl' ? '-translate-x-3' : 'translate-x-3') : (dir === 'rtl' ? '-translate-x-0.5' : 'translate-x-0.5')}`} />
+                                        </button>
+                                      </div>
+
+                                      <div className="px-2 py-0.5 bg-white rounded-md border border-slate-200 flex items-center justify-between gap-1">
+                                        <span className="text-[10px] font-bold text-slate-700 truncate">{t('products.allow_receipt_fraction')}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setFormData({ ...formData, allow_receipt_fraction: !formData.allow_receipt_fraction })}
+                                          className={`relative inline-flex h-3.5 w-6 shrink-0 items-center rounded-full transition-colors ${formData.allow_receipt_fraction ? 'bg-emerald-600' : 'bg-slate-200'}`}
+                                        >
+                                          <span className={`inline-block h-2 w-2 transform rounded-full bg-white transition-transform ${formData.allow_receipt_fraction ? (dir === 'rtl' ? '-translate-x-3' : 'translate-x-3') : (dir === 'rtl' ? '-translate-x-0.5' : 'translate-x-0.5')}`} />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                               </div>
+                            </div>
+
+                            {/* Stock Ledger Shortcut if editing */}
+                            {editingProduct && formData.type !== 'service' && (
+                              <div className="p-2 bg-emerald-50/50 rounded-xl border border-emerald-100 flex items-center justify-between gap-2 text-right">
+                                <div className="flex items-center gap-1.5">
+                                  <div className="w-5 h-5 bg-emerald-100 text-emerald-700 rounded flex items-center justify-center shrink-0">
+                                    <History size={12} />
+                                  </div>
+                                  <div>
+                                    <h3 className="text-[10px] font-bold text-slate-900 leading-none">{language === 'ar' ? 'كارت حركة وتكلفة الصنف' : 'Stock Card'}</h3>
+                                    <p className="text-slate-400 text-[8.5px] mt-0.5">{language === 'ar' ? 'حركات الوارد والمنصرف والأسعار' : 'Stock movements'}</p>
+                                  </div>
                                 </div>
-                              )}
-                           </div>
-                        </div>
-                     </div>
+                                <button 
+                                  type="button"
+                                  onClick={() => {
+                                    setIsModalOpen(false);
+                                    setPendingViewDoc({ type: 'stock_card', idOrNumber: editingProduct.id });
+                                    setCurrentPage('stock_card_report');
+                                  }}
+                                  className="px-2.5 py-1 bg-emerald-600 text-white hover:bg-emerald-700 rounded-md font-bold text-[9.5px] flex items-center gap-1 shadow-2xs"
+                                >
+                                  <History size={11} />
+                                  <span>{language === 'ar' ? 'عرض الكارت 📊' : 'View'}</span>
+                                </button>
+                              </div>
+                            )}
+                         </div>
 
-                     {/* Accounting Section */}
-                     <div className="space-y-2">
-                        <div className="flex items-center gap-1.5 border-b border-slate-100 pb-1">
-                           <div className="w-5 h-5 bg-slate-100 text-slate-600 rounded flex items-center justify-center">
-                              <LayoutGrid size={12} />
-                           </div>
-                           <h2 className="text-xs font-bold text-slate-800 leading-none uppercase">
-                              {language === 'ar' ? 'الإعدادات المحاسبية' : 'Accounting Setup'}
-                           </h2>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-right">
-                           {/* حساب الإيرادات */}
-                           <div className="space-y-0.5">
-                              <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_revenue_account')}</label>
-                              <select 
-                                required 
-                                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold appearance-none outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all" 
-                                value={formData.revenue_account_id} 
-                                onChange={(e) => setFormData({ ...formData, revenue_account_id: e.target.value })}
-                              >
-                                <option value="">{t('common.select_category')}</option>
-                                {accounts.filter(a => ['sales_revenue', 'service_revenue', 'other_revenue'].includes(a.account_usage || '')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
-                              </select>
-                           </div>
-
-                           {/* حساب تكلفة المبيعات */}
-                           <div className="space-y-0.5">
-                              <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_cost_account')}</label>
-                              <select 
-                                required 
-                                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold appearance-none outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all" 
-                                value={formData.cost_account_id} 
-                                onChange={(e) => setFormData({ ...formData, cost_account_id: e.target.value })}
-                              >
-                                <option value="">{t('common.select_category')}</option>
-                                {accounts.filter(a => a.account_usage === 'cost_of_sales').map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
-                              </select>
-                           </div>
-
-                           {/* حساب المخزون */}
-                           {['finished_good', 'raw_material', 'commodity', 'consumable'].includes(formData.type) && (
-                             <>
-                               <div className="space-y-0.5">
-                                 <label className="block text-[10px] font-bold text-slate-500 px-0.5">
-                                   {t('products.form_inventory_account')} <span className="text-rose-500 font-bold">*</span>
-                                 </label>
-                                 <select 
-                                   required
-                                   className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold appearance-none outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all" 
-                                   value={formData.inventory_account_id} 
-                                   onChange={(e) => setFormData({ ...formData, inventory_account_id: e.target.value })}
-                                 >
-                                   <option value="">{t('common.select_account')}</option>
-                                   {accounts.filter(a => ['inventory', 'raw_materials', 'work_in_progress', 'finished_goods'].includes(a.account_usage || '')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
-                                 </select>
+                         {/* Column 2 (Left in RTL): Media & Barcode + Accounting Setup */}
+                         <div className="space-y-2.5">
+                            {/* Media & Barcode Section */}
+                            <div className="space-y-1.5 p-2 bg-slate-50/50 rounded-xl border border-slate-200/60">
+                               <div className="flex items-center gap-1.5 border-b border-slate-200/60 pb-1">
+                                  <div className="w-4 h-4 bg-sky-50 text-sky-600 rounded flex items-center justify-center">
+                                     <Camera size={11} />
+                                  </div>
+                                  <h2 className="text-[11px] font-bold text-slate-800 leading-none uppercase">
+                                     {language === 'ar' ? 'الوسائط والباركود' : 'Media & Barcode'}
+                                  </h2>
                                </div>
+                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-right">
+                                  <div>
+                                     <label className="block text-[10px] font-bold text-slate-500 mb-0.5 px-0.5">{t('products.form_attachment')}</label>
+                                     <div className="relative group">
+                                       <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" id="product-attachment" />
+                                       <label 
+                                         htmlFor="product-attachment" 
+                                         className="relative flex flex-col items-center justify-center gap-1 w-full h-14 bg-white border border-dashed border-slate-200 rounded-md cursor-pointer hover:bg-slate-100 hover:border-emerald-300 transition-all overflow-hidden"
+                                       >
+                                         {formData.image_url ? (
+                                           <>
+                                             <img 
+                                               src={formData.image_url} 
+                                               alt="Product preview" 
+                                               className="absolute inset-0 w-full h-full object-cover rounded-md" 
+                                               referrerPolicy="no-referrer"
+                                             />
+                                             <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-1 text-white rounded-md">
+                                               <Camera size={12} />
+                                               <span className="text-[9px] font-bold">{t('common.edit')}</span>
+                                             </div>
+                                           </>
+                                         ) : (
+                                           <div className="flex items-center gap-1.5 text-slate-400 group-hover:text-emerald-500">
+                                             <Camera size={13} />
+                                             <span className="text-[9.5px] font-bold text-slate-600">إضافة صورة (JPG, PNG)</span>
+                                           </div>
+                                         )}
+                                       </label>
+                                     </div>
+                                  </div>
 
-                               {/* طريقة تقييم المخزون */}
-                               <div className="space-y-0.5">
-                                 <label className="block text-[10px] font-bold text-slate-500 px-0.5">
-                                   {t('company_settings.inventory_cost_method')}
-                                 </label>
-                                 <select 
-                                   className={`w-full px-2.5 py-1.5 border rounded-lg text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all ${
-                                     editingProduct 
-                                       ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' 
-                                       : 'bg-slate-50 text-slate-900 border-slate-200 focus:bg-white'
-                                   }`} 
-                                   value={formData.inventory_cost_method || 'wac'} 
-                                   onChange={(e) => setFormData({ ...formData, inventory_cost_method: e.target.value as any })}
-                                   disabled={!!editingProduct}
-                                 >
-                                   <option value="wac">{t('company_settings.inventory_cost_method.wac')}</option>
-                                   <option value="fifo">{t('company_settings.inventory_cost_method.fifo')}</option>
-                                   <option value="lifo">{t('company_settings.inventory_cost_method.lifo')}</option>
-                                 </select>
-                               </div>
-                             </>
-                           )}
-
-                           {/* VAT Fields if Company is VAT registered */}
-                           {isVatEnabled && (
-                             <>
-                               <div className="space-y-0.5">
-                                 <label className="block text-[10px] font-bold text-slate-500 px-0.5">
-                                   {t('products.form_vat_account')}
-                                 </label>
-                                 <select 
-                                   className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold appearance-none outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all" 
-                                   value={formData.vat_account_id} 
-                                   onChange={(e) => setFormData({ ...formData, vat_account_id: e.target.value })}
-                                 >
-                                   <option value="">{t('common.select_account')}</option>
-                                   {accounts.filter(a => ['vat', 'input_vat', 'output_vat', 'withholding_tax'].includes(a.account_usage || '')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
-                                 </select>
-                               </div>
-
-                               <div className="space-y-0.5">
-                                 <label className="block text-[10px] font-bold text-slate-500 px-0.5">
-                                   {t('products.form_vat_rate')}
-                                 </label>
-                                 <div className="relative">
-                                   <input 
-                                     type="number" 
-                                     step="0.01" 
-                                     min="0" 
-                                     max="100" 
-                                     placeholder="0" 
-                                     className="w-full pl-2.5 pr-6 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all text-left" 
-                                     value={formData.vat_rate || ''} 
-                                     onChange={(e) => setFormData({ ...formData, vat_rate: parseFloat(e.target.value) || 0 })} 
-                                   />
+                                  <div className="space-y-1">
+                                     <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_barcode')}</label>
+                                     <div className="flex items-center gap-1">
+                                       <input 
+                                         type="text" 
+                                         className="flex-1 px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-mono font-bold outline-none focus:ring-1 focus:ring-emerald-500 transition-all" 
+                                         value={formData.barcode} 
                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs select-none pointer-events-none">
                                      %
                                    </span>

@@ -231,6 +231,10 @@ async function startServer() {
       'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "allow_receipt_fraction" BOOLEAN DEFAULT FALSE',
       'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "allow_issue_fraction_pct" DECIMAL(10, 2) DEFAULT 0',
       'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "allow_receipt_fraction_pct" DECIMAL(10, 2) DEFAULT 0',
+      'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "sales_vat_account_id" VARCHAR(36)',
+      'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "sales_vat_account_name" VARCHAR(255)',
+      'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "purchase_vat_account_id" VARCHAR(36)',
+      'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "purchase_vat_account_name" VARCHAR(255)',
 
       // ETA E-Invoicing persistent tables and column schema enforcement
       'CREATE TABLE IF NOT EXISTS "eta_settings" ("id" VARCHAR(36) PRIMARY KEY, "company_id" VARCHAR(36) NOT NULL UNIQUE REFERENCES "companies"("id") ON DELETE CASCADE, "environment" VARCHAR(20) NOT NULL DEFAULT \'preprod\', "activity_code" VARCHAR(50), "branch_id" VARCHAR(50) DEFAULT \'0\', "country_code" VARCHAR(10) DEFAULT \'EG\', "governorate" VARCHAR(100), "city" VARCHAR(100), "street" VARCHAR(255), "building_number" VARCHAR(50), "postal_code" VARCHAR(50), "client_id" TEXT, "client_secret" TEXT, "operating_key" TEXT, "last_notification_at" TIMESTAMP, "is_configured" BOOLEAN DEFAULT FALSE, "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)',
