@@ -396,7 +396,7 @@ export const PurchaseReturns: React.FC = () => {
               const code = `SUPP-${Date.now().toString().slice(-6)}`;
               let supAccount = accounts.find(a => a.id === settings?.default_supplier_account_id);
               if (!supAccount) {
-                supAccount = accounts.find(a => a.type === 'liability' && (a.name.includes('مورد') || a.name.includes('الموردين')))
+                supAccount = accounts.find(a => ((a as any).type === 'liability' || (a as any).type_name?.includes('خصوم')) && (a.name.includes('مورد') || a.name.includes('الموردين')))
                   || accounts.find(a => a.name.includes('مورد') || a.name.includes('الموردين'))
                   || accounts[0];
               }
