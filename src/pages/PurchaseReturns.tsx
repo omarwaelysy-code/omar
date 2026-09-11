@@ -1393,8 +1393,8 @@ export const PurchaseReturns: React.FC = () => {
         }
       }
 
-      const subtotal = etaLockData ? Number(etaLockData.lockedSubtotal) : (Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)), 0)) || 0);
-      const discount_amount = etaLockData ? Number(etaLockData.lockedDiscount) : (Number(discount) || 0);
+      const subtotal = Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)), 0)) || 0;
+      const discount_amount = Number(discount) || 0;
 
       const sanitizedItems = validItems.map(item => {
         const product = products.find(p => p.id === item.product_id);
@@ -1423,7 +1423,29 @@ export const PurchaseReturns: React.FC = () => {
         ? Number(sanitizedItems.reduce((sum, item) => sum + (Number(item.vat_amount) || 0), 0).toFixed(2))
         : 0;
 
-      const total_amount = etaLockData ? Number(etaLockData.lockedTotal) : (Number(subtotal + vatTotal - discount_amount) || 0);
+      const total_amount = Number((subtotal + vatTotal - discount_amount).toFixed(2));
+
+      // تحقق من مطابقة إجماليات الوثيقة الإلكترونية عند الحفظ (السماح بالتعديل ولكن بشرط تطابق الإجماليات)
+      if (etaLockData) {
+        const expTotal = Number(Number(etaLockData.lockedTotal).toFixed(2));
+        const expTax = Number(Number(etaLockData.lockedTax).toFixed(2));
+        const expDiscount = Number(Number(etaLockData.lockedDiscount).toFixed(2));
+
+        const totalDiff = Math.abs(total_amount - expTotal);
+        const taxDiff = Math.abs(vatTotal - expTax);
+        const discDiff = Math.abs(discount_amount - expDiscount);
+
+        if (totalDiff > 1.0 || taxDiff > 1.0 || discDiff > 1.0) {
+          showNotification(
+            language === 'ar'
+              ? `لا يمكن الحفظ: يجب أن تتطابق الإجماليات مع الوثيقة الإلكترونية (المطلوب: إجمالي ${expTotal}، ضريبة ${expTax}، خصم ${expDiscount} | الحالي: إجمالي ${total_amount}، ضريبة ${vatTotal}، خصم ${discount_amount})`
+              : `Cannot save: Totals must match ETA document (Expected: Total ${expTotal}, Tax ${expTax}, Disc ${expDiscount} | Current: Total ${total_amount}, Tax ${vatTotal}, Disc ${discount_amount})`,
+            'error'
+          );
+          setIsSubmitting(false);
+          return;
+        }
+      }
 
       // Diff calculation
       const changes: any[] = [];
@@ -1626,6 +1648,7 @@ export const PurchaseReturns: React.FC = () => {
         description: description || null,
         notes: returnData.notes || null,
         eta_uuid: etaLockData ? etaLockData.uuid : (editingReturn?.eta_uuid || null),
+        eta_invoice_number: etaLockData ? (etaLockData.internalId || null) : (editingReturn?.eta_invoice_number || null),
         created_at: editingReturn ? editingReturn.created_at : new Date().toISOString(),
         created_by: editingReturn ? editingReturn.created_by : user.id,
         updated_at: editingReturn ? new Date().toISOString() : undefined,
@@ -1834,16 +1857,27 @@ export const PurchaseReturns: React.FC = () => {
           data,
           ReturnSchema,
           journalEntryData,
+      let savedReturnId: string | null = null;
+      if (editingReturn) {
+        await dbService.deleteJournalEntryByReference(editingReturn.id, user.company_id);
+        await TransactionManager.updateWithAccounting(
+          'purchase_returns',
+          editingReturn.id,
+          data,
+          ReturnSchema,
+          journalEntryData,
           JournalEntrySchema
         );
+        savedReturnId = editingReturn.id;
       } else {
-        await TransactionManager.saveWithAccounting(
+        const saveRes = await TransactionManager.saveWithAccounting(
           'purchase_returns',
           data,
           ReturnSchema,
           journalEntryData,
           JournalEntrySchema
         );
+        savedReturnId = (saveRes as any)?.mainId || null;
       }
 
       // Log activity
@@ -1871,6 +1905,23 @@ export const PurchaseReturns: React.FC = () => {
           `إضافة مرتجع مشتريات جديد رقم: ${return_number}`, 
           'purchase_returns'
         );
+      }
+
+      // إشعار فوري لشاشة الوثائق الإلكترونية لتحديث الحالة فوراً (0ms) ومنع التكرار
+      const savedEtaUuid = etaLockData ? etaLockData.uuid : (editingReturn?.eta_uuid || null);
+      const savedEtaInvNum = etaLockData ? (etaLockData.internalId || null) : (editingReturn?.eta_invoice_number || null);
+      if (savedEtaUuid || savedEtaInvNum) {
+        const regDetail = {
+          uuid: savedEtaUuid,
+          internalId: savedEtaInvNum,
+          id: savedReturnId,
+          docNumber: return_number,
+          docType: 'purchase_return' as const
+        };
+        window.dispatchEvent(new CustomEvent('eta_document_registered', { detail: regDetail }));
+        try {
+          localStorage.setItem('eta_last_registered', JSON.stringify({ ...regDetail, timestamp: Date.now() }));
+        } catch (e) {}
       }
 
       showNotification(language === 'ar' ? (editingReturn ? 'تم تحديث مرتجع المشتريات بنجاح' : 'تم حفظ مرتجع المشتريات بنجاح') : (editingReturn ? 'Purchase return updated successfully' : 'Purchase return saved successfully'), 'success');
@@ -1943,6 +1994,7 @@ export const PurchaseReturns: React.FC = () => {
     const num = await generateReturnNumber(newDate);
     setReturnNumber(num);
     setEditingReturn(null);
+    setEtaLockData(null);
     setIsModalOpen(true);
   };
 
@@ -1954,6 +2006,22 @@ export const PurchaseReturns: React.FC = () => {
       if (!fullData) throw new Error('Return details not found');
 
       setEditingReturn(fullData);
+      if (fullData.eta_uuid || fullData.eta_invoice_number) {
+        setEtaLockData({
+          uuid: fullData.eta_uuid || '',
+          internalId: fullData.eta_invoice_number || '',
+          lockedTotal: Number(fullData.total_amount) || 0,
+          lockedDiscount: Number(fullData.discount_amount || fullData.discount) || 0,
+          lockedTax: Number(fullData.tax_amount || fullData.vat_total) || 0,
+          lockedSubtotal: Number(fullData.subtotal) || 0,
+          issuerName: fullData.supplier_name || '',
+          issuerTax: '',
+          supplierMappings: [],
+          itemMappings: []
+        });
+      } else {
+        setEtaLockData(null);
+      }
       setReturnNumber(fullData.return_number);
       setReturnData({
         supplier_id: fullData.supplier_id,
@@ -2273,7 +2341,14 @@ export const PurchaseReturns: React.FC = () => {
                           onClick={() => handleEdit(ret)}
                         >
                           <td className="px-6 py-4">
-                            <span className="font-mono text-xs bg-red-50 px-2 py-1 rounded text-red-700 font-bold">{ret.return_number}</span>
+                            <div className="flex flex-col gap-1 items-start">
+                              <span className="font-mono text-xs bg-red-50 px-2 py-1 rounded text-red-700 font-bold">{ret.return_number}</span>
+                              {ret.eta_invoice_number && (
+                                <span className="font-mono text-[10px] bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-indigo-700 font-bold" title={ret.eta_uuid || ''}>
+                                  {language === 'ar' ? 'إلكترونية:' : 'ETA:'} {ret.eta_invoice_number}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-6 py-4 font-bold text-zinc-900">{ret.supplier_name}</td>
                           <td className="px-6 py-4 text-zinc-500">{formatDate(ret.date)}</td>
@@ -2399,8 +2474,13 @@ export const PurchaseReturns: React.FC = () => {
                     <div className="flex flex-col h-full justify-between">
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-mono text-xs bg-red-50 px-2 py-1 rounded text-red-700 font-bold">{ret.return_number}</span>
+                            {ret.eta_invoice_number && (
+                              <span className="font-mono text-[9px] bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-indigo-700 font-bold" title={ret.eta_uuid || ''}>
+                                {language === 'ar' ? 'إلكترونية:' : 'ETA:'} {ret.eta_invoice_number}
+                              </span>
+                            )}
                             {ret.entry_number && (
                               <button
                                 onClick={(e) => {
@@ -2675,6 +2755,12 @@ export const PurchaseReturns: React.FC = () => {
                   <span className="text-[11px] font-mono font-black text-zinc-800 bg-zinc-100 border border-zinc-200 px-1.5 py-0.5 rounded-lg select-all shadow-sm">
                     {returnNumber}
                   </span>
+                  {(etaLockData?.internalId || editingReturn?.eta_invoice_number) && (
+                    <span className="text-[11px] font-mono font-black text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-lg select-all shadow-sm flex items-center gap-1" title={etaLockData?.uuid || editingReturn?.eta_uuid || ''}>
+                      <span className="text-[10px] font-sans font-bold text-indigo-500">{language === 'ar' ? 'الوثيقة الإلكترونية:' : 'ETA Doc:'}</span>
+                      {etaLockData?.internalId || editingReturn?.eta_invoice_number}
+                    </span>
+                  )}
                 </div>
 
                 {editingReturn?.entry_number ? (
@@ -3872,6 +3958,13 @@ export const PurchaseReturns: React.FC = () => {
                         >
                           {viewReturn.entry_number}
                         </button>
+                      </p>
+                    {viewReturn.eta_invoice_number && (
+                      <p className="text-xs text-indigo-700 font-bold mt-1 flex items-center gap-1">
+                        <span>{language === 'ar' ? 'رقم الفاتورة الإلكترونية:' : 'ETA Doc Number:'}</span>
+                        <span className="font-mono bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded text-indigo-800" title={viewReturn.eta_uuid || ''}>
+                          {viewReturn.eta_invoice_number}
+                        </span>
                       </p>
                     )}
                     {viewReturn.currency_id && (

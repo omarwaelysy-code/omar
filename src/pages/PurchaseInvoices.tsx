@@ -2106,16 +2106,10 @@ export const PurchaseInvoices: React.FC = () => {
   };
 
   const calculateSubtotal = () => {
-    if (etaLockData) {
-      return Number(etaLockData.lockedSubtotal) || 0;
-    }
     return items.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
   };
 
   const calculateTotal = () => {
-    if (etaLockData) {
-      return Number(etaLockData.lockedTotal) || 0;
-    }
     const subtotal = items.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
     const vatTotal = isVatEnabled
       ? items.reduce((sum, item) => {
@@ -2571,26 +2565,41 @@ export const PurchaseInvoices: React.FC = () => {
       const supplier = suppliers.find(s => s.id === invoiceData.supplier_id);
       const paymentMethod = paymentMethods.find(pm => pm.id === invoiceData.payment_method_id);
       
-      const subtotal = etaLockData
-        ? Number(etaLockData.lockedSubtotal)
-        : (Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.cost_price || 0)), 0)) || 0);
-      const discount_amount = etaLockData
-        ? Number(etaLockData.lockedDiscount)
-        : (Number(invoiceData.discount) || 0);
+      const subtotal = Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.cost_price || 0)), 0)) || 0;
+      const discount_amount = Number(invoiceData.discount) || 0;
       
-      const vatTotal = etaLockData
-        ? Number(etaLockData.lockedTax)
-        : (isVatEnabled
-          ? Number(validItems.reduce((sum, item) => {
-              const itemTotal = Number(item.quantity || 0) * Number(item.cost_price || 0);
-              const rateVal = Number((item as any).vat_rate) || 0;
-              return sum + (itemTotal * (rateVal / 100));
-            }, 0).toFixed(2))
-          : 0);
+      const vatTotal = isVatEnabled
+        ? Number(validItems.reduce((sum, item) => {
+            const itemTotal = Number(item.quantity || 0) * Number(item.cost_price || 0);
+            const rateVal = Number((item as any).vat_rate) || 0;
+            const vAmount = ((item as any).vat_amount !== undefined && (item as any).vat_amount !== null && Number((item as any).vat_amount) > 0)
+              ? Number((item as any).vat_amount)
+              : (itemTotal * (rateVal / 100));
+            return sum + vAmount;
+          }, 0).toFixed(2))
+        : 0;
 
-      const total_amount = etaLockData
-        ? Number(etaLockData.lockedTotal)
-        : (Number(subtotal + vatTotal - discount_amount) || 0);
+      const total_amount = Number((subtotal + vatTotal - discount_amount).toFixed(2));
+
+      // التحقق من مطابقة الإجماليات مع الوثيقة الإلكترونية
+      if (etaLockData) {
+        const expTotal = Number(Number(etaLockData.lockedTotal).toFixed(2));
+        const expTax = Number(Number(etaLockData.lockedTax).toFixed(2));
+        const expDiscount = Number(Number(etaLockData.lockedDiscount).toFixed(2));
+
+        const totalDiff = Math.abs(total_amount - expTotal);
+        const taxDiff = Math.abs(vatTotal - expTax);
+        const discDiff = Math.abs(discount_amount - expDiscount);
+
+        if (totalDiff > 0.05 || taxDiff > 0.05 || discDiff > 0.05) {
+          const errMsg = language === 'ar'
+            ? `لا يمكن الحفظ: يجب أن تتطابق الإجماليات مع الوثيقة الإلكترونية:\n• المطلوب بالوثيقة: إجمالي ${expTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}، ضريبة ${expTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}، خصم ${expDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 })}\n• الحالي بالفاتورة: إجمالي ${total_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}، ضريبة ${vatTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}، خصم ${discount_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+            : `Cannot save: Totals must match the electronic document:\n• Required: Total ${expTotal.toFixed(2)}, Tax ${expTax.toFixed(2)}, Discount ${expDiscount.toFixed(2)}\n• Current: Total ${total_amount.toFixed(2)}, Tax ${vatTotal.toFixed(2)}, Discount ${discount_amount.toFixed(2)}`;
+          showNotification(errMsg, 'error');
+          setIsSubmitting(false);
+          return;
+        }
+      }
 
       const changes: any[] = [];
       const detailsList: string[] = [];
@@ -2598,6 +2607,7 @@ export const PurchaseInvoices: React.FC = () => {
       const totalSettled = formSettlements.reduce((sum, s) => sum + Number(s.settled_amount), 0);
       if (totalSettled > total_amount) {
         showNotification('التسوية أكبر من المبلغ الإجمالي', 'error');
+        setIsSubmitting(false);
         return;
       }
 
@@ -2813,7 +2823,8 @@ export const PurchaseInvoices: React.FC = () => {
         currency_id: selectedCurrencyId || null,
         exchange_rate: Number(exchangeRate) || 1,
         description: description,
-        eta_uuid: etaLockData ? etaLockData.uuid : (editingInvoice?.eta_uuid || null)
+        eta_uuid: etaLockData ? etaLockData.uuid : (editingInvoice?.eta_uuid || null),
+        eta_invoice_number: etaLockData ? (etaLockData.internalId || null) : (editingInvoice?.eta_invoice_number || null)
       };
 
       const journalItems: any[] = [];
@@ -3169,6 +3180,24 @@ export const PurchaseInvoices: React.FC = () => {
       }
 
       showNotification(editingInvoice ? t('pi.edit_success') : t('pi.add_success'), 'success');
+
+      // إشعار فوري لشاشة الوثائق الإلكترونية لتحديث الحالة فوراً (0ms) ومنع التكرار
+      const savedEtaUuid = etaLockData ? etaLockData.uuid : (editingInvoice?.eta_uuid || null);
+      const savedEtaInvNum = etaLockData ? (etaLockData.internalId || null) : (editingInvoice?.eta_invoice_number || null);
+      if (savedEtaUuid || savedEtaInvNum) {
+        const regDetail = {
+          uuid: savedEtaUuid,
+          internalId: savedEtaInvNum,
+          id: editingInvoice ? editingInvoice.id : (savedInvoiceId || null),
+          docNumber: invoice_number,
+          docType: 'purchase_invoice' as const
+        };
+        window.dispatchEvent(new CustomEvent('eta_document_registered', { detail: regDetail }));
+        try {
+          localStorage.setItem('eta_last_registered', JSON.stringify({ ...regDetail, timestamp: Date.now() }));
+        } catch (e) {}
+      }
+
       setEtaLockData(null);
       setPendingEtaInvoiceForPurchase(null);
       try { sessionStorage.removeItem('pending_eta_invoice_for_purchase'); } catch (e) {}
@@ -3251,6 +3280,22 @@ export const PurchaseInvoices: React.FC = () => {
         }
 
         setEditingInvoice(fullData);
+        if (fullData.eta_uuid || fullData.eta_invoice_number) {
+          setEtaLockData({
+            uuid: fullData.eta_uuid || '',
+            internalId: fullData.eta_invoice_number || '',
+            lockedTotal: Number(fullData.total_amount) || 0,
+            lockedDiscount: Number(fullData.discount_amount) || 0,
+            lockedTax: Number(fullData.tax_amount) || 0,
+            lockedSubtotal: Number(fullData.subtotal) || 0,
+            issuerName: fullData.supplier_name || '',
+            issuerTax: '',
+            supplierMappings: [],
+            itemMappings: []
+          });
+        } else {
+          setEtaLockData(null);
+        }
         setInvoiceData({
           supplier_id: fullData.supplier_id.toString(),
           warehouse_id: fullData.warehouse_id?.toString() || '',
@@ -3641,7 +3686,14 @@ export const PurchaseInvoices: React.FC = () => {
                     onClick={() => openModal(inv)}
                   >
                     <td className="px-6 py-4">
-                      <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold">{inv.invoice_number}</span>
+                      <div className="flex flex-col gap-1 items-start">
+                        <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold">{inv.invoice_number}</span>
+                        {inv.eta_invoice_number && (
+                          <span className="font-mono text-[10px] bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-indigo-700 font-bold" title={inv.eta_uuid || ''}>
+                            {language === 'ar' ? 'إلكترونية:' : 'ETA:'} {inv.eta_invoice_number}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 font-bold text-zinc-900">{inv.supplier_name}</td>
                     <td className="px-6 py-4 text-zinc-500">{formatDate(inv.date)}</td>
@@ -3773,7 +3825,14 @@ export const PurchaseInvoices: React.FC = () => {
 
                 <div className="flex justify-between items-start">
                   <div className="flex flex-col gap-1">
-                    <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
+                      {inv.eta_invoice_number && (
+                        <span className="font-mono text-[9px] bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-indigo-700 font-bold" title={inv.eta_uuid || ''}>
+                          {language === 'ar' ? 'إلكترونية:' : 'ETA:'} {inv.eta_invoice_number}
+                        </span>
+                      )}
+                    </div>
                     <h4 className="font-bold text-zinc-900 group-hover:text-emerald-700 transition-colors text-xl mt-1 tracking-tight">{inv.supplier_name}</h4>
                   </div>
                   {inv.entry_number && (
@@ -3971,6 +4030,16 @@ export const PurchaseInvoices: React.FC = () => {
           ) : (
             <div className="text-[9px] font-bold text-zinc-400">
               {language === 'ar' ? 'القيد المرتبط: لا يوجد قيد مرتبط بعد' : 'Linked JE: No journal entry linked yet'}
+            </div>
+          )}
+
+          {/* Linked ETA Electronic Document Number */}
+          {(etaLockData?.internalId || editingInvoice?.eta_invoice_number) && (
+            <div className="flex items-center gap-1 text-indigo-700 text-[11px] font-bold font-mono leading-none">
+              <span className="text-indigo-500 font-sans font-bold">{language === 'ar' ? 'الفاتورة الإلكترونية:' : 'ETA Doc:'}</span>
+              <span className="bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 font-black text-indigo-800">
+                {etaLockData?.internalId || editingInvoice?.eta_invoice_number}
+              </span>
             </div>
           )}
         </div>
@@ -5410,6 +5479,14 @@ export const PurchaseInvoices: React.FC = () => {
                           >
                             {viewInvoice.entry_number}
                           </button>
+                        </p>
+                      )}
+                      {viewInvoice.eta_invoice_number && (
+                        <p className="text-xs text-indigo-700 font-bold mt-1 flex items-center gap-1">
+                          <span>{language === 'ar' ? 'رقم الفاتورة الإلكترونية:' : 'ETA Doc Number:'}</span>
+                          <span className="font-mono bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded text-indigo-800" title={viewInvoice.eta_uuid || ''}>
+                            {viewInvoice.eta_invoice_number}
+                          </span>
                         </p>
                       )}
                       {viewInvoice.payment_type === 'credit' && viewInvoice.due_date && (

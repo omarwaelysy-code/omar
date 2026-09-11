@@ -349,19 +349,23 @@ export class EtaDocumentService {
   /**
    * Get registered status map for all ETA UUIDs linked to purchase invoices or returns
    */
-  public static async getRegisteredStatusMap(companyId: string): Promise<Record<string, { id: string; docNumber: string; docType: 'purchase_invoice' | 'purchase_return' }>> {
+  public static async getRegisteredStatusMap(companyId: string): Promise<Record<string, { id: string; docNumber: string; docType: 'purchase_invoice' | 'purchase_return'; etaInvoiceNumber?: string }>> {
     if (!companyId) return {};
     try {
       const regRes = await pool.query(
-        `SELECT eta_uuid, id, invoice_number as doc_number, 'purchase_invoice' as doc_type FROM purchase_invoices WHERE company_id = $1 AND eta_uuid IS NOT NULL AND eta_uuid != ''
+        `SELECT eta_uuid, eta_invoice_number, id, invoice_number as doc_number, 'purchase_invoice' as doc_type FROM purchase_invoices WHERE company_id = $1 AND ((eta_uuid IS NOT NULL AND eta_uuid != '') OR (eta_invoice_number IS NOT NULL AND eta_invoice_number != ''))
          UNION ALL
-         SELECT eta_uuid, id, return_number as doc_number, 'purchase_return' as doc_type FROM purchase_returns WHERE company_id = $1 AND eta_uuid IS NOT NULL AND eta_uuid != ''`,
+         SELECT eta_uuid, eta_invoice_number, id, return_number as doc_number, 'purchase_return' as doc_type FROM purchase_returns WHERE company_id = $1 AND ((eta_uuid IS NOT NULL AND eta_uuid != '') OR (eta_invoice_number IS NOT NULL AND eta_invoice_number != ''))`,
         [companyId]
       );
-      const map: Record<string, { id: string; docNumber: string; docType: 'purchase_invoice' | 'purchase_return' }> = {};
+      const map: Record<string, { id: string; docNumber: string; docType: 'purchase_invoice' | 'purchase_return'; etaInvoiceNumber?: string }> = {};
       (regRes.rows || []).forEach(r => {
+        const info = { id: r.id, docNumber: r.doc_number, docType: r.doc_type, etaInvoiceNumber: r.eta_invoice_number };
         if (r.eta_uuid) {
-          map[r.eta_uuid] = { id: r.id, docNumber: r.doc_number, docType: r.doc_type };
+          map[r.eta_uuid] = info;
+        }
+        if (r.eta_invoice_number) {
+          map[r.eta_invoice_number] = info;
         }
       });
       return map;
@@ -465,7 +469,7 @@ export class EtaDocumentService {
           : 0;
         const nonTaxableVatBase = nonTaxableItemsNet;
 
-        const regInfo = regMap[row.uuid];
+        const regInfo = regMap[row.uuid] || (row.internal_id ? regMap[row.internal_id] : undefined);
 
         return {
           uuid: row.uuid,
