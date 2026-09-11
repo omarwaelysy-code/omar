@@ -946,7 +946,7 @@ export function EtaReceivedInvoices() {
     return viewMode === 'all_portal' ? filteredAllInvoices : filteredPeriodInvoices;
   }, [viewMode, filteredAllInvoices, filteredPeriodInvoices]);
 
-  // Compute Supplier / Partner Groups
+  // Compute Tax ID / Partner Groups (تجميع حسب الرقم الضريبي)
   const supplierGroups = useMemo(() => {
     const list = currentActiveInvoices;
     const map = new Map<string, {
@@ -967,17 +967,18 @@ export function EtaReceivedInvoices() {
       const name = isSent 
         ? (inv.receiverName || 'عميل غير محدد')
         : (inv.issuerName || 'مورد غير محدد');
-      const taxNumber = isSent
+      const rawTax = isSent
         ? (inv.receiverId || inv.issuerId || '')
         : (inv.issuerId || '');
+      const taxNumber = (rawTax || '').trim();
       const address = inv.address || inv.issuerAddress || inv.receiverAddress || '';
-      const key = taxNumber ? `${taxNumber}_${name}` : name;
+      const key = taxNumber || (name.trim() || 'بدون رقم ضريبي');
 
       let group = map.get(key);
       if (!group) {
         group = {
           key,
-          name,
+          name: name || 'بدون اسم',
           taxNumber,
           address,
           invoices: [],
@@ -988,6 +989,13 @@ export function EtaReceivedInvoices() {
           totalAmount: 0
         };
         map.set(key, group);
+      } else {
+        if ((!group.name || group.name === 'مورد غير محدد' || group.name === 'عميل غير محدد' || group.name === 'بدون اسم') && name && name !== 'مورد غير محدد' && name !== 'عميل غير محدد') {
+          group.name = name;
+        }
+        if (!group.address && address) {
+          group.address = address;
+        }
       }
 
       group.invoices.push(inv);
@@ -1949,116 +1957,6 @@ export function EtaReceivedInvoices() {
       </div>
 
       {/* ========================================================================= */}
-      {/* 1.1 VIEW MODE & DIRECTION TABS (MATCHING ETA PORTAL) */}
-      {/* ========================================================================= */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
-        {/* View Mode: All Portal vs Period */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setViewMode('all_portal')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs md:text-sm font-bold transition-all ${
-              viewMode === 'all_portal'
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            }`}
-          >
-            <Globe className="w-4 h-4" />
-            <span>{language === 'ar' ? 'بحث في كافة الوثائق (كل ما على البوابة)' : 'All Portal Documents'}</span>
-            {allPortalInvoices.length > 0 && (
-              <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                viewMode === 'all_portal' ? 'bg-indigo-800 text-white' : 'bg-slate-300 text-slate-800'
-              }`}>
-                {filteredAllInvoices.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setViewMode('period')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs md:text-sm font-bold transition-all ${
-              viewMode === 'period'
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            }`}
-          >
-            <Calendar className="w-4 h-4" />
-            <span>{language === 'ar' ? 'بحث حسب الفترة / الشهر' : 'Search by Period'}</span>
-          </button>
-        </div>
-
-        {/* Direction Filter Tabs (الكل / الوثائق المستلمة / الوثائق المرسلة) */}
-        <div className="flex items-center gap-1.5 bg-slate-100/90 p-1 rounded-xl border border-slate-200 shadow-2xs">
-          <button
-            type="button"
-            onClick={() => {
-              setDirectionFilter('all');
-              setClientPage(1);
-            }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              directionFilter === 'all'
-                ? 'bg-white text-indigo-700 shadow-sm border border-indigo-200 ring-1 ring-indigo-200'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <span>{language === 'ar' ? 'الكل' : 'All'}</span>
-            {allFetched && (
-              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                directionFilter === 'all' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200/80 text-slate-700'
-              }`}>
-                {directionCounts.all}
-              </span>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setDirectionFilter('Received');
-              setClientPage(1);
-            }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              directionFilter === 'Received'
-                ? 'bg-white text-emerald-700 shadow-sm border border-emerald-200 ring-1 ring-emerald-200'
-                : 'text-slate-600 hover:text-emerald-700'
-            }`}
-          >
-            <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-600" />
-            <span>{language === 'ar' ? 'الوثائق المستلمة' : 'Received'}</span>
-            {allFetched && (
-              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                directionFilter === 'Received' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200/80 text-slate-700'
-              }`}>
-                {directionCounts.received}
-              </span>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setDirectionFilter('Sent');
-              setClientPage(1);
-            }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              directionFilter === 'Sent'
-                ? 'bg-white text-sky-700 shadow-sm border border-sky-200 ring-1 ring-sky-200'
-                : 'text-slate-600 hover:text-sky-700'
-            }`}
-          >
-            <ArrowUpRight className="w-3.5 h-3.5 text-sky-600" />
-            <span>{language === 'ar' ? 'الوثائق المرسلة' : 'Sent'}</span>
-            {allFetched && (
-              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                directionFilter === 'Sent' ? 'bg-sky-100 text-sky-800' : 'bg-slate-200/80 text-slate-700'
-              }`}>
-                {directionCounts.sent}
-              </span>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* ========================================================================= */}
       {/* 2. NOT CONFIGURED BANNER */}
       {/* ========================================================================= */}
       {!isConfigured && !loading && (
@@ -2136,10 +2034,46 @@ export function EtaReceivedInvoices() {
       {/* 4. FILTERS & SEARCH BAR */}
       {/* ========================================================================= */}
       <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-        {viewMode === 'period' ? (
-          <>
-            {/* Quick Period Presets */}
-            <div className="flex items-center gap-2 flex-wrap pb-3 border-b border-slate-100">
+        {/* View Mode Switcher & Presets */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pb-3 border-b border-slate-100 flex-wrap">
+          {/* View Mode: All Portal vs Period */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => { setViewMode('all_portal'); setClientPage(1); }}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs md:text-sm font-bold transition-all cursor-pointer ${
+                viewMode === 'all_portal'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              <Globe className="w-4 h-4" />
+              <span>{language === 'ar' ? 'بحث في كافة الوثائق (كل ما على البوابة)' : 'All Portal Documents'}</span>
+              {allPortalInvoices.length > 0 && (
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                  viewMode === 'all_portal' ? 'bg-indigo-800 text-white' : 'bg-slate-300 text-slate-800'
+                }`}>
+                  {filteredAllInvoices.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setViewMode('period'); setClientPage(1); }}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs md:text-sm font-bold transition-all cursor-pointer ${
+                viewMode === 'period'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              <Calendar className="w-4 h-4" />
+              <span>{language === 'ar' ? 'بحث حسب الفترة / الشهر' : 'Search by Period'}</span>
+            </button>
+          </div>
+
+          {viewMode === 'period' && (
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
                 <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-600" />
                 <span>{language === 'ar' ? 'فترات سريعة:' : 'Quick Presets:'}</span>
@@ -2152,13 +2086,13 @@ export function EtaReceivedInvoices() {
                   setDateFrom(start.toISOString().split('T')[0]);
                   setDateTo(end.toISOString().split('T')[0]);
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                   dateTo === defaultDates.to && dateFrom === defaultDates.from
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700'
                 }`}
               >
-                {language === 'ar' ? 'آخر 30 يوماً (الفترة الحالية)' : 'Last 30 Days'}
+                {language === 'ar' ? 'آخر 30 يوماً' : 'Last 30 Days'}
               </button>
               <button
                 type="button"
@@ -2166,7 +2100,7 @@ export function EtaReceivedInvoices() {
                   setDateFrom('2026-07-01');
                   setDateTo('2026-07-30');
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                   dateFrom === '2026-07-01' && dateTo === '2026-07-30'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/60'
@@ -2180,22 +2114,20 @@ export function EtaReceivedInvoices() {
                   setDateFrom('2026-04-01');
                   setDateTo('2026-04-30');
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                   dateFrom === '2026-04-01' && dateTo === '2026-04-30'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700'
                 }`}
               >
-                {language === 'ar' ? 'شهر أبريل 2026' : 'April 2026'}
+                {language === 'ar' ? 'أبريل 2026' : 'April 2026'}
               </button>
-
-              <span className="text-[11px] text-slate-400 mr-auto flex items-center gap-1">
-                <Info className="w-3.5 h-3.5 text-indigo-500" />
-                {language === 'ar'
-                  ? 'تسمح مصلحة الضرائب بالاستعلام في نطاق 30 يوماً كحد أقصى لكل عملية بحث.'
-                  : 'ETA allows maximum 30 days window per search.'}
-              </span>
             </div>
+          )}
+        </div>
+
+        {viewMode === 'period' ? (
+          <>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
               {/* Issue Date From */}
@@ -2531,57 +2463,167 @@ export function EtaReceivedInvoices() {
         )}
 
         {/* ========================================================================= */}
-        {/* 4.1 ADVANCED AMOUNT SEARCH (البحث في القيمة المالية) */}
+        {/* 4.1 CONSOLIDATED TOOLBAR: DIRECTION TABS + AMOUNT SEARCH + GROUP BY TAX ID */}
         {/* ========================================================================= */}
-        <div className="pt-3.5 mt-3.5 border-t border-slate-100 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 text-xs md:text-sm">
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 font-bold text-slate-700">
-              <SlidersHorizontal className="w-4 h-4 text-indigo-600" />
-              <span>{language === 'ar' ? 'البحث في القيمة:' : 'Search by Amount:'}</span>
-            </div>
-
-            {/* اختيار نوع القيمة: الصافي - الضريبة - الإجمالي */}
-            <div className="flex items-center gap-1">
-              <select
-                value={amountField}
-                onChange={(e) => {
-                  setAmountField(e.target.value as any);
+        <div className="pt-3.5 mt-3.5 border-t border-slate-100 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 text-xs md:text-sm">
+          {/* Right Side (RTL): Direction Tabs & Amount Search */}
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Direction Filter Tabs */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/80 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setDirectionFilter('all');
                   setClientPage(1);
                 }}
-                className="px-3 py-1.5 rounded-xl border border-slate-300 bg-white font-semibold text-slate-800 text-xs focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-hidden shadow-2xs cursor-pointer"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  directionFilter === 'all'
+                    ? 'bg-white text-indigo-700 shadow-2xs border border-indigo-200/80'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
               >
-                <option value="total_amount">{language === 'ar' ? 'الإجمالي (Total)' : 'Total Amount'}</option>
-                <option value="net_amount">{language === 'ar' ? 'الصافي (Net)' : 'Net Amount'}</option>
-                <option value="tax_amount">{language === 'ar' ? 'الضريبة (Tax)' : 'Tax Amount'}</option>
-                <option value="tax_rate">{language === 'ar' ? 'نسبة الضريبة % (الضريبة ÷ الصافي)' : 'Tax Rate % (Tax ÷ Net)'}</option>
-              </select>
-            </div>
+                <span>{language === 'ar' ? 'الكل' : 'All'}</span>
+                {allFetched && (
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                    directionFilter === 'all' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200/80 text-slate-700'
+                  }`}>
+                    {directionCounts.all}
+                  </span>
+                )}
+              </button>
 
-            {/* اختيار شرط المقارنة: يساوي - من إلى - أكبر من - أصغر من */}
-            <div className="flex items-center gap-1">
-              <select
-                value={amountOperator}
-                onChange={(e) => {
-                  setAmountOperator(e.target.value as any);
+              <button
+                type="button"
+                onClick={() => {
+                  setDirectionFilter('Received');
                   setClientPage(1);
                 }}
-                className="px-3 py-1.5 rounded-xl border border-slate-300 bg-white font-semibold text-slate-800 text-xs focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-hidden shadow-2xs cursor-pointer"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  directionFilter === 'Received'
+                    ? 'bg-emerald-600 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-emerald-700'
+                }`}
               >
-                <option value="all">{language === 'ar' ? 'بدون تصفية بالمبلغ' : 'No Amount Filter'}</option>
-                <option value="eq">{language === 'ar' ? 'يساوي (=)' : 'Equals (=)'}</option>
-                <option value="between">{language === 'ar' ? 'من - إلى (نطاق)' : 'Between (Range)'}</option>
-                <option value="gt">{language === 'ar' ? 'أكبر من (>)' : 'Greater Than (>)'}</option>
-                <option value="lt">{language === 'ar' ? 'أصغر من (<)' : 'Less Than (<)'}</option>
-              </select>
+                <ArrowDownLeft className="w-3.5 h-3.5" />
+                <span>{language === 'ar' ? 'الوثائق المستلمة' : 'Received'}</span>
+                {allFetched && (
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                    directionFilter === 'Received' ? 'bg-emerald-800 text-white' : 'bg-slate-200/80 text-slate-700'
+                  }`}>
+                    {directionCounts.received}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setDirectionFilter('Sent');
+                  setClientPage(1);
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  directionFilter === 'Sent'
+                    ? 'bg-sky-600 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-sky-700'
+                }`}
+              >
+                <ArrowUpRight className="w-3.5 h-3.5" />
+                <span>{language === 'ar' ? 'الوثائق المرسلة' : 'Sent'}</span>
+                {allFetched && (
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                    directionFilter === 'Sent' ? 'bg-sky-800 text-white' : 'bg-slate-200/80 text-slate-700'
+                  }`}>
+                    {directionCounts.sent}
+                  </span>
+                )}
+              </button>
             </div>
 
-            {/* حقول إدخال المبلغ */}
-            {amountOperator !== 'all' && (
-              <div className="flex items-center gap-2 flex-wrap animate-in fade-in duration-150">
-                {amountOperator === 'between' ? (
-                  <>
+            <div className="h-6 w-px bg-slate-200 hidden md:block" />
+
+            {/* Amount Search Controls */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                <SlidersHorizontal className="w-4 h-4 text-indigo-600" />
+                <span>{language === 'ar' ? 'البحث في القيمة:' : 'Amount:'}</span>
+              </div>
+
+              {/* اختيار نوع القيمة: الصافي - الضريبة - الإجمالي */}
+              <div className="flex items-center gap-1">
+                <select
+                  value={amountField}
+                  onChange={(e) => {
+                    setAmountField(e.target.value as any);
+                    setClientPage(1);
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl border border-slate-300 bg-white font-semibold text-slate-800 text-xs focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-hidden shadow-2xs cursor-pointer"
+                >
+                  <option value="total_amount">{language === 'ar' ? 'الإجمالي (Total)' : 'Total Amount'}</option>
+                  <option value="net_amount">{language === 'ar' ? 'الصافي (Net)' : 'Net Amount'}</option>
+                  <option value="tax_amount">{language === 'ar' ? 'الضريبة (Tax)' : 'Tax Amount'}</option>
+                  <option value="tax_rate">{language === 'ar' ? 'نسبة الضريبة % (الضريبة ÷ الصافي)' : 'Tax Rate % (Tax ÷ Net)'}</option>
+                </select>
+              </div>
+
+              {/* اختيار شرط المقارنة: يساوي - من إلى - أكبر من - أصغر من */}
+              <div className="flex items-center gap-1">
+                <select
+                  value={amountOperator}
+                  onChange={(e) => {
+                    setAmountOperator(e.target.value as any);
+                    setClientPage(1);
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl border border-slate-300 bg-white font-semibold text-slate-800 text-xs focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-hidden shadow-2xs cursor-pointer"
+                >
+                  <option value="all">{language === 'ar' ? 'بدون تصفية بالمبلغ' : 'No Amount Filter'}</option>
+                  <option value="eq">{language === 'ar' ? 'يساوي (=)' : 'Equals (=)'}</option>
+                  <option value="between">{language === 'ar' ? 'من - إلى (نطاق)' : 'Between (Range)'}</option>
+                  <option value="gt">{language === 'ar' ? 'أكبر من (>)' : 'Greater Than (>)'}</option>
+                  <option value="lt">{language === 'ar' ? 'أصغر من (<)' : 'Less Than (<)'}</option>
+                </select>
+              </div>
+
+              {/* حقول إدخال المبلغ */}
+              {amountOperator !== 'all' && (
+                <div className="flex items-center gap-2 flex-wrap animate-in fade-in duration-150">
+                  {amountOperator === 'between' ? (
+                    <>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-slate-500 font-medium">{language === 'ar' ? 'من:' : 'From:'}</span>
+                        <input
+                          type="number"
+                          step="any"
+                          value={amountValueFrom}
+                          onChange={(e) => {
+                            setAmountValueFrom(e.target.value);
+                            setClientPage(1);
+                          }}
+                          placeholder="0.00"
+                          className="w-24 px-2.5 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-hidden shadow-2xs"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-slate-500 font-medium">{language === 'ar' ? 'إلى:' : 'To:'}</span>
+                        <input
+                          type="number"
+                          step="any"
+                          value={amountValueTo}
+                          onChange={(e) => {
+                            setAmountValueTo(e.target.value);
+                            setClientPage(1);
+                          }}
+                          placeholder="0.00"
+                          className="w-24 px-2.5 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-hidden shadow-2xs"
+                        />
+                      </div>
+                    </>
+                  ) : (
                     <div className="flex items-center gap-1">
-                      <span className="text-xs text-slate-500 font-medium">{language === 'ar' ? 'من:' : 'From:'}</span>
+                      <span className="text-xs text-slate-500 font-medium">
+                        {amountField === 'tax_rate'
+                          ? (language === 'ar' ? 'النسبة (%):' : 'Rate (%):')
+                          : (language === 'ar' ? 'المبلغ:' : 'Amount:')}
+                      </span>
                       <input
                         type="number"
                         step="any"
@@ -2590,131 +2632,81 @@ export function EtaReceivedInvoices() {
                           setAmountValueFrom(e.target.value);
                           setClientPage(1);
                         }}
-                        placeholder="0.00"
+                        placeholder={amountField === 'tax_rate' ? '14' : '0.00'}
                         className="w-28 px-2.5 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-hidden shadow-2xs"
                       />
                     </div>
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-slate-500 font-medium">{language === 'ar' ? 'إلى:' : 'To:'}</span>
-                      <input
-                        type="number"
-                        step="any"
-                        value={amountValueTo}
-                        onChange={(e) => {
-                          setAmountValueTo(e.target.value);
-                          setClientPage(1);
-                        }}
-                        placeholder="0.00"
-                        className="w-28 px-2.5 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-hidden shadow-2xs"
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs text-slate-500 font-medium">
-                      {amountField === 'tax_rate'
-                        ? (language === 'ar' ? 'النسبة (%):' : 'Rate (%):')
-                        : (language === 'ar' ? 'المبلغ:' : 'Amount:')}
-                    </span>
-                    <input
-                      type="number"
-                      step="any"
-                      value={amountValueFrom}
-                      onChange={(e) => {
-                        setAmountValueFrom(e.target.value);
+                  )}
+
+                  {(amountValueFrom || amountValueTo) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAmountValueFrom('');
+                        setAmountValueTo('');
+                        setAmountOperator('all');
                         setClientPage(1);
                       }}
-                      placeholder={amountField === 'tax_rate' ? '14' : '0.00'}
-                      className="w-32 px-2.5 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 outline-hidden shadow-2xs"
-                    />
-                  </div>
-                )}
+                      className="inline-flex items-center gap-1 text-xs text-rose-500 hover:text-rose-700 hover:underline font-semibold cursor-pointer px-1.5 py-1"
+                      title={language === 'ar' ? 'إلغاء تصفية القيمة' : 'Clear amount filter'}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>{language === 'ar' ? 'إلغاء' : 'Clear'}</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
 
-                {(amountValueFrom || amountValueTo) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAmountValueFrom('');
-                      setAmountValueTo('');
-                      setAmountOperator('all');
-                      setClientPage(1);
-                    }}
-                    className="inline-flex items-center gap-1 text-xs text-rose-500 hover:text-rose-700 hover:underline font-semibold cursor-pointer px-1.5 py-1"
-                    title={language === 'ar' ? 'إلغاء تصفية القيمة' : 'Clear amount filter'}
-                  >
-                    <X className="w-3.5 h-3.5" />
-                    <span>{language === 'ar' ? 'إلغاء الفلتر' : 'Clear'}</span>
-                  </button>
-                )}
+          {/* Left Side (RTL): Group by Tax ID Controls */}
+          <div className="flex items-center gap-2 flex-wrap justify-between xl:justify-end pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-100">
+            <button
+              type="button"
+              onClick={() => {
+                setGroupBySupplier(prev => !prev);
+                setClientPage(1);
+              }}
+              className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 border shadow-2xs cursor-pointer ${
+                groupBySupplier
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-600/20'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+              }`}
+              title={language === 'ar' ? 'تجميع الوثائق حسب الرقم الضريبي مع إمكانية فتح وطي المجموعات' : 'Group documents by Tax ID'}
+            >
+              <Layers size={14} className={groupBySupplier ? 'text-white' : 'text-indigo-600'} />
+              <span>
+                {groupBySupplier 
+                  ? (language === 'ar' ? 'عرض مجمع (حسب الرقم الضريبي)' : 'Grouped by Tax ID')
+                  : (language === 'ar' ? 'تجميع حسب الرقم الضريبي (ضم وفتح)' : 'Group by Tax ID (Expand/Collapse)')}
+              </span>
+            </button>
+
+            {groupBySupplier && (
+              <div className="flex items-center gap-1.5 animate-in fade-in duration-150">
+                <button
+                  type="button"
+                  onClick={expandAllSuppliers}
+                  className="px-2.5 py-1.5 bg-slate-50 hover:bg-indigo-50 text-indigo-700 text-xs font-bold rounded-xl border border-slate-200 hover:border-indigo-200 transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <ChevronDown size={13} />
+                  <span>{language === 'ar' ? 'فتح الكل' : 'Expand All'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={collapseAllSuppliers}
+                  className="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <ChevronUp size={13} />
+                  <span>{language === 'ar' ? 'طي الكل' : 'Collapse All'}</span>
+                </button>
+                <span className="bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-xl border border-indigo-100 text-xs font-bold">
+                  {language === 'ar' ? `الأرقام الضريبية: ${supplierGroups.length}` : `Tax IDs: ${supplierGroups.length}`}
+                </span>
               </div>
             )}
           </div>
-
-          {amountOperator !== 'all' && (amountValueFrom || amountValueTo) && (
-            <div className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100 self-start lg:self-center">
-              {language === 'ar'
-                ? `تصفية حسب: ${amountField === 'net_amount' ? 'الصافي' : amountField === 'tax_amount' ? 'الضريبة' : amountField === 'tax_rate' ? 'نسبة الضريبة (%)' : 'الإجمالي'}`
-                : `Filtering by: ${amountField === 'net_amount' ? 'Net' : amountField === 'tax_amount' ? 'Tax' : amountField === 'tax_rate' ? 'Tax Rate (%)' : 'Total'}`}
-            </div>
-          )}
         </div>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 4.2 GROUP BY SUPPLIER BAR (تجميع حسب المورد ضم وفتح) */}
-      {/* ========================================================================= */}
-      <div className="bg-white p-3 md:p-3.5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <button
-            type="button"
-            onClick={() => {
-              setGroupBySupplier(prev => !prev);
-              setClientPage(1);
-            }}
-            className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 border shadow-2xs cursor-pointer ${
-              groupBySupplier
-                ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-600/20'
-                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-            }`}
-            title={language === 'ar' ? 'تجميع الوثائق حسب المورد مع إمكانية فتح وطي المجموعات' : 'Group documents by supplier with collapsible accordions'}
-          >
-            <Layers size={15} className={groupBySupplier ? 'text-white' : 'text-indigo-600'} />
-            <span>
-              {groupBySupplier 
-                ? (language === 'ar' ? 'عرض مجمع (حسب المورد)' : 'Grouped by Supplier')
-                : (language === 'ar' ? 'تجميع حسب المورد (ضم وفتح)' : 'Group by Supplier (Expand/Collapse)')}
-            </span>
-          </button>
-
-          {groupBySupplier && (
-            <div className="flex items-center gap-2 animate-in fade-in duration-150">
-              <button
-                type="button"
-                onClick={expandAllSuppliers}
-                className="px-3 py-1.5 bg-slate-50 hover:bg-indigo-50 text-indigo-700 text-xs font-bold rounded-xl border border-slate-200 hover:border-indigo-200 transition-all flex items-center gap-1 cursor-pointer"
-              >
-                <ChevronDown size={13} />
-                <span>{language === 'ar' ? 'فتح الكل' : 'Expand All'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={collapseAllSuppliers}
-                className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition-all flex items-center gap-1 cursor-pointer"
-              >
-                <ChevronUp size={13} />
-                <span>{language === 'ar' ? 'طي الكل' : 'Collapse All'}</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        {groupBySupplier && (
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
-            <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-xl border border-indigo-100">
-              {language === 'ar' ? `عدد الموردين / العملاء: ${supplierGroups.length}` : `Suppliers / Partners: ${supplierGroups.length}`}
-            </span>
-          </div>
-        )}
       </div>
 
       {/* ========================================================================= */}
@@ -3421,17 +3413,21 @@ export function EtaReceivedInvoices() {
                                     {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} className="rtl:rotate-180" />}
                                   </span>
                                   <div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      {group.taxNumber ? (
+                                        <span className="px-2.5 py-0.5 rounded-md bg-indigo-600 text-white font-mono text-xs font-bold tracking-wider">
+                                          {group.taxNumber}
+                                        </span>
+                                      ) : (
+                                        <span className="px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 text-xs font-bold">
+                                          {language === 'ar' ? 'بدون رقم ضريبي' : 'No Tax ID'}
+                                        </span>
+                                      )}
                                       <span className="font-black text-slate-900 text-sm">{group.name}</span>
-                                      <span className="bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                      <span className="bg-indigo-100 text-indigo-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
                                         {group.totalCount} {language === 'ar' ? 'وثيقة' : 'docs'}
                                       </span>
                                     </div>
-                                    {group.taxNumber && (
-                                      <span className="font-mono text-xs text-slate-600">
-                                        {group.taxNumber}
-                                      </span>
-                                    )}
                                   </div>
                                 </div>
                                 <div className="text-end">
@@ -3515,18 +3511,22 @@ export function EtaReceivedInvoices() {
                                     <span className="p-1 bg-white rounded-lg border border-indigo-200 text-indigo-700 shadow-2xs">
                                       {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} className="rtl:rotate-180" />}
                                     </span>
-                                    <span className="text-slate-900 text-sm font-black">{group.name}</span>
-                                    {group.taxNumber && (
-                                      <span className="px-2 py-0.5 rounded-md bg-white border border-indigo-200 font-mono text-xs text-indigo-800">
+                                    {group.taxNumber ? (
+                                      <span className="px-2.5 py-0.5 rounded-md bg-indigo-600 text-white font-mono text-xs font-bold tracking-wider">
                                         {group.taxNumber}
                                       </span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 text-xs font-bold">
+                                        {language === 'ar' ? 'بدون رقم ضريبي' : 'No Tax ID'}
+                                      </span>
                                     )}
+                                    <span className="text-slate-900 text-sm font-black">{group.name}</span>
                                     {group.address && (
                                       <span className="text-xs text-slate-500 font-normal hidden lg:inline truncate max-w-[200px]" title={group.address}>
                                         ({group.address})
                                       </span>
                                     )}
-                                    <span className="bg-indigo-600 text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                                    <span className="bg-indigo-100 text-indigo-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
                                       {group.totalCount} {language === 'ar' ? 'وثيقة' : 'docs'}
                                     </span>
                                   </div>
