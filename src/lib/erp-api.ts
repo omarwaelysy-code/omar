@@ -11931,12 +11931,37 @@ router.post(['/company/eta-settings/test-connection', '/eta/test-connection'], a
     }
 
     // 3. Call EtaAuthService to perform official OAuth 2.0 authentication test
-    const result = await EtaAuthService.testConnection({
+    let result = await EtaAuthService.testConnection({
       companyId,
       environment,
       clientId,
       clientSecret
     });
+
+    // Smart Auto-detection: If failed on preprod due to invalid_client, try production!
+    if (!result.connected && environment === 'preprod' && (result.code === 'INVALID_CREDENTIALS' || result.http_status === 400 || result.http_status === 401)) {
+      try {
+        const prodResult = await EtaAuthService.testConnection({
+          companyId,
+          environment: 'production',
+          clientId,
+          clientSecret
+        });
+        if (prodResult.connected) {
+          // Update environment to production automatically
+          await pool.query(
+            'UPDATE eta_settings SET environment = $1 WHERE company_id = $2',
+            ['production', companyId]
+          );
+          result = {
+            ...prodResult,
+            message: 'تم الاتصال والتحقق بنجاح! تم التحويل تلقائياً إلى بيئة التشغيل الفعلي (Production) نظراً لأن المفاتيح المدخلة تتبع الخوادم الرسمية لمصلحة الضرائب.'
+          };
+        }
+      } catch (e) {
+        // keep original result
+      }
+    }
 
     // 4. Log audit without secret/token
     logAudit({

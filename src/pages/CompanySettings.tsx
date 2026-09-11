@@ -235,7 +235,7 @@ export function CompanySettings() {
     operating_key_configured: boolean;
     is_configured: boolean;
   }>({
-    environment: 'preprod',
+    environment: 'production',
     activity_code: '',
     branch_id: '0',
     country_code: 'EG',
