@@ -98,11 +98,11 @@ function SearchableSelect({ options, value, onChange, label, placeholder, icon, 
 
   return (
     <div className="relative" ref={containerRef}>
-      <label className="block text-xs font-semibold text-slate-600 mb-1">{label}</label>
+      <label className="block text-[11px] font-bold text-slate-600 mb-0.5">{label}</label>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-3 py-1.5 h-8 sm:h-8.5 bg-white border border-slate-200 rounded-lg hover:border-indigo-500 transition-all outline-none text-xs"
+        className="w-full flex items-center justify-between px-3 py-1.5 h-8 bg-white border border-slate-200 rounded-lg hover:border-indigo-500 transition-all outline-none text-xs"
       >
         <div className="flex items-center gap-2 overflow-hidden">
           {icon}
@@ -725,20 +725,35 @@ export function CompanySettings() {
 
   return (
     <div className="w-full max-w-full px-2 sm:px-3 py-2 space-y-3 animate-in fade-in duration-300" dir={dir}>
-      <div className="flex items-center justify-between py-1.5 px-1 border-b border-slate-200">
+      <div className="flex items-center justify-between py-1.5 px-2 bg-white/95 backdrop-blur-md rounded-xl border border-slate-200 sticky top-1 z-30 shadow-2xs">
         <div>
-          <h1 className="text-lg sm:text-xl font-bold text-slate-900 leading-tight">
+          <h1 className="text-sm sm:text-base font-bold text-slate-900 leading-tight">
             {t('company_settings.title')}
           </h1>
-          <p className="text-slate-400 font-medium text-[11px]">
+          <p className="text-slate-400 font-medium text-[10px]">
             {t('company_settings.subtitle')}
           </p>
         </div>
+        <button
+          type="submit"
+          form="company-settings-form"
+          disabled={saving}
+          className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg font-bold text-xs shadow-sm active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
+        >
+          {saving ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Save className="w-3.5 h-3.5" />
+          )}
+          <span>{t('common.save')}</span>
+        </button>
       </div>
 
-      <form onSubmit={handleSave} className="space-y-3">
+      <form id="company-settings-form" onSubmit={handleSave} className="grid grid-cols-1 xl:grid-cols-2 gap-2.5 items-start">
+        {/* ================= COLUMN 1: Basic, Financial & Inventory ================= */}
+        <div className="space-y-2.5">
         {/* Card 1: Logo & Basic Info */}
-        <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
+        <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs space-y-2">
           <div className="flex items-center gap-2 text-indigo-600 justify-end">
             <span className="font-bold text-xs sm:text-sm">{language === 'ar' ? 'المعلومات الأساسية والشعار' : 'Basic Information & Logo'}</span>
             <FileText className="w-5 h-5" />
@@ -746,7 +761,7 @@ export function CompanySettings() {
 
           <div className="flex flex-col sm:flex-row-reverse items-center gap-3 justify-between border-b border-slate-100 pb-2.5">
             {/* Logo box */}
-            <div className="w-14 h-14 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center relative overflow-hidden flex-shrink-0">
+            <div className="w-11 h-11 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center relative overflow-hidden flex-shrink-0">
               {data.logo_url ? (
                 <img src={data.logo_url} alt="Logo" className="w-full h-full object-contain p-2" referrerPolicy="no-referrer" />
               ) : (
@@ -784,40 +799,40 @@ export function CompanySettings() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-1.5">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
+              <label className="block text-[11px] font-bold text-slate-600 mb-0.5">
                 {t('company_settings.name')}
               </label>
               <input
                 type="text"
                 value={data.name}
                 onChange={(e) => setData({ ...data, name: e.target.value })}
-                className="w-full px-3 py-1.5 h-8 sm:h-8.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium focus:border-indigo-500 outline-none transition-all text-xs"
+                className="w-full px-3 py-1.5 h-8 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium focus:border-indigo-500 outline-none transition-all text-xs"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
+              <label className="block text-[11px] font-bold text-slate-600 mb-0.5">
                 {t('company_settings.commercial_register')}
               </label>
               <input
                 type="text"
                 value={data.commercial_register}
                 onChange={(e) => setData({ ...data, commercial_register: e.target.value })}
-                className="w-full px-3 py-1.5 h-8 sm:h-8.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium focus:border-indigo-500 outline-none transition-all text-xs"
+                className="w-full px-3 py-1.5 h-8 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium focus:border-indigo-500 outline-none transition-all text-xs"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
+              <label className="block text-[11px] font-bold text-slate-600 mb-0.5">
                 {t('company_settings.tax_number')}
               </label>
               <input
                 type="text"
                 value={data.tax_number}
                 onChange={(e) => setData({ ...data, tax_number: e.target.value })}
-                className="w-full px-3 py-1.5 h-8 sm:h-8.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium focus:border-indigo-500 outline-none transition-all text-xs"
+                className="w-full px-3 py-1.5 h-8 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium focus:border-indigo-500 outline-none transition-all text-xs"
               />
             </div>
 
@@ -845,7 +860,7 @@ export function CompanySettings() {
             </div>
 
             <div className="sm:col-span-2 lg:col-span-4">
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
+              <label className="block text-[11px] font-bold text-slate-600 mb-0.5">
                 {t('company_settings.address')}
               </label>
               <div className="relative group">
@@ -854,7 +869,7 @@ export function CompanySettings() {
                   value={data.address}
                   onChange={(e) => setData({ ...data, address: e.target.value })}
                   rows={1}
-                  className={`w-full ${dir === 'rtl' ? 'pr-11 pl-4' : 'pl-11 pr-4'} py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium focus:border-indigo-500 outline-none transition-all text-xs min-h-[44px]`}
+                  className={`w-full ${dir === 'rtl' ? 'pr-11 pl-4' : 'pl-11 pr-4'} py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium focus:border-indigo-500 outline-none transition-all text-xs min-h-[34px]`}
                 />
               </div>
             </div>
@@ -951,13 +966,13 @@ export function CompanySettings() {
         </div>
 
         {/* Card 2: Financial, Currency & Exchange Rates Section (ALL Currency settings unified in ONE place) */}
-        <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
+        <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs space-y-2">
           <div className="flex items-center gap-2 text-indigo-600 justify-end">
             <span className="font-bold text-xs sm:text-sm">{language === 'ar' ? 'إعدادات العملات وأسعار الصرف' : 'Currency & Exchange Rate Settings'}</span>
             <Coins className="w-5 h-5" />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
             <div>
               <SearchableSelect
                 label={t('company_settings.currency')}
@@ -985,7 +1000,7 @@ export function CompanySettings() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
+              <label className="block text-[11px] font-bold text-slate-600 mb-0.5">
                 {t('company_settings.fiscal_year_end')}*
               </label>
               <div className="grid grid-cols-2 gap-3">
@@ -1263,7 +1278,7 @@ export function CompanySettings() {
         </div>
 
         {/* Card 3: Inventory & Purchase Settings & Negative Stock (Compact layout) */}
-        <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
+        <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs space-y-2">
           <div className="flex items-center gap-2 text-indigo-600 justify-end">
             <span className="font-bold text-xs sm:text-sm">{language === 'ar' ? 'إعدادات المخازن والمشتريات' : 'Inventory & Purchase Settings'}</span>
             <TrendingUp className="w-5 h-5" />
@@ -1505,7 +1520,7 @@ export function CompanySettings() {
         </div>
 
         {/* Card 4: Barcode Scanner Settings (Optimized into 2 columns grid to cut height by 50%!) */}
-        <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
+        <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs space-y-2">
           <div className="flex items-center gap-2 text-indigo-600 justify-end">
             <span className="font-bold text-xs sm:text-sm">
               {language === 'ar' ? 'إعدادات قراءة الباركود' : 'Barcode Scanner Settings'}
@@ -1598,8 +1613,12 @@ export function CompanySettings() {
           </div>
         </div>
 
-        {/* Card 8: Egyptian E-Invoice (ETA) Settings & 4-Step Registration Wizard */}
-        <div id="eta-settings-section" className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
+                </div>
+
+        {/* ================= COLUMN 2: Egyptian E-Invoice (ETA) Wizard ================= */}
+        <div className="space-y-2.5">
+          {/* Card 8: Egyptian E-Invoice (ETA) Settings & 4-Step Registration Wizard */}
+        <div id="eta-settings-section" className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs space-y-2">
           {/* Card Header & Connection Status */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
             <div className="flex items-center gap-3">
@@ -2268,20 +2287,6 @@ export function CompanySettings() {
           </div>
         </div>
 
-        {/* Submit Action */}
-        <div className="pt-2 flex justify-start pb-6">
-          <button
-            type="submit"
-            disabled={saving}
-            className="flex items-center gap-1.5 bg-indigo-600 text-white px-5 py-2 rounded-xl hover:bg-indigo-700 transition-all shadow-md font-bold text-xs active:scale-95 disabled:opacity-50"
-          >
-            {saving ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <Save className="w-5 h-5" />
-            )}
-            <span>{t('common.save')}</span>
-          </button>
         </div>
       </form>
     </div>
