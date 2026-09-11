@@ -198,6 +198,80 @@ export class EtaItemMappingService {
   }
 
   /**
+   * Sync detailed lines for documents that lack invoiceLines in raw_data
+   */
+  public static async syncMissingDocumentLines(companyId: string, limit = 50): Promise<number> {
+    try {
+      const settings = await EtaDocumentService.getCompanySettings(companyId);
+      if (!settings || !settings.clientId || !settings.clientSecret) return 0;
+
+      const token = await EtaAuthService.getValidAccessToken({
+        companyId,
+        environment: settings.environment,
+        clientId: settings.clientId,
+        clientSecret: settings.clientSecret
+      });
+
+      const docsRes = await pool.query(`
+        SELECT uuid, raw_data 
+        FROM eta_documents 
+        WHERE company_id = $1 
+          AND NOT (raw_data::text LIKE '%invoiceLines%')
+        ORDER BY date_time_issued DESC
+        LIMIT $2
+      `, [companyId, limit]);
+
+      if (docsRes.rows.length === 0) return 0;
+
+      const baseUrl = EtaDocumentService.getApiBaseUrl(settings.environment);
+      let updatedCount = 0;
+
+      for (const row of docsRes.rows) {
+        const docUuid = row.uuid;
+        try {
+          const url = `${baseUrl}/api/v1.0/documents/${encodeURIComponent(docUuid)}/raw`;
+          let res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+          if (res.status === 429) {
+            await new Promise(r => setTimeout(r, 2000));
+            res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+          }
+
+          if (res.ok) {
+            const rawJson: any = await res.json();
+            let invoiceLines: any[] = [];
+            if (typeof rawJson.document === 'string') {
+              try {
+                const parsed = JSON.parse(rawJson.document);
+                if (Array.isArray(parsed.invoiceLines)) invoiceLines = parsed.invoiceLines;
+              } catch (e) {}
+            } else if (rawJson.document && Array.isArray(rawJson.document.invoiceLines)) {
+              invoiceLines = rawJson.document.invoiceLines;
+            }
+
+            const existing = typeof row.raw_data === 'string' ? JSON.parse(row.raw_data) : (row.raw_data || {});
+            const merged = { ...existing, ...rawJson, invoiceLines };
+
+            await pool.query(`
+              UPDATE eta_documents 
+              SET raw_data = $1, updated_at = NOW() 
+              WHERE company_id = $2 AND uuid = $3
+            `, [JSON.stringify(merged), companyId, docUuid]);
+
+            updatedCount++;
+          }
+          await new Promise(r => setTimeout(r, 150));
+        } catch (e) {
+          // non-fatal per doc
+        }
+      }
+      return updatedCount;
+    } catch (err: any) {
+      console.warn('[ETA Item Mapping] syncMissingDocumentLines error:', err.message || err);
+      return 0;
+    }
+  }
+
+  /**
    * Get all ETA portal items, their link status, and auto-match candidates
    */
   public static async getItemMappings(
@@ -230,6 +304,7 @@ export class EtaItemMappingService {
         await EtaDocumentService.fetchAllDocuments(companyId, { forceRefresh: true }).catch(err => {
           console.warn('[ETA Item Mapping] forceRefresh fetch warning:', err.message || err);
         });
+        await this.syncMissingDocumentLines(companyId, 100).catch(() => {});
       }
     }
 
@@ -330,11 +405,23 @@ export class EtaItemMappingService {
       const docIssuerId = docPartnerId;
       const docIssuerName = docPartnerName;
 
+      let parsedDocLines: any[] = [];
+      if (typeof rawDataObj?.document === 'string') {
+        try {
+          const p = JSON.parse(rawDataObj.document);
+          if (Array.isArray(p.invoiceLines)) parsedDocLines = p.invoiceLines;
+        } catch (e) {}
+      } else if (rawDataObj?.document && Array.isArray(rawDataObj.document.invoiceLines)) {
+        parsedDocLines = rawDataObj.document.invoiceLines;
+      }
+
       const rawLines: any[] = Array.isArray(rawDataObj?.invoiceLines)
         ? rawDataObj.invoiceLines
-        : (Array.isArray(rawDataObj?.details?.invoiceLines)
-            ? rawDataObj.details.invoiceLines
-            : (Array.isArray(rawDataObj?.rawDocument?.invoiceLines) ? rawDataObj.rawDocument.invoiceLines : []));
+        : (parsedDocLines.length > 0
+            ? parsedDocLines
+            : (Array.isArray(rawDataObj?.details?.invoiceLines)
+                ? rawDataObj.details.invoiceLines
+                : (Array.isArray(rawDataObj?.rawDocument?.invoiceLines) ? rawDataObj.rawDocument.invoiceLines : [])));
 
       for (const line of rawLines) {
         const itemCodeRaw = (line.itemCode || '').trim();
