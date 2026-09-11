@@ -98,11 +98,11 @@ function SearchableSelect({ options, value, onChange, label, placeholder, icon, 
 
   return (
     <div className="relative" ref={containerRef}>
-      <label className="block text-sm font-semibold text-slate-500 mb-2">{label}</label>
+      <label className="block text-xs font-semibold text-slate-600 mb-1">{label}</label>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-5 py-3.5 bg-white border border-slate-200 rounded-2xl hover:border-indigo-500 hover:ring-2 hover:ring-indigo-500/5 transition-all outline-none"
+        className="w-full flex items-center justify-between px-3 py-1.5 h-8 sm:h-8.5 bg-white border border-slate-200 rounded-lg hover:border-indigo-500 transition-all outline-none text-xs"
       >
         <div className="flex items-center gap-2 overflow-hidden">
           {icon}
@@ -724,31 +724,33 @@ export function CompanySettings() {
   }
 
   return (
-    <div className="w-full max-w-[98%] 2xl:max-w-[1600px] mx-auto p-4 md:p-8 space-y-8 animate-in fade-in duration-700" dir={dir}>
-      <div className="flex flex-col gap-2 pb-4 border-b border-slate-100">
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-1">
-          {t('company_settings.title')}
-        </h1>
-        <p className="text-slate-400 font-semibold text-sm">
-          {t('company_settings.subtitle')}
-        </p>
+    <div className="w-full max-w-full px-2 sm:px-3 py-2 space-y-3 animate-in fade-in duration-300" dir={dir}>
+      <div className="flex items-center justify-between py-1.5 px-1 border-b border-slate-200">
+        <div>
+          <h1 className="text-lg sm:text-xl font-bold text-slate-900 leading-tight">
+            {t('company_settings.title')}
+          </h1>
+          <p className="text-slate-400 font-medium text-[11px]">
+            {t('company_settings.subtitle')}
+          </p>
+        </div>
       </div>
 
-      <form onSubmit={handleSave} className="space-y-8">
+      <form onSubmit={handleSave} className="space-y-3">
         {/* Card 1: Logo & Basic Info */}
-        <div className="bg-white p-8 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+        <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
           <div className="flex items-center gap-2 text-indigo-600 justify-end">
-            <span className="font-bold text-lg">{language === 'ar' ? 'المعلومات الأساسية والشعار' : 'Basic Information & Logo'}</span>
+            <span className="font-bold text-xs sm:text-sm">{language === 'ar' ? 'المعلومات الأساسية والشعار' : 'Basic Information & Logo'}</span>
             <FileText className="w-5 h-5" />
           </div>
 
-          <div className="flex flex-col md:flex-row-reverse items-center gap-6 justify-between border-b border-slate-100 pb-6">
+          <div className="flex flex-col sm:flex-row-reverse items-center gap-3 justify-between border-b border-slate-100 pb-2.5">
             {/* Logo box */}
-            <div className="w-28 h-28 bg-slate-50 border border-slate-100 rounded-3xl flex items-center justify-center relative overflow-hidden flex-shrink-0">
+            <div className="w-14 h-14 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center relative overflow-hidden flex-shrink-0">
               {data.logo_url ? (
                 <img src={data.logo_url} alt="Logo" className="w-full h-full object-contain p-2" referrerPolicy="no-referrer" />
               ) : (
-                <Building2 className="w-10 h-10 text-slate-300" />
+                <Building2 className="w-6 h-6 text-slate-300" />
               )}
               <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
             </div>
@@ -774,7 +776,7 @@ export function CompanySettings() {
               <button
                 type="button"
                 onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
-                className="flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100/80 text-indigo-600 px-5 py-2.5 rounded-2xl font-bold text-xs transition-all shadow-sm"
+                className="flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg font-bold text-xs transition-all shadow-2xs"
               >
                 <Upload size={14} />
                 <span>{data.logo_url ? (language === 'ar' ? 'تغيير الشعار' : 'Change Logo') : (language === 'ar' ? 'إضافة شعار' : 'Add Logo')}</span>
@@ -782,40 +784,40 @@ export function CompanySettings() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5">
             <div>
-              <label className="block text-sm font-semibold text-slate-500 mb-2">
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
                 {t('company_settings.name')}
               </label>
               <input
                 type="text"
                 value={data.name}
                 onChange={(e) => setData({ ...data, name: e.target.value })}
-                className="w-full px-5 py-3 bg-white border border-slate-200 rounded-2xl text-slate-800 font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all text-sm"
+                className="w-full px-3 py-1.5 h-8 sm:h-8.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium focus:border-indigo-500 outline-none transition-all text-xs"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-500 mb-2">
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
                 {t('company_settings.commercial_register')}
               </label>
               <input
                 type="text"
                 value={data.commercial_register}
                 onChange={(e) => setData({ ...data, commercial_register: e.target.value })}
-                className="w-full px-5 py-3 bg-white border border-slate-200 rounded-2xl text-slate-800 font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all text-sm"
+                className="w-full px-3 py-1.5 h-8 sm:h-8.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium focus:border-indigo-500 outline-none transition-all text-xs"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-500 mb-2">
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
                 {t('company_settings.tax_number')}
               </label>
               <input
                 type="text"
                 value={data.tax_number}
                 onChange={(e) => setData({ ...data, tax_number: e.target.value })}
-                className="w-full px-5 py-3 bg-white border border-slate-200 rounded-2xl text-slate-800 font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all text-sm"
+                className="w-full px-3 py-1.5 h-8 sm:h-8.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium focus:border-indigo-500 outline-none transition-all text-xs"
               />
             </div>
 
@@ -843,7 +845,7 @@ export function CompanySettings() {
             </div>
 
             <div className="sm:col-span-2 lg:col-span-4">
-              <label className="block text-sm font-semibold text-slate-500 mb-2">
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
                 {t('company_settings.address')}
               </label>
               <div className="relative group">
@@ -851,17 +853,17 @@ export function CompanySettings() {
                 <textarea
                   value={data.address}
                   onChange={(e) => setData({ ...data, address: e.target.value })}
-                  rows={2}
-                  className={`w-full ${dir === 'rtl' ? 'pr-11 pl-4' : 'pl-11 pr-4'} py-3 bg-white border border-slate-200 rounded-2xl text-slate-800 font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all text-sm min-h-[70px]`}
+                  rows={1}
+                  className={`w-full ${dir === 'rtl' ? 'pr-11 pl-4' : 'pl-11 pr-4'} py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium focus:border-indigo-500 outline-none transition-all text-xs min-h-[44px]`}
                 />
               </div>
             </div>
 
             {/* VAT & WHT Toggles side-by-side in grid */}
-            <div className="sm:col-span-2 lg:col-span-4 pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="sm:col-span-2 lg:col-span-4 pt-2.5 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-2">
               {/* VAT Toggle */}
               <div 
-                className="flex items-center justify-between cursor-pointer select-none p-3.5 rounded-2xl border border-slate-100 hover:bg-slate-50/80 transition-colors"
+                className="flex items-center justify-between cursor-pointer select-none p-2 rounded-xl border border-slate-100 hover:bg-slate-50/80 transition-colors"
                 onClick={() => setData(prev => ({ ...prev, vat_enabled: !prev.vat_enabled }))}
               >
                 <div className="flex flex-col gap-0.5">
@@ -873,9 +875,9 @@ export function CompanySettings() {
                   </span>
                 </div>
                 <div 
-                  className={`relative w-12 h-7 rounded-full transition-all duration-300 shadow-inner ms-3 flex-shrink-0 ${data.vat_enabled ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                  className={`relative w-9 h-5 rounded-full transition-all duration-300 shadow-inner ms-3 flex-shrink-0 ${data.vat_enabled ? 'bg-indigo-600' : 'bg-slate-200'}`}
                 >
-                  <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-xs transition-all duration-300 transform ${
                     dir === 'rtl'
                       ? (data.vat_enabled ? 'translate-x-[-110%]' : 'translate-x-[-5%]')
                       : (data.vat_enabled ? 'translate-x-[110%]' : 'translate-x-[5%]')
@@ -885,7 +887,7 @@ export function CompanySettings() {
 
               {/* WHT Toggle */}
               <div 
-                className="flex items-center justify-between cursor-pointer select-none p-3.5 rounded-2xl border border-slate-100 hover:bg-slate-50/80 transition-colors"
+                className="flex items-center justify-between cursor-pointer select-none p-2 rounded-xl border border-slate-100 hover:bg-slate-50/80 transition-colors"
                 onClick={() => setData(prev => ({ ...prev, wht_enabled: !prev.wht_enabled }))}
               >
                 <div className="flex flex-col gap-0.5">
@@ -897,9 +899,9 @@ export function CompanySettings() {
                   </span>
                 </div>
                 <div 
-                  className={`relative w-12 h-7 rounded-full transition-all duration-300 shadow-inner ms-3 flex-shrink-0 ${data.wht_enabled ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                  className={`relative w-9 h-5 rounded-full transition-all duration-300 shadow-inner ms-3 flex-shrink-0 ${data.wht_enabled ? 'bg-indigo-600' : 'bg-slate-200'}`}
                 >
-                  <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-xs transition-all duration-300 transform ${
                     dir === 'rtl'
                       ? (data.wht_enabled ? 'translate-x-[-110%]' : 'translate-x-[-5%]')
                       : (data.wht_enabled ? 'translate-x-[110%]' : 'translate-x-[5%]')
@@ -910,7 +912,7 @@ export function CompanySettings() {
               {/* POS System Toggle */}
               <div 
                 id="pos-system-toggle"
-                className={`flex items-center justify-between cursor-pointer select-none p-3.5 rounded-2xl border transition-all md:col-span-2 ${
+                className={`flex items-center justify-between cursor-pointer select-none p-2 rounded-xl border transition-all md:col-span-2 ${
                   data.pos_enabled 
                     ? 'border-emerald-200 bg-emerald-50/30 shadow-sm' 
                     : 'border-slate-100 hover:bg-slate-50/80'
@@ -935,9 +937,9 @@ export function CompanySettings() {
                   </span>
                 </div>
                 <div 
-                  className={`relative w-12 h-7 rounded-full transition-all duration-300 shadow-inner ms-3 flex-shrink-0 ${data.pos_enabled ? 'bg-emerald-600' : 'bg-slate-200'}`}
+                  className={`relative w-9 h-5 rounded-full transition-all duration-300 shadow-inner ms-3 flex-shrink-0 ${data.pos_enabled ? 'bg-emerald-600' : 'bg-slate-200'}`}
                 >
-                  <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-xs transition-all duration-300 transform ${
                     dir === 'rtl'
                       ? (data.pos_enabled ? 'translate-x-[-110%]' : 'translate-x-[-5%]')
                       : (data.pos_enabled ? 'translate-x-[110%]' : 'translate-x-[5%]')
@@ -949,13 +951,13 @@ export function CompanySettings() {
         </div>
 
         {/* Card 2: Financial, Currency & Exchange Rates Section (ALL Currency settings unified in ONE place) */}
-        <div className="bg-white p-8 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+        <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
           <div className="flex items-center gap-2 text-indigo-600 justify-end">
-            <span className="font-bold text-lg">{language === 'ar' ? 'إعدادات العملات وأسعار الصرف' : 'Currency & Exchange Rate Settings'}</span>
+            <span className="font-bold text-xs sm:text-sm">{language === 'ar' ? 'إعدادات العملات وأسعار الصرف' : 'Currency & Exchange Rate Settings'}</span>
             <Coins className="w-5 h-5" />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-2.5">
             <div>
               <SearchableSelect
                 label={t('company_settings.currency')}
@@ -983,7 +985,7 @@ export function CompanySettings() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-sm font-semibold text-slate-500 mb-2">
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
                 {t('company_settings.fiscal_year_end')}*
               </label>
               <div className="grid grid-cols-2 gap-3">
@@ -999,7 +1001,7 @@ export function CompanySettings() {
                             fiscal_year_day: data.fiscal_year_day > maxDays ? maxDays : data.fiscal_year_day
                         });
                     }}
-                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-slate-800 text-sm font-semibold hover:border-indigo-500 hover:ring-2 hover:ring-indigo-500/5 outline-none appearance-none cursor-pointer transition-all"
+                    className="w-full px-3 py-1.5 h-8 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-semibold hover:border-indigo-500 outline-none appearance-none cursor-pointer transition-all"
                   >
                     {MONTHS.map(m => (
                       <option key={m.value} value={m.value} className="text-slate-900">
@@ -1013,7 +1015,7 @@ export function CompanySettings() {
                   <select
                     value={data.fiscal_year_day}
                     onChange={(e) => setData({ ...data, fiscal_year_day: parseInt(e.target.value) })}
-                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-slate-800 text-sm font-semibold hover:border-indigo-500 hover:ring-2 hover:ring-indigo-500/5 outline-none appearance-none cursor-pointer transition-all"
+                    className="w-full px-3 py-1.5 h-8 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-semibold hover:border-indigo-500 outline-none appearance-none cursor-pointer transition-all"
                   >
                     {Array.from({ length: daysInMonth(data.fiscal_year_month) }, (_, i) => i + 1).map(d => (
                       <option key={d} value={d} className="text-slate-900">{d}</option>
@@ -1033,7 +1035,7 @@ export function CompanySettings() {
           {/* Multi-Currency Toggle Section */}
           <div className="pt-5 border-t border-slate-100 space-y-4">
             <div 
-              className="flex items-center justify-between cursor-pointer select-none p-4 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors"
+              className="flex items-center justify-between cursor-pointer select-none p-2 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors"
               onClick={() => setData(prev => ({ ...prev, enable_multi_currency: !prev.enable_multi_currency }))}
             >
               <div className="flex flex-col gap-0.5">
@@ -1049,7 +1051,7 @@ export function CompanySettings() {
               <div 
                 className={`relative w-14 h-8 rounded-full transition-all duration-300 shadow-inner ms-4 flex-shrink-0 ${data.enable_multi_currency ? 'bg-indigo-600' : 'bg-slate-200'}`}
               >
-                <div className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-xs transition-all duration-300 transform ${
                   dir === 'rtl'
                     ? (data.enable_multi_currency ? 'translate-x-[-120%]' : 'translate-x-[-10%]')
                     : (data.enable_multi_currency ? 'translate-x-[120%]' : 'translate-x-[10%]')
@@ -1067,7 +1069,7 @@ export function CompanySettings() {
                   {/* Manual option */}
                   <div
                     onClick={() => setData(prev => ({ ...prev, exchange_rate_update_method: 'manual' }))}
-                    className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                    className={`p-2.5 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                       data.exchange_rate_update_method === 'manual'
                         ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
                         : 'border-slate-100 bg-white hover:border-slate-200'
@@ -1089,7 +1091,7 @@ export function CompanySettings() {
                   {/* Auto option */}
                   <div
                     onClick={() => setData(prev => ({ ...prev, exchange_rate_update_method: 'auto' }))}
-                    className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                    className={`p-2.5 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                       data.exchange_rate_update_method === 'auto'
                         ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
                         : 'border-slate-100 bg-white hover:border-slate-200'
@@ -1215,8 +1217,8 @@ export function CompanySettings() {
                         <span className="font-bold text-slate-800 text-sm">تحديث تلقائي (Auto Update)</span>
                         <span className="text-xs text-slate-400">تحديث أسعار الصرف تلقائياً وفق الجدول المحدد</span>
                       </div>
-                      <div className={`relative w-12 h-7 rounded-full transition-all duration-300 shadow-inner ${erAutoUpdate ? 'bg-indigo-600' : 'bg-slate-200'}`}>
-                        <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
+                      <div className={`relative w-9 h-5 rounded-full transition-all duration-300 shadow-inner ${erAutoUpdate ? 'bg-indigo-600' : 'bg-slate-200'}`}>
+                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-xs transition-all duration-300 transform ${
                           erAutoUpdate ? 'translate-x-[-110%]' : 'translate-x-[-5%]'
                         }`} />
                       </div>
@@ -1261,9 +1263,9 @@ export function CompanySettings() {
         </div>
 
         {/* Card 3: Inventory & Purchase Settings & Negative Stock (Compact layout) */}
-        <div className="bg-white p-8 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+        <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
           <div className="flex items-center gap-2 text-indigo-600 justify-end">
-            <span className="font-bold text-lg">{language === 'ar' ? 'إعدادات المخازن والمشتريات' : 'Inventory & Purchase Settings'}</span>
+            <span className="font-bold text-xs sm:text-sm">{language === 'ar' ? 'إعدادات المخازن والمشتريات' : 'Inventory & Purchase Settings'}</span>
             <TrendingUp className="w-5 h-5" />
           </div>
 
@@ -1275,7 +1277,7 @@ export function CompanySettings() {
               {/* Simple Mode */}
               <div
                 onClick={() => setData(prev => ({ ...prev, purchase_workflow_mode: 'Simple' }))}
-                className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                className={`p-2.5 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                   data.purchase_workflow_mode === 'Simple' || !data.purchase_workflow_mode
                     ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
                     : 'border-slate-100 bg-white hover:border-slate-200'
@@ -1303,7 +1305,7 @@ export function CompanySettings() {
               {/* Enterprise Flexible Mode */}
               <div
                 onClick={() => setData(prev => ({ ...prev, purchase_workflow_mode: 'Enterprise Flexible' }))}
-                className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                className={`p-2.5 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                   data.purchase_workflow_mode === 'Enterprise Flexible'
                     ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
                     : 'border-slate-100 bg-white hover:border-slate-200'
@@ -1331,7 +1333,7 @@ export function CompanySettings() {
               {/* Enterprise Strict Mode */}
               <div
                 onClick={() => setData(prev => ({ ...prev, purchase_workflow_mode: 'Enterprise Strict' }))}
-                className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                className={`p-2.5 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                   data.purchase_workflow_mode === 'Enterprise Strict'
                     ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
                     : 'border-slate-100 bg-white hover:border-slate-200'
@@ -1366,7 +1368,7 @@ export function CompanySettings() {
               {/* Supplier + Product */}
               <div
                 onClick={() => setData(prev => ({ ...prev, goods_receipt_matching_mode: 'SupplierProduct' }))}
-                className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                className={`p-2 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                   data.goods_receipt_matching_mode === 'SupplierProduct'
                     ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
                     : 'border-slate-100 bg-white hover:border-slate-200'
@@ -1392,7 +1394,7 @@ export function CompanySettings() {
               {/* Product Only */}
               <div
                 onClick={() => setData(prev => ({ ...prev, goods_receipt_matching_mode: 'ProductOnly' }))}
-                className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                className={`p-2 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                   data.goods_receipt_matching_mode === 'ProductOnly'
                     ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
                     : 'border-slate-100 bg-white hover:border-slate-200'
@@ -1418,7 +1420,7 @@ export function CompanySettings() {
               {/* Supplier + Product + Warehouse */}
               <div
                 onClick={() => setData(prev => ({ ...prev, goods_receipt_matching_mode: 'SupplierProductWarehouse' }))}
-                className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                className={`p-2 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                   data.goods_receipt_matching_mode === 'SupplierProductWarehouse'
                     ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
                     : 'border-slate-100 bg-white hover:border-slate-200'
@@ -1444,7 +1446,7 @@ export function CompanySettings() {
               {/* Smart Matching */}
               <div
                 onClick={() => setData(prev => ({ ...prev, goods_receipt_matching_mode: 'SmartMatching' }))}
-                className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                className={`p-2 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                   data.goods_receipt_matching_mode === 'SmartMatching' || !data.goods_receipt_matching_mode
                     ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
                     : 'border-slate-100 bg-white hover:border-slate-200'
@@ -1472,7 +1474,7 @@ export function CompanySettings() {
           {/* Allow Negative Stock Balance Toggle (Embedded inside Card 3 to eliminate extra card height!) */}
           <div className="pt-3 border-t border-slate-100">
             <div
-              className="flex items-center justify-between cursor-pointer select-none p-3.5 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors"
+              className="flex items-center justify-between cursor-pointer select-none p-2 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors"
               onClick={() => setData((prev) => ({ ...prev, allow_negative_stock: !prev.allow_negative_stock }))}
             >
               <div className="flex flex-col gap-0.5 flex-1">
@@ -1486,12 +1488,12 @@ export function CompanySettings() {
                 </span>
               </div>
               <div
-                className={`relative w-12 h-7 rounded-full transition-all duration-300 shadow-inner ms-3 flex-shrink-0 ${
+                className={`relative w-9 h-5 rounded-full transition-all duration-300 shadow-inner ms-3 flex-shrink-0 ${
                   data.allow_negative_stock ? 'bg-indigo-600' : 'bg-slate-200'
                 }`}
               >
                 <div
-                  className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
+                  className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-xs transition-all duration-300 transform ${
                     dir === 'rtl'
                       ? data.allow_negative_stock ? 'translate-x-[-110%]' : 'translate-x-[-5%]'
                       : data.allow_negative_stock ? 'translate-x-[110%]' : 'translate-x-[5%]'
@@ -1503,9 +1505,9 @@ export function CompanySettings() {
         </div>
 
         {/* Card 4: Barcode Scanner Settings (Optimized into 2 columns grid to cut height by 50%!) */}
-        <div className="bg-white p-8 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+        <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
           <div className="flex items-center gap-2 text-indigo-600 justify-end">
-            <span className="font-bold text-lg">
+            <span className="font-bold text-xs sm:text-sm">
               {language === 'ar' ? 'إعدادات قراءة الباركود' : 'Barcode Scanner Settings'}
             </span>
             <ScanLine className="w-5 h-5" />
@@ -1565,7 +1567,7 @@ export function CompanySettings() {
             ] as const).map(({ key, labelAr, labelEn, descAr, descEn }) => (
               <div
                 key={key}
-                className="flex items-center justify-between cursor-pointer select-none p-3.5 rounded-2xl border border-slate-100 hover:bg-slate-50 transition-colors"
+                className="flex items-center justify-between cursor-pointer select-none p-2 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors"
                 onClick={() =>
                   setBarcodeSettings((prev) => ({ ...prev, [key]: !prev[key] }))
                 }
@@ -1579,12 +1581,12 @@ export function CompanySettings() {
                   </span>
                 </div>
                 <div
-                  className={`relative w-12 h-7 rounded-full transition-all duration-300 shadow-inner flex-shrink-0 ${
+                  className={`relative w-9 h-5 rounded-full transition-all duration-300 shadow-inner flex-shrink-0 ${
                     barcodeSettings[key] ? 'bg-indigo-600' : 'bg-slate-200'
                   }`}
                 >
                   <div
-                    className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 transform ${
+                    className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-xs transition-all duration-300 transform ${
                       dir === 'rtl'
                         ? barcodeSettings[key] ? 'translate-x-[-110%]' : 'translate-x-[-5%]'
                         : barcodeSettings[key] ? 'translate-x-[110%]' : 'translate-x-[5%]'
@@ -1597,12 +1599,12 @@ export function CompanySettings() {
         </div>
 
         {/* Card 8: Egyptian E-Invoice (ETA) Settings & 4-Step Registration Wizard */}
-        <div id="eta-settings-section" className="bg-white p-8 md:p-10 rounded-3xl border border-slate-100 shadow-sm space-y-8">
+        <div id="eta-settings-section" className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
           {/* Card Header & Connection Status */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
-                <Receipt className="w-6 h-6" />
+              <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shadow-2xs">
+                <Receipt className="w-4 h-4" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -1708,7 +1710,7 @@ export function CompanySettings() {
           </div>
 
           {/* Environment Selector */}
-          <div className="space-y-3 bg-slate-50/70 p-5 rounded-2xl border border-slate-100">
+          <div className="space-y-3 bg-slate-50/70 p-3 rounded-xl border border-slate-100">
             <div className="flex items-center justify-between">
               <label className="block text-sm font-bold text-slate-700">
                 {language === 'ar' ? 'بيئة التشغيل (Operating Environment)' : 'Operating Environment'}
@@ -1788,7 +1790,7 @@ export function CompanySettings() {
           {/* ========================================================================= */}
           {/* STEP 1: Taxpayer & Company Info */}
           {/* ========================================================================= */}
-          <div className="space-y-4 border border-slate-100 rounded-2xl p-6 bg-white shadow-sm">
+          <div className="space-y-4 border border-slate-100 rounded-xl p-3 bg-white shadow-sm">
             <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
               <span className="w-7 h-7 rounded-xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
                 1
@@ -1944,7 +1946,7 @@ export function CompanySettings() {
           {/* ========================================================================= */}
           {/* STEP 2: ETA Portal ERP Registration Guide & Copy Links */}
           {/* ========================================================================= */}
-          <div className="space-y-4 border border-indigo-100 rounded-2xl p-6 bg-gradient-to-br from-indigo-50/40 via-white to-indigo-50/20 shadow-sm">
+          <div className="space-y-4 border border-indigo-100 rounded-xl p-3 bg-gradient-to-br from-indigo-50/40 via-white to-indigo-50/20 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-100/70 pb-3">
               <div className="flex items-center gap-3">
                 <span className="w-7 h-7 rounded-xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
@@ -2042,7 +2044,7 @@ export function CompanySettings() {
           {/* ========================================================================= */}
           {/* STEP 3: API Credentials Input */}
           {/* ========================================================================= */}
-          <div className="space-y-4 border border-slate-100 rounded-2xl p-6 bg-white shadow-sm">
+          <div className="space-y-4 border border-slate-100 rounded-xl p-3 bg-white shadow-sm">
             <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
               <span className="w-7 h-7 rounded-xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
                 3
@@ -2180,7 +2182,7 @@ export function CompanySettings() {
           {/* ========================================================================= */}
           {/* STEP 4: Test Connection & Live Verification */}
           {/* ========================================================================= */}
-          <div className="space-y-4 border border-slate-100 rounded-2xl p-6 bg-slate-50/50 shadow-sm">
+          <div className="space-y-4 border border-slate-100 rounded-xl p-3 bg-slate-50/50 shadow-sm">
             <div className="flex items-center gap-3 border-b border-slate-200/60 pb-3">
               <span className="w-7 h-7 rounded-xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center flex-shrink-0">
                 4
@@ -2199,7 +2201,7 @@ export function CompanySettings() {
 
             {/* Test Result Feedback Box (if connection was tested) */}
             {etaTestResult && (
-              <div className={`p-4 rounded-2xl border flex items-start gap-3 ${
+              <div className={`p-2 rounded-xl border flex items-start gap-3 ${
                 etaTestResult.connected
                   ? 'bg-emerald-50/90 border-emerald-200 text-emerald-900 shadow-sm'
                   : 'bg-rose-50/90 border-rose-200 text-rose-900 shadow-sm'
@@ -2248,7 +2250,7 @@ export function CompanySettings() {
                   type="button"
                   onClick={handleTestEtaConnection}
                   disabled={etaTesting || etaSaving}
-                  className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold text-xs transition-all shadow-md shadow-indigo-500/10 active:scale-95 disabled:opacity-50 flex-shrink-0"
+                  className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold text-xs transition-all shadow-sm active:scale-95 disabled:opacity-50 flex-shrink-0"
                 >
                   {etaTesting ? (
                     <Loader2 className="w-4 h-4 animate-spin text-white" />
@@ -2267,11 +2269,11 @@ export function CompanySettings() {
         </div>
 
         {/* Submit Action */}
-        <div className="pt-4 flex justify-start pb-20">
+        <div className="pt-2 flex justify-start pb-6">
           <button
             type="submit"
             disabled={saving}
-            className="flex items-center gap-2 bg-indigo-600 text-white px-8 py-3.5 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/10 font-bold active:scale-95 disabled:opacity-50"
+            className="flex items-center gap-1.5 bg-indigo-600 text-white px-5 py-2 rounded-xl hover:bg-indigo-700 transition-all shadow-md font-bold text-xs active:scale-95 disabled:opacity-50"
           >
             {saving ? (
               <Loader2 className="w-5 h-5 animate-spin" />
