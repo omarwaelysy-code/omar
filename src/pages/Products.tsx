@@ -196,26 +196,6 @@ export const Products: React.FC = () => {
     setCollapsedGroupIds({});
   };
 
-  const groupedProducts = React.useMemo(() => {
-    const groupsMap = new Map<string, { id: string; name: string; code: string; items: Product[] }>();
-    itemGroups.forEach(g => {
-      groupsMap.set(g.id, { id: g.id, name: g.name, code: g.code, items: [] });
-    });
-    groupsMap.set('ungrouped', { 
-      id: 'ungrouped', 
-      name: language === 'ar' ? 'أصناف عامة (بدون مجموعة)' : 'General Items (Ungrouped)', 
-      code: '', 
-      items: [] 
-    });
-
-    filteredProducts.forEach(p => {
-      const gId = p.item_group_id && groupsMap.has(p.item_group_id) ? p.item_group_id : 'ungrouped';
-      groupsMap.get(gId)!.items.push(p);
-    });
-
-    return Array.from(groupsMap.values()).filter(g => g.items.length > 0);
-  }, [filteredProducts, itemGroups, language]);
-  
   // Stock Movement & Cost Ledger States
   const [movements, setMovements] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -1129,6 +1109,26 @@ export const Products: React.FC = () => {
     (p.eta_item_code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (p.tax_item_code || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const groupedProducts = React.useMemo(() => {
+    const groupsMap = new Map<string, { id: string; name: string; code: string; items: Product[] }>();
+    itemGroups.forEach(g => {
+      groupsMap.set(g.id, { id: g.id, name: g.name, code: g.code, items: [] });
+    });
+    groupsMap.set('ungrouped', { 
+      id: 'ungrouped', 
+      name: language === 'ar' ? 'أصناف عامة (بدون مجموعة)' : 'General Items (Ungrouped)', 
+      code: '', 
+      items: [] 
+    });
+
+    filteredProducts.forEach(p => {
+      const gId = p.item_group_id && groupsMap.has(p.item_group_id) ? p.item_group_id : 'ungrouped';
+      groupsMap.get(gId)!.items.push(p);
+    });
+
+    return Array.from(groupsMap.values()).filter(g => g.items.length > 0);
+  }, [filteredProducts, itemGroups, language]);
 
   if (!canView) return (
     <div className="flex flex-col items-center justify-center h-[60vh] text-zinc-500 gap-4">
