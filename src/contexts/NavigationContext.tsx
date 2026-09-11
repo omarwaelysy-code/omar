@@ -143,11 +143,74 @@ export const pageLabels: { [key: string]: string } = {
   'eta_tax_types': 'دليل أنواع الضرائب والرسوم (ETA)',
 };
 
+const getStorageKey = (companyId?: string) => {
+  const cid = companyId || localStorage.getItem('current_company_id') || 'default';
+  return `obrain_tabs_state_${cid}`;
+};
+
+const getSavedNavState = (companyId?: string) => {
+  try {
+    const raw = localStorage.getItem(getStorageKey(companyId));
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (data && Array.isArray(data.openTabs) && data.openTabs.length > 0 && typeof data.activeTabId === 'string') {
+        const validTabs: Tab[] = data.openTabs.filter(
+          (t: any) => t && typeof t.id === 'string'
+        );
+        if (validTabs.length > 0) {
+          const hasDashboard = validTabs.some(t => t.id === 'dashboard');
+          const finalTabs = hasDashboard 
+            ? validTabs 
+            : [{ id: 'dashboard', label: pageLabels['dashboard'] || 'لوحة التحكم' }, ...validTabs];
+
+          const activeId = finalTabs.some(t => t.id === data.activeTabId)
+            ? data.activeTabId
+            : finalTabs[finalTabs.length - 1].id;
+
+          return {
+            openTabs: finalTabs,
+            activeTabId: activeId,
+            currentPage: activeId
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error reading saved navigation state:', e);
+  }
+
+  const initialId = 'dashboard';
+  return {
+    openTabs: [{ id: initialId, label: pageLabels[initialId] || 'لوحة التحكم' }],
+    activeTabId: initialId,
+    currentPage: initialId
+  };
+};
+
 export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isSuperAdmin } = useAuth();
-  const [currentPage, setCurrentPage] = useState('dashboard');
-  const [openTabs, setOpenTabs] = useState<Tab[]>([{ id: 'dashboard', label: 'لوحة التحكم' }]);
-  const [activeTabId, setActiveTabId] = useState('dashboard');
+  
+  const [initialNavState] = useState(() => getSavedNavState(user?.company_id));
+  const [currentPage, setCurrentPage] = useState<string>(initialNavState.currentPage);
+  const [openTabs, setOpenTabs] = useState<Tab[]>(initialNavState.openTabs);
+  const [activeTabId, setActiveTabId] = useState<string>(initialNavState.activeTabId);
+  const lastUserCompanyRef = React.useRef<string | null>(null);
+
+  // Auto-save tabs state on changes to localStorage so Ctrl+F5 or reload preserves them
+  useEffect(() => {
+    if (openTabs && openTabs.length > 0 && activeTabId) {
+      try {
+        const key = getStorageKey(user?.company_id);
+        localStorage.setItem(key, JSON.stringify({
+          openTabs,
+          activeTabId
+        }));
+      } catch (e) {
+        console.error('Failed to save nav state:', e);
+      }
+    }
+  }, [openTabs, activeTabId, user?.company_id]);
+
   const [pendingViewDoc, setPendingViewDoc] = useState<{ type: string; idOrNumber: string } | null>(null);
   const [pendingLedgerParams, setPendingLedgerParams] = useState<{ accountId: string; startDate: string; endDate: string } | null>(null);
   const [pendingAccountTypeEditId, setPendingAccountTypeEditId] = useState<string | null>(null);
@@ -196,11 +259,24 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setCurrentPage(initialId);
     setOpenTabs([{ id: initialId, label: initialLabel }]);
     setActiveTabId(initialId);
+    try {
+      localStorage.removeItem(getStorageKey(user?.company_id));
+    } catch (e) {}
   };
 
-  // Reset tabs when user changes (login/logout/switch company)
+  // Only reset/restore tabs when user switches company or different user logs in
   useEffect(() => {
-    resetNavigation();
+    if (!user) return;
+    const currentKey = `${user.id}_${user.company_id}`;
+
+    if (lastUserCompanyRef.current && lastUserCompanyRef.current !== currentKey) {
+      const state = getSavedNavState(user.company_id);
+      setOpenTabs(state.openTabs);
+      setActiveTabId(state.activeTabId);
+      setCurrentPage(state.activeTabId);
+    }
+
+    lastUserCompanyRef.current = currentKey;
   }, [user?.id, user?.company_id]);
 
   const closeTab = (id: string) => {

@@ -431,6 +431,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('current_company_id');
     localStorage.removeItem('user_email');
     localStorage.removeItem('user_id');
+    try {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('obrain_tabs_state_')) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (e) {}
     // Preserve preferred_company_ on logout so last opened company is remembered upon re-login
     setUser(null);
     setUserMemberships([]);
