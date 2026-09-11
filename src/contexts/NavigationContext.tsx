@@ -53,6 +53,10 @@ interface NavigationContextType {
     itemName?: string;
     itemType?: string;
   } | null) => void;
+  pendingEtaInvoiceForPurchase: any | null;
+  setPendingEtaInvoiceForPurchase: (val: any | null) => void;
+  pendingEtaInvoiceForReturn: any | null;
+  setPendingEtaInvoiceForReturn: (val: any | null) => void;
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
@@ -163,6 +167,8 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     itemName?: string;
     itemType?: string;
   } | null>(null);
+  const [pendingEtaInvoiceForPurchase, setPendingEtaInvoiceForPurchase] = useState<any | null>(null);
+  const [pendingEtaInvoiceForReturn, setPendingEtaInvoiceForReturn] = useState<any | null>(null);
 
   const openTab = (id: string, label?: string) => {
     const tabLabel = label || pageLabels[id] || id;
@@ -242,7 +248,11 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       pendingEtaProductForCreation,
       setPendingEtaProductForCreation,
       pendingEtaProductForLinking,
-      setPendingEtaProductForLinking
+      setPendingEtaProductForLinking,
+      pendingEtaInvoiceForPurchase,
+      setPendingEtaInvoiceForPurchase,
+      pendingEtaInvoiceForReturn,
+      setPendingEtaInvoiceForReturn
     }}>
       {children}
     </NavigationContext.Provider>

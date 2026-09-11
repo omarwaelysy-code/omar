@@ -9,7 +9,8 @@ import {
   Eye, History, Printer, ArrowRight, ArrowLeft, Minimize2, 
   Maximize2, Phone, Mail, MapPin, Wallet, Layers, Paperclip, 
   Tag, Box, LayoutGrid, List, Receipt, ChevronDown, ChevronLeft, ChevronRight,
-  Coins, CheckCheck, ExternalLink, RotateCcw, ChevronUp, Copy, Sparkles, FileSpreadsheet
+  Coins, CheckCheck, ExternalLink, RotateCcw, ChevronUp, Copy, Sparkles, FileSpreadsheet,
+  Lock, CheckCircle2, AlertTriangle, Link2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Barcode from 'react-barcode';
@@ -42,7 +43,25 @@ export const PurchaseInvoices: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
-  const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
+  const { pendingViewDoc, setPendingViewDoc, setCurrentPage, pendingEtaInvoiceForPurchase, setPendingEtaInvoiceForPurchase } = useNavigation();
+
+  // ETA Invoices Conversion State & Lock
+  const [etaLockData, setEtaLockData] = useState<{
+    uuid: string;
+    internalId: string;
+    lockedSubtotal: number;
+    lockedDiscount: number;
+    lockedTax: number;
+    lockedTotal: number;
+    issuerTax: string;
+    issuerName: string;
+    supplierMappings?: any[];
+    itemMappings?: any[];
+  } | null>(null);
+
+  const [showEtaLinkPrompt, setShowEtaLinkPrompt] = useState(false);
+  const [unlinkedSupplierTaxToSave, setUnlinkedSupplierTaxToSave] = useState<string | null>(null);
+  const [unlinkedItemsToSave, setUnlinkedItemsToSave] = useState<Array<{ etaCode: string; productId: string; etaName: string }>>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
@@ -82,6 +101,7 @@ export const PurchaseInvoices: React.FC = () => {
   const [barcodeContinuousMode, setBarcodeContinuousMode] = useState(false);
   const [description, setDescription] = useState<string>('');
   const prevExchangeRateRef = useRef<number>(1);
+  const skipEtaLinkCheckRef = useRef(false);
 
   useEffect(() => {
     const oldRate = prevExchangeRateRef.current || 1;
@@ -1191,6 +1211,165 @@ export const PurchaseInvoices: React.FC = () => {
     }
   }, [pendingViewDoc, user, setPendingViewDoc]);
 
+  // Load and prefill ETA Invoice if passed
+  useEffect(() => {
+    let pendingEta = pendingEtaInvoiceForPurchase;
+    if (!pendingEta) {
+      try {
+        const stored = sessionStorage.getItem('pending_eta_invoice_for_purchase');
+        if (stored) pendingEta = JSON.parse(stored);
+      } catch (e) {}
+    }
+
+    if (pendingEta && user?.company_id && suppliers.length > 0) {
+      setPendingEtaInvoiceForPurchase(null);
+      try {
+        sessionStorage.removeItem('pending_eta_invoice_for_purchase');
+      } catch (e) {}
+
+      const initEtaInvoice = async () => {
+        try {
+          await openModal();
+
+          const issuerTax = String(pendingEta.issuerId || '').trim();
+          let matchedSupId = '';
+
+          // 1. Fetch supplier & item mappings
+          const [sMapRes, iMapRes] = await Promise.all([
+            apiRequest<{ success: boolean; suppliers?: any[] }>(`/eta/suppliers/mapping?company_id=${user.company_id}`).catch(() => ({ success: false, suppliers: [] })),
+            apiRequest<{ success: boolean; items?: any[] }>(`/eta/items/mapping?direction=Received&company_id=${user.company_id}`).catch(() => ({ success: false, items: [] }))
+          ]);
+
+          const supMaps = sMapRes?.suppliers || [];
+          const itmMaps = iMapRes?.items || [];
+
+          const mapEntry = supMaps.find((m: any) => m.taxNumber === issuerTax || m.etaTaxNumber === issuerTax);
+          if (mapEntry && mapEntry.linkedSupplier?.id) {
+            matchedSupId = mapEntry.linkedSupplier.id;
+          } else if (mapEntry && mapEntry.supplier_id) {
+            matchedSupId = mapEntry.supplier_id;
+          }
+
+          if (!matchedSupId && suppliers.length > 0) {
+            const direct = suppliers.find(s => String(s.tax_number || '').trim() === issuerTax);
+            if (direct) {
+              matchedSupId = direct.id;
+            } else {
+              const cleanInvName = (pendingEta.issuerName || '').trim().toLowerCase();
+              const byName = suppliers.find(s => s.name && cleanInvName.includes(s.name.trim().toLowerCase()));
+              if (byName) matchedSupId = byName.id;
+            }
+          }
+
+          // 2. Fetch or extract lines
+          let rawLines: any[] = [];
+          if (Array.isArray(pendingEta.raw_data?.invoiceLines)) {
+            rawLines = pendingEta.raw_data.invoiceLines;
+          } else if (pendingEta.uuid) {
+            try {
+              const det = await apiRequest<{ success: boolean; data?: any }>(`/eta/invoices/${pendingEta.uuid}`);
+              if (det?.data?.invoiceLines) {
+                rawLines = det.data.invoiceLines;
+              } else if (det?.data?.document?.invoiceLines) {
+                rawLines = det.data.document.invoiceLines;
+              }
+            } catch (e) {}
+          }
+
+          const parsedItems: any[] = [];
+          if (rawLines && rawLines.length > 0) {
+            rawLines.forEach((line: any, idx: number) => {
+              const etaCode = line.itemCode || line.itemType || '';
+              const etaDesc = line.description || '';
+              let matchedProd: any = null;
+
+              // Check item mapping
+              const iMap = itmMaps.find((m: any) => (m.itemCode === etaCode || m.etaItemCode === etaCode) && (m.linkedProduct || m.product_id));
+              if (iMap) {
+                matchedProd = iMap.linkedProduct || products.find(p => p.id === iMap.product_id);
+              }
+
+              if (!matchedProd) {
+                matchedProd = products.find(p => 
+                  (p.code && p.code === etaCode) ||
+                  (p.barcode && p.barcode === etaCode) ||
+                  (p.name && (etaDesc.includes(p.name) || p.name.includes(etaDesc)))
+                );
+              }
+
+              const qty = Number(line.quantity) || 1;
+              const unitVal = Number(line.unitValue?.amountEGP || line.unitValue?.amountSold || line.unitPrice || 0);
+              const lineTotal = Number(line.salesTotal || (qty * unitVal)) || 0;
+              const lineTax = Number(line.valueDifference || (lineTotal * 0.14)) || 0;
+
+              parsedItems.push({
+                product_id: matchedProd?.id || '',
+                product_name: matchedProd?.name || etaDesc || `صنف فاتورة ${idx + 1}`,
+                product_code: matchedProd?.code || etaCode,
+                barcode: matchedProd?.barcode || '',
+                product_image_url: matchedProd?.image_url || '',
+                quantity: qty,
+                cost_price: unitVal || Number(matchedProd?.cost_price || 0),
+                total: lineTotal,
+                vat_rate: 14,
+                vat_amount: lineTax,
+                etaItemCode: etaCode,
+                etaItemName: etaDesc
+              });
+            });
+          } else {
+            const sub = Number(pendingEta.netAmount || pendingEta.totalSales || 0);
+            const tax = Number(pendingEta.taxAmount || 0);
+            parsedItems.push({
+              product_id: '',
+              product_name: pendingEta.issuerName ? `مشتريات من ${pendingEta.issuerName}` : 'مشتريات فاتورة إلكترونية',
+              quantity: 1,
+              cost_price: sub,
+              total: sub,
+              vat_rate: 14,
+              vat_amount: tax
+            });
+          }
+
+          setInvoiceData(prev => ({
+            ...prev,
+            supplier_id: matchedSupId || prev.supplier_id,
+            warehouse_id: prev.warehouse_id || (warehouses[0]?.id || ''),
+            date: (pendingEta.dateTimeIssued || '').slice(0, 10) || new Date().toISOString().slice(0, 10),
+            notes: `فاتورة مسجلة من منظومة مصلحة الضرائب المصرية (رقم: ${pendingEta.internalId || pendingEta.uuid.slice(0, 8)})`,
+            discount: Number(pendingEta.totalDiscount || 0)
+          }));
+
+          setItems(parsedItems);
+
+          setEtaLockData({
+            uuid: pendingEta.uuid,
+            internalId: pendingEta.internalId || pendingEta.uuid.slice(0, 8),
+            lockedSubtotal: Number(pendingEta.netAmount || pendingEta.totalSales || 0),
+            lockedDiscount: Number(pendingEta.totalDiscount || 0),
+            lockedTax: Number(pendingEta.taxAmount || 0),
+            lockedTotal: Number(pendingEta.totalAmount || 0),
+            issuerTax,
+            issuerName: pendingEta.issuerName || '',
+            supplierMappings: supMaps,
+            itemMappings: itmMaps
+          });
+
+          showNotification(
+            language === 'ar' 
+              ? 'تم تحميل بيانات الفاتورة الإلكترونية بنجاح وتثبيت الإجماليات والضريبة المطابقة للمنظومة'
+              : 'ETA Invoice loaded with locked official totals',
+            'info'
+          );
+        } catch (err) {
+          console.error('Error opening ETA invoice in purchase invoices:', err);
+        }
+      };
+
+      initEtaInvoice();
+    }
+  }, [pendingEtaInvoiceForPurchase, user?.company_id, suppliers, products, warehouses]);
+
   useEffect(() => {
     const generatePreview = () => {
       const subtotalVal = (items || []).reduce((sum, item) => sum + (Number(item.total) || 0), 0);
@@ -1792,10 +1971,16 @@ export const PurchaseInvoices: React.FC = () => {
   };
 
   const calculateSubtotal = () => {
+    if (etaLockData) {
+      return Number(etaLockData.lockedSubtotal) || 0;
+    }
     return items.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
   };
 
   const calculateTotal = () => {
+    if (etaLockData) {
+      return Number(etaLockData.lockedTotal) || 0;
+    }
     const subtotal = items.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
     const vatTotal = isVatEnabled
       ? items.reduce((sum, item) => {
@@ -2089,6 +2274,44 @@ export const PurchaseInvoices: React.FC = () => {
     }
   };
 
+  const handleConfirmSaveWithLinking = async (shouldLink: boolean) => {
+    setShowEtaLinkPrompt(false);
+    if (shouldLink && user?.company_id) {
+      if (unlinkedSupplierTaxToSave && invoiceData.supplier_id) {
+        try {
+          await apiRequest('/eta/suppliers/mapping/link', 'POST', {
+            company_id: user.company_id,
+            etaTaxNumber: unlinkedSupplierTaxToSave,
+            supplierId: invoiceData.supplier_id,
+            etaSupplierName: etaLockData?.issuerName,
+            notes: language === 'ar' ? 'ربط تلقائي عند تسجيل فاتورة مشتريات' : 'Auto-linked from purchase invoice'
+          });
+        } catch (e) {
+          console.warn('Could not link supplier:', e);
+        }
+      }
+      for (const unlinked of unlinkedItemsToSave) {
+        try {
+          await apiRequest('/eta/items/mapping/link', 'POST', {
+            company_id: user.company_id,
+            etaItemCode: unlinked.etaCode,
+            productId: unlinked.productId,
+            etaItemName: unlinked.etaName,
+            etaItemType: 'EGS',
+            direction: 'Received',
+            notes: language === 'ar' ? 'ربط تلقائي عند تسجيل فاتورة مشتريات' : 'Auto-linked from purchase invoice'
+          });
+        } catch (e) {
+          console.warn('Could not link item:', e);
+        }
+      }
+    }
+    skipEtaLinkCheckRef.current = true;
+    const fakeEvent = { preventDefault: () => {} } as any;
+    await handleSubmit(fakeEvent);
+    skipEtaLinkCheckRef.current = false;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || isSubmitting) return;
@@ -2173,22 +2396,66 @@ export const PurchaseInvoices: React.FC = () => {
       }
     }
 
+    if (etaLockData && !skipEtaLinkCheckRef.current) {
+      const issuerTax = etaLockData.issuerTax;
+      const supMaps = etaLockData.supplierMappings || [];
+      const itmMaps = etaLockData.itemMappings || [];
+
+      const isSupLinked = supMaps.some((m: any) => 
+        (m.taxNumber === issuerTax || m.etaTaxNumber === issuerTax) && 
+        (m.linkedSupplier?.id === invoiceData.supplier_id || m.supplier_id === invoiceData.supplier_id)
+      );
+
+      const unlinkedItems: Array<{ etaCode: string; productId: string; etaName: string }> = [];
+      validItems.forEach((it: any) => {
+        if (it.etaItemCode && it.product_id) {
+          const isLinked = itmMaps.some((m: any) => 
+            (m.itemCode === it.etaItemCode || m.etaItemCode === it.etaItemCode) && 
+            (m.linkedProduct?.id === it.product_id || m.product_id === it.product_id)
+          );
+          if (!isLinked) {
+            unlinkedItems.push({
+              etaCode: it.etaItemCode,
+              productId: it.product_id,
+              etaName: it.etaItemName || it.product_name || ''
+            });
+          }
+        }
+      });
+
+      if (!isSupLinked || unlinkedItems.length > 0) {
+        setUnlinkedSupplierTaxToSave(!isSupLinked ? issuerTax : null);
+        setUnlinkedItemsToSave(unlinkedItems);
+        setShowEtaLinkPrompt(true);
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
     try {
       const supplier = suppliers.find(s => s.id === invoiceData.supplier_id);
       const paymentMethod = paymentMethods.find(pm => pm.id === invoiceData.payment_method_id);
       
-      const subtotal = Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.cost_price || 0)), 0)) || 0;
-      const discount_amount = Number(invoiceData.discount) || 0;
+      const subtotal = etaLockData
+        ? Number(etaLockData.lockedSubtotal)
+        : (Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.cost_price || 0)), 0)) || 0);
+      const discount_amount = etaLockData
+        ? Number(etaLockData.lockedDiscount)
+        : (Number(invoiceData.discount) || 0);
       
-      const vatTotal = isVatEnabled
-        ? Number(validItems.reduce((sum, item) => {
-            const itemTotal = Number(item.quantity || 0) * Number(item.cost_price || 0);
-            const rateVal = Number((item as any).vat_rate) || 0;
-            return sum + (itemTotal * (rateVal / 100));
-          }, 0).toFixed(2))
-        : 0;
+      const vatTotal = etaLockData
+        ? Number(etaLockData.lockedTax)
+        : (isVatEnabled
+          ? Number(validItems.reduce((sum, item) => {
+              const itemTotal = Number(item.quantity || 0) * Number(item.cost_price || 0);
+              const rateVal = Number((item as any).vat_rate) || 0;
+              return sum + (itemTotal * (rateVal / 100));
+            }, 0).toFixed(2))
+          : 0);
 
-      const total_amount = Number(subtotal + vatTotal - discount_amount) || 0;
+      const total_amount = etaLockData
+        ? Number(etaLockData.lockedTotal)
+        : (Number(subtotal + vatTotal - discount_amount) || 0);
 
       const changes: any[] = [];
       const detailsList: string[] = [];
@@ -2410,7 +2677,8 @@ export const PurchaseInvoices: React.FC = () => {
         cost_center_id: selectedCostCenterId || null,
         currency_id: selectedCurrencyId || null,
         exchange_rate: Number(exchangeRate) || 1,
-        description: description
+        description: description,
+        eta_uuid: etaLockData ? etaLockData.uuid : (editingInvoice?.eta_uuid || null)
       };
 
       const journalItems: any[] = [];
@@ -2766,6 +3034,9 @@ export const PurchaseInvoices: React.FC = () => {
       }
 
       showNotification(editingInvoice ? t('pi.edit_success') : t('pi.add_success'), 'success');
+      setEtaLockData(null);
+      setPendingEtaInvoiceForPurchase(null);
+      try { sessionStorage.removeItem('pending_eta_invoice_for_purchase'); } catch (e) {}
       closeModal();
 
       if (editingInvoice) {
@@ -3061,6 +3332,7 @@ export const PurchaseInvoices: React.FC = () => {
 
   const closeModal = () => {
     setIsModalOpen(false);
+    setEtaLockData(null);
     setEditingInvoice(null);
     setInvoiceData({
       supplier_id: '',
@@ -3638,6 +3910,29 @@ export const PurchaseInvoices: React.FC = () => {
       </div>
       
       <div className="flex-1 flex flex-col h-full relative overflow-hidden">
+        {etaLockData && (
+          <div className="mx-4 mt-3 p-3 bg-emerald-50 border border-emerald-300 rounded-2xl flex items-center justify-between gap-3 text-emerald-900 shadow-2xs">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-emerald-600 text-white rounded-xl shadow-xs">
+                <Lock className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-bold text-xs md:text-sm flex items-center gap-1.5">
+                  <span>{language === 'ar' ? `فاتورة مشتريات معتمدة من منظومة مصلحة الضرائب المصرية (رقم المستند: ${etaLockData.internalId})` : `Certified ETA Invoice (Doc: ${etaLockData.internalId})`}</span>
+                  <span className="px-2 py-0.5 bg-emerald-200 text-emerald-800 text-[10px] font-bold rounded-md">ETA Locked</span>
+                </h4>
+                <p className="text-[11px] text-emerald-700">
+                  {language === 'ar'
+                    ? 'قاعدة مالية هامة: إجماليات الفاتورة، الخصم، وضريبة القيمة المضافة مقفلة رسمياً ومطابقة للمنظومة. يمكنك اختيار وتعديل الأصناف والكميات بحرية.'
+                    : 'Gross, Discount, VAT and Total amounts are strictly locked to the official ETA document. You can adjust items and quantities freely.'}
+                </p>
+              </div>
+            </div>
+            <span className="hidden sm:inline-block px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-mono font-bold rounded-xl border border-emerald-300 shrink-0">
+              UUID: {etaLockData.uuid.slice(0, 10)}...
+            </span>
+          </div>
+        )}
               
               {/* AI Drawer (Smart Creation) sliding from the right */}
               <AnimatePresence>
@@ -6072,6 +6367,48 @@ export const PurchaseInvoices: React.FC = () => {
           </div>
         </div>
       )}
+      {/* ETA Mapping Prompt Modal */}
+      {showEtaLinkPrompt && (
+        <div className="fixed inset-0 z-[999] bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-zinc-100 space-y-4 animate-in fade-in zoom-in-95 duration-200" dir={dir}>
+            <div className="flex items-center gap-3 text-emerald-700">
+              <div className="p-3 bg-emerald-100 rounded-2xl">
+                <Link2 className="w-6 h-6 text-emerald-700" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-zinc-900">
+                  {language === 'ar' ? 'ربط المورد والأصناف في منظومة الضرائب' : 'Link Supplier & Items in ETA'}
+                </h3>
+                <p className="text-xs text-zinc-500">
+                  {language === 'ar' ? 'تسهيل المطابقة الآلية للفواتير المستقبلية' : 'Auto-match future ETA documents'}
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-zinc-700 leading-relaxed bg-zinc-50 p-3 rounded-xl border border-zinc-100">
+              {language === 'ar'
+                ? 'هل ترغب في حفظ ربط المورد والأصناف المختارة تلقائياً في منظومة الفاتورة الإلكترونية لتتم مطابقتها تلقائياً في المرات القادمة؟'
+                : 'Do you want to automatically link this supplier and mapped products in ETA system for future automatic reconciliation?'}
+            </p>
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => handleConfirmSaveWithLinking(true)}
+                className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-all shadow-md active:scale-95 cursor-pointer"
+              >
+                {language === 'ar' ? 'نعم، حفظ مع الربط' : 'Yes, Save & Link'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmSaveWithLinking(false)}
+                className="flex-1 py-2.5 px-4 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold rounded-xl text-xs transition-all active:scale-95 cursor-pointer"
+              >
+                {language === 'ar' ? 'حفظ الفاتورة فقط' : 'Save Invoice Only'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+

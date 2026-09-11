@@ -52,7 +52,6 @@ import { exportToExcel } from '../utils/excelUtils';
 import { ExportButtons } from '../components/ExportButtons';
 import { exportToPDF, printElement } from '../utils/pdfUtils';
 import { formatMoney } from '../utils/formatUtils';
-import { CreatePurchaseFromEtaModal } from '../components/CreatePurchaseFromEtaModal';
 
 export interface EtaReceivedInvoice {
   uuid: string;
@@ -238,7 +237,7 @@ export function EtaReceivedInvoices() {
   const { language, dir } = useLanguage();
   const { user } = useAuth();
   const { showNotification } = useNotification();
-  const { openTab } = useNavigation();
+  const { openTab, setPendingEtaInvoiceForPurchase, setPendingEtaInvoiceForReturn } = useNavigation();
 
   // Selection, View (Table vs Cards), and Column Visibility
   const [selectedUuids, setSelectedUuids] = useState<string[]>([]);
@@ -387,11 +386,8 @@ export function EtaReceivedInvoices() {
   const [copiedUuid, setCopiedUuid] = useState<string | null>(null);
   const [modalDetailsLoading, setModalDetailsLoading] = useState(false);
 
-  // Registration Status & Create Purchase Modal States
+  // Registration Status & Handlers
   const [registrationFilter, setRegistrationFilter] = useState<'all' | 'registered' | 'unregistered'>('all');
-  const [createPurchaseModalOpen, setCreatePurchaseModalOpen] = useState(false);
-  const [targetInvoiceForPurchase, setTargetInvoiceForPurchase] = useState<EtaReceivedInvoice | null>(null);
-  const [purchaseModalDocType, setPurchaseModalDocType] = useState<'purchase_invoice' | 'purchase_return'>('purchase_invoice');
   const [registeredStatusMap, setRegisteredStatusMap] = useState<Record<string, { id: string; docNumber: string; docType: 'purchase_invoice' | 'purchase_return' }>>({});
 
   const loadRegisteredStatus = useCallback(async () => {
@@ -410,37 +406,20 @@ export function EtaReceivedInvoices() {
     loadRegisteredStatus();
   }, [loadRegisteredStatus]);
 
-  const handlePurchaseCreatedSuccess = (regInfo: { id: string; docNumber: string; docType: 'purchase_invoice' | 'purchase_return' }) => {
-    if (targetInvoiceForPurchase) {
-      setRegisteredStatusMap(prev => ({
-        ...prev,
-        [targetInvoiceForPurchase.uuid]: regInfo
-      }));
-      setAllPortalInvoices(prev => prev.map(inv => {
-        if (inv.uuid === targetInvoiceForPurchase.uuid) {
-          return {
-            ...inv,
-            isRegistered: true,
-            registeredDocId: regInfo.id,
-            registeredDocNumber: regInfo.docNumber,
-            registeredDocType: regInfo.docType
-          };
-        }
-        return inv;
-      }));
-      setInvoices(prev => prev.map(inv => {
-        if (inv.uuid === targetInvoiceForPurchase.uuid) {
-          return {
-            ...inv,
-            isRegistered: true,
-            registeredDocId: regInfo.id,
-            registeredDocNumber: regInfo.docNumber,
-            registeredDocType: regInfo.docType
-          };
-        }
-        return inv;
-      }));
-    }
+  const handleAddPurchaseFromEta = (inv: EtaReceivedInvoice) => {
+    setPendingEtaInvoiceForPurchase(inv);
+    try {
+      sessionStorage.setItem('pending_eta_invoice_for_purchase', JSON.stringify(inv));
+    } catch (e) {}
+    openTab('purchase_invoices', language === 'ar' ? 'فواتير المشتريات' : 'Purchase Invoices');
+  };
+
+  const handleAddReturnFromEta = (inv: EtaReceivedInvoice) => {
+    setPendingEtaInvoiceForReturn(inv);
+    try {
+      sessionStorage.setItem('pending_eta_invoice_for_return', JSON.stringify(inv));
+    } catch (e) {}
+    openTab('purchase_returns', language === 'ar' ? 'مرتجعات المشتريات' : 'Purchase Returns');
   };
 
   // Top & Table synchronized horizontal scrollbar refs
@@ -3055,40 +3034,36 @@ export function EtaReceivedInvoices() {
                       );
                     }
 
-                    const isReceived = (inv.direction === 'Received' || !inv.direction || inv.direction === undefined);
-                    const isValid = String(inv.status).toLowerCase() === 'valid';
-
-                    if (isReceived && isValid) {
-                      const isCreditNote = String(inv.typeName || '').toLowerCase() === 'c' || String(inv.documentTypeName || '').includes('دائن');
-                      return (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setTargetInvoiceForPurchase(inv);
-                            setPurchaseModalDocType(isCreditNote ? 'purchase_return' : 'purchase_invoice');
-                            setCreatePurchaseModalOpen(true);
-                          }}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white shadow-xs transition-all cursor-pointer ${
-                            isCreditNote
-                              ? 'bg-amber-600 hover:bg-amber-700'
-                              : 'bg-emerald-600 hover:bg-emerald-700'
-                          }`}
-                        >
-                          {isCreditNote ? (
-                            <>
-                              <RotateCcw className="w-3.5 h-3.5" />
-                              <span>{language === 'ar' ? 'إضافة مرتجع' : '+ Return'}</span>
-                            </>
-                          ) : (
-                            <>
-                              <ShoppingCart className="w-3.5 h-3.5" />
-                              <span>{language === 'ar' ? 'إضافة فاتورة' : '+ Purchase'}</span>
-                            </>
-                          )}
-                        </button>
-                      );
-                    }
-                    return null;
+                    const isCreditNote = String(inv.typeName || '').toLowerCase() === 'c' || String(inv.documentTypeName || '').includes('دائن') || String(inv.documentTypeName || '').toLowerCase().includes('credit');
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isCreditNote) {
+                            handleAddReturnFromEta(inv);
+                          } else {
+                            handleAddPurchaseFromEta(inv);
+                          }
+                        }}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white shadow-xs transition-all cursor-pointer ${
+                          isCreditNote
+                            ? 'bg-amber-600 hover:bg-amber-700'
+                            : 'bg-emerald-600 hover:bg-emerald-700'
+                        }`}
+                      >
+                        {isCreditNote ? (
+                          <>
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>{language === 'ar' ? 'إضافة مرتجع' : '+ Return'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <ShoppingCart className="w-3.5 h-3.5" />
+                            <span>{language === 'ar' ? 'إضافة فاتورة' : '+ Purchase'}</span>
+                          </>
+                        )}
+                      </button>
+                    );
                   })()}
 
                   <button
@@ -3343,42 +3318,36 @@ export function EtaReceivedInvoices() {
                       );
                     }
 
-                    // Only allowed for Received and Valid documents
-                    const isReceived = (inv.direction === 'Received' || !inv.direction || inv.direction === undefined);
-                    const isValid = String(inv.status).toLowerCase() === 'valid';
-
-                    if (isReceived && isValid) {
-                      const isCreditNote = String(inv.typeName || '').toLowerCase() === 'c' || String(inv.documentTypeName || '').includes('دائن');
-                      return (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setTargetInvoiceForPurchase(inv);
-                            setPurchaseModalDocType(isCreditNote ? 'purchase_return' : 'purchase_invoice');
-                            setCreatePurchaseModalOpen(true);
-                          }}
-                          className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white shadow-md transition-all cursor-pointer ${
-                            isCreditNote
-                              ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/20'
-                              : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
-                          }`}
-                        >
-                          {isCreditNote ? (
-                            <>
-                              <RotateCcw className="w-3.5 h-3.5" />
-                              <span>{language === 'ar' ? 'إضافة مرتجع مشتريات' : 'Add Return'}</span>
-                            </>
-                          ) : (
-                            <>
-                              <ShoppingCart className="w-3.5 h-3.5" />
-                              <span>{language === 'ar' ? 'إضافة فاتورة مشتريات' : 'Add Purchase'}</span>
-                            </>
-                          )}
-                        </button>
-                      );
-                    }
-
-                    return <span className="text-slate-300 text-xs">-</span>;
+                    const isCreditNote = String(inv.typeName || '').toLowerCase() === 'c' || String(inv.documentTypeName || '').includes('دائن') || String(inv.documentTypeName || '').toLowerCase().includes('credit');
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isCreditNote) {
+                            handleAddReturnFromEta(inv);
+                          } else {
+                            handleAddPurchaseFromEta(inv);
+                          }
+                        }}
+                        className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white shadow-md transition-all cursor-pointer ${
+                          isCreditNote
+                            ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/20'
+                            : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+                        }`}
+                      >
+                        {isCreditNote ? (
+                          <>
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>{language === 'ar' ? 'إضافة مرتجع مشتريات' : 'Add Return'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <ShoppingCart className="w-3.5 h-3.5" />
+                            <span>{language === 'ar' ? 'إضافة فاتورة مشتريات' : 'Add Purchase'}</span>
+                          </>
+                        )}
+                      </button>
+                    );
                   })()}
                 </td>
               )}
@@ -4430,18 +4399,6 @@ export function EtaReceivedInvoices() {
           </div>
         )}
       </AnimatePresence>
-
-      {/* Create Purchase Invoice or Return from ETA Modal */}
-      <CreatePurchaseFromEtaModal
-        isOpen={createPurchaseModalOpen}
-        onClose={() => {
-          setCreatePurchaseModalOpen(false);
-          setTargetInvoiceForPurchase(null);
-        }}
-        onSuccess={handlePurchaseCreatedSuccess}
-        invoice={targetInvoiceForPurchase}
-        docType={purchaseModalDocType}
-      />
     </div>
   );
 }

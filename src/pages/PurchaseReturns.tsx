@@ -8,7 +8,7 @@ import {
   Save, Eye, Download, History, Printer, Edit, Phone, Mail, MapPin, Wallet, Box, 
   Maximize2, Minimize2, ChevronRight, ChevronLeft, FileText, FileSpreadsheet, Layers, ChevronDown, 
   LayoutGrid, List, CheckCheck, Coins, ImageIcon, ExternalLink, ChevronUp, Copy
-} from 'lucide-react';
+, Lock, CheckCircle2, AlertTriangle, Link2} from 'lucide-react';
 
 import { motion, AnimatePresence } from 'framer-motion';
 import Barcode from 'react-barcode';
@@ -38,7 +38,7 @@ export const PurchaseReturns: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
-  const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
+  const { pendingViewDoc, setPendingViewDoc, setCurrentPage, pendingEtaInvoiceForReturn, setPendingEtaInvoiceForReturn } = useNavigation();
 
   // Catalogs
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -64,6 +64,25 @@ export const PurchaseReturns: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  // ETA Invoices Conversion State & Lock
+  const [etaLockData, setEtaLockData] = useState<{
+    uuid: string;
+    internalId: string;
+    lockedSubtotal: number;
+    lockedDiscount: number;
+    lockedTax: number;
+    lockedTotal: number;
+    issuerTax: string;
+    issuerName: string;
+    supplierMappings?: any[];
+    itemMappings?: any[];
+  } | null>(null);
+
+  const [showEtaLinkPrompt, setShowEtaLinkPrompt] = useState(false);
+  const [unlinkedSupplierTaxToSave, setUnlinkedSupplierTaxToSave] = useState<string | null>(null);
+  const [unlinkedItemsToSave, setUnlinkedItemsToSave] = useState<Array<{ etaCode: string; productId: string; etaName: string }>>([]);
+  const skipEtaLinkCheckRef = useRef(false);
+
   const [viewReturn, setViewReturn] = useState<any | null>(null);
   const [view, setView] = useState<'table' | 'card'>('table');
   const [showAiInput, setShowAiInput] = useState(false);
@@ -217,6 +236,7 @@ export const PurchaseReturns: React.FC = () => {
 
   const closeModal = () => {
     setIsModalOpen(false);
+    setEtaLockData(null);
     setEditingReturn(null);
     setReturnData({
       supplier_id: '',
@@ -981,6 +1001,44 @@ export const PurchaseReturns: React.FC = () => {
     }
   };
 
+  const handleConfirmSaveWithLinking = async (shouldLink: boolean) => {
+    setShowEtaLinkPrompt(false);
+    if (shouldLink && user?.company_id) {
+      if (unlinkedSupplierTaxToSave && returnData.supplier_id) {
+        try {
+          await apiRequest('/eta/suppliers/mapping/link', 'POST', {
+            company_id: user.company_id,
+            etaTaxNumber: unlinkedSupplierTaxToSave,
+            supplierId: returnData.supplier_id,
+            etaSupplierName: etaLockData?.issuerName,
+            notes: language === 'ar' ? 'ربط تلقائي عند تسجيل مرتجع مشتريات' : 'Auto-linked from purchase return'
+          });
+        } catch (e) {
+          console.warn('Could not link supplier:', e);
+        }
+      }
+      for (const unlinked of unlinkedItemsToSave) {
+        try {
+          await apiRequest('/eta/items/mapping/link', 'POST', {
+            company_id: user.company_id,
+            etaItemCode: unlinked.etaCode,
+            productId: unlinked.productId,
+            etaItemName: unlinked.etaName,
+            etaItemType: 'EGS',
+            direction: 'Received',
+            notes: language === 'ar' ? 'ربط تلقائي عند تسجيل مرتجع مشتريات' : 'Auto-linked from purchase return'
+          });
+        } catch (e) {
+          console.warn('Could not link item:', e);
+        }
+      }
+    }
+    skipEtaLinkCheckRef.current = true;
+    const fakeEvent = { preventDefault: () => {} } as any;
+    await handleSubmit(fakeEvent);
+    skipEtaLinkCheckRef.current = false;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || isSubmitting) return;
@@ -1007,8 +1065,44 @@ export const PurchaseReturns: React.FC = () => {
       const paymentMethod = paymentMethods.find(pm => pm.id === returnData.payment_method_id);
       const return_number = editingReturn ? editingReturn.return_number : returnNumber;
       
-      const subtotal = Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)), 0)) || 0;
-      const discount_amount = Number(discount) || 0;
+      if (etaLockData && !skipEtaLinkCheckRef.current) {
+        const issuerTax = etaLockData.issuerTax;
+        const supMaps = etaLockData.supplierMappings || [];
+        const itmMaps = etaLockData.itemMappings || [];
+
+        const isSupLinked = supMaps.some((m: any) => 
+          (m.taxNumber === issuerTax || m.etaTaxNumber === issuerTax) && 
+          (m.linkedSupplier?.id === returnData.supplier_id || m.supplier_id === returnData.supplier_id)
+        );
+
+        const unlinkedItems: Array<{ etaCode: string; productId: string; etaName: string }> = [];
+        validItems.forEach((it: any) => {
+          if (it.etaItemCode && it.product_id) {
+            const isLinked = itmMaps.some((m: any) => 
+              (m.itemCode === it.etaItemCode || m.etaItemCode === it.etaItemCode) && 
+              (m.linkedProduct?.id === it.product_id || m.product_id === it.product_id)
+            );
+            if (!isLinked) {
+              unlinkedItems.push({
+                etaCode: it.etaItemCode,
+                productId: it.product_id,
+                etaName: it.etaItemName || it.product_name || ''
+              });
+            }
+          }
+        });
+
+        if (!isSupLinked || unlinkedItems.length > 0) {
+          setUnlinkedSupplierTaxToSave(!isSupLinked ? issuerTax : null);
+          setUnlinkedItemsToSave(unlinkedItems);
+          setShowEtaLinkPrompt(true);
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      const subtotal = etaLockData ? Number(etaLockData.lockedSubtotal) : (Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)), 0)) || 0);
+      const discount_amount = etaLockData ? Number(etaLockData.lockedDiscount) : (Number(discount) || 0);
 
       const sanitizedItems = validItems.map(item => {
         const product = products.find(p => p.id === item.product_id);
@@ -1037,7 +1131,7 @@ export const PurchaseReturns: React.FC = () => {
         ? Number(sanitizedItems.reduce((sum, item) => sum + (Number(item.vat_amount) || 0), 0).toFixed(2))
         : 0;
 
-      const total_amount = Number(subtotal + vatTotal - discount_amount) || 0;
+      const total_amount = etaLockData ? Number(etaLockData.lockedTotal) : (Number(subtotal + vatTotal - discount_amount) || 0);
 
       // Diff calculation
       const changes: any[] = [];
@@ -1239,6 +1333,7 @@ export const PurchaseReturns: React.FC = () => {
         exchange_rate: Number(exchangeRate) || 1,
         description: description || null,
         notes: returnData.notes || null,
+        eta_uuid: etaLockData ? etaLockData.uuid : (editingReturn?.eta_uuid || null),
         created_at: editingReturn ? editingReturn.created_at : new Date().toISOString(),
         created_by: editingReturn ? editingReturn.created_by : user.id,
         updated_at: editingReturn ? new Date().toISOString() : undefined,
@@ -4160,6 +4255,47 @@ export const PurchaseReturns: React.FC = () => {
           }}
           onClose={() => setShowBarcodeScanner(false)}
         />
+      )}
+      {/* ETA Mapping Prompt Modal */}
+      {showEtaLinkPrompt && (
+        <div className="fixed inset-0 z-[999] bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-zinc-100 space-y-4 animate-in fade-in zoom-in-95 duration-200" dir={dir}>
+            <div className="flex items-center gap-3 text-amber-700">
+              <div className="p-3 bg-amber-100 rounded-2xl">
+                <Link2 className="w-6 h-6 text-amber-700" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-zinc-900">
+                  {language === 'ar' ? 'ربط المورد والأصناف في منظومة الضرائب' : 'Link Supplier & Items in ETA'}
+                </h3>
+                <p className="text-xs text-zinc-500">
+                  {language === 'ar' ? 'تسهيل المطابقة الآلية للمرتجعات والفواتير القادمة' : 'Auto-match future ETA documents'}
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-zinc-700 leading-relaxed bg-zinc-50 p-3 rounded-xl border border-zinc-100">
+              {language === 'ar'
+                ? 'هل ترغب في حفظ ربط المورد والأصناف المختارة تلقائياً في منظومة الفاتورة الإلكترونية لتتم مطابقتها تلقائياً في المرات القادمة؟'
+                : 'Do you want to automatically link this supplier and mapped products in ETA system for future automatic reconciliation?'}
+            </p>
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => handleConfirmSaveWithLinking(true)}
+                className="flex-1 py-2.5 px-4 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition-all shadow-md active:scale-95 cursor-pointer"
+              >
+                {language === 'ar' ? 'نعم، حفظ مع الربط' : 'Yes, Save & Link'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmSaveWithLinking(false)}
+                className="flex-1 py-2.5 px-4 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold rounded-xl text-xs transition-all active:scale-95 cursor-pointer"
+              >
+                {language === 'ar' ? 'حفظ المرتجع فقط' : 'Save Return Only'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
