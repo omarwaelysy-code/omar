@@ -33,6 +33,7 @@ import {
   List,
   LayoutGrid,
   Layers,
+  ChevronUp,
   ArrowLeft,
   Ban,
   ShieldCheck,
@@ -365,6 +366,20 @@ export function EtaDetailedInvoices() {
   const [tableScrollWidth, setTableScrollWidth] = useState(0);
   const isSyncingTop = useRef(false);
   const isSyncingTable = useRef(false);
+  // Group by Supplier (Collapsible / ضم وفتح)
+  const [groupBySupplier, setGroupBySupplier] = useState(false);
+  const [expandedSuppliers, setExpandedSuppliers] = useState<Record<string, boolean>>({});
+
+  const toggleSupplierGroup = (key: string) => {
+    setExpandedSuppliers(prev => ({
+      ...prev,
+      [key]: prev[key] === undefined ? false : !prev[key]
+    }));
+  };
+
+  const isSupplierExpanded = (key: string) => {
+    return expandedSuppliers[key] !== false; // default open
+  };
 
   const handleTopScroll = () => {
     if (isSyncingTop.current) {
@@ -724,6 +739,88 @@ export function EtaDetailedInvoices() {
     const start = (clientPage - 1) * clientPageSize;
     return filteredLines.slice(start, start + clientPageSize);
   }, [filteredLines, clientPage, clientPageSize]);
+
+  // Compute Supplier / Partner Groups for Detailed Lines
+  const supplierGroups = useMemo(() => {
+    const list = filteredLines;
+    const map = new Map<string, {
+      key: string;
+      name: string;
+      taxNumber: string;
+      address: string;
+      lines: DetailedInvoiceLine[];
+      invoiceUuids: Set<string>;
+      totalLines: number;
+      totalSales: number;
+      totalNet: number;
+      totalVat: number;
+      totalAmount: number;
+    }>();
+
+    for (const line of list) {
+      const name = line.partnerName || (line.direction === 'Sent' ? 'عميل غير محدد' : 'مورد غير محدد');
+      const taxNumber = line.taxId || '';
+      const address = line.address || '';
+      const key = taxNumber ? `${taxNumber}_${name}` : name;
+
+      let group = map.get(key);
+      if (!group) {
+        group = {
+          key,
+          name,
+          taxNumber,
+          address,
+          lines: [],
+          invoiceUuids: new Set<string>(),
+          totalLines: 0,
+          totalSales: 0,
+          totalNet: 0,
+          totalVat: 0,
+          totalAmount: 0
+        };
+        map.set(key, group);
+      }
+
+      group.lines.push(line);
+      group.totalLines++;
+      if (line.uuid) group.invoiceUuids.add(line.uuid);
+      const b = getDetailedLineTaxBreakdown(line);
+      group.totalSales += b.salesTotal;
+      group.totalNet += b.netAmount;
+      group.totalVat += b.vatAmount;
+      group.totalAmount += b.totalAmount;
+    }
+
+    return Array.from(map.values()).sort((a, b) => b.totalAmount - a.totalAmount);
+  }, [filteredLines]);
+
+  const totalPagesGroups = Math.ceil(supplierGroups.length / clientPageSize) || 1;
+
+  const paginatedSupplierGroups = useMemo(() => {
+    if (clientPageSize >= 99999) return supplierGroups;
+    const start = (clientPage - 1) * clientPageSize;
+    return supplierGroups.slice(start, start + clientPageSize);
+  }, [supplierGroups, clientPage, clientPageSize]);
+
+  const expandAllSuppliers = () => {
+    const all: Record<string, boolean> = {};
+    supplierGroups.forEach(g => { all[g.key] = true; });
+    setExpandedSuppliers(all);
+  };
+
+  const collapseAllSuppliers = () => {
+    const none: Record<string, boolean> = {};
+    supplierGroups.forEach(g => { none[g.key] = false; });
+    setExpandedSuppliers(none);
+  };
+
+  const visibleColCount = useMemo(() => {
+    let count = 1; // checkbox
+    Object.keys(visibleColumns).forEach(k => {
+      if (visibleColumns[k] !== false) count++;
+    });
+    return count;
+  }, [visibleColumns]);
 
   // Summary totals for all filtered lines
   const summaryTotals = useMemo(() => {
@@ -2168,11 +2265,489 @@ export function EtaDetailedInvoices() {
       </div>
 
       {/* ========================================================================= */}
+      {/* 4.2 GROUP BY SUPPLIER BAR (تجميع حسب المورد ضم وفتح) */}
+      {/* ========================================================================= */}
+      <div className="bg-white p-3 md:p-3.5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              setGroupBySupplier(prev => !prev);
+              setClientPage(1);
+            }}
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 border shadow-2xs cursor-pointer ${
+              groupBySupplier
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-600/20'
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+            }`}
+            title={language === 'ar' ? 'تجميع البنود حسب المورد مع إمكانية فتح وطي المجموعات' : 'Group lines by supplier with collapsible accordions'}
+          >
+            <Layers size={15} className={groupBySupplier ? 'text-white' : 'text-indigo-600'} />
+            <span>
+              {groupBySupplier 
+                ? (language === 'ar' ? 'عرض مجمع (حسب المورد)' : 'Grouped by Supplier')
+                : (language === 'ar' ? 'تجميع حسب المورد (ضم وفتح)' : 'Group by Supplier (Expand/Collapse)')}
+            </span>
+          </button>
+
+          {groupBySupplier && (
+            <div className="flex items-center gap-2 animate-in fade-in duration-150">
+              <button
+                type="button"
+                onClick={expandAllSuppliers}
+                className="px-3 py-1.5 bg-slate-50 hover:bg-indigo-50 text-indigo-700 text-xs font-bold rounded-xl border border-slate-200 hover:border-indigo-200 transition-all flex items-center gap-1 cursor-pointer"
+              >
+                <ChevronDown size={13} />
+                <span>{language === 'ar' ? 'فتح الكل' : 'Expand All'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={collapseAllSuppliers}
+                className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition-all flex items-center gap-1 cursor-pointer"
+              >
+                <ChevronUp size={13} />
+                <span>{language === 'ar' ? 'طي الكل' : 'Collapse All'}</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {groupBySupplier && (
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
+            <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-xl border border-indigo-100">
+              {language === 'ar' ? `عدد الموردين / العملاء: ${supplierGroups.length}` : `Suppliers / Partners: ${supplierGroups.length}`}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* ========================================================================= */}
       {/* 4. INVOICE LINES TABLE */}
       {/* ========================================================================= */}
       {(() => {
+        const effectiveTotalPages = groupBySupplier ? totalPagesGroups : totalPages;
+        const totalFound = groupBySupplier ? supplierGroups.length : filteredLines.length;
+
+        const renderDetailedLineCard = (line: DetailedInvoiceLine) => {
+          const isSelected = selectedRowKeys.includes(line.rowKey);
+          return (
+            <div
+              key={line.rowKey}
+              data-rowkey={line.rowKey}
+              className={`bg-white rounded-2xl border p-4 transition-all shadow-2xs hover:shadow-md flex flex-col justify-between gap-3 ${
+                isSelected ? 'border-indigo-500 bg-indigo-50/20 ring-1 ring-indigo-500' : 'border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              {/* Card Header */}
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => handleToggleSelect(line.rowKey)}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                  />
+                  <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                    <span>{line.internalId}</span>
+                    {renderDocTypeBadge(line.typeName, line.documentTypeName)}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  {renderDirectionBadge(line.direction)}
+                  {renderStatusBadge(line.status)}
+                </div>
+              </div>
+
+              {/* Item Details */}
+              <div className="p-3 bg-slate-50 rounded-xl space-y-1.5 text-xs">
+                <div className="font-bold text-slate-900 text-sm line-clamp-2" title={line.description}>
+                  {line.description}
+                </div>
+                <div className="flex items-center justify-between text-slate-600 text-[11px]">
+                  <span className="font-mono bg-white px-2 py-0.5 rounded border border-slate-200">
+                    {line.itemType}: {line.itemCode}
+                  </span>
+                  <span className="font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
+                    {line.quantity} {line.unitType}
+                  </span>
+                </div>
+              </div>
+
+              {/* Partner & Date */}
+              <div className="space-y-1 text-xs text-slate-600">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">{language === 'ar' ? 'الطرف:' : 'Partner:'}</span>
+                  <span className="font-semibold text-slate-800 truncate max-w-[170px]">{line.partnerName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">{language === 'ar' ? 'التاريخ:' : 'Date:'}</span>
+                  <span>{formatDateTime(line.dateTimeIssued)}</span>
+                </div>
+              </div>
+
+              {/* Amounts */}
+              {(() => {
+                const b = getDetailedLineTaxBreakdown(line);
+                return (
+                  <div className="pt-2 border-t border-slate-100 space-y-1 text-xs">
+                    <div className="grid grid-cols-2 gap-1 text-[11px]">
+                      <div className="flex justify-between bg-slate-50 px-2 py-1 rounded">
+                        <span className="text-slate-500">{language === 'ar' ? 'سعر الوحدة:' : 'Unit Price:'}</span>
+                        <span className="font-semibold text-slate-700">{formatAmount(line.unitPrice)}</span>
+                      </div>
+                      <div className="flex justify-between bg-slate-50 px-2 py-1 rounded">
+                        <span className="text-slate-500">{language === 'ar' ? 'الإجمالي:' : 'Gross:'}</span>
+                        <span className="font-semibold text-slate-700">{formatAmount(b.salesTotal)}</span>
+                      </div>
+                      <div className="flex justify-between bg-slate-50 px-2 py-1 rounded">
+                        <span className="text-slate-500">{language === 'ar' ? 'الصافي:' : 'Net:'}</span>
+                        <span className="font-semibold text-slate-700">{formatAmount(b.netAmount)}</span>
+                      </div>
+                      <div className="flex justify-between bg-blue-50/50 px-2 py-1 rounded">
+                        <span className="text-blue-700">{language === 'ar' ? 'أصناف 14%:' : 'Items 14%:'}</span>
+                        <span className="font-semibold text-blue-800">{formatAmount(b.taxableItemsNet)}</span>
+                      </div>
+                      <div className="flex justify-between bg-slate-100/70 px-2 py-1 rounded">
+                        <span className="text-slate-600">{language === 'ar' ? 'غير خاضع:' : 'Non-Tax:'}</span>
+                        <span className="font-semibold text-slate-700">{formatAmount(b.nonTaxableItemsNet)}</span>
+                      </div>
+                      <div className="flex justify-between bg-emerald-50/50 px-2 py-1 rounded">
+                        <span className="text-emerald-700">{language === 'ar' ? 'رسوم وعاء:' : 'Fees:'}</span>
+                        <span className="font-semibold text-emerald-800">{formatAmount(b.taxableFees)}</span>
+                      </div>
+                      <div className="flex justify-between bg-amber-50/50 px-2 py-1 rounded">
+                        <span className="text-amber-700">{language === 'ar' ? 'جدول:' : 'Table:'}</span>
+                        <span className="font-semibold text-amber-800">{formatAmount(b.tableTax)}</span>
+                      </div>
+                      <div className="flex justify-between bg-indigo-50/70 px-2 py-1 rounded">
+                        <span className="text-indigo-800 font-bold">{language === 'ar' ? 'وعاء 14%:' : 'Base 14%:'}</span>
+                        <span className="font-bold text-indigo-900">{formatAmount(b.taxableVatBase)}</span>
+                      </div>
+                      <div className="flex justify-between bg-indigo-50/50 px-2 py-1 rounded">
+                        <span className="text-indigo-700">{language === 'ar' ? '14% VAT:' : 'VAT:'}</span>
+                        <span className="font-semibold text-indigo-800">{formatAmount(b.vatAmount)}</span>
+                      </div>
+                      <div className="flex justify-between bg-rose-50/50 px-2 py-1 rounded">
+                        <span className="text-rose-700">{language === 'ar' ? 'خصم WHT:' : 'WHT:'}</span>
+                        <span className="font-semibold text-rose-800">{formatAmount(b.whtAmount)}</span>
+                      </div>
+                      <div className="flex justify-between bg-slate-100 px-2 py-1 rounded">
+                        <span className="text-slate-600">{language === 'ar' ? 'رسوم خارج:' : 'Non-Tax:'}</span>
+                        <span className="font-semibold text-slate-800">{formatAmount(b.nonTaxableFees)}</span>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center pt-1 border-t border-slate-100 text-xs font-bold">
+                      <span className="text-slate-600">{language === 'ar' ? 'القيمة النهائية:' : 'Final Total:'}</span>
+                      <span className="text-slate-900 text-sm font-bold">{formatAmount(b.totalAmount)} {line.currency || 'EGP'}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Footer UUID */}
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                <div className="inline-flex items-center gap-1 text-[11px] font-mono text-slate-500 bg-slate-50 px-2 py-1 rounded">
+                  <span className="truncate max-w-[80px]">{line.uuid.slice(0, 8)}...</span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(line.uuid, line.rowKey)}
+                    className="text-slate-400 hover:text-indigo-600 p-0.5 rounded cursor-pointer"
+                    title="Copy UUID"
+                  >
+                    {copiedUuid === line.rowKey ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedInvoiceUuid(line.uuid)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>{language === 'ar' ? 'تفاصيل الوثيقة' : 'Document'}</span>
+                </button>
+              </div>
+            </div>
+          );
+        };
+
+        const renderDetailedLineRow = (line: DetailedInvoiceLine, isGrouped = false) => {
+          const isSelected = selectedRowKeys.includes(line.rowKey);
+          const b = getDetailedLineTaxBreakdown(line);
+          return (
+            <tr
+              key={line.rowKey}
+              data-rowkey={line.rowKey}
+              className={`hover:bg-slate-50/80 transition-colors group ${
+                isSelected ? 'bg-indigo-50/40' : isGrouped ? 'bg-slate-50/30' : ''
+              }`}
+            >
+              {/* Checkbox */}
+              <td className="py-3 px-4 text-center no-pdf whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => handleToggleSelect(line.rowKey)}
+                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                />
+              </td>
+
+              {/* Internal ID */}
+              {visibleColumns.internal_id && (
+                <td className="py-3 px-4 font-bold text-slate-900 whitespace-nowrap">
+                  <div className="flex items-center gap-1.5">
+                    {isGrouped && <span className="w-2 h-2 rounded-full bg-indigo-300 inline-block shrink-0" />}
+                    <span>{line.internalId}</span>
+                  </div>
+                </td>
+              )}
+
+              {/* Direction */}
+              {visibleColumns.direction && (
+                <td className="py-3 px-4 text-center whitespace-nowrap">
+                  {renderDirectionBadge(line.direction)}
+                </td>
+              )}
+
+              {/* Document Type */}
+              {visibleColumns.type && (
+                <td className="py-3 px-4 text-center whitespace-nowrap">
+                  {renderDocTypeBadge(line.typeName, line.documentTypeName)}
+                </td>
+              )}
+
+              {/* Partner Name */}
+              {visibleColumns.partner_name && (
+                <td className="py-3 px-4">
+                  <div className="font-semibold text-slate-900 max-w-[180px] truncate" title={line.partnerName}>
+                    {line.partnerName}
+                  </div>
+                </td>
+              )}
+
+              {/* Tax ID */}
+              {visibleColumns.tax_id && (
+                <td className="py-3 px-4 text-center whitespace-nowrap">
+                  <span className="inline-block px-2 py-0.5 rounded-lg bg-slate-100 font-mono text-xs font-bold text-slate-700">
+                    {line.taxId}
+                  </span>
+                </td>
+              )}
+
+              {/* Address */}
+              {visibleColumns.address && (
+                <td className="py-3 px-4 text-slate-600 text-xs max-w-[170px] truncate" title={line.address}>
+                  {line.address}
+                </td>
+              )}
+
+              {/* Issue Date */}
+              {visibleColumns.date_issued && (
+                <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
+                  {formatDateTime(line.dateTimeIssued)}
+                </td>
+              )}
+
+              {/* Received Date */}
+              {visibleColumns.date_received && (
+                <td className="py-3 px-4 text-slate-500 whitespace-nowrap">
+                  {formatDateTime(line.dateTimeReceived)}
+                </td>
+              )}
+
+              {/* Currency */}
+              {visibleColumns.currency && (
+                <td className="py-3 px-4 text-center whitespace-nowrap">
+                  <span className="inline-block px-2.5 py-0.5 rounded-lg bg-slate-100 font-mono text-xs font-bold text-slate-700">
+                    {line.currency || 'EGP'}
+                  </span>
+                </td>
+              )}
+
+              {/* Item Code Name */}
+              {visibleColumns.item_code_name && (
+                <td className="py-3 px-4 text-slate-700 max-w-[170px] truncate" title={line.itemCodeName}>
+                  {line.itemCodeName || '---'}
+                </td>
+              )}
+
+              {/* Item Code */}
+              {visibleColumns.item_code && (
+                <td className="py-3 px-4 text-center whitespace-nowrap">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-slate-100 font-mono text-xs font-semibold text-slate-800">
+                    <span>{line.itemCode}</span>
+                  </span>
+                </td>
+              )}
+
+              {/* Item Code Type */}
+              {visibleColumns.item_type && (
+                <td className="py-3 px-4 text-center whitespace-nowrap">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-200/60 font-mono text-[11px] font-bold text-indigo-700">
+                    {line.itemType || 'EGS'}
+                  </span>
+                </td>
+              )}
+
+              {/* Description */}
+              {visibleColumns.item_description && (
+                <td className="py-3 px-4 font-medium text-slate-900 max-w-[240px] truncate" title={line.description}>
+                  {line.description}
+                </td>
+              )}
+
+              {/* Quantity */}
+              {visibleColumns.item_quantity && (
+                <td className="py-3 px-4 text-center whitespace-nowrap font-semibold text-slate-800">
+                  <span className="font-mono text-indigo-700">{line.quantity}</span>
+                </td>
+              )}
+
+              {/* Unit */}
+              {visibleColumns.item_unit && (
+                <td className="py-3 px-4 text-center whitespace-nowrap text-slate-600 font-medium">
+                  {line.unitType ? (
+                    <span className="inline-block px-2 py-0.5 rounded bg-slate-100 font-mono text-xs text-slate-700">
+                      {line.unitType}
+                    </span>
+                  ) : '-'}
+                </td>
+              )}
+
+              {/* Unit Price */}
+              {visibleColumns.item_unit_price && (
+                <td className="py-3 px-4 text-end font-medium text-slate-700 whitespace-nowrap">
+                  {formatAmount(line.unitPrice)}
+                </td>
+              )}
+
+              {/* Sales Total */}
+              {visibleColumns.item_sales_total && (
+                <td className="py-3 px-4 text-end font-medium text-slate-700 whitespace-nowrap">
+                  {formatAmount(b.salesTotal)}
+                </td>
+              )}
+
+              {/* Discount */}
+              {visibleColumns.item_discount && (
+                <td className="py-3 px-4 text-end font-medium text-red-600 whitespace-nowrap">
+                  {formatAmount(b.discountAmount)}
+                </td>
+              )}
+
+              {/* Net Amount */}
+              {visibleColumns.net_amount && (
+                <td className="py-3 px-4 text-end font-medium text-slate-800 whitespace-nowrap">
+                  {formatAmount(b.netAmount)}
+                </td>
+              )}
+
+              {/* 14% Taxable Items Net */}
+              {visibleColumns.taxable_items_net && (
+                <td className="py-3 px-4 text-end font-medium text-blue-700 whitespace-nowrap" title={language === 'ar' ? 'صافي قيمة الأصناف الخاضعة لضريبة القيمة المضافة 14%' : '14% Taxable Items Net'}>
+                  {formatAmount(b.taxableItemsNet, true)}
+                </td>
+              )}
+
+              {/* Non Taxable Items Net */}
+              {visibleColumns.non_taxable_items_net && (
+                <td className="py-3 px-4 text-end font-medium text-slate-500 whitespace-nowrap" title={language === 'ar' ? 'صافي قيمة الأصناف غير الخاضعة أو المعفاة من ضريبة 14%' : 'Non-Taxable / Exempt Items Net'}>
+                  {formatAmount(b.nonTaxableItemsNet, true)}
+                </td>
+              )}
+
+              {/* Taxable Fees */}
+              {visibleColumns.taxable_fees && (
+                <td className="py-3 px-4 text-end font-medium text-emerald-700 whitespace-nowrap">
+                  {formatAmount(b.taxableFees, true)}
+                </td>
+              )}
+
+              {/* Table Tax */}
+              {visibleColumns.table_tax && (
+                <td className="py-3 px-4 text-end font-medium text-amber-700 whitespace-nowrap">
+                  {formatAmount(b.tableTax, true)}
+                </td>
+              )}
+
+              {/* Total 14% Taxable VAT Base */}
+              {visibleColumns.taxable_vat_base && (
+                <td className="py-3 px-4 text-end font-bold text-indigo-900 bg-indigo-50/30 whitespace-nowrap" title={language === 'ar' ? 'إجمالي وعاء الـ 14% (الأصناف الخاضعة + ضرائب ورسوم الوعاء)' : 'Total 14% VAT Base'}>
+                  {formatAmount(b.taxableVatBase, true)}
+                </td>
+              )}
+
+              {/* 14% VAT */}
+              {visibleColumns.vat_amount && (
+                <td className="py-3 px-4 text-end font-bold text-indigo-700 whitespace-nowrap">
+                  {formatAmount(b.vatAmount, true)}
+                </td>
+              )}
+
+              {/* Non-Taxable Fees */}
+              {visibleColumns.non_taxable_fees && (
+                <td className="py-3 px-4 text-end font-medium text-slate-600 whitespace-nowrap">
+                  {formatAmount(b.nonTaxableFees, true)}
+                </td>
+              )}
+
+              {/* WHT */}
+              {visibleColumns.wht_amount && (
+                <td className="py-3 px-4 text-end font-medium text-rose-600 whitespace-nowrap">
+                  {formatAmount(b.whtAmount, true)}
+                </td>
+              )}
+
+              {/* Total Amount */}
+              {visibleColumns.item_total && (
+                <td className="py-3 px-4 text-end font-bold text-slate-900 whitespace-nowrap">
+                  {formatAmount(b.totalAmount)}
+                </td>
+              )}
+
+              {/* Status Badge */}
+              {visibleColumns.status && (
+                <td className="py-3 px-4 text-center whitespace-nowrap">
+                  {renderStatusBadge(line.status)}
+                </td>
+              )}
+
+              {/* UUID with click to open & copy */}
+              {visibleColumns.uuid && (
+                <td className="py-3 px-4 text-center whitespace-nowrap">
+                  <div className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-lg px-2.5 py-1 text-[11px] font-mono transition-all">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedInvoiceUuid(line.uuid)}
+                      className="text-indigo-600 hover:text-indigo-800 font-bold underline decoration-indigo-300 hover:decoration-indigo-600 cursor-pointer flex items-center gap-1"
+                      title={language === 'ar' ? 'عرض تفاصيل المستند بالكامل كما بالمنظومة' : 'View full document'}
+                    >
+                      <FileText className="w-3.5 h-3.5 opacity-70" />
+                      <span className="truncate max-w-[95px]">{line.uuid.slice(0, 10)}...</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCopy(line.uuid, line.rowKey);
+                      }}
+                      className="text-slate-400 hover:text-indigo-600 p-0.5 rounded transition-colors cursor-pointer"
+                      title={language === 'ar' ? 'نسخ UUID' : 'Copy UUID'}
+                    >
+                      {copiedUuid === line.rowKey ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
+                </td>
+              )}
+            </tr>
+          );
+        };
+
         const renderPaginationBar = (position: 'top' | 'bottom') => {
-          if (allLoading || filteredLines.length === 0) return null;
+          if (allLoading || totalFound === 0) return null;
 
           const renderViewAndColumnControls = () => {
             if (position !== 'top') return null;
@@ -2280,10 +2855,16 @@ export function EtaDetailedInvoices() {
             }`}>
               <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
                 <span className="font-bold text-slate-800 bg-indigo-50 text-indigo-700 px-3 py-1 rounded-xl border border-indigo-200/60">
-                  {language === 'ar' ? `البنود: ${filteredLines.length}` : `Lines: ${filteredLines.length}`}
+                  {groupBySupplier
+                    ? (language === 'ar'
+                        ? `الموردين: ${supplierGroups.length} (البنود: ${filteredLines.length})`
+                        : `Suppliers: ${supplierGroups.length} (Lines: ${filteredLines.length})`)
+                    : (language === 'ar'
+                        ? `البنود: ${filteredLines.length}`
+                        : `Lines: ${filteredLines.length}`)}
                 </span>
                 <div className="flex items-center gap-1.5 text-slate-600 font-semibold">
-                  <span>{language === 'ar' ? 'النتائج لكل صفحة:' : 'Per page:'}</span>
+                  <span>{groupBySupplier ? (language === 'ar' ? 'موردين لكل صفحة:' : 'Suppliers per page:') : (language === 'ar' ? 'النتائج لكل صفحة:' : 'Per page:')}</span>
                   <select
                     value={clientPageSize >= 99999 ? 'all' : clientPageSize}
                     onChange={e => {
@@ -2344,7 +2925,7 @@ export function EtaDetailedInvoices() {
                     const pages: (number | string)[] = [];
                     const maxButtons = 5;
                     let start = Math.max(1, clientPage - Math.floor(maxButtons / 2));
-                    let end = Math.min(totalPages, start + maxButtons - 1);
+                    let end = Math.min(effectiveTotalPages, start + maxButtons - 1);
                     if (end - start + 1 < maxButtons) {
                       start = Math.max(1, end - maxButtons + 1);
                     }
@@ -2353,9 +2934,9 @@ export function EtaDetailedInvoices() {
                       if (start > 2) pages.push('...');
                     }
                     for (let p = start; p <= end; p++) pages.push(p);
-                    if (end < totalPages) {
-                      if (end < totalPages - 1) pages.push('...');
-                      pages.push(totalPages);
+                    if (end < effectiveTotalPages) {
+                      if (end < effectiveTotalPages - 1) pages.push('...');
+                      pages.push(effectiveTotalPages);
                     }
                     return pages.map((p, idx) => {
                       if (typeof p === 'string') {
@@ -2381,16 +2962,16 @@ export function EtaDetailedInvoices() {
 
                 <button
                   type="button"
-                  onClick={() => setClientPage(p => Math.min(totalPages, p + 1))}
-                  disabled={clientPage === totalPages}
+                  onClick={() => setClientPage(p => Math.min(effectiveTotalPages, p + 1))}
+                  disabled={clientPage === effectiveTotalPages}
                   className="px-3 py-1 rounded-xl border border-slate-300 bg-white text-slate-700 disabled:opacity-40 hover:bg-slate-50 font-bold transition-all shadow-2xs cursor-pointer"
                 >
                   ›
                 </button>
                 <button
                   type="button"
-                  onClick={() => setClientPage(totalPages)}
-                  disabled={clientPage === totalPages}
+                  onClick={() => setClientPage(effectiveTotalPages)}
+                  disabled={clientPage === effectiveTotalPages}
                   className="px-2.5 py-1 rounded-xl border border-slate-300 bg-white text-slate-700 disabled:opacity-40 hover:bg-slate-50 font-bold transition-all shadow-2xs cursor-pointer"
                   title={language === 'ar' ? 'الصفحة الأخيرة' : 'Last'}
                 >
@@ -2461,148 +3042,61 @@ export function EtaDetailedInvoices() {
 
                 {/* CARD VIEW */}
                 {view === 'card' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-slate-50/50">
-                    {paginatedLines.map((line) => {
-                      const isSelected = selectedRowKeys.includes(line.rowKey);
-                      return (
-                        <div
-                          key={line.rowKey}
-                          data-rowkey={line.rowKey}
-                          className={`bg-white rounded-2xl border p-4 transition-all shadow-2xs hover:shadow-md flex flex-col justify-between gap-3 ${
-                            isSelected ? 'border-indigo-500 bg-indigo-50/20 ring-1 ring-indigo-500' : 'border-slate-200 hover:border-slate-300'
-                          }`}
-                        >
-                          {/* Card Header */}
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => handleToggleSelect(line.rowKey)}
-                                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
-                              />
-                              <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                                <span>{line.internalId}</span>
-                                {renderDocTypeBadge(line.typeName, line.documentTypeName)}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              {renderDirectionBadge(line.direction)}
-                              {renderStatusBadge(line.status)}
-                            </div>
-                          </div>
-
-                          {/* Item Details */}
-                          <div className="p-3 bg-slate-50 rounded-xl space-y-1.5 text-xs">
-                            <div className="font-bold text-slate-900 text-sm line-clamp-2" title={line.description}>
-                              {line.description}
-                            </div>
-                            <div className="flex items-center justify-between text-slate-600 text-[11px]">
-                              <span className="font-mono bg-white px-2 py-0.5 rounded border border-slate-200">
-                                {line.itemType}: {line.itemCode}
-                              </span>
-                              <span className="font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">
-                                {line.quantity} {line.unitType}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Partner & Date */}
-                          <div className="space-y-1 text-xs text-slate-600">
-                            <div className="flex justify-between">
-                              <span className="text-slate-400">{language === 'ar' ? 'الطرف:' : 'Partner:'}</span>
-                              <span className="font-semibold text-slate-800 truncate max-w-[170px]">{line.partnerName}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-400">{language === 'ar' ? 'التاريخ:' : 'Date:'}</span>
-                              <span>{formatDateTime(line.dateTimeIssued)}</span>
-                            </div>
-                          </div>
-
-                          {/* Amounts */}
-                          {(() => {
-                            const b = getDetailedLineTaxBreakdown(line);
-                            return (
-                              <div className="pt-2 border-t border-slate-100 space-y-1 text-xs">
-                                <div className="grid grid-cols-2 gap-1 text-[11px]">
-                                  <div className="flex justify-between bg-slate-50 px-2 py-1 rounded">
-                                    <span className="text-slate-500">{language === 'ar' ? 'سعر الوحدة:' : 'Unit Price:'}</span>
-                                    <span className="font-semibold text-slate-700">{formatAmount(line.unitPrice)}</span>
-                                  </div>
-                                  <div className="flex justify-between bg-slate-50 px-2 py-1 rounded">
-                                    <span className="text-slate-500">{language === 'ar' ? 'الإجمالي:' : 'Gross:'}</span>
-                                    <span className="font-semibold text-slate-700">{formatAmount(b.salesTotal)}</span>
-                                  </div>
-                                  <div className="flex justify-between bg-slate-50 px-2 py-1 rounded">
-                                    <span className="text-slate-500">{language === 'ar' ? 'الصافي:' : 'Net:'}</span>
-                                    <span className="font-semibold text-slate-700">{formatAmount(b.netAmount)}</span>
-                                  </div>
-                                  <div className="flex justify-between bg-blue-50/50 px-2 py-1 rounded">
-                                    <span className="text-blue-700">{language === 'ar' ? 'أصناف 14%:' : 'Items 14%:'}</span>
-                                    <span className="font-semibold text-blue-800">{formatAmount(b.taxableItemsNet)}</span>
-                                  </div>
-                                  <div className="flex justify-between bg-slate-100/70 px-2 py-1 rounded">
-                                    <span className="text-slate-600">{language === 'ar' ? 'غير خاضع:' : 'Non-Tax:'}</span>
-                                    <span className="font-semibold text-slate-700">{formatAmount(b.nonTaxableItemsNet)}</span>
-                                  </div>
-                                  <div className="flex justify-between bg-emerald-50/50 px-2 py-1 rounded">
-                                    <span className="text-emerald-700">{language === 'ar' ? 'رسوم وعاء:' : 'Fees:'}</span>
-                                    <span className="font-semibold text-emerald-800">{formatAmount(b.taxableFees)}</span>
-                                  </div>
-                                  <div className="flex justify-between bg-amber-50/50 px-2 py-1 rounded">
-                                    <span className="text-amber-700">{language === 'ar' ? 'جدول:' : 'Table:'}</span>
-                                    <span className="font-semibold text-amber-800">{formatAmount(b.tableTax)}</span>
-                                  </div>
-                                  <div className="flex justify-between bg-indigo-50/70 px-2 py-1 rounded">
-                                    <span className="text-indigo-800 font-bold">{language === 'ar' ? 'وعاء 14%:' : 'Base 14%:'}</span>
-                                    <span className="font-bold text-indigo-900">{formatAmount(b.taxableVatBase)}</span>
-                                  </div>
-                                  <div className="flex justify-between bg-indigo-50/50 px-2 py-1 rounded">
-                                    <span className="text-indigo-700">{language === 'ar' ? '14% VAT:' : 'VAT:'}</span>
-                                    <span className="font-semibold text-indigo-800">{formatAmount(b.vatAmount)}</span>
-                                  </div>
-                                  <div className="flex justify-between bg-rose-50/50 px-2 py-1 rounded">
-                                    <span className="text-rose-700">{language === 'ar' ? 'خصم WHT:' : 'WHT:'}</span>
-                                    <span className="font-semibold text-rose-800">{formatAmount(b.whtAmount)}</span>
-                                  </div>
-                                  <div className="flex justify-between bg-slate-100 px-2 py-1 rounded">
-                                    <span className="text-slate-600">{language === 'ar' ? 'رسوم خارج:' : 'Non-Tax:'}</span>
-                                    <span className="font-semibold text-slate-800">{formatAmount(b.nonTaxableFees)}</span>
-                                  </div>
-                                </div>
-                                <div className="flex justify-between items-center pt-1 border-t border-slate-100 text-xs font-bold">
-                                  <span className="text-slate-600">{language === 'ar' ? 'القيمة النهائية:' : 'Final Total:'}</span>
-                                  <span className="text-slate-900 text-sm font-bold">{formatAmount(b.totalAmount)} {line.currency || 'EGP'}</span>
-                                </div>
-                              </div>
-                            );
-                          })()}
-
-                          {/* Footer UUID */}
-                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-                            <div className="inline-flex items-center gap-1 text-[11px] font-mono text-slate-500 bg-slate-50 px-2 py-1 rounded">
-                              <span className="truncate max-w-[80px]">{line.uuid.slice(0, 8)}...</span>
-                              <button
-                                type="button"
-                                onClick={() => handleCopy(line.uuid, line.rowKey)}
-                                className="text-slate-400 hover:text-indigo-600 p-0.5 rounded cursor-pointer"
-                                title="Copy UUID"
+                  <div className="p-4 bg-slate-50/50">
+                    {groupBySupplier ? (
+                      /* Grouped Card View */
+                      <div className="space-y-4">
+                        {paginatedSupplierGroups.map(group => {
+                          const isExpanded = isSupplierExpanded(group.key);
+                          return (
+                            <div key={group.key} className="bg-white rounded-2xl border border-indigo-100/80 shadow-2xs overflow-hidden">
+                              <div
+                                onClick={() => toggleSupplierGroup(group.key)}
+                                className="p-3.5 bg-indigo-50/60 hover:bg-indigo-100/60 flex items-center justify-between gap-3 cursor-pointer select-none transition-colors"
                               >
-                                {copiedUuid === line.rowKey ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                              </button>
+                                <div className="flex items-center gap-2.5">
+                                  <span className="p-1 bg-white rounded-lg border border-indigo-200 text-indigo-700 shadow-2xs">
+                                    {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} className="rtl:rotate-180" />}
+                                  </span>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-black text-slate-900 text-sm">{group.name}</span>
+                                      <span className="bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                        {group.totalLines} {language === 'ar' ? 'بند' : 'lines'}
+                                        {group.invoiceUuids.size > 0 && ` (${group.invoiceUuids.size} ${language === 'ar' ? 'فاتورة' : 'inv'})`}
+                                      </span>
+                                    </div>
+                                    {group.taxNumber && (
+                                      <span className="font-mono text-xs text-slate-600">
+                                        {group.taxNumber}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="text-end">
+                                  <div className="text-xs font-bold text-slate-900">
+                                    {formatAmount(group.totalAmount)} {group.lines[0]?.currency || 'EGP'}
+                                  </div>
+                                  <div className="text-[11px] text-indigo-700 font-semibold">
+                                    {language === 'ar' ? 'ضريبة:' : 'VAT:'} {formatAmount(group.totalVat)}
+                                  </div>
+                                </div>
+                              </div>
+                              {isExpanded && (
+                                <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 bg-slate-50/40 border-t border-indigo-100/60">
+                                  {group.lines.map(line => renderDetailedLineCard(line))}
+                                </div>
+                              )}
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => setSelectedInvoiceUuid(line.uuid)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-colors cursor-pointer"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>{language === 'ar' ? 'تفاصيل الوثيقة' : 'Document'}</span>
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      /* Flat Card View */
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {paginatedLines.map(line => renderDetailedLineCard(line))}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -2652,276 +3146,63 @@ export function EtaDetailedInvoices() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {paginatedLines.map((line) => {
-                        const isSelected = selectedRowKeys.includes(line.rowKey);
-                        const b = getDetailedLineTaxBreakdown(line);
-                        return (
-                          <tr
-                            key={line.rowKey}
-                            data-rowkey={line.rowKey}
-                            className={`hover:bg-slate-50/80 transition-colors group ${isSelected ? 'bg-indigo-50/40' : ''}`}
-                          >
-                            {/* Checkbox */}
-                            <td className="py-3.5 px-4 text-center no-pdf whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => handleToggleSelect(line.rowKey)}
-                                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
-                              />
-                            </td>
-
-                            {/* Internal ID */}
-                            {visibleColumns.internal_id && (
-                              <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
-                                {line.internalId}
-                              </td>
-                            )}
-
-                            {/* Direction */}
-                            {visibleColumns.direction && (
-                              <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                                {renderDirectionBadge(line.direction)}
-                              </td>
-                            )}
-
-                            {/* Document Type */}
-                            {visibleColumns.type && (
-                              <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                                {renderDocTypeBadge(line.typeName, line.documentTypeName)}
-                              </td>
-                            )}
-
-                            {/* Partner Name */}
-                            {visibleColumns.partner_name && (
-                              <td className="py-3.5 px-4">
-                                <div className="font-semibold text-slate-900 max-w-[180px] truncate" title={line.partnerName}>
-                                  {line.partnerName}
-                                </div>
-                              </td>
-                            )}
-
-                            {/* Tax ID */}
-                            {visibleColumns.tax_id && (
-                              <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                                <span className="inline-block px-2 py-0.5 rounded-lg bg-slate-100 font-mono text-xs font-bold text-slate-700">
-                                  {line.taxId}
-                                </span>
-                              </td>
-                            )}
-
-                            {/* Address */}
-                            {visibleColumns.address && (
-                              <td className="py-3.5 px-4 text-slate-600 text-xs max-w-[170px] truncate" title={line.address}>
-                                {line.address}
-                              </td>
-                            )}
-
-                            {/* Issue Date */}
-                            {visibleColumns.date_issued && (
-                              <td className="py-3.5 px-4 text-slate-600 whitespace-nowrap">
-                                {formatDateTime(line.dateTimeIssued)}
-                              </td>
-                            )}
-
-                            {/* Received Date */}
-                            {visibleColumns.date_received && (
-                              <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
-                                {formatDateTime(line.dateTimeReceived)}
-                              </td>
-                            )}
-
-                            {/* Currency */}
-                            {visibleColumns.currency && (
-                              <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                                <span className="inline-block px-2.5 py-0.5 rounded-lg bg-slate-100 font-mono text-xs font-bold text-slate-700">
-                                  {line.currency || 'EGP'}
-                                </span>
-                              </td>
-                            )}
-
-                            {/* Item Code Name (اسم الكود) */}
-                            {visibleColumns.item_code_name && (
-                              <td className="py-3.5 px-4 text-slate-700 max-w-[170px] truncate" title={line.itemCodeName}>
-                                {line.itemCodeName || '---'}
-                              </td>
-                            )}
-
-                            {/* Item Code (كود الصنف) */}
-                            {visibleColumns.item_code && (
-                              <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-slate-100 font-mono text-xs font-semibold text-slate-800">
-                                  <span>{line.itemCode}</span>
-                                </span>
-                              </td>
-                            )}
-
-                            {/* Item Code Type (نوع الكود) */}
-                            {visibleColumns.item_type && (
-                              <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-200/60 font-mono text-[11px] font-bold text-indigo-700">
-                                  {line.itemType || 'EGS'}
-                                </span>
-                              </td>
-                            )}
-
-                            {/* Description (الوصف) */}
-                            {visibleColumns.item_description && (
-                              <td className="py-3.5 px-4 font-medium text-slate-900 max-w-[240px] truncate" title={line.description}>
-                                {line.description}
-                              </td>
-                            )}
-
-                            {/* Quantity (الكمية) */}
-                            {visibleColumns.item_quantity && (
-                              <td className="py-3.5 px-4 text-center whitespace-nowrap font-semibold text-slate-800">
-                                <span className="font-mono text-indigo-700">{line.quantity}</span>
-                              </td>
-                            )}
-
-                            {/* Unit (الوحدة) */}
-                            {visibleColumns.item_unit && (
-                              <td className="py-3.5 px-4 text-center whitespace-nowrap text-slate-600 font-medium">
-                                {line.unitType ? (
-                                  <span className="inline-block px-2 py-0.5 rounded bg-slate-100 font-mono text-xs text-slate-700">
-                                    {line.unitType}
-                                  </span>
-                                ) : '-'}
-                              </td>
-                            )}
-
-                            {/* Unit Price (سعر الوحدة) */}
-                            {visibleColumns.item_unit_price && (
-                              <td className="py-3.5 px-4 text-end font-medium text-slate-700 whitespace-nowrap">
-                                {formatAmount(line.unitPrice)}
-                              </td>
-                            )}
-
-                            {/* Sales Total (الإجمالي) */}
-                            {visibleColumns.item_sales_total && (
-                              <td className="py-3.5 px-4 text-end font-medium text-slate-700 whitespace-nowrap">
-                                {formatAmount(b.salesTotal)}
-                              </td>
-                            )}
-
-                            {/* Discount (الخصم) */}
-                            {visibleColumns.item_discount && (
-                              <td className="py-3.5 px-4 text-end font-medium text-red-600 whitespace-nowrap">
-                                {formatAmount(b.discountAmount)}
-                              </td>
-                            )}
-
-                            {/* Net Amount (الصافي) */}
-                            {visibleColumns.net_amount && (
-                              <td className="py-3.5 px-4 text-end font-medium text-slate-800 whitespace-nowrap">
-                                {formatAmount(b.netAmount)}
-                              </td>
-                            )}
-
-                            {/* 14% Taxable Items Net (الأصناف الخاضعة لـ 14%) */}
-                            {visibleColumns.taxable_items_net && (
-                              <td className="py-3.5 px-4 text-end font-medium text-blue-700 whitespace-nowrap" title={language === 'ar' ? 'صافي قيمة الأصناف الخاضعة لضريبة القيمة المضافة 14%' : '14% Taxable Items Net'}>
-                                {formatAmount(b.taxableItemsNet, true)}
-                              </td>
-                            )}
-
-                            {/* Non Taxable Items Net (الأصناف غير الخاضعة / المعفاة) */}
-                            {visibleColumns.non_taxable_items_net && (
-                              <td className="py-3.5 px-4 text-end font-medium text-slate-500 whitespace-nowrap" title={language === 'ar' ? 'صافي قيمة الأصناف غير الخاضعة أو المعفاة من ضريبة 14%' : 'Non-Taxable / Exempt Items Net'}>
-                                {formatAmount(b.nonTaxableItemsNet, true)}
-                              </td>
-                            )}
-
-                            {/* Taxable Fees (ضرائب ورسوم تدخل فى الوعاء) */}
-                            {visibleColumns.taxable_fees && (
-                              <td className="py-3.5 px-4 text-end font-medium text-emerald-700 whitespace-nowrap">
-                                {formatAmount(b.taxableFees, true)}
-                              </td>
-                            )}
-
-                            {/* Table Tax (ضرائب جدول) */}
-                            {visibleColumns.table_tax && (
-                              <td className="py-3.5 px-4 text-end font-medium text-amber-700 whitespace-nowrap">
-                                {formatAmount(b.tableTax, true)}
-                              </td>
-                            )}
-
-                            {/* Total 14% Taxable VAT Base (إجمالي الوعاء الضريبي لـ 14%) */}
-                            {visibleColumns.taxable_vat_base && (
-                              <td className="py-3.5 px-4 text-end font-bold text-indigo-900 bg-indigo-50/30 whitespace-nowrap" title={language === 'ar' ? 'إجمالي وعاء الـ 14% (الأصناف الخاضعة + ضرائب ورسوم الوعاء)' : 'Total 14% VAT Base'}>
-                                {formatAmount(b.taxableVatBase, true)}
-                              </td>
-                            )}
-
-                            {/* 14% VAT (14% القيمة المضافة) */}
-                            {visibleColumns.vat_amount && (
-                              <td className="py-3.5 px-4 text-end font-bold text-indigo-700 whitespace-nowrap">
-                                {formatAmount(b.vatAmount, true)}
-                              </td>
-                            )}
-
-                            {/* Non-Taxable Fees (ضرائب ورسوم لا تدخل فى الوعاء) */}
-                            {visibleColumns.non_taxable_fees && (
-                              <td className="py-3.5 px-4 text-end font-medium text-slate-600 whitespace-nowrap">
-                                {formatAmount(b.nonTaxableFees, true)}
-                              </td>
-                            )}
-
-                            {/* WHT (الخصم والتحصيل تحت حساب الضريبة) */}
-                            {visibleColumns.wht_amount && (
-                              <td className="py-3.5 px-4 text-end font-medium text-rose-600 whitespace-nowrap">
-                                {formatAmount(b.whtAmount, true)}
-                              </td>
-                            )}
-
-                            {/* Total Amount (القيمة النهائية) */}
-                            {visibleColumns.item_total && (
-                              <td className="py-3.5 px-4 text-end font-bold text-slate-900 whitespace-nowrap">
-                                {formatAmount(b.totalAmount)}
-                              </td>
-                            )}
-
-                            {/* Status Badge */}
-                            {visibleColumns.status && (
-                              <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                                {renderStatusBadge(line.status)}
-                              </td>
-                            )}
-
-                            {/* UUID with click to open & copy */}
-                            {visibleColumns.uuid && (
-                              <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                                <div className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-lg px-2.5 py-1 text-[11px] font-mono transition-all">
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedInvoiceUuid(line.uuid)}
-                                    className="text-indigo-600 hover:text-indigo-800 font-bold underline decoration-indigo-300 hover:decoration-indigo-600 cursor-pointer flex items-center gap-1"
-                                    title={language === 'ar' ? 'عرض تفاصيل المستند بالكامل كما بالمنظومة' : 'View full document'}
-                                  >
-                                    <FileText className="w-3.5 h-3.5 opacity-70" />
-                                    <span className="truncate max-w-[95px]">{line.uuid.slice(0, 10)}...</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleCopy(line.uuid, line.rowKey);
-                                    }}
-                                    className="text-slate-400 hover:text-indigo-600 p-0.5 rounded transition-colors cursor-pointer"
-                                    title={language === 'ar' ? 'نسخ UUID' : 'Copy UUID'}
-                                  >
-                                    {copiedUuid === line.rowKey ? (
-                                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                    ) : (
-                                      <Copy className="w-3.5 h-3.5" />
-                                    )}
-                                  </button>
-                                </div>
-                              </td>
-                            )}
-                          </tr>
-                        );
-                      })}
+                      {groupBySupplier ? (
+                        /* Grouped by Supplier Rows */
+                        paginatedSupplierGroups.map((group) => {
+                          const isExpanded = isSupplierExpanded(group.key);
+                          return (
+                            <React.Fragment key={group.key}>
+                              <tr
+                                onClick={() => toggleSupplierGroup(group.key)}
+                                className="bg-indigo-50/70 hover:bg-indigo-100/70 cursor-pointer border-t-2 border-b border-indigo-200/80 transition-colors select-none font-bold"
+                              >
+                                <td colSpan={visibleColCount} className="py-2.5 px-4">
+                                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                                    <div className="flex items-center gap-2.5 flex-wrap">
+                                      <span className="p-1 bg-white rounded-lg border border-indigo-200 text-indigo-700 shadow-2xs">
+                                        {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} className="rtl:rotate-180" />}
+                                      </span>
+                                      <span className="text-slate-900 text-sm font-black">{group.name}</span>
+                                      {group.taxNumber && (
+                                        <span className="px-2 py-0.5 rounded-md bg-white border border-indigo-200 font-mono text-xs text-indigo-800">
+                                          {group.taxNumber}
+                                        </span>
+                                      )}
+                                      {group.address && (
+                                        <span className="text-xs text-slate-500 font-normal hidden lg:inline truncate max-w-[200px]" title={group.address}>
+                                          ({group.address})
+                                        </span>
+                                      )}
+                                      <span className="bg-indigo-600 text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                                        {group.totalLines} {language === 'ar' ? 'بند' : 'lines'}
+                                        {group.invoiceUuids.size > 0 && ` (${group.invoiceUuids.size} ${language === 'ar' ? 'فاتورة' : 'inv'})`}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-xs flex-wrap">
+                                      <div className="bg-white/80 px-2.5 py-1 rounded-lg border border-indigo-100 flex items-center gap-1.5">
+                                        <span className="text-slate-500 font-normal">{language === 'ar' ? 'صافي:' : 'Net:'}</span>
+                                        <span className="font-bold text-slate-800">{formatAmount(group.totalNet)}</span>
+                                      </div>
+                                      <div className="bg-white/80 px-2.5 py-1 rounded-lg border border-indigo-100 flex items-center gap-1.5">
+                                        <span className="text-indigo-600 font-normal">{language === 'ar' ? '14% ضريبة:' : 'VAT:'}</span>
+                                        <span className="font-bold text-indigo-700">{formatAmount(group.totalVat)}</span>
+                                      </div>
+                                      <div className="bg-indigo-700 text-white px-3 py-1 rounded-lg flex items-center gap-1.5 shadow-2xs">
+                                        <span className="font-normal opacity-90">{language === 'ar' ? 'إجمالي:' : 'Total:'}</span>
+                                        <span className="font-black">{formatAmount(group.totalAmount)} {group.lines[0]?.currency || 'EGP'}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                              {isExpanded && group.lines.map(line => renderDetailedLineRow(line, true))}
+                            </React.Fragment>
+                          );
+                        })
+                      ) : (
+                        /* Flat Rows */
+                        paginatedLines.map(line => renderDetailedLineRow(line, false))
+                      )}
                     </tbody>
                   </table>
                 </div>
