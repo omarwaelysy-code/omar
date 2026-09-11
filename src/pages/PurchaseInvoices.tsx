@@ -1221,7 +1221,7 @@ export const PurchaseInvoices: React.FC = () => {
       } catch (e) {}
     }
 
-    if (pendingEta && user?.company_id && suppliers.length > 0) {
+    if (pendingEta && user?.company_id) {
       setPendingEtaInvoiceForPurchase(null);
       try {
         sessionStorage.removeItem('pending_eta_invoice_for_purchase');
@@ -1250,47 +1250,112 @@ export const PurchaseInvoices: React.FC = () => {
             matchedSupId = mapEntry.supplier_id;
           }
 
-          if (!matchedSupId && suppliers.length > 0) {
-            const direct = suppliers.find(s => String(s.tax_number || '').trim() === issuerTax);
-            if (direct) {
-              matchedSupId = direct.id;
-            } else {
-              const cleanInvName = (pendingEta.issuerName || '').trim().toLowerCase();
-              const byName = suppliers.find(s => s.name && cleanInvName.includes(s.name.trim().toLowerCase()));
-              if (byName) matchedSupId = byName.id;
+          let currentSuppliers = suppliers;
+          if (!matchedSupId) {
+            if (!currentSuppliers || currentSuppliers.length === 0) {
+              try {
+                currentSuppliers = await dbService.list<Supplier>('suppliers', { company_id: user.company_id });
+                if (currentSuppliers && currentSuppliers.length > 0) {
+                  setSuppliers(currentSuppliers);
+                }
+              } catch {}
+            }
+
+            if (currentSuppliers && currentSuppliers.length > 0) {
+              const direct = currentSuppliers.find(s => String(s.tax_number || '').trim() === issuerTax);
+              if (direct) {
+                matchedSupId = direct.id;
+              } else {
+                const cleanInvName = (pendingEta.issuerName || '').trim().toLowerCase();
+                const byName = cleanInvName ? currentSuppliers.find(s => s.name && (cleanInvName.includes(s.name.trim().toLowerCase()) || s.name.trim().toLowerCase().includes(cleanInvName))) : null;
+                if (byName) matchedSupId = byName.id;
+              }
+            }
+          }
+
+          // If no supplier exists in ERP matching this ETA invoice issuer, automatically create it!
+          if (!matchedSupId && (pendingEta.issuerName || issuerTax)) {
+            try {
+              const code = `SUPP-${Date.now().toString().slice(-6)}`;
+              let supAccount = accounts.find(a => a.id === settings?.default_supplier_account_id);
+              if (!supAccount) {
+                supAccount = accounts.find(a => a.type === 'liability' && (a.name.includes('مورد') || a.name.includes('الموردين')))
+                  || accounts.find(a => a.name.includes('مورد') || a.name.includes('الموردين'))
+                  || accounts[0];
+              }
+
+              const newSupplierData = {
+                name: pendingEta.issuerName || `مورد ضريبي ${issuerTax}`,
+                code,
+                tax_number: issuerTax,
+                address: typeof pendingEta.issuerAddress === 'string' ? pendingEta.issuerAddress : '',
+                account_id: supAccount?.id || '',
+                account_name: supAccount?.name || '',
+                company_id: user.company_id
+              };
+              const createdSupId = await dbService.add('suppliers', newSupplierData);
+              const newSupObj = { id: createdSupId, ...newSupplierData };
+              setSuppliers(prev => [...prev, newSupObj as Supplier]);
+              matchedSupId = createdSupId;
+            } catch (createErr) {
+              console.error('Failed to auto-create supplier for ETA invoice:', createErr);
             }
           }
 
           // 2. Fetch or extract lines
           let rawLines: any[] = [];
-          if (Array.isArray(pendingEta.raw_data?.invoiceLines)) {
-            rawLines = pendingEta.raw_data.invoiceLines;
-          } else if (pendingEta.uuid) {
+          let rawDataObj = pendingEta.raw_data;
+          if (typeof rawDataObj === 'string') {
+            try { rawDataObj = JSON.parse(rawDataObj); } catch {}
+          }
+          const parsedDoc = rawDataObj?.rawDocument || rawDataObj?.document || rawDataObj;
+          if (Array.isArray(parsedDoc?.invoiceLines) && parsedDoc.invoiceLines.length > 0) {
+            rawLines = parsedDoc.invoiceLines;
+          } else if (Array.isArray(rawDataObj?.invoiceLines) && rawDataObj.invoiceLines.length > 0) {
+            rawLines = rawDataObj.invoiceLines;
+          } else if (Array.isArray(rawDataObj?.details?.invoiceLines) && rawDataObj.details.invoiceLines.length > 0) {
+            rawLines = rawDataObj.details.invoiceLines;
+          }
+
+          if (rawLines.length === 0 && pendingEta.uuid) {
             try {
-              const det = await apiRequest<{ success: boolean; data?: any }>(`/eta/invoices/${pendingEta.uuid}`);
-              if (det?.data?.invoiceLines) {
+              const det = await apiRequest<{ success: boolean; data?: any }>(`/eta/invoices/${encodeURIComponent(pendingEta.uuid)}/details`);
+              if (det?.data?.invoiceLines && Array.isArray(det.data.invoiceLines) && det.data.invoiceLines.length > 0) {
                 rawLines = det.data.invoiceLines;
-              } else if (det?.data?.document?.invoiceLines) {
+              } else if (det?.data?.document?.invoiceLines && Array.isArray(det.data.document.invoiceLines)) {
                 rawLines = det.data.document.invoiceLines;
               }
-            } catch (e) {}
+            } catch (e) {
+              console.warn('Could not fetch details lines:', e);
+            }
+          }
+
+          let currentProducts = products;
+          if (!currentProducts || currentProducts.length === 0) {
+            try {
+              currentProducts = await dbService.list<Product>('products', { company_id: user.company_id });
+              if (currentProducts && currentProducts.length > 0) {
+                setProducts(currentProducts);
+              }
+            } catch {}
           }
 
           const parsedItems: any[] = [];
           if (rawLines && rawLines.length > 0) {
-            rawLines.forEach((line: any, idx: number) => {
+            for (let idx = 0; idx < rawLines.length; idx++) {
+              const line = rawLines[idx];
               const etaCode = line.itemCode || line.itemType || '';
-              const etaDesc = line.description || '';
+              const etaDesc = line.description || line.itemPrimaryName || line.itemCodeName || '';
               let matchedProd: any = null;
 
               // Check item mapping
               const iMap = itmMaps.find((m: any) => (m.itemCode === etaCode || m.etaItemCode === etaCode) && (m.linkedProduct || m.product_id));
               if (iMap) {
-                matchedProd = iMap.linkedProduct || products.find(p => p.id === iMap.product_id);
+                matchedProd = iMap.linkedProduct || currentProducts.find(p => p.id === iMap.product_id);
               }
 
               if (!matchedProd) {
-                matchedProd = products.find(p => 
+                matchedProd = currentProducts.find(p => 
                   (p.code && p.code === etaCode) ||
                   (p.barcode && p.barcode === etaCode) ||
                   (p.name && (etaDesc.includes(p.name) || p.name.includes(etaDesc)))
@@ -1298,9 +1363,33 @@ export const PurchaseInvoices: React.FC = () => {
               }
 
               const qty = Number(line.quantity) || 1;
-              const unitVal = Number(line.unitValue?.amountEGP || line.unitValue?.amountSold || line.unitPrice || 0);
-              const lineTotal = Number(line.salesTotal || (qty * unitVal)) || 0;
-              const lineTax = Number(line.valueDifference || (lineTotal * 0.14)) || 0;
+              const unitVal = Number(line.unitPrice || line.unitValue?.amountEGP || line.unitValue?.amountSold || 0);
+              const lineTotal = Number(line.salesTotal || line.lineTotal || (qty * unitVal)) || 0;
+              const lineTax = Number(line.taxAmount || line.valueDifference || (lineTotal * 0.14)) || 0;
+
+              // If product not found in ERP, auto-create it with ETA code and name
+              if (!matchedProd) {
+                try {
+                  const prodCode = (etaCode && etaCode !== '---') ? etaCode : `PRD-${Date.now().toString().slice(-5)}-${idx + 1}`;
+                  const prodName = etaDesc || (etaCode && etaCode !== '---' ? etaCode : `صنف فاتورة ${idx + 1}`);
+                  const newProdData = {
+                    code: prodCode,
+                    name: prodName,
+                    barcode: etaCode && etaCode !== '---' ? etaCode : '',
+                    type: 'finished_good' as const,
+                    cost_price: unitVal || 0,
+                    sale_price: Number(((unitVal || 0) * 1.2).toFixed(2)),
+                    vat_rate: 14,
+                    company_id: user.company_id
+                  };
+                  const newProdId = await dbService.add('products', newProdData);
+                  matchedProd = { id: newProdId, ...newProdData };
+                  currentProducts.push(matchedProd);
+                  setProducts(prev => [...prev, matchedProd as Product]);
+                } catch (pErr) {
+                  console.error('Failed to auto-create product for ETA line:', pErr);
+                }
+              }
 
               parsedItems.push({
                 product_id: matchedProd?.id || '',
@@ -1316,25 +1405,71 @@ export const PurchaseInvoices: React.FC = () => {
                 etaItemCode: etaCode,
                 etaItemName: etaDesc
               });
-            });
+            }
           } else {
             const sub = Number(pendingEta.netAmount || pendingEta.totalSales || 0);
             const tax = Number(pendingEta.taxAmount || 0);
+            let fallbackProd = currentProducts.find(p => p.name === 'مشتريات فاتورة إلكترونية');
+            if (!fallbackProd) {
+              try {
+                const newProdData = {
+                  code: `ETA-GEN-${Date.now().toString().slice(-4)}`,
+                  name: pendingEta.issuerName ? `مشتريات من ${pendingEta.issuerName}` : 'مشتريات فاتورة إلكترونية',
+                  type: 'finished_good' as const,
+                  cost_price: sub,
+                  sale_price: sub,
+                  vat_rate: 14,
+                  company_id: user.company_id
+                };
+                const newProdId = await dbService.add('products', newProdData);
+                fallbackProd = { id: newProdId, ...newProdData } as any;
+                setProducts(prev => [...prev, fallbackProd as any]);
+              } catch {}
+            }
             parsedItems.push({
-              product_id: '',
-              product_name: pendingEta.issuerName ? `مشتريات من ${pendingEta.issuerName}` : 'مشتريات فاتورة إلكترونية',
+              product_id: fallbackProd?.id || '',
+              product_name: fallbackProd?.name || (pendingEta.issuerName ? `مشتريات من ${pendingEta.issuerName}` : 'مشتريات فاتورة إلكترونية'),
               quantity: 1,
               cost_price: sub,
               total: sub,
               vat_rate: 14,
-              vat_amount: tax
+              vat_amount: tax,
+              etaItemCode: '---',
+              etaItemName: fallbackProd?.name || ''
             });
+          }
+
+          // Ensure a warehouse is available
+          let currentWarehouses = warehouses;
+          if (!currentWarehouses || currentWarehouses.length === 0) {
+            try {
+              currentWarehouses = await dbService.list<any>('warehouses', { company_id: user.company_id });
+              if (currentWarehouses && currentWarehouses.length > 0) {
+                setWarehouses(currentWarehouses);
+              }
+            } catch {}
+          }
+          let assignedWarehouseId = currentWarehouses[0]?.id || '';
+          if (!assignedWarehouseId) {
+            try {
+              const newWhId = await dbService.add('warehouses', {
+                name: 'المخزن الرئيسي',
+                code: 'WH-01',
+                is_active: true,
+                company_id: user.company_id
+              });
+              const whObj = { id: newWhId, name: 'المخزن الرئيسي', code: 'WH-01' };
+              setWarehouses([whObj]);
+              assignedWarehouseId = newWhId;
+            } catch (wErr) {
+              console.error('Failed to create default warehouse:', wErr);
+            }
           }
 
           setInvoiceData(prev => ({
             ...prev,
             supplier_id: matchedSupId || prev.supplier_id,
-            warehouse_id: prev.warehouse_id || (warehouses[0]?.id || ''),
+            warehouse_id: assignedWarehouseId || prev.warehouse_id,
             date: (pendingEta.dateTimeIssued || '').slice(0, 10) || new Date().toISOString().slice(0, 10),
             notes: `فاتورة مسجلة من منظومة مصلحة الضرائب المصرية (رقم: ${pendingEta.internalId || pendingEta.uuid.slice(0, 8)})`,
             discount: Number(pendingEta.totalDiscount || 0)
@@ -1368,7 +1503,7 @@ export const PurchaseInvoices: React.FC = () => {
 
       initEtaInvoice();
     }
-  }, [pendingEtaInvoiceForPurchase, user?.company_id, suppliers, products, warehouses]);
+  }, [pendingEtaInvoiceForPurchase, user?.company_id]);
 
   useEffect(() => {
     const generatePreview = () => {
