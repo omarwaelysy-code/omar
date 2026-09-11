@@ -1849,14 +1849,6 @@ export const PurchaseReturns: React.FC = () => {
         created_by: user.id
       };
 
-      if (editingReturn) {
-        await dbService.deleteJournalEntryByReference(editingReturn.id, user.company_id);
-        await TransactionManager.updateWithAccounting(
-          'purchase_returns',
-          editingReturn.id,
-          data,
-          ReturnSchema,
-          journalEntryData,
       let savedReturnId: string | null = null;
       if (editingReturn) {
         await dbService.deleteJournalEntryByReference(editingReturn.id, user.company_id);
@@ -3959,6 +3951,7 @@ export const PurchaseReturns: React.FC = () => {
                           {viewReturn.entry_number}
                         </button>
                       </p>
+                    )}
                     {viewReturn.eta_invoice_number && (
                       <p className="text-xs text-indigo-700 font-bold mt-1 flex items-center gap-1">
                         <span>{language === 'ar' ? 'رقم الفاتورة الإلكترونية:' : 'ETA Doc Number:'}</span>
