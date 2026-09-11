@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Plus, Trash2, X, Package, History, ChevronRight, ChevronLeft, 
   Wallet, Layers, Hash, User, Calendar, Paperclip, LayoutGrid, List,
@@ -1958,44 +1958,228 @@ export const Products: React.FC = () => {
                                      </div>
                                   </div>
 
-                                  <div className="space-y-1">
-                                     <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_barcode')}</label>
-                                     <div className="flex items-center gap-1">
-                                       <input 
-                                         type="text" 
-                                         className="flex-1 px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-mono font-bold outline-none focus:ring-1 focus:ring-emerald-500 transition-all" 
-                                         value={formData.barcode} 
-                                   <span className="absolute right-2 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs select-none pointer-events-none">
-                                     %
-                                   </span>
-                                 </div>
-                               </div>
-                             </>
-                           )}
-
-                           {/* Active / Inactive Status Toggle */}
-                           <div className="sm:col-span-2 lg:col-span-3 pt-1.5 border-t border-slate-100 flex items-center justify-between">
-                             <div>
-                               <h4 className="text-[11px] font-bold text-slate-800 leading-none">
-                                 {language === 'ar' ? 'حالة النشاط' : 'Active Status'}
-                               </h4>
-                               <p className="text-[9px] text-slate-400 font-medium">
-                                 {language === 'ar' ? 'تحديد ما إذا كان الصنف نشطاً في النظام أم لا' : 'Specify if the product is active in the system'}
-                               </p>
+                                   <div className="space-y-1">
+                                      <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_barcode')}</label>
+                                      <div className="flex items-center gap-1">
+                                        <input 
+                                          type="text" 
+                                          className="flex-1 px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-mono font-bold outline-none focus:ring-1 focus:ring-emerald-500 transition-all" 
+                                          value={formData.barcode} 
+                                          onChange={(e) => setFormData({ ...formData, barcode: e.target.value })} 
+                                        />
+                                        <button 
+                                          type="button" 
+                                          onClick={handleOpenBarcodeSettings} 
+                                          className="p-1 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-md transition-all" 
+                                          title={language === 'ar' ? 'Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯' : 'Settings'}
+                                        >
+                                          <Settings size={12} />
+                                        </button>
+                                        <button 
+                                          type="button" 
+                                          disabled={!formData.barcode} 
+                                          onClick={handleOpenPrintBarcode} 
+                                          className="p-1 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-md transition-all disabled:opacity-40" 
+                                          title={language === 'ar' ? 'Ø·Ø¨Ø§Ø¹Ø© Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯' : 'Print'}
+                                        >
+                                          <Printer size={12} />
+                                        </button>
+                                      </div>
+                                      {formData.barcode && (
+                                        <div className="p-1 bg-white border border-slate-200 rounded-md flex justify-center overflow-hidden">
+                                           {(() => {
+                                             const s = getProductBarcodeSettings(formData);
+                                             const isValid = isValidBarcodeValue(formData.barcode, s.type);
+                                             if (!isValid) {
+                                               return <div className="text-rose-500 font-bold text-[9px]">{language === 'ar' ? 'Ø¨Ø§Ø±ÙƒÙˆØ¯ ØºÙŠØ± ØµØ§Ù„Ø­' : 'Invalid'}</div>;
+                                             }
+                                             return s.type === 'QR_CODE' ? (
+                                               <QRCode value={formData.barcode} size={28} />
+                                             ) : (
+                                               <Barcode 
+                                                 value={formData.barcode} 
+                                                 format={s.type as any} 
+                                                 width={Number(s.width) || 1.1} 
+                                                 height={20} 
+                                                 fontSize={7} 
+                                                 displayValue={s.displayValue}
+                                                 marginTop={1}
+                                                 marginBottom={1}
+                                                 marginLeft={1}
+                                                 marginRight={1}
+                                               />
+                                             );
+                                           })()}
+                                        </div>
+                                      )}
+                                   </div>
+                                </div>
                              </div>
-                             <button
-                               type="button"
-                               onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
-                               className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors focus:outline-none ${formData.is_active ? 'bg-emerald-600' : 'bg-slate-200'}`}
-                             >
-                               <span
-                                 className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform ${formData.is_active ? (dir === 'rtl' ? '-translate-x-3.5' : 'translate-x-3.5') : (dir === 'rtl' ? '-translate-x-0.5' : 'translate-x-0.5')}`}
-                               />
-                             </button>
-                           </div>
-                        </div>
-                     </div>
 
+                             {/* Accounting Section */}
+                             <div className="space-y-1.5 p-2 bg-slate-50/50 rounded-xl border border-slate-200/60">
+                                <div className="flex items-center gap-1.5 border-b border-slate-200/60 pb-1">
+                                   <div className="w-4 h-4 bg-slate-100 text-slate-600 rounded flex items-center justify-center">
+                                      <LayoutGrid size={11} />
+                                   </div>
+                                   <h2 className="text-[11px] font-bold text-slate-800 leading-none uppercase">
+                                      {language === 'ar' ? 'Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ù…Ø­Ø§Ø³Ø¨ÙŠØ©' : 'Accounting Setup'}
+                                   </h2>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-right">
+                                   {/* Ø­Ø³Ø§Ø¨ Ø§Ù„Ø¥ÙŠØ±Ø§Ø¯Ø§Øª */}
+                                   <div className="space-y-0.5">
+                                      <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_revenue_account')}</label>
+                                      <select 
+                                        required 
+                                        className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all" 
+                                        value={formData.revenue_account_id} 
+                                        onChange={(e) => setFormData({ ...formData, revenue_account_id: e.target.value })}
+                                      >
+                                        <option value="">{t('common.select_category')}</option>
+                                        {accounts.filter(a => ['sales_revenue', 'service_revenue', 'other_revenue'].includes(a.account_usage || '')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                      </select>
+                                   </div>
+
+                                   {/* Ø­Ø³Ø§Ø¨ ØªÙƒÙ„ÙØ© Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª */}
+                                   <div className="space-y-0.5">
+                                      <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_cost_account')}</label>
+                                      <select 
+                                        required 
+                                        className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all" 
+                                        value={formData.cost_account_id} 
+                                        onChange={(e) => setFormData({ ...formData, cost_account_id: e.target.value })}
+                                      >
+                                        <option value="">{t('common.select_category')}</option>
+                                        {accounts.filter(a => a.account_usage === 'cost_of_sales').map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                      </select>
+                                   </div>
+
+                                   {/* Ø­Ø³Ø§Ø¨ Ø§Ù„Ù…Ø®Ø²ÙˆÙ† */}
+                                   {['finished_good', 'raw_material', 'commodity', 'consumable'].includes(formData.type) && (
+                                     <>
+                                       <div className="space-y-0.5">
+                                         <label className="block text-[10px] font-bold text-slate-500 px-0.5">
+                                           {t('products.form_inventory_account')} <span className="text-rose-500 font-bold">*</span>
+                                         </label>
+                                         <select 
+                                           required
+                                           className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all" 
+                                           value={formData.inventory_account_id} 
+                                           onChange={(e) => setFormData({ ...formData, inventory_account_id: e.target.value })}
+                                         >
+                                           <option value="">{t('common.select_account')}</option>
+                                           {accounts.filter(a => ['inventory', 'raw_materials', 'work_in_progress', 'finished_goods'].includes(a.account_usage || '')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                         </select>
+                                       </div>
+
+                                       {/* Ø·Ø±ÙŠÙ‚Ø© ØªÙ‚ÙŠÙŠÙ… Ø§Ù„Ù…Ø®Ø²ÙˆÙ† */}
+                                       <div className="space-y-0.5">
+                                         <label className="block text-[10px] font-bold text-slate-500 px-0.5">
+                                           {t('company_settings.inventory_cost_method')}
+                                         </label>
+                                         <select 
+                                           className={`w-full px-2 py-1 border rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all ${
+                                             editingProduct 
+                                               ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' 
+                                               : 'bg-white text-slate-900 border-slate-200'
+                                           }`} 
+                                           value={formData.inventory_cost_method || 'wac'} 
+                                           onChange={(e) => setFormData({ ...formData, inventory_cost_method: e.target.value as any })}
+                                           disabled={!!editingProduct}
+                                         >
+                                           <option value="wac">{t('company_settings.inventory_cost_method.wac')}</option>
+                                           <option value="fifo">{t('company_settings.inventory_cost_method.fifo')}</option>
+                                           <option value="lifo">{t('company_settings.inventory_cost_method.lifo')}</option>
+                                         </select>
+                                       </div>
+                                     </>
+                                   )}
+
+                                   {/* VAT Fields if Company is VAT registered */}
+                                   {isVatEnabled && (
+                                     <>
+                                       {/* Ø¶Ø±ÙŠØ¨Ø© Ù…Ø¨ÙŠØ¹Ø§Øª (Ù…Ø®Ø±Ø¬Ø§Øª) */}
+                                       <div className="space-y-0.5">
+                                         <label className="block text-[10px] font-bold text-slate-600 px-0.5 flex items-center justify-between">
+                                           <span>{language === 'ar' ? 'Ø¶Ø±ÙŠØ¨Ø© Ø§Ù„Ù‚ÙŠÙ…Ø© Ø§Ù„Ù…Ø¶Ø§ÙØ© (Ù…Ø¨ÙŠØ¹Ø§Øª)' : 'Sales VAT Account'}</span>
+                                           <span className="text-[8.5px] text-emerald-700 bg-emerald-100 px-1 py-0.2 rounded font-black">Ù…Ø®Ø±Ø¬Ø§Øª</span>
+                                         </label>
+                                         <select 
+                                           className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all" 
+                                           value={formData.sales_vat_account_id || ''} 
+                                           onChange={(e) => setFormData({ ...formData, sales_vat_account_id: e.target.value })}
+                                         >
+                                           <option value="">{language === 'ar' ? '-- Ø§Ø®ØªØ± Ø­Ø³Ø§Ø¨ Ø¶Ø±ÙŠØ¨Ø© Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª --' : '-- Select Sales VAT Account --'}</option>
+                                           {accounts.filter(a => ['vat', 'output_vat', 'withholding_tax'].includes(a.account_usage || '') || a.name.includes('Ù…Ø¨ÙŠØ¹Ø§Øª') || a.name.includes('Ù…Ø®Ø±Ø¬Ø§Øª') || a.code?.startsWith('222')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                         </select>
+                                       </div>
+
+                                       {/* Ø¶Ø±ÙŠØ¨Ø© Ù…Ø´ØªØ±ÙŠØ§Øª (Ù…Ø¯Ø®Ù„Ø§Øª) */}
+                                       <div className="space-y-0.5">
+                                         <label className="block text-[10px] font-bold text-slate-600 px-0.5 flex items-center justify-between">
+                                           <span>{language === 'ar' ? 'Ø¶Ø±ÙŠØ¨Ø© Ø§Ù„Ù‚ÙŠÙ…Ø© Ø§Ù„Ù…Ø¶Ø§ÙØ© (Ù…Ø´ØªØ±ÙŠØ§Øª)' : 'Purchase VAT Account'}</span>
+                                           <span className="text-[8.5px] text-blue-700 bg-blue-100 px-1 py-0.2 rounded font-black">Ù…Ø¯Ø®Ù„Ø§Øª</span>
+                                         </label>
+                                         <select 
+                                           className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-blue-500 transition-all" 
+                                           value={formData.purchase_vat_account_id || ''} 
+                                           onChange={(e) => setFormData({ ...formData, purchase_vat_account_id: e.target.value })}
+                                         >
+                                           <option value="">{language === 'ar' ? '-- Ø§Ø®ØªØ± Ø­Ø³Ø§Ø¨ Ø¶Ø±ÙŠØ¨Ø© Ø§Ù„Ù…Ø´ØªØ±ÙŠØ§Øª --' : '-- Select Purchase VAT Account --'}</option>
+                                           {accounts.filter(a => ['vat', 'input_vat', 'withholding_tax'].includes(a.account_usage || '') || a.name.includes('Ù…Ø´ØªØ±ÙŠØ§Øª') || a.name.includes('Ù…Ø¯Ø®Ù„Ø§Øª') || a.code?.startsWith('118') || a.code?.startsWith('222')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                         </select>
+                                       </div>
+
+                                       {/* Ù†Ø³Ø¨Ø© Ø¶Ø±ÙŠØ¨Ø© Ø§Ù„Ù‚ÙŠÙ…Ø© Ø§Ù„Ù…Ø¶Ø§ÙØ© */}
+                                       <div className="space-y-0.5 sm:col-span-2">
+                                         <label className="block text-[10px] font-bold text-slate-500 px-0.5">
+                                           {t('products.form_vat_rate')}
+                                         </label>
+                                         <div className="relative">
+                                           <input 
+                                             type="number" 
+                                             step="0.01" 
+                                             min="0" 
+                                             max="100" 
+                                             placeholder="14" 
+                                             className="w-full pl-2 pr-6 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500 transition-all text-left" 
+                                             value={formData.vat_rate || ''} 
+                                             onChange={(e) => setFormData({ ...formData, vat_rate: parseFloat(e.target.value) || 0 })} 
+                                           />
+                                           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs select-none pointer-events-none">
+                                             %
+                                           </span>
+                                         </div>
+                                       </div>
+                                     </>
+                                   )}
+
+                                   {/* Active / Inactive Status Toggle */}
+                                   <div className="sm:col-span-2 pt-1.5 border-t border-slate-100 flex items-center justify-between">
+                                      <div>
+                                        <h4 className="text-[10px] font-bold text-slate-800 leading-none">
+                                          {language === 'ar' ? 'Ø­Ø§Ù„Ø© Ø§Ù„Ù†Ø´Ø§Ø·' : 'Active Status'}
+                                        </h4>
+                                        <p className="text-[8.5px] text-slate-400 font-medium">
+                                          {language === 'ar' ? 'ØªØ­Ø¯ÙŠØ¯ Ù…Ø§ Ø¥Ø°Ø§ ÙƒØ§Ù† Ø§Ù„ØµÙ†Ù Ù†Ø´Ø·Ø§Ù‹ ÙÙŠ Ø§Ù„Ù†Ø¸Ø§Ù… Ø£Ù… Ù„Ø§' : 'Specify if the product is active'}
+                                        </p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
+                                        className={`relative inline-flex h-3.5 w-6 items-center rounded-full transition-colors focus:outline-none ${formData.is_active ? 'bg-emerald-600' : 'bg-slate-200'}`}
+                                      >
+                                        <span
+                                          className={`inline-block h-2 w-2 transform rounded-full bg-white transition-transform ${formData.is_active ? (dir === 'rtl' ? '-translate-x-3' : 'translate-x-3') : (dir === 'rtl' ? '-translate-x-0.5' : 'translate-x-0.5')}`}
+                                        />
+                                      </button>
+                                   </div>
+                                </div>
+                             </div>
+                          </div>
+                       </div>
                      {/* Sticky Bottom Actions */}
                      <div className="px-3 py-2 flex flex-wrap items-center justify-end gap-2 sticky bottom-0 bg-white/95 backdrop-blur-md z-30 border-t border-slate-100 mt-2">
                        {pendingEtaProductForCreation && (
