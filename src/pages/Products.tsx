@@ -1837,7 +1837,7 @@ export const Products: React.FC = () => {
                                       <div className="space-y-0.5">
                                          <label className="block text-[10px] font-bold text-slate-600 px-0.5">{t('products.form_stock')}</label>
                                          <FormattedNumberInput 
-                                           disabled={!canEditStock || isReadOnly} 
+                                           disabled 
                                            className="w-full px-2 py-1 bg-slate-100 border border-slate-200 rounded-md text-xs font-black text-slate-500 outline-none" 
                                            value={formData.stock || 0} 
                                            onChange={(val) => setFormData({ ...formData, stock: val })} 
