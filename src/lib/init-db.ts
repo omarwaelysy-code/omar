@@ -1363,15 +1363,11 @@ async function seedDatabase(client: any) {
     console.warn('    ! User seeding failed:', e);
   }
 
-  // 2b. Update Wael Ragab to Super Admin & Restore Company
+  // 2b. Update Wael Ragab to Super Admin
   try {
     await client.query(
       `UPDATE users 
-       SET role = 'super_admin', 
-           company_id = COALESCE(
-             (SELECT id FROM companies WHERE id != 'SYSTEM' ORDER BY created_at ASC LIMIT 1), 
-             'SYSTEM'
-           )
+       SET role = 'super_admin' 
        WHERE email = $1`,
       ['acc.wael2005@gmail.com']
     );

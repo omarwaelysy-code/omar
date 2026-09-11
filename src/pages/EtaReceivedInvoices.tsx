@@ -2001,13 +2001,29 @@ export function EtaReceivedInvoices() {
             <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0" />
             <span>{errorMessage}</span>
           </div>
-          <button
-            type="button"
-            onClick={handleRefresh}
-            className="px-3 py-1.5 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors flex-shrink-0"
-          >
-            {language === 'ar' ? 'إعادة المحاولة' : 'Retry'}
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {(errorMessage.toLowerCase().includes('token') || errorMessage.includes('جلسة')) && (
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem('auth_token');
+                  localStorage.removeItem('auth_user');
+                  sessionStorage.setItem('session_invalidated_message', 'يرجى تسجيل الدخول لتجديد جلسة العمل واستعراض الوثائق.');
+                  window.location.href = '/login';
+                }}
+                className="px-3 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors flex-shrink-0"
+              >
+                {language === 'ar' ? 'تسجيل الدخول مجدداً' : 'Log In Again'}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleRefresh}
+              className="px-3 py-1.5 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors flex-shrink-0"
+            >
+              {language === 'ar' ? 'إعادة المحاولة' : 'Retry'}
+            </button>
+          </div>
         </div>
       )}
 

@@ -258,6 +258,27 @@ export async function apiRequest<T>(path: string, method: string = 'GET', body?:
         window.location.href = '/login';
         throw new Error(error.message);
       }
+
+      if (
+        response.status === 401 ||
+        (response.status === 403 && (
+          error.error === 'Invalid or expired token.' ||
+          error.error === 'Access denied. No token provided.' ||
+          (typeof error.message === 'string' && error.message.toLowerCase().includes('token')) ||
+          (typeof error.error === 'string' && error.error.toLowerCase().includes('token'))
+        ))
+      ) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+        sessionStorage.setItem(
+          'session_invalidated_message',
+          'انتهت صلاحية جلسة العمل، يرجى تسجيل الدخول مجدداً للمتابعة واستعراض كافة البيانات والوثائق.'
+        );
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+        throw new Error('انتهت صلاحية جلسة العمل، يرجى تسجيل الدخول مجدداً.');
+      }
       
       throw new Error(error.message || error.error || `API Request failed with status ${response.status}`);
 

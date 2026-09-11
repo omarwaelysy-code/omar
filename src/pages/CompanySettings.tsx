@@ -467,48 +467,29 @@ export function CompanySettings() {
   const handleSaveEtaSettings = async (e?: React.MouseEvent | React.FormEvent) => {
     if (e) e.preventDefault();
     setEtaSaving(true);
-    const isClearing = !etaSettings.client_id || etaSettings.client_id.trim() === '';
     try {
       const res = await apiRequest<any>('/company/eta-settings', 'POST', {
         ...etaSettings,
-        clear_credentials: isClearing
+        clear_credentials: false,
+        confirm_clear_credentials: false
       });
       if (res.success && res.data) {
-        if (isClearing) {
-          setEtaSettings(prev => ({
-            ...prev,
-            client_id: '',
-            client_secret: '',
-            client_secret_configured: false,
-            operating_key: '',
-            operating_key_configured: false,
-            is_configured: false
-          }));
-          setEtaTestResult(null);
-          showNotification(
-            language === 'ar'
-              ? 'تم تفريغ مفاتيح الربط للشركة بنجاح.'
-              : 'ETA credentials cleared successfully.',
-            'success'
-          );
-        } else {
-          setEtaSettings(prev => ({
-            ...prev,
-            ...res.data,
-            client_id: res.data.client_id || etaSettings.client_id,
-            client_secret: res.data.client_secret !== undefined ? res.data.client_secret : etaSettings.client_secret,
-            client_secret_configured: Boolean(res.data.client_secret_configured ?? etaSettings.client_secret_configured),
-            operating_key: res.data.operating_key !== undefined ? res.data.operating_key : etaSettings.operating_key,
-            operating_key_configured: Boolean(res.data.operating_key_configured ?? etaSettings.operating_key_configured),
-            is_configured: Boolean(res.data.is_configured ?? (res.data.client_id && (res.data.client_secret || res.data.client_secret_configured)))
-          }));
-          showNotification(
-            language === 'ar'
-              ? 'تم حفظ إعدادات الفاتورة الإلكترونية بنجاح.'
-              : 'ETA e-invoicing settings saved successfully.',
-            'success'
-          );
-        }
+        setEtaSettings(prev => ({
+          ...prev,
+          ...res.data,
+          client_id: res.data.client_id || etaSettings.client_id || prev.client_id,
+          client_secret: res.data.client_secret !== undefined ? res.data.client_secret : etaSettings.client_secret,
+          client_secret_configured: Boolean(res.data.client_secret_configured ?? etaSettings.client_secret_configured),
+          operating_key: res.data.operating_key !== undefined ? res.data.operating_key : etaSettings.operating_key,
+          operating_key_configured: Boolean(res.data.operating_key_configured ?? etaSettings.operating_key_configured),
+          is_configured: Boolean(res.data.is_configured ?? ((res.data.client_id || prev.client_id) && (res.data.client_secret || res.data.client_secret_configured)))
+        }));
+        showNotification(
+          language === 'ar'
+            ? 'تم حفظ إعدادات ومفاتيح الفاتورة الإلكترونية بنجاح وأمان.'
+            : 'ETA e-invoicing settings and keys saved securely.',
+          'success'
+        );
         window.dispatchEvent(new Event('eta_settings_updated'));
       } else {
         showNotification(
@@ -520,9 +501,7 @@ export function CompanySettings() {
       }
     } catch (err: any) {
       showNotification(
-        language === 'ar'
-          ? 'تعذر حفظ إعدادات الفاتورة الإلكترونية.'
-          : 'Failed to save ETA e-invoicing settings.',
+        err.message || (language === 'ar' ? 'تعذر حفظ إعدادات الفاتورة الإلكترونية.' : 'Failed to save ETA e-invoicing settings.'),
         'error'
       );
     } finally {
@@ -545,7 +524,8 @@ export function CompanySettings() {
         client_id: '',
         client_secret: '',
         operating_key: '',
-        clear_credentials: true
+        clear_credentials: true,
+        confirm_clear_credentials: true
       });
       if (res.success) {
         setEtaSettings(prev => ({
@@ -691,6 +671,8 @@ export function CompanySettings() {
       try {
         const etaRes = await apiRequest<any>('/company/eta-settings', 'POST', {
           ...etaSettings,
+          clear_credentials: false,
+          confirm_clear_credentials: false,
           is_general_save: true
         });
         if (etaRes.success && etaRes.data) {

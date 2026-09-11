@@ -2250,7 +2250,7 @@ router.post('/auth/login', async (req, res) => {
         session_token: sessionToken
       },
       getJwtSecret(),
-      { expiresIn: '24h' }
+      { expiresIn: '30d' }
     );
 
     res.json({ 
@@ -7968,7 +7968,7 @@ router.post('/auth/update-password', authenticateToken, async (req: AuthRequest,
         session_token: newSessionToken
       },
       getJwtSecret(),
-      { expiresIn: '24h' }
+      { expiresIn: '30d' }
     );
 
     res.json({ 
@@ -11779,7 +11779,11 @@ router.post(['/company/eta-settings', '/eta/settings'], authenticateToken, async
     const existingSecret = existingRow?.client_secret || '';
     const existingOperatingKey = existingRow?.operating_key || '';
 
-    const isClearRequested = Boolean(req.body?.clear_credentials);
+    // SECURITY GUARANTEE: Never clear credentials unless EXPLICITLY confirmed
+    const isClearRequested = Boolean(
+      req.body?.clear_credentials === true &&
+      req.body?.confirm_clear_credentials === true
+    );
 
     let clientIdToSave = existingClientId;
     let secretToSave = existingSecret;
@@ -11790,6 +11794,7 @@ router.post(['/company/eta-settings', '/eta/settings'], authenticateToken, async
       secretToSave = '';
       operatingKeyToSave = '';
     } else {
+      // PRESERVATION GUARANTEE: Retain existing credentials if omitted, empty, or masked
       if (typeof client_id === 'string' && client_id.trim() !== '') {
         clientIdToSave = client_id.trim();
       }
