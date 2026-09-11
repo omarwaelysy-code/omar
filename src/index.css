@@ -101,6 +101,32 @@
   @apply bg-slate-200 rounded-full hover:bg-slate-300 transition-colors;
 }
 
+/* Profile Modal Scrollbar */
+.profile-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 rgba(0, 0, 0, 0.05);
+}
+
+.profile-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.profile-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 9999px;
+  margin: 8px 0;
+}
+
+.profile-scrollbar::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.profile-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
 /* Hide scrollbar for Chrome, Safari, Opera, Edge, Firefox */
 .no-scrollbar::-webkit-scrollbar {
   display: none;

@@ -864,11 +864,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       )}
 
       {/* Desktop Top Navigation */}
-      <header className="hidden md:flex sticky top-0 z-[200] bg-white border-b border-slate-200 h-16 items-center px-1.5 2xl:px-4 shadow-sm">
-        <div className={`flex items-center gap-1 ${dir === 'rtl' ? 'ml-1 2xl:ml-2' : 'mr-1 2xl:mr-2'} shrink-0`}>
+      <header className="hidden md:flex sticky top-0 z-[200] bg-white border-b border-slate-200 h-14 xl:h-16 items-center px-1 xl:px-2 2xl:px-3 shadow-sm">
+        <div className={`flex items-center gap-1 ${dir === 'rtl' ? 'ml-0.5 xl:ml-1' : 'mr-0.5 xl:mr-1'} shrink-0`}>
           {company?.logo_url ? (
-            <div className="flex items-center gap-1 2xl:gap-2">
-              <div className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-100 p-0.5 flex items-center justify-center">
+            <div className="flex items-center gap-1">
+              <div className="w-7 h-7 xl:w-8 xl:h-8 rounded-lg bg-slate-50 border border-slate-100 p-0.5 flex items-center justify-center">
                 <img 
                   src={company.logo_url} 
                   alt={company.name} 
@@ -876,10 +876,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                   referrerPolicy="no-referrer"
                 />
               </div>
-              <span className="font-black text-slate-900 tracking-tight text-xs 2xl:text-sm truncate max-w-[70px] 2xl:max-w-[140px]">{company.name}</span>
+              <span className="font-black text-slate-900 tracking-tight text-xs truncate max-w-[65px] xl:max-w-[110px]">{company.name}</span>
             </div>
           ) : (
-            <Logo variant="full" size="md" />
+            <Logo variant="full" size="sm" />
           )}
         </div>
 
@@ -894,7 +894,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
               <button
                 type="button"
                 onClick={() => setIsCompanyMenuOpen(!isCompanyMenuOpen)}
-                className="flex items-center gap-0.5 px-1 py-0.5 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-900 rounded-md transition-all border border-emerald-200/80 shadow-2xs cursor-pointer text-[9.5px] xl:text-[10.5px] 2xl:text-[11.5px] font-extrabold tracking-tighter"
+                className="flex items-center gap-0.5 px-0.5 xl:px-1 py-0.5 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-900 rounded-md transition-all border border-emerald-200/80 shadow-2xs cursor-pointer text-[9px] xl:text-[10px] 2xl:text-[11px] font-extrabold tracking-tighter"
                 title={language === 'ar' ? 'تبديل الشركة' : 'Switch Company'}
               >
                 <Building2 size={11} className="text-emerald-600 shrink-0" />
@@ -1012,13 +1012,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                       setActiveDesktopMenu(prev => prev === item.id ? null : item.id);
                     }}
                     className={`
-                      flex items-center gap-[2px] xl:gap-0.5 px-1 xl:px-1.5 py-0.5 rounded-md transition-all font-bold text-[9.5px] xl:text-[10.5px] 2xl:text-[11.5px] whitespace-nowrap cursor-pointer tracking-tighter
+                      flex items-center gap-[2px] px-0.5 xl:px-1 py-0.5 rounded-md transition-all font-bold text-[9px] xl:text-[10px] 2xl:text-[11px] whitespace-nowrap cursor-pointer tracking-tighter
                       ${isActive || isOpen ? 'bg-brand-primary/10 text-brand-primary' : 'text-slate-600 hover:bg-slate-100/70 hover:text-slate-900'}
                     `}
                   >
-                    <item.icon size={11} className="shrink-0 opacity-80" />
+                    <item.icon size={10} className="shrink-0 opacity-75" />
                     <span>{item.label}</span>
-                    <ChevronDown size={8} className={`opacity-50 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown size={7} className={`opacity-40 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
                   </button>
                   
                   {/* Dropdown Menu */}
@@ -1079,18 +1079,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                   setActiveDesktopMenu(null);
                 }}
                 className={`
-                  flex items-center gap-[2px] xl:gap-0.5 px-1 xl:px-1.5 py-0.5 rounded-md transition-all font-bold text-[9.5px] xl:text-[10.5px] 2xl:text-[11.5px] whitespace-nowrap shrink-0 cursor-pointer tracking-tighter
+                  flex items-center gap-[2px] px-0.5 xl:px-1 py-0.5 rounded-md transition-all font-bold text-[9px] xl:text-[10px] 2xl:text-[11px] whitespace-nowrap shrink-0 cursor-pointer tracking-tighter
                   ${currentPage === item.id ? 'bg-brand-primary text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100/70 hover:text-slate-900'}
                 `}
               >
-                <item.icon size={11} className="shrink-0 opacity-80" />
+                <item.icon size={10} className="shrink-0 opacity-75" />
                 <span>{item.label}</span>
               </button>
             );
           })}
         </nav>
 
-        <div className={`flex items-center gap-0.5 xl:gap-1.5 ${dir === 'rtl' ? 'mr-auto' : 'ml-auto'} shrink-0`}>
+        <div className={`flex items-center gap-0.5 xl:gap-1 ${dir === 'rtl' ? 'mr-auto' : 'ml-auto'} shrink-0`}>
           <button 
             type="button"
             onClick={() => setIsCenterOpen(true)}
@@ -1572,11 +1572,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
               initial={{ opacity: 0, scale: 0.95, y: -10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -10 }}
-              className="relative bg-[#e9eee4] text-slate-800 rounded-[32px] p-6 shadow-2xl border border-[#d2dcd0] max-w-sm w-full font-sans pointer-events-auto"
+              className="relative bg-[#e9eee4] text-slate-800 rounded-[32px] p-6 shadow-2xl border border-[#d2dcd0] max-w-sm w-full font-sans pointer-events-auto max-h-[calc(100vh-5rem)] overflow-y-auto profile-scrollbar"
               dir={dir}
             >
               {/* Top Header Actions (Camera Upload + Close Button) */}
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-2 sticky top-0 bg-[#e9eee4]/90 backdrop-blur-xs z-10 -mt-2 py-1">
                 <label
                   htmlFor="profile-avatar-upload-input"
                   className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 rounded-full transition-all cursor-pointer"
