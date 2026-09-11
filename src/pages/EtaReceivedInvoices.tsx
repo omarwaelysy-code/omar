@@ -3034,6 +3034,12 @@ export function EtaReceivedInvoices() {
                       );
                     }
 
+                    // Only Valid (صحيحة) documents can be converted
+                    const isValid = String(inv.status || '').trim().toLowerCase() === 'valid' || String(inv.status || '').trim() === 'صحيحة';
+                    if (!isValid) {
+                      return null;
+                    }
+
                     const isCreditNote = String(inv.typeName || '').toLowerCase() === 'c' || String(inv.documentTypeName || '').includes('دائن') || String(inv.documentTypeName || '').toLowerCase().includes('credit');
                     return (
                       <button
@@ -3316,6 +3322,12 @@ export function EtaReceivedInvoices() {
                           <span>{language === 'ar' ? 'عرض المستند' : 'View Doc'}</span>
                         </button>
                       );
+                    }
+
+                    // Only Valid (صحيحة) documents can be converted
+                    const isValid = String(inv.status || '').trim().toLowerCase() === 'valid' || String(inv.status || '').trim() === 'صحيحة';
+                    if (!isValid) {
+                      return <span className="text-slate-300 text-xs">-</span>;
                     }
 
                     const isCreditNote = String(inv.typeName || '').toLowerCase() === 'c' || String(inv.documentTypeName || '').includes('دائن') || String(inv.documentTypeName || '').toLowerCase().includes('credit');
