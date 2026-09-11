@@ -39,7 +39,9 @@ import {
   LayoutGrid,
   Percent,
   Layers,
-  ChevronUp
+  ChevronUp,
+  ShoppingCart,
+  RotateCcw
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -50,6 +52,7 @@ import { exportToExcel } from '../utils/excelUtils';
 import { ExportButtons } from '../components/ExportButtons';
 import { exportToPDF, printElement } from '../utils/pdfUtils';
 import { formatMoney } from '../utils/formatUtils';
+import { CreatePurchaseFromEtaModal } from '../components/CreatePurchaseFromEtaModal';
 
 export interface EtaReceivedInvoice {
   uuid: string;
@@ -88,6 +91,10 @@ export interface EtaReceivedInvoice {
   nonTaxableItemsNet?: number;
   taxableVatBase?: number;
   nonTaxableVatBase?: number;
+  isRegistered?: boolean;
+  registeredDocType?: 'purchase_invoice' | 'purchase_return';
+  registeredDocId?: string;
+  registeredDocNumber?: string;
 }
 
 export const getInvoiceTaxBreakdown = (inv: Partial<EtaReceivedInvoice> & { raw_data?: any; taxableItemsNet?: number; nonTaxableItemsNet?: number; taxableVatBase?: number; nonTaxableVatBase?: number }) => {
@@ -195,6 +202,8 @@ const defaultVisibleColumns: Record<string, boolean> = {
   wht_amount: true,
   total_amount: true,
   status: true,
+  registered_status: true,
+  purchase_action: true,
   uuid: true,
 };
 
@@ -220,6 +229,8 @@ const columnLabels: Record<string, { ar: string; en: string }> = {
   wht_amount: { ar: 'الخصم والتحصيل تحت حساب الضريبة', en: 'WHT (T4)' },
   total_amount: { ar: 'القيمة النهائية', en: 'Total Amount' },
   status: { ar: 'الحالة', en: 'Status' },
+  registered_status: { ar: 'الحالة في النظام', en: 'System Status' },
+  purchase_action: { ar: 'إجراء المشتريات', en: 'Purchase Action' },
   uuid: { ar: 'UUID', en: 'UUID' },
 };
 
@@ -375,6 +386,62 @@ export function EtaReceivedInvoices() {
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [copiedUuid, setCopiedUuid] = useState<string | null>(null);
   const [modalDetailsLoading, setModalDetailsLoading] = useState(false);
+
+  // Registration Status & Create Purchase Modal States
+  const [registrationFilter, setRegistrationFilter] = useState<'all' | 'registered' | 'unregistered'>('all');
+  const [createPurchaseModalOpen, setCreatePurchaseModalOpen] = useState(false);
+  const [targetInvoiceForPurchase, setTargetInvoiceForPurchase] = useState<EtaReceivedInvoice | null>(null);
+  const [purchaseModalDocType, setPurchaseModalDocType] = useState<'purchase_invoice' | 'purchase_return'>('purchase_invoice');
+  const [registeredStatusMap, setRegisteredStatusMap] = useState<Record<string, { id: string; docNumber: string; docType: 'purchase_invoice' | 'purchase_return' }>>({});
+
+  const loadRegisteredStatus = useCallback(async () => {
+    if (!user?.company_id) return;
+    try {
+      const res = await apiRequest<{ success: boolean; statusMap?: Record<string, any> }>('/eta/registered-status');
+      if (res?.success && res.statusMap) {
+        setRegisteredStatusMap(res.statusMap);
+      }
+    } catch (e) {
+      console.warn('Could not load registered ETA status:', e);
+    }
+  }, [user?.company_id]);
+
+  useEffect(() => {
+    loadRegisteredStatus();
+  }, [loadRegisteredStatus]);
+
+  const handlePurchaseCreatedSuccess = (regInfo: { id: string; docNumber: string; docType: 'purchase_invoice' | 'purchase_return' }) => {
+    if (targetInvoiceForPurchase) {
+      setRegisteredStatusMap(prev => ({
+        ...prev,
+        [targetInvoiceForPurchase.uuid]: regInfo
+      }));
+      setAllPortalInvoices(prev => prev.map(inv => {
+        if (inv.uuid === targetInvoiceForPurchase.uuid) {
+          return {
+            ...inv,
+            isRegistered: true,
+            registeredDocId: regInfo.id,
+            registeredDocNumber: regInfo.docNumber,
+            registeredDocType: regInfo.docType
+          };
+        }
+        return inv;
+      }));
+      setInvoices(prev => prev.map(inv => {
+        if (inv.uuid === targetInvoiceForPurchase.uuid) {
+          return {
+            ...inv,
+            isRegistered: true,
+            registeredDocId: regInfo.id,
+            registeredDocNumber: regInfo.docNumber,
+            registeredDocType: regInfo.docType
+          };
+        }
+        return inv;
+      }));
+    }
+  };
 
   // Top & Table synchronized horizontal scrollbar refs
   const topScrollRef = useRef<HTMLDivElement>(null);
@@ -897,6 +964,11 @@ export function EtaReceivedInvoices() {
     if (amountOperator !== 'all') {
       list = list.filter(matchesAmountFilter);
     }
+    if (registrationFilter === 'registered') {
+      list = list.filter(inv => inv.isRegistered || !!registeredStatusMap[inv.uuid]);
+    } else if (registrationFilter === 'unregistered') {
+      list = list.filter(inv => !inv.isRegistered && !registeredStatusMap[inv.uuid]);
+    }
     if (!appliedSearch.trim()) return list;
     const q = appliedSearch.trim().toLowerCase();
     return list.filter(inv =>
@@ -907,7 +979,22 @@ export function EtaReceivedInvoices() {
       (inv.receiverName && inv.receiverName.toLowerCase().includes(q)) ||
       (inv.receiverId && inv.receiverId.toLowerCase().includes(q))
     );
-  }, [allPortalInvoices, selectedYears, selectedMonths, directionFilter, docTypeFilter, statusFilter, selectedDocTypes, selectedStatuses, selectedTaxRates, taxRateFilter, matchesTaxRateFilter, amountOperator, matchesAmountFilter, appliedSearch]);
+  }, [allPortalInvoices, selectedYears, selectedMonths, directionFilter, docTypeFilter, statusFilter, selectedDocTypes, selectedStatuses, selectedTaxRates, taxRateFilter, matchesTaxRateFilter, amountOperator, matchesAmountFilter, registrationFilter, registeredStatusMap, appliedSearch]);
+
+  // Dynamic counts for registration status tabs
+  const registrationCounts = useMemo(() => {
+    let registered = 0;
+    let unregistered = 0;
+    const source = viewMode === 'all_portal' ? allPortalInvoices : invoices;
+    for (const inv of source) {
+      if (inv.isRegistered || !!registeredStatusMap[inv.uuid]) {
+        registered++;
+      } else {
+        unregistered++;
+      }
+    }
+    return { all: source.length, registered, unregistered };
+  }, [allPortalInvoices, invoices, viewMode, registeredStatusMap]);
 
   const totalPagesAll = Math.ceil(filteredAllInvoices.length / clientPageSize) || 1;
   const paginatedAllInvoices = useMemo(() => {
@@ -935,8 +1022,13 @@ export function EtaReceivedInvoices() {
     if (amountOperator !== 'all') {
       list = list.filter(matchesAmountFilter);
     }
+    if (registrationFilter === 'registered') {
+      list = list.filter(inv => inv.isRegistered || !!registeredStatusMap[inv.uuid]);
+    } else if (registrationFilter === 'unregistered') {
+      list = list.filter(inv => !inv.isRegistered && !registeredStatusMap[inv.uuid]);
+    }
     return list;
-  }, [invoices, selectedDocTypes, selectedStatuses, docTypeFilter, statusFilter, selectedTaxRates, taxRateFilter, matchesTaxRateFilter, amountOperator, matchesAmountFilter]);
+  }, [invoices, selectedDocTypes, selectedStatuses, docTypeFilter, statusFilter, selectedTaxRates, taxRateFilter, matchesTaxRateFilter, amountOperator, matchesAmountFilter, registrationFilter, registeredStatusMap]);
 
   const currentDisplayInvoices = useMemo(() => {
     return viewMode === 'all_portal' ? paginatedAllInvoices : filteredPeriodInvoices;
@@ -2541,6 +2633,73 @@ export function EtaReceivedInvoices() {
 
             <div className="h-6 w-px bg-slate-200 hidden md:block" />
 
+            {/* Registration Filter Tabs (مسجلة في النظام من عدمه) */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/80 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setRegistrationFilter('all');
+                  setClientPage(1);
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  registrationFilter === 'all'
+                    ? 'bg-white text-indigo-700 shadow-2xs border border-indigo-200/80'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>{language === 'ar' ? 'الكل' : 'All'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setRegistrationFilter('registered');
+                  setClientPage(1);
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  registrationFilter === 'registered'
+                    ? 'bg-emerald-600 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-emerald-700'
+                }`}
+                title={language === 'ar' ? 'عرض الوثائق المسجلة في النظام كفاتورة أو مرتجع مشتريات' : 'Show registered documents'}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{language === 'ar' ? 'مسجلة في النظام' : 'Registered'}</span>
+                {allFetched && (
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                    registrationFilter === 'registered' ? 'bg-emerald-800 text-white' : 'bg-slate-200/80 text-slate-700'
+                  }`}>
+                    {registrationCounts.registered}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setRegistrationFilter('unregistered');
+                  setClientPage(1);
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  registrationFilter === 'unregistered'
+                    ? 'bg-amber-600 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-amber-700'
+                }`}
+                title={language === 'ar' ? 'عرض الوثائق غير المسجلة بعد في فواتير أو مرتجعات المشتريات' : 'Show unregistered documents'}
+              >
+                <span>{language === 'ar' ? 'غير مسجلة' : 'Unregistered'}</span>
+                {allFetched && (
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                    registrationFilter === 'unregistered' ? 'bg-amber-800 text-white' : 'bg-slate-200/80 text-slate-700'
+                  }`}>
+                    {registrationCounts.unregistered}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            <div className="h-6 w-px bg-slate-200 hidden md:block" />
+
             {/* Amount Search Controls */}
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1.5 font-bold text-slate-700">
@@ -2770,6 +2929,32 @@ export function EtaReceivedInvoices() {
                     </span>
                   </div>
                 )}
+                {/* Registration Status in Card */}
+                {(() => {
+                  const isRegistered = inv.isRegistered || !!registeredStatusMap[inv.uuid];
+                  const regInfo = registeredStatusMap[inv.uuid] || {
+                    id: inv.registeredDocId,
+                    docNumber: inv.registeredDocNumber,
+                    docType: inv.registeredDocType
+                  };
+                  return (
+                    <div className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-slate-50 border border-slate-100 text-xs">
+                      <span className="text-slate-500">{language === 'ar' ? 'الحالة بالنظام:' : 'System:'}</span>
+                      {isRegistered ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-100 text-emerald-800">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span>{language === 'ar' ? 'مسجلة' : 'Registered'}</span>
+                          {regInfo.docNumber && <span className="font-mono text-[10px]">({regInfo.docNumber})</span>}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-medium text-slate-500">
+                          {language === 'ar' ? 'غير مسجلة' : 'Unregistered'}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-slate-500">{language === 'ar' ? 'تاريخ الإصدار:' : 'Issue Date:'}</span>
                   <span className="text-slate-600">{formatDateTime(inv.dateTimeIssued)}</span>
@@ -2828,7 +3013,7 @@ export function EtaReceivedInvoices() {
               })()}
 
               {/* Card Footer Actions */}
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
                 <div className="inline-flex items-center gap-1 text-[11px] font-mono text-slate-500 bg-slate-50 px-2 py-1 rounded">
                   <span className="truncate max-w-[80px]">{inv.uuid.slice(0, 8)}...</span>
                   <button
@@ -2840,14 +3025,81 @@ export function EtaReceivedInvoices() {
                     {copiedUuid === inv.uuid ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedInvoice(inv)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-colors cursor-pointer"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>{language === 'ar' ? 'التفاصيل' : 'Details'}</span>
-                </button>
+
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {(() => {
+                    const isRegistered = inv.isRegistered || !!registeredStatusMap[inv.uuid];
+                    const regInfo = registeredStatusMap[inv.uuid] || {
+                      id: inv.registeredDocId,
+                      docNumber: inv.registeredDocNumber,
+                      docType: inv.registeredDocType
+                    };
+
+                    if (isRegistered) {
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (regInfo.docType === 'purchase_return') {
+                              openTab('purchase_returns');
+                            } else {
+                              openTab('purchase_invoices');
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-indigo-50 text-indigo-700 border border-slate-200 transition-all cursor-pointer shadow-2xs"
+                          title={language === 'ar' ? 'عرض المستند المسجل في النظام' : 'Open registered document'}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>{language === 'ar' ? 'المستند' : 'Doc'}</span>
+                        </button>
+                      );
+                    }
+
+                    const isReceived = (inv.direction === 'Received' || !inv.direction || inv.direction === undefined);
+                    const isValid = String(inv.status).toLowerCase() === 'valid';
+
+                    if (isReceived && isValid) {
+                      const isCreditNote = String(inv.typeName || '').toLowerCase() === 'c' || String(inv.documentTypeName || '').includes('دائن');
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTargetInvoiceForPurchase(inv);
+                            setPurchaseModalDocType(isCreditNote ? 'purchase_return' : 'purchase_invoice');
+                            setCreatePurchaseModalOpen(true);
+                          }}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white shadow-xs transition-all cursor-pointer ${
+                            isCreditNote
+                              ? 'bg-amber-600 hover:bg-amber-700'
+                              : 'bg-emerald-600 hover:bg-emerald-700'
+                          }`}
+                        >
+                          {isCreditNote ? (
+                            <>
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>{language === 'ar' ? 'إضافة مرتجع' : '+ Return'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <ShoppingCart className="w-3.5 h-3.5" />
+                              <span>{language === 'ar' ? 'إضافة فاتورة' : '+ Purchase'}</span>
+                            </>
+                          )}
+                        </button>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedInvoice(inv)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>{language === 'ar' ? 'التفاصيل' : 'Details'}</span>
+                  </button>
+                </div>
               </div>
             </div>
           );
@@ -3027,6 +3279,107 @@ export function EtaReceivedInvoices() {
               {visibleColumns.status && (
                 <td className="py-3 px-4 text-center whitespace-nowrap">
                   {renderStatusBadge(inv.status)}
+                </td>
+              )}
+
+              {/* Registered Status in System (مسجلة في النظام) */}
+              {visibleColumns.registered_status && (
+                <td className="py-3 px-4 text-center whitespace-nowrap">
+                  {(() => {
+                    const isRegistered = inv.isRegistered || !!registeredStatusMap[inv.uuid];
+                    const regInfo = registeredStatusMap[inv.uuid] || {
+                      id: inv.registeredDocId,
+                      docNumber: inv.registeredDocNumber,
+                      docType: inv.registeredDocType
+                    };
+                    if (isRegistered) {
+                      return (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>{language === 'ar' ? 'مسجلة' : 'Registered'}</span>
+                          {regInfo.docNumber && (
+                            <span className="font-mono text-[11px] opacity-85">({regInfo.docNumber})</span>
+                          )}
+                        </span>
+                      );
+                    }
+                    return (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
+                        {language === 'ar' ? 'غير مسجلة' : 'Unregistered'}
+                      </span>
+                    );
+                  })()}
+                </td>
+              )}
+
+              {/* Purchase Action (إجراء المشتريات) */}
+              {visibleColumns.purchase_action && (
+                <td className="py-3 px-4 text-center whitespace-nowrap">
+                  {(() => {
+                    const isRegistered = inv.isRegistered || !!registeredStatusMap[inv.uuid];
+                    const regInfo = registeredStatusMap[inv.uuid] || {
+                      id: inv.registeredDocId,
+                      docNumber: inv.registeredDocNumber,
+                      docType: inv.registeredDocType
+                    };
+
+                    if (isRegistered) {
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (regInfo.docType === 'purchase_return') {
+                              openTab('purchase_returns');
+                            } else {
+                              openTab('purchase_invoices');
+                            }
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-indigo-50 text-indigo-700 hover:text-indigo-900 border border-slate-200 hover:border-indigo-300 transition-all cursor-pointer shadow-2xs"
+                          title={language === 'ar' ? 'فتح المستند المسجل في النظام' : 'Open registered document'}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>{language === 'ar' ? 'عرض المستند' : 'View Doc'}</span>
+                        </button>
+                      );
+                    }
+
+                    // Only allowed for Received and Valid documents
+                    const isReceived = (inv.direction === 'Received' || !inv.direction || inv.direction === undefined);
+                    const isValid = String(inv.status).toLowerCase() === 'valid';
+
+                    if (isReceived && isValid) {
+                      const isCreditNote = String(inv.typeName || '').toLowerCase() === 'c' || String(inv.documentTypeName || '').includes('دائن');
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTargetInvoiceForPurchase(inv);
+                            setPurchaseModalDocType(isCreditNote ? 'purchase_return' : 'purchase_invoice');
+                            setCreatePurchaseModalOpen(true);
+                          }}
+                          className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white shadow-md transition-all cursor-pointer ${
+                            isCreditNote
+                              ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/20'
+                              : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+                          }`}
+                        >
+                          {isCreditNote ? (
+                            <>
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>{language === 'ar' ? 'إضافة مرتجع مشتريات' : 'Add Return'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <ShoppingCart className="w-3.5 h-3.5" />
+                              <span>{language === 'ar' ? 'إضافة فاتورة مشتريات' : 'Add Purchase'}</span>
+                            </>
+                          )}
+                        </button>
+                      );
+                    }
+
+                    return <span className="text-slate-300 text-xs">-</span>;
+                  })()}
                 </td>
               )}
 
@@ -3491,6 +3844,8 @@ export function EtaReceivedInvoices() {
                       {visibleColumns.wht_amount && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'الخصم والتحصيل تحت حساب الضريبة' : 'WHT (T4)'}</th>}
                       {visibleColumns.total_amount && <th className="py-3 px-4 text-end whitespace-nowrap">{language === 'ar' ? 'القيمة النهائية' : 'Total Amount'}</th>}
                       {visibleColumns.status && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الحالة' : 'Status'}</th>}
+                      {visibleColumns.registered_status && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'الحالة في النظام' : 'System Status'}</th>}
+                      {visibleColumns.purchase_action && <th className="py-3 px-4 text-center whitespace-nowrap">{language === 'ar' ? 'إجراء المشتريات' : 'Purchase Action'}</th>}
                       {visibleColumns.uuid && <th className="py-3 px-4 text-center whitespace-nowrap">UUID</th>}
                     </tr>
                   </thead>
@@ -4075,6 +4430,18 @@ export function EtaReceivedInvoices() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Create Purchase Invoice or Return from ETA Modal */}
+      <CreatePurchaseFromEtaModal
+        isOpen={createPurchaseModalOpen}
+        onClose={() => {
+          setCreatePurchaseModalOpen(false);
+          setTargetInvoiceForPurchase(null);
+        }}
+        onSuccess={handlePurchaseCreatedSuccess}
+        invoice={targetInvoiceForPurchase}
+        docType={purchaseModalDocType}
+      />
     </div>
   );
 }

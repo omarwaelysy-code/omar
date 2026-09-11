@@ -12181,6 +12181,20 @@ router.get('/eta/invoices/detailed', authenticateToken, async (req: AuthRequest,
   }
 });
 
+// GET /api/erp/eta/registered-status
+router.get('/eta/registered-status', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = getAuthenticatedCompanyId(req);
+  if (!companyId) {
+    return res.status(401).json({ error: 'Unauthorized: Company ID is required' });
+  }
+  try {
+    const statusMap = await EtaDocumentService.getRegisteredStatusMap(companyId);
+    res.json({ success: true, statusMap });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Failed to fetch registered status' });
+  }
+});
+
 // =========================================================================
 // ETA SUPPLIER MAPPING APIS
 // =========================================================================

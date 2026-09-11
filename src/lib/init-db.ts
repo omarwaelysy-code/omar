@@ -507,6 +507,7 @@ export async function initDatabase() {
         "notes" TEXT,
         "supplier_name" VARCHAR(255),
         "payment_method_name" VARCHAR(255),
+        "eta_uuid" VARCHAR(255),
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `, 'purchase_invoices table');
@@ -526,6 +527,7 @@ export async function initDatabase() {
         "notes" TEXT,
         "supplier_name" VARCHAR(255),
         "payment_method_name" VARCHAR(255),
+        "eta_uuid" VARCHAR(255),
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `, 'purchase_returns table');

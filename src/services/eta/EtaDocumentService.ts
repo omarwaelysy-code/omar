@@ -70,6 +70,10 @@ export interface EtaReceivedInvoiceDTO {
   nonTaxableItemsNet?: number;
   taxableVatBase?: number;
   nonTaxableVatBase?: number;
+  isRegistered?: boolean;
+  registeredDocType?: 'purchase_invoice' | 'purchase_return';
+  registeredDocId?: string;
+  registeredDocNumber?: string;
 }
 
 export interface EtaSearchDocumentsResponse {
@@ -343,15 +347,44 @@ export class EtaDocumentService {
 
 
   /**
+   * Get registered status map for all ETA UUIDs linked to purchase invoices or returns
+   */
+  public static async getRegisteredStatusMap(companyId: string): Promise<Record<string, { id: string; docNumber: string; docType: 'purchase_invoice' | 'purchase_return' }>> {
+    if (!companyId) return {};
+    try {
+      const regRes = await pool.query(
+        `SELECT eta_uuid, id, invoice_number as doc_number, 'purchase_invoice' as doc_type FROM purchase_invoices WHERE company_id = $1 AND eta_uuid IS NOT NULL AND eta_uuid != ''
+         UNION ALL
+         SELECT eta_uuid, id, return_number as doc_number, 'purchase_return' as doc_type FROM purchase_returns WHERE company_id = $1 AND eta_uuid IS NOT NULL AND eta_uuid != ''`,
+        [companyId]
+      );
+      const map: Record<string, { id: string; docNumber: string; docType: 'purchase_invoice' | 'purchase_return' }> = {};
+      (regRes.rows || []).forEach(r => {
+        if (r.eta_uuid) {
+          map[r.eta_uuid] = { id: r.id, docNumber: r.doc_number, docType: r.doc_type };
+        }
+      });
+      return map;
+    } catch (err) {
+      console.warn('Error fetching registered ETA status map:', err);
+      return {};
+    }
+  }
+
+  /**
    * Load saved ETA documents from PostgreSQL eta_documents table
    */
   public static async getDocumentsFromDatabase(companyId: string): Promise<{ data: EtaReceivedInvoiceDTO[]; lastSyncedAt: string | null }> {
     if (!companyId) return { data: [], lastSyncedAt: null };
     try {
-      const res = await pool.query(
-        `SELECT * FROM eta_documents WHERE company_id = $1 ORDER BY date_time_issued DESC`,
-        [companyId]
-      );
+      const [res, regMap] = await Promise.all([
+        pool.query(
+          `SELECT * FROM eta_documents WHERE company_id = $1 ORDER BY date_time_issued DESC`,
+          [companyId]
+        ),
+        this.getRegisteredStatusMap(companyId)
+      ]);
+
       if (!res.rows || res.rows.length === 0) {
         return { data: [], lastSyncedAt: null };
       }
@@ -432,6 +465,8 @@ export class EtaDocumentService {
           : 0;
         const nonTaxableVatBase = nonTaxableItemsNet;
 
+        const regInfo = regMap[row.uuid];
+
         return {
           uuid: row.uuid,
           submissionUuid: row.submission_uuid || undefined,
@@ -467,7 +502,11 @@ export class EtaDocumentService {
           nonTaxableItemsNet,
           taxableVatBase,
           nonTaxableVatBase,
-          raw_data: rawDataObj
+          raw_data: rawDataObj,
+          isRegistered: !!regInfo,
+          registeredDocType: regInfo?.docType,
+          registeredDocId: regInfo?.id,
+          registeredDocNumber: regInfo?.docNumber
         };
       });
       return { data, lastSyncedAt };
