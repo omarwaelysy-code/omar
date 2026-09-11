@@ -137,17 +137,25 @@ const IMPORT_CONFIGS: Record<string, {
       { key: 'cost_price',              label: 'سعر التكلفة',                        labelEn: 'Cost Price',                                        required: false, type: 'number',       example: '1200' },
       { key: 'min_stock',               label: 'الحد الأدنى للمخزون',                labelEn: 'Minimum Stock Alert Level',                         required: false, type: 'number',       example: '5' },
       // الإعدادات المحاسبية - حسابات
-      { key: 'revenue_account_code',    label: 'كود حساب الإيرادات *',               labelEn: 'Revenue Account Code (Required) e.g. 41',           required: true,  type: 'account_code', example: '41',   note: 'حساب المبيعات/الإيرادات المرتبط بهذا الصنف' },
-      { key: 'cost_account_code',       label: 'كود حساب التكلفة *',                 labelEn: 'Cost of Goods Account Code (Required) e.g. 51',     required: true,  type: 'account_code', example: '51',   note: 'حساب تكلفة البضاعة المباعة' },
-      { key: 'inventory_account_code',  label: 'كود حساب المخزون',                   labelEn: 'Inventory Account Code e.g. 1115',                  required: false, type: 'account_code', example: '1115', note: 'حساب المخزون (للأصناف المخزنية فقط)' },
-      { key: 'vat_account_code',        label: 'كود حساب ضريبة القيمة المضافة',       labelEn: 'VAT Account Code e.g. 2221',                        required: false, type: 'account_code', example: '2221', note: 'حساب ضريبة القيمة المضافة المحصلة' },
+      { key: 'revenue_account_code',        label: 'كود حساب الإيرادات *',                    labelEn: 'Revenue Account Code (Required) e.g. 41',           required: true,  type: 'account_code', example: '41',   note: 'حساب المبيعات/الإيرادات المرتبط بهذا الصنف' },
+      { key: 'cost_account_code',           label: 'كود حساب التكلفة *',                      labelEn: 'Cost of Goods Account Code (Required) e.g. 51',     required: true,  type: 'account_code', example: '51',   note: 'حساب تكلفة البضاعة المباعة' },
+      { key: 'inventory_account_code',      label: 'كود حساب المخزون',                        labelEn: 'Inventory Account Code e.g. 1115',                  required: false, type: 'account_code', example: '1115', note: 'حساب المخزون (للأصناف المخزنية فقط)' },
+      { key: 'sales_vat_account_code',      label: 'كود حساب ضريبة القيمة المضافة (مبيعات)',  labelEn: 'Sales VAT Account Code (e.g. 2221)',                required: false, type: 'account_code', example: '2221', note: 'حساب ضريبة القيمة المضافة (مخرجات)' },
+      { key: 'purchase_vat_account_code',   label: 'كود حساب ضريبة القيمة المضافة (مشتريات)', labelEn: 'Purchase VAT Account Code (e.g. 1181)',             required: false, type: 'account_code', example: '1181', note: 'حساب ضريبة القيمة المضافة (مدخلات)' },
+      { key: 'vat_account_code',            label: 'كود حساب الضريبة (عام)',                  labelEn: 'General VAT Account Code',                          required: false, type: 'account_code', example: '2221', note: 'حساب الضريبة العام' },
       // إعدادات الضريبة والمخزون
-      { key: 'vat_rate',                label: 'نسبة الضريبة %',                     labelEn: 'VAT Rate % (e.g. 15)',                              required: false, type: 'number',       example: '15' },
-      { key: 'inventory_cost_method',   label: 'طريقة تكلفة المخزون',                labelEn: 'Inventory Costing Method',                          required: false, type: 'select',       options: ['WAC', 'FIFO', 'specific'], example: 'WAC' },
-      // المجموعة
-      { key: 'item_group_code',         label: 'كود مجموعة الأصناف',                 labelEn: 'Item Group Code (must match existing group code)',   required: false, type: 'text',         example: 'GRP-001' },
+      { key: 'vat_rate',                    label: 'نسبة الضريبة %',                          labelEn: 'VAT Rate % (e.g. 14)',                              required: false, type: 'number',       example: '14' },
+      { key: 'inventory_cost_method',       label: 'طريقة تكلفة المخزون',                     labelEn: 'Inventory Costing Method',                          required: false, type: 'select',       options: ['WAC', 'FIFO', 'LIFO'], example: 'WAC' },
+      // منظومة الفاتورة الإلكترونية ETA
+      { key: 'eta_item_code',               label: 'كود الصنف الإلكتروني (ETA مبيعات)',       labelEn: 'ETA Sales Item Code',                               required: false, type: 'text',         example: 'EG-123456789-PROD01' },
+      { key: 'eta_code_type',               label: 'نوع كود ETA مبيعات',                      labelEn: 'ETA Sales Code Type (EGS / GS1)',                   required: false, type: 'select',       options: ['EGS', 'GS1', 'GPC', 'OTHER'], example: 'EGS' },
+      { key: 'tax_item_code',               label: 'كود ربط المشتريات (ETA وارد)',            labelEn: 'ETA Received Item Code',                            required: false, type: 'text',         example: 'EG-987654321-MAT01' },
+      { key: 'tax_code_type',               label: 'نوع كود ETA مشتريات',                     labelEn: 'ETA Received Code Type (EGS / GS1)',                required: false, type: 'select',       options: ['EGS', 'GS1', 'GPC', 'OTHER'], example: 'EGS' },
+      // الحالة والمجموعة
+      { key: 'is_active',                   label: 'حالة النشاط',                             labelEn: 'Active Status (نشط / غير نشط)',                     required: false, type: 'text',         example: 'نشط' },
+      { key: 'item_group_code',             label: 'كود مجموعة الأصناف',                      labelEn: 'Item Group Code (must match existing group code)',   required: false, type: 'text',         example: 'GRP-001' },
       // الصورة
-      { key: 'image_url',               label: 'رابط صورة الصنف (URL)',               labelEn: 'Product Image URL (optional, paste a public image link)', required: false, type: 'text',   example: 'https://example.com/product.jpg', note: 'ارفع الصورة على الإنترنت ثم الصق الرابط هنا' },
+      { key: 'image_url',                   label: 'رابط صورة الصنف (URL)',                   labelEn: 'Product Image URL (optional, paste a public image link)', required: false, type: 'text',   example: 'https://example.com/product.jpg', note: 'ارفع الصورة على الإنترنت ثم الصق الرابط هنا' },
     ]
   }
 };
@@ -383,6 +391,13 @@ router.post('/import/validate/:module', authenticateToken, upload.single('file')
           }
         }
 
+        // is_active boolean conversion
+        if (colDef.key === 'is_active') {
+          const strVal = String(value).trim().toLowerCase();
+          rowData['is_active'] = !['غير نشط', 'معطل', 'false', '0', 'no', 'disabled'].includes(strVal);
+          continue;
+        }
+
         // Account code resolution
         if (colDef.type === 'account_code') {
           const codeStr = String(value).trim();
@@ -474,7 +489,7 @@ router.post('/import/execute/:module', authenticateToken, async (req: AuthReques
       // Remove raw _code display fields (account_code, revenue_account_code, etc.)
       // The resolved _id and _name fields are already in rowData from validation
       Object.keys(rowToInsert).forEach(k => {
-        if (k.endsWith('_code') && !['employee_code', 'item_group_code'].includes(k)) {
+        if (k.endsWith('_code') && !['employee_code', 'item_group_code', 'eta_item_code', 'tax_item_code', 'code'].includes(k)) {
           delete rowToInsert[k];
         }
       });

@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Search, Plus, Trash2, X, Package, History, ChevronRight, ChevronLeft, 
+  Search, Plus, Trash2, X, Package, History, ChevronRight, ChevronLeft, ChevronDown, Folder, FolderOpen, 
   Wallet, Layers, Hash, User, Calendar, Paperclip, LayoutGrid, List,
   Lock, Camera, Printer, Download, Upload, FileText, RefreshCw, AlertCircle, Settings, FileUp, Percent,
   Link2, Check, Sparkles, CheckCircle, Clock, ShieldCheck
@@ -176,6 +176,45 @@ export const Products: React.FC = () => {
   const [view, setView] = useViewPreference('products', 'table');
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [isAutoCode, setIsAutoCode] = useState(true);
+  const [isGrouped, setIsGrouped] = useState(true);
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Record<string, boolean>>({});
+
+  const toggleGroupCollapse = (groupId: string) => {
+    setCollapsedGroupIds(prev => ({
+      ...prev,
+      [groupId]: !prev[groupId]
+    }));
+  };
+
+  const collapseAllGroups = () => {
+    const all: Record<string, boolean> = {};
+    groupedProducts.forEach(g => { all[g.id] = true; });
+    setCollapsedGroupIds(all);
+  };
+
+  const expandAllGroups = () => {
+    setCollapsedGroupIds({});
+  };
+
+  const groupedProducts = React.useMemo(() => {
+    const groupsMap = new Map<string, { id: string; name: string; code: string; items: Product[] }>();
+    itemGroups.forEach(g => {
+      groupsMap.set(g.id, { id: g.id, name: g.name, code: g.code, items: [] });
+    });
+    groupsMap.set('ungrouped', { 
+      id: 'ungrouped', 
+      name: language === 'ar' ? 'أصناف عامة (بدون مجموعة)' : 'General Items (Ungrouped)', 
+      code: '', 
+      items: [] 
+    });
+
+    filteredProducts.forEach(p => {
+      const gId = p.item_group_id && groupsMap.has(p.item_group_id) ? p.item_group_id : 'ungrouped';
+      groupsMap.get(gId)!.items.push(p);
+    });
+
+    return Array.from(groupsMap.values()).filter(g => g.items.length > 0);
+  }, [filteredProducts, itemGroups, language]);
   
   // Stock Movement & Cost Ledger States
   const [movements, setMovements] = useState<any[]>([]);
@@ -1216,34 +1255,71 @@ export const Products: React.FC = () => {
             </div>
 
             {/* List Control */}
-            <div className="flex-1 bg-white rounded-[3.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden flex flex-col transition-all duration-500">
-              <div className="p-8 border-b border-slate-50 flex items-center gap-4 bg-slate-50/20">
-                <div className="relative flex-1 group">
-                  <Search className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors pointer-events-none`} size={24} />
+            <div className="flex-1 bg-white rounded-2xl border border-slate-200/80 shadow-md shadow-slate-100 overflow-hidden flex flex-col transition-all">
+              <div className="p-3.5 border-b border-slate-100 flex flex-wrap items-center gap-3 bg-slate-50/50">
+                <div className="relative flex-1 min-w-[240px] group">
+                  <Search className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors pointer-events-none`} size={16} />
                   <input
                     type="text"
                     placeholder={t('products.search_placeholder')}
-                    className={`w-full ${dir === 'rtl' ? 'pr-16 pl-6' : 'pl-16 pr-6'} py-4 bg-white border border-slate-100 rounded-[2rem] outline-none font-bold text-slate-900 placeholder:text-slate-300 focus:ring-8 focus:ring-emerald-500/5 focus:border-emerald-500/50 transition-all shadow-inner`}
+                    className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-1.5 bg-white border border-slate-200 rounded-xl outline-none font-bold text-xs text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-xs`}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
-                <div className="flex bg-white p-1.5 rounded-2xl border border-slate-100 shadow-sm">
-                  <button onClick={() => setView('table')} className={`p-2.5 rounded-xl transition-all ${view === 'table' ? 'bg-zinc-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}><List size={22} /></button>
-                  <button onClick={() => setView('card')} className={`p-2.5 rounded-xl transition-all ${view === 'card' ? 'bg-zinc-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}><LayoutGrid size={22} /></button>
+
+                {/* Grouping & Collapse Controls */}
+                <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => setIsGrouped(!isGrouped)}
+                    className={`px-2.5 py-1 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all ${
+                      isGrouped ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title={language === 'ar' ? 'تجميع حسب مجموعات الأصناف' : 'Group by Item Groups'}
+                  >
+                    <Folder size={13} />
+                    <span>{language === 'ar' ? 'تجميع بالمجموعات' : 'Grouped'}</span>
+                  </button>
+                  {isGrouped && (
+                    <>
+                      <div className="w-[1px] h-4 bg-slate-200 mx-0.5" />
+                      <button
+                        type="button"
+                        onClick={expandAllGroups}
+                        className="px-2 py-1 text-[10.5px] font-bold text-slate-600 hover:text-emerald-700 hover:bg-slate-50 rounded transition-all"
+                        title={language === 'ar' ? 'فتح جميع المجموعات' : 'Expand All'}
+                      >
+                        {language === 'ar' ? 'فتح الكل' : 'Expand'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={collapseAllGroups}
+                        className="px-2 py-1 text-[10.5px] font-bold text-slate-600 hover:text-emerald-700 hover:bg-slate-50 rounded transition-all"
+                        title={language === 'ar' ? 'طي جميع المجموعات' : 'Collapse All'}
+                      >
+                        {language === 'ar' ? 'طي الكل' : 'Collapse'}
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
+                  <button onClick={() => setView('table')} className={`p-1.5 rounded-lg transition-all ${view === 'table' ? 'bg-zinc-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}><List size={16} /></button>
+                  <button onClick={() => setView('card')} className={`p-1.5 rounded-lg transition-all ${view === 'card' ? 'bg-zinc-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}><LayoutGrid size={16} /></button>
                 </div>
               </div>
 
               <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {view === 'table' ? (
-                  <div className="overflow-x-auto h-full p-8">
-                    <table ref={tableRef} className="w-full">
-                      <thead className="bg-slate-50/50 rounded-2xl">
-                        <tr className="text-slate-400 text-[10px] uppercase font-black tracking-[0.2em]">
-                          <th className="px-6 py-6 rounded-s-2xl text-center animate-in fade-in" style={{ width: '60px' }}>
+                  <div className="overflow-x-auto h-full p-3">
+                    <table ref={tableRef} className="w-full text-xs">
+                      <thead className="bg-slate-100/80 rounded-xl">
+                        <tr className="text-slate-600 text-[11px] font-bold border-b border-slate-200">
+                          <th className="px-3 py-2 rounded-s-lg text-center" style={{ width: '45px' }}>
                             <input 
                               type="checkbox" 
-                              className="w-5 h-5 rounded border-slate-200 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer" 
+                              className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer" 
                               checked={filteredProducts.length > 0 && selectedProductIds.length === filteredProducts.length} 
                               onChange={(e) => {
                                 if (e.target.checked) {
@@ -1254,113 +1330,255 @@ export const Products: React.FC = () => {
                               }} 
                             />
                           </th>
-                          <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_code')}</th>
-                          <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_name')}</th>
-                          <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_sale_price')}</th>
-                          <th className={`px-8 py-6 rounded-e-2xl ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
+                          <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_code')}</th>
+                          <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_name')}</th>
+                          <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_sale_price')}</th>
+                          <th className={`px-3 py-2 rounded-e-lg ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-50">
+                      <tbody className="divide-y divide-slate-100">
                         {loading ? (
-                          <tr><td colSpan={5} className="py-20 text-center"><div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>
-                        ) : filteredProducts.map((product) => (
-                          <tr 
-                            key={product.id} 
-                            onClick={() => openModal(product)}
-                            className="hover:bg-slate-50 transition-all group cursor-pointer"
-                          >
-                            <td className="px-6 py-5 text-center" onClick={(e) => e.stopPropagation()}>
-                              <input 
-                                type="checkbox" 
-                                className="w-5 h-5 rounded border-slate-200 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer" 
-                                checked={selectedProductIds.includes(product.id)} 
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedProductIds(prev => [...prev, product.id]);
-                                  } else {
-                                    setSelectedProductIds(prev => prev.filter(id => id !== product.id));
-                                  }
-                                }} 
-                              />
-                            </td>
-                            <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              <span className="font-mono text-[10px] bg-slate-100 px-3 py-1 rounded-lg text-slate-500 font-black border border-slate-200 group-hover:border-emerald-200 transition-all">{product.code}</span>
-                            </td>
-                            <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                               <div className="flex items-center gap-4">
-                                  <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center overflow-hidden border border-slate-200">
-                                    {product.image_url ? <img src={product.image_url} alt="" className="w-full h-full object-cover" /> : <Package size={20} />}
-                                  </div>
-                                  <div className="flex flex-col">
-                                     <span className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors">{product.name}</span>
-                                     <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                       <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{t(`products.type_${product.type}`)}</span>
-                                       <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${product.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                                         {product.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
-                                       </span>
-                                       {product.eta_item_code && (
-                                         <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200/60 flex items-center gap-1" title={language === 'ar' ? 'كود رفع الوثائق (الفواتير المصدرة)' : 'Upload ETA Code (Issued)'}>
-                                           <span className="text-[8px] bg-purple-200/60 text-purple-800 px-1 rounded">{language === 'ar' ? 'رفع' : 'Up'}</span> {product.eta_item_code} ({product.eta_code_type || 'EGS'})
-                                         </span>
-                                       )}
-                                       {product.tax_item_code && (
-                                         <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200/60 flex items-center gap-1" title={language === 'ar' ? 'كود ربط الوثائق المستلمة (فواتير الموردين)' : 'Received ETA Code (Received)'}>
-                                           <span className="text-[8px] bg-blue-200/60 text-blue-800 px-1 rounded">{language === 'ar' ? 'استلام' : 'In'}</span> {product.tax_item_code} ({product.tax_code_type || 'EGS'})
-                                         </span>
-                                       )}
-                                     </div>
-                                  </div>
-                               </div>
-                            </td>
-                            <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              <span className="font-black text-emerald-600 text-lg">{formatNumber(product.sale_price || 0)} <span className="text-[10px] text-slate-400 italic ms-1">{t('invoices.currency')}</span></span>
-                            </td>
-                            <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                                <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1.5 ${pendingEtaProductForLinking ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-all`}>
-                                   {pendingEtaProductForLinking && (
-                                     <button
-                                       type="button"
-                                       onClick={(e) => {
-                                         e.stopPropagation();
-                                         handleLinkExistingToEta(product);
-                                       }}
-                                       disabled={isLinkingDirect}
-                                       className="px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-md shadow-indigo-600/20 active:scale-95 disabled:opacity-50"
-                                       title={language === 'ar' ? 'ربط هذا الصنف مع كود الضرائب' : 'Link with ETA'}
-                                     >
-                                       <Link2 size={14} />
-                                       <span>{language === 'ar' ? 'ربط مع ETA' : 'Link ETA'}</span>
-                                     </button>
-                                   )}
-                                  <button 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setPendingViewDoc({ type: 'stock_card', idOrNumber: product.id });
-                                      setCurrentPage('stock_card_report');
-                                    }} 
-                                    className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
-                                    title={language === 'ar' ? 'تقرير حركة وتكلفة الصنف (كارت الصنف)' : 'Product stock card report'}
+                          <tr><td colSpan={5} className="py-12 text-center"><div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>
+                        ) : filteredProducts.length === 0 ? (
+                          <tr><td colSpan={5} className="py-10 text-center text-slate-400 font-bold text-xs">{t('common.no_data')}</td></tr>
+                        ) : isGrouped ? (
+                          groupedProducts.map((group) => {
+                            const isCollapsed = !!collapsedGroupIds[group.id];
+                            return (
+                              <React.Fragment key={`grp-${group.id}`}>
+                                <tr 
+                                  onClick={() => toggleGroupCollapse(group.id)}
+                                  className="bg-slate-100/90 hover:bg-slate-200/70 cursor-pointer select-none transition-colors border-y border-slate-200"
+                                >
+                                  <td colSpan={5} className="px-3 py-1.5">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <span className="p-0.5 rounded text-slate-600 bg-white shadow-2xs">
+                                          <ChevronDown 
+                                            size={14} 
+                                            className={`transform transition-transform ${isCollapsed ? (dir === 'rtl' ? 'rotate-90' : '-rotate-90') : 'rotate-0'}`} 
+                                          />
+                                        </span>
+                                        <Folder size={14} className="text-emerald-600 shrink-0" />
+                                        <span className="font-black text-slate-900 text-xs">{group.name}</span>
+                                        {group.code && (
+                                          <span className="text-[9px] font-mono bg-white px-1.5 py-0.2 rounded border border-slate-200 text-slate-600 font-bold">
+                                            {group.code}
+                                          </span>
+                                        )}
+                                        <span className="text-[9px] font-bold px-2 py-0.2 bg-emerald-100 text-emerald-800 rounded-full">
+                                          {group.items.length} {language === 'ar' ? 'صنف' : 'items'}
+                                        </span>
+                                      </div>
+                                      <div className="text-[10px] text-slate-400 font-medium">
+                                        {isCollapsed ? (language === 'ar' ? 'عرض الأصناف ▼' : 'Show items ▼') : (language === 'ar' ? 'إخفاء الأصناف ▲' : 'Hide items ▲')}
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                                {!isCollapsed && group.items.map((product) => (
+                                  <tr 
+                                    key={product.id} 
+                                    onClick={() => openModal(product)}
+                                    className="hover:bg-slate-50 transition-colors group cursor-pointer border-b border-slate-100"
                                   >
-                                    <History size={18} />
-                                  </button>
-                                  {canDelete && (
-                                    <button onClick={async (e) => { 
-                                      e.stopPropagation(); 
-                                      if (window.confirm(t('common.confirm_delete'))) {
-                                        try {
-                                          await dbService.delete('products', product.id);
-                                          showNotification(t('common.deleted_successfully'), 'success');
-                                        } catch (err: any) {
-                                          showNotification(err.message || 'Error deleting', 'error');
+                                    <td className="px-3 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                      <input 
+                                        type="checkbox" 
+                                        className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer" 
+                                        checked={selectedProductIds.includes(product.id)} 
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setSelectedProductIds(prev => [...prev, product.id]);
+                                          } else {
+                                            setSelectedProductIds(prev => prev.filter(id => id !== product.id));
+                                          }
+                                        }} 
+                                      />
+                                    </td>
+                                    <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                      <span className="font-mono text-[10.5px] bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200/80 group-hover:border-emerald-300 transition-all">{product.code}</span>
+                                    </td>
+                                    <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                       <div className="flex items-center gap-2.5">
+                                          <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center overflow-hidden border border-slate-200 shrink-0">
+                                            {product.image_url ? <img src={product.image_url} alt="" className="w-full h-full object-cover" /> : <Package size={14} />}
+                                          </div>
+                                          <div className="flex flex-col min-w-0">
+                                             <span className="font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors truncate">{product.name}</span>
+                                             <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                               <span className="text-[9px] text-slate-400 font-bold uppercase">{t(`products.type_${product.type}`)}</span>
+                                               <span className={`text-[8.5px] font-black px-1.5 py-0.2 rounded border ${product.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/40' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                                 {product.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
+                                               </span>
+                                               {product.eta_item_code && (
+                                                 <span className="text-[8.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 border border-purple-200/60 flex items-center gap-0.5" title={language === 'ar' ? 'كود رفع الوثائق' : 'Upload ETA Code'}>
+                                                   <span className="text-[7.5px] bg-purple-200/60 text-purple-800 px-0.5 rounded">{language === 'ar' ? 'رفع' : 'Up'}</span> {product.eta_item_code}
+                                                 </span>
+                                               )}
+                                               {product.tax_item_code && (
+                                                 <span className="text-[8.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200/60 flex items-center gap-0.5" title={language === 'ar' ? 'كود ربط الوارد' : 'Received ETA Code'}>
+                                                   <span className="text-[7.5px] bg-blue-200/60 text-blue-800 px-0.5 rounded">{language === 'ar' ? 'استلام' : 'In'}</span> {product.tax_item_code}
+                                                 </span>
+                                               )}
+                                             </div>
+                                          </div>
+                                       </div>
+                                    </td>
+                                    <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                      <span className="font-black text-emerald-600 text-xs">{formatNumber(product.sale_price || 0)} <span className="text-[9px] text-slate-400 font-normal ms-0.5">{t('invoices.currency')}</span></span>
+                                    </td>
+                                    <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                                        <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1 ${pendingEtaProductForLinking ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-all`}>
+                                           {pendingEtaProductForLinking && (
+                                             <button
+                                               type="button"
+                                               onClick={(e) => {
+                                                 e.stopPropagation();
+                                                 handleLinkExistingToEta(product);
+                                               }}
+                                               disabled={isLinkingDirect}
+                                               className="px-2 py-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg text-[10.5px] font-bold transition-all flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
+                                               title={language === 'ar' ? 'ربط هذا الصنف مع كود الضرائب' : 'Link with ETA'}
+                                             >
+                                               <Link2 size={12} />
+                                               <span>{language === 'ar' ? 'ربط مع ETA' : 'Link ETA'}</span>
+                                             </button>
+                                           )}
+                                          <button 
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setPendingViewDoc({ type: 'stock_card', idOrNumber: product.id });
+                                              setCurrentPage('stock_card_report');
+                                            }} 
+                                            className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                            title={language === 'ar' ? 'تقرير حركة وتكلفة الصنف (كارت الصنف)' : 'Product stock card report'}
+                                          >
+                                            <History size={15} />
+                                          </button>
+                                          {canDelete && (
+                                            <button onClick={async (e) => { 
+                                              e.stopPropagation(); 
+                                              if (window.confirm(t('common.confirm_delete'))) {
+                                                try {
+                                                  await dbService.delete('products', product.id);
+                                                  setProducts(products.filter(p => p.id !== product.id));
+                                                  showNotification(t('common.delete_success'), 'success');
+                                                } catch (err: any) {
+                                                  showNotification(err.message || t('common.error'), 'error');
+                                                }
+                                              }
+                                            }} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all">
+                                              <Trash2 size={15} />
+                                            </button>
+                                          )}
+                                        </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </React.Fragment>
+                            );
+                          })
+                        ) : (
+                          filteredProducts.map((product) => (
+                            <tr 
+                              key={product.id} 
+                              onClick={() => openModal(product)}
+                              className="hover:bg-slate-50 transition-colors group cursor-pointer border-b border-slate-100"
+                            >
+                              <td className="px-3 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                <input 
+                                  type="checkbox" 
+                                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer" 
+                                  checked={selectedProductIds.includes(product.id)} 
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedProductIds(prev => [...prev, product.id]);
+                                    } else {
+                                      setSelectedProductIds(prev => prev.filter(id => id !== product.id));
+                                    }
+                                  }} 
+                                />
+                              </td>
+                              <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                <span className="font-mono text-[10.5px] bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200/80 group-hover:border-emerald-300 transition-all">{product.code}</span>
+                              </td>
+                              <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                 <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center overflow-hidden border border-slate-200 shrink-0">
+                                      {product.image_url ? <img src={product.image_url} alt="" className="w-full h-full object-cover" /> : <Package size={14} />}
+                                    </div>
+                                    <div className="flex flex-col min-w-0">
+                                       <span className="font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors truncate">{product.name}</span>
+                                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                         <span className="text-[9px] text-slate-400 font-bold uppercase">{t(`products.type_${product.type}`)}</span>
+                                         <span className={`text-[8.5px] font-black px-1.5 py-0.2 rounded border ${product.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/40' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                           {product.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
+                                         </span>
+                                         {product.eta_item_code && (
+                                           <span className="text-[8.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 border border-purple-200/60 flex items-center gap-0.5">
+                                             <span className="text-[7.5px] bg-purple-200/60 text-purple-800 px-0.5 rounded">{language === 'ar' ? 'رفع' : 'Up'}</span> {product.eta_item_code}
+                                           </span>
+                                         )}
+                                         {product.tax_item_code && (
+                                           <span className="text-[8.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200/60 flex items-center gap-0.5">
+                                             <span className="text-[7.5px] bg-blue-200/60 text-blue-800 px-0.5 rounded">{language === 'ar' ? 'استلام' : 'In'}</span> {product.tax_item_code}
+                                           </span>
+                                         )}
+                                       </div>
+                                    </div>
+                                 </div>
+                              </td>
+                              <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                <span className="font-black text-emerald-600 text-xs">{formatNumber(product.sale_price || 0)} <span className="text-[9px] text-slate-400 font-normal ms-0.5">{t('invoices.currency')}</span></span>
+                              </td>
+                              <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                                  <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1 ${pendingEtaProductForLinking ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-all`}>
+                                     {pendingEtaProductForLinking && (
+                                       <button
+                                         type="button"
+                                         onClick={(e) => {
+                                           e.stopPropagation();
+                                           handleLinkExistingToEta(product);
+                                         }}
+                                         disabled={isLinkingDirect}
+                                         className="px-2 py-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg text-[10.5px] font-bold transition-all flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
+                                       >
+                                         <Link2 size={12} />
+                                         <span>{language === 'ar' ? 'ربط مع ETA' : 'Link ETA'}</span>
+                                       </button>
+                                     )}
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setPendingViewDoc({ type: 'stock_card', idOrNumber: product.id });
+                                        setCurrentPage('stock_card_report');
+                                      }} 
+                                      className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                    >
+                                      <History size={15} />
+                                    </button>
+                                    {canDelete && (
+                                      <button onClick={async (e) => { 
+                                        e.stopPropagation(); 
+                                        if (window.confirm(t('common.confirm_delete'))) {
+                                          try {
+                                            await dbService.delete('products', product.id);
+                                            setProducts(products.filter(p => p.id !== product.id));
+                                            showNotification(t('common.delete_success'), 'success');
+                                          } catch (err: any) {
+                                            showNotification(err.message || t('common.error'), 'error');
+                                          }
                                         }
-                                      }
-                                    }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"><Trash2 size={18} /></button>
-                                  )}
-                                  <div className="p-2 text-emerald-400 bg-white rounded-xl shadow-sm border border-slate-100">{dir === 'rtl' ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}</div>
-                               </div>
-                            </td>
-                          </tr>
-                        ))}
+                                      }} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all">
+                                        <Trash2 size={15} />
+                                      </button>
+                                    )}
+                                  </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -1477,7 +1695,23 @@ export const Products: React.FC = () => {
                        </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
+                    {/* Active Status Switch in Header */}
+                    <div className="flex items-center gap-2 px-2.5 py-1 bg-slate-100/90 hover:bg-slate-200/70 rounded-lg border border-slate-200 transition-all">
+                      <span className={`text-[10px] font-bold ${formData.is_active ? 'text-emerald-700' : 'text-slate-500'}`}>
+                        {formData.is_active ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, is_active: !prev.is_active }))}
+                        className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors focus:outline-none ${formData.is_active ? 'bg-emerald-600' : 'bg-slate-300'}`}
+                      >
+                        <span
+                          className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform shadow-xs ${formData.is_active ? (dir === 'rtl' ? '-translate-x-3.5' : 'translate-x-3.5') : (dir === 'rtl' ? '-translate-x-0.5' : 'translate-x-0.5')}`}
+                        />
+                      </button>
+                    </div>
+
                     {pendingEtaProductForCreation && (
                       <button 
                         type="submit" 
@@ -1971,7 +2205,7 @@ export const Products: React.FC = () => {
                                           type="button" 
                                           onClick={handleOpenBarcodeSettings} 
                                           className="p-1 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-md transition-all" 
-                                          title={language === 'ar' ? 'Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯' : 'Settings'}
+                                          title={language === 'ar' ? 'إعدادات الباركود' : 'Settings'}
                                         >
                                           <Settings size={12} />
                                         </button>
@@ -1980,7 +2214,7 @@ export const Products: React.FC = () => {
                                           disabled={!formData.barcode} 
                                           onClick={handleOpenPrintBarcode} 
                                           className="p-1 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-md transition-all disabled:opacity-40" 
-                                          title={language === 'ar' ? 'Ø·Ø¨Ø§Ø¹Ø© Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯' : 'Print'}
+                                          title={language === 'ar' ? 'طباعة الباركود' : 'Print'}
                                         >
                                           <Printer size={12} />
                                         </button>
@@ -1991,7 +2225,7 @@ export const Products: React.FC = () => {
                                              const s = getProductBarcodeSettings(formData);
                                              const isValid = isValidBarcodeValue(formData.barcode, s.type);
                                              if (!isValid) {
-                                               return <div className="text-rose-500 font-bold text-[9px]">{language === 'ar' ? 'Ø¨Ø§Ø±ÙƒÙˆØ¯ ØºÙŠØ± ØµØ§Ù„Ø­' : 'Invalid'}</div>;
+                                               return <div className="text-rose-500 font-bold text-[9px]">{language === 'ar' ? 'باركود غير صالح' : 'Invalid'}</div>;
                                              }
                                              return s.type === 'QR_CODE' ? (
                                                <QRCode value={formData.barcode} size={28} />
@@ -2023,12 +2257,12 @@ export const Products: React.FC = () => {
                                       <LayoutGrid size={11} />
                                    </div>
                                    <h2 className="text-[11px] font-bold text-slate-800 leading-none uppercase">
-                                      {language === 'ar' ? 'Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ù…Ø­Ø§Ø³Ø¨ÙŠØ©' : 'Accounting Setup'}
+                                      {language === 'ar' ? 'الإعدادات المحاسبية' : 'Accounting Setup'}
                                    </h2>
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-right">
-                                   {/* Ø­Ø³Ø§Ø¨ Ø§Ù„Ø¥ÙŠØ±Ø§Ø¯Ø§Øª */}
+                                   {/* حساب الإيرادات */}
                                    <div className="space-y-0.5">
                                       <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_revenue_account')}</label>
                                       <select 
@@ -2042,7 +2276,7 @@ export const Products: React.FC = () => {
                                       </select>
                                    </div>
 
-                                   {/* Ø­Ø³Ø§Ø¨ ØªÙƒÙ„ÙØ© Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª */}
+                                   {/* حساب تكلفة المبيعات */}
                                    <div className="space-y-0.5">
                                       <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_cost_account')}</label>
                                       <select 
@@ -2056,7 +2290,7 @@ export const Products: React.FC = () => {
                                       </select>
                                    </div>
 
-                                   {/* Ø­Ø³Ø§Ø¨ Ø§Ù„Ù…Ø®Ø²ÙˆÙ† */}
+                                   {/* حساب المخزون */}
                                    {['finished_good', 'raw_material', 'commodity', 'consumable'].includes(formData.type) && (
                                      <>
                                        <div className="space-y-0.5">
@@ -2074,7 +2308,7 @@ export const Products: React.FC = () => {
                                          </select>
                                        </div>
 
-                                       {/* Ø·Ø±ÙŠÙ‚Ø© ØªÙ‚ÙŠÙŠÙ… Ø§Ù„Ù…Ø®Ø²ÙˆÙ† */}
+                                       {/* طريقة تقييم المخزون */}
                                        <div className="space-y-0.5">
                                          <label className="block text-[10px] font-bold text-slate-500 px-0.5">
                                            {t('company_settings.inventory_cost_method')}
@@ -2100,39 +2334,39 @@ export const Products: React.FC = () => {
                                    {/* VAT Fields if Company is VAT registered */}
                                    {isVatEnabled && (
                                      <>
-                                       {/* Ø¶Ø±ÙŠØ¨Ø© Ù…Ø¨ÙŠØ¹Ø§Øª (Ù…Ø®Ø±Ø¬Ø§Øª) */}
+                                       {/* ضريبة مبيعات (مخرجات) */}
                                        <div className="space-y-0.5">
                                          <label className="block text-[10px] font-bold text-slate-600 px-0.5 flex items-center justify-between">
-                                           <span>{language === 'ar' ? 'Ø¶Ø±ÙŠØ¨Ø© Ø§Ù„Ù‚ÙŠÙ…Ø© Ø§Ù„Ù…Ø¶Ø§ÙØ© (Ù…Ø¨ÙŠØ¹Ø§Øª)' : 'Sales VAT Account'}</span>
-                                           <span className="text-[8.5px] text-emerald-700 bg-emerald-100 px-1 py-0.2 rounded font-black">Ù…Ø®Ø±Ø¬Ø§Øª</span>
+                                           <span>{language === 'ar' ? 'ضريبة القيمة المضافة (مبيعات)' : 'Sales VAT Account'}</span>
+                                           <span className="text-[8.5px] text-emerald-700 bg-emerald-100 px-1 py-0.2 rounded font-black">مخرجات</span>
                                          </label>
                                          <select 
                                            className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all" 
                                            value={formData.sales_vat_account_id || ''} 
                                            onChange={(e) => setFormData({ ...formData, sales_vat_account_id: e.target.value })}
                                          >
-                                           <option value="">{language === 'ar' ? '-- Ø§Ø®ØªØ± Ø­Ø³Ø§Ø¨ Ø¶Ø±ÙŠØ¨Ø© Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª --' : '-- Select Sales VAT Account --'}</option>
-                                           {accounts.filter(a => ['vat', 'output_vat', 'withholding_tax'].includes(a.account_usage || '') || a.name.includes('Ù…Ø¨ÙŠØ¹Ø§Øª') || a.name.includes('Ù…Ø®Ø±Ø¬Ø§Øª') || a.code?.startsWith('222')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                           <option value="">{language === 'ar' ? '-- اختر حساب ضريبة المبيعات --' : '-- Select Sales VAT Account --'}</option>
+                                           {accounts.filter(a => ['vat', 'output_vat', 'withholding_tax'].includes(a.account_usage || '') || a.name.includes('مبيعات') || a.name.includes('مخرجات') || a.code?.startsWith('222')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                                          </select>
                                        </div>
 
-                                       {/* Ø¶Ø±ÙŠØ¨Ø© Ù…Ø´ØªØ±ÙŠØ§Øª (Ù…Ø¯Ø®Ù„Ø§Øª) */}
+                                       {/* ضريبة مشتريات (مدخلات) */}
                                        <div className="space-y-0.5">
                                          <label className="block text-[10px] font-bold text-slate-600 px-0.5 flex items-center justify-between">
-                                           <span>{language === 'ar' ? 'Ø¶Ø±ÙŠØ¨Ø© Ø§Ù„Ù‚ÙŠÙ…Ø© Ø§Ù„Ù…Ø¶Ø§ÙØ© (Ù…Ø´ØªØ±ÙŠØ§Øª)' : 'Purchase VAT Account'}</span>
-                                           <span className="text-[8.5px] text-blue-700 bg-blue-100 px-1 py-0.2 rounded font-black">Ù…Ø¯Ø®Ù„Ø§Øª</span>
+                                           <span>{language === 'ar' ? 'ضريبة القيمة المضافة (مشتريات)' : 'Purchase VAT Account'}</span>
+                                           <span className="text-[8.5px] text-blue-700 bg-blue-100 px-1 py-0.2 rounded font-black">مدخلات</span>
                                          </label>
                                          <select 
                                            className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-blue-500 transition-all" 
                                            value={formData.purchase_vat_account_id || ''} 
                                            onChange={(e) => setFormData({ ...formData, purchase_vat_account_id: e.target.value })}
                                          >
-                                           <option value="">{language === 'ar' ? '-- Ø§Ø®ØªØ± Ø­Ø³Ø§Ø¨ Ø¶Ø±ÙŠØ¨Ø© Ø§Ù„Ù…Ø´ØªØ±ÙŠØ§Øª --' : '-- Select Purchase VAT Account --'}</option>
-                                           {accounts.filter(a => ['vat', 'input_vat', 'withholding_tax'].includes(a.account_usage || '') || a.name.includes('Ù…Ø´ØªØ±ÙŠØ§Øª') || a.name.includes('Ù…Ø¯Ø®Ù„Ø§Øª') || a.code?.startsWith('118') || a.code?.startsWith('222')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                           <option value="">{language === 'ar' ? '-- اختر حساب ضريبة المشتريات --' : '-- Select Purchase VAT Account --'}</option>
+                                           {accounts.filter(a => ['vat', 'input_vat', 'withholding_tax'].includes(a.account_usage || '') || a.name.includes('مشتريات') || a.name.includes('مدخلات') || a.code?.startsWith('118') || a.code?.startsWith('222')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                                          </select>
                                        </div>
 
-                                       {/* Ù†Ø³Ø¨Ø© Ø¶Ø±ÙŠØ¨Ø© Ø§Ù„Ù‚ÙŠÙ…Ø© Ø§Ù„Ù…Ø¶Ø§ÙØ© */}
+                                       {/* نسبة ضريبة القيمة المضافة */}
                                        <div className="space-y-0.5 sm:col-span-2">
                                          <label className="block text-[10px] font-bold text-slate-500 px-0.5">
                                            {t('products.form_vat_rate')}
@@ -2155,52 +2389,11 @@ export const Products: React.FC = () => {
                                        </div>
                                      </>
                                    )}
-
-                                   {/* Active / Inactive Status Toggle */}
-                                   <div className="sm:col-span-2 pt-1.5 border-t border-slate-100 flex items-center justify-between">
-                                      <div>
-                                        <h4 className="text-[10px] font-bold text-slate-800 leading-none">
-                                          {language === 'ar' ? 'Ø­Ø§Ù„Ø© Ø§Ù„Ù†Ø´Ø§Ø·' : 'Active Status'}
-                                        </h4>
-                                        <p className="text-[8.5px] text-slate-400 font-medium">
-                                          {language === 'ar' ? 'ØªØ­Ø¯ÙŠØ¯ Ù…Ø§ Ø¥Ø°Ø§ ÙƒØ§Ù† Ø§Ù„ØµÙ†Ù Ù†Ø´Ø·Ø§Ù‹ ÙÙŠ Ø§Ù„Ù†Ø¸Ø§Ù… Ø£Ù… Ù„Ø§' : 'Specify if the product is active'}
-                                        </p>
-                                      </div>
-                                      <button
-                                        type="button"
-                                        onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
-                                        className={`relative inline-flex h-3.5 w-6 items-center rounded-full transition-colors focus:outline-none ${formData.is_active ? 'bg-emerald-600' : 'bg-slate-200'}`}
-                                      >
-                                        <span
-                                          className={`inline-block h-2 w-2 transform rounded-full bg-white transition-transform ${formData.is_active ? (dir === 'rtl' ? '-translate-x-3' : 'translate-x-3') : (dir === 'rtl' ? '-translate-x-0.5' : 'translate-x-0.5')}`}
-                                        />
-                                      </button>
-                                   </div>
                                 </div>
                              </div>
                           </div>
                        </div>
-                     {/* Sticky Bottom Actions */}
-                     <div className="px-3 py-2 flex flex-wrap items-center justify-end gap-2 sticky bottom-0 bg-white/95 backdrop-blur-md z-30 border-t border-slate-100 mt-2">
-                       {pendingEtaProductForCreation && (
-                         <button 
-                           type="submit" 
-                           onClick={() => setLinkWithEta(true)}
-                           className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg font-bold text-xs hover:from-emerald-700 hover:to-teal-700 transition-all shadow-xs active:scale-[0.98] border border-emerald-400/40 flex items-center gap-1"
-                         >
-                           <Link2 className="w-3.5 h-3.5" />
-                           <span>{language === 'ar' ? 'حفظ وربط مع منظومة ETA فوراً' : 'Save & Link to ETA'}</span>
-                         </button>
-                       )}
-                       <button 
-                         type="submit" 
-                         onClick={() => setLinkWithEta(false)}
-                         className="px-5 py-1.5 bg-zinc-900 text-white rounded-lg font-bold text-xs hover:bg-zinc-800 transition-all shadow-xs active:scale-[0.98]"
-                       >
-                         {editingProduct ? t('common.save') : (pendingEtaProductForCreation ? (language === 'ar' ? 'حفظ عادي' : 'Save Normal') : t('common.add'))}
-                       </button>
-                     </div>
-                   </form>
+                    </form>
                 </div>
               </div>
 
