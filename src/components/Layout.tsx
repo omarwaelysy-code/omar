@@ -65,7 +65,7 @@ import { useNotification } from '../contexts/NotificationContext';
 import { notificationService } from '../services/notificationService';
 import { dbService, apiRequest } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Company } from '../types';
+import { Company, Product } from '../types';
 
 import { Logo } from './Logo';
 
@@ -181,7 +181,7 @@ const getTabIcon = (id: string) => {
 export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPage }) => {
   const { language, setLanguage, t, dir } = useLanguage();
   const { logout, user, userMemberships, switchCompany, isSuperAdmin, isSuperAdminAccount, isCompanyAdmin, isManager, isStandardUser, hasPermission, workspaceMode, setWorkspaceMode } = useAuth();
-  const { unreadCount, setIsCenterOpen, addPersistentNotification, showNotification } = useNotification();
+  const { unreadCount, setIsCenterOpen, addPersistentNotification, showNotification, dismissNotification } = useNotification();
   const { openTabs, activeTabId, openTab, closeTab, setActiveTab } = useNavigation();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
@@ -426,8 +426,22 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
     if (!user || isSuperAdmin) return;
 
     const runChecks = async () => {
-      // Check low stock
+      // Check low stock (services excluded)
       const lowStockProducts = await notificationService.checkLowStock(user.company_id);
+
+      // Auto-cleanup any stale or invalid low-stock notifications (e.g. for services or items with normal stock)
+      try {
+        const allProducts = await dbService.list<Product>('products', user.company_id);
+        const lowStockIds = new Set(lowStockProducts.map(p => p.id));
+        allProducts.forEach(p => {
+          if (p.type === 'service' || (p as any).is_service === true || !lowStockIds.has(p.id)) {
+            dismissNotification(`low-stock-${p.id}`);
+          }
+        });
+      } catch (err) {
+        console.error('Error cleaning stale low-stock notifications:', err);
+      }
+
       lowStockProducts.forEach(p => {
         addPersistentNotification({
           id: `low-stock-${p.id}`,
@@ -460,7 +474,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
     runChecks();
     const interval = setInterval(runChecks, 1000 * 60 * 30); // Every 30 minutes
     return () => clearInterval(interval);
-  }, [user, isSuperAdmin, addPersistentNotification]);
+  }, [user, isSuperAdmin, addPersistentNotification, dismissNotification]);
 
   React.useEffect(() => {
     const handleResize = () => {

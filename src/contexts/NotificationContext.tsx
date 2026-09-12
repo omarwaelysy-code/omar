@@ -42,7 +42,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (user) {
       try {
         const saved = localStorage.getItem(`app_notifications_${user.company_id}`);
-        setPersistentNotifications(saved ? JSON.parse(saved) : []);
+        const parsed: AppNotification[] = saved ? JSON.parse(saved) : [];
+        // Automatically purge any invalid stock alerts for services
+        const cleaned = parsed.filter(n => !(n.category === 'stock' && (n.message.includes('"خدمة"') || n.message.toLowerCase().includes('"service"'))));
+        setPersistentNotifications(cleaned);
       } catch (error) {
         console.error('Error loading notifications from localStorage:', error);
         setPersistentNotifications([]);

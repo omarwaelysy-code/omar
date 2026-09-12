@@ -5,7 +5,13 @@ export const notificationService = {
   async checkLowStock(companyId: string) {
     try {
       const products = await dbService.list<Product>('products', companyId);
-      return products.filter(p => p.stock <= p.min_stock);
+      return products.filter(p => {
+        // Services do not have physical inventory or stock tracking
+        if (p.type === 'service' || (p as any).is_service === true) {
+          return false;
+        }
+        return Number(p.stock) <= Number(p.min_stock);
+      });
     } catch (error) {
       console.error('Error checking low stock:', error);
       return [];
