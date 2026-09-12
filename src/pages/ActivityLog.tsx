@@ -399,28 +399,7 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
   const uniqueBrowsers = useMemo(() => Array.from(new Set(logs.map(l => (l as any).browser).filter(Boolean))).sort(), [logs]);
   const uniqueDevices = useMemo(() => Array.from(new Set(logs.map(l => (l as any).device).filter(Boolean))).sort(), [logs]);
 
-  // Count items for each mode for badges
-  const modeCounts = useMemo(() => {
-    let cancellations = 0;
-    let modifications = 0;
-    let views = 0;
-    let prints = 0;
 
-    logs.forEach(l => {
-      if (matchesActionCategory(l.action, l.details, 'cancellations')) cancellations++;
-      if (matchesActionCategory(l.action, l.details, 'modifications')) modifications++;
-      if (matchesActionCategory(l.action, l.details, 'views')) views++;
-      if (matchesActionCategory(l.action, l.details, 'prints')) prints++;
-    });
-
-    return {
-      all: logs.length,
-      cancellations,
-      modifications,
-      views,
-      prints
-    };
-  }, [logs]);
 
   // Filter logs by activeMode first, then by the user filters
   const filteredLogs = useMemo(() => {
@@ -797,88 +776,7 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
         </div>
       </div>
 
-      {/* Screen Mode Tabs Switcher */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 print:hidden">
-        <button
-          type="button"
-          onClick={() => { setActiveMode('cancellations'); setPage(1); }}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all shrink-0 cursor-pointer ${
-            activeMode === 'cancellations' 
-              ? 'bg-rose-500 text-white shadow-sm' 
-              : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-50'
-          }`}
-        >
-          <Trash2 size={14} />
-          <span>{language === 'ar' ? 'سجل الإلغاءات والمحذوفات' : 'Cancellations & Deletions'}</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${activeMode === 'cancellations' ? 'bg-white/20 text-white' : 'bg-rose-50 text-rose-700'}`}>
-            {modeCounts.cancellations}
-          </span>
-        </button>
 
-        <button
-          type="button"
-          onClick={() => { setActiveMode('modifications'); setPage(1); }}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all shrink-0 cursor-pointer ${
-            activeMode === 'modifications' 
-              ? 'bg-emerald-600 text-white shadow-sm' 
-              : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-50'
-          }`}
-        >
-          <Edit3 size={14} />
-          <span>{language === 'ar' ? 'سجل الإنشاء والتعديلات' : 'Creations & Modifications'}</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${activeMode === 'modifications' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-700'}`}>
-            {modeCounts.modifications}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => { setActiveMode('views'); setPage(1); }}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all shrink-0 cursor-pointer ${
-            activeMode === 'views' 
-              ? 'bg-blue-600 text-white shadow-sm' 
-              : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-50'
-          }`}
-        >
-          <Eye size={14} />
-          <span>{language === 'ar' ? 'سجل الدخول والمشاهدات' : 'Logins & Views'}</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${activeMode === 'views' ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-700'}`}>
-            {modeCounts.views}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => { setActiveMode('prints'); setPage(1); }}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all shrink-0 cursor-pointer ${
-            activeMode === 'prints' 
-              ? 'bg-indigo-600 text-white shadow-sm' 
-              : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-50'
-          }`}
-        >
-          <Printer size={14} />
-          <span>{language === 'ar' ? 'سجل الطباعة والتقارير' : 'Prints & Reports'}</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${activeMode === 'prints' ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-700'}`}>
-            {modeCounts.prints}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => { setActiveMode('all'); setPage(1); }}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all shrink-0 cursor-pointer ${
-            activeMode === 'all' 
-              ? 'bg-zinc-900 text-white shadow-sm' 
-              : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-50'
-          }`}
-        >
-          <ShieldCheck size={14} />
-          <span>{language === 'ar' ? 'سجل التدقيق الشامل (الكل)' : 'All Activity Logs'}</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${activeMode === 'all' ? 'bg-white/20 text-white' : 'bg-zinc-100 text-zinc-700'}`}>
-            {modeCounts.all}
-          </span>
-        </button>
-      </div>
 
       {/* Advanced Filter Section */}
       <div className="bg-white p-5 rounded-2xl border border-zinc-100 shadow-xs space-y-4 print:hidden">
