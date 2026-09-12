@@ -59,6 +59,10 @@ const PurchaseReturns = React.lazy(() => import('./pages/PurchaseReturns').then(
 const GeneralStockMovementsReport = React.lazy(() => import('./pages/GeneralStockMovementsReport').then(m => ({ default: m.GeneralStockMovementsReport })));
 const SalesReport = React.lazy(() => import('./pages/SalesReport').then(m => ({ default: m.SalesReport })));
 const ActivityLogPage = React.lazy(() => import('./pages/ActivityLog').then(m => ({ default: m.ActivityLogPage })));
+const ActivityLogCancellationsPage = React.lazy(() => import('./pages/ActivityLog').then(m => ({ default: m.ActivityLogCancellationsPage })));
+const ActivityLogModificationsPage = React.lazy(() => import('./pages/ActivityLog').then(m => ({ default: m.ActivityLogModificationsPage })));
+const ActivityLogViewsPage = React.lazy(() => import('./pages/ActivityLog').then(m => ({ default: m.ActivityLogViewsPage })));
+const ActivityLogPrintsPage = React.lazy(() => import('./pages/ActivityLog').then(m => ({ default: m.ActivityLogPrintsPage })));
 const DetailedJournalEntries = React.lazy(() => import('./pages/DetailedJournalEntries').then(m => ({ default: m.DetailedJournalEntries })));
 const CreateJournalEntry = React.lazy(() => import('./pages/CreateJournalEntry').then(m => ({ default: m.CreateJournalEntry })));
 const GeneralLedger = React.lazy(() => import('./pages/GeneralLedger').then(m => ({ default: m.GeneralLedger })));
@@ -273,6 +277,10 @@ export default function App() {
       case 'period_closing': return <PeriodClosing />;
       case 'integrity_dashboard': return <IntegrityDashboard />;
       case 'activity_log': return <ActivityLogPage />;
+      case 'activity_log_cancellations': return <ActivityLogCancellationsPage />;
+      case 'activity_log_modifications': return <ActivityLogModificationsPage />;
+      case 'activity_log_views': return <ActivityLogViewsPage />;
+      case 'activity_log_prints': return <ActivityLogPrintsPage />;
       case 'company_settings': return <CompanySettings />;
       case 'currencies': return <Currencies />;
       case 'operation_categories': return <OperationCategories />;

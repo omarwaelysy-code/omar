@@ -56,8 +56,11 @@ import {
   Camera,
   Radio,
   Laptop,
-  Link2,
-  HelpCircle
+  HelpCircle,
+  Trash2,
+  Edit3,
+  Printer,
+  Monitor
 } from 'lucide-react';
 
 import { useAuth } from '../contexts/AuthContext';
@@ -155,6 +158,14 @@ const getTabIcon = (id: string) => {
     case 'general_stock_movements_report':
     case 'activity_log':
       return <History {...iconProps} />;
+    case 'activity_log_cancellations':
+      return <Trash2 {...iconProps} />;
+    case 'activity_log_modifications':
+      return <Edit3 {...iconProps} />;
+    case 'activity_log_views':
+      return <Eye {...iconProps} />;
+    case 'activity_log_prints':
+      return <Printer {...iconProps} />;
     case 'stock_balances_report':
     case 'customer_balances':
     case 'sales_report':
@@ -707,6 +718,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'period_closing', label: language === 'ar' ? 'إغلاق الفترات المحاسبية' : 'Period Closing', icon: Lock },
           { id: 'integrity_dashboard', label: t('nav.integrity_check') || 'Integrity Check', icon: ShieldCheck },
           { id: 'backup_restore', label: t('nav.backup_restore'), icon: Database },
+          { id: 'div_activity', isDivider: true },
+          { id: 'h_activity', label: language === 'ar' ? 'سجلات الرقابة والنشاط' : 'Audit & Activity Logs', isHeader: true },
+          { id: 'activity_log_cancellations', label: t('nav.activity_log_cancellations'), icon: Trash2 },
+          { id: 'activity_log_modifications', label: t('nav.activity_log_modifications'), icon: Edit3 },
+          { id: 'activity_log_views', label: t('nav.activity_log_views'), icon: Eye },
+          { id: 'activity_log_prints', label: t('nav.activity_log_prints'), icon: Printer },
           { id: 'activity_log', label: t('nav.activity_log'), icon: History },
           ...(company?.settings?.enable_multi_currency || (company?.settings as any)?.enable_multi_currency === 'true' || isSuperAdmin ? [{ id: 'currencies', label: t('nav.currencies'), icon: Coins }] : [])
         ]
