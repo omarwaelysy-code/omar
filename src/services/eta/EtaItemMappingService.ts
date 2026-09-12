@@ -875,21 +875,21 @@ export class EtaItemMappingService {
       await pool.query(`
         UPDATE products
         SET 
-          eta_item_code = $1,
-          eta_code_type = $2,
-          tax_item_code = COALESCE(NULLIF(tax_item_code, ''), $1),
-          tax_code_type = COALESCE(NULLIF(tax_code_type, ''), $2)
-        WHERE id = $3 AND company_id = $4
+          eta_item_code = $1::text,
+          eta_code_type = $2::text,
+          tax_item_code = COALESCE(NULLIF(tax_item_code, ''), $1::text),
+          tax_code_type = COALESCE(NULLIF(tax_code_type, ''), $2::text)
+        WHERE id = $3::text AND company_id = $4::text
       `, [cleanItemCode, cleanItemType, productId, companyId]);
     } else {
       await pool.query(`
         UPDATE products
         SET 
-          tax_item_code = $1,
-          tax_code_type = $2,
-          eta_item_code = COALESCE(NULLIF(eta_item_code, ''), $1),
-          eta_code_type = COALESCE(NULLIF(eta_code_type, ''), $2)
-        WHERE id = $3 AND company_id = $4
+          tax_item_code = $1::text,
+          tax_code_type = $2::text,
+          eta_item_code = COALESCE(NULLIF(eta_item_code, ''), $1::text),
+          eta_code_type = COALESCE(NULLIF(eta_code_type, ''), $2::text)
+        WHERE id = $3::text AND company_id = $4::text
       `, [cleanItemCode, cleanItemType, productId, companyId]);
     }
 
