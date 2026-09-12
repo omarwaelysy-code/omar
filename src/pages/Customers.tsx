@@ -122,11 +122,13 @@ export const Customers: React.FC = () => {
     if (!user) return;
 
     try {
-      // Phone number validation: starts with 0 and exactly 11 digits
-      const phoneRegex = /^0\d{10}$/;
-      if (!phoneRegex.test(formData.mobile)) {
-        showNotification('رقم الهاتف يجب أن يبدأ بـ 0 ويتكون من 11 رقم', 'error');
-        return;
+      // Phone number validation: optional, but if provided must start with 0 and be 11 digits
+      if (formData.mobile && formData.mobile.trim()) {
+        const phoneRegex = /^0\d{10}$/;
+        if (!phoneRegex.test(formData.mobile.trim())) {
+          showNotification('رقم الهاتف يجب أن يبدأ بـ 0 ويتكون من 11 رقم', 'error');
+          return;
+        }
       }
 
       if (!formData.account_id) {
@@ -501,11 +503,16 @@ export const Customers: React.FC = () => {
                 <div className="hidden md:block overflow-x-auto h-full">
                   <table ref={tableRef} className="w-full">
                     <thead className="sticky top-0 bg-white/95 backdrop-blur-md z-10 border-b border-slate-100">
-                      <tr className="text-slate-500 text-[10px] uppercase font-black tracking-wider">
-                        <th className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_code')}</th>
-                        <th className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_name')}</th>
-                        <th className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>الرصيد الحالي</th>
-                        <th className={`px-4 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
+                      <tr className="text-slate-500 text-[10px] uppercase font-black tracking-wider whitespace-nowrap">
+                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_code')}</th>
+                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_name')}</th>
+                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الهاتف' : 'Phone'}</th>
+                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'طريقة السداد' : 'Payment Method'}</th>
+                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الرقم الضريبي' : 'Tax Number'}</th>
+                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'حد الائتمان' : 'Credit Limit'}</th>
+                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الحالة' : 'Status'}</th>
+                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>الرصيد الحالي</th>
+                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -515,44 +522,60 @@ export const Customers: React.FC = () => {
                           onClick={() => openModal(customer)}
                           className={`hover:bg-emerald-50/40 transition-all group cursor-pointer border-transparent border-x-2 ${editingCustomer?.id === customer.id ? 'bg-emerald-50/80 border-emerald-500' : ''}`}
                         >
-                          <td className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
                             <span className="font-mono text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-bold border border-slate-200 group-hover:border-emerald-200 group-hover:text-emerald-700 transition-all">{customer.code}</span>
                           </td>
-                          <td className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                             <div className="flex flex-col">
-                                <span className={`font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors ${editingCustomer?.id === customer.id ? 'text-emerald-700' : ''}`}>{customer.name}</span>
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                    <span className="text-[10px] text-slate-400 font-medium tracking-tight">{customer.mobile}</span>
-                                    {customer.tax_number && (
-                                      <span className="text-[9px] font-bold px-1 py-0.2 bg-blue-50 text-blue-700 rounded border border-blue-200/20 dir-ltr font-mono" title={language === 'ar' ? 'الرقم الضريبي' : 'Tax Number'}>
-                                        {language === 'ar' ? 'ض: ' : 'VAT: '}{customer.tax_number}
-                                      </span>
-                                    )}
-                                    {customer.payment_method && (
-                                      <span className="text-[9px] font-bold px-1 py-0.2 bg-slate-100 text-slate-600 rounded">
-                                        {customer.payment_method === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') :
-                                         customer.payment_method === 'credit' ? (language === 'ar' ? 'آجل' : 'Credit') :
-                                         customer.payment_method === 'installments' ? (language === 'ar' ? 'دفعات' : 'Installments') : 
-                                         (language === 'ar' ? 'أخرى' : 'Other')}
-                                      </span>
-                                    )}
-                                    {customer.credit_limit > 0 && (
-                                      <span className="text-[9px] font-bold px-1 py-0.2 bg-amber-50 text-amber-700 rounded border border-amber-200/20">
-                                        {language === 'ar' ? 'حد: ' : 'Limit: '}{formatNumber(customer.credit_limit)}
-                                      </span>
-                                    )}
-                                    <span className={`text-[9px] font-bold px-1 py-0.2 rounded border ${customer.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                                      {customer.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
-                                    </span>
-                                 </div>
-                             </div>
+                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <span className={`font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors ${editingCustomer?.id === customer.id ? 'text-emerald-700' : ''}`}>{customer.name}</span>
                           </td>
-                          <td className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                            <span className={`font-bold text-xs px-2 py-0.5 rounded-md ${getCustomerBalance(customer.id) >= 0 ? 'bg-emerald-100/70 text-emerald-800' : 'bg-rose-100/70 text-rose-800'} border border-emerald-200/20`}>
+                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                            {customer.mobile ? (
+                              <span className="text-xs text-slate-600 font-mono dir-ltr inline-block font-medium">{customer.mobile}</span>
+                            ) : (
+                              <span className="text-slate-300 text-xs font-mono">-</span>
+                            )}
+                          </td>
+                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                            {customer.payment_method ? (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
+                                {customer.payment_method === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') :
+                                 customer.payment_method === 'credit' ? (language === 'ar' ? 'آجل' : 'Credit') :
+                                 customer.payment_method === 'installments' ? (language === 'ar' ? 'دفعات' : 'Installments') : 
+                                 (language === 'ar' ? 'أخرى' : 'Other')}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 text-xs font-mono">-</span>
+                            )}
+                          </td>
+                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                            {customer.tax_number ? (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200/20 dir-ltr font-mono">
+                                {customer.tax_number}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 text-xs font-mono">-</span>
+                            )}
+                          </td>
+                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                            {customer.credit_limit > 0 ? (
+                              <span className="text-[11px] font-bold px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded border border-amber-200/20 font-mono">
+                                {formatNumber(customer.credit_limit)}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 text-xs font-mono">-</span>
+                            )}
+                          </td>
+                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${customer.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                              {customer.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
+                            </span>
+                          </td>
+                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                            <span className={`font-bold text-xs px-2 py-0.5 rounded-md ${getCustomerBalance(customer.id) >= 0 ? 'bg-emerald-100/70 text-emerald-800' : 'bg-rose-100/70 text-rose-800'} border border-emerald-200/20 font-mono`}>
                               {formatBalance(getCustomerBalance(customer.id))}
                             </span>
                           </td>
-                          <td className={`px-4 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-left' : 'text-right'} whitespace-nowrap`}>
                             <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1 opacity-0 group-hover:opacity-100 transition-all`}>
                                {canDelete && (
                                 <button 
@@ -659,7 +682,22 @@ export const Customers: React.FC = () => {
                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider leading-none">{editingCustomer?.code || 'CUSTOMER FLOW : NEW'}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
+                    {/* Active Status Switch in Header */}
+                    <div className="flex items-center gap-1.5 bg-slate-100/80 px-2 py-1 rounded-lg border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-700">
+                        {formData.is_active ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
+                        className={`relative inline-flex h-4.5 w-8 items-center rounded-full transition-colors focus:outline-none ${formData.is_active ? 'bg-emerald-600' : 'bg-slate-300'}`}
+                      >
+                        <span
+                          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${formData.is_active ? (dir === 'rtl' ? '-translate-x-4' : 'translate-x-4') : (dir === 'rtl' ? '-translate-x-0.5' : 'translate-x-0.5')}`}
+                        />
+                      </button>
+                    </div>
                     <button 
                       type="submit" 
                       form="customer-form"
@@ -923,21 +961,6 @@ export const Customers: React.FC = () => {
                           </>
                         )}
 
-                        {/* Active Status */}
-                        <div className="sm:col-span-2 lg:col-span-4 pt-1 flex items-center justify-between border-t border-slate-200/40">
-                          <span className="text-[11px] font-bold text-slate-700">
-                            {language === 'ar' ? 'حالة نشاط العميل' : 'Active Status'}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${formData.is_active ? 'bg-emerald-600' : 'bg-slate-200'}`}
-                          >
-                            <span
-                              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${formData.is_active ? (dir === 'rtl' ? '-translate-x-4.5' : 'translate-x-4.5') : (dir === 'rtl' ? '-translate-x-0.5' : 'translate-x-0.5')}`}
-                            />
-                          </button>
-                        </div>
                       </div>
                     </div>
 
@@ -1059,6 +1082,7 @@ export const Customers: React.FC = () => {
                         {editingCustomer ? (language === 'ar' ? 'تحديث البيانات' : 'Update') : (language === 'ar' ? 'حفظ العميل' : 'Save')}
                       </button>
                     </div>
+
                   </form>
                 </div>
               </div>

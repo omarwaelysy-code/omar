@@ -897,9 +897,26 @@ export const Suppliers: React.FC = () => {
                        <h3 className="text-sm font-black text-slate-900 tracking-tight leading-none">{editingSupplier ? t('suppliers.edit') : t('suppliers.add')}</h3>
                     </div>
                   </div>
-                  <button onClick={closeModal} className="text-slate-400 hover:text-slate-700 p-1 hover:bg-slate-100 rounded-lg transition-all">
-                    <X size={16} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {/* Active Status */}
+                    <div className="flex items-center gap-1.5 bg-slate-100/80 px-2 py-1 rounded-lg border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-700">
+                        {formData.is_active ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
+                        className={`relative inline-flex h-4.5 w-8 items-center rounded-full transition-colors focus:outline-none ${formData.is_active ? 'bg-emerald-600' : 'bg-slate-300'}`}
+                      >
+                        <span
+                          className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${formData.is_active ? (dir === 'rtl' ? '-translate-x-4' : 'translate-x-4') : (dir === 'rtl' ? '-translate-x-0.5' : 'translate-x-0.5')}`}
+                        />
+                      </button>
+                    </div>
+                    <button onClick={closeModal} className="text-slate-400 hover:text-slate-700 p-1 hover:bg-slate-100 rounded-lg transition-all" title={language === 'ar' ? 'إغلاق' : 'Close'}>
+                      <X size={16} />
+                    </button>
+                  </div>
                 </div>
                 
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -1187,20 +1204,6 @@ export const Suppliers: React.FC = () => {
                             </>
                           )}
 
-                          <div className="sm:col-span-2 lg:col-span-3 pt-1 border-t border-slate-100 flex items-center justify-between">
-                            <span className="text-xs font-bold text-slate-700">
-                              {language === 'ar' ? 'حالة المورد نشط' : 'Active Status'}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
-                              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${formData.is_active ? 'bg-emerald-600' : 'bg-slate-200'}`}
-                            >
-                              <span
-                                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${formData.is_active ? (dir === 'rtl' ? '-translate-x-4' : 'translate-x-4') : (dir === 'rtl' ? '-translate-x-1' : 'translate-x-1')}`}
-                              />
-                            </button>
-                          </div>
                         </div>
                       </div>
 
