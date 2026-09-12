@@ -211,14 +211,23 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
   };
 
   const getSubscriptionStatus = (company: Company) => {
-    if (company.company_status === 'suspended') return { label: 'موقوف', color: 'bg-red-100 text-red-800', icon: XCircle };
+    if (company.company_status === 'suspended' || company.subscription_status === 'suspended') {
+      return { label: 'موقوف', color: 'bg-red-100 text-red-800 border border-red-200 font-bold', icon: XCircle };
+    }
     
     const nowStr = formatDateForInput(new Date());
     const endStr = formatDateForInput(company.subscription_end || company.subscription_expiry);
+    const subStatus = String(company.subscription_status || '').toLowerCase();
     
-    if (endStr && endStr < nowStr) return { label: 'منتهي', color: 'bg-amber-100 text-amber-800', icon: AlertCircle };
+    if (subStatus === 'expired' || (Boolean(endStr) && endStr < nowStr)) {
+      return { label: 'منتهي', color: 'bg-amber-100 text-amber-800 border border-amber-200 font-bold', icon: AlertCircle };
+    }
+
+    if (subStatus === 'trial') {
+      return { label: 'تجريبي', color: 'bg-blue-100 text-blue-800 border border-blue-200 font-bold', icon: Clock };
+    }
     
-    return { label: 'نشط', color: 'bg-emerald-100 text-emerald-800', icon: CheckCircle2 };
+    return { label: 'نشط', color: 'bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold', icon: CheckCircle2 };
   };
 
   const realCompanies = companies.filter(c => c.id !== 'system' && c.id !== 'SYSTEM' && c.code !== 'SYS-ROOT');
@@ -227,12 +236,13 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
   const stats = [
     { label: 'إجمالي الشركات', value: realCompanies.length, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'إجمالي مستخدمي الشركات', value: realCompanyUsers.length, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'اشتراكات نشطة', value: realCompanies.filter(c => c.company_status === 'active' && (String(c.subscription_status).toLowerCase() === 'active')).length, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'اشتراكات نشطة', value: realCompanies.filter(c => {
+        const s = getSubscriptionStatus(c);
+        return s.label === 'نشط' || s.label === 'تجريبي';
+      }).length, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
     { label: 'اشتراكات منتهية', value: realCompanies.filter(c => {
-        const nowStr = formatDateForInput(new Date());
-        const endStr = formatDateForInput(c.subscription_end || c.subscription_expiry);
-        const subStatus = String(c.subscription_status).toLowerCase();
-        return c.company_status === 'suspended' || subStatus === 'expired' || (Boolean(endStr) && endStr < nowStr);
+        const s = getSubscriptionStatus(c);
+        return s.label === 'منتهي' || s.label === 'موقوف';
       }).length, icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
   ];
 
@@ -840,12 +850,16 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm font-mono font-bold text-stone-600">{company.code}</td>
                       <td className="px-4 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          company.company_status === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {company.company_status === 'active' ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                          {company.company_status === 'active' ? 'نشط' : 'موقوف'}
-                        </span>
+                        {(() => {
+                          const status = getSubscriptionStatus(company);
+                          const StatusIcon = status.icon;
+                          return (
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${status.color}`}>
+                              <StatusIcon className="w-3 h-3" />
+                              <span>{status.label}</span>
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-xs font-mono text-stone-600 font-medium">
                         {createdAtStr}
