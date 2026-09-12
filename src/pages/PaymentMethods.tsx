@@ -9,7 +9,7 @@ import { dbService } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
-import { PaymentMethod, Account } from '../types';
+import { PaymentMethod, Account, JournalEntry } from '../types';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
@@ -23,6 +23,10 @@ export const PaymentMethods: React.FC = () => {
   
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
+  const [receiptVouchers, setReceiptVouchers] = useState<any[]>([]);
+  const [paymentVouchers, setPaymentVouchers] = useState<any[]>([]);
+  const [cashTransfers, setCashTransfers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [view, setView] = useState<'card' | 'table'>('card');
@@ -59,10 +63,19 @@ export const PaymentMethods: React.FC = () => {
       const unsubscribeAccounts = dbService.subscribe<Account>('accounts', user.company_id, (data) => {
         setAccounts(data);
       });
+      const unsubJournals = dbService.subscribe<JournalEntry>('journal_entries', user.company_id, setJournalEntries);
+      const unsubReceipts = dbService.subscribe<any>('receipt_vouchers', user.company_id, setReceiptVouchers);
+      const unsubPayments = dbService.subscribe<any>('payment_vouchers', user.company_id, setPaymentVouchers);
+      const unsubTransfers = dbService.subscribe<any>('cash_transfers', user.company_id, setCashTransfers);
+
       setLoading(false);
       return () => {
         unsub();
         unsubscribeAccounts();
+        unsubJournals();
+        unsubReceipts();
+        unsubPayments();
+        unsubTransfers();
       };
     }
   }, [user?.company_id]);
@@ -307,6 +320,54 @@ export const PaymentMethods: React.FC = () => {
     resetForm();
   };
 
+  const getMethodCurrentBalance = (method: PaymentMethod): number => {
+    let delta = 0;
+    journalEntries.forEach(je => {
+      // Skip opening balance entries to avoid double counting with method.opening_balance
+      if (je.reference_type === 'opening_balance') return;
+
+      je.items?.forEach((item: any) => {
+        let isMatch = false;
+
+        // 1. Direct sub_account match
+        if (item.sub_account_type === 'payment_method' && item.sub_account_id === method.id) {
+          isMatch = true;
+        }
+        // 2. Receipt Voucher lookup
+        else if (je.reference_type === 'receipt' && je.reference_id && item.account_id === method.account_id) {
+          const rv = receiptVouchers.find(v => v.id === je.reference_id);
+          if (rv && rv.payment_method_id === method.id) {
+            isMatch = true;
+          }
+        }
+        // 3. Payment Voucher lookup
+        else if (je.reference_type === 'payment' && je.reference_id && item.account_id === method.account_id) {
+          const pv = paymentVouchers.find(v => v.id === je.reference_id);
+          if (pv && pv.payment_method_id === method.id) {
+            isMatch = true;
+          }
+        }
+        // 4. Cash Transfer lookup
+        else if ((je.reference_type === 'transfer' || je.reference_type === 'cash_transfer') && je.reference_id && item.account_id === method.account_id) {
+          const ct = cashTransfers.find(v => v.id === je.reference_id);
+          if (ct) {
+            const d = Number(item.debit) || 0;
+            const pmId = d > 0 ? ct.to_payment_method_id : ct.from_payment_method_id;
+            if (pmId === method.id) {
+              isMatch = true;
+            }
+          }
+        }
+
+        if (isMatch) {
+          delta += (Number(item.debit) || 0) - (Number(item.credit) || 0);
+        }
+      });
+    });
+
+    return (Number(method.opening_balance) || 0) + delta;
+  };
+
   const filteredMethods = methods.filter(m => 
     m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.code.toLowerCase().includes(searchTerm.toLowerCase())
@@ -461,12 +522,30 @@ export const PaymentMethods: React.FC = () => {
                            </div>
                         </div>
 
-                        <div className="pt-1.5 border-t border-slate-50 flex items-center justify-between">
-                           <div>
-                              <p className="text-[9px] font-bold text-slate-400 uppercase">{language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}</p>
-                              <p className="font-black text-base text-indigo-600 tracking-tight leading-none">{formatNumber(method.opening_balance || 0)} <span className="text-[10px] font-normal text-slate-400">{t('invoices.currency')}</span></p>
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                           <div className="flex items-center gap-3">
+                             <div>
+                               <p className="text-[9px] font-bold text-slate-400 uppercase">{language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}</p>
+                               <p className="font-bold text-xs text-slate-600 tracking-tight leading-none mt-0.5">{formatNumber(method.opening_balance || 0)} <span className="text-[9px] font-normal text-slate-400">{t('invoices.currency')}</span></p>
+                             </div>
+                             <div className="h-6 w-[1px] bg-slate-100" />
+                             <div>
+                               <p className="text-[9px] font-bold text-slate-400 uppercase">{language === 'ar' ? 'الرصيد الحالي' : 'Current Balance'}</p>
+                               {(() => {
+                                 const currentBal = getMethodCurrentBalance(method);
+                                 const isPositive = currentBal > 0;
+                                 const isNegative = currentBal < 0;
+                                 return (
+                                   <p className={`font-black text-sm tracking-tight leading-none mt-0.5 ${
+                                     isNegative ? 'text-rose-600' : isPositive ? 'text-emerald-600' : 'text-slate-800'
+                                   }`}>
+                                     {formatNumber(currentBal)} <span className="text-[9px] font-normal text-slate-400">{t('invoices.currency')}</span>
+                                   </p>
+                                 );
+                               })()}
+                             </div>
                            </div>
-                           <div className="p-1 bg-slate-50 rounded-md text-slate-300 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                           <div className="p-1 bg-slate-50 rounded-md text-slate-300 group-hover:bg-indigo-600 group-hover:text-white transition-all shrink-0">
                               {dir === 'rtl' ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
                            </div>
                         </div>
@@ -484,50 +563,63 @@ export const PaymentMethods: React.FC = () => {
                           <th className="px-4 py-2">{language === 'ar' ? 'كود طريقة السداد' : 'Code'}</th>
                           <th className="px-4 py-2">{language === 'ar' ? 'طريقة السداد' : 'Name'}</th>
                           <th className="px-4 py-2">{language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}</th>
+                          <th className="px-4 py-2">{language === 'ar' ? 'الرصيد الحالي' : 'Current Balance'}</th>
                           <th className="px-4 py-2 text-left">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
                         {filteredMethods.length === 0 ? (
                           <tr>
-                            <td colSpan={4} className="px-4 py-8 text-center text-slate-400 text-xs italic">{language === 'ar' ? 'لا توجد طرق سداد حالياً' : 'No methods found.'}</td>
+                            <td colSpan={5} className="px-4 py-8 text-center text-slate-400 text-xs italic">{language === 'ar' ? 'لا توجد طرق سداد حالياً' : 'No methods found.'}</td>
                           </tr>
-                        ) : filteredMethods.map((method) => (
-                          <tr 
-                            key={method.id} 
-                            className="hover:bg-slate-50/50 transition-colors group cursor-pointer text-xs"
-                            onClick={() => openModal(method)}
-                          >
-                            <td className="px-4 py-2">
-                              <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold border border-slate-200">{method.code}</span>
-                            </td>
-                            <td className="px-4 py-2 font-bold text-slate-900">{method.name}</td>
-                            <td className="px-4 py-2">
-                              <span className="font-bold text-indigo-600">{formatNumber(method.opening_balance || 0)} ج.م</span>
-                            </td>
-                            <td className="px-4 py-2 text-left" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex items-center justify-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button 
-                                  onClick={() => openModal(method)}
-                                  className="p-1 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-                                  title={language === 'ar' ? 'تعديل' : 'Edit'}
-                                >
-                                  <FileText size={14} />
-                                </button>
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteClick(method);
-                                  }}
-                                  className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                                  title={language === 'ar' ? 'حذف' : 'Delete'}
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
+                        ) : filteredMethods.map((method) => {
+                          const currentBal = getMethodCurrentBalance(method);
+                          const isPositive = currentBal > 0;
+                          const isNegative = currentBal < 0;
+                          return (
+                            <tr 
+                              key={method.id} 
+                              className="hover:bg-slate-50/50 transition-colors group cursor-pointer text-xs"
+                              onClick={() => openModal(method)}
+                            >
+                              <td className="px-4 py-2">
+                                <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold border border-slate-200">{method.code}</span>
+                              </td>
+                              <td className="px-4 py-2 font-bold text-slate-900">{method.name}</td>
+                              <td className="px-4 py-2">
+                                <span className="font-bold text-slate-600">{formatNumber(method.opening_balance || 0)} ج.م</span>
+                              </td>
+                              <td className="px-4 py-2">
+                                <span className={`font-black ${
+                                  isNegative ? 'text-rose-600' : isPositive ? 'text-emerald-600' : 'text-slate-800'
+                                }`}>
+                                  {formatNumber(currentBal)} ج.م
+                                </span>
+                              </td>
+                              <td className="px-4 py-2 text-left" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center justify-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button 
+                                    onClick={() => openModal(method)}
+                                    className="p-1 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                                    title={language === 'ar' ? 'تعديل' : 'Edit'}
+                                  >
+                                    <FileText size={14} />
+                                  </button>
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteClick(method);
+                                    }}
+                                    className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                    title={language === 'ar' ? 'حذف' : 'Delete'}
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
