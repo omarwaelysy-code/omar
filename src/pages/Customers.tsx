@@ -755,11 +755,12 @@ export const Customers: React.FC = () => {
                         )}
 
                         <div className="space-y-0.5">
-                          <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">{t('customers.form_mobile')}</label>
+                          <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">
+                            {t('customers.form_mobile')} <span className="text-[9px] text-slate-400 font-normal">({language === 'ar' ? 'اختياري' : 'Optional'})</span>
+                          </label>
                           <div className="relative group">
                             <Phone className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
                             <input
-                              required
                               type="tel"
                               maxLength={11}
                               placeholder="01234567890"
@@ -1064,23 +1065,6 @@ export const Customers: React.FC = () => {
                           </div>
                         );
                       })()}
-                    </div>
-
-                    {/* Footer Actions */}
-                    <div className="pt-2 pb-1 flex items-center justify-end gap-2 sticky bottom-0 bg-white/95 backdrop-blur-md z-30 border-t border-slate-100 mt-2">
-                      <button 
-                        type="button"
-                        onClick={closeModal}
-                        className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg font-bold text-xs hover:bg-slate-200 transition-all active:scale-95 border border-slate-200"
-                      >
-                        {t('common.cancel')}
-                      </button>
-                      <button 
-                        type="submit"
-                        className="px-5 py-1.5 bg-zinc-900 text-white rounded-lg font-bold text-xs hover:bg-zinc-800 transition-all shadow-sm active:scale-95"
-                      >
-                        {editingCustomer ? (language === 'ar' ? 'تحديث البيانات' : 'Update') : (language === 'ar' ? 'حفظ العميل' : 'Save')}
-                      </button>
                     </div>
 
                   </form>

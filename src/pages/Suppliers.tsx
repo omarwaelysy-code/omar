@@ -184,12 +184,14 @@ export const Suppliers: React.FC = () => {
         }
       }
 
-      // Phone number validation: starts with 0 and exactly 11 digits
-      const phoneRegex = /^0\d{10}$/;
-      if (!phoneRegex.test(formData.mobile)) {
-        setIsSaving(false);
-        showNotification('رقم الهاتف يجب أن يبدأ بـ 0 ويتكون من 11 رقم', 'error');
-        return;
+      // Phone number validation: optional, but if provided must start with 0 and be 11 digits
+      if (formData.mobile && formData.mobile.trim()) {
+        const phoneRegex = /^0\d{10}$/;
+        if (!phoneRegex.test(formData.mobile.trim())) {
+          setIsSaving(false);
+          showNotification('رقم الهاتف يجب أن يبدأ بـ 0 ويتكون من 11 رقم', 'error');
+          return;
+        }
       }
 
       if (!formData.account_id) {
@@ -683,12 +685,17 @@ export const Suppliers: React.FC = () => {
               {view === 'table' ? (
                 <div className="hidden md:block overflow-x-auto h-full">
                   <table ref={tableRef} className="w-full">
-                    <thead className="sticky top-0 bg-white/90 backdrop-blur-md z-10 border-b border-slate-100">
-                      <tr className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">
-                        <th className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_code')}</th>
-                        <th className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_name')}</th>
-                        <th className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>الرصيد الحالي</th>
-                        <th className={`px-4 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
+                    <thead className="sticky top-0 bg-white/95 backdrop-blur-md z-10 border-b border-slate-100">
+                      <tr className="text-slate-500 text-[10px] uppercase font-black tracking-wider whitespace-nowrap">
+                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_code')}</th>
+                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_name')}</th>
+                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الهاتف' : 'Phone'}</th>
+                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'طريقة السداد' : 'Payment Method'}</th>
+                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الرقم الضريبي' : 'Tax Number'}</th>
+                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'حد الائتمان' : 'Credit Limit'}</th>
+                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الحالة' : 'Status'}</th>
+                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>الرصيد الحالي</th>
+                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -708,44 +715,60 @@ export const Suppliers: React.FC = () => {
                               : editingSupplier?.id === supplier.id ? 'bg-emerald-50 border-emerald-500' : ''
                           }`}
                         >
-                          <td className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                            <span className="font-mono text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold border border-slate-200 group-hover:border-emerald-200 group-hover:text-emerald-600 transition-all">{supplier.code}</span>
+                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                            <span className="font-mono text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-bold border border-slate-200 group-hover:border-emerald-200 group-hover:text-emerald-700 transition-all">{supplier.code}</span>
                           </td>
-                          <td className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                             <div className="flex flex-col">
-                                <span className={`font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors ${editingSupplier?.id === supplier.id ? 'text-emerald-700' : ''}`}>{supplier.name}</span>
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                   <span className="text-[10px] text-slate-400 font-medium tracking-tight">{supplier.mobile}</span>
-                                   {supplier.tax_number && (
-                                     <span className="text-[9px] font-bold px-1 py-0.2 bg-blue-50 text-blue-700 rounded border border-blue-200/20 dir-ltr font-mono" title={language === 'ar' ? 'الرقم الضريبي' : 'Tax Number'}>
-                                       {language === 'ar' ? 'ضريبي: ' : 'VAT: '}{supplier.tax_number}
-                                     </span>
-                                   )}
-                                  {supplier.payment_method && (
-                                    <span className="text-[9px] font-medium px-1 py-0.2 bg-slate-100 text-slate-500 rounded">
-                                      {supplier.payment_method === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') :
-                                       supplier.payment_method === 'credit' ? (language === 'ar' ? 'آجل' : 'Credit') :
-                                       supplier.payment_method === 'installments' ? (language === 'ar' ? 'دفعات' : 'Installments') : 
-                                       (language === 'ar' ? 'أخرى' : 'Other')}
-                                    </span>
-                                  )}
-                                  {supplier.credit_limit > 0 && (
-                                    <span className="text-[9px] font-medium px-1 py-0.2 bg-amber-50 text-amber-700 rounded border border-amber-200/20">
-                                      {language === 'ar' ? 'حد: ' : 'Limit: '}{formatNumber(supplier.credit_limit)}
-                                    </span>
-                                  )}
-                                  <span className={`text-[9px] font-medium px-1 py-0.2 rounded border ${supplier.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                                    {supplier.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
-                                  </span>
-                                </div>
-                             </div>
+                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <span className={`font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors ${editingSupplier?.id === supplier.id ? 'text-emerald-700' : ''}`}>{supplier.name}</span>
                           </td>
-                          <td className={`px-4 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                            <span className={`font-bold text-xs px-2 py-0.5 rounded-full ${getSupplierBalance(supplier.id) >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'} shadow-xs border border-emerald-200/20`}>
+                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                            {supplier.mobile ? (
+                              <span className="text-xs text-slate-600 font-mono dir-ltr inline-block font-medium">{supplier.mobile}</span>
+                            ) : (
+                              <span className="text-slate-300 text-xs font-mono">-</span>
+                            )}
+                          </td>
+                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                            {supplier.payment_method ? (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
+                                {supplier.payment_method === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') :
+                                 supplier.payment_method === 'credit' ? (language === 'ar' ? 'آجل' : 'Credit') :
+                                 supplier.payment_method === 'installments' ? (language === 'ar' ? 'دفعات' : 'Installments') : 
+                                 (language === 'ar' ? 'أخرى' : 'Other')}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 text-xs font-mono">-</span>
+                            )}
+                          </td>
+                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                            {supplier.tax_number ? (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200/20 dir-ltr font-mono">
+                                {supplier.tax_number}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 text-xs font-mono">-</span>
+                            )}
+                          </td>
+                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                            {supplier.credit_limit > 0 ? (
+                              <span className="text-[11px] font-bold px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded border border-amber-200/20 font-mono">
+                                {formatNumber(supplier.credit_limit)}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 text-xs font-mono">-</span>
+                            )}
+                          </td>
+                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${supplier.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                              {supplier.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
+                            </span>
+                          </td>
+                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                            <span className={`font-bold text-xs px-2 py-0.5 rounded-md ${getSupplierBalance(supplier.id) >= 0 ? 'bg-emerald-100/70 text-emerald-800' : 'bg-rose-100/70 text-rose-800'} border border-emerald-200/20 font-mono`}>
                               {formatBalance(getSupplierBalance(supplier.id))}
                             </span>
                           </td>
-                          <td className={`px-4 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-left' : 'text-right'} whitespace-nowrap`}>
                             {pendingEtaSupplierForLinking ? (
                               <button
                                 type="button"
@@ -913,14 +936,54 @@ export const Suppliers: React.FC = () => {
                         />
                       </button>
                     </div>
-                    <button onClick={closeModal} className="text-slate-400 hover:text-slate-700 p-1 hover:bg-slate-100 rounded-lg transition-all" title={language === 'ar' ? 'إغلاق' : 'Close'}>
-                      <X size={16} />
+
+                    {pendingEtaSupplierForCreation && (
+                      <button 
+                        type="submit"
+                        form="supplier-form"
+                        disabled={isSaving}
+                        onClick={() => setLinkWithEta(true)}
+                        className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white rounded-lg font-bold text-xs hover:from-emerald-700 hover:to-teal-800 transition-all shadow-xs active:scale-95 border border-emerald-400/40 flex items-center justify-center gap-1.5 disabled:opacity-60"
+                      >
+                        {isSaving && linkWithEta ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>{language === 'ar' ? 'جاري الحفظ...' : 'Linking...'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Link2 className="w-3.5 h-3.5" />
+                            <span>{language === 'ar' ? 'حفظ وربط مع ETA' : 'Save & Link'}</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+
+                    <button 
+                      type="submit"
+                      form="supplier-form"
+                      disabled={isSaving}
+                      onClick={() => setLinkWithEta(false)}
+                      className="px-4 py-1.5 bg-zinc-900 text-white rounded-lg font-bold text-xs hover:bg-zinc-800 transition-all shadow-xs active:scale-95 border border-white/10 flex items-center justify-center gap-1.5 disabled:opacity-60"
+                    >
+                      {isSaving && (!pendingEtaSupplierForCreation || !linkWithEta) ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>{language === 'ar' ? 'جاري الحفظ...' : 'Saving...'}</span>
+                        </>
+                      ) : (
+                        editingSupplier ? (language === 'ar' ? 'تحديث البيانات' : 'Update') : (pendingEtaSupplierForCreation ? (language === 'ar' ? 'حفظ المورد فقط' : 'Save Only') : (language === 'ar' ? 'حفظ المورد' : 'Save'))
+                      )}
+                    </button>
+
+                    <button onClick={closeModal} className="w-7 h-7 flex items-center justify-center bg-slate-50 text-slate-400 rounded-lg hover:bg-rose-50 hover:text-rose-500 transition-all border border-slate-200/60" title={language === 'ar' ? 'إغلاق' : 'Close'}>
+                      <X size={15} />
                     </button>
                   </div>
                 </div>
                 
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
-                  <form onSubmit={handleSubmit} className="p-3 md:p-4 space-y-2.5">
+                  <form id="supplier-form" onSubmit={handleSubmit} className="p-3 md:p-4 space-y-2.5">
                     {/* ETA Linked Banner */}
                     {pendingEtaSupplierForCreation && (
                       <div className="p-2.5 bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/30 rounded-xl flex items-center justify-between gap-2 shadow-xs">
@@ -977,11 +1040,12 @@ export const Suppliers: React.FC = () => {
                       )}
 
                       <div>
-                        <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_mobile')}</label>
+                        <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                          {t('suppliers.form_mobile')} <span className="text-[9px] text-slate-400 font-normal">({language === 'ar' ? 'اختياري' : 'Optional'})</span>
+                        </label>
                         <div className="relative group">
                           <Phone className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={13} />
                           <input
-                            required
                             type="tel"
                             maxLength={11}
                             placeholder="01234567890"
@@ -1276,51 +1340,7 @@ export const Suppliers: React.FC = () => {
                       )}
                     </div>
 
-                    <div className="pt-2 pb-1 flex flex-wrap items-center justify-end gap-2 sticky bottom-0 bg-white/95 backdrop-blur-md z-30 border-t border-slate-100 mt-2">
-                      <button 
-                        type="button"
-                        disabled={isSaving}
-                        onClick={closeModal}
-                        className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg font-bold text-xs hover:bg-slate-200 transition-all active:scale-95 border border-slate-200 disabled:opacity-40"
-                      >
-                        {t('common.cancel')}
-                      </button>
-                      {pendingEtaSupplierForCreation && (
-                        <button 
-                          type="submit"
-                          disabled={isSaving}
-                          onClick={() => setLinkWithEta(true)}
-                          className="px-4 py-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white rounded-lg font-bold text-xs hover:from-emerald-700 hover:to-teal-800 transition-all shadow-xs active:scale-95 border border-emerald-400/40 flex items-center justify-center gap-1.5 disabled:opacity-60"
-                        >
-                          {isSaving && linkWithEta ? (
-                            <>
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              <span>{language === 'ar' ? 'جاري الحفظ والربط...' : 'Linking...'}</span>
-                            </>
-                          ) : (
-                            <>
-                              <Link2 className="w-3.5 h-3.5" />
-                              <span>{language === 'ar' ? 'حفظ وربط مع ETA' : 'Save & Link to ETA'}</span>
-                            </>
-                          )}
-                        </button>
-                      )}
-                      <button 
-                        type="submit"
-                        disabled={isSaving}
-                        onClick={() => setLinkWithEta(false)}
-                        className="px-5 py-1.5 bg-zinc-900 text-white rounded-lg font-bold text-xs hover:bg-zinc-800 transition-all shadow-xs active:scale-95 border border-white/10 flex items-center justify-center gap-1.5 disabled:opacity-60"
-                      >
-                        {isSaving && (!pendingEtaSupplierForCreation || !linkWithEta) ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            <span>{language === 'ar' ? 'جاري الحفظ...' : 'Saving...'}</span>
-                          </>
-                        ) : (
-                          editingSupplier ? (language === 'ar' ? 'تحديث البيانات' : 'Update') : (pendingEtaSupplierForCreation ? (language === 'ar' ? 'حفظ المورد فقط' : 'Save Only') : (language === 'ar' ? 'حفظ المورد' : 'Save'))
-                        )}
-                      </button>
-                    </div>
+
                   </form>
                 </div>
               </div>
