@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Plus, Trash2, X, Package, History, ChevronRight, ChevronLeft, ChevronDown, Folder, FolderOpen, 
   Wallet, Layers, Hash, User, Calendar, Paperclip, LayoutGrid, List,
@@ -73,6 +73,46 @@ const getProductBarcodeSettings = (product: any) => {
     }
   }
   return { ...DEFAULT_BARCODE_SETTINGS, ...product.barcode_settings };
+};
+
+const getItemTypeBadge = (type: string, lang: string) => {
+  switch (type) {
+    case 'finished_good':
+      return {
+        label: lang === 'ar' ? 'منتج تام' : 'Finished Good',
+        className: 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
+      };
+    case 'raw_material':
+      return {
+        label: lang === 'ar' ? 'مواد خام' : 'Raw Material',
+        className: 'bg-blue-50 text-blue-700 border-blue-200/80'
+      };
+    case 'commodity':
+      return {
+        label: lang === 'ar' ? 'سلعة' : 'Commodity',
+        className: 'bg-purple-50 text-purple-700 border-purple-200/80'
+      };
+    case 'service':
+      return {
+        label: lang === 'ar' ? 'خدمة' : 'Service',
+        className: 'bg-amber-50 text-amber-700 border-amber-200/80'
+      };
+    case 'consumable':
+      return {
+        label: lang === 'ar' ? 'مستهلكات' : 'Consumable',
+        className: 'bg-teal-50 text-teal-700 border-teal-200/80'
+      };
+    case 'packaging':
+      return {
+        label: lang === 'ar' ? 'تعبئة وتغليف' : 'Packaging',
+        className: 'bg-indigo-50 text-indigo-700 border-indigo-200/80'
+      };
+    default:
+      return {
+        label: type || '-',
+        className: 'bg-slate-50 text-slate-700 border-slate-200'
+      };
+  }
 };
 
 const BarcodeLabel: React.FC<{
@@ -176,7 +216,9 @@ export const Products: React.FC = () => {
   const [view, setView] = useViewPreference('products', 'table');
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [isAutoCode, setIsAutoCode] = useState(true);
-  const [isGrouped, setIsGrouped] = useState(true);
+  type ProductGroupMode = 'none' | 'group' | 'type';
+  const [groupMode, setGroupMode] = useState<ProductGroupMode>('group');
+  const isGrouped = groupMode !== 'none';
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Record<string, boolean>>({});
 
   const toggleGroupCollapse = (groupId: string) => {
@@ -1111,24 +1153,79 @@ export const Products: React.FC = () => {
   );
 
   const groupedProducts = React.useMemo(() => {
-    const groupsMap = new Map<string, { id: string; name: string; code: string; items: Product[] }>();
+    if (groupMode === 'none') return [];
+
+    if (groupMode === 'type') {
+      const typeMeta: Record<string, { ar: string; en: string }> = {
+        finished_good: { ar: 'منتج تام الصنع', en: 'Finished Goods' },
+        raw_material: { ar: 'مواد خام', en: 'Raw Materials' },
+        commodity: { ar: 'سلعة تجارية', en: 'Commodities' },
+        service: { ar: 'خدمات', en: 'Services' },
+        consumable: { ar: 'مواد استهلاكية', en: 'Consumables' },
+        packaging: { ar: 'مواد تعبئة وتغليف', en: 'Packaging' },
+      };
+
+      const groupsMap = new Map<string, { id: string; name: string; code: string; items: Product[]; totalStock: number; isService: boolean }>();
+      
+      Object.keys(typeMeta).forEach(key => {
+        groupsMap.set(key, {
+          id: key,
+          name: language === 'ar' ? typeMeta[key].ar : typeMeta[key].en,
+          code: key.toUpperCase(),
+          items: [],
+          totalStock: 0,
+          isService: key === 'service'
+        });
+      });
+
+      groupsMap.set('other', {
+        id: 'other',
+        name: language === 'ar' ? 'أنواع أخرى' : 'Other Types',
+        code: 'OTHER',
+        items: [],
+        totalStock: 0,
+        isService: false
+      });
+
+      filteredProducts.forEach(p => {
+        const tKey = p.type && groupsMap.has(p.type) ? p.type : 'other';
+        const grp = groupsMap.get(tKey)!;
+        grp.items.push(p);
+        const qty = Number(p.current_stock ?? p.stock ?? 0);
+        if (!isNaN(qty) && p.type !== 'service') {
+          grp.totalStock += qty;
+        }
+      });
+
+      return Array.from(groupsMap.values()).filter(g => g.items.length > 0);
+    }
+
+    // Default: Group by item_group_id
+    const groupsMap = new Map<string, { id: string; name: string; code: string; items: Product[]; totalStock: number; isService: boolean }>();
     itemGroups.forEach(g => {
-      groupsMap.set(g.id, { id: g.id, name: g.name, code: g.code, items: [] });
+      groupsMap.set(g.id, { id: g.id, name: g.name, code: g.code, items: [], totalStock: 0, isService: false });
     });
     groupsMap.set('ungrouped', { 
       id: 'ungrouped', 
       name: language === 'ar' ? 'أصناف عامة (بدون مجموعة)' : 'General Items (Ungrouped)', 
       code: '', 
-      items: [] 
+      items: [],
+      totalStock: 0,
+      isService: false
     });
 
     filteredProducts.forEach(p => {
       const gId = p.item_group_id && groupsMap.has(p.item_group_id) ? p.item_group_id : 'ungrouped';
-      groupsMap.get(gId)!.items.push(p);
+      const grp = groupsMap.get(gId)!;
+      grp.items.push(p);
+      const qty = Number(p.current_stock ?? p.stock ?? 0);
+      if (!isNaN(qty) && p.type !== 'service') {
+        grp.totalStock += qty;
+      }
     });
 
     return Array.from(groupsMap.values()).filter(g => g.items.length > 0);
-  }, [filteredProducts, itemGroups, language]);
+  }, [filteredProducts, itemGroups, groupMode, language]);
 
   if (!canView) return (
     <div className="flex flex-col items-center justify-center h-[60vh] text-zinc-500 gap-4">
@@ -1272,15 +1369,34 @@ export const Products: React.FC = () => {
                 <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
                   <button
                     type="button"
-                    onClick={() => setIsGrouped(!isGrouped)}
+                    onClick={() => {
+                      setGroupMode(prev => prev === 'group' ? 'none' : 'group');
+                      setCollapsedGroupIds({});
+                    }}
                     className={`px-2.5 py-1 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all ${
-                      isGrouped ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'text-slate-500 hover:text-slate-800'
+                      groupMode === 'group' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'text-slate-500 hover:text-slate-800'
                     }`}
                     title={language === 'ar' ? 'تجميع حسب مجموعات الأصناف' : 'Group by Item Groups'}
                   >
                     <Folder size={13} />
-                    <span>{language === 'ar' ? 'تجميع بالمجموعات' : 'Grouped'}</span>
+                    <span>{language === 'ar' ? 'تجميع بالمجموعات' : 'By Groups'}</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGroupMode(prev => prev === 'type' ? 'none' : 'type');
+                      setCollapsedGroupIds({});
+                    }}
+                    className={`px-2.5 py-1 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all ${
+                      groupMode === 'type' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title={language === 'ar' ? 'تجميع حسب نوع الصنف' : 'Group by Item Type'}
+                  >
+                    <Layers size={13} />
+                    <span>{language === 'ar' ? 'تجميع بالنوع' : 'By Type'}</span>
+                  </button>
+
                   {isGrouped && (
                     <>
                       <div className="w-[1px] h-4 bg-slate-200 mx-0.5" />
@@ -1332,15 +1448,17 @@ export const Products: React.FC = () => {
                           </th>
                           <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_code')}</th>
                           <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_name')}</th>
+                          <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_type')}</th>
+                          <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_stock')}</th>
                           <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_sale_price')}</th>
                           <th className={`px-3 py-2 rounded-e-lg ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {loading ? (
-                          <tr><td colSpan={5} className="py-12 text-center"><div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>
+                          <tr><td colSpan={7} className="py-12 text-center"><div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>
                         ) : filteredProducts.length === 0 ? (
-                          <tr><td colSpan={5} className="py-10 text-center text-slate-400 font-bold text-xs">{t('common.no_data')}</td></tr>
+                          <tr><td colSpan={7} className="py-10 text-center text-slate-400 font-bold text-xs">{t('common.no_data')}</td></tr>
                         ) : isGrouped ? (
                           groupedProducts.map((group) => {
                             const isCollapsed = !!collapsedGroupIds[group.id];
@@ -1350,7 +1468,7 @@ export const Products: React.FC = () => {
                                   onClick={() => toggleGroupCollapse(group.id)}
                                   className="bg-slate-100/90 hover:bg-slate-200/70 cursor-pointer select-none transition-colors border-y border-slate-200"
                                 >
-                                  <td colSpan={5} className="px-3 py-1.5">
+                                  <td colSpan={7} className="px-3 py-1.5">
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-2">
                                         <span className="p-0.5 rounded text-slate-600 bg-white shadow-2xs">
@@ -1359,7 +1477,11 @@ export const Products: React.FC = () => {
                                             className={`transform transition-transform ${isCollapsed ? (dir === 'rtl' ? 'rotate-90' : '-rotate-90') : 'rotate-0'}`} 
                                           />
                                         </span>
-                                        <Folder size={14} className="text-emerald-600 shrink-0" />
+                                        {groupMode === 'type' ? (
+                                          <Layers size={14} className="text-indigo-600 shrink-0" />
+                                        ) : (
+                                          <Folder size={14} className="text-emerald-600 shrink-0" />
+                                        )}
                                         <span className="font-black text-slate-900 text-xs">{group.name}</span>
                                         {group.code && (
                                           <span className="text-[9px] font-mono bg-white px-1.5 py-0.2 rounded border border-slate-200 text-slate-600 font-bold">
@@ -1369,6 +1491,11 @@ export const Products: React.FC = () => {
                                         <span className="text-[9px] font-bold px-2 py-0.2 bg-emerald-100 text-emerald-800 rounded-full">
                                           {group.items.length} {language === 'ar' ? 'صنف' : 'items'}
                                         </span>
+                                        {!group.isService && (
+                                          <span className="text-[9px] font-bold px-2 py-0.2 bg-slate-200/80 text-slate-700 rounded-full font-mono">
+                                            {language === 'ar' ? 'إجمالي الرصيد:' : 'Total Stock:'} {formatNumber(group.totalStock)}
+                                          </span>
+                                        )}
                                       </div>
                                       <div className="text-[10px] text-slate-400 font-medium">
                                         {isCollapsed ? (language === 'ar' ? 'عرض الأصناف ▼' : 'Show items ▼') : (language === 'ar' ? 'إخفاء الأصناف ▲' : 'Hide items ▲')}
@@ -1424,6 +1551,34 @@ export const Products: React.FC = () => {
                                              </div>
                                           </div>
                                        </div>
+                                    </td>
+                                    <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                      {(() => {
+                                        const badge = getItemTypeBadge(product.type, language);
+                                        return (
+                                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-bold border ${badge.className}`}>
+                                            {badge.label}
+                                          </span>
+                                        );
+                                      })()}
+                                    </td>
+                                    <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                      {product.type === 'service' ? (
+                                        <span className="text-slate-300 font-mono text-xs font-bold">-</span>
+                                      ) : (
+                                        <div className="flex items-center gap-1.5">
+                                          <span className={`font-mono font-bold text-xs ${
+                                            Number(product.current_stock ?? product.stock ?? 0) <= 0 
+                                              ? 'text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200/70' 
+                                              : 'text-slate-900 bg-slate-100/90 px-2 py-0.5 rounded border border-slate-200'
+                                          }`}>
+                                            {formatNumber(product.current_stock ?? product.stock ?? 0)}
+                                          </span>
+                                          {product.unit && (
+                                            <span className="text-[10px] text-slate-400 font-medium">{product.unit}</span>
+                                          )}
+                                        </div>
+                                      )}
                                     </td>
                                     <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                                       <span className="font-black text-emerald-600 text-xs">{formatNumber(product.sale_price || 0)} <span className="text-[9px] text-slate-400 font-normal ms-0.5">{t('invoices.currency')}</span></span>
@@ -1528,6 +1683,34 @@ export const Products: React.FC = () => {
                                        </div>
                                     </div>
                                  </div>
+                              </td>
+                              <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {(() => {
+                                  const badge = getItemTypeBadge(product.type, language);
+                                  return (
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-bold border ${badge.className}`}>
+                                      {badge.label}
+                                    </span>
+                                  );
+                                })()}
+                              </td>
+                              <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {product.type === 'service' ? (
+                                  <span className="text-slate-300 font-mono text-xs font-bold">-</span>
+                                ) : (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={`font-mono font-bold text-xs ${
+                                      Number(product.current_stock ?? product.stock ?? 0) <= 0 
+                                        ? 'text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200/70' 
+                                        : 'text-slate-900 bg-slate-100/90 px-2 py-0.5 rounded border border-slate-200'
+                                    }`}>
+                                      {formatNumber(product.current_stock ?? product.stock ?? 0)}
+                                    </span>
+                                    {product.unit && (
+                                      <span className="text-[10px] text-slate-400 font-medium">{product.unit}</span>
+                                    )}
+                                  </div>
+                                )}
                               </td>
                               <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                                 <span className="font-black text-emerald-600 text-xs">{formatNumber(product.sale_price || 0)} <span className="text-[9px] text-slate-400 font-normal ms-0.5">{t('invoices.currency')}</span></span>
