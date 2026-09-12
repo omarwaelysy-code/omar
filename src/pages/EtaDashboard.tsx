@@ -287,7 +287,13 @@ export const EtaDashboard: React.FC = () => {
     let totalSales = 0;
     let totalDiscount = 0;
     let netAmount = 0;
+    let taxableItemsNet = 0;
+    let nonTaxableItemsNet = 0;
+    let taxableFees = 0;
+    let tableTax = 0;
+    let taxableVatBase = 0;
     let vatAmount = 0;
+    let nonTaxableFees = 0;
     let whtAmount = 0;
     let totalAmount = 0;
 
@@ -310,7 +316,13 @@ export const EtaDashboard: React.FC = () => {
       totalSales += breakdown.totalSales;
       totalDiscount += (Number(inv.totalDiscount) || 0);
       netAmount += breakdown.netAmount;
+      taxableItemsNet += (Number(breakdown.taxableItemsNet) || 0);
+      nonTaxableItemsNet += (Number(breakdown.nonTaxableItemsNet) || 0);
+      taxableFees += (Number(breakdown.taxableFees) || 0);
+      tableTax += (Number(breakdown.tableTax) || 0);
+      taxableVatBase += (Number(breakdown.taxableVatBase) || 0);
       vatAmount += breakdown.vatAmount;
+      nonTaxableFees += (Number(breakdown.nonTaxableFees) || 0);
       whtAmount += breakdown.whtAmount;
       totalAmount += breakdown.totalAmount;
 
@@ -341,7 +353,13 @@ export const EtaDashboard: React.FC = () => {
       totalSales,
       totalDiscount,
       netAmount,
+      taxableItemsNet,
+      nonTaxableItemsNet,
+      taxableFees,
+      tableTax,
+      taxableVatBase,
       vatAmount,
+      nonTaxableFees,
       whtAmount,
       totalAmount,
       typesList
@@ -383,12 +401,28 @@ export const EtaDashboard: React.FC = () => {
     const map: Record<string, {
       sentCount: number;
       sentNet: number;
+      sentTaxableItemsNet: number;
+      sentNonTaxableItemsNet: number;
+      sentTaxableFees: number;
+      sentTableTax: number;
+      sentTaxableVatBase: number;
       sentVat: number;
+      sentNonTaxableFees: number;
+      sentWht: number;
       sentTotal: number;
+
       receivedCount: number;
       receivedNet: number;
+      receivedTaxableItemsNet: number;
+      receivedNonTaxableItemsNet: number;
+      receivedTaxableFees: number;
+      receivedTableTax: number;
+      receivedTaxableVatBase: number;
       receivedVat: number;
+      receivedNonTaxableFees: number;
+      receivedWht: number;
       receivedTotal: number;
+
       netDiff: number;
       vatDiff: number;
     }> = {};
@@ -397,12 +431,28 @@ export const EtaDashboard: React.FC = () => {
       map[m.id] = {
         sentCount: 0,
         sentNet: 0,
+        sentTaxableItemsNet: 0,
+        sentNonTaxableItemsNet: 0,
+        sentTaxableFees: 0,
+        sentTableTax: 0,
+        sentTaxableVatBase: 0,
         sentVat: 0,
+        sentNonTaxableFees: 0,
+        sentWht: 0,
         sentTotal: 0,
+
         receivedCount: 0,
         receivedNet: 0,
+        receivedTaxableItemsNet: 0,
+        receivedNonTaxableItemsNet: 0,
+        receivedTaxableFees: 0,
+        receivedTableTax: 0,
+        receivedTaxableVatBase: 0,
         receivedVat: 0,
+        receivedNonTaxableFees: 0,
+        receivedWht: 0,
         receivedTotal: 0,
+
         netDiff: 0,
         vatDiff: 0
       };
@@ -415,12 +465,26 @@ export const EtaDashboard: React.FC = () => {
         if (inv.direction === 'Sent') {
           map[m].sentCount += 1;
           map[m].sentNet += b.netAmount;
+          map[m].sentTaxableItemsNet += (Number(b.taxableItemsNet) || 0);
+          map[m].sentNonTaxableItemsNet += (Number(b.nonTaxableItemsNet) || 0);
+          map[m].sentTaxableFees += (Number(b.taxableFees) || 0);
+          map[m].sentTableTax += (Number(b.tableTax) || 0);
+          map[m].sentTaxableVatBase += (Number(b.taxableVatBase) || 0);
           map[m].sentVat += b.vatAmount;
+          map[m].sentNonTaxableFees += (Number(b.nonTaxableFees) || 0);
+          map[m].sentWht += b.whtAmount;
           map[m].sentTotal += b.totalAmount;
         } else {
           map[m].receivedCount += 1;
           map[m].receivedNet += b.netAmount;
+          map[m].receivedTaxableItemsNet += (Number(b.taxableItemsNet) || 0);
+          map[m].receivedNonTaxableItemsNet += (Number(b.nonTaxableItemsNet) || 0);
+          map[m].receivedTaxableFees += (Number(b.taxableFees) || 0);
+          map[m].receivedTableTax += (Number(b.tableTax) || 0);
+          map[m].receivedTaxableVatBase += (Number(b.taxableVatBase) || 0);
           map[m].receivedVat += b.vatAmount;
+          map[m].receivedNonTaxableFees += (Number(b.nonTaxableFees) || 0);
+          map[m].receivedWht += b.whtAmount;
           map[m].receivedTotal += b.totalAmount;
         }
       }
@@ -463,46 +527,119 @@ export const EtaDashboard: React.FC = () => {
 
     // 2. Transposed Monthly Matrix Sheet
     const matrixRows = [
+      // Sales
       {
         [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المبيعات الصادرة - عدد الوثائق' : 'Sales - Docs Count',
         ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.sentCount || 0 }), {}),
         [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: sentTotals.count
       },
       {
-        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المبيعات الصادرة - صافي القيمة' : 'Sales - Net Amount',
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المبيعات الصادرة - الصافي' : 'Sales - Net Amount',
         ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.sentNet || 0 }), {}),
         [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: sentTotals.netAmount
       },
       {
-        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المبيعات الصادرة - ضريبة المخرجات 14%' : 'Sales - Output VAT',
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المبيعات الصادرة - الأصناف الخاضعة لـ 14%' : 'Sales - Taxable Items (14%)',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.sentTaxableItemsNet || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: sentTotals.taxableItemsNet
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المبيعات الصادرة - الأصناف غير الخاضعة / المعفاة' : 'Sales - Exempt / Non-Taxable Items',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.sentNonTaxableItemsNet || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: sentTotals.nonTaxableItemsNet
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المبيعات الصادرة - ضرائب ورسوم تدخل في الوعاء' : 'Sales - Fees In Base',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.sentTaxableFees || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: sentTotals.taxableFees
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المبيعات الصادرة - ضرائب جدول' : 'Sales - Table Tax',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.sentTableTax || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: sentTotals.tableTax
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المبيعات الصادرة - إجمالي الوعاء الضريبي لـ 14%' : 'Sales - Taxable VAT Base (14%)',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.sentTaxableVatBase || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: sentTotals.taxableVatBase
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المبيعات الصادرة - 14% القيمة المضافة' : 'Sales - VAT 14%',
         ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.sentVat || 0 }), {}),
         [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: sentTotals.vatAmount
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المبيعات الصادرة - ضرائب ورسوم لا تدخل في الوعاء' : 'Sales - Fees Not In Base',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.sentNonTaxableFees || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: sentTotals.nonTaxableFees
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المبيعات الصادرة - الخصم والتحصيل تحت حساب الضريبة' : 'Sales - Withholding Tax (WHT)',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.sentWht || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: sentTotals.whtAmount
       },
       {
         [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المبيعات الصادرة - الإجمالي شامل الضريبة' : 'Sales - Grand Total',
         ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.sentTotal || 0 }), {}),
         [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: sentTotals.totalAmount
       },
+      // Purchases
       {
         [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المشتريات المستلمة - عدد الوثائق' : 'Purchases - Docs Count',
         ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.receivedCount || 0 }), {}),
         [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: receivedTotals.count
       },
       {
-        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المشتريات المستلمة - صافي القيمة' : 'Purchases - Net Amount',
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المشتريات المستلمة - الصافي' : 'Purchases - Net Amount',
         ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.receivedNet || 0 }), {}),
         [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: receivedTotals.netAmount
       },
       {
-        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المشتريات المستلمة - ضريبة المدخلات 14%' : 'Purchases - Input VAT',
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المشتريات المستلمة - الأصناف الخاضعة لـ 14%' : 'Purchases - Taxable Items (14%)',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.receivedTaxableItemsNet || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: receivedTotals.taxableItemsNet
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المشتريات المستلمة - الأصناف غير الخاضعة / المعفاة' : 'Purchases - Exempt / Non-Taxable Items',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.receivedNonTaxableItemsNet || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: receivedTotals.nonTaxableItemsNet
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المشتريات المستلمة - ضرائب ورسوم تدخل في الوعاء' : 'Purchases - Fees In Base',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.receivedTaxableFees || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: receivedTotals.taxableFees
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المشتريات المستلمة - ضرائب جدول' : 'Purchases - Table Tax',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.receivedTableTax || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: receivedTotals.tableTax
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المشتريات المستلمة - إجمالي الوعاء الضريبي لـ 14%' : 'Purchases - Taxable VAT Base (14%)',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.receivedTaxableVatBase || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: receivedTotals.taxableVatBase
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المشتريات المستلمة - 14% القيمة المضافة' : 'Purchases - VAT 14%',
         ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.receivedVat || 0 }), {}),
         [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: receivedTotals.vatAmount
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المشتريات المستلمة - ضرائب ورسوم لا تدخل في الوعاء' : 'Purchases - Fees Not In Base',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.receivedNonTaxableFees || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: receivedTotals.nonTaxableFees
+      },
+      {
+        [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المشتريات المستلمة - الخصم والتحصيل تحت حساب الضريبة' : 'Purchases - Withholding Tax (WHT)',
+        ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.receivedWht || 0 }), {}),
+        [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: receivedTotals.whtAmount
       },
       {
         [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'المشتريات المستلمة - الإجمالي شامل الضريبة' : 'Purchases - Grand Total',
         ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.receivedTotal || 0 }), {}),
         [language === 'ar' ? 'الإجمالي الكلي' : 'Total']: receivedTotals.totalAmount
       },
+      // Clearance / Differences
       {
         [language === 'ar' ? 'البيان' : 'Metric']: language === 'ar' ? 'صافي فرق القيمة (مبيعات - مشتريات)' : 'Net Margin (Sales - Purchases)',
         ...MONTHS_LIST.reduce((acc, m) => ({ ...acc, [m.shortAr]: monthlyDataMap[m.id]?.netDiff || 0 }), {}),
@@ -1247,7 +1384,7 @@ export const EtaDashboard: React.FC = () => {
             {/* Header: Months Across The Top */}
             <thead>
               <tr className="bg-slate-100/90 text-slate-800 border-b border-slate-200">
-                <th className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-slate-100 py-3 px-3.5 text-start font-black text-xs border-x border-slate-200 min-w-[210px]`}>
+                <th className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-slate-100 py-3 px-3.5 text-start font-black text-xs border-x border-slate-200 min-w-[250px]`}>
                   {language === 'ar' ? 'البيان / البند المالي والضريبي' : 'Financial Metric'}
                 </th>
                 {MONTHS_LIST.map(m => (
@@ -1272,8 +1409,9 @@ export const EtaDashboard: React.FC = () => {
                 </td>
               </tr>
 
+              {/* 1. عدد الفواتير */}
               <tr className="hover:bg-sky-50/30 transition-colors">
-                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-bold text-slate-700 py-2.5 px-3 text-start border-x border-slate-200`}>
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-bold text-slate-700 py-2 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
                   {language === 'ar' ? '• عدد الفواتير الصادرة' : '• Issued Docs Count'}
                 </td>
                 {MONTHS_LIST.map(m => (
@@ -1286,9 +1424,10 @@ export const EtaDashboard: React.FC = () => {
                 </td>
               </tr>
 
+              {/* 2. الصافي */}
               <tr className="hover:bg-sky-50/30 transition-colors">
-                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-bold text-slate-700 py-2.5 px-3 text-start border-x border-slate-200`}>
-                  {language === 'ar' ? '• صافي المبيعات (الوعاء الضريبي)' : '• Net Sales Amount'}
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-bold text-slate-700 py-2 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
+                  {language === 'ar' ? '• الصافي' : '• Net Amount'}
                 </td>
                 {MONTHS_LIST.map(m => (
                   <td key={m.id} className="py-2 px-2 border-r border-slate-200 text-slate-800">
@@ -1300,9 +1439,85 @@ export const EtaDashboard: React.FC = () => {
                 </td>
               </tr>
 
+              {/* 3. الأصناف الخاضعة لـ 14% */}
+              <tr className="hover:bg-sky-50/30 transition-colors">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-medium text-slate-700 py-2 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
+                  {language === 'ar' ? '• الأصناف الخاضعة لـ 14%' : '• Taxable Items (14%)'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 text-slate-800">
+                    {monthlyDataMap[m.id]?.sentTaxableItemsNet ? formatMoney(monthlyDataMap[m.id].sentTaxableItemsNet) : '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-bold bg-sky-50/50 text-sky-900">
+                  {formatMoney(sentTotals.taxableItemsNet)}
+                </td>
+              </tr>
+
+              {/* 4. الأصناف غير الخاضعة / المعفاة */}
+              <tr className="hover:bg-sky-50/30 transition-colors">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-medium text-slate-700 py-2 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
+                  {language === 'ar' ? '• الأصناف غير الخاضعة / المعفاة' : '• Exempt / Non-Taxable Items'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 text-slate-800">
+                    {monthlyDataMap[m.id]?.sentNonTaxableItemsNet ? formatMoney(monthlyDataMap[m.id].sentNonTaxableItemsNet) : '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-bold bg-sky-50/50 text-sky-900">
+                  {formatMoney(sentTotals.nonTaxableItemsNet)}
+                </td>
+              </tr>
+
+              {/* 5. ضرائب ورسوم تدخل في الوعاء */}
+              <tr className="hover:bg-sky-50/30 transition-colors">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-medium text-slate-700 py-2 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
+                  {language === 'ar' ? '• ضرائب ورسوم تدخل في الوعاء' : '• Fees In Base'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 text-slate-800">
+                    {monthlyDataMap[m.id]?.sentTaxableFees ? formatMoney(monthlyDataMap[m.id].sentTaxableFees) : '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-bold bg-sky-50/50 text-sky-900">
+                  {formatMoney(sentTotals.taxableFees)}
+                </td>
+              </tr>
+
+              {/* 6. ضرائب جدول */}
+              <tr className="hover:bg-sky-50/30 transition-colors">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-medium text-slate-700 py-2 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
+                  {language === 'ar' ? '• ضرائب جدول' : '• Table Tax'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 text-slate-800">
+                    {monthlyDataMap[m.id]?.sentTableTax ? formatMoney(monthlyDataMap[m.id].sentTableTax) : '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-bold bg-sky-50/50 text-sky-900">
+                  {formatMoney(sentTotals.tableTax)}
+                </td>
+              </tr>
+
+              {/* 7. إجمالي الوعاء الضريبي لـ 14% */}
+              <tr className="hover:bg-sky-50/30 transition-colors bg-sky-50/10">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-bold text-sky-900 py-2 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
+                  {language === 'ar' ? '• إجمالي الوعاء الضريبي لـ 14%' : '• Total VAT Base (14%)'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 font-semibold text-sky-900">
+                    {monthlyDataMap[m.id]?.sentTaxableVatBase ? formatMoney(monthlyDataMap[m.id].sentTaxableVatBase) : '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-black bg-sky-100/50 text-sky-950">
+                  {formatMoney(sentTotals.taxableVatBase)}
+                </td>
+              </tr>
+
+              {/* 8. 14% القيمة المضافة */}
               <tr className="hover:bg-sky-50/30 transition-colors bg-sky-50/20">
-                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-black text-sky-800 py-2.5 px-3 text-start border-x border-slate-200`}>
-                  {language === 'ar' ? '• ضريبة المخرجات 14% (T1)' : '• Output VAT 14% (T1)'}
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-black text-sky-800 py-2 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
+                  {language === 'ar' ? '• 14% القيمة المضافة' : '• Value Added Tax 14% (T1)'}
                 </td>
                 {MONTHS_LIST.map(m => (
                   <td key={m.id} className="py-2 px-2 border-r border-slate-200 font-bold text-sky-800">
@@ -1314,16 +1529,47 @@ export const EtaDashboard: React.FC = () => {
                 </td>
               </tr>
 
+              {/* 9. ضرائب ورسوم لا تدخل في الوعاء */}
               <tr className="hover:bg-sky-50/30 transition-colors">
-                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-bold text-slate-900 py-2.5 px-3 text-start border-x border-slate-200`}>
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-medium text-slate-700 py-2 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
+                  {language === 'ar' ? '• ضرائب ورسوم لا تدخل في الوعاء' : '• Fees Not In Base'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 text-slate-800">
+                    {monthlyDataMap[m.id]?.sentNonTaxableFees ? formatMoney(monthlyDataMap[m.id].sentNonTaxableFees) : '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-bold bg-sky-50/50 text-sky-900">
+                  {formatMoney(sentTotals.nonTaxableFees)}
+                </td>
+              </tr>
+
+              {/* 10. الخصم والتحصيل تحت حساب الضريبة */}
+              <tr className="hover:bg-sky-50/30 transition-colors">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-medium text-slate-700 py-2 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
+                  {language === 'ar' ? '• الخصم والتحصيل تحت حساب الضريبة' : '• Withholding Tax (WHT / T4)'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 text-slate-800">
+                    {monthlyDataMap[m.id]?.sentWht ? formatMoney(monthlyDataMap[m.id].sentWht) : '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-bold bg-sky-50/50 text-sky-900">
+                  {formatMoney(sentTotals.whtAmount)}
+                </td>
+              </tr>
+
+              {/* 11. إجمالي الصادر شامل الضريبة */}
+              <tr className="hover:bg-sky-50/30 transition-colors bg-sky-50/30">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-black text-slate-900 py-2.5 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
                   {language === 'ar' ? '• إجمالي الصادر شامل الضريبة' : '• Total Sales with Tax'}
                 </td>
                 {MONTHS_LIST.map(m => (
-                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 font-semibold text-slate-900">
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 font-bold text-slate-900">
                     {monthlyDataMap[m.id]?.sentTotal ? formatMoney(monthlyDataMap[m.id].sentTotal) : '—'}
                   </td>
                 ))}
-                <td className="py-2 px-2 border-r border-slate-200 font-black bg-sky-50/50 text-sky-900">
+                <td className="py-2 px-2 border-r border-slate-200 font-black bg-sky-100/70 text-sky-950">
                   {formatMoney(sentTotals.totalAmount)}
                 </td>
               </tr>
@@ -1338,8 +1584,9 @@ export const EtaDashboard: React.FC = () => {
                 </td>
               </tr>
 
+              {/* 1. عدد الفواتير المستلمة */}
               <tr className="hover:bg-emerald-50/30 transition-colors">
-                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-bold text-slate-700 py-2.5 px-3 text-start border-x border-slate-200`}>
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-bold text-slate-700 py-2 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
                   {language === 'ar' ? '• عدد الفواتير المستلمة' : '• Received Docs Count'}
                 </td>
                 {MONTHS_LIST.map(m => (
@@ -1352,9 +1599,10 @@ export const EtaDashboard: React.FC = () => {
                 </td>
               </tr>
 
+              {/* 2. الصافي */}
               <tr className="hover:bg-emerald-50/30 transition-colors">
-                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-bold text-slate-700 py-2.5 px-3 text-start border-x border-slate-200`}>
-                  {language === 'ar' ? '• صافي المشتريات (الوعاء الضريبي)' : '• Net Purchases Amount'}
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-bold text-slate-700 py-2 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
+                  {language === 'ar' ? '• الصافي' : '• Net Amount'}
                 </td>
                 {MONTHS_LIST.map(m => (
                   <td key={m.id} className="py-2 px-2 border-r border-slate-200 text-slate-800">
@@ -1366,9 +1614,85 @@ export const EtaDashboard: React.FC = () => {
                 </td>
               </tr>
 
+              {/* 3. الأصناف الخاضعة لـ 14% */}
+              <tr className="hover:bg-emerald-50/30 transition-colors">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-medium text-slate-700 py-2 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
+                  {language === 'ar' ? '• الأصناف الخاضعة لـ 14%' : '• Taxable Items (14%)'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 text-slate-800">
+                    {monthlyDataMap[m.id]?.receivedTaxableItemsNet ? formatMoney(monthlyDataMap[m.id].receivedTaxableItemsNet) : '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-bold bg-emerald-50/50 text-emerald-900">
+                  {formatMoney(receivedTotals.taxableItemsNet)}
+                </td>
+              </tr>
+
+              {/* 4. الأصناف غير الخاضعة / المعفاة */}
+              <tr className="hover:bg-emerald-50/30 transition-colors">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-medium text-slate-700 py-2 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
+                  {language === 'ar' ? '• الأصناف غير الخاضعة / المعفاة' : '• Exempt / Non-Taxable Items'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 text-slate-800">
+                    {monthlyDataMap[m.id]?.receivedNonTaxableItemsNet ? formatMoney(monthlyDataMap[m.id].receivedNonTaxableItemsNet) : '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-bold bg-emerald-50/50 text-emerald-900">
+                  {formatMoney(receivedTotals.nonTaxableItemsNet)}
+                </td>
+              </tr>
+
+              {/* 5. ضرائب ورسوم تدخل في الوعاء */}
+              <tr className="hover:bg-emerald-50/30 transition-colors">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-medium text-slate-700 py-2 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
+                  {language === 'ar' ? '• ضرائب ورسوم تدخل في الوعاء' : '• Fees In Base'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 text-slate-800">
+                    {monthlyDataMap[m.id]?.receivedTaxableFees ? formatMoney(monthlyDataMap[m.id].receivedTaxableFees) : '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-bold bg-emerald-50/50 text-emerald-900">
+                  {formatMoney(receivedTotals.taxableFees)}
+                </td>
+              </tr>
+
+              {/* 6. ضرائب جدول */}
+              <tr className="hover:bg-emerald-50/30 transition-colors">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-medium text-slate-700 py-2 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
+                  {language === 'ar' ? '• ضرائب جدول' : '• Table Tax'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 text-slate-800">
+                    {monthlyDataMap[m.id]?.receivedTableTax ? formatMoney(monthlyDataMap[m.id].receivedTableTax) : '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-bold bg-emerald-50/50 text-emerald-900">
+                  {formatMoney(receivedTotals.tableTax)}
+                </td>
+              </tr>
+
+              {/* 7. إجمالي الوعاء الضريبي لـ 14% */}
+              <tr className="hover:bg-emerald-50/30 transition-colors bg-emerald-50/10">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-bold text-emerald-900 py-2 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
+                  {language === 'ar' ? '• إجمالي الوعاء الضريبي لـ 14%' : '• Total VAT Base (14%)'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 font-semibold text-emerald-900">
+                    {monthlyDataMap[m.id]?.receivedTaxableVatBase ? formatMoney(monthlyDataMap[m.id].receivedTaxableVatBase) : '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-black bg-emerald-100/50 text-emerald-950">
+                  {formatMoney(receivedTotals.taxableVatBase)}
+                </td>
+              </tr>
+
+              {/* 8. 14% القيمة المضافة */}
               <tr className="hover:bg-emerald-50/30 transition-colors bg-emerald-50/20">
-                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-black text-emerald-800 py-2.5 px-3 text-start border-x border-slate-200`}>
-                  {language === 'ar' ? '• ضريبة المدخلات 14% (T1)' : '• Input VAT 14% (T1)'}
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-black text-emerald-800 py-2 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
+                  {language === 'ar' ? '• 14% القيمة المضافة' : '• Value Added Tax 14% (T1)'}
                 </td>
                 {MONTHS_LIST.map(m => (
                   <td key={m.id} className="py-2 px-2 border-r border-slate-200 font-bold text-emerald-800">
@@ -1380,16 +1704,47 @@ export const EtaDashboard: React.FC = () => {
                 </td>
               </tr>
 
+              {/* 9. ضرائب ورسوم لا تدخل في الوعاء */}
               <tr className="hover:bg-emerald-50/30 transition-colors">
-                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-bold text-slate-900 py-2.5 px-3 text-start border-x border-slate-200`}>
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-medium text-slate-700 py-2 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
+                  {language === 'ar' ? '• ضرائب ورسوم لا تدخل في الوعاء' : '• Fees Not In Base'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 text-slate-800">
+                    {monthlyDataMap[m.id]?.receivedNonTaxableFees ? formatMoney(monthlyDataMap[m.id].receivedNonTaxableFees) : '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-bold bg-emerald-50/50 text-emerald-900">
+                  {formatMoney(receivedTotals.nonTaxableFees)}
+                </td>
+              </tr>
+
+              {/* 10. الخصم والتحصيل تحت حساب الضريبة */}
+              <tr className="hover:bg-emerald-50/30 transition-colors">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-medium text-slate-700 py-2 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
+                  {language === 'ar' ? '• الخصم والتحصيل تحت حساب الضريبة' : '• Withholding Tax (WHT / T4)'}
+                </td>
+                {MONTHS_LIST.map(m => (
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 text-slate-800">
+                    {monthlyDataMap[m.id]?.receivedWht ? formatMoney(monthlyDataMap[m.id].receivedWht) : '—'}
+                  </td>
+                ))}
+                <td className="py-2 px-2 border-r border-slate-200 font-bold bg-emerald-50/50 text-emerald-900">
+                  {formatMoney(receivedTotals.whtAmount)}
+                </td>
+              </tr>
+
+              {/* 11. إجمالي المستلم شامل الضريبة */}
+              <tr className="hover:bg-emerald-50/30 transition-colors bg-emerald-50/30">
+                <td className={`sticky ${dir === 'rtl' ? 'right-0' : 'left-0'} z-10 bg-white font-sans font-black text-slate-900 py-2.5 px-3 text-start border-x border-slate-200 min-w-[250px]`}>
                   {language === 'ar' ? '• إجمالي المستلم شامل الضريبة' : '• Total Purchases with Tax'}
                 </td>
                 {MONTHS_LIST.map(m => (
-                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 font-semibold text-slate-900">
+                  <td key={m.id} className="py-2 px-2 border-r border-slate-200 font-bold text-slate-900">
                     {monthlyDataMap[m.id]?.receivedTotal ? formatMoney(monthlyDataMap[m.id].receivedTotal) : '—'}
                   </td>
                 ))}
-                <td className="py-2 px-2 border-r border-slate-200 font-black bg-emerald-50/50 text-emerald-900">
+                <td className="py-2 px-2 border-r border-slate-200 font-black bg-emerald-100/70 text-emerald-950">
                   {formatMoney(receivedTotals.totalAmount)}
                 </td>
               </tr>
