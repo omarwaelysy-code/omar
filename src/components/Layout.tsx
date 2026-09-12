@@ -57,6 +57,7 @@ import {
   Radio,
   Laptop,
   HelpCircle,
+  Link2,
   Trash2,
   Edit3,
   Printer,
