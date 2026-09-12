@@ -43,7 +43,7 @@ export const PurchaseInvoices: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
-  const { pendingViewDoc, setPendingViewDoc, setCurrentPage, pendingEtaInvoiceForPurchase, setPendingEtaInvoiceForPurchase } = useNavigation();
+  const { pendingViewDoc, setPendingViewDoc, setCurrentPage, closeTab, pendingEtaInvoiceForPurchase, setPendingEtaInvoiceForPurchase } = useNavigation();
 
   // ETA Invoices Conversion State & Lock
   const [etaLockData, setEtaLockData] = useState<{
@@ -73,6 +73,122 @@ export const PurchaseInvoices: React.FC = () => {
   const isMultiCurrencyEnabled = companyData?.settings?.enable_multi_currency || (companyData as any)?.enable_multi_currency || false;
   const [settings, setSettings] = useState<any>(null);
   const [purchaseInvoices, setPurchaseInvoices] = useState<any[]>([]);
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
+  const [isExportingPDFSelected, setIsExportingPDFSelected] = useState(false);
+  const [isColumnSelectorOpen, setIsColumnSelectorOpen] = useState(false);
+  const columnSelectorRef = useRef<HTMLDivElement>(null);
+
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem(`purchase_invoices_visible_columns_${user?.id}`);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return {
+      invoice_number: true,
+      supplier_name: true,
+      date: true,
+      description: true,
+      payment_type: true,
+      status: true,
+      currency: true,
+      foreign_amount: true,
+      remaining_foreign: true,
+      subtotal: true,
+      tax_amount: true,
+      base_amount: true,
+      remaining: true,
+      entry_number: true,
+      created_date: false,
+      created_time: false,
+      updated_date: false,
+      updated_time: false,
+    };
+  });
+
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
+    invoice_number: 140,
+    supplier_name: 180,
+    date: 110,
+    description: 150,
+    payment_type: 100,
+    status: 100,
+    currency: 80,
+    foreign_amount: 120,
+    remaining_foreign: 120,
+    subtotal: 120,
+    tax_amount: 100,
+    base_amount: 150,
+    remaining: 120,
+    entry_number: 150,
+    created_date: 110,
+    created_time: 90,
+    updated_date: 110,
+    updated_time: 90,
+  });
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (columnSelectorRef.current && !columnSelectorRef.current.contains(event.target as Node)) {
+        setIsColumnSelectorOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleResizeStart = (e: React.MouseEvent, columnKey: string, side: 'left' | 'right') => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startWidth = columnWidths[columnKey] || 100;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      let widthChange = side === 'left' ? -deltaX : deltaX;
+      if (dir === 'rtl') {
+        widthChange = -widthChange;
+      }
+      
+      const newWidth = Math.max(50, startWidth + widthChange);
+      setColumnWidths((prev) => ({
+        ...prev,
+        [columnKey]: newWidth,
+      }));
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const renderResizeHandles = (columnKey: string) => {
+    return (
+      <>
+        {/* Left resize handle */}
+        <div
+          onMouseDown={(e) => handleResizeStart(e, columnKey, 'left')}
+          className="absolute top-0 left-0 bottom-0 w-3 cursor-col-resize group/resize z-10 flex items-center justify-center -ml-1.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="w-[2px] h-4 bg-slate-200 group-hover/resize:bg-emerald-500 group-hover/resize:h-full transition-all duration-150" />
+        </div>
+        {/* Right resize handle */}
+        <div
+          onMouseDown={(e) => handleResizeStart(e, columnKey, 'right')}
+          className="absolute top-0 right-0 bottom-0 w-3 cursor-col-resize group/resize z-10 flex items-center justify-center -mr-1.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="w-[2px] h-4 bg-slate-200 group-hover/resize:bg-emerald-500 group-hover/resize:h-full transition-all duration-150" />
+        </div>
+      </>
+    );
+  };
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -3489,24 +3605,96 @@ export const PurchaseInvoices: React.FC = () => {
     }
   };
 
-  const handleExportExcel = () => {
-    const formattedData = formatDataForExcel(purchaseInvoices, {
-      'invoice_number': t('pi.invoice_number'),
-      'supplier_name': t('pi.supplier'),
-      'date': t('common.date'),
-      'total_amount': t('pi.total_amount'),
-      'purchase_type': t('pi.purchase_type')
+  const handleExportExcel = (onlySelected: boolean = false) => {
+    const listToExport = onlySelected && selectedInvoiceIds.length > 0
+      ? filteredInvoices.filter(inv => selectedInvoiceIds.includes(inv.id))
+      : filteredInvoices;
+
+    const dataToExport = listToExport.map(inv => {
+      const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
+      const currencyCode = inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP');
+      const isForeign = currencyCode.toLowerCase() !== baseCode;
+
+      const settlements = (allReceipts.length > 0 || allPayments.length > 0 || entries.length > 0) ? getInvoiceSettlements(inv) : (inv.settlements || []);
+      const totalSettled = settlements.reduce((sum: number, s: any) => sum + (Number(s.settled_amount || s.amount) || 0), 0);
+      const remaining = inv.payment_type === 'cash' ? 0 : Math.max(0, inv.total_amount - totalSettled);
+      const remainingLocal = remaining * (Number(inv.exchange_rate) || 1);
+
+      const statusLabels = {
+        paid: 'مدفوعة',
+        partial: 'مدفوعة جزئياً',
+        unpaid: 'غير مدفوعة',
+      };
+      const paymentStatus = statusLabels[getPaymentStatus(inv)] || 'غير مدفوعة';
+
+      return {
+        ...inv,
+        formatted_invoice_number: inv.invoice_number,
+        formatted_supplier_name: inv.supplier_name,
+        formatted_date: formatDate(inv.date),
+        formatted_description: inv.description || '-',
+        formatted_payment_type: inv.payment_type === 'cash' ? 'نقدي' : 'آجل',
+        formatted_status: paymentStatus,
+        formatted_currency: currencyCode,
+        formatted_foreign_amount: isForeign ? inv.total_amount : '-',
+        formatted_remaining_foreign: isForeign ? remaining : '-',
+        formatted_subtotal: (Number(inv.subtotal) || Number(inv.total_amount) || 0) * (Number(inv.exchange_rate) || 1),
+        formatted_tax_amount: (Number(inv.tax_amount) || 0) * (Number(inv.exchange_rate) || 1),
+        formatted_base_amount: (Number(inv.total_amount) || 0) * (Number(inv.exchange_rate) || 1),
+        formatted_remaining: remainingLocal,
+        formatted_entry_number: inv.entry_number || '-',
+        formatted_created_date: formatTimestampDate(inv.created_at),
+        formatted_created_time: formatTimestampTime(inv.created_at),
+        formatted_updated_date: formatTimestampDate(inv.updated_at || inv.created_at),
+        formatted_updated_time: formatTimestampTime(inv.updated_at || inv.created_at),
+      };
     });
-    exportToExcel(formattedData, { filename: 'Purchase_Invoices_Report', sheetName: t('pi.title') });
+
+    const keyMap: Record<string, string> = {};
+    if (visibleColumns.invoice_number) keyMap['formatted_invoice_number'] = 'رقم الفاتورة';
+    if (visibleColumns.supplier_name) keyMap['formatted_supplier_name'] = 'المورد';
+    if (visibleColumns.date) keyMap['formatted_date'] = 'التاريخ';
+    if (visibleColumns.description) keyMap['formatted_description'] = 'وصف الفاتورة';
+    if (visibleColumns.payment_type) keyMap['formatted_payment_type'] = 'طريقة الدفع';
+    if (visibleColumns.status) keyMap['formatted_status'] = 'حالة الدفع';
+    if (visibleColumns.currency && isMultiCurrencyEnabled) keyMap['formatted_currency'] = 'العملة';
+    if (visibleColumns.foreign_amount && isMultiCurrencyEnabled) keyMap['formatted_foreign_amount'] = 'صافي القيمة بالعملة الأجنبية';
+    if (visibleColumns.remaining_foreign && isMultiCurrencyEnabled) keyMap['formatted_remaining_foreign'] = 'الباقي بالعملة الأجنبية';
+    if (visibleColumns.subtotal && isVatEnabled) keyMap['formatted_subtotal'] = 'قبل الضريبة';
+    if (visibleColumns.tax_amount && isVatEnabled) keyMap['formatted_tax_amount'] = 'الضريبة';
+    if (visibleColumns.base_amount) keyMap['formatted_base_amount'] = 'القيمة المعادلة بالعملة المحلية';
+    if (visibleColumns.remaining) keyMap['formatted_remaining'] = 'الباقي من الفاتورة';
+    if (visibleColumns.entry_number) keyMap['formatted_entry_number'] = 'رقم القيد';
+    if (visibleColumns.created_date) keyMap['formatted_created_date'] = 'تاريخ الإنشاء';
+    if (visibleColumns.created_time) keyMap['formatted_created_time'] = 'وقت الإنشاء';
+    if (visibleColumns.updated_date) keyMap['formatted_updated_date'] = 'تاريخ آخر تعديل';
+    if (visibleColumns.updated_time) keyMap['formatted_updated_time'] = 'وقت آخر تعديل';
+
+    const formattedData = formatDataForExcel(dataToExport, keyMap);
+    exportToExcel(formattedData, { filename: 'Purchase_Invoices_Report', sheetName: 'فواتير المشتريات' });
   };
 
-  const handleExportPDF = async () => {
-    if (tableRef.current) {
-      await exportToPDFUtil(tableRef.current, { 
-        filename: 'Purchase_Invoices_Report', 
-        orientation: 'landscape',
-        reportTitle: t('pi.report_title')
-      });
+  const handleExportPDF = async (onlySelected: boolean = false) => {
+    if (onlySelected) {
+      setIsExportingPDFSelected(true);
+      setTimeout(async () => {
+        if (tableRef.current) {
+          await exportToPDFUtil(tableRef.current, { 
+            filename: 'Purchase_Invoices_Selected_Report', 
+            orientation: 'landscape',
+            reportTitle: 'قائمة فواتير المشتريات المحددة'
+          });
+        }
+        setIsExportingPDFSelected(false);
+      }, 100);
+    } else {
+      if (tableRef.current) {
+        await exportToPDFUtil(tableRef.current, { 
+          filename: 'Purchase_Invoices_Report', 
+          orientation: 'landscape',
+          reportTitle: t('pi.report_title')
+        });
+      }
     }
   };
 
@@ -3551,419 +3739,1018 @@ export const PurchaseInvoices: React.FC = () => {
     i.supplier_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const formatTimestampDate = (tsStr: any) => {
+    if (!tsStr) return '-';
+    const d = new Date(tsStr);
+    if (isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  };
+
+  const formatTimestampTime = (tsStr: any) => {
+    if (!tsStr) return '-';
+    const d = new Date(tsStr);
+    if (isNaN(d.getTime())) return '-';
+    return d.toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+  };
+
+  const selectedTotals = React.useMemo(() => {
+    const selectedInvoices = filteredInvoices.filter(inv => selectedInvoiceIds.includes(inv.id));
+    const total_amount = selectedInvoices.reduce((sum, inv) => sum + (Number(inv.total_amount) || 0), 0);
+    const total_discount = selectedInvoices.reduce((sum, inv) => sum + (Number(inv.discount_amount || inv.discount) || 0), 0);
+    const net_amount = total_amount - total_discount;
+
+    const remaining_amount = selectedInvoices.reduce((sum, inv) => {
+      const settlements = (allReceipts.length > 0 || allPayments.length > 0 || entries.length > 0) ? getInvoiceSettlements(inv) : (inv.settlements || []);
+      const totalSettled = settlements.reduce((sSum: number, s: any) => sSum + (Number(s.settled_amount || s.amount) || 0), 0);
+      const remaining = inv.payment_type === 'cash' ? 0 : Math.max(0, inv.total_amount - totalSettled);
+      const remainingLocal = remaining * (Number(inv.exchange_rate) || 1);
+      return sum + remainingLocal;
+    }, 0);
+
+    return { total_amount, total_discount, net_amount, remaining_amount };
+  }, [selectedInvoiceIds, filteredInvoices, allReceipts, allPayments, entries]);
+
+  const totalRemainingFiltered = React.useMemo(() => {
+    return filteredInvoices.reduce((sum, inv) => {
+      const settlements = (allReceipts.length > 0 || allPayments.length > 0 || entries.length > 0) ? getInvoiceSettlements(inv) : (inv.settlements || []);
+      const totalSettled = settlements.reduce((sSum: number, s: any) => sSum + (Number(s.settled_amount || s.amount) || 0), 0);
+      const remaining = inv.payment_type === 'cash' ? 0 : Math.max(0, inv.total_amount - totalSettled);
+      const remainingLocal = remaining * (Number(inv.exchange_rate) || 1);
+      return sum + remainingLocal;
+    }, 0);
+  }, [filteredInvoices, allReceipts, allPayments, entries]);
+
+  const isAllSelected = filteredInvoices.length > 0 && filteredInvoices.every(inv => selectedInvoiceIds.includes(inv.id));
+
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      const visibleIds = filteredInvoices.map(inv => inv.id);
+      setSelectedInvoiceIds(prev => prev.filter(id => !visibleIds.includes(id)));
+    } else {
+      const visibleIds = filteredInvoices.map(inv => inv.id);
+      setSelectedInvoiceIds(prev => {
+        const newSelection = [...prev];
+        visibleIds.forEach(id => {
+          if (!newSelection.includes(id)) {
+            newSelection.push(id);
+          }
+        });
+        return newSelection;
+      });
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {!isModalOpen ? (
         <>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('pi.title')}</h2>
-          <p className="text-zinc-500">{t('pi.subtitle')}</p>
-          {(serverSummary.total_amount !== undefined) && (
-            <div className={`mt-2 flex items-center gap-4 text-sm ${t('dir') === 'rtl' ? 'flex-row-reverse' : ''}`}>
-              <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
-                {t('pi.total_amount')}: {formatMoney(serverSummary.total_amount)} {t('common.currency')}
-              </span>
-              {serverSummary.total_discount !== undefined && (
-                <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
-                   {t('reports.total_discounts')}: {formatMoney(serverSummary.total_discount)} {t('common.currency')}
-                </span>
-              )}
-              {serverSummary.total_discount !== undefined && (
-                <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100 font-bold">
-                   {t('common.net')}: {formatMoney(serverSummary.total_amount - serverSummary.total_discount)} {t('common.currency')}
-                </span>
+            <div>
+              <h2 className="text-3xl font-bold tracking-tight text-slate-900 italic serif">{t('pi.title')}</h2>
+              <p className="text-slate-500">{t('pi.subtitle')}</p>
+              {(serverSummary.total_amount !== undefined) && (
+                <div className="mt-2 flex flex-col gap-2">
+                  <div className="flex flex-wrap items-center gap-4 text-sm">
+                    <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">إجمالي الفواتير: {formatMoney(serverSummary.total_amount)} {(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
+                    <span className="bg-red-50 text-red-700 px-3 py-1 rounded-full border border-red-100 font-bold">إجمالي الخصومات: {formatMoney(serverSummary.total_discount || 0)} {(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
+                    <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100 font-bold">الصافي: {formatMoney((serverSummary.total_amount || 0) - (serverSummary.total_discount || 0))} {(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
+                    <span className="bg-amber-50 text-amber-700 px-3 py-1 rounded-full border border-amber-100 font-bold">إجمالي المتبقي: {formatMoney(totalRemainingFiltered)} {(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
+                  </div>
+                  {selectedInvoiceIds.length > 0 && (
+                    <div className="flex items-center gap-4 text-sm animate-in slide-in-from-top-1 duration-200">
+                      <span className="bg-zinc-100 text-zinc-700 px-3.5 py-1.5 rounded-full border border-zinc-200 font-bold flex flex-wrap items-center gap-1.5 shadow-sm">
+                        <span>مجموع المحدد ({selectedInvoiceIds.length}):</span>
+                        <span className="text-emerald-700">{formatMoney(selectedTotals.total_amount)}</span>
+                        <span className="text-zinc-300 font-normal">/</span>
+                        <span>الخصم:</span>
+                        <span className="text-red-650">{formatMoney(selectedTotals.total_discount)}</span>
+                        <span className="text-zinc-300 font-normal">/</span>
+                        <span className="text-blue-700">الصافي: {formatMoney(selectedTotals.net_amount)}</span>
+                        <span className="text-zinc-300 font-normal">/</span>
+                        <span className="text-amber-700">المتبقي: {formatMoney(selectedTotals.remaining_amount)}</span>
+                        <span className="text-zinc-500 font-mono text-[10px]">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
+                      </span>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button 
-            onClick={() => setIsActivityLogOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-zinc-600 border border-zinc-200 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm"
-            title={t('common.audit_log')}
-          >
-            <History size={20} />
-            <span className="hidden md:inline">{t('common.audit_log')}</span>
-          </button>
-          <ExportButtons 
-            onExportExcel={handleExportExcel} 
-            onExportPDF={handleExportPDF} 
-            onPrint={() => printElement(tableRef.current, 'فواتير المشتريات')}
-          />
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
-          >
-            <Plus size={20} />
-            {t('pi.add_invoice')}
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-zinc-50 flex items-center gap-4">
-          <div className="relative flex-1">
-            <Search className={`absolute ${t('dir') === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={18} />
-            <input
-              type="text"
-              placeholder={t('pi.search_placeholder')}
-              className={`w-full ${t('dir') === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all`}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <button 
+                onClick={() => setIsActivityLogOpen(true)}
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+                title={t('common.activity_log')}
+              >
+                <History size={20} />
+                <span className="hidden md:inline">{t('common.activity_log')}</span>
+              </button>
+              <ExportButtons 
+                onExportExcel={() => handleExportExcel(false)} 
+                onExportPDF={() => handleExportPDF(false)} 
+                onPrint={() => printElement(tableRef.current, 'قائمة فواتير المشتريات')}
+                onExportExcelSelected={() => handleExportExcel(true)}
+                onExportPDFSelected={() => handleExportPDF(true)}
+                onPrintSelected={() => printElement(tableRef.current, 'فواتير المشتريات المحددة')}
+                selectedCount={selectedInvoiceIds.length}
+              />
+              <button 
+                onClick={() => setIsModalOpen(true)}
+                className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
+              >
+                <Plus size={20} />
+                {t('pi.add_invoice')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  closeTab('purchase_invoices');
+                  setCurrentPage('dashboard');
+                }}
+                className="w-11 h-11 flex items-center justify-center bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-2xl border border-slate-200 transition-all shadow-sm active:scale-95 shrink-0"
+                title={language === 'ar' ? 'إغلاق الشاشة' : 'Close Page'}
+              >
+                <X size={20} className="stroke-[2.5]" />
+              </button>
+            </div>
           </div>
-          <div className="flex bg-zinc-100 p-1 rounded-xl">
-            <button
-              onClick={() => setView('table')}
-              className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
-              title={t('dir') === 'rtl' ? 'عرض الجدول' : 'Table View'}
-            >
-              <List size={18} />
-            </button>
-            <button
-              onClick={() => setView('card')}
-              className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
-              title={t('dir') === 'rtl' ? 'عرض الكروت' : 'Card View'}
-            >
-              <LayoutGrid size={18} />
-            </button>
-          </div>
-        </div>
 
-        {view === 'table' ? (
-          <>
-            <div ref={tableRef} id="purchase-invoices-list-table" className="overflow-x-auto hidden md:block">
-            <table className={`w-full ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
-              <thead>
-                <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                  <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('invoice_number')}>
-                    <div className="flex items-center gap-1">
-                      {t('pi.invoice_number')}
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        {sortBy === 'invoice_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                      </span>
-                    </div>
-                  </th>
-                  <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('supplier_name')}>
-                    <div className="flex items-center gap-1">
-                      {t('pi.supplier')}
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        {sortBy === 'supplier_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                      </span>
-                    </div>
-                  </th>
-                  <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('date')}>
-                    <div className="flex items-center gap-1">
-                      {t('common.date')}
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                      </span>
-                    </div>
-                  </th>
-                  <th className={`px-6 py-4 font-bold ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>حالة الدفع</th>
-                  <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('total_amount')}>
-                    <div className="flex items-center gap-1">
-                      {t('pi.total_amount')}
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        {sortBy === 'total_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                      </span>
-                    </div>
-                  </th>
-                  <th className={`px-6 py-4 font-bold ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</th>
-                  <th className={`px-6 py-4 font-bold ${t('dir') === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.actions')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-50">
-                {filteredInvoices.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-zinc-400 italic">{t('pi.no_invoices')}</td>
-                  </tr>
-                ) : filteredInvoices.map((inv) => (
-                  <tr 
-                    key={inv.id} 
-                    className="hover:bg-zinc-50/50 transition-colors group cursor-pointer"
-                    onClick={() => openModal(inv)}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center gap-4">
+              <div className="relative flex-1">
+                <Search className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 text-slate-400`} size={18} />
+                <input
+                  type="text"
+                  placeholder={t('pi.search_placeholder')}
+                  className={`w-full ${dir === 'rtl' ? 'pl-10 pr-4' : 'pr-10 pl-4'} py-2 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all`}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <div className="flex bg-slate-100 p-1 rounded-xl">
+                <button
+                  onClick={() => setView('table')}
+                  className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
+                >
+                  <List size={18} />
+                </button>
+                <button
+                  onClick={() => setView('card')}
+                  className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
+                >
+                  <LayoutGrid size={18} />
+                </button>
+              </div>
+
+              {/* Column Selection Dropdown */}
+              {view === 'table' && (
+                <div className="relative" ref={columnSelectorRef}>
+                  <button
+                    onClick={() => setIsColumnSelectorOpen(!isColumnSelectorOpen)}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow-sm active:scale-95"
                   >
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col gap-1 items-start">
-                        <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold">{inv.invoice_number}</span>
-                        {inv.eta_invoice_number && (
-                          <span className="font-mono text-[10px] bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-indigo-700 font-bold" title={inv.eta_uuid || ''}>
-                            {language === 'ar' ? 'إلكترونية:' : 'ETA:'} {inv.eta_invoice_number}
-                          </span>
-                        )}
+                    <Eye size={14} className="text-slate-400" />
+                    <span>{language === 'ar' ? 'أعمدة الجدول' : 'Table Columns'}</span>
+                    <ChevronDown size={14} className="text-slate-400" />
+                  </button>
+                  
+                  {isColumnSelectorOpen && (
+                    <div className="absolute top-full mt-1.5 right-0 bg-white border border-slate-200 rounded-xl shadow-xl p-3 z-50 min-w-[220px] max-h-[300px] overflow-y-auto space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest pb-1 border-b border-slate-100">
+                        {language === 'ar' ? 'تخصيص الأعمدة' : 'Customize Columns'}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 font-bold text-zinc-900">{inv.supplier_name}</td>
-                    <td className="px-6 py-4 text-zinc-500">{formatDate(inv.date)}</td>
-                    <td className="px-6 py-4">
-                      {(() => {
-                        const status = getPaymentStatus(inv);
-                        const statusLabels = {
-                          paid: language === 'ar' ? 'مدفوعة' : 'Paid',
-                          partial: language === 'ar' ? 'مدفوعة جزئياً' : 'Partially Paid',
-                          unpaid: language === 'ar' ? 'غير مدفوعة' : 'Unpaid'
+                      {Object.keys(visibleColumns).filter(colKey => {
+                        if (colKey === 'currency' || colKey === 'foreign_amount' || colKey === 'remaining_foreign') {
+                          return isMultiCurrencyEnabled;
+                        }
+                        if (colKey === 'subtotal' || colKey === 'tax_amount') {
+                          return isVatEnabled;
+                        }
+                        return true;
+                      }).map((colKey) => {
+                        const labels: Record<string, string> = {
+                          invoice_number: language === 'ar' ? 'رقم الفاتورة' : 'Invoice Number',
+                          supplier_name: language === 'ar' ? 'المورد' : 'Supplier',
+                          date: language === 'ar' ? 'التاريخ' : 'Date',
+                          description: language === 'ar' ? 'وصف الفاتورة' : 'Description',
+                          payment_type: language === 'ar' ? 'طريقة الدفع' : 'Payment Type',
+                          status: language === 'ar' ? 'حالة الدفع' : 'Payment Status',
+                          currency: language === 'ar' ? 'العملة' : 'Currency',
+                          foreign_amount: language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Currency Amount',
+                          remaining_foreign: language === 'ar' ? 'الباقي بالعملة الأجنبية' : 'Remaining in Foreign Currency',
+                          subtotal: language === 'ar' ? 'قبل الضريبة' : 'Subtotal',
+                          tax_amount: language === 'ar' ? 'الضريبة' : 'Tax',
+                          base_amount: language === 'ar' ? 'القيمة المعادلة بالعملة المحلية' : 'Equivalent Local Amount',
+                          remaining: language === 'ar' ? 'الباقي من الفاتورة' : 'Remaining Balance',
+                          entry_number: language === 'ar' ? 'رقم القيد' : 'Entry Number',
+                          created_date: language === 'ar' ? 'تاريخ الإنشاء' : 'Created Date',
+                          created_time: language === 'ar' ? 'وقت الإنشاء' : 'Created Time',
+                          updated_date: language === 'ar' ? 'تاريخ آخر تعديل' : 'Last Modified Date',
+                          updated_time: language === 'ar' ? 'وقت آخر تعديل' : 'Last Modified Time',
                         };
-                        const statusClasses = {
-                          paid: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-                          partial: 'bg-blue-100 text-blue-800 border-blue-200',
-                          unpaid: 'bg-red-100 text-red-800 border-red-200'
-                        };
+
                         return (
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-bold border ${statusClasses[status]}`}>
-                            {statusLabels[status]}
-                          </span>
+                          <label key={colKey} className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer hover:bg-slate-50 p-1.5 rounded-lg transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={visibleColumns[colKey]}
+                              onChange={() => {
+                                const newVal = !visibleColumns[colKey];
+                                const updated = {
+                                  ...visibleColumns,
+                                  [colKey]: newVal
+                                };
+                                setVisibleColumns(updated);
+                                if (user?.id) {
+                                  localStorage.setItem(`purchase_invoices_visible_columns_${user.id}`, JSON.stringify(updated));
+                                }
+                              }}
+                              className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5"
+                            />
+                            <span>{labels[colKey] || colKey}</span>
+                          </label>
                         );
-                      })()}
-                    </td>
-                    <td className="px-6 py-4 font-bold text-zinc-900">
-                      {formatNumber(inv.total_amount)} <span className="text-[10px] font-bold text-zinc-500">{inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP')}</span>
-                    </td>
-                    <td className={`px-6 py-4 ${t('dir') === 'rtl' ? 'text-right' : 'text-left'}`}>
-                      {inv.entry_number ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPendingViewDoc({ type: 'journal', idOrNumber: inv.entry_number! });
-                            setCurrentPage('journal_entries');
-                          }}
-                          className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-100/50 transition-all active:scale-95"
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <PaginationControls 
+              page={page} 
+              limit={limit} 
+              total={totalRecords} 
+              onPageChange={setPage} 
+              onLimitChange={setLimit} 
+              className="border-b border-slate-100"
+            />
+
+            {view === 'table' ? (
+              <div ref={tableRef} id="purchase-invoices-list-table" className="overflow-x-auto hidden md:block [transform:rotateX(180deg)]">
+                <table className="w-full [transform:rotateX(180deg)]">
+                  <thead>
+                    <tr className="bg-slate-50/50 text-slate-500 text-[10px] uppercase tracking-widest font-bold border-b border-slate-100">
+                      <th className="px-6 py-0.5 text-center w-12 no-pdf whitespace-nowrap">
+                        <input 
+                          type="checkbox"
+                          checked={isAllSelected}
+                          onChange={handleSelectAll}
+                          className="rounded border-slate-350 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                        />
+                      </th>
+                      {visibleColumns.invoice_number && (
+                        <th 
+                          style={{ width: columnWidths.invoice_number, minWidth: columnWidths.invoice_number }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('invoice_number')}
                         >
-                          {inv.entry_number}
-                        </button>
-                      ) : (
-                        <span className="text-slate-400 font-mono text-xs">-</span>
+                          <div className="flex items-center gap-1">
+                            {t('pi.invoice_number')}
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'invoice_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('invoice_number')}
+                        </th>
                       )}
-                    </td>
-                    <td className={`px-6 py-4 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'}`}>
-                      <div className={`flex items-center ${t('dir') === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActivityLogDocumentId(inv.id);
-                            setIsActivityLogOpen(true);
-                          }}
-                          className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
-                          title={t('common.activity_log')}
+                      {visibleColumns.supplier_name && (
+                        <th 
+                          style={{ width: columnWidths.supplier_name, minWidth: columnWidths.supplier_name }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('supplier_name')}
                         >
-                          <History size={18} />
-                        </button>
+                          <div className="flex items-center gap-1">
+                            {t('pi.supplier')}
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'supplier_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('supplier_name')}
+                        </th>
+                      )}
+                      {visibleColumns.date && (
+                        <th 
+                          style={{ width: columnWidths.date, minWidth: columnWidths.date }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('date')}
+                        >
+                          <div className="flex items-center gap-1">
+                            {t('common.date')}
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('date')}
+                        </th>
+                      )}
+                      {visibleColumns.description && (
+                        <th 
+                          style={{ width: columnWidths.description, minWidth: columnWidths.description }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('description')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>وصف الفاتورة</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'description' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('description')}
+                        </th>
+                      )}
+                      {visibleColumns.payment_type && (
+                        <th 
+                          style={{ width: columnWidths.payment_type, minWidth: columnWidths.payment_type }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('payment_type')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>طريقة الدفع</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'payment_type' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('payment_type')}
+                        </th>
+                      )}
+                      {visibleColumns.status && (
+                        <th 
+                          style={{ width: columnWidths.status, minWidth: columnWidths.status }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('status')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'حالة الدفع' : 'Payment Status'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'status' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('status')}
+                        </th>
+                      )}
+                      {visibleColumns.currency && isMultiCurrencyEnabled && (
+                        <th 
+                          style={{ width: columnWidths.currency, minWidth: columnWidths.currency }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('currency')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'العملة' : 'Currency'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'currency' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('currency')}
+                        </th>
+                      )}
+                      {visibleColumns.foreign_amount && isMultiCurrencyEnabled && (
+                        <th 
+                          style={{ width: columnWidths.foreign_amount, minWidth: columnWidths.foreign_amount }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('foreign_amount')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'foreign_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('foreign_amount')}
+                        </th>
+                      )}
+                      {visibleColumns.remaining_foreign && isMultiCurrencyEnabled && (
+                        <th 
+                          style={{ width: columnWidths.remaining_foreign, minWidth: columnWidths.remaining_foreign }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('remaining_foreign')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'الباقي بالعملة الأجنبية' : 'Remaining (FC)'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'remaining_foreign' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('remaining_foreign')}
+                        </th>
+                      )}
+                      {visibleColumns.subtotal && isVatEnabled && (
+                        <th 
+                          style={{ width: columnWidths.subtotal, minWidth: columnWidths.subtotal }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('subtotal')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'قبل الضريبة' : 'Before Tax'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'subtotal' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('subtotal')}
+                        </th>
+                      )}
+                      {visibleColumns.tax_amount && isVatEnabled && (
+                        <th 
+                          style={{ width: columnWidths.tax_amount, minWidth: columnWidths.tax_amount }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('tax_amount')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'الضريبة' : 'Tax'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'tax_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('tax_amount')}
+                        </th>
+                      )}
+                      {visibleColumns.base_amount && (
+                        <th 
+                          style={{ width: columnWidths.base_amount, minWidth: columnWidths.base_amount }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('base_amount')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'القيمة المعادلة بالعملة المحلية' : 'Equivalent Local Amount'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'base_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('base_amount')}
+                        </th>
+                      )}
+                      {visibleColumns.remaining && (
+                        <th 
+                          style={{ width: columnWidths.remaining, minWidth: columnWidths.remaining }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('remaining')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'الباقي من الفاتورة' : 'Remaining Balance'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'remaining' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('remaining')}
+                        </th>
+                      )}
+                      {visibleColumns.entry_number && (
+                        <th 
+                          style={{ width: columnWidths.entry_number, minWidth: columnWidths.entry_number }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('entry_number')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'entry_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('entry_number')}
+                        </th>
+                      )}
+                      {visibleColumns.created_date && (
+                        <th 
+                          style={{ width: columnWidths.created_date, minWidth: columnWidths.created_date }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('created_at')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'تاريخ الإنشاء' : 'Created Date'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'created_at' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('created_date')}
+                        </th>
+                      )}
+                      {visibleColumns.created_time && (
+                        <th 
+                          style={{ width: columnWidths.created_time, minWidth: columnWidths.created_time }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('created_at')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'وقت الإنشاء' : 'Created Time'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'created_at' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('created_time')}
+                        </th>
+                      )}
+                      {visibleColumns.updated_date && (
+                        <th 
+                          style={{ width: columnWidths.updated_date, minWidth: columnWidths.updated_date }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('updated_at')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'تاريخ آخر تعديل' : 'Last Modified Date'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'updated_at' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('updated_date')}
+                        </th>
+                      )}
+                      {visibleColumns.updated_time && (
+                        <th 
+                          style={{ width: columnWidths.updated_time, minWidth: columnWidths.updated_time }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('updated_at')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'وقت آخر تعديل' : 'Last Modified Time'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'updated_at' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('updated_time')}
+                        </th>
+                      )}
+                      <th className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.actions')}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {loading ? (
+                      Array.from({ length: 5 }).map((_, rowIndex) => (
+                        <tr key={rowIndex} className="animate-pulse">
+                          <td className="px-6 py-0.5 text-center no-pdf whitespace-nowrap">
+                            <div className="h-4 bg-slate-100 rounded w-4 mx-auto animate-pulse"></div>
+                          </td>
+                          {Object.keys(visibleColumns).filter(colKey => {
+                            if (colKey === 'currency' || colKey === 'foreign_amount' || colKey === 'remaining_foreign') {
+                              return isMultiCurrencyEnabled;
+                            }
+                            if (colKey === 'subtotal' || colKey === 'tax_amount') {
+                              return isVatEnabled;
+                            }
+                            return true;
+                          }).map((colKey) => {
+                            if (!visibleColumns[colKey]) return null;
+                            return (
+                              <td key={colKey} className="px-6 py-0.5 whitespace-nowrap">
+                                <div className="h-4 bg-slate-100 rounded w-2/3"></div>
+                              </td>
+                            );
+                          })}
+                          <td className="px-6 py-0.5 whitespace-nowrap">
+                            <div className="h-4 bg-slate-100 rounded w-12 ml-auto"></div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : filteredInvoices.length === 0 ? (
+                      <tr>
+                        <td colSpan={Object.keys(visibleColumns).filter(k => {
+                          if (!visibleColumns[k]) return false;
+                          if (k === 'currency' || k === 'foreign_amount' || k === 'remaining_foreign') return isMultiCurrencyEnabled;
+                          if (k === 'subtotal' || k === 'tax_amount') return isVatEnabled;
+                          return true;
+                        }).length + 2} className="px-6 py-12 text-center text-slate-500 italic font-medium whitespace-nowrap">{t('common.no_data')}</td>
+                      </tr>
+                    ) : (
+                      (isExportingPDFSelected 
+                        ? filteredInvoices.filter(inv => selectedInvoiceIds.includes(inv.id))
+                        : filteredInvoices
+                      ).map((inv) => (
+                        <tr 
+                          key={inv.id} 
+                          className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
+                          onClick={() => openModal(inv)}
+                        >
+                          <td 
+                            className="px-6 py-0.5 text-center w-12 no-pdf whitespace-nowrap"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input 
+                              type="checkbox"
+                              checked={selectedInvoiceIds.includes(inv.id)}
+                              onChange={(e) => {
+                                setSelectedInvoiceIds(prev => 
+                                  prev.includes(inv.id) ? prev.filter(id => id !== inv.id) : [...prev, inv.id]
+                                );
+                              }}
+                              className="rounded border-slate-350 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                            />
+                          </td>
+                          {visibleColumns.invoice_number && (
+                            <td style={{ width: columnWidths.invoice_number, minWidth: columnWidths.invoice_number }} className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>
+                              <div className="flex flex-col gap-1 items-start">
+                                <span className="font-mono font-bold text-slate-950 text-xs select-all">
+                                  {inv.invoice_number}
+                                </span>
+                                {inv.eta_invoice_number && (
+                                  <span className="font-mono text-[9px] bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-indigo-700 font-bold" title={inv.eta_uuid || ''}>
+                                    {language === 'ar' ? 'إلكترونية:' : 'ETA:'} {inv.eta_invoice_number}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          )}
+                          {visibleColumns.supplier_name && (
+                            <td style={{ width: columnWidths.supplier_name, minWidth: columnWidths.supplier_name }} className={`px-6 py-0.5 font-bold text-slate-900 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>
+                              {inv.supplier_name}
+                            </td>
+                          )}
+                          {visibleColumns.date && (
+                            <td style={{ width: columnWidths.date, minWidth: columnWidths.date }} className={`px-6 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(inv.date)}</td>
+                          )}
+                          {visibleColumns.description && (
+                            <td style={{ width: columnWidths.description, minWidth: columnWidths.description }} className={`px-6 py-0.5 text-slate-500 max-w-[200px] truncate whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={inv.description}>
+                              {inv.description || '-'}
+                            </td>
+                          )}
+                          {visibleColumns.payment_type && (
+                            <td style={{ width: columnWidths.payment_type, minWidth: columnWidths.payment_type }} className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {inv.payment_type === 'cash' ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100/50 whitespace-nowrap">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                  نقدي
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100/50 whitespace-nowrap">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                  آجل
+                                </span>
+                              )}
+                            </td>
+                          )}
+                          {visibleColumns.status && (
+                            <td style={{ width: columnWidths.status, minWidth: columnWidths.status }} className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {(() => {
+                                const status = getPaymentStatus(inv);
+                                const statusLabels = {
+                                  paid: 'مدفوعة',
+                                  partial: 'مدفوعة جزئياً',
+                                  unpaid: 'غير مدفوعة',
+                                };
+                                const statusClasses = {
+                                  paid: 'bg-emerald-50 text-emerald-700 border-emerald-100/50',
+                                  partial: 'bg-amber-50 text-amber-700 border-amber-100/50',
+                                  unpaid: 'bg-red-50 text-red-700 border-red-100/50',
+                                };
+                                return (
+                                  <span className={`px-3 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap ${statusClasses[status]}`}>
+                                    {statusLabels[status]}
+                                  </span>
+                                );
+                              })()}
+                            </td>
+                          )}
+                          {visibleColumns.currency && isMultiCurrencyEnabled && (
+                            <td style={{ width: columnWidths.currency, minWidth: columnWidths.currency }} className={`px-6 py-0.5 font-bold text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP')}
+                            </td>
+                          )}
+                          {visibleColumns.foreign_amount && isMultiCurrencyEnabled && (
+                            <td style={{ width: columnWidths.foreign_amount, minWidth: columnWidths.foreign_amount }} className={`px-6 py-0.5 font-bold text-slate-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {(() => {
+                                const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
+                                const currencyCode = inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP');
+                                const isForeign = currencyCode.toLowerCase() !== baseCode;
+                                return isForeign ? formatMoney(inv.total_amount) : '-';
+                              })()}
+                            </td>
+                          )}
+                          {visibleColumns.remaining_foreign && isMultiCurrencyEnabled && (
+                            <td style={{ width: columnWidths.remaining_foreign, minWidth: columnWidths.remaining_foreign }} className={`px-6 py-0.5 font-bold text-slate-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {(() => {
+                                const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
+                                const currencyCode = inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP');
+                                const isForeign = currencyCode.toLowerCase() !== baseCode;
+                                if (!isForeign) return '-';
+
+                                const settlements = (allReceipts.length > 0 || allPayments.length > 0 || entries.length > 0) ? getInvoiceSettlements(inv) : (inv.settlements || []);
+                                const totalSettled = settlements.reduce((sum: number, s: any) => sum + (Number(s.settled_amount || s.amount) || 0), 0);
+                                const remaining = inv.payment_type === 'cash' ? 0 : Math.max(0, inv.total_amount - totalSettled);
+                                
+                                if (remaining <= 0) return <span className="text-emerald-600">0.00</span>;
+                                return <span className="text-red-600">{formatMoney(remaining)}</span>;
+                              })()}
+                            </td>
+                          )}
+                          {visibleColumns.subtotal && isVatEnabled && (
+                            <td style={{ width: columnWidths.subtotal, minWidth: columnWidths.subtotal }} className={`px-6 py-0.5 font-bold text-slate-900 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {formatMoney((Number(inv.subtotal) || Number(inv.total_amount) || 0) * (Number(inv.exchange_rate) || 1))}
+                            </td>
+                          )}
+                          {visibleColumns.tax_amount && isVatEnabled && (
+                            <td style={{ width: columnWidths.tax_amount, minWidth: columnWidths.tax_amount }} className={`px-6 py-0.5 font-bold text-slate-900 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {formatMoney((Number(inv.tax_amount) || 0) * (Number(inv.exchange_rate) || 1))}
+                            </td>
+                          )}
+                          {visibleColumns.base_amount && (
+                            <td style={{ width: columnWidths.base_amount, minWidth: columnWidths.base_amount }} className={`px-6 py-0.5 font-bold text-slate-900 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {formatMoney((Number(inv.total_amount) || 0) * (Number(inv.exchange_rate) || 1))}
+                            </td>
+                          )}
+                          {visibleColumns.remaining && (
+                            <td style={{ width: columnWidths.remaining, minWidth: columnWidths.remaining }} className={`px-6 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {(() => {
+                                const settlements = (allReceipts.length > 0 || allPayments.length > 0 || entries.length > 0) ? getInvoiceSettlements(inv) : (inv.settlements || []);
+                                const totalSettled = settlements.reduce((sum: number, s: any) => sum + (Number(s.settled_amount || s.amount) || 0), 0);
+                                const remaining = inv.payment_type === 'cash' ? 0 : Math.max(0, inv.total_amount - totalSettled);
+                                const remainingLocal = remaining * (Number(inv.exchange_rate) || 1);
+                                
+                                if (remainingLocal <= 0) return <span className="text-emerald-600">0.00</span>;
+                                return <span className="text-red-600">{formatMoney(remainingLocal)}</span>;
+                              })()}
+                            </td>
+                          )}
+                          {visibleColumns.entry_number && (
+                            <td style={{ width: columnWidths.entry_number, minWidth: columnWidths.entry_number }} className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {inv.entry_number ? (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPendingViewDoc({ type: 'journal', idOrNumber: inv.entry_number! });
+                                    setCurrentPage('journal_entries');
+                                  }}
+                                  className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-100/50 transition-all active:scale-95 whitespace-nowrap"
+                                >
+                                  {inv.entry_number}
+                                </button>
+                              ) : (
+                                <span className="text-slate-400 font-mono text-xs">-</span>
+                              )}
+                            </td>
+                          )}
+                          {visibleColumns.created_date && (
+                            <td style={{ width: columnWidths.created_date, minWidth: columnWidths.created_date }} className={`px-6 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {formatTimestampDate(inv.created_at)}
+                            </td>
+                          )}
+                          {visibleColumns.created_time && (
+                            <td style={{ width: columnWidths.created_time, minWidth: columnWidths.created_time }} className={`px-6 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {formatTimestampTime(inv.created_at)}
+                            </td>
+                          )}
+                          {visibleColumns.updated_date && (
+                            <td style={{ width: columnWidths.updated_date, minWidth: columnWidths.updated_date }} className={`px-6 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {formatTimestampDate(inv.updated_at || inv.created_at)}
+                            </td>
+                          )}
+                          {visibleColumns.updated_time && (
+                            <td style={{ width: columnWidths.updated_time, minWidth: columnWidths.updated_time }} className={`px-6 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {formatTimestampTime(inv.updated_at || inv.created_at)}
+                            </td>
+                          )}
+                          <td className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                            <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActivityLogDocumentId(inv.id);
+                                  setIsActivityLogOpen(true);
+                                }}
+                                className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
+                                title={t('common.activity_log')}
+                              >
+                                <History size={18} />
+                              </button>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setViewInvoice(inv);
+                                }}
+                                className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
+                                title={t('common.view')}
+                              >
+                                <Eye size={18} />
+                              </button>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openModal(inv);
+                                }}
+                                className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
+                                title={t('common.edit')}
+                              >
+                                <Pencil size={18} />
+                              </button>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDelete(inv.id);
+                                }}
+                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
+                                title={t('common.delete')}
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {loading ? (
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="p-6 bg-slate-50/50 rounded-3xl border border-slate-100 animate-pulse space-y-4">
+                      <div className="flex justify-between items-center">
+                        <div className="h-5 bg-slate-100 rounded w-1/3"></div>
+                        <div className="h-5 bg-slate-100 rounded w-1/4"></div>
+                      </div>
+                      <div className="h-4 bg-slate-100 rounded w-2/3"></div>
+                      <div className="flex justify-between items-center pt-2">
+                        <div className="h-4 bg-slate-100 rounded w-1/4"></div>
+                        <div className="h-4 bg-slate-100 rounded w-1/4"></div>
+                      </div>
+                    </div>
+                  ))
+                ) : filteredInvoices.length === 0 ? (
+                  <div className="col-span-full p-12 text-center text-slate-500 font-bold italic">{t('common.no_data')}</div>
+                ) : (
+                  filteredInvoices.map((inv) => (
+                    <div 
+                      key={inv.id} 
+                      onClick={() => openModal(inv)}
+                      className="p-6 bg-slate-50/50 rounded-3xl border border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden cursor-pointer"
+                    >
+                      <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
                             setViewInvoice(inv);
                           }}
-                          className="p-2 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50 rounded-xl transition-all no-pdf"
+                          className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
                         >
-                          <Eye size={18} />
+                          <Eye size={16} />
                         </button>
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
                             openModal(inv);
                           }}
-                          className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all no-pdf"
+                          className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
                         >
-                          <Pencil size={18} />
+                          <Pencil size={16} />
                         </button>
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDelete(inv.id);
                           }}
-                          className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all no-pdf"
+                          className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
                         >
-                          <Trash2 size={18} />
+                          <Trash2 size={16} />
                         </button>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-            <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
-          </>
-        ) : (
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredInvoices.map((inv) => (
-              <div 
-                key={inv.id} 
-                onClick={() => openModal(inv)}
-                className="p-6 bg-zinc-50/50 rounded-3xl border border-zinc-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden cursor-pointer"
-              >
-                <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setViewInvoice(inv);
-                    }}
-                    className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
-                  >
-                    <Eye size={16} />
-                  </button>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openModal(inv);
-                    }}
-                    className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
-                  >
-                    <Pencil size={16} />
-                  </button>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(inv.id);
-                    }}
-                    className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
 
-                <div className="flex justify-between items-start">
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
-                      {inv.eta_invoice_number && (
-                        <span className="font-mono text-[9px] bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-indigo-700 font-bold" title={inv.eta_uuid || ''}>
-                          {language === 'ar' ? 'إلكترونية:' : 'ETA:'} {inv.eta_invoice_number}
-                        </span>
-                      )}
+                      <div className="flex justify-between items-start">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
+                            {inv.eta_invoice_number && (
+                              <span className="font-mono text-[9px] bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-indigo-700 font-bold" title={inv.eta_uuid || ''}>
+                                {language === 'ar' ? 'إلكترونية:' : 'ETA:'} {inv.eta_invoice_number}
+                              </span>
+                            )}
+                          </div>
+                          <h4 className="font-bold text-slate-900 group-hover:text-emerald-700 transition-colors text-xl mt-1 tracking-tight">{inv.supplier_name}</h4>
+                        </div>
+                        {inv.entry_number && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPendingViewDoc({ type: 'journal', idOrNumber: inv.entry_number! });
+                              setCurrentPage('journal_entries');
+                            }}
+                            className="font-mono text-[9px] bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100/50 transition-all active:scale-95 z-10"
+                          >
+                            {inv.entry_number}
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200/50 mt-4">
+                        <div className="space-y-1">
+                          <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">{t('common.date')}</p>
+                          <p className="text-slate-900 font-bold text-sm tracking-tight">{formatDate(inv.date)}</p>
+                        </div>
+                        <div className="space-y-1 text-left">
+                          <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">حالة الدفع</p>
+                          {(() => {
+                            const status = getPaymentStatus(inv);
+                            const statusLabels = {
+                              paid: 'مدفوعة',
+                              partial: 'مدفوعة جزئياً',
+                              unpaid: 'غير مدفوعة'
+                            };
+                            const statusClasses = {
+                              paid: 'bg-emerald-50 text-emerald-700 border-emerald-100/50',
+                              partial: 'bg-amber-50 text-amber-700 border-amber-100/50',
+                              unpaid: 'bg-red-50 text-red-700 border-red-100/50'
+                            };
+                            return (
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-[8px] font-bold border ${statusClasses[status]}`}>
+                                {statusLabels[status]}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                        <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-slate-200/50 flex justify-between items-end">
+                          <div>
+                            <p className="text-slate-400 text-[10px] uppercase font-black tracking-widest">{t('pi.total_amount')}</p>
+                            <p className="font-black text-2xl tracking-tighter text-emerald-600">
+                              {formatMoney(inv.total_amount)} <span className="text-sm font-bold">{inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP')}</span>
+                            </p>
+                          </div>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActivityLogDocumentId(inv.id);
+                              setIsActivityLogOpen(true);
+                            }}
+                            className="p-2 text-slate-400 hover:text-emerald-500 bg-white border border-slate-100 rounded-xl transition-all"
+                            title={t('common.activity_log')}
+                          >
+                            <History size={16} />
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <h4 className="font-bold text-zinc-900 group-hover:text-emerald-700 transition-colors text-xl mt-1 tracking-tight">{inv.supplier_name}</h4>
-                  </div>
-                  {inv.entry_number && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPendingViewDoc({ type: 'journal', idOrNumber: inv.entry_number! });
-                        setCurrentPage('journal_entries');
-                      }}
-                      className="font-mono text-[9px] bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100/50 transition-all active:scale-95 z-10"
-                    >
-                      {inv.entry_number}
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-200/50 mt-4">
-                  <div className="space-y-1">
-                    <p className="text-zinc-400 text-[10px] uppercase font-black tracking-widest">{t('common.date')}</p>
-                    <p className="text-zinc-900 font-bold text-sm tracking-tight">{formatDate(inv.date)}</p>
-                  </div>
-                  <div className="space-y-1 text-left">
-                    <p className="text-zinc-400 text-[10px] uppercase font-black tracking-widest">حالة الدفع</p>
-                    {(() => {
-                      const status = getPaymentStatus(inv);
-                      const statusLabels = {
-                        paid: language === 'ar' ? 'مدفوعة' : 'Paid',
-                        partial: language === 'ar' ? 'مدفوعة جزئياً' : 'Partially Paid',
-                        unpaid: language === 'ar' ? 'غير مدفوعة' : 'Unpaid'
-                      };
-                      const statusClasses = {
-                        paid: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-                        partial: 'bg-blue-100 text-blue-800 border-blue-200',
-                        unpaid: 'bg-red-100 text-red-800 border-red-200'
-                      };
-                      return (
-                        <span className={`inline-block px-2 py-0.5 rounded-full text-[8px] font-bold border ${statusClasses[status]}`}>
-                          {statusLabels[status]}
-                        </span>
-                      );
-                    })()}
-                  </div>
-                  <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-zinc-200/50 flex justify-between items-end">
-                    <div>
-                      <p className="text-zinc-400 text-[10px] uppercase font-black tracking-widest">{t('pi.total_amount')}</p>
-                      <p className="font-black text-2xl tracking-tighter text-emerald-600">
-                        {formatNumber(inv.total_amount)} <span className="text-sm font-bold">{inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP')}</span>
-                      </p>
-                    </div>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActivityLogDocumentId(inv.id);
-                        setIsActivityLogOpen(true);
-                      }}
-                      className="p-2 text-zinc-400 hover:text-emerald-500 bg-white border border-zinc-100 rounded-xl transition-all"
-                      title={t('common.activity_log')}
-                    >
-                      <History size={16} />
-                    </button>
-                  </div>
-                </div>
+                  ))
+                )}
               </div>
-            ))}
-            {filteredInvoices.length === 0 && (
-              <div className="col-span-full p-12 text-center text-zinc-500 font-bold italic">{t('pi.no_invoices')}</div>
             )}
-          </div>
-        )}
 
-        {/* Mobile List View */}
-        <div className="md:hidden divide-y divide-zinc-50">
-          {filteredInvoices.map((inv) => (
-            <div 
-              key={inv.id} 
-              onClick={() => openModal(inv)}
-              className="p-4 space-y-4 cursor-pointer hover:bg-zinc-50 transition-colors"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex flex-col gap-1">
-                  <span className="font-mono text-[10px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold w-fit">{inv.invoice_number}</span>
-                  {inv.entry_number && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPendingViewDoc({ type: 'journal', idOrNumber: inv.entry_number! });
-                        setCurrentPage('journal_entries');
-                      }}
-                      className="font-mono text-[9px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100/50"
-                    >
-                      {inv.entry_number}
-                    </button>
-                  )}
-                  <h4 className="font-bold text-zinc-900 text-lg">{inv.supplier_name}</h4>
-                </div>
-                <div className={t('dir') === 'rtl' ? 'text-left' : 'text-right'}>
-                  <p className="font-bold text-emerald-600 text-lg">
-                    {formatNumber(inv.total_amount)} <span className="text-[10px] font-bold text-zinc-500">{inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP')}</span>
-                  </p>
-                  <span className="text-xs text-zinc-400">{formatDate(inv.date)}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
-                <button 
-                  onClick={() => setViewInvoice(inv)}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-zinc-50 text-zinc-600 rounded-2xl text-sm font-bold border border-zinc-100 active:scale-95 transition-transform"
-                >
-                  <Eye size={18} /> {t('common.view')}
-                </button>
-                <button 
+            {/* Mobile List View */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {filteredInvoices.map((inv) => (
+                <div 
+                  key={inv.id} 
                   onClick={() => openModal(inv)}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-50 text-blue-600 rounded-2xl text-sm font-bold border border-blue-100 active:scale-95 transition-transform"
+                  className="p-4 space-y-4 cursor-pointer hover:bg-slate-50 transition-colors"
                 >
-                  <Pencil size={18} /> {t('common.edit')}
-                </button>
-                <button 
-                  onClick={() => handleDelete(inv.id)}
-                  className="p-3 bg-red-50 text-red-600 rounded-2xl border border-red-100 active:scale-95 transition-transform"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-1">
+                      <span className="font-mono text-[10px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold w-fit">{inv.invoice_number}</span>
+                      {inv.entry_number && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingViewDoc({ type: 'journal', idOrNumber: inv.entry_number! });
+                            setCurrentPage('journal_entries');
+                          }}
+                          className="font-mono text-[9px] bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100/50"
+                        >
+                          {inv.entry_number}
+                        </button>
+                      )}
+                      <h4 className="font-bold text-slate-900 text-lg">{inv.supplier_name}</h4>
+                    </div>
+                    <div className={dir === 'rtl' ? 'text-left' : 'text-right'}>
+                      <p className="font-bold text-emerald-600 text-lg">
+                        {formatMoney(inv.total_amount)} <span className="text-[10px] font-bold text-slate-500">{inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP')}</span>
+                      </p>
+                      <span className="text-xs text-slate-400">{formatDate(inv.date)}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
+                    <button 
+                      onClick={() => setViewInvoice(inv)}
+                      className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-600 rounded-2xl text-sm font-bold border border-slate-100 active:scale-95 transition-transform"
+                    >
+                      <Eye size={18} /> {t('common.view')}
+                    </button>
+                    <button 
+                      onClick={() => openModal(inv)}
+                      className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-50 text-blue-600 rounded-2xl text-sm font-bold border border-blue-100 active:scale-95 transition-transform"
+                    >
+                      <Pencil size={18} /> {t('common.edit')}
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(inv.id)}
+                      className="p-3 bg-red-50 text-red-600 rounded-2xl border border-red-100 active:scale-95 transition-transform"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {filteredInvoices.length === 0 && !loading && (
+                <div className="p-8 text-center text-slate-500 italic">{t('pi.no_invoices')}</div>
+              )}
             </div>
-          ))}
-          {filteredInvoices.length === 0 && !loading && (
-            <div className="p-8 text-center text-zinc-500 italic">{t('pi.no_invoices')}</div>
-          )}
-        </div>
-      </div>
-    </>
-  ) : (
-    <div ref={editModalRef} className="bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
+          </div>
+        </>
+      ) : (
+        <div ref={editModalRef} className="bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
       {/* Form Header */}
       <div className="p-2 md:px-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-[70] gap-2 flex-wrap" dir={dir}>
         {/* Start side (Right in RTL): Status Badge, Title & Invoice Code, Linked Journal Entry */}

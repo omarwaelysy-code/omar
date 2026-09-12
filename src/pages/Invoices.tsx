@@ -43,7 +43,7 @@ export const Invoices: React.FC = () => {
   const { user } = useAuth();
   const { canView, canCreate, canEdit, canDelete, canChangePrices, hasBusinessPermission } = usePermissions('invoices');
   const { showNotification } = useNotification();
-  const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
+  const { pendingViewDoc, setPendingViewDoc, setCurrentPage, closeTab } = useNavigation();
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
@@ -3238,6 +3238,17 @@ export const Invoices: React.FC = () => {
                   {t('invoices.add_invoice')}
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => {
+                  closeTab('invoices');
+                  setCurrentPage('dashboard');
+                }}
+                className="w-11 h-11 flex items-center justify-center bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-2xl border border-slate-200 transition-all shadow-sm active:scale-95 shrink-0"
+                title={language === 'ar' ? 'إغلاق الشاشة' : 'Close Page'}
+              >
+                <X size={20} className="stroke-[2.5]" />
+              </button>
             </div>
           </div>
 
