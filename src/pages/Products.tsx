@@ -1472,6 +1472,8 @@ export const Products: React.FC = () => {
                           </th>
                           <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_code')}</th>
                           <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_name')}</th>
+                          <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_eta_sent')}</th>
+                          <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_eta_received')}</th>
                           <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الحالة' : 'Status'}</th>
                           <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_type')}</th>
                           <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_stock')}</th>
@@ -1481,9 +1483,9 @@ export const Products: React.FC = () => {
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {loading ? (
-                          <tr><td colSpan={8} className="py-12 text-center"><div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>
+                          <tr><td colSpan={10} className="py-12 text-center"><div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>
                         ) : filteredProducts.length === 0 ? (
-                          <tr><td colSpan={8} className="py-10 text-center text-slate-400 font-bold text-xs">{t('common.no_data')}</td></tr>
+                          <tr><td colSpan={10} className="py-10 text-center text-slate-400 font-bold text-xs">{t('common.no_data')}</td></tr>
                         ) : isGrouped ? (
                           groupedProducts.map((group) => {
                             const isCollapsed = !!collapsedGroupIds[group.id];
@@ -1493,7 +1495,7 @@ export const Products: React.FC = () => {
                                   onClick={() => toggleGroupCollapse(group.id)}
                                   className="bg-slate-100/90 hover:bg-slate-200/70 cursor-pointer select-none transition-colors border-y border-slate-200"
                                 >
-                                  <td colSpan={8} className="px-3 py-1.5">
+                                  <td colSpan={10} className="px-3 py-1.5">
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-2">
                                         <span className="p-0.5 rounded text-slate-600 bg-white shadow-2xs">
@@ -1558,22 +1560,28 @@ export const Products: React.FC = () => {
                                            </div>
                                            <div className="flex flex-col min-w-0">
                                               <span className="font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors truncate">{product.name}</span>
-                                              {(product.eta_item_code || product.tax_item_code) && (
-                                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                                  {product.eta_item_code && (
-                                                    <span className="text-[8.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 border border-purple-200/60 flex items-center gap-0.5" title={language === 'ar' ? 'كود رفع الوثائق' : 'Upload ETA Code'}>
-                                                      <span className="text-[7.5px] bg-purple-200/60 text-purple-800 px-0.5 rounded">{language === 'ar' ? 'رفع' : 'Up'}</span> {product.eta_item_code}
-                                                    </span>
-                                                  )}
-                                                  {product.tax_item_code && (
-                                                    <span className="text-[8.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200/60 flex items-center gap-0.5" title={language === 'ar' ? 'كود ربط الوارد' : 'Received ETA Code'}>
-                                                      <span className="text-[7.5px] bg-blue-200/60 text-blue-800 px-0.5 rounded">{language === 'ar' ? 'استلام' : 'In'}</span> {product.tax_item_code}
-                                                    </span>
-                                                  )}
-                                                </div>
-                                              )}
                                            </div>
                                         </div>
+                                     </td>
+                                     <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                       {product.eta_item_code ? (
+                                         <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200/60 max-w-full" title={language === 'ar' ? 'كود الفاتورة الإلكترونية (صادر / مبيعات)' : 'ETA Sent Code'}>
+                                           {product.eta_code_type && <span className="text-[7.5px] bg-purple-200/70 text-purple-800 px-1 py-0.2 rounded font-black shrink-0">{product.eta_code_type}</span>}
+                                           <span className="truncate">{product.eta_item_code}</span>
+                                         </span>
+                                       ) : (
+                                         <span className="text-slate-300 font-mono text-xs">-</span>
+                                       )}
+                                     </td>
+                                     <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                       {product.tax_item_code ? (
+                                         <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200/60 max-w-full" title={language === 'ar' ? 'كود ربط الوارد (مستلم / مشتريات)' : 'ETA Received Code'}>
+                                           {product.tax_code_type && <span className="text-[7.5px] bg-blue-200/70 text-blue-800 px-1 py-0.2 rounded font-black shrink-0">{product.tax_code_type}</span>}
+                                           <span className="truncate">{product.tax_item_code}</span>
+                                         </span>
+                                       ) : (
+                                         <span className="text-slate-300 font-mono text-xs">-</span>
+                                       )}
                                      </td>
                                      <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-bold border ${product.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50' : 'bg-rose-50 text-rose-700 border-rose-200/50'}`}>
@@ -1693,22 +1701,28 @@ export const Products: React.FC = () => {
                                      </div>
                                      <div className="flex flex-col min-w-0">
                                         <span className="font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors truncate">{product.name}</span>
-                                        {(product.eta_item_code || product.tax_item_code) && (
-                                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                            {product.eta_item_code && (
-                                              <span className="text-[8.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 border border-purple-200/60 flex items-center gap-0.5" title={language === 'ar' ? 'كود رفع الوثائق' : 'Upload ETA Code'}>
-                                                <span className="text-[7.5px] bg-purple-200/60 text-purple-800 px-0.5 rounded">{language === 'ar' ? 'رفع' : 'Up'}</span> {product.eta_item_code}
-                                              </span>
-                                            )}
-                                            {product.tax_item_code && (
-                                              <span className="text-[8.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200/60 flex items-center gap-0.5" title={language === 'ar' ? 'كود ربط الوارد' : 'Received ETA Code'}>
-                                                <span className="text-[7.5px] bg-blue-200/60 text-blue-800 px-0.5 rounded">{language === 'ar' ? 'استلام' : 'In'}</span> {product.tax_item_code}
-                                              </span>
-                                            )}
-                                          </div>
-                                        )}
                                      </div>
                                   </div>
+                               </td>
+                               <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                 {product.eta_item_code ? (
+                                   <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200/60 max-w-full" title={language === 'ar' ? 'كود الفاتورة الإلكترونية (صادر / مبيعات)' : 'ETA Sent Code'}>
+                                     {product.eta_code_type && <span className="text-[7.5px] bg-purple-200/70 text-purple-800 px-1 py-0.2 rounded font-black shrink-0">{product.eta_code_type}</span>}
+                                     <span className="truncate">{product.eta_item_code}</span>
+                                   </span>
+                                 ) : (
+                                   <span className="text-slate-300 font-mono text-xs">-</span>
+                                 )}
+                               </td>
+                               <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                 {product.tax_item_code ? (
+                                   <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200/60 max-w-full" title={language === 'ar' ? 'كود ربط الوارد (مستلم / مشتريات)' : 'ETA Received Code'}>
+                                     {product.tax_code_type && <span className="text-[7.5px] bg-blue-200/70 text-blue-800 px-1 py-0.2 rounded font-black shrink-0">{product.tax_code_type}</span>}
+                                     <span className="truncate">{product.tax_item_code}</span>
+                                   </span>
+                                 ) : (
+                                   <span className="text-slate-300 font-mono text-xs">-</span>
+                                 )}
                                </td>
                                <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-bold border ${product.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50' : 'bg-rose-50 text-rose-700 border-rose-200/50'}`}>

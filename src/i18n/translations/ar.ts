@@ -670,6 +670,8 @@ export const ar = {
   'products.search_placeholder': 'بحث بالاسم أو الكود...',
   'products.column_code': 'الكود',
   'products.column_name': 'الاسم',
+  'products.column_eta_sent': 'ETA صادر',
+  'products.column_eta_received': 'ETA مستلم',
   'products.column_status': 'الحالة',
   'products.column_type': 'نوع الصنف',
   'products.column_stock': 'الرصيد الحالي',

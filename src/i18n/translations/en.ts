@@ -670,6 +670,8 @@ export const en = {
   'products.search_placeholder': 'Search by name or code...',
   'products.column_code': 'Code',
   'products.column_name': 'Name',
+  'products.column_eta_sent': 'ETA Sent',
+  'products.column_eta_received': 'ETA Received',
   'products.column_status': 'Status',
   'products.column_type': 'Item Type',
   'products.column_stock': 'Current Stock',
