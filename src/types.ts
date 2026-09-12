@@ -403,6 +403,8 @@ export interface Invoice {
   cost_center_id?: string | null;
   created_at?: string;
   updated_at?: string;
+  eta_uuid?: string;
+  eta_invoice_number?: string;
 }
 
 export interface PurchaseInvoice {
@@ -439,6 +441,8 @@ export interface PurchaseInvoice {
   operation_id?: string | null;
   department_id?: string | null;
   cost_center_id?: string | null;
+  eta_uuid?: string;
+  eta_invoice_number?: string;
 }
 
 export interface InvoiceItem {

@@ -463,6 +463,8 @@ export async function initDatabase() {
         "created_by" VARCHAR(36),
         "customer_name" VARCHAR(255),
         "payment_method_name" VARCHAR(255),
+        "eta_uuid" VARCHAR(255),
+        "eta_invoice_number" VARCHAR(255),
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -483,6 +485,8 @@ export async function initDatabase() {
         "notes" TEXT,
         "customer_name" VARCHAR(255),
         "payment_method_name" VARCHAR(255),
+        "eta_uuid" VARCHAR(255),
+        "eta_invoice_number" VARCHAR(255),
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `, 'returns table');

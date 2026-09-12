@@ -196,6 +196,7 @@ export const Invoices: React.FC = () => {
   const columnSelectorRef = useRef<HTMLDivElement>(null);
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
     invoice_number: true,
+    eta_invoice_number: true,
     customer_name: true,
     date: true,
     description: true,
@@ -217,6 +218,7 @@ export const Invoices: React.FC = () => {
 
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     invoice_number: 140,
+    eta_invoice_number: 140,
     customer_name: 180,
     date: 110,
     description: 150,
@@ -2056,7 +2058,9 @@ export const Invoices: React.FC = () => {
         department_id: selectedDepartmentId || null,
         cost_center_id: selectedCostCenterId || null,
         currency_id: selectedCurrencyId || null,
-        exchange_rate: Number(exchangeRate) || 1
+        exchange_rate: Number(exchangeRate) || 1,
+        eta_uuid: editingInvoice?.eta_uuid || null,
+        eta_invoice_number: editingInvoice?.eta_invoice_number || null
       };
 
       // Journal items generation
@@ -2792,6 +2796,7 @@ export const Invoices: React.FC = () => {
         formatted_base_amount: inv.total_amount * (Number(inv.exchange_rate) || 1),
         formatted_remaining: remainingLocal,
         formatted_entry_number: inv.entry_number || '-',
+        formatted_eta_invoice_number: inv.eta_invoice_number || '-',
         formatted_created_date: formatTimestampDate(inv.created_at),
         formatted_created_time: formatTimestampTime(inv.created_at),
         formatted_updated_date: formatTimestampDate(inv.updated_at || inv.created_at),
@@ -2801,6 +2806,7 @@ export const Invoices: React.FC = () => {
 
     const keyMap: Record<string, string> = {};
     if (visibleColumns.invoice_number) keyMap['formatted_invoice_number'] = 'رقم الفاتورة';
+    if (visibleColumns.eta_invoice_number) keyMap['formatted_eta_invoice_number'] = language === 'ar' ? 'رقم الوثيقة الإلكترونية' : 'Electronic Doc No.';
     if (visibleColumns.customer_name) keyMap['formatted_customer_name'] = 'العميل';
     if (visibleColumns.date) keyMap['formatted_date'] = 'التاريخ';
     if (visibleColumns.description) keyMap['formatted_description'] = 'وصف الفاتورة';
@@ -3092,7 +3098,8 @@ export const Invoices: React.FC = () => {
 
   const filteredInvoices = invoices.filter(i => 
     i.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    i.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    i.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (i.eta_invoice_number && i.eta_invoice_number.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const formatTimestampDate = (tsStr: any) => {
@@ -3309,6 +3316,7 @@ export const Invoices: React.FC = () => {
                       }).map((colKey) => {
                         const labels: Record<string, string> = {
                           invoice_number: language === 'ar' ? 'رقم الفاتورة' : 'Invoice Number',
+                          eta_invoice_number: language === 'ar' ? 'رقم الوثيقة الإلكترونية' : 'Electronic Doc No.',
                           customer_name: language === 'ar' ? 'العميل' : 'Customer',
                           date: language === 'ar' ? 'التاريخ' : 'Date',
                           description: language === 'ar' ? 'وصف الفاتورة' : 'Description',
@@ -3391,6 +3399,21 @@ export const Invoices: React.FC = () => {
                             </span>
                           </div>
                           {renderResizeHandles('invoice_number')}
+                        </th>
+                      )}
+                      {visibleColumns.eta_invoice_number && (
+                        <th 
+                          style={{ width: columnWidths.eta_invoice_number, minWidth: columnWidths.eta_invoice_number }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('eta_invoice_number')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'رقم الوثيقة الإلكترونية' : 'Electronic Doc No.'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'eta_invoice_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('eta_invoice_number')}
                         </th>
                       )}
                       {visibleColumns.customer_name && (
@@ -3720,6 +3743,17 @@ export const Invoices: React.FC = () => {
                               </span>
                             </td>
                           )}
+                          {visibleColumns.eta_invoice_number && (
+                            <td style={{ width: columnWidths.eta_invoice_number, minWidth: columnWidths.eta_invoice_number }} className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>
+                              {inv.eta_invoice_number ? (
+                                <span className="font-mono text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded select-all inline-block shadow-sm" title={inv.eta_uuid || ''}>
+                                  {inv.eta_invoice_number}
+                                </span>
+                              ) : (
+                                <span className="text-slate-350 text-xs font-mono">-</span>
+                              )}
+                            </td>
+                          )}
                           {visibleColumns.customer_name && (
                             <td style={{ width: columnWidths.customer_name, minWidth: columnWidths.customer_name }} className={`px-6 py-0.5 font-bold text-slate-900 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>
                               {inv.customer_name}
@@ -3984,7 +4018,14 @@ export const Invoices: React.FC = () => {
 
                       <div className="flex justify-between items-start">
                         <div className="flex flex-col gap-1">
-                          <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{inv.invoice_number}</span>
+                            {inv.eta_invoice_number && (
+                              <span className="font-mono text-[9px] bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-indigo-700 font-bold" title={inv.eta_uuid || ''}>
+                                {language === 'ar' ? 'إلكترونية:' : 'ETA:'} {inv.eta_invoice_number}
+                              </span>
+                            )}
+                          </div>
                           <h4 className="font-bold text-slate-900 group-hover:text-emerald-700 transition-colors text-xl mt-1 tracking-tight">{inv.customer_name}</h4>
                         </div>
                         {inv.entry_number && (
@@ -4203,6 +4244,16 @@ export const Invoices: React.FC = () => {
               ) : (
                 <div className="text-[9px] font-bold text-zinc-400">
                   {language === 'ar' ? 'القيد المرتبط: لا يوجد قيد مرتبط بعد' : 'Linked JE: No journal entry linked yet'}
+                </div>
+              )}
+
+              {/* Linked ETA Electronic Document Number */}
+              {editingInvoice?.eta_invoice_number && (
+                <div className="flex items-center gap-1 text-indigo-700 text-[11px] font-bold font-mono leading-none">
+                  <span className="text-indigo-500 font-sans font-bold">{language === 'ar' ? 'الفاتورة الإلكترونية:' : 'ETA Doc:'}</span>
+                  <span className="bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 font-black text-indigo-800" title={editingInvoice.eta_uuid || ''}>
+                    {editingInvoice.eta_invoice_number}
+                  </span>
                 </div>
               )}
             </div>
@@ -5860,6 +5911,14 @@ export const Invoices: React.FC = () => {
                         >
                           {viewInvoice.entry_number}
                         </button>
+                      </p>
+                    )}
+                    {viewInvoice.eta_invoice_number && (
+                      <p className="text-xs text-indigo-700 font-bold mt-1 flex items-center gap-1">
+                        <span>{language === 'ar' ? 'رقم الوثيقة الإلكترونية:' : 'ETA Doc Number:'}</span>
+                        <span className="font-mono bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded text-indigo-800" title={viewInvoice.eta_uuid || ''}>
+                          {viewInvoice.eta_invoice_number}
+                        </span>
                       </p>
                     )}
                     {viewInvoice.payment_type === 'credit' && viewInvoice.payment_terms && (
