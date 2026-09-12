@@ -878,11 +878,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       )}
 
       {/* Desktop Top Navigation */}
-      <header className="hidden md:flex sticky top-0 z-[200] bg-white border-b border-slate-200 h-14 xl:h-16 items-center px-1 xl:px-2 2xl:px-3 shadow-sm">
+      <header className="hidden md:flex sticky top-0 z-[200] bg-white border-b border-slate-200 h-11 xl:h-12 items-center px-1.5 xl:px-2 shadow-xs">
         <div className={`flex items-center gap-1 ${dir === 'rtl' ? 'ml-0.5 xl:ml-1' : 'mr-0.5 xl:mr-1'} shrink-0`}>
           {company?.logo_url ? (
             <div className="flex items-center gap-1">
-              <div className="w-7 h-7 xl:w-8 xl:h-8 rounded-lg bg-slate-50 border border-slate-100 p-0.5 flex items-center justify-center">
+              <div className="w-6 h-6 xl:w-7 xl:h-7 rounded-lg bg-slate-50 border border-slate-100 p-0.5 flex items-center justify-center">
                 <img 
                   src={company.logo_url} 
                   alt={company.name} 
@@ -890,7 +890,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                   referrerPolicy="no-referrer"
                 />
               </div>
-              <span className="font-black text-slate-900 tracking-tight text-xs truncate max-w-[65px] xl:max-w-[110px]">{company.name}</span>
+              <span className="font-black text-slate-900 tracking-tight text-xs truncate max-w-[65px] xl:max-w-[100px]">{company.name}</span>
             </div>
           ) : (
             <Logo variant="full" size="sm" />
@@ -900,7 +900,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         <nav 
           ref={desktopNavRef} 
           onMouseLeave={() => setActiveDesktopMenu(null)}
-          className="flex items-center gap-0 xl:gap-[1px] 2xl:gap-0.5 flex-1 min-w-0 py-0.5"
+          className="flex items-center gap-0 xl:gap-[1px] flex-1 min-w-0 py-0.5"
         >
           {/* Company Switcher (Only rendered if user has multiple companies or is super_admin) */}
           {(isSuperAdminAccount || (userMemberships && userMemberships.length > 1)) && (
@@ -908,14 +908,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
               <button
                 type="button"
                 onClick={() => setIsCompanyMenuOpen(!isCompanyMenuOpen)}
-                className="flex items-center gap-0.5 px-0.5 xl:px-1 py-0.5 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-900 rounded-md transition-all border border-emerald-200/80 shadow-2xs cursor-pointer text-[9px] xl:text-[10px] 2xl:text-[11px] font-extrabold tracking-tighter"
+                className="flex items-center gap-0.5 px-0.5 xl:px-1 py-0.5 bg-emerald-50 hover:bg-emerald-100/90 text-emerald-900 rounded-md transition-all border border-emerald-200/80 shadow-2xs cursor-pointer text-[8.5px] xl:text-[9px] 2xl:text-[9.5px] font-extrabold tracking-tight"
                 title={language === 'ar' ? 'تبديل الشركة' : 'Switch Company'}
               >
-                <Building2 size={11} className="text-emerald-600 shrink-0" />
-                <span className="truncate max-w-[65px] xl:max-w-[100px] 2xl:max-w-[140px]">
+                <Building2 size={10} className="text-emerald-600 shrink-0" />
+                <span className="truncate max-w-[55px] xl:max-w-[80px] 2xl:max-w-[110px]">
                   {activeCompanyName}
                 </span>
-                <ChevronDown size={8} className={`text-emerald-600/70 transition-transform shrink-0 ${isCompanyMenuOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown size={6.5} className={`text-emerald-600/70 transition-transform shrink-0 ${isCompanyMenuOpen ? 'rotate-180' : ''}`} />
               </button>
 
               <AnimatePresence>
@@ -1026,13 +1026,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                       setActiveDesktopMenu(prev => prev === item.id ? null : item.id);
                     }}
                     className={`
-                      flex items-center gap-[2px] px-0.5 xl:px-1 py-0.5 rounded-md transition-all font-bold text-[9px] xl:text-[10px] 2xl:text-[11px] whitespace-nowrap cursor-pointer tracking-tighter
+                      flex items-center gap-[1.5px] px-0.5 xl:px-1 py-0.5 rounded transition-all font-bold text-[8.5px] xl:text-[9px] 2xl:text-[9.5px] whitespace-nowrap cursor-pointer tracking-tight
                       ${isActive || isOpen ? 'bg-brand-primary/10 text-brand-primary' : 'text-slate-600 hover:bg-slate-100/70 hover:text-slate-900'}
                     `}
                   >
-                    <item.icon size={10} className="shrink-0 opacity-75" />
+                    <item.icon size={9} className="shrink-0 opacity-70" />
                     <span>{item.label}</span>
-                    <ChevronDown size={7} className={`opacity-40 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown size={6} className={`opacity-40 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
                   </button>
                   
                   {/* Dropdown Menu */}
@@ -1093,11 +1093,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                   setActiveDesktopMenu(null);
                 }}
                 className={`
-                  flex items-center gap-[2px] px-0.5 xl:px-1 py-0.5 rounded-md transition-all font-bold text-[9px] xl:text-[10px] 2xl:text-[11px] whitespace-nowrap shrink-0 cursor-pointer tracking-tighter
+                  flex items-center gap-[1.5px] px-0.5 xl:px-1 py-0.5 rounded transition-all font-bold text-[8.5px] xl:text-[9px] 2xl:text-[9.5px] whitespace-nowrap shrink-0 cursor-pointer tracking-tight
                   ${currentPage === item.id ? 'bg-brand-primary text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100/70 hover:text-slate-900'}
                 `}
               >
-                <item.icon size={10} className="shrink-0 opacity-75" />
+                <item.icon size={9} className="shrink-0 opacity-70" />
                 <span>{item.label}</span>
               </button>
             );
@@ -1108,11 +1108,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           <button 
             type="button"
             onClick={() => setIsCenterOpen(true)}
-            className="relative p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition-all group cursor-pointer"
+            className="relative p-1 text-slate-500 hover:bg-slate-100 rounded-lg transition-all group cursor-pointer"
           >
-            <Bell size={18} />
+            <Bell size={16} />
             {unreadCount > 0 && (
-              <span className={`absolute top-1 ${dir === 'rtl' ? 'right-1' : 'left-1'} w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white`}>
+              <span className={`absolute top-0.5 ${dir === 'rtl' ? 'right-0.5' : 'left-0.5'} w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center border-2 border-white`}>
                 {unreadCount}
               </span>
             )}
@@ -1120,10 +1120,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
           <div 
             onClick={() => setIsProfileModalOpen(!isProfileModalOpen)}
-            className="flex items-center cursor-pointer group p-1 rounded-full hover:bg-slate-100 transition-all select-none"
+            className="flex items-center cursor-pointer group p-0.5 rounded-full hover:bg-slate-100 transition-all select-none"
             title={language === 'ar' ? 'الملف الشخصي' : 'Profile'}
           >
-            <div className="w-8 h-8 rounded-full bg-[#c8d6c5] border border-[#a8b8a5] text-[#2d3a2a] flex items-center justify-center font-bold text-sm shadow-sm overflow-hidden group-hover:scale-105 transition-transform">
+            <div className="w-7 h-7 rounded-full bg-[#c8d6c5] border border-[#a8b8a5] text-[#2d3a2a] flex items-center justify-center font-bold text-xs shadow-sm overflow-hidden group-hover:scale-105 transition-transform">
               {avatarUrl ? (
                 <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
               ) : (

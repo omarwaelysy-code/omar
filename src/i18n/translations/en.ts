@@ -166,7 +166,7 @@ export const en = {
   'nav.transactions': 'Transactions',
   'nav.sales': 'Sales',
   'nav.purchases': 'Purchases',
-  'nav.cash': 'Cash & Treasuries',
+  'nav.cash': 'Cash',
   'nav.invoices': 'Sales Invoices',
   'nav.sales_orders': 'Sales Orders',
   'nav.returns': 'Sales Returns',

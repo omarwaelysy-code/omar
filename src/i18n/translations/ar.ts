@@ -166,7 +166,7 @@ export const ar = {
   'nav.transactions': 'الحركات',
   'nav.sales': 'المبيعات',
   'nav.purchases': 'المشتريات',
-  'nav.cash': 'النقدية والخزائن',
+  'nav.cash': 'النقدية',
   'nav.invoices': 'فواتير مبيعات',
   'nav.sales_orders': 'أوامر بيع',
   'nav.returns': 'مرتجع مبيعات',
