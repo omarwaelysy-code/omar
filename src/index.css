@@ -59,6 +59,10 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
+  [dir="rtl"], html[dir="rtl"], html[lang="ar"] {
+    font-family: "Cairo", "IBM Plex Sans Arabic", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+
   /* Smooth transitions for all interactive elements */
   a, button, input, select, textarea {
     @apply transition-all duration-300;

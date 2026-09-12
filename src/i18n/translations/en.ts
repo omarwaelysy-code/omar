@@ -670,6 +670,7 @@ export const en = {
   'products.search_placeholder': 'Search by name or code...',
   'products.column_code': 'Code',
   'products.column_name': 'Name',
+  'products.column_status': 'Status',
   'products.column_type': 'Item Type',
   'products.column_stock': 'Current Stock',
   'products.column_sale_price': 'Sale Price',

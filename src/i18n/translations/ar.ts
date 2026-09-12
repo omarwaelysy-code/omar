@@ -670,6 +670,7 @@ export const ar = {
   'products.search_placeholder': 'بحث بالاسم أو الكود...',
   'products.column_code': 'الكود',
   'products.column_name': 'الاسم',
+  'products.column_status': 'الحالة',
   'products.column_type': 'نوع الصنف',
   'products.column_stock': 'الرصيد الحالي',
   'products.column_sale_price': 'سعر البيع',

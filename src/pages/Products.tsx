@@ -3,7 +3,7 @@ import {
   Search, Plus, Trash2, X, Package, History, ChevronRight, ChevronLeft, ChevronDown, Folder, FolderOpen, 
   Wallet, Layers, Hash, User, Calendar, Paperclip, LayoutGrid, List,
   Lock, Camera, Printer, Download, Upload, FileText, RefreshCw, AlertCircle, Settings, FileUp, Percent,
-  Link2, Check, Sparkles, CheckCircle, Clock, ShieldCheck
+  Link2, Check, Sparkles, CheckCircle, Clock, ShieldCheck, Filter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Barcode from 'react-barcode';
@@ -209,6 +209,7 @@ export const Products: React.FC = () => {
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -1144,13 +1145,19 @@ export const Products: React.FC = () => {
     return true;
   });
 
-  const filteredProducts = products.filter(p => 
-    (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (p.code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.barcode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.eta_item_code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.tax_item_code || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = products.filter(p => {
+    const isActive = p.is_active !== false;
+    if (statusFilter === 'active' && !isActive) return false;
+    if (statusFilter === 'inactive' && isActive) return false;
+
+    return (
+      (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (p.code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.barcode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.eta_item_code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.tax_item_code || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  });
 
   const groupedProducts = React.useMemo(() => {
     if (groupMode === 'none') return [];
@@ -1365,6 +1372,23 @@ export const Products: React.FC = () => {
                   />
                 </div>
 
+                {/* Status Filter */}
+                <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-xl border border-slate-200 shadow-2xs shrink-0">
+                  <Filter size={13} className="text-slate-400" />
+                  <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">
+                    {language === 'ar' ? 'الحالة:' : 'Status:'}
+                  </span>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as any)}
+                    className="bg-transparent text-xs font-black text-slate-800 outline-none cursor-pointer pe-1"
+                  >
+                    <option value="all">{language === 'ar' ? 'الكل' : 'All'}</option>
+                    <option value="active">{language === 'ar' ? 'نشط فقط' : 'Active Only'}</option>
+                    <option value="inactive">{language === 'ar' ? 'غير نشط فقط' : 'Inactive Only'}</option>
+                  </select>
+                </div>
+
                 {/* Grouping & Collapse Controls */}
                 <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
                   <button
@@ -1448,6 +1472,7 @@ export const Products: React.FC = () => {
                           </th>
                           <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_code')}</th>
                           <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_name')}</th>
+                          <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الحالة' : 'Status'}</th>
                           <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_type')}</th>
                           <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_stock')}</th>
                           <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_sale_price')}</th>
@@ -1456,9 +1481,9 @@ export const Products: React.FC = () => {
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {loading ? (
-                          <tr><td colSpan={7} className="py-12 text-center"><div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>
+                          <tr><td colSpan={8} className="py-12 text-center"><div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>
                         ) : filteredProducts.length === 0 ? (
-                          <tr><td colSpan={7} className="py-10 text-center text-slate-400 font-bold text-xs">{t('common.no_data')}</td></tr>
+                          <tr><td colSpan={8} className="py-10 text-center text-slate-400 font-bold text-xs">{t('common.no_data')}</td></tr>
                         ) : isGrouped ? (
                           groupedProducts.map((group) => {
                             const isCollapsed = !!collapsedGroupIds[group.id];
@@ -1468,7 +1493,7 @@ export const Products: React.FC = () => {
                                   onClick={() => toggleGroupCollapse(group.id)}
                                   className="bg-slate-100/90 hover:bg-slate-200/70 cursor-pointer select-none transition-colors border-y border-slate-200"
                                 >
-                                  <td colSpan={7} className="px-3 py-1.5">
+                                  <td colSpan={8} className="px-3 py-1.5">
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-2">
                                         <span className="p-0.5 rounded text-slate-600 bg-white shadow-2xs">
@@ -1526,32 +1551,35 @@ export const Products: React.FC = () => {
                                     <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                                       <span className="font-mono text-[10.5px] bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200/80 group-hover:border-emerald-300 transition-all">{product.code}</span>
                                     </td>
-                                    <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                       <div className="flex items-center gap-2.5">
-                                          <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center overflow-hidden border border-slate-200 shrink-0">
-                                            {product.image_url ? <img src={product.image_url} alt="" className="w-full h-full object-cover" /> : <Package size={14} />}
-                                          </div>
-                                          <div className="flex flex-col min-w-0">
-                                             <span className="font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors truncate">{product.name}</span>
-                                             <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                               <span className="text-[9px] text-slate-400 font-bold uppercase">{t(`products.type_${product.type}`)}</span>
-                                               <span className={`text-[8.5px] font-black px-1.5 py-0.2 rounded border ${product.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/40' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                                                 {product.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
-                                               </span>
-                                               {product.eta_item_code && (
-                                                 <span className="text-[8.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 border border-purple-200/60 flex items-center gap-0.5" title={language === 'ar' ? 'كود رفع الوثائق' : 'Upload ETA Code'}>
-                                                   <span className="text-[7.5px] bg-purple-200/60 text-purple-800 px-0.5 rounded">{language === 'ar' ? 'رفع' : 'Up'}</span> {product.eta_item_code}
-                                                 </span>
-                                               )}
-                                               {product.tax_item_code && (
-                                                 <span className="text-[8.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200/60 flex items-center gap-0.5" title={language === 'ar' ? 'كود ربط الوارد' : 'Received ETA Code'}>
-                                                   <span className="text-[7.5px] bg-blue-200/60 text-blue-800 px-0.5 rounded">{language === 'ar' ? 'استلام' : 'In'}</span> {product.tax_item_code}
-                                                 </span>
-                                               )}
-                                             </div>
-                                          </div>
-                                       </div>
-                                    </td>
+                                     <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                        <div className="flex items-center gap-2.5">
+                                           <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center overflow-hidden border border-slate-200 shrink-0">
+                                             {product.image_url ? <img src={product.image_url} alt="" className="w-full h-full object-cover" /> : <Package size={14} />}
+                                           </div>
+                                           <div className="flex flex-col min-w-0">
+                                              <span className="font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors truncate">{product.name}</span>
+                                              {(product.eta_item_code || product.tax_item_code) && (
+                                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                                  {product.eta_item_code && (
+                                                    <span className="text-[8.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 border border-purple-200/60 flex items-center gap-0.5" title={language === 'ar' ? 'كود رفع الوثائق' : 'Upload ETA Code'}>
+                                                      <span className="text-[7.5px] bg-purple-200/60 text-purple-800 px-0.5 rounded">{language === 'ar' ? 'رفع' : 'Up'}</span> {product.eta_item_code}
+                                                    </span>
+                                                  )}
+                                                  {product.tax_item_code && (
+                                                    <span className="text-[8.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200/60 flex items-center gap-0.5" title={language === 'ar' ? 'كود ربط الوارد' : 'Received ETA Code'}>
+                                                      <span className="text-[7.5px] bg-blue-200/60 text-blue-800 px-0.5 rounded">{language === 'ar' ? 'استلام' : 'In'}</span> {product.tax_item_code}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              )}
+                                           </div>
+                                        </div>
+                                     </td>
+                                     <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                       <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-bold border ${product.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50' : 'bg-rose-50 text-rose-700 border-rose-200/50'}`}>
+                                         {product.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
+                                       </span>
+                                     </td>
                                     <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                                       {(() => {
                                         const badge = getItemTypeBadge(product.type, language);
@@ -1659,31 +1687,34 @@ export const Products: React.FC = () => {
                                 <span className="font-mono text-[10.5px] bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200/80 group-hover:border-emerald-300 transition-all">{product.code}</span>
                               </td>
                               <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                 <div className="flex items-center gap-2.5">
-                                    <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center overflow-hidden border border-slate-200 shrink-0">
-                                      {product.image_url ? <img src={product.image_url} alt="" className="w-full h-full object-cover" /> : <Package size={14} />}
-                                    </div>
-                                    <div className="flex flex-col min-w-0">
-                                       <span className="font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors truncate">{product.name}</span>
-                                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                         <span className="text-[9px] text-slate-400 font-bold uppercase">{t(`products.type_${product.type}`)}</span>
-                                         <span className={`text-[8.5px] font-black px-1.5 py-0.2 rounded border ${product.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/40' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                                           {product.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
-                                         </span>
-                                         {product.eta_item_code && (
-                                           <span className="text-[8.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 border border-purple-200/60 flex items-center gap-0.5">
-                                             <span className="text-[7.5px] bg-purple-200/60 text-purple-800 px-0.5 rounded">{language === 'ar' ? 'رفع' : 'Up'}</span> {product.eta_item_code}
-                                           </span>
-                                         )}
-                                         {product.tax_item_code && (
-                                           <span className="text-[8.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200/60 flex items-center gap-0.5">
-                                             <span className="text-[7.5px] bg-blue-200/60 text-blue-800 px-0.5 rounded">{language === 'ar' ? 'استلام' : 'In'}</span> {product.tax_item_code}
-                                           </span>
-                                         )}
-                                       </div>
-                                    </div>
-                                 </div>
-                              </td>
+                                  <div className="flex items-center gap-2.5">
+                                     <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center overflow-hidden border border-slate-200 shrink-0">
+                                       {product.image_url ? <img src={product.image_url} alt="" className="w-full h-full object-cover" /> : <Package size={14} />}
+                                     </div>
+                                     <div className="flex flex-col min-w-0">
+                                        <span className="font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors truncate">{product.name}</span>
+                                        {(product.eta_item_code || product.tax_item_code) && (
+                                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                            {product.eta_item_code && (
+                                              <span className="text-[8.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 border border-purple-200/60 flex items-center gap-0.5" title={language === 'ar' ? 'كود رفع الوثائق' : 'Upload ETA Code'}>
+                                                <span className="text-[7.5px] bg-purple-200/60 text-purple-800 px-0.5 rounded">{language === 'ar' ? 'رفع' : 'Up'}</span> {product.eta_item_code}
+                                              </span>
+                                            )}
+                                            {product.tax_item_code && (
+                                              <span className="text-[8.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200/60 flex items-center gap-0.5" title={language === 'ar' ? 'كود ربط الوارد' : 'Received ETA Code'}>
+                                                <span className="text-[7.5px] bg-blue-200/60 text-blue-800 px-0.5 rounded">{language === 'ar' ? 'استلام' : 'In'}</span> {product.tax_item_code}
+                                              </span>
+                                            )}
+                                          </div>
+                                        )}
+                                     </div>
+                                  </div>
+                               </td>
+                               <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-bold border ${product.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50' : 'bg-rose-50 text-rose-700 border-rose-200/50'}`}>
+                                   {product.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
+                                 </span>
+                               </td>
                               <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                                 {(() => {
                                   const badge = getItemTypeBadge(product.type, language);
