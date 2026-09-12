@@ -327,6 +327,7 @@ export interface Product {
   category?: string;
   unit?: string;
   stock: number;
+  current_stock?: number;
   min_stock: number;
   account_id?: string;
   account_name?: string;
