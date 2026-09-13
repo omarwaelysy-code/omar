@@ -30,6 +30,7 @@ import { EtaAuthService } from '../services/eta/EtaAuthService';
 import { EtaDocumentService } from '../services/eta/EtaDocumentService';
 import { EtaSupplierMappingService } from '../services/eta/EtaSupplierMappingService';
 import { EtaItemMappingService } from '../services/eta/EtaItemMappingService';
+import { EtaSubmissionService } from '../services/eta/EtaSubmissionService';
 
 export function getEffectiveModule(moduleName: string): string {
   const mapping: { [key: string]: string } = {
@@ -5434,6 +5435,16 @@ modules.forEach(moduleName => {
         }
 
         if (moduleName === 'invoices') {
+          const invEtaCheck = await client.query(
+            'SELECT eta_uuid, eta_status FROM invoices WHERE id = $1',
+            [id]
+          );
+          if (invEtaCheck.rows.length > 0 && (invEtaCheck.rows[0].eta_uuid || invEtaCheck.rows[0].eta_status === 'Valid' || invEtaCheck.rows[0].eta_status === 'Submitted')) {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, 'لا يمكن حذف الفاتورة بعد رفعها إلى منظومة الفاتورة الإلكترونية.');
+          }
+
           await client.query(
             `UPDATE sales_orders 
              SET status = 'pending', invoice_id = NULL, invoice_number = NULL 
@@ -5458,6 +5469,16 @@ modules.forEach(moduleName => {
         }
 
         if (moduleName === 'returns') {
+          const retEtaCheck = await client.query(
+            'SELECT eta_uuid, eta_status FROM returns WHERE id = $1',
+            [id]
+          );
+          if (retEtaCheck.rows.length > 0 && (retEtaCheck.rows[0].eta_uuid || retEtaCheck.rows[0].eta_status === 'Valid' || retEtaCheck.rows[0].eta_status === 'Submitted')) {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, 'لا يمكن حذف المرتجع بعد رفعه إلى منظومة الفاتورة الإلكترونية.');
+          }
+
           await InventoryMovementService.reverseMovement('sales_return', id, client);
         }
 
@@ -6000,6 +6021,13 @@ router.put('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
     }
     const existingInv = existingInvRes.rows[0];
 
+    // Locking: Invoice cannot be updated if uploaded to ETA
+    if (existingInv.eta_uuid || existingInv.eta_status === 'Valid' || existingInv.eta_status === 'Submitted') {
+      await client.query('ROLLBACK');
+      client.release();
+      return sendError(res, 400, 'لا يمكن تعديل الفاتورة بعد رفعها إلى منظومة الفاتورة الإلكترونية.');
+    }
+
     const { items, id: bodyId, ...rawInvoiceData } = req.body;
 
     const invoiceNumber = rawInvoiceData.invoice_number || existingInv.invoice_number || `INV-${invoiceId}`;
@@ -6411,6 +6439,20 @@ router.put('/returns/:id', authenticateToken, async (req: AuthRequest, res) => {
     if (!isUUID(returnId)) return sendError(res, 400, 'Invalid Return ID format');
 
     await client.query('BEGIN');
+
+    // Locking: Return cannot be updated if uploaded to ETA
+    const existingRetRes = await client.query(
+      'SELECT eta_uuid, eta_status FROM returns WHERE id = $1',
+      [returnId]
+    );
+    if (existingRetRes.rows.length > 0) {
+      const existingRet = existingRetRes.rows[0];
+      if (existingRet.eta_uuid || existingRet.eta_status === 'Valid' || existingRet.eta_status === 'Submitted') {
+        await client.query('ROLLBACK');
+        client.release();
+        return sendError(res, 400, 'لا يمكن تعديل المرتجع بعد رفعه إلى منظومة الفاتورة الإلكترونية.');
+      }
+    }
     // Removed legacy preservedEntryNumber code
 
     const { items, id: bodyId, ...rawReturnData } = req.body;
@@ -12555,6 +12597,80 @@ router.get('/eta/invoices/:uuid/pdf', authenticateToken, async (req: AuthRequest
       error: err.message || 'تعذر تحميل ملف PDF من منظومة مصلحة الضرائب المصرية.',
       code: err.code || 'ETA_ERROR'
     });
+  }
+});
+
+// POST /api/erp/invoices/:id/validate-eta
+router.post('/invoices/:id/validate-eta', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = getAuthenticatedCompanyId(req);
+  if (!companyId) return sendError(res, 401, 'Unauthorized');
+  try {
+    const result = await EtaSubmissionService.validateInvoiceForSubmission(companyId, req.params.id);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ valid: false, error: err.message || 'فشل التحقق من الفاتورة' });
+  }
+});
+
+// POST /api/erp/invoices/:id/submit-eta
+router.post('/invoices/:id/submit-eta', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = getAuthenticatedCompanyId(req);
+  if (!companyId) return sendError(res, 401, 'Unauthorized');
+  try {
+    const result = await EtaSubmissionService.submitInvoice(companyId, req.params.id);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Error submitting invoice to ETA:', err.message || err);
+    res.status(400).json({ success: false, error: err.message || 'فشل رفع الفاتورة لمنظومة الضرائب' });
+  }
+});
+
+// GET /api/erp/invoices/:id/eta-status
+router.get('/invoices/:id/eta-status', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = getAuthenticatedCompanyId(req);
+  if (!companyId) return sendError(res, 401, 'Unauthorized');
+  try {
+    const result = await EtaSubmissionService.syncDocumentStatus(companyId, 'invoice', req.params.id);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message || 'تعذر تحديث حالة الفاتورة من الضرائب' });
+  }
+});
+
+// POST /api/erp/returns/:id/validate-eta
+router.post('/returns/:id/validate-eta', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = getAuthenticatedCompanyId(req);
+  if (!companyId) return sendError(res, 401, 'Unauthorized');
+  try {
+    const result = await EtaSubmissionService.validateReturnForSubmission(companyId, req.params.id);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ valid: false, error: err.message || 'فشل التحقق من المرتجع' });
+  }
+});
+
+// POST /api/erp/returns/:id/submit-eta
+router.post('/returns/:id/submit-eta', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = getAuthenticatedCompanyId(req);
+  if (!companyId) return sendError(res, 401, 'Unauthorized');
+  try {
+    const result = await EtaSubmissionService.submitReturn(companyId, req.params.id);
+    res.json(result);
+  } catch (err: any) {
+    console.error('Error submitting return to ETA:', err.message || err);
+    res.status(400).json({ success: false, error: err.message || 'فشل رفع المرتجع لمنظومة الضرائب' });
+  }
+});
+
+// GET /api/erp/returns/:id/eta-status
+router.get('/returns/:id/eta-status', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = getAuthenticatedCompanyId(req);
+  if (!companyId) return sendError(res, 401, 'Unauthorized');
+  try {
+    const result = await EtaSubmissionService.syncDocumentStatus(companyId, 'return', req.params.id);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message || 'تعذر تحديث حالة المرتجع من الضرائب' });
   }
 });
 

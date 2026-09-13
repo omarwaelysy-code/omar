@@ -5,7 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { TransactionManager } from '../services/TransactionManager';
 import { ReturnSchema, JournalEntrySchema } from '../lib/schemas';
 import { Return, Customer, Product, ReturnItem, JournalEntry, JournalEntryItem, Account, PaymentMethod, Operation, Department, CostCenter, Currency, ExchangeRate } from '../types';
-import { Search, Plus, Trash2, X, Eye, Download, FileText, FileSpreadsheet, RotateCcw, History, Printer, Phone, Mail, MapPin, Wallet, Calendar, Box, CreditCard, User, ChevronDown, Layers, Save, Package, ChevronRight, ChevronLeft, Maximize2, Minimize2, LayoutGrid, List, CheckCheck, Copy, Coins, Image as ImageIcon } from 'lucide-react';
+import { Search, Plus, Trash2, X, Eye, Download, FileText, FileSpreadsheet, RotateCcw, History, Printer, Phone, Mail, MapPin, Wallet, Calendar, Box, CreditCard, User, ChevronDown, Layers, Save, Package, ChevronRight, ChevronLeft, Maximize2, Minimize2, LayoutGrid, List, CheckCheck, Copy, Coins, Image as ImageIcon, UploadCloud, AlertTriangle, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
@@ -67,6 +67,200 @@ export const Returns: React.FC = () => {
   const returnRef = useRef<HTMLDivElement>(null);
   const editModalRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
+
+  const [isSubmittingEta, setIsSubmittingEta] = useState(false);
+  const [submittingEtaReturnId, setSubmittingEtaReturnId] = useState<string | null>(null);
+  const [etaDateConfirmModal, setEtaDateConfirmModal] = useState<{
+    isOpen: boolean;
+    returnDoc: Return | null;
+    returnDate: string;
+    todayDate: string;
+  } | null>(null);
+
+  const handleCopyUuid = (uuid: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    navigator.clipboard.writeText(uuid);
+    showNotification(language === 'ar' ? 'تم نسخ المعرف الرقمي (UUID) بنجاح' : 'UUID copied to clipboard', 'info');
+  };
+
+  const handleTriggerEtaUpload = (returnDoc: Return, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+
+    if (returnDoc.eta_uuid || returnDoc.eta_status === 'Valid') {
+      showNotification(
+        language === 'ar' 
+          ? 'تم رفع المرتجع مسبقاً إلى منظومة الفاتورة الإلكترونية' 
+          : 'Return has already been submitted to ETA',
+        'warning'
+      );
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const retDate = String(returnDoc.date || '').slice(0, 10);
+
+    if (retDate && retDate !== today) {
+      setEtaDateConfirmModal({
+        isOpen: true,
+        returnDoc,
+        returnDate: retDate,
+        todayDate: today
+      });
+      return;
+    }
+
+    proceedEtaUpload(returnDoc);
+  };
+
+  const proceedEtaUpload = async (returnDoc: Return) => {
+    const cust = customers.find(c => c.id === returnDoc.customer_id);
+    const taxNumber = (
+      cust?.tax_number || 
+      (returnDoc as any)?.customer_tax_number || 
+      (returnDoc as any)?.tax_number || 
+      ''
+    ).trim();
+
+    if (!taxNumber) {
+      showNotification(
+        language === 'ar' ? 'لا يوجد رقم ضريبي للعميل' : 'Customer has no tax number',
+        'error'
+      );
+      return;
+    }
+
+    let returnItems = returnDoc.items;
+    if (!returnItems || returnItems.length === 0) {
+      try {
+        const fullDoc = await dbService.get<Return>('returns', returnDoc.id);
+        if (fullDoc?.items) {
+          returnItems = fullDoc.items;
+        }
+      } catch (e) {}
+    }
+
+    if (returnItems && returnItems.length > 0) {
+      let hasUnregistered = false;
+      for (const item of returnItems) {
+        const prod = products.find(p => p.id === item.product_id);
+        const etaCode = (prod?.eta_item_code || (item as any)?.eta_item_code || '').trim();
+        const etaStatus = prod?.eta_code_status || (item as any)?.eta_code_status;
+        const etaType = prod?.eta_code_type || (item as any)?.eta_code_type;
+        if (!etaCode || (etaStatus !== 'Approved' && etaStatus !== 'Submitted' && etaType !== 'GS1')) {
+          hasUnregistered = true;
+          break;
+        }
+      }
+
+      if (hasUnregistered) {
+        showNotification(
+          language === 'ar'
+            ? 'الاصناف غير مسجلة على بوابة الضرائب برجاء التأكد من التسجيل قبل رفع الفاتورة'
+            : 'Items are not registered on ETA portal. Please verify registration before uploading return',
+          'error'
+        );
+        return;
+      }
+    }
+
+    setIsSubmittingEta(true);
+    setSubmittingEtaReturnId(returnDoc.id);
+    try {
+      const res: any = await apiRequest(`/returns/${returnDoc.id}/submit-eta`, 'POST');
+      if (res && (res.success || res.uuid)) {
+        showNotification(
+          language === 'ar'
+            ? 'تم رفع المرتجع بنجاح إلى منظومة الضرائب المصرية'
+            : 'Return successfully uploaded to ETA',
+          'success'
+        );
+        const updatedRet: Return = {
+          ...returnDoc,
+          eta_uuid: res.uuid,
+          eta_invoice_number: res.documentNumber || returnDoc.return_number,
+          eta_status: res.status || 'Valid'
+        };
+        setReturns(prev => prev.map(r => r.id === returnDoc.id ? updatedRet : r));
+        if (viewReturn && viewReturn.id === returnDoc.id) {
+          setViewReturn(updatedRet);
+        }
+      } else {
+        showNotification(res?.error || 'فشل رفع المرتجع إلى منظومة الضرائب', 'error');
+      }
+    } catch (err: any) {
+      showNotification(err.message || 'حدث خطأ أثناء رفع المرتجع للضرائب', 'error');
+    } finally {
+      setIsSubmittingEta(false);
+      setSubmittingEtaReturnId(null);
+    }
+  };
+
+  const renderEtaStatusBadge = (status?: string, uuid?: string) => {
+    if (!uuid && !status) return <span className="text-zinc-400 text-xs font-mono">-</span>;
+    const s = status || (uuid ? 'Valid' : 'Draft');
+    if (s === 'Valid' || s === 'صحيحة') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" title="المرتجع صحيح ومعتمد بمنظومة الضرائب">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          صحيحة
+        </span>
+      );
+    }
+    if (s === 'Submitted' || s === 'قيد المعالجة') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200" title="المرتجع قيد المراجعة والمعالجة بالمنظومة">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+          قيد المعالجة
+        </span>
+      );
+    }
+    if (s === 'Invalid' || s === 'غير صحيحة') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200" title="المرتجع غير صحيح بالمنظومة">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+          غير صحيحة
+        </span>
+      );
+    }
+    if (s === 'Cancelled' || s === 'ملغاة') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600 border border-zinc-200">
+          ملغاة
+        </span>
+      );
+    }
+    if (s === 'Rejected' || s === 'مرفوضة') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+          مرفوضة
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-50 text-zinc-500 border border-zinc-200">
+        {s}
+      </span>
+    );
+  };
+
+  const renderEtaUuidCell = (uuid?: string) => {
+    if (!uuid) return <span className="text-zinc-400 text-xs font-mono">-</span>;
+    return (
+      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+        <span className="font-mono text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded max-w-[130px] truncate select-all" title={uuid}>
+          {uuid.slice(0, 10)}...{uuid.slice(-6)}
+        </span>
+        <button
+          type="button"
+          onClick={(e) => handleCopyUuid(uuid, e)}
+          className="p-1 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-100 rounded transition-colors"
+          title="نسخ المعرف الرقمي (UUID)"
+        >
+          <Copy size={13} />
+        </button>
+      </div>
+    );
+  };
 
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -1387,6 +1581,16 @@ export const Returns: React.FC = () => {
   };
 
   const handleDelete = (id: string) => {
+    const ret = returns.find(r => r.id === id);
+    if (ret && (ret.eta_uuid || ret.eta_status === 'Valid' || ret.eta_status === 'Submitted')) {
+      showNotification(
+        language === 'ar'
+          ? 'لا يمكن حذف المرتجع بعد رفعه إلى منظومة الفاتورة الإلكترونية'
+          : 'Return cannot be deleted after submission to ETA',
+        'warning'
+      );
+      return;
+    }
     setReturnToDelete(id);
     setIsDeleteModalOpen(true);
   };
@@ -1412,6 +1616,16 @@ export const Returns: React.FC = () => {
 
   const openModal = async (ret?: Return) => {
     if (ret) {
+      if (ret.eta_uuid || ret.eta_status === 'Valid' || ret.eta_status === 'Submitted') {
+        showNotification(
+          language === 'ar'
+            ? 'لا يمكن تعديل المرتجع بعد رفعه إلى منظومة الفاتورة الإلكترونية'
+            : 'Return cannot be edited after submission to ETA',
+          'warning'
+        );
+        handleViewReturn(ret);
+        return;
+      }
 
       try {
         const fullData = await dbService.get<Return>('returns', ret.id);
@@ -1730,6 +1944,12 @@ export const Returns: React.FC = () => {
                   <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                     {language === 'ar' ? 'رقم القيد' : 'Journal Entry'}
                   </th>
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                    {language === 'ar' ? 'المعرف الرقمي (UUID)' : 'UUID'}
+                  </th>
+                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                    {language === 'ar' ? 'حالة المرتجع بالضرائب' : 'ETA Status'}
+                  </th>
                   <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.actions')}</th>
                 </tr>
               </thead>
@@ -1769,8 +1989,30 @@ export const Returns: React.FC = () => {
                         <span className="text-zinc-400 font-mono text-xs">-</span>
                       )}
                     </td>
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      {renderEtaUuidCell(ret.eta_uuid)}
+                    </td>
+                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      {renderEtaStatusBadge(ret.eta_status, ret.eta_uuid)}
+                    </td>
                     <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                       <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleTriggerEtaUpload(ret);
+                          }}
+                          disabled={isSubmittingEta && submittingEtaReturnId === ret.id}
+                          className={`p-2 rounded-lg transition-all no-pdf flex items-center gap-1 text-xs font-bold ${
+                            ret.eta_uuid 
+                              ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100' 
+                              : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100'
+                          }`}
+                          title={ret.eta_uuid ? (language === 'ar' ? 'تحديث حالة المرتجع من الضرائب' : 'Sync ETA Status') : (language === 'ar' ? 'رفع المرتجع للضرائب' : 'Submit to ETA')}
+                        >
+                          <UploadCloud size={16} className={submittingEtaReturnId === ret.id ? 'animate-bounce' : ''} />
+                          <span className="hidden xl:inline">{ret.eta_uuid ? (language === 'ar' ? 'تحديث' : 'Sync') : (language === 'ar' ? 'رفع للمنظومة' : 'ETA')}</span>
+                        </button>
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1782,16 +2024,25 @@ export const Returns: React.FC = () => {
                         >
                           <History size={18} />
                         </button>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openModal(ret);
-                          }}
-                          className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
-                          title={t('common.edit')}
-                        >
-                          <FileText size={18} />
-                        </button>
+                        {ret.eta_uuid ? (
+                          <div 
+                            className="p-2 text-zinc-300 cursor-not-allowed rounded-lg"
+                            title={language === 'ar' ? 'لا يمكن تعديل المرتجع بعد رفعه للضرائب' : 'Cannot edit return submitted to ETA'}
+                          >
+                            <Lock size={18} />
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openModal(ret);
+                            }}
+                            className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
+                            title={t('common.edit')}
+                          >
+                            <FileText size={18} />
+                          </button>
+                        )}
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1802,23 +2053,32 @@ export const Returns: React.FC = () => {
                         >
                           <Eye size={18} />
                         </button>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(ret.id);
-                          }}
-                          className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
-                          title={t('common.delete')}
-                        >
-                          <Trash2 size={18} />
-                        </button>
+                        {ret.eta_uuid ? (
+                          <div 
+                            className="p-2 text-zinc-300 cursor-not-allowed rounded-lg"
+                            title={language === 'ar' ? 'لا يمكن حذف المرتجع بعد رفعه للضرائب' : 'Cannot delete return submitted to ETA'}
+                          >
+                            <Lock size={18} />
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(ret.id);
+                            }}
+                            className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
+                            title={t('common.delete')}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
                 ))}
                 {filteredReturns.length === 0 && !loading && (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-zinc-500">{t('common.no_data')}</td>
+                    <td colSpan={9} className="px-6 py-12 text-center text-zinc-500">{t('common.no_data')}</td>
                   </tr>
                 )}
               </tbody>
@@ -1837,30 +2097,63 @@ export const Returns: React.FC = () => {
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
+                      handleTriggerEtaUpload(ret);
+                    }}
+                    disabled={isSubmittingEta && submittingEtaReturnId === ret.id}
+                    className={`p-2 rounded-xl border shadow-sm transition-all font-bold ${
+                      ret.eta_uuid 
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' 
+                        : 'bg-white text-indigo-600 border-indigo-100 hover:bg-indigo-50'
+                    }`}
+                    title={ret.eta_uuid ? (language === 'ar' ? 'تحديث حالة المرتجع من الضرائب' : 'Sync ETA Status') : (language === 'ar' ? 'رفع المرتجع للضرائب' : 'Submit to ETA')}
+                  >
+                    <UploadCloud size={16} className={submittingEtaReturnId === ret.id ? 'animate-bounce' : ''} />
+                  </button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
                       handleViewReturn(ret);
                     }}
                     className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
                   >
                     <Eye size={16} />
                   </button>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openModal(ret);
-                    }}
-                    className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
-                  >
-                    <FileText size={16} />
-                  </button>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(ret.id);
-                    }}
-                    className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  {ret.eta_uuid ? (
+                    <div 
+                      className="p-2 bg-zinc-100 text-zinc-300 rounded-xl border border-zinc-200 cursor-not-allowed font-bold"
+                      title={language === 'ar' ? 'لا يمكن التعديل بعد الرفع للضرائب' : 'Locked'}
+                    >
+                      <Lock size={16} />
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openModal(ret);
+                      }}
+                      className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
+                    >
+                      <FileText size={16} />
+                    </button>
+                  )}
+                  {ret.eta_uuid ? (
+                    <div 
+                      className="p-2 bg-zinc-100 text-zinc-300 rounded-xl border border-zinc-200 cursor-not-allowed font-bold"
+                      title={language === 'ar' ? 'لا يمكن الحذف بعد الرفع للضرائب' : 'Locked'}
+                    >
+                      <Lock size={16} />
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(ret.id);
+                      }}
+                      className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
                 </div>
                 
                 <div className="flex flex-col h-full justify-between">
@@ -1888,6 +2181,24 @@ export const Returns: React.FC = () => {
                       <p className="text-xs text-zinc-400 mt-1">
                         {ret.payment_type === 'cash' ? t('returns.payment_cash') : t('returns.payment_credit')}
                       </p>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-zinc-100">
+                      <div>
+                        {renderEtaStatusBadge(ret.eta_status, ret.eta_uuid)}
+                      </div>
+                      {ret.eta_uuid && (
+                        <div className="flex items-center gap-1 font-mono text-[10px] text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">
+                          <span>{ret.eta_uuid.substring(0, 8)}...</span>
+                          <button
+                            type="button"
+                            onClick={(e) => handleCopyUuid(ret.eta_uuid!, e)}
+                            className="text-indigo-600 hover:text-indigo-800"
+                          >
+                            <Copy size={11} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                   
@@ -3170,6 +3481,22 @@ export const Returns: React.FC = () => {
                           </p>
                         );
                       })()}
+                      {viewReturn.eta_uuid && (
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <span className="text-xs font-bold text-indigo-700">{language === 'ar' ? 'المعرف الرقمي (UUID):' : 'ETA UUID:'}</span>
+                          <span className="font-mono text-xs bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded text-indigo-900 select-all font-bold">
+                            {viewReturn.eta_uuid}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => handleCopyUuid(viewReturn.eta_uuid!, e)}
+                            className="p-1 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100 rounded transition-colors"
+                            title={language === 'ar' ? 'نسخ المعرف الرقمي' : 'Copy UUID'}
+                          >
+                            <Copy size={14} />
+                          </button>
+                        </div>
+                      )}
                       {viewReturn.customer_id && (
                         <p className="text-xs text-slate-500 font-medium">كود العميل: {viewReturn.customer_id.slice(-6).toUpperCase()}</p>
                       )}
@@ -3202,6 +3529,7 @@ export const Returns: React.FC = () => {
                         }`}>
                         {viewReturn.payment_type === 'cash' ? 'سداد نقدي' : 'سداد آجل'}
                       </div>
+                      {renderEtaStatusBadge(viewReturn.eta_status, viewReturn.eta_uuid)}
                     </div>
                   </div>
 
@@ -3292,15 +3620,31 @@ export const Returns: React.FC = () => {
                     {language === 'ar' ? 'طباعة ونموذج' : 'Print & Template'}
                   </button>
                   <button 
-                    onClick={() => {
-                      if (viewReturn) {
-                        printDocument('returns', viewReturn.id);
-                      }
-                    }}
-                    className="flex items-center gap-2 px-6 py-3 bg-white text-slate-700 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm cursor-pointer"
+                    type="button"
+                    disabled={isSubmittingEta && submittingEtaReturnId === viewReturn.id}
+                    onClick={() => handleTriggerEtaUpload(viewReturn)}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-bold transition-all active:scale-95 shadow-sm cursor-pointer ${
+                      viewReturn.eta_uuid || viewReturn.eta_status === 'Valid'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'
+                    }`}
                   >
-                    <Download size={20} />
-                    تصدير بالنموذج
+                    {isSubmittingEta && submittingEtaReturnId === viewReturn.id ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>{language === 'ar' ? 'جاري الرفع للضرائب...' : 'Submitting...'}</span>
+                      </>
+                    ) : viewReturn.eta_uuid || viewReturn.eta_status === 'Valid' ? (
+                      <>
+                        <CheckCheck size={20} />
+                        <span>{language === 'ar' ? 'تم الرفع للضرائب' : 'Submitted to ETA'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <UploadCloud size={20} />
+                        <span>{language === 'ar' ? 'رفع المرتجع إلكترونياً' : 'Submit Return to ETA'}</span>
+                      </>
+                    )}
                   </button>
                 </div>
                 <button 
@@ -3314,6 +3658,62 @@ export const Returns: React.FC = () => {
           </div>
         );
       })()}
+
+      {/* ETA Date Confirmation Modal */}
+      {etaDateConfirmModal?.isOpen && etaDateConfirmModal.returnDoc && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl p-6 border border-amber-200 space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 text-amber-600">
+              <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200">
+                <AlertTriangle size={28} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">{language === 'ar' ? 'تأكيد تاريخ المرتجع' : 'Confirm Return Date'}</h3>
+                <p className="text-xs text-slate-500">{language === 'ar' ? 'تنبيه قبل رفع الوثيقة لمنظومة الضرائب' : 'Warning before submitting to ETA'}</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-amber-50/60 rounded-2xl border border-amber-100 text-sm text-slate-700 space-y-2">
+              <p>
+                {language === 'ar' 
+                  ? `تاريخ المرتجع الحالي هو ` 
+                  : `Current return date is `}
+                <span className="font-mono font-bold text-amber-900">{formatDate(etaDateConfirmModal.returnDate)}</span>
+                {language === 'ar' 
+                  ? `، وهو لا يطابق تاريخ اليوم ` 
+                  : `, which does not match today's date `}
+                <span className="font-mono font-bold text-slate-900">{formatDate(etaDateConfirmModal.todayDate)}</span>.
+              </p>
+              <p className="font-bold text-amber-800">
+                {language === 'ar'
+                  ? 'هل ترغب في الاستمرار ورفع المرتجع بهذا التاريخ إلى منظومة الضرائب المصرية؟'
+                  : 'Do you want to proceed and submit this return with this date to ETA?'}
+              </p>
+            </div>
+
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setEtaDateConfirmModal(null)}
+                className="px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const ret = etaDateConfirmModal.returnDoc;
+                  setEtaDateConfirmModal(null);
+                  if (ret) proceedEtaUpload(ret);
+                }}
+                className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all"
+              >
+                {language === 'ar' ? 'نعم، استمر في الرفع' : 'Yes, proceed'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Customer Modal */}
       {isCustomerModalOpen && (

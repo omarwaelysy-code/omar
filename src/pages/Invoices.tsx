@@ -8,7 +8,8 @@ import {
   ChevronLeft, ChevronRight, Maximize2, Minimize2, Hash, 
   Wallet, Calendar, Package, Tag, Layers, Box, Paperclip, 
   Phone, Mail, Lock, LayoutGrid, List, Building2, ChevronDown, ChevronUp,
-  CreditCard, RotateCcw, Save, ExternalLink, CheckCheck, Copy, Coins
+  CreditCard, RotateCcw, Save, ExternalLink, CheckCheck, Copy, Coins,
+  UploadCloud, AlertTriangle, ShieldCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Barcode from 'react-barcode';
@@ -197,6 +198,8 @@ export const Invoices: React.FC = () => {
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
     invoice_number: true,
     eta_invoice_number: true,
+    eta_uuid: true,
+    eta_status: true,
     customer_name: true,
     date: true,
     description: true,
@@ -219,6 +222,8 @@ export const Invoices: React.FC = () => {
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     invoice_number: 140,
     eta_invoice_number: 140,
+    eta_uuid: 160,
+    eta_status: 110,
     customer_name: 180,
     date: 110,
     description: 150,
@@ -237,6 +242,200 @@ export const Invoices: React.FC = () => {
     updated_date: 110,
     updated_time: 90,
   });
+
+  const [isSubmittingEta, setIsSubmittingEta] = useState(false);
+  const [submittingEtaInvoiceId, setSubmittingEtaInvoiceId] = useState<string | null>(null);
+  const [etaDateConfirmModal, setEtaDateConfirmModal] = useState<{
+    isOpen: boolean;
+    invoice: Invoice | null;
+    invoiceDate: string;
+    todayDate: string;
+  } | null>(null);
+
+  const handleCopyUuid = (uuid: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    navigator.clipboard.writeText(uuid);
+    showNotification(language === 'ar' ? 'تم نسخ المعرف الرقمي (UUID) بنجاح' : 'UUID copied to clipboard', 'info');
+  };
+
+  const handleTriggerEtaUpload = (invoice: Invoice, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+
+    if (invoice.eta_uuid || invoice.eta_status === 'Valid') {
+      showNotification(
+        language === 'ar' 
+          ? 'تم رفع الفاتورة مسبقاً إلى منظومة الفاتورة الإلكترونية' 
+          : 'Invoice has already been submitted to ETA',
+        'warning'
+      );
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const invDate = String(invoice.date || '').slice(0, 10);
+
+    if (invDate && invDate !== today) {
+      setEtaDateConfirmModal({
+        isOpen: true,
+        invoice,
+        invoiceDate: invDate,
+        todayDate: today
+      });
+      return;
+    }
+
+    proceedEtaUpload(invoice);
+  };
+
+  const proceedEtaUpload = async (invoice: Invoice) => {
+    const cust = customers.find(c => c.id === invoice.customer_id);
+    const taxNumber = (
+      cust?.tax_number || 
+      (invoice as any)?.customer_tax_number || 
+      (invoice as any)?.tax_number || 
+      ''
+    ).trim();
+
+    if (!taxNumber) {
+      showNotification(
+        language === 'ar' ? 'لا يوجد رقم ضريبي للعميل' : 'Customer has no tax number',
+        'error'
+      );
+      return;
+    }
+
+    let invoiceItems = invoice.items;
+    if (!invoiceItems || invoiceItems.length === 0) {
+      try {
+        const fullDoc = await dbService.get<Invoice>('invoices', invoice.id);
+        if (fullDoc?.items) {
+          invoiceItems = fullDoc.items;
+        }
+      } catch (e) {}
+    }
+
+    if (invoiceItems && invoiceItems.length > 0) {
+      let hasUnregistered = false;
+      for (const item of invoiceItems) {
+        const prod = products.find(p => p.id === item.product_id);
+        const etaCode = (prod?.eta_item_code || (item as any)?.eta_item_code || '').trim();
+        const etaStatus = prod?.eta_code_status || (item as any)?.eta_code_status;
+        const etaType = prod?.eta_code_type || (item as any)?.eta_code_type;
+        if (!etaCode || (etaStatus !== 'Approved' && etaStatus !== 'Submitted' && etaType !== 'GS1')) {
+          hasUnregistered = true;
+          break;
+        }
+      }
+
+      if (hasUnregistered) {
+        showNotification(
+          language === 'ar'
+            ? 'الاصناف غير مسجلة على بوابة الضرائب برجاء التأكد من التسجيل قبل رفع الفاتورة'
+            : 'Items are not registered on ETA portal. Please verify registration before uploading invoice',
+          'error'
+        );
+        return;
+      }
+    }
+
+    setIsSubmittingEta(true);
+    setSubmittingEtaInvoiceId(invoice.id);
+    try {
+      const res: any = await apiRequest(`/invoices/${invoice.id}/submit-eta`, 'POST');
+      if (res && (res.success || res.uuid)) {
+        showNotification(
+          language === 'ar'
+            ? 'تم رفع الفاتورة بنجاح إلى منظومة الضرائب المصرية'
+            : 'Invoice successfully uploaded to ETA',
+          'success'
+        );
+        const updatedInv: Invoice = {
+          ...invoice,
+          eta_uuid: res.uuid,
+          eta_invoice_number: res.documentNumber || invoice.invoice_number,
+          eta_status: res.status || 'Valid'
+        };
+        setInvoices(prev => prev.map(inv => inv.id === invoice.id ? updatedInv : inv));
+        if (viewInvoice && viewInvoice.id === invoice.id) {
+          setViewInvoice(updatedInv);
+        }
+      } else {
+        showNotification(res?.error || 'فشل رفع الفاتورة إلى منظومة الضرائب', 'error');
+      }
+    } catch (err: any) {
+      showNotification(err.message || 'حدث خطأ أثناء رفع الفاتورة للضرائب', 'error');
+    } finally {
+      setIsSubmittingEta(false);
+      setSubmittingEtaInvoiceId(null);
+    }
+  };
+
+  const renderEtaStatusBadge = (status?: string, uuid?: string) => {
+    if (!uuid && !status) return <span className="text-slate-350 text-xs font-mono">-</span>;
+    const s = status || (uuid ? 'Valid' : 'Draft');
+    if (s === 'Valid' || s === 'صحيحة') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" title="الوثيقة صحيحة ومعتمدة بمنظومة الضرائب">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          صحيحة
+        </span>
+      );
+    }
+    if (s === 'Submitted' || s === 'قيد المعالجة') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200" title="الوثيقة قيد المراجعة والمعالجة بالمنظومة">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+          قيد المعالجة
+        </span>
+      );
+    }
+    if (s === 'Invalid' || s === 'غير صحيحة') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200" title="الوثيقة غير صحيحة بالمنظومة">
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+          غير صحيحة
+        </span>
+      );
+    }
+    if (s === 'Cancelled' || s === 'ملغاة') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+          ملغاة
+        </span>
+      );
+    }
+    if (s === 'Rejected' || s === 'مرفوضة') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+          مرفوضة
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-50 text-slate-500 border border-slate-200">
+        {s}
+      </span>
+    );
+  };
+
+  const renderEtaUuidCell = (uuid?: string) => {
+    if (!uuid) return <span className="text-slate-350 text-xs font-mono">-</span>;
+    return (
+      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+        <span className="font-mono text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded max-w-[130px] truncate select-all" title={uuid}>
+          {uuid.slice(0, 10)}...{uuid.slice(-6)}
+        </span>
+        <button
+          type="button"
+          onClick={(e) => handleCopyUuid(uuid, e)}
+          className="p-1 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-100 rounded transition-colors"
+          title="نسخ المعرف الرقمي (UUID)"
+        >
+          <Copy size={13} />
+        </button>
+      </div>
+    );
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -2464,6 +2663,16 @@ export const Invoices: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
+    const inv = invoices.find(i => i.id === id);
+    if (inv && (inv.eta_uuid || inv.eta_status === 'Valid' || inv.eta_status === 'Submitted')) {
+      showNotification(
+        language === 'ar'
+          ? 'لا يمكن حذف الفاتورة بعد رفعها إلى منظومة الفاتورة الإلكترونية'
+          : 'Invoice cannot be deleted after submission to ETA',
+        'warning'
+      );
+      return;
+    }
     setInvoiceToDelete(id);
     setIsDeleteModalOpen(true);
   };
@@ -2945,6 +3154,16 @@ export const Invoices: React.FC = () => {
   };
 
   const openEditModal = async (invoice: Invoice) => {
+    if (invoice.eta_uuid || invoice.eta_status === 'Valid' || invoice.eta_status === 'Submitted') {
+      showNotification(
+        language === 'ar'
+          ? 'لا يمكن تعديل الفاتورة بعد رفعها إلى منظومة الفاتورة الإلكترونية'
+          : 'Invoice cannot be edited after submission to ETA',
+        'warning'
+      );
+      handleViewInvoice(invoice);
+      return;
+    }
 
     try {
       // Fetch latest full data to be sure we have everything including items
@@ -3317,6 +3536,8 @@ export const Invoices: React.FC = () => {
                         const labels: Record<string, string> = {
                           invoice_number: language === 'ar' ? 'رقم الفاتورة' : 'Invoice Number',
                           eta_invoice_number: language === 'ar' ? 'رقم الوثيقة الإلكترونية' : 'Electronic Doc No.',
+                          eta_uuid: language === 'ar' ? 'المعرف الإلكتروني (UUID)' : 'ETA UUID',
+                          eta_status: language === 'ar' ? 'حالة الفاتورة (الضرائب)' : 'ETA Status',
                           customer_name: language === 'ar' ? 'العميل' : 'Customer',
                           date: language === 'ar' ? 'التاريخ' : 'Date',
                           description: language === 'ar' ? 'وصف الفاتورة' : 'Description',
@@ -3414,6 +3635,36 @@ export const Invoices: React.FC = () => {
                             </span>
                           </div>
                           {renderResizeHandles('eta_invoice_number')}
+                        </th>
+                      )}
+                      {visibleColumns.eta_uuid && (
+                        <th 
+                          style={{ width: columnWidths.eta_uuid, minWidth: columnWidths.eta_uuid }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('eta_uuid')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'المعرف الرقمي (UUID)' : 'ETA UUID'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'eta_uuid' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('eta_uuid')}
+                        </th>
+                      )}
+                      {visibleColumns.eta_status && (
+                        <th 
+                          style={{ width: columnWidths.eta_status, minWidth: columnWidths.eta_status }} 
+                          className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('eta_status')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'حالة الفاتورة (الضرائب)' : 'ETA Status'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'eta_status' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('eta_status')}
                         </th>
                       )}
                       {visibleColumns.customer_name && (
@@ -3754,6 +4005,16 @@ export const Invoices: React.FC = () => {
                               )}
                             </td>
                           )}
+                          {visibleColumns.eta_uuid && (
+                            <td style={{ width: columnWidths.eta_uuid, minWidth: columnWidths.eta_uuid }} className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {renderEtaUuidCell(inv.eta_uuid)}
+                            </td>
+                          )}
+                          {visibleColumns.eta_status && (
+                            <td style={{ width: columnWidths.eta_status, minWidth: columnWidths.eta_status }} className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {renderEtaStatusBadge(inv.eta_status, inv.eta_uuid)}
+                            </td>
+                          )}
                           {visibleColumns.customer_name && (
                             <td style={{ width: columnWidths.customer_name, minWidth: columnWidths.customer_name }} className={`px-6 py-0.5 font-bold text-slate-900 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>
                               {inv.customer_name}
@@ -3925,29 +4186,70 @@ export const Invoices: React.FC = () => {
                               >
                                 <Eye size={18} />
                               </button>
+                              <button 
+                                type="button"
+                                onClick={(e) => handleTriggerEtaUpload(inv, e)}
+                                disabled={isSubmittingEta && submittingEtaInvoiceId === inv.id}
+                                className={`p-2 rounded-lg transition-all no-pdf ${
+                                  inv.eta_uuid || inv.eta_status === 'Valid'
+                                    ? 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100'
+                                    : 'text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 active:scale-95'
+                                }`}
+                                title={
+                                  inv.eta_uuid || inv.eta_status === 'Valid'
+                                    ? (language === 'ar' ? 'تم رفع الفاتورة إلكترونياً بالفعل' : 'Invoice uploaded to ETA')
+                                    : (language === 'ar' ? 'رفع الفاتورة إلكترونياً إلى مصلحة الضرائب' : 'Upload Invoice to ETA')
+                                }
+                              >
+                                {isSubmittingEta && submittingEtaInvoiceId === inv.id ? (
+                                  <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                                ) : inv.eta_uuid || inv.eta_status === 'Valid' ? (
+                                  <CheckCheck size={18} />
+                                ) : (
+                                  <UploadCloud size={18} />
+                                )}
+                              </button>
                               {canEdit && (
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openEditModal(inv);
-                                  }}
-                                  className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
-                                  title={t('common.edit')}
-                                >
-                                  <Pencil size={18} />
-                                </button>
+                                (inv.eta_uuid || inv.eta_status === 'Valid' || inv.eta_status === 'Submitted') ? (
+                                  <span 
+                                    className="p-2 text-slate-300 cursor-not-allowed rounded-lg inline-flex items-center"
+                                    title={language === 'ar' ? 'لا يمكن تعديل الفاتورة بعد رفعها إلى الضرائب' : 'Invoice cannot be edited after ETA upload'}
+                                  >
+                                    <Lock size={16} />
+                                  </span>
+                                ) : (
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openEditModal(inv);
+                                    }}
+                                    className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
+                                    title={t('common.edit')}
+                                  >
+                                    <Pencil size={18} />
+                                  </button>
+                                )
                               )}
                               {canDelete && (
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDelete(inv.id);
-                                  }}
-                                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
-                                  title={t('common.delete')}
-                                >
-                                  <Trash2 size={18} />
-                                </button>
+                                (inv.eta_uuid || inv.eta_status === 'Valid' || inv.eta_status === 'Submitted') ? (
+                                  <span 
+                                    className="p-2 text-slate-300 cursor-not-allowed rounded-lg inline-flex items-center"
+                                    title={language === 'ar' ? 'لا يمكن حذف الفاتورة بعد رفعها إلى الضرائب' : 'Invoice cannot be deleted after ETA upload'}
+                                  >
+                                    <Lock size={16} />
+                                  </span>
+                                ) : (
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDelete(inv.id);
+                                    }}
+                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
+                                    title={t('common.delete')}
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                )
                               )}
                             </div>
                           </td>
@@ -3989,30 +4291,74 @@ export const Invoices: React.FC = () => {
                             handleViewInvoice(inv);
                           }}
                           className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
+                          title={t('common.view')}
                         >
                           <Eye size={16} />
                         </button>
+                        <button 
+                          type="button"
+                          onClick={(e) => handleTriggerEtaUpload(inv, e)}
+                          disabled={isSubmittingEta && submittingEtaInvoiceId === inv.id}
+                          className={`p-2 rounded-xl border shadow-sm transition-all font-bold ${
+                            inv.eta_uuid || inv.eta_status === 'Valid'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                              : 'bg-white text-indigo-600 border-indigo-100 hover:bg-indigo-50'
+                          }`}
+                          title={
+                            inv.eta_uuid || inv.eta_status === 'Valid'
+                              ? (language === 'ar' ? 'تم رفع الفاتورة إلكترونياً' : 'Uploaded to ETA')
+                              : (language === 'ar' ? 'رفع الفاتورة إلكترونياً إلى مصلحة الضرائب' : 'Upload Invoice to ETA')
+                          }
+                        >
+                          {isSubmittingEta && submittingEtaInvoiceId === inv.id ? (
+                            <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                          ) : inv.eta_uuid || inv.eta_status === 'Valid' ? (
+                            <CheckCheck size={16} />
+                          ) : (
+                            <UploadCloud size={16} />
+                          )}
+                        </button>
                         {canEdit && (
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openEditModal(inv);
-                            }}
-                            className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
-                          >
-                            <Pencil size={16} />
-                          </button>
+                          (inv.eta_uuid || inv.eta_status === 'Valid' || inv.eta_status === 'Submitted') ? (
+                            <span 
+                              className="p-2 bg-slate-50 text-slate-300 rounded-xl border border-slate-100 shadow-sm cursor-not-allowed font-bold inline-flex items-center"
+                              title={language === 'ar' ? 'لا يمكن تعديل الفاتورة بعد رفعها للضرائب' : 'Invoice cannot be edited after ETA upload'}
+                            >
+                              <Lock size={15} />
+                            </span>
+                          ) : (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditModal(inv);
+                              }}
+                              className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
+                              title={t('common.edit')}
+                            >
+                              <Pencil size={16} />
+                            </button>
+                          )
                         )}
                         {canDelete && (
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(inv.id);
-                            }}
-                            className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          (inv.eta_uuid || inv.eta_status === 'Valid' || inv.eta_status === 'Submitted') ? (
+                            <span 
+                              className="p-2 bg-slate-50 text-slate-300 rounded-xl border border-slate-100 shadow-sm cursor-not-allowed font-bold inline-flex items-center"
+                              title={language === 'ar' ? 'لا يمكن حذف الفاتورة بعد رفعها للضرائب' : 'Invoice cannot be deleted after ETA upload'}
+                            >
+                              <Lock size={15} />
+                            </span>
+                          ) : (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(inv.id);
+                              }}
+                              className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
+                              title={t('common.delete')}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )
                         )}
                       </div>
 
@@ -4025,7 +4371,13 @@ export const Invoices: React.FC = () => {
                                 {language === 'ar' ? 'إلكترونية:' : 'ETA:'} {inv.eta_invoice_number}
                               </span>
                             )}
+                            {renderEtaStatusBadge(inv.eta_status, inv.eta_uuid)}
                           </div>
+                          {inv.eta_uuid && (
+                            <div className="mt-0.5">
+                              {renderEtaUuidCell(inv.eta_uuid)}
+                            </div>
+                          )}
                           <h4 className="font-bold text-slate-900 group-hover:text-emerald-700 transition-colors text-xl mt-1 tracking-tight">{inv.customer_name}</h4>
                         </div>
                         {inv.entry_number && (
@@ -5921,6 +6273,28 @@ export const Invoices: React.FC = () => {
                         </span>
                       </p>
                     )}
+                    {(viewInvoice.eta_uuid || viewInvoice.eta_status) && (
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <span className="text-xs font-bold text-slate-700">{language === 'ar' ? 'حالة الوثيقة بالضرائب:' : 'ETA Status:'}</span>
+                        {renderEtaStatusBadge(viewInvoice.eta_status, viewInvoice.eta_uuid)}
+                      </div>
+                    )}
+                    {viewInvoice.eta_uuid && (
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <span className="text-xs font-bold text-indigo-700">{language === 'ar' ? 'المعرف الرقمي (UUID):' : 'ETA UUID:'}</span>
+                        <span className="font-mono text-xs bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded text-indigo-900 select-all font-bold">
+                          {viewInvoice.eta_uuid}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => handleCopyUuid(viewInvoice.eta_uuid!, e)}
+                          className="p-1 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100 rounded transition-colors"
+                          title={language === 'ar' ? 'نسخ المعرف الرقمي' : 'Copy UUID'}
+                        >
+                          <Copy size={14} />
+                        </button>
+                      </div>
+                    )}
                     {viewInvoice.payment_type === 'credit' && viewInvoice.payment_terms && (
                       <p className="text-xs text-slate-500 font-medium mt-1">
                         {language === 'ar' ? 'شروط السداد:' : 'Payment Terms:'} <span className="text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-100/50">
@@ -6178,12 +6552,86 @@ export const Invoices: React.FC = () => {
                   <Download size={20} />
                   تصدير بالنموذج
                 </button>
+                <button 
+                  type="button"
+                  disabled={isSubmittingEta && submittingEtaInvoiceId === viewInvoice.id}
+                  onClick={() => handleTriggerEtaUpload(viewInvoice)}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-bold transition-all active:scale-95 shadow-sm cursor-pointer ${
+                    viewInvoice.eta_uuid || viewInvoice.eta_status === 'Valid'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'
+                  }`}
+                >
+                  {isSubmittingEta && submittingEtaInvoiceId === viewInvoice.id ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>جاري الرفع للضرائب...</span>
+                    </>
+                  ) : viewInvoice.eta_uuid || viewInvoice.eta_status === 'Valid' ? (
+                    <>
+                      <CheckCheck size={20} />
+                      <span>تم الرفع للضرائب</span>
+                    </>
+                  ) : (
+                    <>
+                      <UploadCloud size={20} />
+                      <span>رفع الفاتورة إلكترونياً</span>
+                    </>
+                  )}
+                </button>
               </div>
               <button 
                 onClick={() => setViewInvoice(null)}
                 className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all active:scale-95 shadow-lg shadow-slate-200"
               >
                 إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ETA Date Confirmation Modal */}
+      {etaDateConfirmModal?.isOpen && etaDateConfirmModal.invoice && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white max-w-md w-full rounded-3xl shadow-2xl p-6 border border-amber-200 space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 text-amber-600">
+              <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200">
+                <AlertTriangle size={28} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">تأكيد تاريخ الفاتورة</h3>
+                <p className="text-xs text-slate-500">تنبيه قبل رفع الوثيقة لمنظومة الضرائب</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-amber-50/60 rounded-2xl border border-amber-100 text-sm text-slate-700 space-y-2">
+              <p>
+                تاريخ الفاتورة الحالي هو <span className="font-mono font-bold text-amber-900">{formatDate(etaDateConfirmModal.invoiceDate)}</span>، وهو لا يطابق تاريخ اليوم <span className="font-mono font-bold text-slate-900">{formatDate(etaDateConfirmModal.todayDate)}</span>.
+              </p>
+              <p className="font-bold text-amber-800">
+                هل ترغب في الاستمرار ورفع الفاتورة بهذا التاريخ إلى منظومة الضرائب المصرية؟
+              </p>
+            </div>
+
+            <div className="flex gap-3 justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setEtaDateConfirmModal(null)}
+                className="px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-all"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const inv = etaDateConfirmModal.invoice;
+                  setEtaDateConfirmModal(null);
+                  if (inv) proceedEtaUpload(inv);
+                }}
+                className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-md shadow-indigo-200 transition-all"
+              >
+                نعم، استمر في الرفع
               </button>
             </div>
           </div>

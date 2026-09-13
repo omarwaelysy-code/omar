@@ -405,6 +405,10 @@ export interface Invoice {
   updated_at?: string;
   eta_uuid?: string;
   eta_invoice_number?: string;
+  eta_status?: string;
+  eta_submission_uuid?: string;
+  eta_submitted_at?: string;
+  eta_error?: string;
 }
 
 export interface PurchaseInvoice {
@@ -633,6 +637,12 @@ export interface Return {
   exchange_rate?: number;
   exchange_rate_type?: 'manual' | 'auto';
   total_base_amount?: number;
+  eta_uuid?: string;
+  eta_invoice_number?: string;
+  eta_status?: string;
+  eta_submission_uuid?: string;
+  eta_submitted_at?: string;
+  eta_error?: string;
 }
 
 export interface PurchaseReturn {
