@@ -5758,6 +5758,13 @@ router.post('/invoices', authenticateToken, TransactionsLimitMiddleware, async (
        return sendError(res, 400, 'total_amount is required');
     }
 
+    // CRITICAL GUARD: Reject invoices with no items.
+    // An invoice with no items would cause the backfill to create a debit-only
+    // (unbalanced) journal entry, leading to catastrophic accounting imbalance.
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return sendError(res, 400, 'لا يمكن حفظ الفاتورة: يجب إضافة صنف واحد على الأقل.');
+    }
+
     await client.query('BEGIN');
 
     // Validate negative stock restrictions

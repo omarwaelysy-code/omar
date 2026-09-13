@@ -1,4 +1,4 @@
-﻿import crypto from 'crypto';
+import crypto from 'crypto';
 import { generateNextSequence } from './erp-api';
 
 export async function backfillMissingJournalEntries(pool: any) {
@@ -218,15 +218,26 @@ export async function backfillMissingJournalEntries(pool: any) {
     }
 
     // 2. Find all sales invoices that don't have journal entries
+    // CRITICAL GUARD: Only process invoices that have at least 1 item.
+    // Invoices with no items are either ghost/duplicate records or corrupt data.
+    // Creating a JE for them would result in a debit-only (unbalanced) entry.
     const missingSalesInvoicesRes = await client.query(`
-      SELECT i.* 
+      SELECT DISTINCT i.* 
       FROM invoices i
+      INNER JOIN invoice_items ii ON ii.invoice_id = i.id
       LEFT JOIN journal_entries je ON je.reference_id = i.id AND je.reference_type = 'invoice'
       WHERE je.id IS NULL
     `);
 
     for (const invoice of missingSalesInvoicesRes.rows) {
       try {
+        // Extra safety guard: skip if no items (should not happen due to INNER JOIN above)
+        const itemCheckRes = await client.query('SELECT COUNT(*) as cnt FROM invoice_items WHERE invoice_id = $1', [invoice.id]);
+        if (parseInt(itemCheckRes.rows[0].cnt, 10) === 0) {
+          console.warn(`[BACKFILL] Skipping invoice ${invoice.invoice_number} (${invoice.id}) - has no items, cannot create balanced JE.`);
+          continue;
+        }
+
 
         const invoiceId = invoice.id;
         const companyId = invoice.company_id;
