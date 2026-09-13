@@ -376,6 +376,185 @@ export class EtaDocumentService {
   }
 
   /**
+   * Comprehensive tax breakdown extractor from any ETA payload/raw_data.
+   * Defensively searches root taxTotals, nested details/rawDocument, inner document JSON,
+   * candidate invoiceLines (aggregating line taxableItems), and rate-based estimation.
+   */
+  public static extractTaxBreakdown(itemOrRaw: any, taxAmountNum = 0, netAmountNum = 0): {
+    taxTotals: Array<{ taxType: string; amount: number; rate?: number; subType?: string }>;
+    taxableFees: number;
+    tableTax: number;
+    vatAmount: number;
+    nonTaxableFees: number;
+    whtAmount: number;
+    hasExplicitTaxes: boolean;
+  } {
+    let raw = itemOrRaw || {};
+    if (typeof raw === 'string') {
+      try {
+        raw = JSON.parse(raw);
+      } catch {
+        raw = {};
+      }
+    }
+
+    // 1. Try to find parsed document inside raw.document if it's a JSON string
+    let parsedDoc: any = null;
+    if (raw?.document) {
+      if (typeof raw.document === 'string') {
+        try {
+          parsedDoc = JSON.parse(raw.document);
+        } catch {}
+      } else if (typeof raw.document === 'object') {
+        parsedDoc = raw.document;
+      }
+    }
+
+    // 2. Look for taxTotals array with items
+    let taxTotals: any[] = [];
+    if (Array.isArray(raw?.taxTotals) && raw.taxTotals.length > 0) {
+      taxTotals = raw.taxTotals;
+    } else if (Array.isArray(raw?.details?.taxTotals) && raw.details.taxTotals.length > 0) {
+      taxTotals = raw.details.taxTotals;
+    } else if (Array.isArray(raw?.rawDocument?.taxTotals) && raw.rawDocument.taxTotals.length > 0) {
+      taxTotals = raw.rawDocument.taxTotals;
+    } else if (Array.isArray(parsedDoc?.taxTotals) && parsedDoc.taxTotals.length > 0) {
+      taxTotals = parsedDoc.taxTotals;
+    }
+
+    // 3. If taxTotals is still empty, look for invoiceLines across all possible locations
+    if (taxTotals.length === 0) {
+      const candidateLines: any[] = Array.isArray(raw?.invoiceLines) && raw.invoiceLines.length > 0
+        ? raw.invoiceLines
+        : (Array.isArray(raw?.details?.invoiceLines) && raw.details.invoiceLines.length > 0
+            ? raw.details.invoiceLines
+            : (Array.isArray(raw?.rawDocument?.invoiceLines) && raw.rawDocument.invoiceLines.length > 0
+                ? raw.rawDocument.invoiceLines
+                : (Array.isArray(parsedDoc?.invoiceLines) && parsedDoc.invoiceLines.length > 0
+                    ? parsedDoc.invoiceLines
+                    : [])));
+
+      if (candidateLines.length > 0) {
+        const aggMap = new Map<string, { taxType: string; amount: number; rate?: number; subType?: string }>();
+        for (const line of candidateLines) {
+          const lTaxes: any[] = Array.isArray(line.taxableItems) && line.taxableItems.length > 0
+            ? line.taxableItems
+            : (Array.isArray(line.lineTaxableItems) && line.lineTaxableItems.length > 0
+                ? line.lineTaxableItems
+                : (Array.isArray(line.taxesList) && line.taxesList.length > 0
+                    ? line.taxesList
+                    : []));
+
+          for (const t of lTaxes) {
+            const type = String(t.taxType || t.type || '').toUpperCase().trim();
+            const amt = Number(t.amount ?? t.taxAmount ?? 0);
+            if (type && amt > 0) {
+              const existing = aggMap.get(type);
+              if (existing) {
+                existing.amount = Math.round((existing.amount + amt) * 10000) / 10000;
+              } else {
+                aggMap.set(type, {
+                  taxType: type,
+                  amount: amt,
+                  rate: t.rate !== undefined ? Number(t.rate) : undefined,
+                  subType: t.subType || t.taxSubType
+                });
+              }
+            }
+          }
+        }
+        if (aggMap.size > 0) {
+          taxTotals = Array.from(aggMap.values());
+        }
+      }
+    }
+
+    // Calculate components from resolved taxTotals
+    const hasExplicitTaxes = taxTotals.length > 0;
+    const taxableFees = taxTotals
+      .filter(t => ['T5','T6','T7','T8','T9','T10','T11','T12'].includes(t.taxType))
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+
+    const tableTax = taxTotals
+      .filter(t => ['T2','T3'].includes(t.taxType))
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+
+    const nonTaxableFees = taxTotals
+      .filter(t => ['T13','T14','T15','T16','T17','T18','T19','T20'].includes(t.taxType))
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+
+    const whtAmount = taxTotals
+      .filter(t => t.taxType === 'T4')
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+
+    let vatAmount = taxTotals
+      .filter(t => t.taxType === 'T1')
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+
+    // 4. Intelligent fallback ONLY if no explicit tax totals were found anywhere
+    if (!hasExplicitTaxes && taxAmountNum > 0) {
+      if (netAmountNum > 0) {
+        const effectiveRate = taxAmountNum / netAmountNum;
+        // Check Table Tax standard rates: 10%, 5%, 8%
+        if (effectiveRate >= 0.09 && effectiveRate <= 0.11) {
+          return {
+            taxTotals: [{ taxType: 'T2', amount: taxAmountNum, rate: 10 }],
+            taxableFees: 0,
+            tableTax: taxAmountNum,
+            vatAmount: 0,
+            nonTaxableFees: 0,
+            whtAmount: 0,
+            hasExplicitTaxes: false
+          };
+        } else if (effectiveRate >= 0.045 && effectiveRate <= 0.055) {
+          return {
+            taxTotals: [{ taxType: 'T2', amount: taxAmountNum, rate: 5 }],
+            taxableFees: 0,
+            tableTax: taxAmountNum,
+            vatAmount: 0,
+            nonTaxableFees: 0,
+            whtAmount: 0,
+            hasExplicitTaxes: false
+          };
+        } else if (effectiveRate >= 0.075 && effectiveRate <= 0.085) {
+          return {
+            taxTotals: [{ taxType: 'T2', amount: taxAmountNum, rate: 8 }],
+            taxableFees: 0,
+            tableTax: taxAmountNum,
+            vatAmount: 0,
+            nonTaxableFees: 0,
+            whtAmount: 0,
+            hasExplicitTaxes: false
+          };
+        } else if (effectiveRate > 0 && effectiveRate <= 0.035) {
+          return {
+            taxTotals: [{ taxType: 'T4', amount: taxAmountNum }],
+            taxableFees: 0,
+            tableTax: 0,
+            vatAmount: 0,
+            nonTaxableFees: 0,
+            whtAmount: taxAmountNum,
+            hasExplicitTaxes: false
+          };
+        }
+      }
+      // If none of the table/wht rates match, default to VAT 14%
+      vatAmount = taxAmountNum;
+      taxTotals = [{ taxType: 'T1', amount: taxAmountNum }];
+    }
+
+    return {
+      taxTotals,
+      taxableFees: Math.round(taxableFees * 100) / 100,
+      tableTax: Math.round(tableTax * 100) / 100,
+      vatAmount: Math.round(vatAmount * 100) / 100,
+      nonTaxableFees: Math.round(nonTaxableFees * 100) / 100,
+      whtAmount: Math.round(whtAmount * 100) / 100,
+      hasExplicitTaxes
+    };
+  }
+
+  /**
    * Load saved ETA documents from PostgreSQL eta_documents table
    */
   public static async getDocumentsFromDatabase(companyId: string): Promise<{ data: EtaReceivedInvoiceDTO[]; lastSyncedAt: string | null }> {
@@ -404,22 +583,19 @@ export class EtaDocumentService {
             rawDataObj = typeof row.raw_data === 'string' ? JSON.parse(row.raw_data) : row.raw_data;
           } catch {}
         }
-        const taxTotals: any[] = Array.isArray(rawDataObj?.taxTotals)
-          ? rawDataObj.taxTotals
-          : (Array.isArray(rawDataObj?.details?.taxTotals)
-              ? rawDataObj.details.taxTotals
-              : (Array.isArray(rawDataObj?.rawDocument?.taxTotals) ? rawDataObj.rawDocument.taxTotals : []));
 
         const taxAmount = Number(row.tax_amount || 0);
-        const hasTaxTotals = taxTotals.length > 0;
-        const taxableFees = taxTotals.filter(t => ['T5','T6','T7','T8','T9','T10','T11','T12'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-        const tableTax = taxTotals.filter(t => ['T2','T3'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-        const vatAmount = hasTaxTotals
-          ? taxTotals.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0)
-          : taxAmount;
-        const nonTaxableFees = taxTotals.filter(t => ['T13','T14','T15','T16','T17','T18','T19','T20'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-        const whtAmount = taxTotals.filter(t => t.taxType === 'T4').reduce((s, t) => s + (Number(t.amount) || 0), 0);
         const netAmount = Number(row.net_amount || 0);
+
+        const {
+          taxTotals,
+          taxableFees,
+          tableTax,
+          vatAmount,
+          nonTaxableFees,
+          whtAmount
+        } = this.extractTaxBreakdown(rawDataObj, taxAmount, netAmount);
+
 
         // حساب صافي الأصناف الخاضعة وغير الخاضعة، وإجمالي الوعاء الضريبي لـ 14%
         const rawLines: any[] = Array.isArray(rawDataObj?.invoiceLines)
@@ -965,19 +1141,19 @@ export class EtaDocumentService {
         });
       } else {
         // Fallback: 1 line with document totals
-        const docTaxTotals: any[] = Array.isArray(rawDataObj?.taxTotals) ? rawDataObj.taxTotals : [];
         const docTaxAmount = Number(row.tax_amount || 0);
-        const hasDocTaxTotals = docTaxTotals.length > 0;
-        const taxableFees = docTaxTotals.filter(t => ['T5','T6','T7','T8','T9','T10','T11','T12'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-        const tableTax = docTaxTotals.filter(t => ['T2','T3'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-        const vatAmount = hasDocTaxTotals
-          ? docTaxTotals.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0)
-          : docTaxAmount;
-        const nonTaxableFees = docTaxTotals.filter(t => ['T13','T14','T15','T16','T17','T18','T19','T20'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-        const whtAmount = docTaxTotals.filter(t => t.taxType === 'T4').reduce((s, t) => s + (Number(t.amount) || 0), 0);
+        const netTotal = Number(row.net_amount || (Number(row.total_sales_amount || 0) - Number(row.total_discount_amount || 0)));
+        const {
+          taxTotals: docTaxTotals,
+          taxableFees,
+          tableTax,
+          vatAmount,
+          nonTaxableFees,
+          whtAmount
+        } = this.extractTaxBreakdown(rawDataObj, docTaxAmount, netTotal);
         const salesTotal = Number(row.total_sales_amount || row.net_amount || 0);
         const discountAmount = Number(row.total_discount_amount || 0);
-        const netTotal = Number(row.net_amount || (salesTotal - discountAmount));
+
 
         const approxVatBase = vatAmount > 0 ? Math.round((vatAmount / 0.14) * 100) / 100 : 0;
         const baseNet = Math.max(0, approxVatBase - taxableFees);
@@ -1397,18 +1573,17 @@ export class EtaDocumentService {
         try {
           rawDataObj = typeof row.raw_data === 'string' ? JSON.parse(row.raw_data) : row.raw_data;
         } catch {}
-      }
-      const taxTotals: any[] = Array.isArray(rawDataObj?.taxTotals) ? rawDataObj.taxTotals : [];
       const taxAmount = Number(row.tax_amount || 0);
-      const hasTaxTotals = taxTotals.length > 0;
-      const taxableFees = taxTotals.filter(t => ['T5','T6','T7','T8','T9','T10','T11','T12'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-      const tableTax = taxTotals.filter(t => ['T2','T3'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-      const vatAmount = hasTaxTotals
-        ? taxTotals.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0)
-        : taxAmount;
-      const nonTaxableFees = taxTotals.filter(t => ['T13','T14','T15','T16','T17','T18','T19','T20'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-      const whtAmount = taxTotals.filter(t => t.taxType === 'T4').reduce((s, t) => s + (Number(t.amount) || 0), 0);
       const netAmount = Number(row.net_amount || 0);
+      const {
+        taxTotals,
+        taxableFees,
+        tableTax,
+        vatAmount,
+        nonTaxableFees,
+        whtAmount
+      } = this.extractTaxBreakdown(rawDataObj, taxAmount, netAmount);
+
 
       const rawLines: any[] = Array.isArray(rawDataObj?.invoiceLines)
         ? rawDataObj.invoiceLines
@@ -1796,23 +1971,23 @@ export class EtaDocumentService {
     const netAmount = Number(item?.netAmount || 0);
     const totalAmount = Number(item?.total || item?.totalAmount || 0);
 
-    // Calculate tax totals safely
-    const taxTotals: any[] = Array.isArray(item?.taxTotals) ? item.taxTotals : [];
+    // Calculate tax totals and components safely
     let taxAmount = 0;
-    if (taxTotals.length > 0) {
-      taxAmount = taxTotals.reduce((acc: number, t: any) => acc + (Number(t?.amount) || 0), 0);
+    if (Array.isArray(item?.taxTotals) && item.taxTotals.length > 0) {
+      taxAmount = item.taxTotals.reduce((acc: number, t: any) => acc + (Number(t?.amount) || 0), 0);
     } else if (totalAmount > 0 && netAmount > 0) {
       taxAmount = Math.max(0, Math.round((totalAmount - netAmount) * 10000) / 10000);
     }
 
-    const hasTaxTotals = taxTotals.length > 0;
-    const taxableFees = taxTotals.filter(t => ['T5','T6','T7','T8','T9','T10','T11','T12'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-    const tableTax = taxTotals.filter(t => ['T2','T3'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-    const vatAmount = hasTaxTotals
-      ? taxTotals.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0)
-      : taxAmount;
-    const nonTaxableFees = taxTotals.filter(t => ['T13','T14','T15','T16','T17','T18','T19','T20'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-    const whtAmount = taxTotals.filter(t => t.taxType === 'T4').reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const {
+      taxTotals,
+      taxableFees,
+      tableTax,
+      vatAmount,
+      nonTaxableFees,
+      whtAmount
+    } = EtaDocumentService.extractTaxBreakdown(item, taxAmount, netAmount);
+
 
     const currency = String(item?.documentCurrency || item?.currency || 'EGP').trim();
     const status = String(item?.status || 'Valid').trim();

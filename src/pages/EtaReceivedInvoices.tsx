@@ -98,55 +98,166 @@ export interface EtaReceivedInvoice {
 
 export const getInvoiceTaxBreakdown = (inv: Partial<EtaReceivedInvoice> & { raw_data?: any; taxableItemsNet?: number; nonTaxableItemsNet?: number; taxableVatBase?: number; nonTaxableVatBase?: number }) => {
   let taxTotals = Array.isArray(inv.taxTotals) ? inv.taxTotals : [];
-  if (taxTotals.length === 0 && inv.raw_data) {
+  let raw: any = null;
+  if (inv.raw_data) {
     try {
-      const raw = typeof inv.raw_data === 'string' ? JSON.parse(inv.raw_data) : inv.raw_data;
-      if (Array.isArray(raw?.taxTotals)) taxTotals = raw.taxTotals;
-      else if (Array.isArray(raw?.details?.taxTotals)) taxTotals = raw.details.taxTotals;
-      else if (Array.isArray(raw?.rawDocument?.taxTotals)) taxTotals = raw.rawDocument.taxTotals;
+      raw = typeof inv.raw_data === 'string' ? JSON.parse(inv.raw_data) : inv.raw_data;
     } catch {}
   }
 
+  let parsedDoc: any = null;
+  if (raw?.document) {
+    if (typeof raw.document === 'string') {
+      try { parsedDoc = JSON.parse(raw.document); } catch {}
+    } else if (typeof raw.document === 'object') {
+      parsedDoc = raw.document;
+    }
+  }
+
+  // 1. If taxTotals is empty or missing, search nested structures
+  if (taxTotals.length === 0 && (raw || parsedDoc)) {
+    if (Array.isArray(raw?.taxTotals) && raw.taxTotals.length > 0) taxTotals = raw.taxTotals;
+    else if (Array.isArray(raw?.details?.taxTotals) && raw.details.taxTotals.length > 0) taxTotals = raw.details.taxTotals;
+    else if (Array.isArray(raw?.rawDocument?.taxTotals) && raw.rawDocument.taxTotals.length > 0) taxTotals = raw.rawDocument.taxTotals;
+    else if (Array.isArray(parsedDoc?.taxTotals) && parsedDoc.taxTotals.length > 0) taxTotals = parsedDoc.taxTotals;
+  }
+
+  // 2. If still empty, aggregate from invoiceLines across all possible locations
+  if (taxTotals.length === 0 && (raw || parsedDoc)) {
+    const candidateLines: any[] = Array.isArray(raw?.invoiceLines) && raw.invoiceLines.length > 0
+      ? raw.invoiceLines
+      : (Array.isArray(raw?.details?.invoiceLines) && raw.details.invoiceLines.length > 0
+          ? raw.details.invoiceLines
+          : (Array.isArray(raw?.rawDocument?.invoiceLines) && raw.rawDocument.invoiceLines.length > 0
+              ? raw.rawDocument.invoiceLines
+              : (Array.isArray(parsedDoc?.invoiceLines) && parsedDoc.invoiceLines.length > 0
+                  ? parsedDoc.invoiceLines
+                  : [])));
+
+    if (candidateLines.length > 0) {
+      const aggMap = new Map<string, { taxType: string; amount: number; rate?: number; subType?: string }>();
+      for (const line of candidateLines) {
+        const lTaxes: any[] = Array.isArray(line.taxableItems) && line.taxableItems.length > 0
+          ? line.taxableItems
+          : (Array.isArray(line.lineTaxableItems) && line.lineTaxableItems.length > 0
+              ? line.lineTaxableItems
+              : (Array.isArray(line.taxesList) && line.taxesList.length > 0
+                  ? line.taxesList
+                  : []));
+
+        for (const t of lTaxes) {
+          const type = String(t.taxType || t.type || '').toUpperCase().trim();
+          const amt = Number(t.amount ?? t.taxAmount ?? 0);
+          if (type && amt > 0) {
+            const existing = aggMap.get(type);
+            if (existing) {
+              existing.amount = Math.round((existing.amount + amt) * 10000) / 10000;
+            } else {
+              aggMap.set(type, {
+                taxType: type,
+                amount: amt,
+                rate: t.rate !== undefined ? Number(t.rate) : undefined,
+                subType: t.subType || t.taxSubType
+              });
+            }
+          }
+        }
+      }
+      if (aggMap.size > 0) {
+        taxTotals = Array.from(aggMap.values());
+      }
+    }
+  }
+
   const hasTaxTotals = taxTotals.length > 0;
-  const taxableFees = inv.taxableFees !== undefined
-    ? Number(inv.taxableFees)
-    : taxTotals.filter(t => ['T5','T6','T7','T8','T9','T10','T11','T12'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-  const tableTax = inv.tableTax !== undefined
-    ? Number(inv.tableTax)
-    : taxTotals.filter(t => ['T2','T3'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-  const vatAmount = inv.vatAmount !== undefined
-    ? Number(inv.vatAmount)
-    : (hasTaxTotals
-        ? taxTotals.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0)
-        : Number(inv.taxAmount || 0));
-  const nonTaxableFees = inv.nonTaxableFees !== undefined
-    ? Number(inv.nonTaxableFees)
-    : taxTotals.filter(t => ['T13','T14','T15','T16','T17','T18','T19','T20'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-  const whtAmount = inv.whtAmount !== undefined
-    ? Number(inv.whtAmount)
-    : taxTotals.filter(t => t.taxType === 'T4').reduce((s, t) => s + (Number(t.amount) || 0), 0);
-  const totalSales = Number(inv.totalSales || inv.netAmount || 0);
   const netAmount = Number(inv.netAmount || 0);
+  const taxAmount = Number(inv.taxAmount || 0);
+  const totalSales = Number(inv.totalSales || inv.netAmount || 0);
   const totalAmount = Number(inv.totalAmount || 0);
 
-  let taxableItemsNet = inv.taxableItemsNet !== undefined ? Number(inv.taxableItemsNet) : 0;
-  let nonTaxableItemsNet = inv.nonTaxableItemsNet !== undefined ? Number(inv.nonTaxableItemsNet) : 0;
+  let taxableFees = 0;
+  let tableTax = 0;
+  let vatAmount = 0;
+  let nonTaxableFees = 0;
+  let whtAmount = 0;
 
-  if (inv.taxableItemsNet === undefined) {
-    if (vatAmount > 0) {
-      const approxVatBase = Math.round((vatAmount / 0.14) * 100) / 100;
-      const baseNet = Math.max(0, approxVatBase - taxableFees);
-      if (baseNet <= netAmount + 1) {
-        taxableItemsNet = Math.min(netAmount, baseNet);
-        nonTaxableItemsNet = Math.max(0, Math.round((netAmount - taxableItemsNet) * 100) / 100);
-      } else {
-        taxableItemsNet = netAmount;
-        nonTaxableItemsNet = 0;
-      }
-    } else {
-      taxableItemsNet = 0;
-      nonTaxableItemsNet = netAmount;
+  if (hasTaxTotals) {
+    taxableFees = taxTotals.filter(t => ['T5','T6','T7','T8','T9','T10','T11','T12'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    tableTax = taxTotals.filter(t => ['T2','T3'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    vatAmount = taxTotals.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    nonTaxableFees = taxTotals.filter(t => ['T13','T14','T15','T16','T17','T18','T19','T20'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    whtAmount = taxTotals.filter(t => t.taxType === 'T4').reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  } else {
+    // If inv already has explicit tableTax or vatAmount passed from server
+    if (inv.tableTax !== undefined && Number(inv.tableTax) > 0) {
+      tableTax = Number(inv.tableTax);
     }
+    if (inv.vatAmount !== undefined && Number(inv.vatAmount) > 0) {
+      vatAmount = Number(inv.vatAmount);
+    }
+    if (inv.taxableFees !== undefined) taxableFees = Number(inv.taxableFees);
+    if (inv.nonTaxableFees !== undefined) nonTaxableFees = Number(inv.nonTaxableFees);
+    if (inv.whtAmount !== undefined) whtAmount = Number(inv.whtAmount);
+
+    // If still no tax breakdown was found but total tax exists, intelligently classify by rate
+    if (tableTax === 0 && vatAmount === 0 && taxAmount > 0) {
+      if (netAmount > 0) {
+        const effectiveRate = taxAmount / netAmount;
+        if (effectiveRate >= 0.09 && effectiveRate <= 0.11) {
+          tableTax = taxAmount;
+        } else if (effectiveRate >= 0.045 && effectiveRate <= 0.055) {
+          tableTax = taxAmount;
+        } else if (effectiveRate >= 0.075 && effectiveRate <= 0.085) {
+          tableTax = taxAmount;
+        } else if (effectiveRate > 0 && effectiveRate <= 0.035) {
+          whtAmount = taxAmount;
+        } else {
+          vatAmount = taxAmount;
+        }
+      } else {
+        vatAmount = taxAmount;
+      }
+    }
+  }
+
+  // Taxable and Non-Taxable Net calculation
+  let taxableItemsNet = 0;
+  let nonTaxableItemsNet = 0;
+
+  const candidateLines: any[] = raw ? (Array.isArray(raw.invoiceLines) ? raw.invoiceLines : (Array.isArray(parsedDoc?.invoiceLines) ? parsedDoc.invoiceLines : [])) : [];
+  if (candidateLines.length > 0) {
+    candidateLines.forEach(l => {
+      const lTaxes: any[] = Array.isArray(l.taxableItems) && l.taxableItems.length > 0
+        ? l.taxableItems
+        : (Array.isArray(l.lineTaxableItems) && l.lineTaxableItems.length > 0
+            ? l.lineTaxableItems
+            : (Array.isArray(l.taxesList) ? l.taxesList : []));
+      const lNet = Number(l.netTotal ?? ((Number(l.quantity || 1) * Number(l.unitPrice || 0)) - Number(l.discountAmount || 0)));
+      const hasT1 = lTaxes.some(t => t.taxType === 'T1' && Number(t.amount || 0) > 0);
+      if (hasT1) {
+        taxableItemsNet += lNet;
+      } else {
+        nonTaxableItemsNet += lNet;
+      }
+    });
+    taxableItemsNet = Math.round(taxableItemsNet * 100) / 100;
+    nonTaxableItemsNet = Math.round(nonTaxableItemsNet * 100) / 100;
+  } else if (inv.taxableItemsNet !== undefined && inv.nonTaxableItemsNet !== undefined && vatAmount > 0) {
+    taxableItemsNet = Number(inv.taxableItemsNet);
+    nonTaxableItemsNet = Number(inv.nonTaxableItemsNet);
+  } else if (vatAmount > 0) {
+    const approxVatBase = Math.round((vatAmount / 0.14) * 100) / 100;
+    const baseNet = Math.max(0, approxVatBase - taxableFees);
+    if (baseNet <= netAmount + 1) {
+      taxableItemsNet = Math.min(netAmount, baseNet);
+      nonTaxableItemsNet = Math.max(0, Math.round((netAmount - taxableItemsNet) * 100) / 100);
+    } else {
+      taxableItemsNet = netAmount;
+      nonTaxableItemsNet = 0;
+    }
+  } else {
+    taxableItemsNet = 0;
+    nonTaxableItemsNet = netAmount;
   }
 
   // إجمالي الوعاء الضريبي لـ 14% = صافي الأصناف الخاضعة + ضرائب ورسوم تدخل في الوعاء
@@ -157,6 +268,7 @@ export const getInvoiceTaxBreakdown = (inv: Partial<EtaReceivedInvoice> & { raw_
 
   return { totalSales, netAmount, taxableItemsNet, nonTaxableItemsNet, taxableFees, tableTax, taxableVatBase, vatAmount, nonTaxableFees, whtAmount, totalAmount, nonTaxableVatBase };
 };
+
 
 interface EtaSearchApiResponse {
   success: boolean;

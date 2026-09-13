@@ -98,24 +98,36 @@ export const getDetailedLineTaxBreakdown = (line: Partial<DetailedInvoiceLine>) 
   const taxableFees = line.taxableFees !== undefined
     ? Number(line.taxableFees)
     : lineTaxes.filter(t => ['T5','T6','T7','T8','T9','T10','T11','T12'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-  const tableTax = line.tableTax !== undefined
+  let tableTax = line.tableTax !== undefined
     ? Number(line.tableTax)
     : lineTaxes.filter(t => ['T2','T3'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
-  const vatAmount = line.vatAmount !== undefined
+  let vatAmount = line.vatAmount !== undefined
     ? Number(line.vatAmount)
     : (hasLineTaxes
         ? lineTaxes.filter(t => t.taxType === 'T1').reduce((s, t) => s + (Number(t.amount) || 0), 0)
-        : Number(line.taxAmount || 0));
+        : 0);
+
+  const salesTotal = Number(line.salesTotal || 0);
+  const discountAmount = Number(line.discountAmount || 0);
+  const netAmount = Number(line.netTotal ?? (salesTotal - discountAmount));
+
+  if (!hasLineTaxes && line.vatAmount === undefined && Number(line.taxAmount || 0) > 0) {
+    const effectiveRate = netAmount > 0 ? (Number(line.taxAmount || 0) / netAmount) : 0;
+    if (tableTax === 0 && ((effectiveRate >= 0.09 && effectiveRate <= 0.11) || (effectiveRate >= 0.045 && effectiveRate <= 0.055) || (effectiveRate >= 0.075 && effectiveRate <= 0.085))) {
+      tableTax = Number(line.taxAmount || 0);
+      vatAmount = 0;
+    } else {
+      vatAmount = Math.max(0, Number(line.taxAmount || 0) - tableTax - taxableFees);
+    }
+  }
+
   const nonTaxableFees = line.nonTaxableFees !== undefined
     ? Number(line.nonTaxableFees)
     : lineTaxes.filter(t => ['T13','T14','T15','T16','T17','T18','T19','T20'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
   const whtAmount = line.whtAmount !== undefined
     ? Number(line.whtAmount)
-    : lineTaxes.filter(t => t.taxType === 'T4').reduce((s, t) => s + (Number(t.amount) || 0), 0);
-  const salesTotal = Number(line.salesTotal || 0);
-  const discountAmount = Number(line.discountAmount || 0);
-  const netAmount = Number(line.netTotal ?? (salesTotal - discountAmount));
   const totalAmount = Number(line.lineTotal || 0);
+
 
   let taxableItemsNet = line.taxableItemsNet !== undefined ? Number(line.taxableItemsNet) : 0;
   let nonTaxableItemsNet = line.nonTaxableItemsNet !== undefined ? Number(line.nonTaxableItemsNet) : 0;
