@@ -23,6 +23,12 @@ export class EtaSubmissionService {
   ): Promise<{
     valid: boolean;
     error?: string;
+    taxNumberError?: string | null;
+    itemsError?: string | null;
+    unregisteredItems?: string[];
+    customerName?: string;
+    customerId?: string;
+    customerTaxNumber?: string | null;
     invoice?: any;
     customer?: any;
     items?: any[];
