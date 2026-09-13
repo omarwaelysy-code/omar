@@ -1573,7 +1573,9 @@ export class EtaDocumentService {
         try {
           rawDataObj = typeof row.raw_data === 'string' ? JSON.parse(row.raw_data) : row.raw_data;
         } catch {}
+      }
       const taxAmount = Number(row.tax_amount || 0);
+
       const netAmount = Number(row.net_amount || 0);
       const {
         taxTotals,

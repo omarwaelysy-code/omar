@@ -126,7 +126,9 @@ export const getDetailedLineTaxBreakdown = (line: Partial<DetailedInvoiceLine>) 
     : lineTaxes.filter(t => ['T13','T14','T15','T16','T17','T18','T19','T20'].includes(t.taxType)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
   const whtAmount = line.whtAmount !== undefined
     ? Number(line.whtAmount)
+    : lineTaxes.filter(t => t.taxType === 'T4').reduce((s, t) => s + (Number(t.amount) || 0), 0);
   const totalAmount = Number(line.lineTotal || 0);
+
 
 
   let taxableItemsNet = line.taxableItemsNet !== undefined ? Number(line.taxableItemsNet) : 0;
