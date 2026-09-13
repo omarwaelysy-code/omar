@@ -666,14 +666,15 @@ export class EtaSubmissionService {
     }
 
     try {
-      const details = await EtaDocumentService.getDocumentDetails(companyId, row.eta_uuid);
-      if (details && details.status) {
-        let mappedStatus = details.status;
-        if (details.status === 'Valid') mappedStatus = 'Valid';
-        else if (details.status === 'Submitted') mappedStatus = 'Submitted';
-        else if (details.status === 'Invalid') mappedStatus = 'Invalid';
-        else if (details.status === 'Cancelled') mappedStatus = 'Cancelled';
-        else if (details.status === 'Rejected') mappedStatus = 'Rejected';
+      const detailsRes = await EtaDocumentService.getDocumentDetails(companyId, row.eta_uuid);
+      const docData: any = (detailsRes as any)?.data || detailsRes;
+      if (docData && docData.status) {
+        let mappedStatus = docData.status;
+        if (docData.status === 'Valid') mappedStatus = 'Valid';
+        else if (docData.status === 'Submitted') mappedStatus = 'Submitted';
+        else if (docData.status === 'Invalid') mappedStatus = 'Invalid';
+        else if (docData.status === 'Cancelled') mappedStatus = 'Cancelled';
+        else if (docData.status === 'Rejected') mappedStatus = 'Rejected';
 
         await pool.query(
           `UPDATE "${table}" SET eta_status = $1 WHERE id = $2`,
