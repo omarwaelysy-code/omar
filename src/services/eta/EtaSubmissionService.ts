@@ -48,27 +48,27 @@ export class EtaSubmissionService {
     }
 
     // 2. Fetch customer and validate tax number
+    let customer: any = null;
+    let customerTaxNumber = '';
+    let taxNumberError: string | null = null;
+
     if (!invoice.customer_id) {
-      return { valid: false, error: 'لا يوجد عميل محدد للفاتورة.' };
-    }
+      taxNumberError = 'لا يوجد عميل محدد للفاتورة.';
+    } else {
+      const custRes = await pool.query(
+        `SELECT id, name, tax_number, address, commercial_register, phone FROM customers WHERE id = $1 AND company_id = $2`,
+        [invoice.customer_id, companyId]
+      );
 
-    const custRes = await pool.query(
-      `SELECT id, name, tax_number, address, commercial_register, phone FROM customers WHERE id = $1 AND company_id = $2`,
-      [invoice.customer_id, companyId]
-    );
-
-    if (custRes.rows.length === 0) {
-      return { valid: false, error: 'بيانات العميل غير موجودة.' };
-    }
-
-    const customer = custRes.rows[0];
-    const customerTaxNumber = (customer.tax_number || '').trim();
-
-    if (!customerTaxNumber) {
-      return {
-        valid: false,
-        error: 'لا يوجد رقم ضريبي للعميل'
-      };
+      if (custRes.rows.length === 0) {
+        taxNumberError = 'بيانات العميل غير موجودة.';
+      } else {
+        customer = custRes.rows[0];
+        customerTaxNumber = (customer.tax_number || '').trim();
+        if (!customerTaxNumber) {
+          taxNumberError = 'لا يوجد رقم ضريبي للعميل';
+        }
+      }
     }
 
     // 3. Fetch items and validate product registration on ETA
@@ -80,40 +80,46 @@ export class EtaSubmissionService {
       [invoiceId]
     );
 
-    if (itemsRes.rows.length === 0) {
-      return { valid: false, error: 'لا توجد أصناف مسجلة في الفاتورة.' };
-    }
-
-    const items = itemsRes.rows;
+    let itemsError: string | null = null;
     const unregisteredItems: string[] = [];
 
-    for (const item of items) {
-      const etaCode = (item.eta_item_code || '').trim();
-      const codeStatus = item.eta_code_status;
+    if (itemsRes.rows.length === 0) {
+      itemsError = 'لا توجد أصناف مسجلة في الفاتورة.';
+    } else {
+      for (const item of itemsRes.rows) {
+        const etaCode = (item.eta_item_code || '').trim();
+        const codeStatus = item.eta_code_status;
 
-      // Must have eta_item_code and status must be Approved or Submitted (or valid GS1/EGS code)
-      const isRegistered = Boolean(
-        etaCode &&
-        (codeStatus === 'Approved' || codeStatus === 'Submitted' || item.eta_code_type === 'GS1')
-      );
+        // Must have eta_item_code and status must be Approved or Submitted (or valid GS1/EGS code)
+        const isRegistered = Boolean(
+          etaCode &&
+          (codeStatus === 'Approved' || codeStatus === 'Submitted' || item.eta_code_type === 'GS1')
+        );
 
-      if (!isRegistered) {
-        unregisteredItems.push(item.product_name || item.prod_name || item.product_code || 'صنف غير محدد');
+        if (!isRegistered) {
+          unregisteredItems.push(item.product_name || item.prod_name || item.product_code || 'صنف غير محدد');
+        }
+      }
+
+      if (unregisteredItems.length > 0) {
+        itemsError = 'الاصناف غير مسجلة على بوابة الضرائب برجاء التأكد من التسجيل قبل رفع الفاتورة';
       }
     }
 
-    if (unregisteredItems.length > 0) {
-      return {
-        valid: false,
-        error: 'الاصناف غير مسجلة على بوابة الضرائب برجاء التأكد من التسجيل قبل رفع الفاتورة'
-      };
-    }
+    const hasErrors = Boolean(taxNumberError || itemsError);
 
     return {
-      valid: true,
+      valid: !hasErrors,
+      error: [taxNumberError, itemsError].filter(Boolean).join(' - '),
+      taxNumberError,
+      itemsError,
+      unregisteredItems,
+      customerName: customer?.name || invoice.customer_name || 'العميل',
+      customerId: customer?.id || invoice.customer_id,
+      customerTaxNumber: customerTaxNumber || null,
       invoice,
       customer,
-      items
+      items: itemsRes.rows
     };
   }
 
@@ -126,6 +132,12 @@ export class EtaSubmissionService {
   ): Promise<{
     valid: boolean;
     error?: string;
+    taxNumberError?: string | null;
+    itemsError?: string | null;
+    unregisteredItems?: string[];
+    customerName?: string;
+    customerId?: string;
+    customerTaxNumber?: string | null;
     returnDoc?: any;
     customer?: any;
     items?: any[];
@@ -151,27 +163,27 @@ export class EtaSubmissionService {
     }
 
     // 2. Fetch customer and validate tax number
+    let customer: any = null;
+    let customerTaxNumber = '';
+    let taxNumberError: string | null = null;
+
     if (!returnDoc.customer_id) {
-      return { valid: false, error: 'لا يوجد عميل محدد للمرتجع.' };
-    }
+      taxNumberError = 'لا يوجد عميل محدد للمرتجع.';
+    } else {
+      const custRes = await pool.query(
+        `SELECT id, name, tax_number, address, commercial_register, phone FROM customers WHERE id = $1 AND company_id = $2`,
+        [returnDoc.customer_id, companyId]
+      );
 
-    const custRes = await pool.query(
-      `SELECT id, name, tax_number, address, commercial_register, phone FROM customers WHERE id = $1 AND company_id = $2`,
-      [returnDoc.customer_id, companyId]
-    );
-
-    if (custRes.rows.length === 0) {
-      return { valid: false, error: 'بيانات العميل غير موجودة.' };
-    }
-
-    const customer = custRes.rows[0];
-    const customerTaxNumber = (customer.tax_number || '').trim();
-
-    if (!customerTaxNumber) {
-      return {
-        valid: false,
-        error: 'لا يوجد رقم ضريبي للعميل'
-      };
+      if (custRes.rows.length === 0) {
+        taxNumberError = 'بيانات العميل غير موجودة.';
+      } else {
+        customer = custRes.rows[0];
+        customerTaxNumber = (customer.tax_number || '').trim();
+        if (!customerTaxNumber) {
+          taxNumberError = 'لا يوجد رقم ضريبي للعميل';
+        }
+      }
     }
 
     // 3. Fetch items and validate product registration on ETA
@@ -183,39 +195,45 @@ export class EtaSubmissionService {
       [returnId]
     );
 
-    if (itemsRes.rows.length === 0) {
-      return { valid: false, error: 'لا توجد أصناف مسجلة في المرتجع.' };
-    }
-
-    const items = itemsRes.rows;
+    let itemsError: string | null = null;
     const unregisteredItems: string[] = [];
 
-    for (const item of items) {
-      const etaCode = (item.eta_item_code || '').trim();
-      const codeStatus = item.eta_code_status;
+    if (itemsRes.rows.length === 0) {
+      itemsError = 'لا توجد أصناف مسجلة في المرتجع.';
+    } else {
+      for (const item of itemsRes.rows) {
+        const etaCode = (item.eta_item_code || '').trim();
+        const codeStatus = item.eta_code_status;
 
-      const isRegistered = Boolean(
-        etaCode &&
-        (codeStatus === 'Approved' || codeStatus === 'Submitted' || item.eta_code_type === 'GS1')
-      );
+        const isRegistered = Boolean(
+          etaCode &&
+          (codeStatus === 'Approved' || codeStatus === 'Submitted' || item.eta_code_type === 'GS1')
+        );
 
-      if (!isRegistered) {
-        unregisteredItems.push(item.product_name || item.prod_name || item.product_code || 'صنف غير محدد');
+        if (!isRegistered) {
+          unregisteredItems.push(item.product_name || item.prod_name || item.product_code || 'صنف غير محدد');
+        }
+      }
+
+      if (unregisteredItems.length > 0) {
+        itemsError = 'الاصناف غير مسجلة على بوابة الضرائب برجاء التأكد من التسجيل قبل رفع الفاتورة';
       }
     }
 
-    if (unregisteredItems.length > 0) {
-      return {
-        valid: false,
-        error: 'الاصناف غير مسجلة على بوابة الضرائب برجاء التأكد من التسجيل قبل رفع الفاتورة'
-      };
-    }
+    const hasErrors = Boolean(taxNumberError || itemsError);
 
     return {
-      valid: true,
+      valid: !hasErrors,
+      error: [taxNumberError, itemsError].filter(Boolean).join(' - '),
+      taxNumberError,
+      itemsError,
+      unregisteredItems,
+      customerName: customer?.name || returnDoc.customer_name || 'العميل',
+      customerId: customer?.id || returnDoc.customer_id,
+      customerTaxNumber: customerTaxNumber || null,
       returnDoc,
       customer,
-      items
+      items: itemsRes.rows
     };
   }
 

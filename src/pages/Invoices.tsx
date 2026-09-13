@@ -252,6 +252,15 @@ export const Invoices: React.FC = () => {
     todayDate: string;
   } | null>(null);
 
+  const [etaValidationModal, setEtaValidationModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    customerName?: string;
+    taxNumberError?: string | null;
+    itemsError?: string | null;
+    unregisteredItems?: string[];
+  } | null>(null);
+
   const handleCopyUuid = (uuid: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     navigator.clipboard.writeText(uuid);
@@ -296,12 +305,9 @@ export const Invoices: React.FC = () => {
       ''
     ).trim();
 
+    let taxNumberError: string | null = null;
     if (!taxNumber) {
-      showNotification(
-        language === 'ar' ? 'لا يوجد رقم ضريبي للعميل' : 'Customer has no tax number',
-        'error'
-      );
-      return;
+      taxNumberError = language === 'ar' ? 'لا يوجد رقم ضريبي للعميل' : 'Customer has no tax number';
     }
 
     let invoiceItems = invoice.items;
@@ -314,28 +320,43 @@ export const Invoices: React.FC = () => {
       } catch (e) {}
     }
 
+    let itemsError: string | null = null;
+    const unregisteredItems: string[] = [];
+
     if (invoiceItems && invoiceItems.length > 0) {
-      let hasUnregistered = false;
       for (const item of invoiceItems) {
         const prod = products.find(p => p.id === item.product_id);
         const etaCode = (prod?.eta_item_code || (item as any)?.eta_item_code || '').trim();
         const etaStatus = prod?.eta_code_status || (item as any)?.eta_code_status;
         const etaType = prod?.eta_code_type || (item as any)?.eta_code_type;
-        if (!etaCode || (etaStatus !== 'Approved' && etaStatus !== 'Submitted' && etaType !== 'GS1')) {
-          hasUnregistered = true;
-          break;
+        const isRegistered = Boolean(
+          etaCode &&
+          (etaStatus === 'Approved' || etaStatus === 'Submitted' || etaType === 'GS1')
+        );
+
+        if (!isRegistered) {
+          unregisteredItems.push(item.product_name || prod?.name || (item as any)?.product_code || 'صنف غير محدد');
         }
       }
 
-      if (hasUnregistered) {
-        showNotification(
-          language === 'ar'
-            ? 'الاصناف غير مسجلة على بوابة الضرائب برجاء التأكد من التسجيل قبل رفع الفاتورة'
-            : 'Items are not registered on ETA portal. Please verify registration before uploading invoice',
-          'error'
-        );
-        return;
+      if (unregisteredItems.length > 0) {
+        itemsError = language === 'ar'
+          ? 'الاصناف غير مسجلة على بوابة الضرائب برجاء التأكد من التسجيل قبل رفع الفاتورة'
+          : 'Items are not registered on ETA portal. Please verify registration before uploading invoice';
       }
+    }
+
+    // If there are validation errors, display both in the external modal box!
+    if (taxNumberError || itemsError) {
+      setEtaValidationModal({
+        isOpen: true,
+        title: language === 'ar' ? 'تنبيه متطلبات الفاتورة الإلكترونية' : 'ETA Requirements Alert',
+        customerName: cust?.name || invoice.customer_name || 'العميل',
+        taxNumberError,
+        itemsError,
+        unregisteredItems
+      });
+      return;
     }
 
     setIsSubmittingEta(true);
@@ -360,10 +381,33 @@ export const Invoices: React.FC = () => {
           setViewInvoice(updatedInv);
         }
       } else {
-        showNotification(res?.error || 'فشل رفع الفاتورة إلى منظومة الضرائب', 'error');
+        if (res?.taxNumberError || res?.itemsError) {
+          setEtaValidationModal({
+            isOpen: true,
+            title: language === 'ar' ? 'تنبيه متطلبات الفاتورة الإلكترونية' : 'ETA Requirements Alert',
+            customerName: res.customerName || cust?.name || invoice.customer_name,
+            taxNumberError: res.taxNumberError,
+            itemsError: res.itemsError,
+            unregisteredItems: res.unregisteredItems || []
+          });
+        } else {
+          showNotification(res?.error || 'فشل رفع الفاتورة إلى منظومة الضرائب', 'error');
+        }
       }
     } catch (err: any) {
-      showNotification(err.message || 'حدث خطأ أثناء رفع الفاتورة للضرائب', 'error');
+      const msg = err.message || '';
+      if (msg.includes('رقم ضريبي') || msg.includes('الاصناف غير مسجلة')) {
+        setEtaValidationModal({
+          isOpen: true,
+          title: language === 'ar' ? 'تنبيه متطلبات الفاتورة الإلكترونية' : 'ETA Requirements Alert',
+          customerName: cust?.name || invoice.customer_name,
+          taxNumberError: msg.includes('رقم ضريبي') ? 'لا يوجد رقم ضريبي للعميل' : null,
+          itemsError: msg.includes('الاصناف غير مسجلة') ? 'الاصناف غير مسجلة على بوابة الضرائب برجاء التأكد من التسجيل قبل رفع الفاتورة' : null,
+          unregisteredItems: []
+        });
+      } else {
+        showNotification(err.message || 'حدث خطأ أثناء رفع الفاتورة للضرائب', 'error');
+      }
     } finally {
       setIsSubmittingEta(false);
       setSubmittingEtaInvoiceId(null);
@@ -4654,6 +4698,40 @@ export const Invoices: React.FC = () => {
               </button>
 
               <button 
+                type="button"
+                onClick={() => {
+                  if (editingInvoice) {
+                    handleTriggerEtaUpload(editingInvoice);
+                  } else {
+                    showNotification(
+                      language === 'ar' 
+                        ? 'يرجى حفظ الفاتورة أولاً ثم الضغط على زر الرفع' 
+                        : 'Please save the invoice first, then click upload', 
+                      'warning'
+                    );
+                  }
+                }}
+                disabled={isSubmitting || isSubmittingEta || (!!editingInvoice?.eta_uuid && editingInvoice?.eta_status === 'Valid')}
+                className={`px-3 py-1 rounded-xl font-bold transition-all flex items-center gap-1.5 justify-center active:scale-95 shadow-sm text-[11px] whitespace-nowrap font-sans ${
+                  editingInvoice?.eta_uuid
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                    : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200'
+                }`}
+                title={editingInvoice?.eta_uuid ? (language === 'ar' ? 'تحديث حالة الفاتورة من الضرائب' : 'Sync ETA') : (language === 'ar' ? 'رفع الفاتورة إلى منظومة الضرائب المصرية' : 'Upload to ETA')}
+              >
+                {isSubmittingEta ? (
+                  <div className="w-3.5 h-3.5 border border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <UploadCloud size={13} />
+                )}
+                <span>
+                  {editingInvoice?.eta_uuid 
+                    ? (language === 'ar' ? 'تحديث بالضرائب' : 'Sync ETA') 
+                    : (language === 'ar' ? 'رفع الفاتورة' : 'Upload to ETA')}
+                </span>
+              </button>
+
+              <button 
                 type="submit"
                 form="invoice-form"
                 onClick={handleSubmit}
@@ -6634,6 +6712,144 @@ export const Invoices: React.FC = () => {
                 نعم، استمر في الرفع
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ETA Validation Requirements Modal (مربع خارجي منبثق لمتطلبات الفاتورة الإلكترونية) */}
+      {etaValidationModal?.isOpen && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white max-w-lg w-full rounded-3xl shadow-2xl overflow-hidden border border-amber-200 animate-in zoom-in-95 duration-200 flex flex-col">
+            
+            {/* Header */}
+            <div className="p-5 bg-gradient-to-r from-amber-50 to-rose-50 border-b border-amber-200/70 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-rose-100/80 text-rose-600 rounded-2xl border border-rose-200 shadow-sm">
+                  <AlertTriangle size={24} className="animate-bounce" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 leading-tight">
+                    {etaValidationModal.title}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    {language === 'ar' ? 'يرجى استيفاء المتطلبات التالية قبل رفع الفاتورة' : 'Please resolve the following requirements before ETA upload'}
+                  </p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setEtaValidationModal(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white/80 rounded-xl transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content Body: Contains BOTH Tax Number box and Items box */}
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              
+              {/* Box 1: Customer Tax Number Check */}
+              <div className={`p-4 rounded-2xl border transition-all ${
+                etaValidationModal.taxNumberError 
+                  ? 'bg-rose-50/80 border-rose-200 text-rose-900' 
+                  : 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+              }`}>
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 rounded-xl mt-0.5 ${
+                    etaValidationModal.taxNumberError ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-600'
+                  }`}>
+                    {etaValidationModal.taxNumberError ? <AlertTriangle size={18} /> : <CheckCheck size={18} />}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-sm">
+                        {etaValidationModal.taxNumberError 
+                          ? etaValidationModal.taxNumberError 
+                          : (language === 'ar' ? 'الرقم الضريبي للعميل مسجل' : 'Customer Tax Number Registered')}
+                      </h4>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                        etaValidationModal.taxNumberError ? 'bg-rose-200/70 text-rose-800' : 'bg-emerald-200/70 text-emerald-800'
+                      }`}>
+                        {etaValidationModal.taxNumberError ? (language === 'ar' ? 'مطلوب' : 'Required') : (language === 'ar' ? 'سليم' : 'Valid')}
+                      </span>
+                    </div>
+
+                    {etaValidationModal.customerName && (
+                      <p className="text-xs text-slate-600 font-medium mt-1">
+                        {language === 'ar' ? 'العميل: ' : 'Customer: '}
+                        <span className="font-bold text-slate-900">{etaValidationModal.customerName}</span>
+                      </p>
+                    )}
+
+                    {etaValidationModal.taxNumberError && (
+                      <p className="text-xs text-rose-700/80 mt-1 font-medium leading-relaxed">
+                        {language === 'ar'
+                          ? 'تشترط منظومة الضرائب وجود رقم التسجيل الضريبي للعميل لرفع الفاتورة الإلكترونية بنجاح.'
+                          : 'ETA requires the customer tax registration number before uploading.'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Box 2: Registered Items Check */}
+              <div className={`p-4 rounded-2xl border transition-all ${
+                etaValidationModal.itemsError 
+                  ? 'bg-amber-50/80 border-amber-200 text-amber-950' 
+                  : 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+              }`}>
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 rounded-xl mt-0.5 ${
+                    etaValidationModal.itemsError ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-600'
+                  }`}>
+                    {etaValidationModal.itemsError ? <Box size={18} /> : <CheckCheck size={18} />}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-sm">
+                        {etaValidationModal.itemsError 
+                          ? etaValidationModal.itemsError 
+                          : (language === 'ar' ? 'جميع أصناف الفاتورة مسجلة ومعتمدة على منظومة الضرائب' : 'All invoice items are registered on ETA')}
+                      </h4>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                        etaValidationModal.itemsError ? 'bg-amber-200/70 text-amber-800' : 'bg-emerald-200/70 text-emerald-800'
+                      }`}>
+                        {etaValidationModal.itemsError ? (language === 'ar' ? 'تنبيه' : 'Alert') : (language === 'ar' ? 'سليم' : 'Valid')}
+                      </span>
+                    </div>
+
+                    {etaValidationModal.itemsError && etaValidationModal.unregisteredItems && etaValidationModal.unregisteredItems.length > 0 && (
+                      <div className="mt-2.5 space-y-1.5">
+                        <p className="text-xs font-bold text-amber-900">
+                          {language === 'ar' ? 'الأصناف غير المسجلة على المنظومة:' : 'Unregistered items:'}
+                        </p>
+                        <div className="max-h-32 overflow-y-auto bg-white/80 rounded-xl border border-amber-200/60 p-2 space-y-1">
+                          {etaValidationModal.unregisteredItems.map((prodName, idx) => (
+                            <div key={idx} className="flex items-center gap-2 text-xs text-slate-700">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                              <span className="font-medium">{prodName}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setEtaValidationModal(null)}
+                className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs transition-all active:scale-95 shadow-sm"
+              >
+                {language === 'ar' ? 'إغلاق ومتابعة التصحيح' : 'Close'}
+              </button>
+            </div>
+
           </div>
         </div>
       )}
