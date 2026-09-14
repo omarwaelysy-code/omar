@@ -50,52 +50,57 @@ CREATE TRIGGER trg_check_journal_entry_balance
   EXECUTE FUNCTION fn_check_journal_entry_balance();
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- STEP 3: Function that auto-recalculates header totals from lines
---         and validates balance after any line INSERT/UPDATE/DELETE
+-- STEP 3: Function that validates balance after all transaction lines are committed
+--         (DEFERRABLE INITIALLY DEFERRED)
 -- ─────────────────────────────────────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION fn_sync_journal_entry_totals()
+CREATE OR REPLACE FUNCTION fn_check_deferred_je_balance()
 RETURNS TRIGGER AS $$
 DECLARE
   v_je_id TEXT;
   v_sum_debit NUMERIC(18,4);
   v_sum_credit NUMERIC(18,4);
 BEGIN
-  -- Determine which journal_entry_id to check
   IF TG_OP = 'DELETE' THEN
     v_je_id := OLD.journal_entry_id;
   ELSE
     v_je_id := NEW.journal_entry_id;
   END IF;
 
-  -- Calculate actual sums from lines
-  SELECT 
-    COALESCE(SUM(debit), 0),
-    COALESCE(SUM(credit), 0)
-  INTO v_sum_debit, v_sum_credit
-  FROM journal_entry_lines
-  WHERE journal_entry_id = v_je_id;
+  -- Only check if journal_entry still exists (not deleted in same transaction)
+  IF EXISTS (SELECT 1 FROM journal_entries WHERE id = v_je_id) THEN
+    SELECT 
+      COALESCE(SUM(debit), 0),
+      COALESCE(SUM(credit), 0)
+    INTO v_sum_debit, v_sum_credit
+    FROM journal_entry_lines
+    WHERE journal_entry_id = v_je_id;
 
-  -- Update the header totals to match actual lines
-  UPDATE journal_entries
-  SET 
-    total_debit = v_sum_debit,
-    total_credit = v_sum_credit
-  WHERE id = v_je_id;
-  -- Note: The UPDATE above will fire trg_check_journal_entry_balance,
-  -- which will REJECT the update if lines are unbalanced.
+    -- The core balance check: lines must be balanced
+    IF ABS(v_sum_debit - v_sum_credit) > 0.01 THEN
+      RAISE EXCEPTION 'القيد المحاسبي غير متوازن: مجموع سطور المدين (%) لا يساوي مجموع سطور الدائن (%) (الفرق=%). لا يمكن حفظ قيد غير متوازن.',
+        v_sum_debit, v_sum_credit, ABS(v_sum_debit - v_sum_credit);
+    END IF;
 
-  RETURN COALESCE(NEW, OLD);
+    -- Automatically sync header totals to match verified lines
+    UPDATE journal_entries 
+    SET total_debit = v_sum_debit, total_credit = v_sum_credit
+    WHERE id = v_je_id AND (total_debit != v_sum_debit OR total_credit != v_sum_credit);
+  END IF;
+
+  RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- STEP 4: Attach trigger AFTER INSERT/UPDATE/DELETE on journal_entry_lines
+-- STEP 4: Attach CONSTRAINT TRIGGER (DEFERRABLE INITIALLY DEFERRED) on lines
 -- ─────────────────────────────────────────────────────────────────────────────
 DROP TRIGGER IF EXISTS trg_sync_journal_entry_totals ON journal_entry_lines;
-CREATE TRIGGER trg_sync_journal_entry_totals
+DROP TRIGGER IF EXISTS trg_check_deferred_je_balance ON journal_entry_lines;
+CREATE CONSTRAINT TRIGGER trg_check_deferred_je_balance
   AFTER INSERT OR UPDATE OR DELETE ON journal_entry_lines
+  DEFERRABLE INITIALLY DEFERRED
   FOR EACH ROW
-  EXECUTE FUNCTION fn_sync_journal_entry_totals();
+  EXECUTE FUNCTION fn_check_deferred_je_balance();
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- STEP 5: Verify existing data is clean before enabling
