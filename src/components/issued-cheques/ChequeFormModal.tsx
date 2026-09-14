@@ -48,29 +48,22 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
     return paymentMethods.filter(p => p.type === 'bank' || Boolean(p.bank_name));
   }, [paymentMethods]);
 
-  // Find default credit account (Notes Payable / أوراق دفع)
+  // Restrict selectable credit accounts ONLY to accounts with usage 'notes_payable'
+  const notesPayableAccounts = useMemo(() => {
+    return accounts
+      .filter(a => 
+        a.account_usage === 'notes_payable' || 
+        a.name?.includes('أوراق دفع') || 
+        a.name?.includes('اوراق دفع') ||
+        a.name?.includes('أوراق الدفع') ||
+        a.name?.includes('اوراق الدفع')
+      )
+      .sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+  }, [accounts]);
+
   const defaultCreditAcc = useMemo(() => {
-    const notesAcc = accounts.find(a => 
-      a.account_usage === 'notes_payable' || 
-      a.code === '210102' || 
-      a.code === '212' || 
-      a.name.includes('أوراق دفع') || 
-      a.name.includes('شيكات صادرة')
-    );
-    if (notesAcc) return notesAcc;
-
-    const liabilityAcc = accounts.find(a => 
-      a.account_usage === 'current_liability' || 
-      a.code?.startsWith('21') ||
-      (a as any).type_id === 'liabilities'
-    );
-    return liabilityAcc || accounts[0] || null;
-  }, [accounts]);
-
-  // Selectable accounts sorted by code
-  const selectableAccounts = useMemo(() => {
-    return [...accounts].sort((a, b) => (a.code || '').localeCompare(b.code || ''));
-  }, [accounts]);
+    return notesPayableAccounts[0] || null;
+  }, [notesPayableAccounts]);
 
   useEffect(() => {
     if (chequeToEdit) {
@@ -370,13 +363,22 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
               onChange={e => setCreditAccountId(e.target.value)}
               className="w-full px-3 py-1.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50/30 dark:bg-emerald-950/20 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-xs font-semibold transition-all"
             >
-              <option value="">-- اختر الحساب الدائن --</option>
-              {selectableAccounts.map(acc => (
+              <option value="">
+                {notesPayableAccounts.length === 0
+                  ? '-- لا يوجد حساب أوراق دفع مُعرّف --'
+                  : '-- اختر حساب أوراق الدفع --'}
+              </option>
+              {notesPayableAccounts.map(acc => (
                 <option key={acc.id} value={acc.id}>
-                  {acc.code} - {acc.name} {acc.account_usage === 'notes_payable' ? '★ (أوراق دفع)' : ''}
+                  {acc.code ? `${acc.code} - ` : ''}{acc.name}
                 </option>
               ))}
             </select>
+            {notesPayableAccounts.length === 0 && (
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 font-medium leading-tight">
+                ⚠️ يرجى إضافة حساب استخدامه "أوراق دفع" من شجرة الحسابات (قسم أوراق الدفع والموردين).
+              </p>
+            )}
           </div>
 
           {/* Bank Account Selection ( المسحوب عليه) */}
