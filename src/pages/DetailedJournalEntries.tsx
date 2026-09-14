@@ -429,6 +429,8 @@ export const DetailedJournalEntries: React.FC = () => {
       case 'opening_stock': return language === 'ar' ? 'أول الميزانية مخزون' : 'Opening Stock';
       case 'stock_adjustment': return language === 'ar' ? 'تسوية مخزنية' : 'Stock Adjustment';
       case 'warehouse_transfer': return language === 'ar' ? 'تحويل مخزني' : 'Warehouse Transfer';
+      case 'issued_cheque': return language === 'ar' ? 'إصدار شيك' : 'Issued Cheque';
+      case 'cheque_payment': return language === 'ar' ? 'صرف شيك' : 'Cheque Payment';
       default: return type;
     }
   };
@@ -450,7 +452,7 @@ export const DetailedJournalEntries: React.FC = () => {
         else if (col.id === 'account_type') entry[header] = row.account_type_name || '-';
         else if (col.id === 'reference_type') entry[header] = getDocTypeLabel(row.reference_type);
         else if (col.id === 'reference_number') entry[header] = row.reference_number || '-';
-        else if (col.id === 'sub_account') entry[header] = row.parent_account_name ? row.account_name : (row.sub_account_id || '-');
+        else if (col.id === 'sub_account') entry[header] = row.parent_account_name ? row.account_name : (row.supplier_name || row.customer_name || (row.sub_account_id && !row.sub_account_id.includes('-') ? row.sub_account_id : '-'));
         else if (col.id === 'client_supplier') entry[header] = row.customer_name || row.supplier_name || '-';
         else if (col.id === 'product_names') entry[header] = row.product_names || '-';
         else if (col.id === 'currency') entry[header] = row.currency_code || '-';
@@ -937,7 +939,7 @@ export const DetailedJournalEntries: React.FC = () => {
                           }}
                           className="px-3 py-1.5 border-l border-zinc-300 dark:border-zinc-700 text-center font-sans font-semibold"
                         >
-                          {row.parent_account_name ? row.account_name : (row.sub_account_id || '-')}
+                          {row.parent_account_name ? row.account_name : (row.supplier_name || row.customer_name || (row.sub_account_id && !row.sub_account_id.includes('-') ? row.sub_account_id : '-'))}
                         </td>
                       )}
 

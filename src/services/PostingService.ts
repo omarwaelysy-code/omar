@@ -938,18 +938,24 @@ export class PostingService {
       supplierAccountName = defaultSupplierAcc?.name || 'حساب الموردين';
     }
 
-    // Notes Payable Account (Credit)
+    // Notes Payable Account / Designated Credit Account (Credit)
     let notesPayableAccountId = '';
     let notesPayableAccountName = 'حساب أوراق الدفع - شيكات صادرة';
-    const notesPayableAcc = accounts.find(a => a.account_usage === 'notes_payable' || a.code === '210102' || a.name.includes('أوراق دفع') || a.name.includes('شيكات صادرة'));
-    if (notesPayableAcc) {
-      notesPayableAccountId = notesPayableAcc.id;
-      notesPayableAccountName = notesPayableAcc.name;
+    if (doc.credit_account_id) {
+      const explicitAcc = accounts.find(a => a.id === doc.credit_account_id);
+      notesPayableAccountId = doc.credit_account_id;
+      notesPayableAccountName = explicitAcc?.name || doc.credit_account_name || 'حساب أوراق الدفع';
     } else {
-      // Fallback to liabilities or supplier account
-      const fallbackAcc = accounts.find(a => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
-      notesPayableAccountId = fallbackAcc?.id || supplierAccountId;
-      notesPayableAccountName = fallbackAcc?.name || 'أوراق دفع';
+      const notesPayableAcc = accounts.find(a => a.account_usage === 'notes_payable' || a.code === '210102' || a.name.includes('أوراق دفع') || a.name.includes('شيكات صادرة'));
+      if (notesPayableAcc) {
+        notesPayableAccountId = notesPayableAcc.id;
+        notesPayableAccountName = notesPayableAcc.name;
+      } else {
+        // Fallback to liabilities or supplier account
+        const fallbackAcc = accounts.find(a => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
+        notesPayableAccountId = fallbackAcc?.id || supplierAccountId;
+        notesPayableAccountName = fallbackAcc?.name || 'أوراق دفع';
+      }
     }
 
     const journalItems: JournalEntryItem[] = [
@@ -1015,14 +1021,20 @@ export class PostingService {
     // Notes Payable Account (Debit)
     let notesPayableAccountId = '';
     let notesPayableAccountName = 'حساب أوراق الدفع - شيكات صادرة';
-    const notesPayableAcc = accounts.find(a => a.account_usage === 'notes_payable' || a.code === '210102' || a.name.includes('أوراق دفع') || a.name.includes('شيكات صادرة'));
-    if (notesPayableAcc) {
-      notesPayableAccountId = notesPayableAcc.id;
-      notesPayableAccountName = notesPayableAcc.name;
+    if (doc.credit_account_id) {
+      const explicitAcc = accounts.find(a => a.id === doc.credit_account_id);
+      notesPayableAccountId = doc.credit_account_id;
+      notesPayableAccountName = explicitAcc?.name || doc.credit_account_name || 'حساب أوراق الدفع';
     } else {
-      const fallbackAcc = accounts.find(a => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
-      notesPayableAccountId = fallbackAcc?.id || bankAccountId;
-      notesPayableAccountName = fallbackAcc?.name || 'أوراق دفع';
+      const notesPayableAcc = accounts.find(a => a.account_usage === 'notes_payable' || a.code === '210102' || a.name.includes('أوراق دفع') || a.name.includes('شيكات صادرة'));
+      if (notesPayableAcc) {
+        notesPayableAccountId = notesPayableAcc.id;
+        notesPayableAccountName = notesPayableAcc.name;
+      } else {
+        const fallbackAcc = accounts.find(a => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
+        notesPayableAccountId = fallbackAcc?.id || bankAccountId;
+        notesPayableAccountName = fallbackAcc?.name || 'أوراق دفع';
+      }
     }
 
     const journalItems: JournalEntryItem[] = [
@@ -1086,14 +1098,20 @@ export class PostingService {
     // Notes Payable Account (Debit - Clears the liability)
     let notesPayableAccountId = '';
     let notesPayableAccountName = 'حساب أوراق الدفع - شيكات صادرة';
-    const notesPayableAcc = accounts.find(a => a.account_usage === 'notes_payable' || a.code === '210102' || a.name.includes('أوراق دفع') || a.name.includes('شيكات صادرة'));
-    if (notesPayableAcc) {
-      notesPayableAccountId = notesPayableAcc.id;
-      notesPayableAccountName = notesPayableAcc.name;
+    if (doc.credit_account_id) {
+      const explicitAcc = accounts.find(a => a.id === doc.credit_account_id);
+      notesPayableAccountId = doc.credit_account_id;
+      notesPayableAccountName = explicitAcc?.name || doc.credit_account_name || 'حساب أوراق الدفع';
     } else {
-      const fallbackAcc = accounts.find(a => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
-      notesPayableAccountId = fallbackAcc?.id || supplierAccountId;
-      notesPayableAccountName = fallbackAcc?.name || 'أوراق دفع';
+      const notesPayableAcc = accounts.find(a => a.account_usage === 'notes_payable' || a.code === '210102' || a.name.includes('أوراق دفع') || a.name.includes('شيكات صادرة'));
+      if (notesPayableAcc) {
+        notesPayableAccountId = notesPayableAcc.id;
+        notesPayableAccountName = notesPayableAcc.name;
+      } else {
+        const fallbackAcc = accounts.find(a => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
+        notesPayableAccountId = fallbackAcc?.id || supplierAccountId;
+        notesPayableAccountName = fallbackAcc?.name || 'أوراق دفع';
+      }
     }
 
     const journalItems: JournalEntryItem[] = [

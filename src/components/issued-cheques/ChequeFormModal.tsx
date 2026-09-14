@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { X, Save, AlertCircle, Calendar, DollarSign, Building2, User, FileText, Paperclip, Trash2, CheckCircle2, ArrowLeft } from 'lucide-react';
-import { IssuedCheque, Supplier, PaymentMethod, IssuedChequeAttachment } from '../../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Save, AlertCircle, Calendar, DollarSign, Building2, User, FileText, Paperclip, Trash2, ArrowLeft } from 'lucide-react';
+import { IssuedCheque, Supplier, PaymentMethod, IssuedChequeAttachment, Account } from '../../types';
 import { issuedChequeService } from '../../services/issuedChequeService';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -12,6 +12,7 @@ interface ChequeFormModalProps {
   chequeToEdit?: IssuedCheque | null;
   suppliers: Supplier[];
   paymentMethods: PaymentMethod[];
+  accounts?: Account[];
   inline?: boolean;
 }
 
@@ -22,6 +23,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
   chequeToEdit,
   suppliers,
   paymentMethods,
+  accounts = [],
   inline = false
 }) => {
   const { showSuccess, showError } = useNotification();
@@ -29,6 +31,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
 
   const [chequeNumber, setChequeNumber] = useState('');
   const [supplierId, setSupplierId] = useState('');
+  const [creditAccountId, setCreditAccountId] = useState('');
   const [bankAccountId, setBankAccountId] = useState('');
   const [amount, setAmount] = useState('');
   const [issueDate, setIssueDate] = useState(new Date().toISOString().slice(0, 10));
@@ -41,12 +44,39 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
   const [validationError, setValidationError] = useState('');
 
   // Filter bank payment methods only
-  const bankAccounts = paymentMethods.filter(p => p.type === 'bank' || Boolean(p.bank_name));
+  const bankAccounts = useMemo(() => {
+    return paymentMethods.filter(p => p.type === 'bank' || Boolean(p.bank_name));
+  }, [paymentMethods]);
+
+  // Find default credit account (Notes Payable / أوراق دفع)
+  const defaultCreditAcc = useMemo(() => {
+    const notesAcc = accounts.find(a => 
+      a.account_usage === 'notes_payable' || 
+      a.code === '210102' || 
+      a.code === '212' || 
+      a.name.includes('أوراق دفع') || 
+      a.name.includes('شيكات صادرة')
+    );
+    if (notesAcc) return notesAcc;
+
+    const liabilityAcc = accounts.find(a => 
+      a.account_usage === 'current_liability' || 
+      a.code?.startsWith('21') ||
+      (a as any).type_id === 'liabilities'
+    );
+    return liabilityAcc || accounts[0] || null;
+  }, [accounts]);
+
+  // Selectable accounts sorted by code
+  const selectableAccounts = useMemo(() => {
+    return [...accounts].sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+  }, [accounts]);
 
   useEffect(() => {
     if (chequeToEdit) {
       setChequeNumber(chequeToEdit.cheque_number || '');
       setSupplierId(chequeToEdit.supplier_id || '');
+      setCreditAccountId(chequeToEdit.credit_account_id || defaultCreditAcc?.id || '');
       setBankAccountId(chequeToEdit.bank_account_id || '');
       setAmount(chequeToEdit.amount ? String(chequeToEdit.amount) : '');
       setIssueDate(chequeToEdit.issue_date ? chequeToEdit.issue_date.slice(0, 10) : new Date().toISOString().slice(0, 10));
@@ -58,6 +88,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
     } else {
       setChequeNumber('');
       setSupplierId('');
+      setCreditAccountId(defaultCreditAcc?.id || '');
       setBankAccountId(bankAccounts[0]?.id || '');
       setAmount('');
       setIssueDate(new Date().toISOString().slice(0, 10));
@@ -68,7 +99,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
       setAttachments([]);
     }
     setValidationError('');
-  }, [chequeToEdit, isOpen]);
+  }, [chequeToEdit, isOpen, defaultCreditAcc, bankAccounts]);
 
   // When supplier changes, auto-populate payee name if empty
   const handleSupplierChange = (sId: string) => {
@@ -122,6 +153,10 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
       setValidationError('يرجى اختيار المورد المستفيد.');
       return;
     }
+    if (!creditAccountId) {
+      setValidationError('يرجى اختيار الحساب الدائن (أوراق الدفع).');
+      return;
+    }
     if (!bankAccountId) {
       setValidationError('يرجى اختيار الحساب البنكي المسحوب عليه الشيك.');
       return;
@@ -146,6 +181,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
 
     const selectedBank = paymentMethods.find(p => p.id === bankAccountId);
     const selectedSupplier = suppliers.find(s => s.id === supplierId);
+    const selectedCreditAcc = accounts.find(a => a.id === creditAccountId);
 
     setLoading(true);
     try {
@@ -156,6 +192,8 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
         bank_account_id: bankAccountId,
         bank_name: selectedBank?.name || selectedBank?.bank_name || '',
         account_number: selectedBank?.account_number || '',
+        credit_account_id: creditAccountId,
+        credit_account_name: selectedCreditAcc?.name || 'أوراق دفع - شيكات صادرة',
         amount: numAmount,
         currency: 'EGP',
         exchange_rate: 1.0,
@@ -187,20 +225,20 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
   if (!isOpen) return null;
 
   const formContent = (
-    <div className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 w-full ${inline ? 'rounded-3xl shadow-sm' : 'max-w-3xl rounded-3xl shadow-2xl'} overflow-hidden animate-in fade-in duration-200`} dir="rtl">
+    <div className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 w-full ${inline ? 'rounded-2xl shadow-sm' : 'max-w-4xl rounded-2xl shadow-2xl'} overflow-hidden animate-in fade-in duration-200`} dir="rtl">
       
-      {/* Header */}
-      <div className="px-6 py-5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xl">
+      {/* Header - Compact */}
+      <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-base">
             🏦
           </div>
           <div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
               {chequeToEdit ? 'تعديل مسودة الشيك الصادر' : 'تحرير وإضافة شيك صادر جديد'}
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              تسجيل بيانات الشيك البنكي الصادر للمورد مع ربط الحسابات المحاسبية
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              تسجيل بيانات الشيك البنكي وربط حساب المورد والحساب الدائن المحاسبي
             </p>
           </div>
         </div>
@@ -208,262 +246,270 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 border border-slate-200 dark:border-slate-700"
+            className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 border border-slate-200 dark:border-slate-700"
           >
             <span>الرجوع للقائمة</span>
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-3.5 h-3.5" />
           </button>
         ) : (
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         )}
       </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          
-          {validationError && (
-            <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-sm flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 flex-shrink-0" />
-              <span>{validationError}</span>
-            </div>
-          )}
+      {/* Form Body - Compact & Dense */}
+      <form onSubmit={handleSubmit} className="p-4 space-y-3">
+        
+        {validationError && (
+          <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <span>{validationError}</span>
+          </div>
+        )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            
-            {/* Cheque Number */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                رقم الشيك المطبوع <span className="text-rose-500">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  required
-                  placeholder="مثال: 00045892"
-                  value={chequeNumber}
-                  onChange={e => setChequeNumber(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm font-bold font-mono transition-all"
-                />
-              </div>
-              <p className="text-[11px] text-slate-400 mt-1">الرقم المطبوع على الشيك الفعلي من دفتر الشيكات</p>
-            </div>
+        {/* Row 1: Basic Cheque Data (4 Columns on Desktop) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Cheque Number */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+              رقم الشيك المطبوع <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="مثال: 00045892"
+              value={chequeNumber}
+              onChange={e => setChequeNumber(e.target.value)}
+              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-xs font-bold font-mono transition-all"
+            />
+          </div>
 
-            {/* Amount */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                مبلغ الشيك (ج.م) <span className="text-rose-500">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  required
-                  placeholder="0.00"
-                  value={amount}
-                  onChange={e => setAmount(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm font-bold font-mono transition-all"
-                />
-                <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-bold">EGP</span>
-              </div>
-            </div>
-
-            {/* Supplier Selection */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                المورد المستفيد <span className="text-rose-500">*</span>
-              </label>
-              <select
+          {/* Amount */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+              مبلغ الشيك (ج.م) <span className="text-rose-500">*</span>
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
                 required
-                value={supplierId}
-                onChange={e => handleSupplierChange(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm transition-all"
+                placeholder="0.00"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                className="w-full px-3 py-1.5 pl-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-xs font-bold font-mono transition-all"
+              />
+              <span className="absolute left-2.5 top-1.5 text-[10px] text-slate-400 font-bold">EGP</span>
+            </div>
+          </div>
+
+          {/* Issue Date */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+              تاريخ التحرير والإصدار <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="date"
+              required
+              value={issueDate}
+              onChange={e => setIssueDate(e.target.value)}
+              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-xs font-mono transition-all"
+            />
+          </div>
+
+          {/* Due Date */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+              تاريخ الاستحقاق والصرف <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="date"
+              required
+              value={dueDate}
+              onChange={e => setDueDate(e.target.value)}
+              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-xs font-mono transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Row 2: Parties & Accounts (3 Columns on Desktop) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Supplier Selection (Debit Side) */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+              المورد المستفيد (المدين) <span className="text-rose-500">*</span>
+            </label>
+            <select
+              required
+              value={supplierId}
+              onChange={e => handleSupplierChange(e.target.value)}
+              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-xs transition-all"
+            >
+              <option value="">-- اختر المورد --</option>
+              {suppliers.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.name} {s.code ? `(${s.code})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Credit Account Selection (Credit Side - أوراق الدفع / شيكات صادرة) */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+              الحساب الدائن (أوراق الدفع) <span className="text-rose-500">*</span>
+            </label>
+            <select
+              required
+              value={creditAccountId}
+              onChange={e => setCreditAccountId(e.target.value)}
+              className="w-full px-3 py-1.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50/30 dark:bg-emerald-950/20 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-xs font-semibold transition-all"
+            >
+              <option value="">-- اختر الحساب الدائن --</option>
+              {selectableAccounts.map(acc => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.code} - {acc.name} {acc.account_usage === 'notes_payable' ? '★ (أوراق دفع)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Bank Account Selection ( المسحوب عليه) */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+              الحساب البنكي المسحوب عليه <span className="text-rose-500">*</span>
+            </label>
+            <select
+              required
+              value={bankAccountId}
+              onChange={e => setBankAccountId(e.target.value)}
+              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-xs transition-all"
+            >
+              <option value="">-- اختر الحساب البنكي --</option>
+              {bankAccounts.map(b => (
+                <option key={b.id} value={b.id}>
+                  {b.name} {b.bank_name ? `- ${b.bank_name}` : ''} {b.account_number ? `(${b.account_number})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Row 3: Payee Name & Description (2 Columns) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+              اسم المستفيد المكتوب على الشيك
+            </label>
+            <input
+              type="text"
+              placeholder="يصرف للمستفيد الأول: ..."
+              value={payeeName}
+              onChange={e => setPayeeName(e.target.value)}
+              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-xs transition-all"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+              البيان / الغرض من الصرف
+            </label>
+            <input
+              type="text"
+              placeholder="سداد دفعة تحت الحساب / سداد فاتورة توريد رقم ..."
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-xs transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Row 4: Notes & Attachments (2 Columns) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+              ملاحظات إضافية
+            </label>
+            <textarea
+              rows={2}
+              placeholder="أي ملاحظات داخلية خاصة بالإدارة المالية..."
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-xs transition-all resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+              صورة الشيك / المرفقات
+            </label>
+            <div className="border border-dashed border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-center hover:border-emerald-500 transition-colors">
+              <input
+                type="file"
+                id="cheque-attachments-input"
+                multiple
+                accept="image/*,application/pdf"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <label
+                htmlFor="cheque-attachments-input"
+                className="cursor-pointer flex items-center justify-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-emerald-600"
               >
-                <option value="">-- اختر المورد --</option>
-                {suppliers.map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} {s.code ? `(${s.code})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Bank Account Selection */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                الحساب البنكي المسحوب عليه <span className="text-rose-500">*</span>
+                <Paperclip className="w-4 h-4 text-emerald-600" />
+                <span>اضغط لرفع صورة الشيك أو المستند المؤيد (حتى 10MB)</span>
               </label>
-              <select
-                required
-                value={bankAccountId}
-                onChange={e => setBankAccountId(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm transition-all"
-              >
-                <option value="">-- اختر الحساب البنكي --</option>
-                {bankAccounts.map(b => (
-                  <option key={b.id} value={b.id}>
-                    {b.name} {b.bank_name ? `- ${b.bank_name}` : ''} {b.account_number ? `(${b.account_number})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
 
-            {/* Issue Date */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                تاريخ التحرير والإصدار <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="date"
-                required
-                value={issueDate}
-                onChange={e => setIssueDate(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm font-mono transition-all"
-              />
-            </div>
-
-            {/* Due Date */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                تاريخ الاستحقاق والصرف <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="date"
-                required
-                value={dueDate}
-                onChange={e => setDueDate(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm font-mono transition-all"
-              />
-            </div>
-
-            {/* Payee Name */}
-            <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                اسم المستفيد المكتوب على الشيك
-              </label>
-              <input
-                type="text"
-                placeholder="يصرف للمستفيد الأول: ..."
-                value={payeeName}
-                onChange={e => setPayeeName(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm transition-all"
-              />
-            </div>
-
-            {/* Description & Purpose */}
-            <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                البيان / الغرض من الصرف
-              </label>
-              <input
-                type="text"
-                placeholder="سداد دفعة تحت الحساب / سداد فاتورة توريد رقم ..."
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm transition-all"
-              />
-            </div>
-
-            {/* Notes */}
-            <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                ملاحظات إضافية
-              </label>
-              <textarea
-                rows={2}
-                placeholder="أي ملاحظات داخلية خاصة بالإدارة المالية..."
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm transition-all resize-none"
-              />
-            </div>
-
-            {/* Attachments Upload */}
-            <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                صورة الشيك / المرفقات
-              </label>
-              <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-4 text-center hover:border-emerald-500/50 transition-colors">
-                <input
-                  type="file"
-                  id="cheque-attachments-input"
-                  multiple
-                  accept="image/*,application/pdf"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-                <label
-                  htmlFor="cheque-attachments-input"
-                  className="cursor-pointer flex flex-col items-center justify-center gap-2"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 flex items-center justify-center">
-                    <Paperclip className="w-5 h-5" />
-                  </div>
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                    اضغط لرفع صورة الشيك أو المستندات المؤيدة
-                  </span>
-                  <span className="text-[11px] text-slate-400">يدعم الصور وملفات PDF حتى 10MB</span>
-                </label>
-
-                {/* Uploaded attachments preview */}
-                {attachments.length > 0 && (
-                  <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {attachments.map(att => (
-                      <div
-                        key={att.id}
-                        className="relative group rounded-xl border border-slate-200 dark:border-slate-700 p-2 bg-slate-50 dark:bg-slate-800/80 flex items-center gap-2"
+              {/* Uploaded attachments preview */}
+              {attachments.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {attachments.map(att => (
+                    <div
+                      key={att.id}
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-[11px]"
+                    >
+                      <span className="truncate max-w-[120px]">{att.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(att.id)}
+                        className="text-rose-500 hover:text-rose-700"
                       >
-                        {att.type.startsWith('image/') ? (
-                          <img src={att.url} alt={att.name} className="w-9 h-9 object-cover rounded-lg" />
-                        ) : (
-                          <FileText className="w-9 h-9 text-slate-400 p-1" />
-                        )}
-                        <div className="flex-1 min-w-0 text-right">
-                          <p className="text-xs font-medium text-slate-800 dark:text-slate-200 truncate">{att.name}</p>
-                          <p className="text-[10px] text-slate-400">{(att.size / 1024).toFixed(1)} KB</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeAttachment(att.id)}
-                          className="p-1 rounded-lg text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-900/30 transition-colors"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-
           </div>
+        </div>
 
-          {/* Modal Footer */}
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-            >
-              إلغاء
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition-all disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" />
-              <span>{loading ? 'جاري الحفظ...' : chequeToEdit ? 'حفظ التعديلات' : 'حفظ الشيك'}</span>
-            </button>
-          </div>
+        {/* Modal Footer - Compact */}
+        <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            إلغاء
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-500/20 flex items-center gap-1.5 transition-all disabled:opacity-50"
+          >
+            <Save className="w-3.5 h-3.5" />
+            <span>{loading ? 'جاري الحفظ...' : chequeToEdit ? 'حفظ التعديلات' : 'حفظ الشيك'}</span>
+          </button>
+        </div>
 
-        </form>
-      </div>
+      </form>
+    </div>
   );
 
   if (inline) {
@@ -471,7 +517,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-3">
       {formContent}
     </div>
   );

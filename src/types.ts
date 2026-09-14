@@ -562,6 +562,8 @@ export interface IssuedCheque {
   bank_account_id: string;
   bank_name?: string;
   account_number?: string;
+  credit_account_id?: string;
+  credit_account_name?: string;
   amount: number;
   currency?: string;
   exchange_rate?: number;

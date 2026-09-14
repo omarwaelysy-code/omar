@@ -89,75 +89,85 @@ export const ChequeDetailsModal: React.FC<ChequeDetailsModalProps> = ({
   const isOverdue = cheque.due_date && new Date(cheque.due_date) < new Date() && ['ISSUED', 'POSTPONED'].includes(cheque.status);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200" dir="rtl">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-3">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200" dir="rtl">
         
-        {/* Modal Header */}
-        <div className="px-6 py-5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl font-bold">
+        {/* Modal Header - Compact */}
+        <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-lg font-bold">
               🏦
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  شيك رقم: <span className="font-mono">{cheque.cheque_number}</span>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  شيك رقم: <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{cheque.cheque_number}</span>
                 </h3>
                 {getStatusBadge(cheque.status, isOverdue)}
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 تفاصيل الشيك الصادر والسجل المحاسبي وحالة المعالجة
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+        {/* Modal Body - Compact */}
+        <div className="p-4 space-y-3 max-h-[75vh] overflow-y-auto">
           
           {/* Main Amount Banner */}
-          <div className="p-5 rounded-2xl bg-gradient-to-l from-emerald-600 to-teal-700 text-white flex items-center justify-between shadow-lg shadow-emerald-600/15">
+          <div className="p-3.5 rounded-xl bg-gradient-to-l from-emerald-600 to-teal-700 text-white flex items-center justify-between shadow-md shadow-emerald-600/15">
             <div>
-              <p className="text-xs text-emerald-100 font-medium">مبلغ الشيك الإجمالي</p>
-              <h2 className="text-2xl font-black font-mono mt-1">
-                {Number(cheque.amount).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} <span className="text-sm font-normal">ج.م</span>
+              <p className="text-[11px] text-emerald-100 font-medium">مبلغ الشيك الإجمالي</p>
+              <h2 className="text-xl font-black font-mono mt-0.5">
+                {Number(cheque.amount).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} <span className="text-xs font-normal">ج.م</span>
               </h2>
             </div>
-            <div className="text-left text-xs text-emerald-100 space-y-1">
+            <div className="text-left text-[11px] text-emerald-100 space-y-0.5">
               <p>تاريخ التحرير: <span className="font-mono font-bold text-white">{String(cheque.issue_date).slice(0, 10)}</span></p>
               <p>تاريخ الاستحقاق: <span className="font-mono font-bold text-white">{String(cheque.due_date).slice(0, 10)}</span></p>
             </div>
           </div>
 
-          {/* Core Information Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 space-y-1">
-              <span className="text-xs text-slate-400 flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5" /> المورد المستفيد
+          {/* Core Information Grid - 3 Columns */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 space-y-0.5">
+              <span className="text-[10px] text-slate-400 flex items-center gap-1 font-bold">
+                <User className="w-3 h-3" /> المورد المستفيد (المدين)
               </span>
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+              <p className="text-xs font-bold text-slate-800 dark:text-slate-100">
                 {cheque.supplier_name || 'غير محدد'}
               </p>
               {cheque.payee_name && cheque.payee_name !== cheque.supplier_name && (
-                <p className="text-xs text-slate-500">المستفيد المكتوب: {cheque.payee_name}</p>
+                <p className="text-[10px] text-slate-500 truncate">المستفيد: {cheque.payee_name}</p>
               )}
             </div>
 
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 space-y-1">
-              <span className="text-xs text-slate-400 flex items-center gap-1.5">
-                <Building2 className="w-3.5 h-3.5" /> الحساب البنكي المسحوب عليه
+            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 space-y-0.5">
+              <span className="text-[10px] text-slate-400 flex items-center gap-1 font-bold">
+                <FileText className="w-3 h-3" /> الحساب الدائن
               </span>
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+              <p className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                {cheque.credit_account_name || 'أوراق دفع - شيكات صادرة'}
+              </p>
+              <p className="text-[10px] text-emerald-600 font-semibold">التزام أوراق دفع</p>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 space-y-0.5">
+              <span className="text-[10px] text-slate-400 flex items-center gap-1 font-bold">
+                <Building2 className="w-3 h-3" /> الحساب البنكي المسحوب عليه
+              </span>
+              <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
                 {cheque.bank_name || 'الحساب البنكي'}
               </p>
               {cheque.account_number && (
-                <p className="text-xs font-mono text-slate-500">رقم الحساب: {cheque.account_number}</p>
+                <p className="text-[10px] font-mono text-slate-500">رقم الحساب: {cheque.account_number}</p>
               )}
             </div>
           </div>
@@ -265,29 +275,30 @@ export const ChequeDetailsModal: React.FC<ChequeDetailsModalProps> = ({
 
         </div>
 
-        {/* Modal Actions Footer */}
-        <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
-          <div>
+        {/* Modal Footer - Compact */}
+        <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
+          
+          <div className="flex items-center gap-1.5">
             {onPrint && (
               <button
                 type="button"
                 onClick={() => onPrint(cheque)}
-                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-white dark:hover:bg-slate-800 flex items-center gap-1.5 transition-colors"
+                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1.5 transition-colors"
               >
-                <Printer className="w-4 h-4" />
-                طباعة الشيك / إيصال الاستلام
+                <Printer className="w-3.5 h-3.5" />
+                طباعة الشيك
               </button>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             {cheque.status === 'DRAFT' && onIssue && (
               <button
                 type="button"
                 onClick={() => { onClose(); onIssue(cheque); }}
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-1.5 transition-all"
+                className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm shadow-blue-500/20 flex items-center gap-1.5 transition-all"
               >
-                <CheckCircle2 className="w-4 h-4" />
+                <CheckCircle2 className="w-3.5 h-3.5" />
                 اعتماد وإصدار الشيك
               </button>
             )}
@@ -298,9 +309,9 @@ export const ChequeDetailsModal: React.FC<ChequeDetailsModalProps> = ({
                   <button
                     type="button"
                     onClick={() => { onClose(); onPay(cheque); }}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-500/20 flex items-center gap-1.5 transition-all"
+                    className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm shadow-emerald-500/20 flex items-center gap-1.5 transition-all"
                   >
-                    <CheckCircle2 className="w-4 h-4" />
+                    <CheckCircle2 className="w-3.5 h-3.5" />
                     تسجيل الصرف والسداد
                   </button>
                 )}
@@ -308,9 +319,9 @@ export const ChequeDetailsModal: React.FC<ChequeDetailsModalProps> = ({
                   <button
                     type="button"
                     onClick={() => { onClose(); onPostpone(cheque); }}
-                    className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-md shadow-amber-500/20 flex items-center gap-1.5 transition-all"
+                    className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-sm shadow-amber-500/20 flex items-center gap-1.5 transition-all"
                   >
-                    <Clock className="w-4 h-4" />
+                    <Clock className="w-3.5 h-3.5" />
                     تأجيل الاستحقاق
                   </button>
                 )}
@@ -318,9 +329,9 @@ export const ChequeDetailsModal: React.FC<ChequeDetailsModalProps> = ({
                   <button
                     type="button"
                     onClick={() => { onClose(); onReturn(cheque); }}
-                    className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-500/20 flex items-center gap-1.5 transition-all"
+                    className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm shadow-rose-500/20 flex items-center gap-1.5 transition-all"
                   >
-                    <RotateCcw className="w-4 h-4" />
+                    <RotateCcw className="w-3.5 h-3.5" />
                     تسجيل الارتداد
                   </button>
                 )}
@@ -331,9 +342,9 @@ export const ChequeDetailsModal: React.FC<ChequeDetailsModalProps> = ({
               <button
                 type="button"
                 onClick={() => { onClose(); onCancel(cheque); }}
-                className="px-3.5 py-2 rounded-xl border border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                className="px-3.5 py-1.5 rounded-lg border border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs font-bold flex items-center gap-1.5 transition-colors"
               >
-                <Ban className="w-4 h-4" />
+                <Ban className="w-3.5 h-3.5" />
                 إلغاء الشيك
               </button>
             )}

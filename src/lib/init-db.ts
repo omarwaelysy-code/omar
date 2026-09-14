@@ -578,6 +578,8 @@ export async function initDatabase() {
         "cheque_number" VARCHAR(100) NOT NULL,
         "supplier_id" VARCHAR(36) NOT NULL REFERENCES "suppliers"("id"),
         "bank_account_id" VARCHAR(36) NOT NULL REFERENCES "payment_methods"("id"),
+        "credit_account_id" VARCHAR(36) REFERENCES "accounts"("id"),
+        "credit_account_name" VARCHAR(255),
         "bank_name" VARCHAR(255),
         "account_number" VARCHAR(100),
         "amount" DECIMAL(18, 4) NOT NULL CHECK ("amount" > 0),

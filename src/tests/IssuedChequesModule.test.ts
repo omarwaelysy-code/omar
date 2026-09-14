@@ -166,4 +166,34 @@ describe('🏦 Issued Cheques Module - Accounting & Logic Verification', () => {
     const invalidDateCheque = { ...sampleCheque, issue_date: '2026-09-15', due_date: '2026-09-01' };
     expect(new Date(invalidDateCheque.due_date).getTime()).toBeLessThan(new Date(invalidDateCheque.issue_date).getTime());
   });
+
+  it('5. Explicit Credit Account overrides default Notes Payable', () => {
+    const customCreditCheque: IssuedCheque = {
+      ...sampleCheque,
+      credit_account_id: 'acc-custom-notes',
+      credit_account_name: 'أوراق دفع مخصصة'
+    };
+
+    const journal = PostingService.generateIssuedChequeJournal(
+      customCreditCheque,
+      mockSuppliers,
+      [
+        ...mockAccounts,
+        {
+          id: 'acc-custom-notes',
+          company_id: 'comp-1',
+          code: '210102002',
+          name: 'أوراق دفع مخصصة',
+          type_id: 'liabilities',
+          account_usage: 'notes_payable',
+          opening_balance: 0,
+          is_active: true
+        }
+      ]
+    );
+
+    const creditLine = journal?.items.find(i => i.credit === 50000);
+    expect(creditLine?.account_id).toBe('acc-custom-notes');
+    expect(creditLine?.account_name).toBe('أوراق دفع مخصصة');
+  });
 });

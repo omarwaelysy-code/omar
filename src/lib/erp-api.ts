@@ -3412,14 +3412,20 @@ const chequeIssueHandler = async (req: AuthRequest, res: any) => {
 
     let notesPayableAccId = '';
     let notesPayableAccName = 'حساب أوراق الدفع - شيكات صادرة';
-    const notesAcc = accRows.find((a: any) => a.account_usage === 'notes_payable' || a.code === '210102' || a.name?.includes('أوراق دفع') || a.name?.includes('شيكات صادرة'));
-    if (notesAcc) {
-      notesPayableAccId = notesAcc.id;
-      notesPayableAccName = notesAcc.name;
+    if (cheque.credit_account_id) {
+      const explicitAcc = accRows.find((a: any) => a.id === cheque.credit_account_id);
+      notesPayableAccId = cheque.credit_account_id;
+      notesPayableAccName = explicitAcc?.name || cheque.credit_account_name || 'حساب أوراق الدفع';
     } else {
-      const fallbackAcc = accRows.find((a: any) => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
-      notesPayableAccId = fallbackAcc?.id || supplierAccId;
-      notesPayableAccName = fallbackAcc?.name || 'أوراق دفع';
+      const notesAcc = accRows.find((a: any) => a.account_usage === 'notes_payable' || a.code === '210102' || a.name?.includes('أوراق دفع') || a.name?.includes('شيكات صادرة'));
+      if (notesAcc) {
+        notesPayableAccId = notesAcc.id;
+        notesPayableAccName = notesAcc.name;
+      } else {
+        const fallbackAcc = accRows.find((a: any) => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
+        notesPayableAccId = fallbackAcc?.id || supplierAccId;
+        notesPayableAccName = fallbackAcc?.name || 'أوراق دفع';
+      }
     }
 
     const amount = Number(cheque.amount);
@@ -3549,14 +3555,20 @@ const chequePayHandler = async (req: AuthRequest, res: any) => {
 
     let notesPayableAccId = '';
     let notesPayableAccName = 'حساب أوراق الدفع - شيكات صادرة';
-    const notesAcc = accRows.find((a: any) => a.account_usage === 'notes_payable' || a.code === '210102' || a.name?.includes('أوراق دفع') || a.name?.includes('شيكات صادرة'));
-    if (notesAcc) {
-      notesPayableAccId = notesAcc.id;
-      notesPayableAccName = notesAcc.name;
+    if (cheque.credit_account_id) {
+      const explicitAcc = accRows.find((a: any) => a.id === cheque.credit_account_id);
+      notesPayableAccId = cheque.credit_account_id;
+      notesPayableAccName = explicitAcc?.name || cheque.credit_account_name || 'حساب أوراق الدفع';
     } else {
-      const fallbackAcc = accRows.find((a: any) => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
-      notesPayableAccId = fallbackAcc?.id || bankAccId;
-      notesPayableAccName = fallbackAcc?.name || 'أوراق دفع';
+      const notesAcc = accRows.find((a: any) => a.account_usage === 'notes_payable' || a.code === '210102' || a.name?.includes('أوراق دفع') || a.name?.includes('شيكات صادرة'));
+      if (notesAcc) {
+        notesPayableAccId = notesAcc.id;
+        notesPayableAccName = notesAcc.name;
+      } else {
+        const fallbackAcc = accRows.find((a: any) => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
+        notesPayableAccId = fallbackAcc?.id || bankAccId;
+        notesPayableAccName = fallbackAcc?.name || 'أوراق دفع';
+      }
     }
 
     const amount = Number(cheque.amount);
@@ -3770,14 +3782,20 @@ const chequeReturnHandler = async (req: AuthRequest, res: any) => {
 
     let notesPayableAccId = '';
     let notesPayableAccName = 'حساب أوراق الدفع - شيكات صادرة';
-    const notesAcc = accRows.find((a: any) => a.account_usage === 'notes_payable' || a.code === '210102' || a.name?.includes('أوراق دفع') || a.name?.includes('شيكات صادرة'));
-    if (notesAcc) {
-      notesPayableAccId = notesAcc.id;
-      notesPayableAccName = notesAcc.name;
+    if (cheque.credit_account_id) {
+      const explicitAcc = accRows.find((a: any) => a.id === cheque.credit_account_id);
+      notesPayableAccId = cheque.credit_account_id;
+      notesPayableAccName = explicitAcc?.name || cheque.credit_account_name || 'حساب أوراق الدفع';
     } else {
-      const fallbackAcc = accRows.find((a: any) => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
-      notesPayableAccId = fallbackAcc?.id || supplierAccId;
-      notesPayableAccName = fallbackAcc?.name || 'أوراق دفع';
+      const notesAcc = accRows.find((a: any) => a.account_usage === 'notes_payable' || a.code === '210102' || a.name?.includes('أوراق دفع') || a.name?.includes('شيكات صادرة'));
+      if (notesAcc) {
+        notesPayableAccId = notesAcc.id;
+        notesPayableAccName = notesAcc.name;
+      } else {
+        const fallbackAcc = accRows.find((a: any) => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
+        notesPayableAccId = fallbackAcc?.id || supplierAccId;
+        notesPayableAccName = fallbackAcc?.name || 'أوراق دفع';
+      }
     }
 
     const amount = Number(cheque.amount);

@@ -5,7 +5,7 @@ import {
   ChevronRight, Calendar, Building2, User, DollarSign, LayoutDashboard, 
   ListOrdered, BarChart3, AlertCircle 
 } from 'lucide-react';
-import { IssuedCheque, Supplier, PaymentMethod, IssuedChequeStats } from '../types';
+import { IssuedCheque, Supplier, PaymentMethod, IssuedChequeStats, Account } from '../types';
 import { dbService } from '../services/dbService';
 import { issuedChequeService } from '../services/issuedChequeService';
 import { useNotification } from '../contexts/NotificationContext';
@@ -32,6 +32,7 @@ export const IssuedCheques: React.FC = () => {
   const [upcomingCheques, setUpcomingCheques] = useState<IssuedCheque[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filters
@@ -56,12 +57,13 @@ export const IssuedCheques: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [chequesData, statsData, upcomingData, suppData, pmData] = await Promise.all([
+      const [chequesData, statsData, upcomingData, suppData, pmData, accData] = await Promise.all([
         issuedChequeService.list(),
         issuedChequeService.getDashboardStats().catch(() => null),
         issuedChequeService.getUpcomingCheques().catch(() => []),
         dbService.list<Supplier>('suppliers'),
-        dbService.list<PaymentMethod>('payment_methods')
+        dbService.list<PaymentMethod>('payment_methods'),
+        dbService.list<Account>('accounts')
       ]);
 
       setCheques(chequesData || []);
@@ -69,6 +71,7 @@ export const IssuedCheques: React.FC = () => {
       setUpcomingCheques(upcomingData || []);
       setSuppliers(suppData || []);
       setPaymentMethods(pmData || []);
+      setAccounts(accData || []);
     } catch (err: any) {
       console.error('Error loading issued cheques data:', err);
       showError(err.message || 'فشل في تحميل بيانات الشيكات الصادرة');
@@ -227,20 +230,20 @@ export const IssuedCheques: React.FC = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto min-h-screen" dir="rtl">
+    <div className="p-3 sm:p-4 lg:p-5 space-y-3.5 max-w-[1600px] mx-auto min-h-screen" dir="rtl">
       
-      {/* Top Header Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      {/* Top Header Bar - Compact */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-emerald-500/20">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white flex items-center justify-center text-xl shadow-md shadow-emerald-500/20">
               🏦
             </div>
             <div>
-              <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+              <h1 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
                 إدارة الشيكات الصادرة
               </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 إصدار، متابعة، تسوية، وتوثيق استحقاقات الشيكات الصادرة للموردين والجهات الدائنة
               </p>
             </div>
@@ -253,72 +256,72 @@ export const IssuedCheques: React.FC = () => {
             setSelectedChequeForEdit(null);
             setActiveTab('create');
           }}
-          className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2.5 transition-all hover:scale-[1.02] active:scale-[0.98]"
+          className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99]"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-4 h-4" />
           <span>تحرير شيك صادر جديد</span>
         </button>
       </div>
 
-      {/* Main Navigation Tabs */}
-      <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 w-fit overflow-x-auto max-w-full">
+      {/* Main Navigation Tabs - Compact */}
+      <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 w-fit overflow-x-auto max-w-full">
         <button
           onClick={() => { setActiveTab('dashboard'); setCurrentPage(1); }}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
             activeTab === 'dashboard'
               ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
-          <LayoutDashboard className="w-4 h-4" />
+          <LayoutDashboard className="w-3.5 h-3.5" />
           <span>لوحة التحكم</span>
         </button>
 
         <button
           onClick={() => { setActiveTab('all'); setCurrentPage(1); }}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
             activeTab === 'all'
               ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
-          <ListOrdered className="w-4 h-4" />
+          <ListOrdered className="w-3.5 h-3.5" />
           <span>كل الشيكات ({cheques.length})</span>
         </button>
 
         <button
           onClick={() => { setActiveTab('create'); }}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
             activeTab === 'create'
               ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-3.5 h-3.5" />
           <span>{selectedChequeForEdit ? 'تعديل مسودة الشيك' : 'تحرير شيك صادر'}</span>
         </button>
 
         <button
           onClick={() => { setActiveTab('due'); setCurrentPage(1); }}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
             activeTab === 'due'
               ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
-          <Clock className="w-4 h-4" />
+          <Clock className="w-3.5 h-3.5" />
           <span>الشيكات المستحقة واجبة الصرف</span>
         </button>
 
         <button
           onClick={() => { setActiveTab('reports'); setCurrentPage(1); }}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
             activeTab === 'reports'
               ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
-          <BarChart3 className="w-4 h-4" />
+          <BarChart3 className="w-3.5 h-3.5" />
           <span>التقارير المالية والتحليلية</span>
         </button>
       </div>
@@ -346,25 +349,26 @@ export const IssuedCheques: React.FC = () => {
           chequeToEdit={selectedChequeForEdit}
           suppliers={suppliers}
           paymentMethods={paymentMethods}
+          accounts={accounts}
         />
       )}
 
       {/* Tab 2 & 3: All Cheques & Due Cheques Tables */}
       {(activeTab === 'all' || activeTab === 'due') && (
-        <div className="space-y-4">
+        <div className="space-y-3">
           
-          {/* Filters Strip */}
-          <div className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center gap-3">
+          {/* Filters Strip - Compact */}
+          <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center gap-2">
             
             {/* Search Input */}
             <div className="relative flex-1 w-full">
-              <Search className="w-4 h-4 absolute right-3.5 top-3 text-slate-400" />
+              <Search className="w-3.5 h-3.5 absolute right-3 top-2.5 text-slate-400" />
               <input
                 type="text"
                 placeholder="البحث برقم الشيك، اسم المورد، الحساب البنكي، أو البيان..."
                 value={searchTerm}
                 onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                className="w-full pr-10 pl-4 py-2 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                className="w-full pr-9 pl-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
               />
             </div>
 
@@ -372,7 +376,7 @@ export const IssuedCheques: React.FC = () => {
             <select
               value={supplierFilter}
               onChange={e => { setSupplierFilter(e.target.value); setCurrentPage(1); }}
-              className="w-full md:w-48 px-3 py-2 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 outline-none"
+              className="w-full md:w-44 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 outline-none"
             >
               <option value="">كل الموردين</option>
               {suppliers.map(s => (
@@ -384,7 +388,7 @@ export const IssuedCheques: React.FC = () => {
             <select
               value={bankFilter}
               onChange={e => { setBankFilter(e.target.value); setCurrentPage(1); }}
-              className="w-full md:w-48 px-3 py-2 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 outline-none"
+              className="w-full md:w-44 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 outline-none"
             >
               <option value="">كل البنوك</option>
               {paymentMethods.filter(p => p.type === 'bank' || p.bank_name).map(b => (
@@ -397,7 +401,7 @@ export const IssuedCheques: React.FC = () => {
               <select
                 value={statusFilter}
                 onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-                className="w-full md:w-40 px-3 py-2 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 outline-none"
+                className="w-full md:w-36 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 outline-none"
               >
                 <option value="">كل الحالات</option>
                 <option value="DRAFT">مسودة</option>
@@ -413,7 +417,7 @@ export const IssuedCheques: React.FC = () => {
             <select
               value={duePeriodFilter}
               onChange={e => { setDuePeriodFilter(e.target.value as any); setCurrentPage(1); }}
-              className="w-full md:w-40 px-3 py-2 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 outline-none"
+              className="w-full md:w-36 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 outline-none"
             >
               <option value="all">كل المواعيد</option>
               <option value="today">مستحق اليوم</option>
@@ -425,40 +429,41 @@ export const IssuedCheques: React.FC = () => {
             <button
               onClick={fetchData}
               disabled={loading}
-              className="p-2 rounded-2xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               title="تحديث"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
 
-          {/* Cheques Table */}
-          <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+          {/* Cheques Table - Compact Cells & Padding */}
+          <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
             {paginatedCheques.length === 0 ? (
-              <div className="py-16 text-center text-slate-400">
-                <AlertCircle className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                <p className="text-base font-bold text-slate-700 dark:text-slate-300">لم يتم العثور على أي شيكات مطابقة</p>
-                <p className="text-xs text-slate-400 mt-1">جرب تغيير معايير البحث أو إضافة شيك صادر جديد</p>
+              <div className="py-12 text-center text-slate-400">
+                <AlertCircle className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-2" />
+                <p className="text-sm font-bold text-slate-700 dark:text-slate-300">لم يتم العثور على أي شيكات مطابقة</p>
+                <p className="text-[11px] text-slate-400 mt-1">جرب تغيير معايير البحث أو إضافة شيك صادر جديد</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-right text-xs">
                   <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300 font-bold border-b border-slate-100 dark:border-slate-800">
                     <tr>
-                      <th className="px-5 py-4">رقم الشيك</th>
-                      <th className="px-5 py-4">المورد المستفيد</th>
-                      <th className="px-5 py-4">الحساب البنكي</th>
-                      <th className="px-5 py-4">المبلغ</th>
-                      <th className="px-5 py-4">تاريخ التحرير</th>
-                      <th className="px-5 py-4">تاريخ الاستحقاق</th>
-                      <th className="px-5 py-4">الحالة</th>
-                      <th className="px-5 py-4 text-center">إجراءات</th>
+                      <th className="px-3 py-2 text-[11px]">رقم الشيك</th>
+                      <th className="px-3 py-2 text-[11px]">المورد المستفيد</th>
+                      <th className="px-3 py-2 text-[11px]">الحساب الدائن</th>
+                      <th className="px-3 py-2 text-[11px]">الحساب البنكي</th>
+                      <th className="px-3 py-2 text-[11px]">المبلغ</th>
+                      <th className="px-3 py-2 text-[11px]">تاريخ التحرير</th>
+                      <th className="px-3 py-2 text-[11px]">تاريخ الاستحقاق</th>
+                      <th className="px-3 py-2 text-[11px]">الحالة</th>
+                      <th className="px-3 py-2 text-[11px] text-center">إجراءات</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                     {paginatedCheques.map(cheque => (
                       <tr key={cheque.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors group">
-                        <td className="px-5 py-3.5 font-mono font-bold text-slate-900 dark:text-white">
+                        <td className="px-3 py-2 font-mono font-bold text-slate-900 dark:text-white">
                           <button
                             onClick={() => setSelectedChequeForDetails(cheque)}
                             className="hover:text-emerald-600 transition-colors"
@@ -466,25 +471,28 @@ export const IssuedCheques: React.FC = () => {
                             {cheque.cheque_number}
                           </button>
                         </td>
-                        <td className="px-5 py-3.5 font-medium text-slate-800 dark:text-slate-200">
+                        <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-200">
                           {cheque.supplier_name || cheque.payee_name || '-'}
                         </td>
-                        <td className="px-5 py-3.5 text-slate-600 dark:text-slate-400">
+                        <td className="px-3 py-2 text-slate-700 dark:text-slate-300 font-medium">
+                          {cheque.credit_account_name || 'أوراق دفع'}
+                        </td>
+                        <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
                           {cheque.bank_name || '-'}
                         </td>
-                        <td className="px-5 py-3.5 font-mono font-black text-slate-900 dark:text-white">
+                        <td className="px-3 py-2 font-mono font-black text-slate-900 dark:text-white">
                           {formatMoney(cheque.amount)} ج.م
                         </td>
-                        <td className="px-5 py-3.5 font-mono text-slate-500">
+                        <td className="px-3 py-2 font-mono text-slate-500">
                           {String(cheque.issue_date).slice(0, 10)}
                         </td>
-                        <td className="px-5 py-3.5 font-mono font-bold text-slate-700 dark:text-slate-300">
+                        <td className="px-3 py-2 font-mono font-bold text-slate-700 dark:text-slate-300">
                           {String(cheque.due_date).slice(0, 10)}
                         </td>
-                        <td className="px-5 py-3.5">
+                        <td className="px-3 py-2">
                           {getStatusBadge(cheque.status, cheque.due_date)}
                         </td>
-                        <td className="px-5 py-3.5">
+                        <td className="px-3 py-2">
                           <div className="flex items-center justify-center gap-1">
                             
                             {/* View details */}
