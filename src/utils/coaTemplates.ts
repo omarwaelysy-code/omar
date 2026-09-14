@@ -123,7 +123,8 @@ export const STANDARD_COA_TEMPLATE: TemplateType[] = [
             name_en: 'Accounts Payable',
             usage: 'supplier',
             children: [
-              { code: '210101', name_ar: 'الموردون', name_en: 'Suppliers', usage: 'supplier' }
+              { code: '210101', name_ar: 'الموردون', name_en: 'Suppliers', usage: 'supplier' },
+              { code: '210102', name_ar: 'أوراق الدفع', name_en: 'Notes Payable', usage: 'notes_payable' }
             ]
           },
           {
