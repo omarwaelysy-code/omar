@@ -295,13 +295,19 @@ export async function backfillMissingJournalEntries(pool: any) {
         // 2. Discount Line (if any)
         if (discount > 0) {
           const discountAccount = accounts.find((a: any) => 
-            a.name.includes('خصم مسموح به') || a.name.includes('خصم مبيعات') ||
-            a.name.toLowerCase().includes('discount allowed') || a.name.toLowerCase().includes('sales discount')
+            (a.name && a.name.includes('خصم') && (a.name.includes('مسموح') || a.name.includes('عملاء') || a.name.includes('مبيعات'))) ||
+            a.code === '412' || a.code === '4104' || a.code === '5401' ||
+            (a.name && (a.name.toLowerCase().includes('discount allowed') || a.name.toLowerCase().includes('sales discount')))
           );
+          if (!discountAccount?.id) {
+            console.warn(`[BACKFILL] No discount account found for invoice ${invoiceNumber}, skipping`);
+            await client.query('ROLLBACK');
+            continue;
+          }
           journalItems.push({
             id: crypto.randomUUID(),
-            account_id: discountAccount?.id || '',
-            account_name: discountAccount?.name || 'حساب الخصم المسموح به',
+            account_id: discountAccount.id,
+            account_name: discountAccount.name || 'حساب الخصم المسموح به',
             debit: discount,
             credit: 0,
             description: `خصم فاتورة مبيعات رقم ${invoiceNumber}`
@@ -309,10 +315,22 @@ export async function backfillMissingJournalEntries(pool: any) {
         }
 
         // 3. Items Credit Lines (Sales Revenue)
+        let hasInvalidItemAcc = false;
         for (const item of items) {
           const product = products.find((p: any) => p.id === item.product_id);
           let creditAccountId = product?.revenue_account_id || '';
           let creditAccountName = product?.revenue_account_name || 'حساب المبيعات';
+
+          if (!creditAccountId) {
+            const defaultSalesAcc = accounts.find((a: any) => a.code === '41' || a.code === '4101' || (a.name && a.name.includes('مبيعات')));
+            creditAccountId = defaultSalesAcc?.id || '';
+            creditAccountName = defaultSalesAcc?.name || 'حساب المبيعات';
+          }
+
+          if (!creditAccountId) {
+            hasInvalidItemAcc = true;
+            break;
+          }
 
           journalItems.push({
             id: crypto.randomUUID(),
@@ -324,15 +342,27 @@ export async function backfillMissingJournalEntries(pool: any) {
           });
         }
 
+        if (hasInvalidItemAcc) {
+          console.warn(`[BACKFILL] Missing sales account for items in invoice ${invoiceNumber}, skipping`);
+          await client.query('ROLLBACK');
+          continue;
+        }
+
         // 4. VAT Line (if any)
         const vatTotal = items.reduce((sum, item) => sum + parseFloat(item.vat_amount || '0'), 0);
         if (vatTotal > 0) {
           const vatAccount = accounts.find((a: any) => 
-            a.name.includes('ضريبة القيمة المضافة') || a.name.includes('قيمة مضافة') || a.name.includes('ضريبة مبيعات') ||
-            a.name.toLowerCase().includes('vat') || a.name.toLowerCase().includes('tax')
+            (a.name && (a.name.includes('ضريب') || a.name.includes('مضافة'))) ||
+            a.code === '2221' || a.code === '222' ||
+            (a.name && (a.name.toLowerCase().includes('vat') || a.name.toLowerCase().includes('tax')))
           );
-          const vatAccountId = vatAccount?.id || '';
-          const vatAccountName = vatAccount?.name || 'حساب ضريبة القيمة المضافة';
+          if (!vatAccount?.id) {
+            console.warn(`[BACKFILL] No VAT account found for invoice ${invoiceNumber}, skipping`);
+            await client.query('ROLLBACK');
+            continue;
+          }
+          const vatAccountId = vatAccount.id;
+          const vatAccountName = vatAccount.name || 'حساب ضريبة القيمة المضافة';
           
           journalItems.push({
             id: crypto.randomUUID(),
