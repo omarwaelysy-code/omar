@@ -366,6 +366,7 @@ export async function initDatabase() {
         "name" VARCHAR(100) NOT NULL,
         "code" VARCHAR(50),
         "type" VARCHAR(20) DEFAULT 'cash',
+        "currency" VARCHAR(10) DEFAULT 'EGP',
         "opening_balance" DECIMAL(18, 4) DEFAULT 0,
         "opening_balance_date" DATE,
         "counter_account_id" VARCHAR(36),

@@ -481,7 +481,14 @@ export const IssuedCheques: React.FC = () => {
                           {cheque.bank_name || '-'}
                         </td>
                         <td className="px-3 py-2 font-mono font-black text-slate-900 dark:text-white">
-                          {formatMoney(cheque.amount)} ج.م
+                          <div>
+                            <span>{formatMoney(cheque.amount)} {cheque.currency || 'ج.م'}</span>
+                            {cheque.currency && cheque.currency !== 'EGP' && (
+                              <span className="block text-[10px] font-normal text-emerald-600 dark:text-emerald-400">
+                                ({formatMoney(Number(cheque.amount) * (Number(cheque.exchange_rate) || 1))} ج.م)
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-3 py-2 font-mono text-slate-500">
                           {String(cheque.issue_date).slice(0, 10)}
@@ -655,6 +662,8 @@ export const IssuedCheques: React.FC = () => {
         onClose={() => setSelectedChequeForPay(null)}
         onSuccess={fetchData}
         cheque={selectedChequeForPay}
+        paymentMethods={paymentMethods}
+        accounts={accounts}
       />
 
       <ChequePostponeModal

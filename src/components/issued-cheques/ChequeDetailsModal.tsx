@@ -4,6 +4,7 @@ import {
   RotateCcw, Ban, Paperclip, Printer, ExternalLink, ShieldCheck, ArrowUpRight 
 } from 'lucide-react';
 import { IssuedCheque } from '../../types';
+import { tafqeetAr } from '../../utils/tafqeet';
 
 interface ChequeDetailsModalProps {
   isOpen: boolean;
@@ -29,6 +30,11 @@ export const ChequeDetailsModal: React.FC<ChequeDetailsModalProps> = ({
   onPrint
 }) => {
   if (!isOpen || !cheque) return null;
+
+  const isForeign = cheque.currency && cheque.currency !== 'EGP';
+  const exchangeRate = Number(cheque.exchange_rate) || 1.0;
+  const equivalentEgp = isForeign ? Number(cheque.amount) * exchangeRate : Number(cheque.amount);
+  const tafqeetText = tafqeetAr(Number(cheque.amount) || 0, cheque.currency || 'EGP');
 
   const getStatusBadge = (status: string, isOverdue?: boolean) => {
     if (isOverdue && (status === 'ISSUED' || status === 'POSTPONED')) {
@@ -122,16 +128,34 @@ export const ChequeDetailsModal: React.FC<ChequeDetailsModalProps> = ({
         <div className="p-4 space-y-3 max-h-[75vh] overflow-y-auto">
           
           {/* Main Amount Banner */}
-          <div className="p-3.5 rounded-xl bg-gradient-to-l from-emerald-600 to-teal-700 text-white flex items-center justify-between shadow-md shadow-emerald-600/15">
-            <div>
-              <p className="text-[11px] text-emerald-100 font-medium">مبلغ الشيك الإجمالي</p>
-              <h2 className="text-xl font-black font-mono mt-0.5">
-                {Number(cheque.amount).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} <span className="text-xs font-normal">ج.م</span>
-              </h2>
+          <div className="p-3.5 rounded-xl bg-gradient-to-l from-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-600/15 space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[11px] text-emerald-100 font-medium">مبلغ الشيك المطبوع</p>
+                <h2 className="text-xl font-black font-mono mt-0.5">
+                  {Number(cheque.amount).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} <span className="text-xs font-bold">{cheque.currency || 'ج.م'}</span>
+                </h2>
+                {isForeign && (
+                  <p className="text-[11px] text-emerald-200 font-semibold mt-0.5">
+                    يعادل: {Number(equivalentEgp).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م (سعر الصرف: {exchangeRate})
+                  </p>
+                )}
+              </div>
+              <div className="text-left text-[11px] text-emerald-100 space-y-0.5">
+                <p>تاريخ التحرير: <span className="font-mono font-bold text-white">{String(cheque.issue_date).slice(0, 10)}</span></p>
+                <p>تاريخ الاستحقاق: <span className="font-mono font-bold text-white">{String(cheque.due_date).slice(0, 10)}</span></p>
+              </div>
             </div>
-            <div className="text-left text-[11px] text-emerald-100 space-y-0.5">
-              <p>تاريخ التحرير: <span className="font-mono font-bold text-white">{String(cheque.issue_date).slice(0, 10)}</span></p>
-              <p>تاريخ الاستحقاق: <span className="font-mono font-bold text-white">{String(cheque.due_date).slice(0, 10)}</span></p>
+
+            {/* Tafqeet in words */}
+            <div className="pt-2 border-t border-emerald-500/40 text-xs font-serif font-bold text-emerald-50 leading-relaxed">
+              <span>التفقيط: </span>
+              <span className="text-white font-black">{tafqeetText}</span>
+              {isForeign && (
+                <span className="text-emerald-200 text-[11px] block mt-0.5">
+                  (المعادل بالمصري: {tafqeetAr(equivalentEgp, 'EGP')})
+                </span>
+              )}
             </div>
           </div>
 

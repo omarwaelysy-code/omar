@@ -283,6 +283,7 @@ export interface PaymentMethod {
   code: string;
   name: string;
   type: 'cash' | 'bank' | 'wallet';
+  currency?: string;
   opening_balance: number;
   opening_balance_date?: string;
   account_id?: string;

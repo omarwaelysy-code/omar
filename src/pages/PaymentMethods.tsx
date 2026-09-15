@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Search, Plus, Trash2, X, CreditCard, History, ChevronRight, ChevronLeft, 
   Wallet, Layers, Hash, Box, AlertCircle, Calendar, LayoutGrid, List, FileText, FileUp,
@@ -27,6 +27,7 @@ export const PaymentMethods: React.FC = () => {
   const [receiptVouchers, setReceiptVouchers] = useState<any[]>([]);
   const [paymentVouchers, setPaymentVouchers] = useState<any[]>([]);
   const [cashTransfers, setCashTransfers] = useState<any[]>([]);
+  const [companyCurrencies, setCompanyCurrencies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [view, setView] = useState<'card' | 'table'>('card');
@@ -48,6 +49,7 @@ export const PaymentMethods: React.FC = () => {
     account_id: '',
     counter_account_id: '',
     type: 'cash',
+    currency: 'EGP',
     bank_name: '',
     branch_name: '',
     account_number: '',
@@ -56,6 +58,26 @@ export const PaymentMethods: React.FC = () => {
     contact_person: '',
     contact_phone: ''
   });
+
+  const currencyOptions = useMemo(() => {
+    const defaults = [
+      { code: 'EGP', name: language === 'ar' ? 'الجنيه المصري (EGP)' : 'Egyptian Pound (EGP)' },
+      { code: 'USD', name: language === 'ar' ? 'الدولار الأمريكي (USD)' : 'US Dollar (USD)' },
+      { code: 'EUR', name: language === 'ar' ? 'اليورو الأوروبي (EUR)' : 'Euro (EUR)' },
+      { code: 'SAR', name: language === 'ar' ? 'الريال السعودي (SAR)' : 'Saudi Riyal (SAR)' },
+      { code: 'AED', name: language === 'ar' ? 'الدرهم الإماراتي (AED)' : 'UAE Dirham (AED)' },
+      { code: 'KWD', name: language === 'ar' ? 'الدينار الكويتي (KWD)' : 'Kuwaiti Dinar (KWD)' },
+      { code: 'QAR', name: language === 'ar' ? 'الريال القطري (QAR)' : 'Qatari Riyal (QAR)' },
+      { code: 'BHD', name: language === 'ar' ? 'الدينار البحريني (BHD)' : 'Bahraini Dinar (BHD)' },
+      { code: 'OMR', name: language === 'ar' ? 'الريال العماني (OMR)' : 'Omani Rial (OMR)' },
+      { code: 'JOD', name: language === 'ar' ? 'الدينار الأردني (JOD)' : 'Jordanian Dinar (JOD)' },
+      { code: 'GBP', name: language === 'ar' ? 'الجنيه الإسترليني (GBP)' : 'British Pound (GBP)' },
+    ];
+    const custom = (companyCurrencies || [])
+      .filter((c: any) => c.code && !defaults.some(d => d.code.toUpperCase() === c.code.toUpperCase()))
+      .map((c: any) => ({ code: c.code.toUpperCase(), name: `${c.name || c.code} (${c.code.toUpperCase()})` }));
+    return [...defaults, ...custom];
+  }, [companyCurrencies, language]);
 
   useEffect(() => {
     if (user?.company_id) {
@@ -67,6 +89,7 @@ export const PaymentMethods: React.FC = () => {
       const unsubReceipts = dbService.subscribe<any>('receipt_vouchers', user.company_id, setReceiptVouchers);
       const unsubPayments = dbService.subscribe<any>('payment_vouchers', user.company_id, setPaymentVouchers);
       const unsubTransfers = dbService.subscribe<any>('cash_transfers', user.company_id, setCashTransfers);
+      const unsubCurrencies = dbService.subscribe<any>('currencies', user.company_id, setCompanyCurrencies);
 
       setLoading(false);
       return () => {
@@ -76,6 +99,7 @@ export const PaymentMethods: React.FC = () => {
         unsubReceipts();
         unsubPayments();
         unsubTransfers();
+        unsubCurrencies();
       };
     }
   }, [user?.company_id]);
@@ -280,6 +304,7 @@ export const PaymentMethods: React.FC = () => {
       account_id: defaultCashAccount?.id || '',
       counter_account_id: '',
       type: 'cash',
+      currency: 'EGP',
       bank_name: '',
       branch_name: '',
       account_number: '',
@@ -301,6 +326,7 @@ export const PaymentMethods: React.FC = () => {
         account_id: method.account_id || '',
         counter_account_id: method.counter_account_id || '',
         type: method.type || 'cash',
+        currency: method.currency || 'EGP',
         bank_name: method.bank_name || '',
         branch_name: method.branch_name || '',
         account_number: method.account_number || '',
@@ -501,6 +527,9 @@ export const PaymentMethods: React.FC = () => {
                         <div className="space-y-1">
                            <div className="flex items-center gap-1.5 flex-wrap">
                              <h3 className="text-sm font-bold text-slate-900 line-clamp-1 group-hover:text-indigo-700 transition-colors">{method.name}</h3>
+                             <span className="inline-block px-1.5 py-0.2 bg-emerald-50 text-emerald-700 rounded text-[9px] font-bold border border-emerald-200">
+                               {method.currency || 'EGP'}
+                             </span>
                              {method.type === 'bank' && (
                                <span className="inline-block px-1.5 py-0.2 bg-indigo-50 text-indigo-700 rounded text-[9px] font-bold border border-indigo-100">
                                  {language === 'ar' ? 'بنك' : 'Bank'}
@@ -526,7 +555,7 @@ export const PaymentMethods: React.FC = () => {
                            <div className="flex items-center gap-3">
                              <div>
                                <p className="text-[9px] font-bold text-slate-400 uppercase">{language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}</p>
-                               <p className="font-bold text-xs text-slate-600 tracking-tight leading-none mt-0.5">{formatNumber(method.opening_balance || 0)} <span className="text-[9px] font-normal text-slate-400">{t('invoices.currency')}</span></p>
+                               <p className="font-bold text-xs text-slate-600 tracking-tight leading-none mt-0.5">{formatNumber(method.opening_balance || 0)} <span className="text-[9px] font-normal text-slate-400">{method.currency || t('invoices.currency')}</span></p>
                              </div>
                              <div className="h-6 w-[1px] bg-slate-100" />
                              <div>
@@ -539,7 +568,7 @@ export const PaymentMethods: React.FC = () => {
                                    <p className={`font-black text-sm tracking-tight leading-none mt-0.5 ${
                                      isNegative ? 'text-rose-600' : isPositive ? 'text-emerald-600' : 'text-slate-800'
                                    }`}>
-                                     {formatNumber(currentBal)} <span className="text-[9px] font-normal text-slate-400">{t('invoices.currency')}</span>
+                                     {formatNumber(currentBal)} <span className="text-[9px] font-normal text-slate-400">{method.currency || t('invoices.currency')}</span>
                                    </p>
                                  );
                                })()}
@@ -562,6 +591,7 @@ export const PaymentMethods: React.FC = () => {
                         <tr className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">
                           <th className="px-4 py-2">{language === 'ar' ? 'كود طريقة السداد' : 'Code'}</th>
                           <th className="px-4 py-2">{language === 'ar' ? 'طريقة السداد' : 'Name'}</th>
+                          <th className="px-4 py-2">{language === 'ar' ? 'العملة' : 'Currency'}</th>
                           <th className="px-4 py-2">{language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}</th>
                           <th className="px-4 py-2">{language === 'ar' ? 'الرصيد الحالي' : 'Current Balance'}</th>
                           <th className="px-4 py-2 text-left">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
@@ -570,7 +600,7 @@ export const PaymentMethods: React.FC = () => {
                       <tbody className="divide-y divide-slate-50">
                         {filteredMethods.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="px-4 py-8 text-center text-slate-400 text-xs italic">{language === 'ar' ? 'لا توجد طرق سداد حالياً' : 'No methods found.'}</td>
+                            <td colSpan={6} className="px-4 py-8 text-center text-slate-400 text-xs italic">{language === 'ar' ? 'لا توجد طرق سداد حالياً' : 'No methods found.'}</td>
                           </tr>
                         ) : filteredMethods.map((method) => {
                           const currentBal = getMethodCurrentBalance(method);
@@ -587,13 +617,18 @@ export const PaymentMethods: React.FC = () => {
                               </td>
                               <td className="px-4 py-2 font-bold text-slate-900">{method.name}</td>
                               <td className="px-4 py-2">
-                                <span className="font-bold text-slate-600">{formatNumber(method.opening_balance || 0)} ج.م</span>
+                                <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                  {method.currency || 'EGP'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2">
+                                <span className="font-bold text-slate-600">{formatNumber(method.opening_balance || 0)} {method.currency || 'ج.م'}</span>
                               </td>
                               <td className="px-4 py-2">
                                 <span className={`font-black ${
                                   isNegative ? 'text-rose-600' : isPositive ? 'text-emerald-600' : 'text-slate-800'
                                 }`}>
-                                  {formatNumber(currentBal)} ج.م
+                                  {formatNumber(currentBal)} {method.currency || 'ج.م'}
                                 </span>
                               </td>
                               <td className="px-4 py-2 text-left" onClick={(e) => e.stopPropagation()}>
@@ -662,8 +697,8 @@ export const PaymentMethods: React.FC = () => {
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-4">
                   <form id="method-form" onSubmit={handleSubmit} className="space-y-2.5" dir={dir}>
                      {/* Base Info Section */}
-                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-right">
-                        <div className="sm:col-span-2">
+                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 text-right">
+                        <div className="sm:col-span-2 lg:col-span-2">
                            <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">{language === 'ar' ? 'اسم الطريقة / الخزينة' : 'Method Name'}</label>
                            <input required type="text" placeholder="اسم طريقة السداد" className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
                         </div>
@@ -676,13 +711,23 @@ export const PaymentMethods: React.FC = () => {
                             </select>
                          </div>
                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">{language === 'ar' ? 'عملة الطريقة' : 'Method Currency'}</label>
+                            <select className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs" value={formData.currency || 'EGP'} onChange={(e) => setFormData({ ...formData, currency: e.target.value })}>
+                              {currencyOptions.map(c => (
+                                <option key={c.code} value={c.code}>
+                                  {c.code} - {c.name}
+                                </option>
+                              ))}
+                            </select>
+                         </div>
+                         <div>
                             <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">{language === 'ar' ? 'كود الطريقة' : 'Code'}</label>
                             <div className="relative group">
                               <Hash className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={13} />
                               <input required type="text" placeholder="CASH-01" className="w-full pr-7 pl-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono text-xs font-bold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 shadow-xs" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} />
                             </div>
                          </div>
-                         <div className="sm:col-span-2 lg:col-span-4">
+                         <div className="sm:col-span-2 lg:col-span-5">
                             <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">{language === 'ar' ? 'الحساب المحاسبي' : 'Linked Account'}</label>
                             <div className="relative group">
                               <Box className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={13} />

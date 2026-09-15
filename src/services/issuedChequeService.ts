@@ -105,12 +105,12 @@ export const issuedChequeService = {
   /**
    * Pay / Cash Cheque from Bank (ISSUED / POSTPONED -> PAID) + Journal Entry
    */
-  async payCheque(id: string, paymentDate?: string, notes?: string): Promise<{ success: boolean; message: string; journal_entry_id?: string }> {
+  async payCheque(id: string, paymentDate?: string, notes?: string, bankAccountId?: string): Promise<{ success: boolean; message: string; journal_entry_id?: string }> {
     const headers = getAuthHeaders();
     const res = await fetch(`/api/erp/issued-cheques/${id}/pay`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ payment_date: paymentDate, notes })
+      body: JSON.stringify({ payment_date: paymentDate, notes, bank_account_id: bankAccountId })
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

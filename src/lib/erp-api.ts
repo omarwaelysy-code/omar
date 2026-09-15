@@ -3428,13 +3428,15 @@ const chequeIssueHandler = async (req: AuthRequest, res: any) => {
       }
     }
 
-    const amount = Number(cheque.amount);
+    const rate = Number(cheque.exchange_rate) || 1.0;
+    const isForeign = cheque.currency && cheque.currency !== 'EGP';
+    const amount = isForeign ? Number(cheque.amount) * rate : Number(cheque.amount);
     const issueDateStr = parseToStandardDateStr(cheque.issue_date) || new Date().toISOString().slice(0, 10);
     const dueDateStr = parseToStandardDateStr(cheque.due_date) || issueDateStr;
 
     const jeId = await createChequeJournalEntry(client, companyId, {
       date: issueDateStr,
-      description: `قيد إصدار شيك رقم: ${cheque.cheque_number} للمورد: ${supplier?.name || cheque.payee_name || ''}`,
+      description: `قيد إصدار شيك رقم: ${cheque.cheque_number} للمورد: ${supplier?.name || cheque.payee_name || ''}${isForeign ? ` (${cheque.amount} ${cheque.currency})` : ''}`,
       reference_id: cheque.id,
       reference_type: 'issued_cheque',
       reference_number: cheque.cheque_number,
@@ -3512,7 +3514,7 @@ const chequePayHandler = async (req: AuthRequest, res: any) => {
     }
     const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
     const { id } = req.params;
-    const { payment_date, notes } = req.body;
+    const { payment_date, notes, bank_account_id } = req.body;
 
     const chequeQuery = isSuperAdmin
       ? `SELECT * FROM issued_cheques WHERE id = $1 FOR UPDATE`
@@ -3539,8 +3541,9 @@ const chequePayHandler = async (req: AuthRequest, res: any) => {
       return sendError(res, 400, `لا يمكن صرف هذا الشيك لأن حالته الحالية هي (${cheque.status}). يجب أن يكون صادراً أولاً.`);
     }
 
-    // Fetch Bank Method and Accounts
-    const { rows: pmRows } = await client.query(`SELECT * FROM payment_methods WHERE id = $1`, [cheque.bank_account_id]);
+    // Resolve Target Bank / Cash Method and Accounts
+    const targetBankAccId = bank_account_id || cheque.bank_account_id;
+    const { rows: pmRows } = await client.query(`SELECT * FROM payment_methods WHERE id = $1`, [targetBankAccId]);
     const { rows: accRows } = await client.query(`SELECT * FROM accounts WHERE company_id = $1`, [companyId]);
 
     const pm = pmRows[0] || null;
@@ -3548,9 +3551,15 @@ const chequePayHandler = async (req: AuthRequest, res: any) => {
     let bankAccName = pm?.account_name || pm?.name || 'حساب البنك';
 
     if (!bankAccId) {
-      const defBankAcc = accRows.find((a: any) => a.account_usage === 'bank' || a.code === '110103');
-      bankAccId = defBankAcc?.id;
-      bankAccName = defBankAcc?.name || bankAccName;
+      const directAcc = accRows.find((a: any) => a.id === targetBankAccId);
+      if (directAcc) {
+        bankAccId = directAcc.id;
+        bankAccName = directAcc.name;
+      } else {
+        const defBankAcc = accRows.find((a: any) => a.account_usage === 'bank' || a.code === '110103');
+        bankAccId = defBankAcc?.id;
+        bankAccName = defBankAcc?.name || bankAccName;
+      }
     }
 
     let notesPayableAccId = '';
@@ -3571,12 +3580,14 @@ const chequePayHandler = async (req: AuthRequest, res: any) => {
       }
     }
 
-    const amount = Number(cheque.amount);
+    const rate = Number(cheque.exchange_rate) || 1.0;
+    const isForeign = cheque.currency && cheque.currency !== 'EGP';
+    const amount = isForeign ? Number(cheque.amount) * rate : Number(cheque.amount);
     const payDate = parseToStandardDateStr(payment_date) || new Date().toISOString().slice(0, 10);
 
     const jeId = await createChequeJournalEntry(client, companyId, {
       date: payDate,
-      description: `قيد صرف وسداد شيك رقم: ${cheque.cheque_number} من بنك: ${pm?.name || cheque.bank_name || ''}`,
+      description: `قيد صرف وسداد شيك رقم: ${cheque.cheque_number} من: ${pm?.name || bankAccName}${isForeign ? ` (${cheque.amount} ${cheque.currency})` : ''}`,
       reference_id: cheque.id,
       reference_type: 'cheque_payment',
       reference_number: cheque.cheque_number,
@@ -3589,7 +3600,7 @@ const chequePayHandler = async (req: AuthRequest, res: any) => {
           account_name: notesPayableAccName,
           debit: amount,
           credit: 0,
-          description: `تسوية وصرف شيك رقم ${cheque.cheque_number} من بنك ${pm?.name || cheque.bank_name || ''}`,
+          description: `تسوية وصرف شيك رقم ${cheque.cheque_number} من ${pm?.name || bankAccName}${isForeign ? ` (${cheque.amount} ${cheque.currency})` : ''}`,
           supplier_id: cheque.supplier_id,
           supplier_name: cheque.supplier_name || cheque.payee_name
         },
@@ -3598,18 +3609,18 @@ const chequePayHandler = async (req: AuthRequest, res: any) => {
           account_name: bankAccName,
           debit: 0,
           credit: amount,
-          description: `خصم قيمة الشيك رقم ${cheque.cheque_number} من الحساب البنكي ${pm?.name || ''}`,
-          sub_account_id: pm?.id,
-          sub_account_type: 'payment_method'
+          description: `خصم قيمة الشيك رقم ${cheque.cheque_number} من ${pm?.name || bankAccName}`,
+          sub_account_id: pm?.id || null,
+          sub_account_type: pm ? 'payment_method' : undefined
         }
       ]
     });
 
     await client.query(
       `UPDATE issued_cheques 
-       SET status = 'PAID', payment_date = $1, payment_journal_entry_id = $2, notes = COALESCE($3, notes), updated_by = $4, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $5`,
-      [payDate, jeId, notes || null, req.user?.id || null, id]
+       SET status = 'PAID', payment_date = $1, payment_journal_entry_id = $2, bank_account_id = COALESCE($3, bank_account_id), bank_name = COALESCE($4, bank_name), notes = COALESCE($5, notes), updated_by = $6, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $7`,
+      [payDate, jeId, pm?.id || bankAccId, pm?.name || bankAccName, notes || null, req.user?.id || null, id]
     );
 
     await client.query('COMMIT');
