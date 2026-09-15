@@ -54,6 +54,7 @@ const Receipts = React.lazy(() => import('./pages/Receipts').then(m => ({ defaul
 const PaymentVouchers = React.lazy(() => import('./pages/PaymentVouchers').then(m => ({ default: m.PaymentVouchers })));
 const SupplierPaymentVouchers = React.lazy(() => import('./pages/SupplierPaymentVouchers').then(m => ({ default: m.SupplierPaymentVouchers })));
 const IssuedCheques = React.lazy(() => import('./pages/IssuedCheques').then(m => ({ default: m.IssuedCheques })));
+const EgyptianBanks = React.lazy(() => import('./pages/EgyptianBanks').then(m => ({ default: m.EgyptianBanks })));
 const Returns = React.lazy(() => import('./pages/Returns').then(m => ({ default: m.Returns })));
 const PurchaseReturns = React.lazy(() => import('./pages/PurchaseReturns').then(m => ({ default: m.PurchaseReturns })));
 const GeneralStockMovementsReport = React.lazy(() => import('./pages/GeneralStockMovementsReport').then(m => ({ default: m.GeneralStockMovementsReport })));
@@ -240,6 +241,7 @@ export default function App() {
       case 'payment_vouchers': return <PaymentVouchers />;
       case 'supplier_payment_vouchers': return <SupplierPaymentVouchers />;
       case 'issued_cheques': return <IssuedCheques />;
+      case 'egyptian_banks': return <EgyptianBanks />;
       case 'returns': return <Returns />;
       case 'purchase_returns': return <PurchaseReturns />;
       case 'customer_discounts': return <CustomerDiscounts />;

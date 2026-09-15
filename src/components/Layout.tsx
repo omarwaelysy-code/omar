@@ -612,16 +612,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         subItems: [
           { id: 'receipts', label: t('nav.receipts'), icon: Receipt },
           { id: 'payment_vouchers', label: t('nav.payment_vouchers'), icon: CreditCard },
-          { id: 'issued_cheques', label: language === 'ar' ? 'الشيكات الصادرة' : 'Issued Cheques', icon: Landmark },
-          { id: 'cash_transfers', label: t('nav.cash_transfers'), icon: ArrowLeftRight }
+          { id: 'issued_cheques', label: language === 'ar' ? 'الشيكات' : 'Cheques', icon: Landmark },
+          { id: 'cash_transfers', label: t('nav.cash_transfers'), icon: ArrowLeftRight },
+          { id: 'egyptian_banks', label: language === 'ar' ? 'دليل البنوك المصرية' : 'Egyptian Banks Directory', icon: Building2 }
         ]
       },
       {
         id: 'issued_cheques_menu',
-        label: language === 'ar' ? 'الشيكات الصادرة' : 'Issued Cheques',
+        label: language === 'ar' ? 'الشيكات' : 'Cheques',
         icon: Landmark,
         subItems: [
-          { id: 'issued_cheques', label: language === 'ar' ? 'إدارة الشيكات الصادرة' : 'Issued Cheques Management', icon: Landmark }
+          { id: 'issued_cheques', label: language === 'ar' ? 'إدارة الشيكات' : 'Cheques Management', icon: Landmark },
+          { id: 'egyptian_banks', label: language === 'ar' ? 'دليل البنوك المصرية' : 'Egyptian Banks Directory', icon: Building2 }
         ]
       },
       {

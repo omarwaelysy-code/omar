@@ -285,7 +285,8 @@ export const MODULE_PERMISSIONS_META: { [moduleId: string]: { labelAr: string; l
   supplier_payment_vouchers: { labelAr: 'سند صرف مورد', labelEn: 'Supplier Payment Vouchers', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved'] },
   cash_transfers: { labelAr: 'حوالات الخزينة', labelEn: 'Cash Transfers', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'edit_approved', 'delete_approved'] },
   cash_balances: { labelAr: 'أرصدة النقدية والخزائن', labelEn: 'Cash Balances', hasCrud: true },
-  issued_cheques: { labelAr: 'الشيكات الصادرة', labelEn: 'Issued Cheques', hasCrud: true, special: ['issue', 'pay', 'postpone', 'cancel', 'return', 'print', 'export_pdf', 'export_excel'] },
+  issued_cheques: { labelAr: 'الشيكات', labelEn: 'Cheques', hasCrud: true, special: ['issue', 'pay', 'postpone', 'cancel', 'return', 'print', 'export_pdf', 'export_excel'] },
+  egyptian_banks: { labelAr: 'دليل البنوك المصرية', labelEn: 'Egyptian Banks Directory', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
   // GL
   account_types: { labelAr: 'أنواع الحسابات', labelEn: 'Account Types', hasCrud: true },
   accounts: { labelAr: 'دليل الحسابات', labelEn: 'Accounts', hasCrud: true },
