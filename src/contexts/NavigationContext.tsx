@@ -125,6 +125,7 @@ export const pageLabels: { [key: string]: string } = {
   'detailed_journal_entries': 'دفتر اليومية المفصل',
   'integrity_dashboard': 'فحص سلامة البيانات',
   'currencies': 'العملات',
+  'currency_management': 'إدارة العملات',
   'operation_categories': 'فئات العمليات',
   'operation_fields': 'حقول العمليات',
   'operations': 'العمليات',

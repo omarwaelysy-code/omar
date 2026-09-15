@@ -8,6 +8,7 @@ import { IssuedCheque, Supplier, PaymentMethod, IssuedChequeAttachment, Account 
 import { issuedChequeService } from '../../services/issuedChequeService';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { tafqeetAr } from '../../utils/tafqeet';
 
 interface ChequeFormModalProps {
@@ -44,6 +45,8 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
 }) => {
   const { showSuccess, showError } = useNotification();
   const { user } = useAuth();
+  const { language } = useLanguage();
+  const isAr = language === 'ar';
 
   const [chequeNumber, setChequeNumber] = useState('');
   const [supplierId, setSupplierId] = useState('');
@@ -424,29 +427,73 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
           {/* Inner Security Hairline Frame */}
           <div className="absolute inset-2 sm:inset-3 border border-emerald-900/15 dark:border-emerald-500/20 rounded-xl pointer-events-none" />
 
-          {/* Optional Crossing Lines "//" & "غير قابل للتداول" Stamp (Image 1 replica) */}
+          {/* Optional Crossing Lines "//" Stamp */}
           {isCrossed && (
-            <div className="absolute top-2 left-2 sm:top-4 sm:left-4 z-10 pointer-events-none select-none">
-              {/* Dual diagonal crossing lines */}
-              <div className="w-20 h-16 relative">
-                <div className="absolute w-[2px] h-20 bg-slate-800 dark:bg-slate-300 rotate-45 top-[-10px] left-5 opacity-80" />
-                <div className="absolute w-[2px] h-20 bg-slate-800 dark:bg-slate-300 rotate-45 top-[-10px] left-9 opacity-80" />
-              </div>
-              {/* Not Negotiable Stamp Box */}
-              <div className="mt-[-15px] px-2.5 py-1 border-2 border-slate-800 dark:border-slate-300 rounded font-black text-[11px] text-slate-800 dark:text-slate-200 tracking-wider bg-white/80 dark:bg-slate-900/80 shadow-xs">
-                غير قابل للتداول
+            <div className="absolute top-2 left-2 sm:top-3 sm:left-4 z-10 pointer-events-none select-none">
+              <div className="w-16 h-12 relative">
+                <div className="absolute w-[2px] h-14 bg-slate-700 dark:bg-slate-300 rotate-45 top-[-4px] left-3 opacity-80" />
+                <div className="absolute w-[2px] h-14 bg-slate-700 dark:bg-slate-300 rotate-45 top-[-4px] left-6 opacity-80" />
               </div>
             </div>
           )}
 
           <div className="relative z-10 space-y-4 sm:space-y-5">
             
-            {/* 1. CHEQUE HEADER BAR: Bank Logo & Name | Cheque Title | Cheque No & Dates */}
+            {/* 1. CHEQUE HEADER BAR: Cheque No & Due Date (Right) | Bank Details (Left) */}
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-emerald-900/20 dark:border-emerald-700/30 pb-3">
               
-              {/* Left/Right Header in RTL: Bank Selection & Details */}
+              {/* Header Right in RTL: Cheque Number & Due Date Slots + Crossing Toggle */}
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Due Date Box (تاريخ الاستحقاق والصرف / DATE) */}
+                <div className="bg-white dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 shadow-inner">
+                  <div className="flex items-center justify-between gap-2 text-[9px] font-bold text-slate-400">
+                    <span>تاريخ الاستحقاق</span>
+                    <span className="font-sans uppercase">DATE</span>
+                  </div>
+                  <input
+                    type="date"
+                    required
+                    value={dueDate}
+                    onChange={e => setDueDate(e.target.value)}
+                    className="bg-transparent text-slate-900 dark:text-white font-mono font-bold text-xs outline-none cursor-pointer"
+                  />
+                </div>
+
+                {/* Cheque Number Slot */}
+                <div className="bg-white dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 shadow-inner">
+                  <div className="flex items-center justify-between gap-2 text-[9px] font-bold text-slate-400">
+                    <span>شيك رقم</span>
+                    <span className="font-sans uppercase">CHEQUE NO.</span>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    placeholder="000128507578"
+                    value={chequeNumber}
+                    onChange={e => setChequeNumber(e.target.value)}
+                    className="w-32 bg-transparent text-slate-900 dark:text-white font-mono font-black text-xs outline-none tracking-widest"
+                  />
+                </div>
+
+                {/* Crossed Check Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setIsCrossed(!isCrossed)}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1.5 ${
+                    isCrossed 
+                      ? 'bg-slate-800 text-white border-slate-900 shadow-xs' 
+                      : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                  }`}
+                  title="تفعيل أو إلغاء تسطير الشيك"
+                >
+                  <Stamp className="w-3 h-3" />
+                  <span>{isCrossed ? 'تسطير: غير قابل للتداول ✓' : 'بدون تسطير'}</span>
+                </button>
+              </div>
+
+              {/* Header Left in RTL: Bank Selection & Details */}
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-emerald-700/10 text-emerald-800 dark:text-emerald-400 flex items-center justify-center text-2xl border border-emerald-700/20">
+                <div className="w-11 h-11 rounded-xl bg-emerald-700/10 text-emerald-800 dark:text-emerald-400 flex items-center justify-center text-xl border border-emerald-700/20">
                   🏦
                 </div>
                 <div>
@@ -464,63 +511,22 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                 </div>
               </div>
 
-              {/* Header Right: Cheque Number & Due Date Slots */}
-              <div className="flex flex-wrap items-center gap-3">
-                {/* Crossed Check Toggle */}
-                <button
-                  type="button"
-                  onClick={() => setIsCrossed(!isCrossed)}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1.5 ${
-                    isCrossed 
-                      ? 'bg-slate-800 text-white border-slate-900 shadow-xs' 
-                      : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
-                  }`}
-                  title="تفعيل أو إلغاء تسطير الشيك"
-                >
-                  <Stamp className="w-3 h-3" />
-                  <span>{isCrossed ? 'تسطير: غير قابل للتداول ✓' : 'بدون تسطير'}</span>
-                </button>
-
-                {/* Cheque Number Slot */}
-                <div className="bg-white dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 shadow-inner">
-                  <span className="text-[9px] font-bold text-slate-400 block uppercase">شيك رقم / CHEQUE NO.</span>
-                  <input
-                    type="text"
-                    required
-                    placeholder="مثال: 000128507578"
-                    value={chequeNumber}
-                    onChange={e => setChequeNumber(e.target.value)}
-                    className="w-32 bg-transparent text-slate-900 dark:text-white font-mono font-black text-xs outline-none tracking-widest"
-                  />
-                </div>
-
-                {/* Due Date Box (تاريخ الاستحقاق والصرف / DUE DATE) */}
-                <div className="bg-white dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 shadow-inner">
-                  <span className="text-[9px] font-bold text-slate-400 block">تاريخ الاستحقاق / DATE</span>
-                  <input
-                    type="date"
-                    required
-                    value={dueDate}
-                    onChange={e => setDueDate(e.target.value)}
-                    className="bg-transparent text-slate-900 dark:text-white font-mono font-bold text-xs outline-none"
-                  />
-                </div>
-              </div>
             </div>
 
             {/* 2. CHEQUE BODY LINES */}
             <div className="space-y-4 pt-1">
               
-              {/* Row: Pay to the Order of (ادفعوا بموجب هذا الشيك لأمر) */}
-              <div className="flex flex-col sm:flex-row sm:items-baseline gap-2">
+              {/* Row 1: Pay to the Order of (ادفعوا بموجب هذا الشيك لأمر) */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                {/* Right: Arabic Label */}
                 <span className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-200 whitespace-nowrap font-serif">
                   ادفعوا بموجب هذا الشيك لأمر:
-                  <span className="text-[10px] block text-slate-400 font-sans font-normal">Against this cheque pay to the order of</span>
                 </span>
                 
+                {/* Middle: Payee inputs */}
                 <div className="flex-1 flex flex-col sm:flex-row items-center gap-2">
                   {/* Supplier Select */}
-                  <div className="w-full sm:w-1/3">
+                  <div className="w-full sm:w-2/5">
                     <select
                       required
                       value={supplierId}
@@ -537,7 +543,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                   </div>
 
                   {/* Beneficiary Name on Cheque (Drawn line) */}
-                  <div className="w-full sm:w-2/3 relative">
+                  <div className="w-full sm:w-3/5 relative">
                     <input
                       type="text"
                       placeholder="اسم المستفيد المكتوب نصاً على الشيك..."
@@ -547,39 +553,27 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                     />
                   </div>
                 </div>
+
+                {/* Left: English Translation */}
+                <div className="hidden sm:block text-left text-[10px] text-slate-400 font-sans font-medium whitespace-nowrap leading-tight shrink-0 select-none">
+                  <div>Against This Cheque</div>
+                  <div>Pay to the order of</div>
+                </div>
               </div>
 
-              {/* Row: The Sum of (مبلغاً وقدره) & Amount Box */}
+              {/* Row 2: The Sum of (مبلغاً وقدره) & Amount Box */}
               <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pt-1">
                 
-                {/* The Sum of (Tafqeet) */}
-                <div className="flex-1 w-full space-y-1">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-200 whitespace-nowrap font-serif">
-                      مبلغاً وقدره:
-                      <span className="text-[10px] block text-slate-400 font-sans font-normal">The sum of</span>
-                    </span>
-                    <div className="flex-1 border-b-2 border-slate-700 dark:border-slate-400 px-2 py-1 min-h-[34px] flex items-center">
-                      <span className="text-xs sm:text-sm font-black text-emerald-950 dark:text-emerald-200 font-serif leading-relaxed">
-                        {tafqeetWords}
-                      </span>
-                    </div>
-                  </div>
+                {/* Right in RTL: "مبلغاً وقدره:" + Amount Box */}
+                <div className="flex items-center gap-2.5 shrink-0">
+                  <span className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-200 whitespace-nowrap font-serif">
+                    مبلغاً وقدره:
+                  </span>
 
-                  {/* If foreign currency, show the Egyptian Pound Equivalent Tafqeet */}
-                  {isForeign && (
-                    <div className="pr-16 text-[11px] text-emerald-700 dark:text-emerald-400 font-bold">
-                      المعادل بالمصري: <span className="underline decoration-emerald-500/50">{egpTafqeetWords}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Amount Box (Image replica: # 500,000.89 (ج.م) EGP #) */}
-                <div className="w-full lg:w-auto flex items-center justify-end">
-                  <div className="bg-white dark:bg-slate-800 border-2 border-slate-900 dark:border-slate-500 rounded-xl p-2 shadow-md flex items-center gap-2">
-                    
+                  {/* Amount Box (# 500,000.89 (ج.م) EGP #) */}
+                  <div className="bg-white dark:bg-slate-800 border-2 border-slate-900 dark:border-slate-500 rounded-xl p-1.5 shadow-md flex items-center gap-2">
                     {/* Fixed currency badge from payment method - non-editable */}
-                    <div className="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-xs font-black text-emerald-800 dark:text-emerald-300 select-none">
+                    <div className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-xs font-black text-emerald-800 dark:text-emerald-300 select-none">
                       {currency === 'EGP' ? '(ج.م) EGP' : currency}
                     </div>
 
@@ -594,11 +588,32 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                       value={amount}
                       onChange={handleAmountChange}
                       onBlur={handleAmountBlur}
-                      className="w-36 sm:w-44 text-left px-2 py-0.5 bg-transparent font-mono font-black text-base sm:text-lg text-slate-900 dark:text-white outline-none tracking-tight [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className="w-32 sm:w-40 text-left px-1.5 py-0.5 bg-transparent font-mono font-black text-base sm:text-lg text-slate-900 dark:text-white outline-none tracking-tight [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
 
                     <span className="text-sm font-mono font-black text-slate-400">#</span>
                   </div>
+                </div>
+
+                {/* Middle in RTL: Tafqeet Line */}
+                <div className="flex-1 w-full space-y-1">
+                  <div className="border-b-2 border-slate-700 dark:border-slate-400 px-2 py-1 min-h-[38px] flex items-center">
+                    <span className="text-xs sm:text-sm font-black text-emerald-950 dark:text-emerald-200 font-serif leading-relaxed">
+                      {tafqeetWords}
+                    </span>
+                  </div>
+
+                  {/* If foreign currency, show the Egyptian Pound Equivalent Tafqeet */}
+                  {isForeign && (
+                    <div className="pr-2 text-[11px] text-emerald-700 dark:text-emerald-400 font-bold">
+                      المعادل بالمصري: <span className="underline decoration-emerald-500/50">{egpTafqeetWords}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Left in RTL: English Translation */}
+                <div className="hidden sm:block text-left text-[11px] sm:text-xs text-slate-400 font-sans font-medium whitespace-nowrap shrink-0 select-none">
+                  The sum of
                 </div>
 
               </div>
@@ -648,6 +663,52 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* 4. CHEQUE BOTTOM ROW: Crossing Stamp (Right) | Cheque Notice (Center) | Signatory & Signature (Left) */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-3 border-t border-emerald-900/10 dark:border-emerald-700/20">
+                {/* Right in RTL: Crossing Stamp Box */}
+                <div className="min-w-[140px]">
+                  {isCrossed ? (
+                    <div className="inline-block px-3 py-1 border-2 border-slate-800 dark:border-slate-300 rounded font-black text-xs text-slate-800 dark:text-slate-200 tracking-wider bg-white/80 dark:bg-slate-900/80 shadow-xs select-none">
+                      غير قابل للتداول
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 font-medium">شيك قابل للصرف المباشر</span>
+                  )}
+                </div>
+
+                {/* Center: Cheque Warning Note */}
+                <div className="text-[10px] text-slate-400 font-medium text-center select-none">
+                  (( نرجو عدم الكتابة أو وضع أختام على هذا الجزء أو خلفه ))
+                </div>
+
+                {/* Left in RTL: Signatory & Signature */}
+                <div className="flex items-center gap-4 text-left sm:text-left shrink-0">
+                  <div className="text-right sm:text-right">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
+                      <span>اسم الموقع</span>
+                      <span className="font-sans font-normal text-[9px]">/ Signatory Name</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={signatoryName}
+                      onChange={e => setSignatoryName(e.target.value)}
+                      placeholder="المفوض بالتوقيع"
+                      className="bg-transparent border-b border-dashed border-slate-400 dark:border-slate-500 text-xs font-black text-slate-800 dark:text-slate-200 py-0.5 outline-none w-32"
+                    />
+                  </div>
+
+                  <div className="text-right sm:text-right">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
+                      <span>التوقيع</span>
+                      <span className="font-sans font-normal text-[9px]">/ Signature</span>
+                    </div>
+                    <div className="w-24 h-6 border-b-2 border-slate-700 dark:border-slate-400 flex items-center justify-center text-slate-400 text-xs font-serif italic">
+                      ✓ معتمد
+                    </div>
+                  </div>
+                </div>
+              </div>
 
             </div>
 
