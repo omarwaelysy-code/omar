@@ -622,8 +622,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         label: language === 'ar' ? 'الشيكات' : 'Cheques',
         icon: Landmark,
         subItems: [
-          { id: 'issued_cheques', label: language === 'ar' ? 'إدارة الشيكات' : 'Cheques Management', icon: Landmark },
-          { id: 'egyptian_banks', label: language === 'ar' ? 'دليل البنوك المصرية' : 'Egyptian Banks Directory', icon: Building2 }
+          { id: 'issued_cheques', label: language === 'ar' ? 'إدارة الشيكات' : 'Cheques Management', icon: Landmark }
         ]
       },
       {

@@ -250,30 +250,17 @@ export const IssuedCheques: React.FC = () => {
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => {
-              const event = new CustomEvent('navigate-to', { detail: { page: 'egyptian_banks' } });
-              window.dispatchEvent(event);
-            }}
-            className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center gap-2 transition-all shadow-xs"
-          >
-            <Building2 className="w-4 h-4 text-emerald-600" />
-            <span>دليل البنوك المصرية</span>
-          </button>
-          
-          <button
-            onClick={() => {
-              setSelectedChequeForEdit(null);
-              setActiveTab('create');
-            }}
-            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99]"
-          >
-            <Plus className="w-4 h-4" />
-            <span>تحرير شيك جديد</span>
-          </button>
-        </div>
+        {/* Primary Action Button */}
+        <button
+          onClick={() => {
+            setSelectedChequeForEdit(null);
+            setActiveTab('create');
+          }}
+          className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99]"
+        >
+          <Plus className="w-4 h-4" />
+          <span>تحرير شيك جديد</span>
+        </button>
       </div>
 
       {/* Main Navigation Tabs - Compact */}

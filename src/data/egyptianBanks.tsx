@@ -13,6 +13,7 @@ export interface EgyptianBank {
   categoryEn: string;
   hotline: string;
   website: string;
+  logoUrl?: string;
   foundedYear?: number;
   branchesCount?: string;
   notes?: string;
@@ -582,194 +583,102 @@ export const EGYPTIAN_BANKS_DATA: EgyptianBank[] = [
 ];
 
 /**
- * Bank Logo Visual Badges Component (High resolution SVG vectors with official brand tokens)
+ * Official verified brand logo mappings for all 35 Egyptian banks
  */
-export const BankLogoBadge: React.FC<{ bank: EgyptianBank; size?: 'sm' | 'md' | 'lg' }> = ({
+export const BANK_LOGO_MAP: Record<string, string> = {
+  NBE: '/banks/NBE.svg',
+  BM: '/banks/BM.svg',
+  BDC: '/banks/BDC.svg',
+  BOA: '/banks/BOA.svg',
+  CIB: '/banks/CIB.svg',
+  QNB: '/banks/QNB.svg',
+  AAIB: '/banks/AAIB.png',
+  EGB: '/banks/EGB.png',
+  SAIB: '/banks/SAIB.jpg',
+  ARAB: '/banks/ARAB.svg',
+  EBE: '/banks/EBE.jpg',
+  AIB: '/banks/AIB.png',
+  FIBE: '/banks/FIBE.png',
+  ABRK: '/banks/ABRK.svg',
+  AWE: '/banks/AWE.png',
+  ADIB: '/banks/ADIB.png',
+  ABK: '/banks/ABK.svg',
+  HDB: '/banks/HDB.png',
+  NBK: '/banks/NBK.svg',
+  EALB: '/banks/EALB.png',
+  SCB: '/banks/SCB.png',
+  UBE: '/banks/UBE.png',
+  AUB: '/banks/AUB.png',
+  HSBC: '/banks/HSBC.svg',
+  ADCB: '/banks/ADCB.svg',
+  FAB: '/banks/FAB.svg',
+  CITI: '/banks/CITI.svg',
+  CAE: '/banks/CAE.svg',
+  MASHREQ: '/banks/MASHREQ.png',
+  ENBD: '/banks/ENBD.jpg',
+  NXT: '/banks/NXT.png',
+  ABC: '/banks/ABC.svg',
+  MIDB: '/banks/MIDB.png',
+  IDB: '/banks/IDB.webp',
+  ABE: '/banks/ABE.png',
+};
+
+// Ensure all bank records have their official logo URL populated
+EGYPTIAN_BANKS_DATA.forEach(bank => {
+  if (!bank.logoUrl && BANK_LOGO_MAP[bank.code]) {
+    bank.logoUrl = BANK_LOGO_MAP[bank.code];
+  }
+});
+
+/**
+ * Official Bank Logo Component
+ * Renders the authentic official corporate logo with fallback to brand color monogram
+ */
+export const BankLogoBadge: React.FC<{ 
+  bank: EgyptianBank; 
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  className?: string;
+}> = ({
   bank,
-  size = 'md'
+  size = 'md',
+  className = ''
 }) => {
+  const [imgError, setImgError] = React.useState(false);
+
   const dims = {
-    sm: 'w-8 h-8 text-[9px]',
-    md: 'w-11 h-11 text-xs',
-    lg: 'w-14 h-14 text-sm'
+    sm: 'w-9 h-9 p-1',
+    md: 'w-12 h-12 p-1.5',
+    lg: 'w-16 h-16 p-2',
+    xl: 'w-20 h-20 p-2.5',
   }[size];
 
-  // Unique recognizable visual icon per bank
-  const renderIcon = () => {
-    switch (bank.code) {
-      case 'NBE':
-        return (
-          <svg viewBox="0 0 36 36" className="w-full h-full" fill="none">
-            <rect width="36" height="36" rx="8" fill="#008244" />
-            <circle cx="18" cy="18" r="11" stroke="#DAA520" strokeWidth="2.2" />
-            <path d="M12 18h12M18 12v12" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" />
-            <circle cx="18" cy="18" r="3.5" fill="#DAA520" />
-          </svg>
-        );
-      case 'BM':
-        return (
-          <svg viewBox="0 0 36 36" className="w-full h-full" fill="none">
-            <rect width="36" height="36" rx="8" fill="#9B2735" />
-            <circle cx="18" cy="18" r="10" stroke="#D4AF37" strokeWidth="2" />
-            <path d="M13 14l5-4 5 4v9h-10v-9z" fill="#D4AF37" />
-            <circle cx="18" cy="14" r="2" fill="#9B2735" />
-          </svg>
-        );
-      case 'CIB':
-        return (
-          <svg viewBox="0 0 36 36" className="w-full h-full" fill="none">
-            <rect width="36" height="36" rx="8" fill="#004B87" />
-            <path d="M9 18a9 9 0 0 1 9-9" stroke="#F58220" strokeWidth="3.5" strokeLinecap="round" />
-            <text x="18" y="23" fill="#FFFFFF" fontSize="9.5" fontWeight="900" textAnchor="middle" fontFamily="sans-serif">CIB</text>
-          </svg>
-        );
-      case 'BDC':
-        return (
-          <svg viewBox="0 0 36 36" className="w-full h-full" fill="none">
-            <rect width="36" height="36" rx="8" fill="#005A9C" />
-            <polygon points="18,8 28,26 8,26" fill="#E6A100" opacity="0.95" />
-            <polygon points="18,14 24,25 12,25" fill="#005A9C" />
-          </svg>
-        );
-      case 'BOA':
-        return (
-          <svg viewBox="0 0 36 36" className="w-full h-full" fill="none">
-            <rect width="36" height="36" rx="8" fill="#E30613" />
-            <rect x="8" y="15" width="20" height="6" rx="2" fill="#FFFFFF" />
-            <rect x="15" y="8" width="6" height="20" rx="2" fill="#FFFFFF" />
-          </svg>
-        );
-      case 'QNB':
-        return (
-          <svg viewBox="0 0 36 36" className="w-full h-full" fill="none">
-            <rect width="36" height="36" rx="8" fill="#800020" />
-            <circle cx="18" cy="18" r="10" stroke="#FFFFFF" strokeWidth="2.5" />
-            <text x="18" y="22" fill="#FFFFFF" fontSize="8.5" fontWeight="900" textAnchor="middle">QNB</text>
-          </svg>
-        );
-      case 'HSBC':
-        return (
-          <svg viewBox="0 0 36 36" className="w-full h-full" fill="none">
-            <rect width="36" height="36" rx="8" fill="#FFFFFF" stroke="#E2E8F0" />
-            <rect x="12" y="12" width="12" height="12" fill="#DB0011" />
-            <polygon points="6,18 12,12 12,24" fill="#DB0011" />
-            <polygon points="30,18 24,12 24,24" fill="#DB0011" />
-            <polygon points="18,6 12,12 24,12" fill="#FFFFFF" stroke="#DB0011" />
-            <polygon points="18,30 12,24 24,24" fill="#FFFFFF" stroke="#DB0011" />
-          </svg>
-        );
-      case 'ADIB':
-        return (
-          <svg viewBox="0 0 36 36" className="w-full h-full" fill="none">
-            <rect width="36" height="36" rx="8" fill="#008A90" />
-            <path d="M10 24C10 14 18 10 26 10" stroke="#C59B27" strokeWidth="3" strokeLinecap="round" />
-            <path d="M10 26C16 26 22 22 26 16" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" />
-          </svg>
-        );
-      case 'FIBE':
-        return (
-          <svg viewBox="0 0 36 36" className="w-full h-full" fill="none">
-            <rect width="36" height="36" rx="8" fill="#0A6836" />
-            <circle cx="18" cy="18" r="10" stroke="#C89D3C" strokeWidth="2" />
-            <path d="M14 18a6 6 0 1 0 8 0" stroke="#C89D3C" strokeWidth="2" fill="none" />
-            <circle cx="18" cy="13" r="1.5" fill="#C89D3C" />
-          </svg>
-        );
-      case 'NXT':
-        return (
-          <svg viewBox="0 0 36 36" className="w-full h-full" fill="none">
-            <rect width="36" height="36" rx="8" fill="#6C2BD9" />
-            <path d="M10 12l8 12 8-12" stroke="#00E5FF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        );
-      case 'AAIB':
-        return (
-          <svg viewBox="0 0 36 36" className="w-full h-full" fill="none">
-            <rect width="36" height="36" rx="8" fill="#A37B35" />
-            <circle cx="18" cy="18" r="11" stroke="#FFFFFF" strokeWidth="1.5" strokeDasharray="3 2" />
-            <text x="18" y="22" fill="#FFFFFF" fontSize="8" fontWeight="900" textAnchor="middle">AAIB</text>
-          </svg>
-        );
-      case 'FAB':
-        return (
-          <svg viewBox="0 0 36 36" className="w-full h-full" fill="none">
-            <rect width="36" height="36" rx="8" fill="#00205B" />
-            <path d="M10 24L18 10l8 14" stroke="#E31B23" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            <line x1="13" y1="20" x2="23" y2="20" stroke="#FFFFFF" strokeWidth="2" />
-          </svg>
-        );
-      case 'MASHREQ':
-        return (
-          <svg viewBox="0 0 36 36" className="w-full h-full" fill="none">
-            <rect width="36" height="36" rx="8" fill="#FF5E00" />
-            <circle cx="18" cy="18" r="8" fill="#FFFFFF" />
-            <circle cx="18" cy="18" r="5" fill="#FF5E00" />
-          </svg>
-        );
-      case 'ENBD':
-        return (
-          <svg viewBox="0 0 36 36" className="w-full h-full" fill="none">
-            <rect width="36" height="36" rx="8" fill="#0B2265" />
-            <path d="M10 18h16M20 12l6 6-6 6" stroke="#7DBA00" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        );
-      case 'CITI':
-        return (
-          <svg viewBox="0 0 36 36" className="w-full h-full" fill="none">
-            <rect width="36" height="36" rx="8" fill="#003B70" />
-            <path d="M11 13c4-4 10-4 14 0" stroke="#E51937" strokeWidth="2.5" strokeLinecap="round" />
-            <text x="18" y="24" fill="#FFFFFF" fontSize="9" fontWeight="900" textAnchor="middle">citi</text>
-          </svg>
-        );
-      case 'CAE':
-        return (
-          <svg viewBox="0 0 36 36" className="w-full h-full" fill="none">
-            <rect width="36" height="36" rx="8" fill="#007A53" />
-            <path d="M12 24l6-12 6 12" stroke="#E2001A" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx="18" cy="12" r="2.5" fill="#FFFFFF" />
-          </svg>
-        );
-      case 'EBE':
-        return (
-          <svg viewBox="0 0 36 36" className="w-full h-full" fill="none">
-            <rect width="36" height="36" rx="8" fill="#0072CE" />
-            <text x="18" y="23" fill="#FFB81C" fontSize="9" fontWeight="900" textAnchor="middle">EBank</text>
-          </svg>
-        );
-      case 'ABE':
-        return (
-          <svg viewBox="0 0 36 36" className="w-full h-full" fill="none">
-            <rect width="36" height="36" rx="8" fill="#2E7D32" />
-            <path d="M18 10v16M14 14c2 0 4-2 4-2s2 2 4 2M14 20c2 0 4-2 4-2s2 2 4 2" stroke="#DAA520" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-        );
-      case 'HDB':
-        return (
-          <svg viewBox="0 0 36 36" className="w-full h-full" fill="none">
-            <rect width="36" height="36" rx="8" fill="#0B6E4F" />
-            <polygon points="18,10 26,24 10,24" stroke="#F58220" strokeWidth="2" fill="none" />
-            <rect x="15" y="18" width="6" height="6" fill="#F58220" />
-          </svg>
-        );
-      default:
-        return (
-          <div 
-            className="w-full h-full rounded-lg flex flex-col items-center justify-center font-black tracking-tighter"
-            style={{ backgroundColor: bank.brandColor, color: '#FFFFFF' }}
-          >
-            <span className="leading-none text-[10px] uppercase font-mono">{bank.code.slice(0, 4)}</span>
-          </div>
-        );
-    }
-  };
+  const logoSrc = bank.logoUrl || BANK_LOGO_MAP[bank.code];
 
   return (
     <div 
-      className={`${dims} rounded-xl shrink-0 flex items-center justify-center shadow-sm overflow-hidden border transition-transform hover:scale-105`}
-      style={{ borderColor: `${bank.brandColor}40`, backgroundColor: `${bank.brandColor}10` }}
+      className={`${dims} rounded-xl shrink-0 flex items-center justify-center bg-white shadow-sm border border-slate-200/90 dark:border-slate-700 transition-all hover:shadow-md hover:scale-105 overflow-hidden ${className}`}
+      style={{ 
+        boxShadow: `0 2px 8px -2px ${bank.brandColor}35`
+      }}
       title={`${bank.nameAr} (${bank.code})`}
     >
-      {renderIcon()}
+      {!imgError && logoSrc ? (
+        <img
+          src={logoSrc}
+          alt={bank.nameAr}
+          className="w-full h-full object-contain filter drop-shadow-none"
+          loading="lazy"
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        <div 
+          className="w-full h-full rounded-lg flex flex-col items-center justify-center font-black tracking-tighter"
+          style={{ backgroundColor: bank.brandColor, color: '#FFFFFF' }}
+        >
+          <span className="leading-none text-[10px] uppercase font-mono">{bank.code.slice(0, 4)}</span>
+        </div>
+      )}
     </div>
   );
 };
+
