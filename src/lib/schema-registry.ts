@@ -177,7 +177,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'id', 'operation_id', 'field_id', 'value', 'company_id', 'created_at'
   ],
   payment_methods: [
-    'id', 'company_id', 'account_id', 'account_name', 'code', 'name', 'type', 'opening_balance', 
+    'id', 'company_id', 'account_id', 'account_name', 'code', 'name', 'type', 'currency', 'opening_balance', 
     'opening_balance_date', 'counter_account_id', 'bank_name', 'branch_name', 'account_number', 'swift_code', 'iban', 'contact_person', 'contact_phone'
   ],
   activity_logs: [

@@ -28,6 +28,7 @@ export const PaymentMethods: React.FC = () => {
   const [paymentVouchers, setPaymentVouchers] = useState<any[]>([]);
   const [cashTransfers, setCashTransfers] = useState<any[]>([]);
   const [companyCurrencies, setCompanyCurrencies] = useState<any[]>([]);
+  const [company, setCompany] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [view, setView] = useState<'card' | 'table'>('card');
@@ -60,27 +61,38 @@ export const PaymentMethods: React.FC = () => {
   });
 
   const currencyOptions = useMemo(() => {
-    const defaults = [
-      { code: 'EGP', name: language === 'ar' ? 'الجنيه المصري (EGP)' : 'Egyptian Pound (EGP)' },
-      { code: 'USD', name: language === 'ar' ? 'الدولار الأمريكي (USD)' : 'US Dollar (USD)' },
-      { code: 'EUR', name: language === 'ar' ? 'اليورو الأوروبي (EUR)' : 'Euro (EUR)' },
-      { code: 'SAR', name: language === 'ar' ? 'الريال السعودي (SAR)' : 'Saudi Riyal (SAR)' },
-      { code: 'AED', name: language === 'ar' ? 'الدرهم الإماراتي (AED)' : 'UAE Dirham (AED)' },
-      { code: 'KWD', name: language === 'ar' ? 'الدينار الكويتي (KWD)' : 'Kuwaiti Dinar (KWD)' },
-      { code: 'QAR', name: language === 'ar' ? 'الريال القطري (QAR)' : 'Qatari Riyal (QAR)' },
-      { code: 'BHD', name: language === 'ar' ? 'الدينار البحريني (BHD)' : 'Bahraini Dinar (BHD)' },
-      { code: 'OMR', name: language === 'ar' ? 'الريال العماني (OMR)' : 'Omani Rial (OMR)' },
-      { code: 'JOD', name: language === 'ar' ? 'الدينار الأردني (JOD)' : 'Jordanian Dinar (JOD)' },
-      { code: 'GBP', name: language === 'ar' ? 'الجنيه الإسترليني (GBP)' : 'British Pound (GBP)' },
-    ];
-    const custom = (companyCurrencies || [])
-      .filter((c: any) => c.code && !defaults.some(d => d.code.toUpperCase() === c.code.toUpperCase()))
-      .map((c: any) => ({ code: c.code.toUpperCase(), name: `${c.name || c.code} (${c.code.toUpperCase()})` }));
-    return [...defaults, ...custom];
-  }, [companyCurrencies, language]);
+    // Only currencies registered in "إدارة العملات والعملات المتعددة"
+    const activeFromDb = (companyCurrencies || [])
+      .filter((c: any) => c && c.code && c.is_active !== false)
+      .map((c: any) => {
+        const code = c.code.toUpperCase();
+        const label = language === 'ar' 
+          ? `${code} - ${c.name_ar || c.name || code}` 
+          : `${code} - ${c.name_en || c.name || code}`;
+        return { code, name: label };
+      });
+
+    // Company base currency
+    const baseCode = (company?.currency || company?.settings?.currency || 'EGP').toUpperCase();
+    const baseName = baseCode === 'EGP' 
+      ? (language === 'ar' ? 'EGP - الجنيه المصري' : 'EGP - Egyptian Pound') 
+      : `${baseCode} - ${baseCode}`;
+
+    const list = [...activeFromDb];
+    if (!list.some(c => c.code === baseCode)) {
+      list.unshift({ code: baseCode, name: baseName });
+    }
+
+    if (formData.currency && !list.some(c => c.code === formData.currency.toUpperCase())) {
+      list.push({ code: formData.currency.toUpperCase(), name: formData.currency.toUpperCase() });
+    }
+
+    return list;
+  }, [companyCurrencies, company, language, formData.currency]);
 
   useEffect(() => {
     if (user?.company_id) {
+      dbService.get<any>('companies', user.company_id).then(setCompany).catch(console.error);
       const unsub = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setMethods);
       const unsubscribeAccounts = dbService.subscribe<Account>('accounts', user.company_id, (data) => {
         setAccounts(data);
@@ -715,7 +727,7 @@ export const PaymentMethods: React.FC = () => {
                             <select className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs" value={formData.currency || 'EGP'} onChange={(e) => setFormData({ ...formData, currency: e.target.value })}>
                               {currencyOptions.map(c => (
                                 <option key={c.code} value={c.code}>
-                                  {c.code} - {c.name}
+                                  {c.name}
                                 </option>
                               ))}
                             </select>

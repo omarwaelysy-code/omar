@@ -68,7 +68,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
 
   // Categorize financial methods with Banks first as default
   const { bankOptions, cashOptions } = useMemo(() => {
-    type FinancialAccountOption = { id: string; name: string; bankName?: string; accNo?: string; type: string; isBank: boolean };
+    type FinancialAccountOption = { id: string; name: string; bankName?: string; accNo?: string; type: string; currency: string; isBank: boolean };
     const banks: FinancialAccountOption[] = [];
     const cash: FinancialAccountOption[] = [];
 
@@ -80,6 +80,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
         bankName: p.bank_name || p.name,
         accNo: p.account_number,
         type: p.type,
+        currency: p.currency || 'EGP',
         isBank
       };
       if (isBank) {
@@ -101,6 +102,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
             bankName: a.name,
             accNo: '',
             type: a.account_usage || 'cash',
+            currency: 'EGP',
             isBank
           };
           if (isBank) {
@@ -120,6 +122,13 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
     const all = [...bankOptions, ...cashOptions];
     return all.find(a => a.id === bankAccountId) || bankOptions[0] || null;
   }, [bankOptions, cashOptions, bankAccountId]);
+
+  // Keep currency in sync with selected financial account (payment method)
+  useEffect(() => {
+    if (selectedFinancialAccount?.currency) {
+      setCurrency(selectedFinancialAccount.currency);
+    }
+  }, [selectedFinancialAccount]);
 
   // Restrict selectable credit accounts ONLY to accounts with usage 'notes_payable'
   const notesPayableAccounts = useMemo(() => {
@@ -144,8 +153,8 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
       setSupplierId(chequeToEdit.supplier_id || '');
       setCreditAccountId(chequeToEdit.credit_account_id || defaultCreditAcc?.id || '');
       setBankAccountId(chequeToEdit.bank_account_id || bankOptions[0]?.id || '');
-      setAmount(chequeToEdit.amount ? String(chequeToEdit.amount) : '');
-      setCurrency(chequeToEdit.currency || 'EGP');
+      setAmount(chequeToEdit.amount ? Number(chequeToEdit.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
+      setCurrency(chequeToEdit.currency || selectedFinancialAccount?.currency || 'EGP');
       setExchangeRate(chequeToEdit.exchange_rate ? String(chequeToEdit.exchange_rate) : '1.0');
       setIssueDate(chequeToEdit.issue_date ? chequeToEdit.issue_date.slice(0, 10) : new Date().toISOString().slice(0, 10));
       setDueDate(chequeToEdit.due_date ? chequeToEdit.due_date.slice(0, 10) : new Date().toISOString().slice(0, 10));
@@ -160,7 +169,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
       setCreditAccountId(defaultCreditAcc?.id || '');
       setBankAccountId(bankOptions[0]?.id || '');
       setAmount('');
-      setCurrency('EGP');
+      setCurrency(selectedFinancialAccount?.currency || 'EGP');
       setExchangeRate('1.0');
       setIssueDate(new Date().toISOString().slice(0, 10));
       setDueDate(new Date().toISOString().slice(0, 10));
@@ -184,9 +193,34 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
 
   // Monetary & Conversion Computations
   const numAmount = useMemo(() => {
-    const parsed = parseFloat(amount);
+    const raw = typeof amount === 'string' ? amount.replace(/,/g, '') : String(amount || 0);
+    const parsed = parseFloat(raw);
     return isNaN(parsed) || parsed < 0 ? 0 : parsed;
   }, [amount]);
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    const clean = val.replace(/,/g, '');
+    if (clean === '' || clean === '.') {
+      setAmount(clean);
+      return;
+    }
+    if (!/^\d*\.?\d*$/.test(clean)) return;
+
+    const parts = clean.split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    const formatted = parts.length > 1 ? `${parts[0]}.${parts[1].slice(0, 2)}` : parts[0];
+    setAmount(formatted);
+  };
+
+  const handleAmountBlur = () => {
+    if (!amount) return;
+    const clean = amount.replace(/,/g, '');
+    const num = parseFloat(clean);
+    if (!isNaN(num) && num > 0) {
+      setAmount(num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    }
+  };
 
   const numExchangeRate = useMemo(() => {
     const parsed = parseFloat(exchangeRate);
@@ -430,15 +464,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                 </div>
               </div>
 
-              {/* Center Watermark Text */}
-              <div className="hidden lg:block text-center">
-                <h4 className="text-sm font-black tracking-widest text-emerald-900/60 dark:text-emerald-400/60 font-serif">
-                  CHEQUE • شيك مصرفي
-                </h4>
-                <p className="text-[9px] text-slate-400">جمهورية مصر العربية</p>
-              </div>
-
-              {/* Header Right: Cheque Number & Date Slots */}
+              {/* Header Right: Cheque Number & Due Date Slots */}
               <div className="flex flex-wrap items-center gap-3">
                 {/* Crossed Check Toggle */}
                 <button
@@ -468,14 +494,14 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                   />
                 </div>
 
-                {/* Date Box (DD / MM / YYYY) */}
+                {/* Due Date Box (تاريخ الاستحقاق والصرف / DUE DATE) */}
                 <div className="bg-white dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 shadow-inner">
-                  <span className="text-[9px] font-bold text-slate-400 block">التاريخ / DATE</span>
+                  <span className="text-[9px] font-bold text-slate-400 block">تاريخ الاستحقاق / DATE</span>
                   <input
                     type="date"
                     required
-                    value={issueDate}
-                    onChange={e => setIssueDate(e.target.value)}
+                    value={dueDate}
+                    onChange={e => setDueDate(e.target.value)}
                     className="bg-transparent text-slate-900 dark:text-white font-mono font-bold text-xs outline-none"
                   />
                 </div>
@@ -548,35 +574,27 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                   )}
                 </div>
 
-                {/* Amount Box (Replica of Image 1: # 1000000 # with Currency) */}
+                {/* Amount Box (Image replica: # 500,000.89 (ج.م) EGP #) */}
                 <div className="w-full lg:w-auto flex items-center justify-end">
                   <div className="bg-white dark:bg-slate-800 border-2 border-slate-900 dark:border-slate-500 rounded-xl p-2 shadow-md flex items-center gap-2">
                     
-                    {/* Currency Selector */}
-                    <select
-                      value={currency}
-                      onChange={e => setCurrency(e.target.value)}
-                      className="px-2 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-black text-emerald-700 dark:text-emerald-300 outline-none"
-                    >
-                      {SUPPORTED_CURRENCIES.map(c => (
-                        <option key={c.code} value={c.code}>
-                          {c.code} ({c.symbol})
-                        </option>
-                      ))}
-                    </select>
+                    {/* Fixed currency badge from payment method - non-editable */}
+                    <div className="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-xs font-black text-emerald-800 dark:text-emerald-300 select-none">
+                      {currency === 'EGP' ? '(ج.م) EGP' : currency}
+                    </div>
 
                     <span className="text-sm font-mono font-black text-slate-400">#</span>
                     
-                    {/* Amount Input */}
+                    {/* Amount Input with comma format 500,000.89 and without spin arrows */}
                     <input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
+                      type="text"
+                      inputMode="decimal"
                       required
                       placeholder="0.00"
                       value={amount}
-                      onChange={e => setAmount(e.target.value)}
-                      className="w-32 sm:w-40 text-left px-2 py-0.5 bg-transparent font-mono font-black text-base sm:text-lg text-slate-900 dark:text-white outline-none tracking-tight"
+                      onChange={handleAmountChange}
+                      onBlur={handleAmountBlur}
+                      className="w-36 sm:w-44 text-left px-2 py-0.5 bg-transparent font-mono font-black text-base sm:text-lg text-slate-900 dark:text-white outline-none tracking-tight [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
 
                     <span className="text-sm font-mono font-black text-slate-400">#</span>
@@ -631,60 +649,6 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                 </div>
               )}
 
-              {/* 4. DUE DATE & SIGNATURE ROW */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2 border-t border-emerald-900/20 dark:border-emerald-700/30">
-                
-                {/* Due Date */}
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0" />
-                  <div className="flex-1">
-                    <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                      تاريخ الاستحقاق والصرف <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      value={dueDate}
-                      onChange={e => setDueDate(e.target.value)}
-                      className="w-full px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white/90 dark:bg-slate-800 text-xs font-mono font-bold text-slate-900 dark:text-white outline-none"
-                    />
-                  </div>
-                </div>
-
-                {/* Signatory Name */}
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                    اسم الموقع / المفوض
-                  </label>
-                  <input
-                    type="text"
-                    value={signatoryName}
-                    onChange={e => setSignatoryName(e.target.value)}
-                    placeholder="اسم المسؤول المفوض بالتوقيع"
-                    className="w-full px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 bg-white/90 dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-white outline-none"
-                  />
-                </div>
-
-                {/* Signature Box Simulation */}
-                <div className="border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-1.5 text-center bg-white/50 dark:bg-slate-800/40">
-                  <span className="text-[10px] font-serif text-slate-400 block">التوقيع المعتمد / Authorized Signature</span>
-                  <div className="h-6 flex items-center justify-center font-serif italic text-sm text-emerald-800 dark:text-emerald-400 select-none">
-                    {signatoryName || 'توقيع معتمد'} ✍️
-                  </div>
-                </div>
-
-              </div>
-
-            </div>
-
-            {/* 5. BOTTOM MICR BANKING STRIP (Replica of Image 1 & Image 2) */}
-            <div className="pt-3 border-t-2 border-dashed border-slate-300 dark:border-slate-700 text-center select-none">
-              <p className="text-[9px] text-slate-400 mb-1">
-                (( نرجو عدم الكتابة أو وضع أختام على هذا الجزء أو خلفه ))
-              </p>
-              <div className="font-mono font-bold text-xs sm:text-sm tracking-[0.25em] text-slate-700 dark:text-slate-400 bg-slate-200/50 dark:bg-slate-800/80 py-1 px-3 rounded-lg inline-block border border-slate-300 dark:border-slate-700">
-                ⑈ {chequeNumber || '00000000'} ⑈ {selectedFinancialAccount?.isBank ? '020' : '010'} 1435 ⑈ {selectedFinancialAccount?.accNo || '100023742947'} ⑈ 25
-              </div>
             </div>
 
           </div>
@@ -756,8 +720,22 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
               </select>
             </div>
 
-            {/* Description / Purpose */}
+            {/* Issue / Registration Date (تاريخ التحرير والتسجيل) */}
             <div>
+              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                تاريخ التحرير والتسجيل <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="date"
+                required
+                value={issueDate}
+                onChange={e => setIssueDate(e.target.value)}
+                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+              />
+            </div>
+
+            {/* Description / Purpose (البيان / الغرض من الصرف) */}
+            <div className="sm:col-span-2 lg:col-span-3">
               <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
                 البيان / الغرض من الصرف
               </label>
