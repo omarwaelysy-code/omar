@@ -142,6 +142,11 @@ async function startServer() {
       'ALTER TABLE "accounts" ADD COLUMN IF NOT EXISTS "account_usage" VARCHAR(50) DEFAULT \'other\'',
       'ALTER TABLE "payment_methods" ADD COLUMN IF NOT EXISTS "type" VARCHAR(50) DEFAULT \'cash\'',
       'ALTER TABLE "payment_methods" ADD COLUMN IF NOT EXISTS "currency" VARCHAR(10) DEFAULT \'EGP\'',
+      'ALTER TABLE "payment_methods" ADD COLUMN IF NOT EXISTS "bank_name_en" VARCHAR(255)',
+      'ALTER TABLE "payment_methods" ADD COLUMN IF NOT EXISTS "bank_code" VARCHAR(50)',
+      'ALTER TABLE "payment_methods" ADD COLUMN IF NOT EXISTS "bank_logo" TEXT',
+      'ALTER TABLE "payment_methods" ADD COLUMN IF NOT EXISTS "bank_website" TEXT',
+      'ALTER TABLE "payment_methods" ADD COLUMN IF NOT EXISTS "bank_hotline" VARCHAR(50)',
       
       // Products specific columns from arabic request
       'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "inventory_account_id" VARCHAR(36)',

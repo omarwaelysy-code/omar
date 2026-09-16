@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Search, Plus, Trash2, X, CreditCard, History, ChevronRight, ChevronLeft, 
   Wallet, Layers, Hash, Box, AlertCircle, Calendar, LayoutGrid, List, FileText, FileUp,
-  Building2, Landmark, Phone, User
+  Building2, Landmark, Phone, User, Globe, ExternalLink, Copy, Check, ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { dbService } from '../services/dbService';
@@ -15,6 +15,7 @@ import { InlineActivityLog } from '../components/InlineActivityLog';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { formatNumber } from '../utils/formatUtils';
 import { ExcelImportWizard } from '../components/ExcelImportWizard';
+import { EGYPTIAN_BANKS_DATA, BankLogoBadge, EgyptianBank } from '../data/egyptianBanks';
 
 export const PaymentMethods: React.FC = () => {
   const { user } = useAuth();
@@ -41,6 +42,12 @@ export const PaymentMethods: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [methodToDelete, setMethodToDelete] = useState<PaymentMethod | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Bank selector state
+  const [bankSearchTerm, setBankSearchTerm] = useState('');
+  const [isBankPickerOpen, setIsBankPickerOpen] = useState(false);
+  const [copiedSwift, setCopiedSwift] = useState(false);
+  const bankPickerRef = useRef<HTMLDivElement>(null);
   
   const [formData, setFormData] = useState({
     code: '',
@@ -52,6 +59,11 @@ export const PaymentMethods: React.FC = () => {
     type: 'cash',
     currency: 'EGP',
     bank_name: '',
+    bank_name_en: '',
+    bank_code: '',
+    bank_logo: '',
+    bank_website: '',
+    bank_hotline: '',
     branch_name: '',
     account_number: '',
     swift_code: '',
@@ -305,6 +317,82 @@ export const PaymentMethods: React.FC = () => {
     }
   };
 
+  // Close bank picker on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (bankPickerRef.current && !bankPickerRef.current.contains(event.target as Node)) {
+        setIsBankPickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filtered bank list for search
+  const filteredBankList = useMemo(() => {
+    const q = bankSearchTerm.trim().toLowerCase();
+    if (!q) return EGYPTIAN_BANKS_DATA;
+    return EGYPTIAN_BANKS_DATA.filter(b => 
+      b.nameAr.toLowerCase().includes(q) ||
+      b.nameEn.toLowerCase().includes(q) ||
+      b.code.toLowerCase().includes(q) ||
+      b.swift.toLowerCase().includes(q) ||
+      b.hotline.includes(q)
+    );
+  }, [bankSearchTerm]);
+
+  // Find Egyptian Bank helper
+  const findEgyptianBank = (methodOrBank: { bank_code?: string; name?: string; bank_name?: string; swift_code?: string } | null | undefined): EgyptianBank | null => {
+    if (!methodOrBank) return null;
+    if (methodOrBank.bank_code) {
+      const b = EGYPTIAN_BANKS_DATA.find(x => x.code.toUpperCase() === methodOrBank.bank_code?.toUpperCase());
+      if (b) return b;
+    }
+    if (methodOrBank.swift_code) {
+      const b = EGYPTIAN_BANKS_DATA.find(x => x.swift.toUpperCase() === methodOrBank.swift_code?.toUpperCase());
+      if (b) return b;
+    }
+    const nameToSearch = (methodOrBank.bank_name || methodOrBank.name || '').trim().toLowerCase();
+    if (nameToSearch) {
+      const b = EGYPTIAN_BANKS_DATA.find(x => 
+        x.nameAr.toLowerCase() === nameToSearch ||
+        nameToSearch.includes(x.nameAr.toLowerCase()) ||
+        x.nameAr.toLowerCase().includes(nameToSearch) ||
+        x.nameEn.toLowerCase() === nameToSearch ||
+        x.code.toLowerCase() === nameToSearch
+      );
+      if (b) return b;
+    }
+    return null;
+  };
+
+  // Currently matched bank for form
+  const matchedBank = useMemo(() => {
+    if (formData.type !== 'bank') return null;
+    return findEgyptianBank(formData);
+  }, [formData.type, formData.bank_code, formData.swift_code, formData.bank_name, formData.name]);
+
+  // Handle bank selection
+  const handleSelectEgyptianBank = (bank: EgyptianBank) => {
+    setFormData(prev => ({
+      ...prev,
+      name: bank.nameAr,
+      bank_name: bank.nameAr,
+      bank_name_en: bank.nameEn,
+      bank_code: bank.code,
+      swift_code: bank.swift !== '—' ? bank.swift : '',
+      bank_logo: bank.logoUrl || '',
+      bank_website: bank.website || '',
+      bank_hotline: bank.hotline || '',
+      contact_phone: prev.contact_phone || bank.hotline || '',
+      code: (!prev.code || prev.code === 'CASH-01' || prev.code.startsWith('BANK-'))
+        ? `BANK-${bank.code}`
+        : prev.code
+    }));
+    setIsBankPickerOpen(false);
+    setBankSearchTerm('');
+  };
+
   const resetForm = () => {
     const defaultCashAccount = accounts.find(a => ['cash', 'petty_cash', 'bank', 'wallet', 'credit_card', 'debit_card', 'main_cash'].includes(a.account_usage || ''));
     setEditingMethod(null);
@@ -318,6 +406,11 @@ export const PaymentMethods: React.FC = () => {
       type: 'cash',
       currency: 'EGP',
       bank_name: '',
+      bank_name_en: '',
+      bank_code: '',
+      bank_logo: '',
+      bank_website: '',
+      bank_hotline: '',
       branch_name: '',
       account_number: '',
       swift_code: '',
@@ -325,6 +418,8 @@ export const PaymentMethods: React.FC = () => {
       contact_person: '',
       contact_phone: ''
     });
+    setIsBankPickerOpen(false);
+    setBankSearchTerm('');
   };
 
   const openModal = (method?: PaymentMethod) => {
@@ -339,7 +434,12 @@ export const PaymentMethods: React.FC = () => {
         counter_account_id: method.counter_account_id || '',
         type: method.type || 'cash',
         currency: method.currency || 'EGP',
-        bank_name: method.bank_name || '',
+        bank_name: method.bank_name || method.name || '',
+        bank_name_en: method.bank_name_en || '',
+        bank_code: method.bank_code || '',
+        bank_logo: method.bank_logo || '',
+        bank_website: method.bank_website || '',
+        bank_hotline: method.bank_hotline || '',
         branch_name: method.branch_name || '',
         account_number: method.account_number || '',
         swift_code: method.swift_code || '',
@@ -519,8 +619,14 @@ export const PaymentMethods: React.FC = () => {
                         className="p-3 space-y-2 rounded-xl border bg-white border-slate-100 hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer group relative overflow-hidden"
                       >
                         <div className="flex items-start justify-between">
-                           <div className="w-8 h-8 bg-slate-50 rounded-lg shadow-inner border border-slate-100 flex items-center justify-center text-slate-400 group-hover:text-indigo-600 group-hover:bg-indigo-50 transition-all">
-                             <CreditCard size={16} />
+                           <div className="w-9 h-9 rounded-xl shadow-xs border border-slate-100 flex items-center justify-center text-slate-400 group-hover:text-indigo-600 transition-all overflow-hidden bg-white">
+                             {method.type === 'bank' && findEgyptianBank(method) ? (
+                               <BankLogoBadge bank={findEgyptianBank(method)!} size="sm" className="!w-full !h-full !p-0.5 border-none shadow-none rounded-none" />
+                             ) : (
+                               <div className="w-full h-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:text-indigo-600 group-hover:bg-indigo-50 transition-all">
+                                 <CreditCard size={16} />
+                               </div>
+                             )}
                            </div>
                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
                               <button 
@@ -550,14 +656,24 @@ export const PaymentMethods: React.FC = () => {
                            </div>
                            <div className="flex items-center gap-1 flex-wrap">
                              <span className="inline-block px-1.5 py-0.2 bg-slate-100 text-slate-500 rounded text-[10px] font-bold border border-slate-200 font-mono">{method.code}</span>
+                             {method.type === 'bank' && method.swift_code && (
+                               <span className="inline-block px-1.5 py-0.2 bg-emerald-50 text-emerald-800 rounded text-[9px] font-mono font-black border border-emerald-200">
+                                 SWIFT: {method.swift_code}
+                               </span>
+                             )}
                              {method.type === 'bank' && method.account_number && (
                                <span className="inline-block px-1.5 py-0.2 bg-slate-50 text-slate-600 rounded text-[10px] font-mono font-bold border border-slate-200">
                                  #{method.account_number}
                                </span>
                              )}
-                             {method.type === 'bank' && method.bank_name && (
+                             {method.type === 'bank' && (method.bank_name_en || method.bank_name) && (
                                <span className="inline-block px-1.5 py-0.2 bg-slate-50 text-slate-500 rounded text-[10px] font-medium border border-slate-200">
-                                 {method.bank_name}
+                                 {method.bank_name_en || method.bank_name}
+                               </span>
+                             )}
+                             {method.type === 'bank' && method.bank_hotline && (
+                               <span className="inline-block px-1.5 py-0.2 bg-slate-50 text-slate-600 rounded text-[9px] font-mono font-bold border border-slate-200">
+                                 📞 {method.bank_hotline}
                                </span>
                              )}
                            </div>
@@ -627,7 +743,21 @@ export const PaymentMethods: React.FC = () => {
                               <td className="px-4 py-2">
                                 <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold border border-slate-200">{method.code}</span>
                               </td>
-                              <td className="px-4 py-2 font-bold text-slate-900">{method.name}</td>
+                              <td className="px-4 py-2 font-bold text-slate-900">
+                                <div className="flex items-center gap-2">
+                                  {method.type === 'bank' && findEgyptianBank(method) && (
+                                    <BankLogoBadge bank={findEgyptianBank(method)!} size="sm" className="!w-6 !h-6 !p-0.5 rounded-md shrink-0 shadow-2xs" />
+                                  )}
+                                  <div>
+                                    <span className="font-bold text-slate-900">{method.name}</span>
+                                    {method.type === 'bank' && method.swift_code && (
+                                      <span className="block text-[10px] font-mono text-emerald-700 font-bold">
+                                        SWIFT: {method.swift_code}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
                               <td className="px-4 py-2">
                                 <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
                                   {method.currency || 'EGP'}
@@ -710,10 +840,146 @@ export const PaymentMethods: React.FC = () => {
                   <form id="method-form" onSubmit={handleSubmit} className="space-y-2.5" dir={dir}>
                      {/* Base Info Section */}
                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 text-right">
-                        <div className="sm:col-span-2 lg:col-span-2">
-                           <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">{language === 'ar' ? 'اسم الطريقة / الخزينة' : 'Method Name'}</label>
-                           <input required type="text" placeholder="اسم طريقة السداد" className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
-                        </div>
+                        {formData.type === 'bank' ? (
+                          <div className="sm:col-span-2 lg:col-span-2 relative" ref={bankPickerRef}>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase">
+                                {language === 'ar' ? 'اختيار البنك من الدليل الرسمي' : 'Bank Selection'}
+                              </label>
+                              {matchedBank && (
+                                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 flex items-center gap-1">
+                                  <Check size={10} /> {matchedBank.code}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Bank Picker Trigger */}
+                            <div className="space-y-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setIsBankPickerOpen(!isBankPickerOpen)}
+                                className="w-full px-2.5 py-1.5 bg-slate-50 hover:bg-white border border-slate-200 hover:border-emerald-500 rounded-lg text-xs font-bold text-slate-900 flex items-center justify-between gap-2 transition-all shadow-xs text-right group"
+                              >
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  {matchedBank ? (
+                                    <>
+                                      <BankLogoBadge bank={matchedBank} size="sm" className="!w-6 !h-6 !p-0.5 rounded-md shrink-0 shadow-2xs" />
+                                      <span className="truncate font-black text-slate-900 group-hover:text-emerald-700">{matchedBank.nameAr}</span>
+                                      <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">({matchedBank.code})</span>
+                                    </>
+                                  ) : formData.name ? (
+                                    <>
+                                      <Building2 size={14} className="text-emerald-600 shrink-0" />
+                                      <span className="truncate font-bold text-slate-900">{formData.name}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Landmark size={14} className="text-slate-400 shrink-0" />
+                                      <span className="text-slate-400 font-medium">
+                                        {language === 'ar' ? 'اختر البنك من الدليل (35 بنك معتمد)...' : 'Select Bank...'}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0 text-slate-400 group-hover:text-emerald-600">
+                                  <span className="text-[10px] font-bold hidden sm:inline text-emerald-600">
+                                    {language === 'ar' ? 'تغيير' : 'Change'}
+                                  </span>
+                                  <ChevronDown size={14} className={`transition-transform duration-200 ${isBankPickerOpen ? 'rotate-180 text-emerald-600' : ''}`} />
+                                </div>
+                              </button>
+
+                              {/* Name input */}
+                              <input
+                                required
+                                type="text"
+                                placeholder={language === 'ar' ? 'اسم طريقة السداد (مثال: بنك مصر - فرع الدقي)' : 'Method Name'}
+                                className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-900 outline-none focus:ring-1 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                value={formData.name}
+                                onChange={(e) => setFormData({ ...formData, name: e.target.value, bank_name: e.target.value })}
+                              />
+                            </div>
+
+                            {/* Bank Picker Dropdown Popover */}
+                            {isBankPickerOpen && (
+                              <div className="absolute top-full right-0 left-0 sm:-right-4 sm:-left-20 mt-1 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 p-2.5 space-y-2 max-h-96 flex flex-col animate-in fade-in zoom-in-95 duration-150">
+                                <div className="flex items-center justify-between px-1">
+                                  <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                                    <Landmark size={13} className="text-emerald-600" />
+                                    {language === 'ar' ? 'دليل ومرجع البنوك المصرية المعتمدة (CBE)' : 'Egyptian Banks Directory'}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                                    {filteredBankList.length} {language === 'ar' ? 'بنك' : 'banks'}
+                                  </span>
+                                </div>
+
+                                {/* Search */}
+                                <div className="relative">
+                                  <Search size={13} className={`absolute top-2.5 ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} text-slate-400 pointer-events-none`} />
+                                  <input
+                                    type="text"
+                                    autoFocus
+                                    placeholder={language === 'ar' ? 'بحث باسم البنك، الكود، أو السويفت...' : 'Search by name, code, SWIFT...'}
+                                    value={bankSearchTerm}
+                                    onChange={e => setBankSearchTerm(e.target.value)}
+                                    className={`w-full ${dir === 'rtl' ? 'pr-8 pl-3' : 'pl-8 pr-3'} py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-emerald-500 focus:bg-white transition-all`}
+                                  />
+                                  {bankSearchTerm && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setBankSearchTerm('')}
+                                      className={`absolute top-2 ${dir === 'rtl' ? 'left-2' : 'right-2'} text-xs text-slate-400 hover:text-slate-600`}
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* Banks List */}
+                                <div className="overflow-y-auto custom-scrollbar flex-1 space-y-1 max-h-64 divide-y divide-slate-50">
+                                  {filteredBankList.map(b => (
+                                    <button
+                                      key={b.id}
+                                      type="button"
+                                      onClick={() => handleSelectEgyptianBank(b)}
+                                      className="w-full p-2 rounded-xl hover:bg-emerald-50/70 border border-transparent hover:border-emerald-200 flex items-center justify-between gap-2.5 text-right transition-all group"
+                                    >
+                                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                        <BankLogoBadge bank={b} size="sm" className="!w-9 !h-9 !p-1 shrink-0 rounded-lg" />
+                                        <div className="min-w-0 text-right">
+                                          <p className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 leading-snug truncate">
+                                            {b.nameAr}
+                                          </p>
+                                          <p className="text-[10px] text-slate-400 font-medium truncate font-sans">
+                                            {b.nameEn}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <div className="text-left shrink-0 font-mono text-[10px]">
+                                        <span className="px-1.5 py-0.5 rounded bg-slate-100 group-hover:bg-emerald-100 font-black text-slate-700 group-hover:text-emerald-800 block text-center">
+                                          {b.code}
+                                        </span>
+                                        <span className="block text-[9px] text-emerald-600 font-bold mt-0.5">
+                                          {b.swift}
+                                        </span>
+                                      </div>
+                                    </button>
+                                  ))}
+                                  {filteredBankList.length === 0 && (
+                                    <div className="p-4 text-center text-xs text-slate-400 font-medium">
+                                      {language === 'ar' ? 'لا يوجد بنك مطابق للبحث' : 'No matching banks found'}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="sm:col-span-2 lg:col-span-2">
+                             <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">{language === 'ar' ? 'اسم الطريقة / الخزينة' : 'Method Name'}</label>
+                             <input required type="text" placeholder="اسم طريقة السداد" className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+                          </div>
+                        )}
                         <div>
                             <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">{language === 'ar' ? 'نوع طريقة السداد' : 'Type'}</label>
                             <select required className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value, account_id: '' })}>
@@ -768,24 +1034,109 @@ export const PaymentMethods: React.FC = () => {
 
                      {/* Bank Specific Details Section */}
                      {formData.type === 'bank' && (
-                       <div className="p-2.5 bg-indigo-50/40 rounded-xl border border-indigo-100/80 space-y-2">
-                         <div className="flex items-center gap-2">
-                           <div className="w-6 h-6 bg-indigo-600 text-white rounded-md flex items-center justify-center shadow-xs">
-                             <Building2 size={13} />
+                       <div className="p-3 bg-gradient-to-br from-indigo-50/50 via-slate-50/70 to-emerald-50/30 rounded-2xl border border-indigo-100/90 space-y-3">
+                         <div className="flex items-center justify-between flex-wrap gap-2">
+                           <div className="flex items-center gap-2">
+                             <div className="w-6 h-6 bg-indigo-600 text-white rounded-md flex items-center justify-center shadow-xs">
+                               <Building2 size={13} />
+                             </div>
+                             <div>
+                               <h4 className="text-xs font-black text-slate-900 leading-none">
+                                 {language === 'ar' ? 'بيانات البنك والحساب المصرفي' : 'Bank Account Details'}
+                               </h4>
+                               <span className="text-[10px] text-slate-400 font-medium">
+                                 {language === 'ar' ? 'البيانات الرسمية المعتمدة من البنك المركزي المصري (SWIFT / Hotline / Web)' : 'Official CBE recognized banking data'}
+                               </span>
+                             </div>
                            </div>
-                           <h4 className="text-xs font-black text-slate-900">
-                             {language === 'ar' ? 'بيانات الحساب البنكي (اختياري)' : 'Bank Account Details'}
-                           </h4>
+
+                           <button
+                             type="button"
+                             onClick={() => setIsBankPickerOpen(true)}
+                             className="px-2.5 py-1 bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-lg text-[10px] font-bold text-slate-700 hover:text-emerald-700 flex items-center gap-1.5 transition-all shadow-2xs"
+                           >
+                             <Landmark size={12} className="text-emerald-600" />
+                             <span>{language === 'ar' ? 'اختيار بنك آخر من القائمة' : 'Change Bank'}</span>
+                           </button>
                          </div>
+
+                         {/* Bank Profile Card Preview (if bank is matched or has data) */}
+                         {matchedBank && (
+                           <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative overflow-hidden">
+                             <div className="absolute top-0 right-0 w-1.5 h-full" style={{ backgroundColor: matchedBank.brandColor }} />
+                             
+                             <div className="flex items-center gap-3 min-w-0">
+                               <BankLogoBadge bank={matchedBank} size="md" />
+                               <div className="min-w-0">
+                                 <div className="flex items-center gap-2 flex-wrap">
+                                   <h5 className="text-sm font-black text-slate-900">{matchedBank.nameAr}</h5>
+                                   <span className="font-mono font-black text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                                     {matchedBank.code}
+                                   </span>
+                                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">
+                                     {matchedBank.categoryAr}
+                                   </span>
+                                 </div>
+                                 <p className="text-[11px] text-slate-400 font-medium truncate font-sans">{matchedBank.nameEn}</p>
+                               </div>
+                             </div>
+
+                             <div className="flex items-center gap-2 flex-wrap text-xs">
+                               {matchedBank.swift && matchedBank.swift !== '—' && (
+                                 <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200">
+                                   <span className="text-[9px] text-slate-400 font-bold uppercase">SWIFT:</span>
+                                   <span className="font-mono font-black text-xs text-emerald-700">{matchedBank.swift}</span>
+                                   <button
+                                     type="button"
+                                     onClick={() => {
+                                       navigator.clipboard.writeText(matchedBank.swift);
+                                       setCopiedSwift(true);
+                                       setTimeout(() => setCopiedSwift(false), 2000);
+                                     }}
+                                     className="p-0.5 hover:text-emerald-600 text-slate-400 transition-colors"
+                                     title={language === 'ar' ? 'نسخ السويفت' : 'Copy SWIFT'}
+                                   >
+                                     {copiedSwift ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                                   </button>
+                                 </div>
+                               )}
+
+                               {matchedBank.hotline && (
+                                 <a
+                                   href={`tel:${matchedBank.hotline}`}
+                                   className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-700 hover:text-emerald-700 font-bold font-mono transition-all"
+                                   title={language === 'ar' ? 'الاتصال بالخط الساخن' : 'Call Hotline'}
+                                 >
+                                   <Phone size={12} className="text-emerald-600" />
+                                   <span>{matchedBank.hotline}</span>
+                                 </a>
+                               )}
+
+                               {matchedBank.website && (
+                                 <a
+                                   href={matchedBank.website}
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 text-slate-700 hover:text-indigo-700 font-bold transition-all"
+                                   title={language === 'ar' ? 'زيارة الموقع الرسمي' : 'Official Website'}
+                                 >
+                                   <Globe size={12} className="text-indigo-600" />
+                                   <span>{language === 'ar' ? 'الموقع' : 'Site'}</span>
+                                   <ExternalLink size={10} />
+                                 </a>
+                               )}
+                             </div>
+                           </div>
+                         )}
                          
                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-right">
                            <div>
                              <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">
-                               {language === 'ar' ? 'اسم البنك' : 'Bank Name'}
+                               {language === 'ar' ? 'اسم البنك بالعربي' : 'Bank Name (Ar)'}
                              </label>
                              <input 
                                type="text" 
-                               placeholder="مثال: CIB"
+                               placeholder="مثال: بنك مصر"
                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs"
                                value={formData.bank_name || ''} 
                                onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })} 
@@ -794,14 +1145,40 @@ export const PaymentMethods: React.FC = () => {
 
                            <div>
                              <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">
-                               {language === 'ar' ? 'الفرع' : 'Branch'}
+                               {language === 'ar' ? 'اسم البنك بالإنجليزي' : 'Bank Name (En)'}
                              </label>
                              <input 
                                type="text" 
-                               placeholder="الفرع"
+                               placeholder="e.g. Banque Misr"
                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs"
-                               value={formData.branch_name || ''} 
-                               onChange={(e) => setFormData({ ...formData, branch_name: e.target.value })} 
+                               value={formData.bank_name_en || ''} 
+                               onChange={(e) => setFormData({ ...formData, bank_name_en: e.target.value })} 
+                             />
+                           </div>
+
+                           <div>
+                             <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">
+                               {language === 'ar' ? 'كود البنك' : 'Bank Code'}
+                              </label>
+                             <input 
+                               type="text" 
+                               placeholder="BM / NBE / CIB"
+                               className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs uppercase"
+                               value={formData.bank_code || ''} 
+                               onChange={(e) => setFormData({ ...formData, bank_code: e.target.value.toUpperCase() })} 
+                             />
+                           </div>
+
+                           <div>
+                             <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">
+                               {language === 'ar' ? 'SWIFT / BIC' : 'SWIFT'}
+                             </label>
+                             <input 
+                               type="text" 
+                               placeholder="CIBEEGCX"
+                               className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs uppercase"
+                               value={formData.swift_code || ''} 
+                               onChange={(e) => setFormData({ ...formData, swift_code: e.target.value.toUpperCase() })} 
                              />
                            </div>
 
@@ -820,14 +1197,14 @@ export const PaymentMethods: React.FC = () => {
 
                            <div>
                              <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">
-                               {language === 'ar' ? 'SWIFT' : 'SWIFT'}
+                               {language === 'ar' ? 'الفرع' : 'Branch'}
                              </label>
                              <input 
                                type="text" 
-                               placeholder="CIBEEGCX"
-                               className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs uppercase"
-                               value={formData.swift_code || ''} 
-                               onChange={(e) => setFormData({ ...formData, swift_code: e.target.value.toUpperCase() })} 
+                               placeholder="الفرع"
+                               className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs"
+                               value={formData.branch_name || ''} 
+                               onChange={(e) => setFormData({ ...formData, branch_name: e.target.value })} 
                              />
                            </div>
 
@@ -841,6 +1218,32 @@ export const PaymentMethods: React.FC = () => {
                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs uppercase"
                                value={formData.iban || ''} 
                                onChange={(e) => setFormData({ ...formData, iban: e.target.value.toUpperCase() })} 
+                             />
+                           </div>
+
+                           <div>
+                             <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">
+                               {language === 'ar' ? 'الخط الساخن / الهاتف' : 'Hotline / Phone'}
+                             </label>
+                             <input 
+                               type="tel" 
+                               placeholder="19888"
+                               className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs font-mono"
+                               value={formData.bank_hotline || ''} 
+                               onChange={(e) => setFormData({ ...formData, bank_hotline: e.target.value })} 
+                             />
+                           </div>
+
+                           <div>
+                             <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">
+                               {language === 'ar' ? 'الموقع الإلكتروني' : 'Website'}
+                             </label>
+                             <input 
+                               type="url" 
+                               placeholder="https://www.banquemisr.com"
+                               className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs font-mono"
+                               value={formData.bank_website || ''} 
+                               onChange={(e) => setFormData({ ...formData, bank_website: e.target.value })} 
                              />
                            </div>
 
@@ -864,7 +1267,7 @@ export const PaymentMethods: React.FC = () => {
                              <input 
                                type="tel" 
                                placeholder="01xxxxxxxxx"
-                               className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs"
+                               className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs font-mono"
                                value={formData.contact_phone || ''} 
                                onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })} 
                              />

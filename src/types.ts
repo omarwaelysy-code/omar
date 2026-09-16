@@ -291,6 +291,11 @@ export interface PaymentMethod {
   counter_account_id?: string;
   company_id: string;
   bank_name?: string;
+  bank_name_en?: string;
+  bank_code?: string;
+  bank_logo?: string;
+  bank_website?: string;
+  bank_hotline?: string;
   branch_name?: string;
   account_number?: string;
   swift_code?: string;
