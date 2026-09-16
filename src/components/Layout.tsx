@@ -1123,7 +1123,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           })}
         </nav>
 
-        <div className={`flex items-center gap-0.5 xl:gap-1 ${dir === 'rtl' ? 'mr-auto' : 'ml-auto'} shrink-0`}>
+        <div className={`flex items-center gap-1 xl:gap-1.5 ${dir === 'rtl' ? 'mr-auto' : 'ml-auto'} shrink-0`}>
+          {/* Desktop Language Switcher */}
+          <button
+            type="button"
+            onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
+            className="flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-slate-700 hover:text-emerald-700 bg-slate-100/80 hover:bg-emerald-50 rounded-lg border border-slate-200 hover:border-emerald-300 transition-all cursor-pointer shadow-2xs active:scale-95"
+            title={language === 'ar' ? 'التغيير إلى الإنجليزية (Switch to English)' : 'التبديل إلى العربية (Switch to Arabic)'}
+          >
+            <Languages size={13} className="text-emerald-600 shrink-0" />
+            <span>{language === 'ar' ? 'English' : 'العربية'}</span>
+          </button>
+
           <button 
             type="button"
             onClick={() => setIsCenterOpen(true)}

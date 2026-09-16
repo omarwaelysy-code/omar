@@ -180,6 +180,7 @@ export const ar = {
   'nav.payment_vouchers': 'سند الصرف / صرف لمورد',
   'nav.supplier_payment_vouchers': 'سند صرف مورد',
   'nav.issued_cheques': 'الشيكات',
+  'nav.issued_cheques_menu': 'الشيكات',
   'nav.egyptian_banks': 'دليل البنوك المصرية',
   'nav.cash_transfers': 'التحويل بين الخزائن',
   'nav.warehouses_menu': 'المخازن',

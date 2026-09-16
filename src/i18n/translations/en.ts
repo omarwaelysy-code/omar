@@ -180,6 +180,7 @@ export const en = {
   'nav.payment_vouchers': 'Payment / Supplier Vouchers',
   'nav.supplier_payment_vouchers': 'Supplier Payment Voucher',
   'nav.issued_cheques': 'Cheques',
+  'nav.issued_cheques_menu': 'Cheques',
   'nav.egyptian_banks': 'Egyptian Banks Directory',
   'nav.cash_transfers': 'Cash Transfers',
   'nav.warehouses_menu': 'Warehouses',

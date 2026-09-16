@@ -3,6 +3,7 @@ import { X, RotateCcw, AlertCircle } from 'lucide-react';
 import { IssuedCheque } from '../../types';
 import { issuedChequeService } from '../../services/issuedChequeService';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface ChequeReturnModalProps {
   isOpen: boolean;
@@ -18,39 +19,51 @@ export const ChequeReturnModal: React.FC<ChequeReturnModalProps> = ({
   cheque
 }) => {
   const { showSuccess, showError } = useNotification();
+  const { language, dir } = useLanguage();
+  const isAr = language === 'ar';
+
   const [returnDate, setReturnDate] = useState(new Date().toISOString().slice(0, 10));
-  const [reason, setReason] = useState('عدم كفاية الرصيد');
+  const [reason, setReason] = useState(isAr ? 'عدم كفاية الرصيد' : 'Insufficient Funds');
   const [customReason, setCustomReason] = useState('');
   const [loading, setLoading] = useState(false);
 
   if (!isOpen || !cheque) return null;
 
-  const returnReasonsList = [
+  const returnReasonsList = isAr ? [
     'عدم كفاية الرصيد',
     'اختلاف في التوقيع',
     'خطأ في صياغة التاريخ أو المبلغ',
     'الشيك متقادم / منتهي الصلاحية',
     'إيقاف الصرف بناء على طلب الساحب',
     'سبب آخر'
+  ] : [
+    'Insufficient Funds',
+    'Signature Mismatch',
+    'Date or Amount Error',
+    'Cheque Expired / Stale',
+    'Stop Payment Requested by Drawer',
+    'Other Reason'
   ];
+
+  const otherReasonLabel = isAr ? 'سبب آخر' : 'Other Reason';
 
   const handleConfirmReturn = async (e: React.FormEvent) => {
     e.preventDefault();
-    const finalReason = reason === 'سبب آخر' ? customReason.trim() : reason;
+    const finalReason = reason === otherReasonLabel ? customReason.trim() : reason;
     if (!finalReason) {
-      showError('يرجى تحديد أو إدخال سبب ارتداد الشيك.');
+      showError(isAr ? 'يرجى تحديد أو إدخال سبب ارتداد الشيك.' : 'Please specify or enter the cheque return reason.');
       return;
     }
 
     setLoading(true);
     try {
       await issuedChequeService.returnCheque(cheque.id, returnDate, finalReason);
-      showSuccess('تم تسجيل ارتداد الشيك وإعادة إثبات مديونية المورد بنجاح.');
+      showSuccess(isAr ? 'تم تسجيل ارتداد الشيك وإعادة إثبات مديونية المورد بنجاح.' : 'Cheque return recorded and supplier liability re-established successfully.');
       onSuccess();
       onClose();
     } catch (err: any) {
       console.error('Error returning cheque:', err);
-      showError(err.message || 'فشل في تسجيل ارتداد الشيك.');
+      showError(err.message || (isAr ? 'فشل في تسجيل ارتداد الشيك.' : 'Failed to record cheque return.'));
     } finally {
       setLoading(false);
     }
@@ -58,7 +71,7 @@ export const ChequeReturnModal: React.FC<ChequeReturnModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200" dir="rtl">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200" dir={dir}>
         
         {/* Header */}
         <div className="px-6 py-5 bg-rose-50/50 dark:bg-rose-950/20 border-b border-rose-100 dark:border-rose-900/30 flex items-center justify-between">
@@ -68,16 +81,16 @@ export const ChequeReturnModal: React.FC<ChequeReturnModalProps> = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                تسجيل ارتداد الشيك من البنك
+                {isAr ? 'تسجيل ارتداد الشيك من البنك' : 'Record Cheque Return by Bank'}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                إلغاء ورقة الدفع وإعادة إثبات مديونية المورد
+                {isAr ? 'إلغاء ورقة الدفع وإعادة إثبات مديونية المورد' : 'Reverse notes payable and re-establish supplier balance'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -88,24 +101,24 @@ export const ChequeReturnModal: React.FC<ChequeReturnModalProps> = ({
           
           <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 space-y-2 text-xs">
             <div className="flex justify-between items-center text-slate-500">
-              <span>رقم الشيك:</span>
+              <span>{isAr ? 'رقم الشيك:' : 'Cheque #:'}</span>
               <span className="font-mono font-bold text-slate-900 dark:text-white">{cheque.cheque_number}</span>
             </div>
             <div className="flex justify-between items-center text-slate-500">
-              <span>المورد:</span>
+              <span>{isAr ? 'المورد:' : 'Supplier:'}</span>
               <span className="font-bold text-slate-900 dark:text-white">{cheque.supplier_name || cheque.payee_name}</span>
             </div>
             <div className="flex justify-between items-center text-slate-500">
-              <span>المبلغ:</span>
+              <span>{isAr ? 'المبلغ:' : 'Amount:'}</span>
               <span className="font-mono font-bold text-rose-600 dark:text-rose-400">
-                {Number(cheque.amount).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م
+                {Number(cheque.amount).toLocaleString(isAr ? 'ar-EG' : 'en-US', { minimumFractionDigits: 2 })} {cheque.currency || (isAr ? 'ج.م' : 'EGP')}
               </span>
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              تاريخ الارتداد <span className="text-rose-500">*</span>
+              {isAr ? 'تاريخ الارتداد' : 'Return Date'} <span className="text-rose-500">*</span>
             </label>
             <input
               type="date"
@@ -118,7 +131,7 @@ export const ChequeReturnModal: React.FC<ChequeReturnModalProps> = ({
 
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              سبب الارتداد <span className="text-rose-500">*</span>
+              {isAr ? 'سبب الارتداد' : 'Return Reason'} <span className="text-rose-500">*</span>
             </label>
             <select
               value={reason}
@@ -131,15 +144,15 @@ export const ChequeReturnModal: React.FC<ChequeReturnModalProps> = ({
             </select>
           </div>
 
-          {reason === 'سبب آخر' && (
+          {reason === otherReasonLabel && (
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                توضيح السبب بالتفصيل <span className="text-rose-500">*</span>
+                {isAr ? 'توضيح السبب بالتفصيل' : 'Detailed Explanation'} <span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
                 required
-                placeholder="اكتب سبب ارتداد الشيك..."
+                placeholder={isAr ? "اكتب سبب ارتداد الشيك..." : "Enter cheque return reason..."}
                 value={customReason}
                 onChange={e => setCustomReason(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none text-sm transition-all"
@@ -148,24 +161,24 @@ export const ChequeReturnModal: React.FC<ChequeReturnModalProps> = ({
           )}
 
           <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/30 text-rose-700 dark:text-rose-300 text-[11px] leading-relaxed">
-            ⚠️ <strong>الأثر المحاسبي:</strong> سيتم إنشاء قيد ارتداد (من حـ/ أوراق الدفع إلى حـ/ المورد) لإلغاء ورقة الدفع وإعادة تعليق المبلغ على حساب المورد.
+            ⚠️ <strong>{isAr ? 'الأثر المحاسبي:' : 'Accounting Impact:'}</strong> {isAr ? 'سيتم إنشاء قيد ارتداد (من حـ/ أوراق الدفع إلى حـ/ المورد) لإلغاء ورقة الدفع وإعادة تعليق المبلغ على حساب المورد.' : 'A return journal entry will be created (Dr. Notes Payable, Cr. Supplier) to cancel the note and restore supplier liability.'}
           </div>
 
           <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
-              إلغاء
+              {isAr ? 'إلغاء' : 'Cancel'}
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-lg shadow-rose-500/20 flex items-center gap-2 transition-all disabled:opacity-50"
+              className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-lg shadow-rose-500/20 flex items-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
             >
               <RotateCcw className="w-4 h-4" />
-              <span>{loading ? 'جاري التسجيل...' : 'تأكيد الارتداد'}</span>
+              <span>{loading ? (isAr ? 'جاري التسجيل...' : 'Recording...') : (isAr ? 'تأكيد الارتداد' : 'Confirm Return')}</span>
             </button>
           </div>
 

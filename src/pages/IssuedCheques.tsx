@@ -3,13 +3,14 @@ import {
   Plus, Search, Filter, RefreshCw, Eye, Edit3, Trash2, CheckCircle2, 
   Clock, RotateCcw, Ban, Paperclip, Printer, FileSpreadsheet, ChevronLeft, 
   ChevronRight, Calendar, Building2, User, DollarSign, LayoutDashboard, 
-  ListOrdered, BarChart3, AlertCircle 
+  ListOrdered, BarChart3, AlertCircle, Check 
 } from 'lucide-react';
 import { IssuedCheque, Supplier, PaymentMethod, IssuedChequeStats, Account } from '../types';
 import { dbService } from '../services/dbService';
 import { issuedChequeService } from '../services/issuedChequeService';
 import { useNotification } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { ChequeFormModal } from '../components/issued-cheques/ChequeFormModal';
 import { ChequeDetailsModal } from '../components/issued-cheques/ChequeDetailsModal';
 import { ChequePaymentModal } from '../components/issued-cheques/ChequePaymentModal';
@@ -22,6 +23,8 @@ import { ChequesReportsTab } from '../components/issued-cheques/ChequesReportsTa
 export const IssuedCheques: React.FC = () => {
   const { showSuccess, showError } = useNotification();
   const { user } = useAuth();
+  const { language, dir } = useLanguage();
+  const isAr = language === 'ar';
 
   // Active Main Tab
   const [activeTab, setActiveTab] = useState<'dashboard' | 'all' | 'create' | 'due' | 'reports'>('dashboard');
@@ -74,7 +77,7 @@ export const IssuedCheques: React.FC = () => {
       setAccounts(accData || []);
     } catch (err: any) {
       console.error('Error loading issued cheques data:', err);
-      showError(err.message || 'فشل في تحميل بيانات الشيكات الصادرة');
+      showError(err.message || (isAr ? 'فشل في تحميل بيانات الشيكات الصادرة' : 'Failed to load issued cheques data'));
     } finally {
       setLoading(false);
     }
@@ -100,33 +103,32 @@ export const IssuedCheques: React.FC = () => {
     const date30Days = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     return cheques.filter(c => {
-      // Due tab specific constraint
-      if (activeTab === 'due') {
-        if (!['ISSUED', 'POSTPONED'].includes(c.status)) return false;
+      // If Due tab is selected, only show un-paid, un-cancelled cheques
+      if (activeTab === 'due' && !['ISSUED', 'POSTPONED'].includes(c.status)) {
+        return false;
       }
 
-      // Search term
-      if (searchTerm.trim()) {
+      // Search
+      if (searchTerm) {
         const term = searchTerm.toLowerCase();
-        const numMatch = (c.cheque_number || '').toLowerCase().includes(term);
-        const suppMatch = (c.supplier_name || '').toLowerCase().includes(term);
-        const payeeMatch = (c.payee_name || '').toLowerCase().includes(term);
-        const bankMatch = (c.bank_name || '').toLowerCase().includes(term);
-        const descMatch = (c.description || '').toLowerCase().includes(term);
-        if (!numMatch && !suppMatch && !payeeMatch && !bankMatch && !descMatch) return false;
+        const matchNum = c.cheque_number?.toLowerCase().includes(term);
+        const matchSupp = c.supplier_name?.toLowerCase().includes(term) || c.payee_name?.toLowerCase().includes(term);
+        const matchBank = c.bank_name?.toLowerCase().includes(term);
+        const matchNotes = c.description?.toLowerCase().includes(term);
+        if (!matchNum && !matchSupp && !matchBank && !matchNotes) return false;
       }
 
-      // Supplier filter
+      // Supplier
       if (supplierFilter && c.supplier_id !== supplierFilter) return false;
 
-      // Bank filter
+      // Bank
       if (bankFilter && c.bank_account_id !== bankFilter) return false;
 
-      // Status filter
+      // Status
       if (statusFilter && c.status !== statusFilter) return false;
 
-      // Due Period filter
-      if (duePeriodFilter !== 'all') {
+      // Due Period
+      if (c.due_date) {
         const dueStr = String(c.due_date).slice(0, 10);
         if (duePeriodFilter === 'today' && dueStr !== todayStr) return false;
         if (duePeriodFilter === '7days' && (dueStr < todayStr || dueStr > date7Days)) return false;
@@ -148,17 +150,17 @@ export const IssuedCheques: React.FC = () => {
 
   const handleDeleteCheque = async (cheque: IssuedCheque) => {
     if (cheque.status !== 'DRAFT') {
-      showError('لا يمكن حذف هذا الشيك لأنه تم إصداره مسبقاً. يمكنك إلغاء الشيك بدلاً من ذلك.');
+      showError(isAr ? 'لا يمكن حذف هذا الشيك لأنه تم إصداره مسبقاً. يمكنك إلغاء الشيك بدلاً من ذلك.' : 'Cannot delete this cheque because it was already issued. You can cancel it instead.');
       return;
     }
-    if (!window.confirm(`هل أنت متأكد من حذف مسودة الشيك رقم (${cheque.cheque_number})؟`)) return;
+    if (!window.confirm(isAr ? `هل أنت متأكد من حذف مسودة الشيك رقم (${cheque.cheque_number})؟` : `Are you sure you want to delete cheque draft #${cheque.cheque_number}?`)) return;
 
     try {
       await issuedChequeService.delete(cheque.id);
-      showSuccess('تم حذف مسودة الشيك بنجاح.');
+      showSuccess(isAr ? 'تم حذف مسودة الشيك بنجاح.' : 'Cheque draft deleted successfully.');
       fetchData();
     } catch (err: any) {
-      showError(err.message || 'فشل في حذف الشيك.');
+      showError(err.message || (isAr ? 'فشل في حذف الشيك.' : 'Failed to delete cheque.'));
     }
   };
 
@@ -167,8 +169,10 @@ export const IssuedCheques: React.FC = () => {
   };
 
   const formatMoney = (val?: number) => {
-    return Number(val || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return Number(val || 0).toLocaleString(isAr ? 'ar-EG' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
+
+  const currencyLabel = isAr ? 'ج.م' : 'EGP';
 
   const getStatusBadge = (status: string, dueDateStr?: string) => {
     const isOverdue = dueDateStr && new Date(dueDateStr) < new Date() && ['ISSUED', 'POSTPONED'].includes(status);
@@ -177,7 +181,7 @@ export const IssuedCheques: React.FC = () => {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
           <Clock className="w-3 h-3" />
-          متأخر الصرف
+          {isAr ? 'متأخر الصرف' : 'Overdue'}
         </span>
       );
     }
@@ -186,42 +190,42 @@ export const IssuedCheques: React.FC = () => {
       case 'DRAFT':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-            مسودة
+            {isAr ? 'مسودة' : 'Draft'}
           </span>
         );
       case 'ISSUED':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
             <CheckCircle2 className="w-3 h-3" />
-            صادر (برسم الدفع)
+            {isAr ? 'صادر (برسم الدفع)' : 'Issued (Under Payment)'}
           </span>
         );
       case 'PAID':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
             <CheckCircle2 className="w-3 h-3" />
-            مدفوع ومصروف
+            {isAr ? 'مدفوع ومصروف' : 'Paid / Cleared'}
           </span>
         );
       case 'POSTPONED':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
             <Clock className="w-3 h-3" />
-            مؤجل
+            {isAr ? 'مؤجل' : 'Postponed'}
           </span>
         );
       case 'RETURNED':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
             <RotateCcw className="w-3 h-3" />
-            مرتد
+            {isAr ? 'مرتد' : 'Returned'}
           </span>
         );
       case 'CANCELLED':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
             <Ban className="w-3 h-3" />
-            ملغى
+            {isAr ? 'ملغى' : 'Cancelled'}
           </span>
         );
       default:
@@ -230,7 +234,7 @@ export const IssuedCheques: React.FC = () => {
   };
 
   return (
-    <div className="p-3 sm:p-4 lg:p-5 space-y-3.5 max-w-[1600px] mx-auto min-h-screen" dir="rtl">
+    <div className="p-3 sm:p-4 lg:p-5 space-y-3.5 max-w-[1600px] mx-auto min-h-screen" dir={dir}>
       
       {/* Top Header Bar - Compact */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -241,88 +245,96 @@ export const IssuedCheques: React.FC = () => {
             </div>
             <div>
               <h1 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-                إدارة الشيكات
+                {isAr ? 'إدارة الشيكات' : 'Cheques Management'}
               </h1>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                إصدار، متابعة، تسوية، وتوثيق استحقاقات الشيكات البنكية للموردين والجهات الدائنة
+                {isAr 
+                  ? 'إصدار، متابعة، تسوية، وتوثيق استحقاقات الشيكات البنكية للموردين والجهات الدائنة' 
+                  : 'Issue, track, settle, and document bank cheque obligations for suppliers and creditors'}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Primary Action Button */}
-        <button
-          onClick={() => {
-            setSelectedChequeForEdit(null);
-            setActiveTab('create');
-          }}
-          className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99]"
-        >
-          <Plus className="w-4 h-4" />
-          <span>تحرير شيك جديد</span>
-        </button>
+        {/* Primary Action Button (hidden on dashboard to avoid duplicate button) */}
+        {activeTab !== 'dashboard' && (
+          <button
+            onClick={() => {
+              setSelectedChequeForEdit(null);
+              setActiveTab('create');
+            }}
+            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>{isAr ? 'تحرير شيك جديد' : 'Issue New Cheque'}</span>
+          </button>
+        )}
       </div>
 
       {/* Main Navigation Tabs - Compact */}
       <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 w-fit overflow-x-auto max-w-full">
         <button
           onClick={() => { setActiveTab('dashboard'); setCurrentPage(1); }}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
             activeTab === 'dashboard'
               ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
           <LayoutDashboard className="w-3.5 h-3.5" />
-          <span>لوحة التحكم</span>
+          <span>{isAr ? 'لوحة التحكم' : 'Dashboard'}</span>
         </button>
 
         <button
           onClick={() => { setActiveTab('all'); setCurrentPage(1); }}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
             activeTab === 'all'
               ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
           <ListOrdered className="w-3.5 h-3.5" />
-          <span>كل الشيكات ({cheques.length})</span>
+          <span>{isAr ? `كل الشيكات (${cheques.length})` : `All Cheques (${cheques.length})`}</span>
         </button>
 
         <button
           onClick={() => { setActiveTab('create'); }}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
             activeTab === 'create'
               ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
           <Plus className="w-3.5 h-3.5" />
-          <span>{selectedChequeForEdit ? 'تعديل مسودة الشيك' : 'تحرير شيك صادر'}</span>
+          <span>
+            {selectedChequeForEdit 
+              ? (isAr ? 'تعديل مسودة الشيك' : 'Edit Cheque Draft') 
+              : (isAr ? 'تحرير شيك صادر' : 'Issue Cheque')}
+          </span>
         </button>
 
         <button
           onClick={() => { setActiveTab('due'); setCurrentPage(1); }}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
             activeTab === 'due'
               ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
           <Clock className="w-3.5 h-3.5" />
-          <span>الشيكات المستحقة واجبة الصرف</span>
+          <span>{isAr ? 'الشيكات المستحقة واجبة الصرف' : 'Due & Payable Cheques'}</span>
         </button>
 
         <button
           onClick={() => { setActiveTab('reports'); setCurrentPage(1); }}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
             activeTab === 'reports'
               ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
           <BarChart3 className="w-3.5 h-3.5" />
-          <span>التقارير المالية والتحليلية</span>
+          <span>{isAr ? 'التقارير المالية والتحليلية' : 'Financial & Analytical Reports'}</span>
         </button>
       </div>
 
@@ -362,13 +374,13 @@ export const IssuedCheques: React.FC = () => {
             
             {/* Search Input */}
             <div className="relative flex-1 w-full">
-              <Search className="w-3.5 h-3.5 absolute right-3 top-2.5 text-slate-400" />
+              <Search className={`w-3.5 h-3.5 absolute ${isAr ? 'right-3' : 'left-3'} top-2.5 text-slate-400`} />
               <input
                 type="text"
-                placeholder="البحث برقم الشيك، اسم المورد، الحساب البنكي، أو البيان..."
+                placeholder={isAr ? "البحث برقم الشيك، اسم المورد، الحساب البنكي، أو البيان..." : "Search by cheque #, supplier, bank account, or memo..."}
                 value={searchTerm}
                 onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                className="w-full pr-9 pl-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                className={`w-full ${isAr ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500`}
               />
             </div>
 
@@ -378,7 +390,7 @@ export const IssuedCheques: React.FC = () => {
               onChange={e => { setSupplierFilter(e.target.value); setCurrentPage(1); }}
               className="w-full md:w-44 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 outline-none"
             >
-              <option value="">كل الموردين</option>
+              <option value="">{isAr ? 'كل الموردين' : 'All Suppliers'}</option>
               {suppliers.map(s => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
@@ -390,7 +402,7 @@ export const IssuedCheques: React.FC = () => {
               onChange={e => { setBankFilter(e.target.value); setCurrentPage(1); }}
               className="w-full md:w-44 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 outline-none"
             >
-              <option value="">كل البنوك</option>
+              <option value="">{isAr ? 'كل البنوك' : 'All Banks'}</option>
               {paymentMethods.filter(p => p.type === 'bank' || p.bank_name).map(b => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
@@ -403,13 +415,13 @@ export const IssuedCheques: React.FC = () => {
                 onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}
                 className="w-full md:w-36 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 outline-none"
               >
-                <option value="">كل الحالات</option>
-                <option value="DRAFT">مسودة</option>
-                <option value="ISSUED">صادر</option>
-                <option value="PAID">مدفوع ومصروف</option>
-                <option value="POSTPONED">مؤجل</option>
-                <option value="RETURNED">مرتد</option>
-                <option value="CANCELLED">ملغى</option>
+                <option value="">{isAr ? 'كل الحالات' : 'All Statuses'}</option>
+                <option value="DRAFT">{isAr ? 'مسودة' : 'Draft'}</option>
+                <option value="ISSUED">{isAr ? 'صادر' : 'Issued'}</option>
+                <option value="PAID">{isAr ? 'مدفوع ومصروف' : 'Paid / Cleared'}</option>
+                <option value="POSTPONED">{isAr ? 'مؤجل' : 'Postponed'}</option>
+                <option value="RETURNED">{isAr ? 'مرتد' : 'Returned'}</option>
+                <option value="CANCELLED">{isAr ? 'ملغى' : 'Cancelled'}</option>
               </select>
             )}
 
@@ -419,18 +431,18 @@ export const IssuedCheques: React.FC = () => {
               onChange={e => { setDuePeriodFilter(e.target.value as any); setCurrentPage(1); }}
               className="w-full md:w-36 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-300 outline-none"
             >
-              <option value="all">كل المواعيد</option>
-              <option value="today">مستحق اليوم</option>
-              <option value="7days">خلال 7 أيام</option>
-              <option value="30days">خلال 30 يوم</option>
-              <option value="overdue">متأخر الصرف</option>
+              <option value="all">{isAr ? 'كل المواعيد' : 'All Due Dates'}</option>
+              <option value="today">{isAr ? 'مستحق اليوم' : 'Due Today'}</option>
+              <option value="7days">{isAr ? 'خلال 7 أيام' : 'Within 7 Days'}</option>
+              <option value="30days">{isAr ? 'خلال 30 يوم' : 'Within 30 Days'}</option>
+              <option value="overdue">{isAr ? 'متأخر الصرف' : 'Overdue'}</option>
             </select>
 
             <button
               onClick={fetchData}
               disabled={loading}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              title="تحديث"
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              title={isAr ? 'تحديث' : 'Refresh'}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             </button>
@@ -441,23 +453,27 @@ export const IssuedCheques: React.FC = () => {
             {paginatedCheques.length === 0 ? (
               <div className="py-12 text-center text-slate-400">
                 <AlertCircle className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-2" />
-                <p className="text-sm font-bold text-slate-700 dark:text-slate-300">لم يتم العثور على أي شيكات مطابقة</p>
-                <p className="text-[11px] text-slate-400 mt-1">جرب تغيير معايير البحث أو إضافة شيك صادر جديد</p>
+                <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                  {isAr ? 'لم يتم العثور على أي شيكات مطابقة' : 'No matching cheques found'}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  {isAr ? 'جرب تغيير معايير البحث أو إضافة شيك صادر جديد' : 'Try adjusting search filters or issue a new cheque'}
+                </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-right text-xs">
+                <table className={`w-full ${isAr ? 'text-right' : 'text-left'} text-xs`}>
                   <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300 font-bold border-b border-slate-100 dark:border-slate-800">
                     <tr>
-                      <th className="px-3 py-2 text-[11px]">رقم الشيك</th>
-                      <th className="px-3 py-2 text-[11px]">المورد المستفيد</th>
-                      <th className="px-3 py-2 text-[11px]">الحساب الدائن</th>
-                      <th className="px-3 py-2 text-[11px]">الحساب البنكي</th>
-                      <th className="px-3 py-2 text-[11px]">المبلغ</th>
-                      <th className="px-3 py-2 text-[11px]">تاريخ التحرير</th>
-                      <th className="px-3 py-2 text-[11px]">تاريخ الاستحقاق</th>
-                      <th className="px-3 py-2 text-[11px]">الحالة</th>
-                      <th className="px-3 py-2 text-[11px] text-center">إجراءات</th>
+                      <th className="px-3 py-2 text-[11px]">{isAr ? 'رقم الشيك' : 'Cheque #'}</th>
+                      <th className="px-3 py-2 text-[11px]">{isAr ? 'المورد المستفيد' : 'Beneficiary / Supplier'}</th>
+                      <th className="px-3 py-2 text-[11px]">{isAr ? 'الحساب الدائن' : 'Credit Account'}</th>
+                      <th className="px-3 py-2 text-[11px]">{isAr ? 'الحساب البنكي' : 'Bank Account'}</th>
+                      <th className="px-3 py-2 text-[11px]">{isAr ? 'المبلغ' : 'Amount'}</th>
+                      <th className="px-3 py-2 text-[11px]">{isAr ? 'تاريخ التحرير' : 'Issue Date'}</th>
+                      <th className="px-3 py-2 text-[11px]">{isAr ? 'تاريخ الاستحقاق' : 'Due Date'}</th>
+                      <th className="px-3 py-2 text-[11px]">{isAr ? 'الحالة' : 'Status'}</th>
+                      <th className="px-3 py-2 text-[11px] text-center">{isAr ? 'إجراءات' : 'Actions'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -466,7 +482,7 @@ export const IssuedCheques: React.FC = () => {
                         <td className="px-3 py-2 font-mono font-bold text-slate-900 dark:text-white">
                           <button
                             onClick={() => setSelectedChequeForDetails(cheque)}
-                            className="hover:text-emerald-600 transition-colors"
+                            className="hover:text-emerald-600 transition-colors cursor-pointer"
                           >
                             {cheque.cheque_number}
                           </button>
@@ -475,17 +491,17 @@ export const IssuedCheques: React.FC = () => {
                           {cheque.supplier_name || cheque.payee_name || '-'}
                         </td>
                         <td className="px-3 py-2 text-slate-700 dark:text-slate-300 font-medium">
-                          {cheque.credit_account_name || 'أوراق دفع'}
+                          {cheque.credit_account_name || (isAr ? 'أوراق دفع' : 'Notes Payable')}
                         </td>
                         <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
                           {cheque.bank_name || '-'}
                         </td>
                         <td className="px-3 py-2 font-mono font-black text-slate-900 dark:text-white">
                           <div>
-                            <span>{formatMoney(cheque.amount)} {cheque.currency || 'ج.م'}</span>
+                            <span>{formatMoney(cheque.amount)} {cheque.currency || currencyLabel}</span>
                             {cheque.currency && cheque.currency !== 'EGP' && (
                               <span className="block text-[10px] font-normal text-emerald-600 dark:text-emerald-400">
-                                ({formatMoney(Number(cheque.amount) * (Number(cheque.exchange_rate) || 1))} ج.م)
+                                ({formatMoney(Number(cheque.amount) * (Number(cheque.exchange_rate) || 1))} {currencyLabel})
                               </span>
                             )}
                           </div>
@@ -505,8 +521,8 @@ export const IssuedCheques: React.FC = () => {
                             {/* View details */}
                             <button
                               onClick={() => setSelectedChequeForDetails(cheque)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                              title="عرض التفاصيل"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                              title={isAr ? 'عرض التفاصيل' : 'View Details'}
                             >
                               <Eye className="w-4 h-4" />
                             </button>
@@ -516,32 +532,32 @@ export const IssuedCheques: React.FC = () => {
                               <>
                                 <button
                                   onClick={async () => {
-                                    if (window.confirm(`هل أنت متأكد من اعتماد وإصدار الشيك رقم (${cheque.cheque_number}) وترحيل قيد أوراق الدفع؟`)) {
+                                    if (window.confirm(isAr ? `هل أنت متأكد من اعتماد وإصدار الشيك رقم (${cheque.cheque_number}) وترحيل قيد أوراق الدفع؟` : `Are you sure you want to approve and issue cheque #${cheque.cheque_number}?`)) {
                                       try {
                                         await issuedChequeService.issueCheque(cheque.id);
-                                        showSuccess('تم إصدار الشيك بنجاح.');
+                                        showSuccess(isAr ? 'تم إصدار الشيك بنجاح.' : 'Cheque issued successfully.');
                                         fetchData();
                                       } catch (err: any) {
-                                        showError(err.message || 'فشل في إصدار الشيك');
+                                        showError(err.message || (isAr ? 'فشل في إصدار الشيك' : 'Failed to issue cheque'));
                                       }
                                     }
                                   }}
-                                  className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 font-bold text-[11px] transition-colors"
-                                  title="اعتماد وإصدار"
+                                  className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 font-bold text-[11px] transition-colors cursor-pointer"
+                                  title={isAr ? 'اعتماد وإصدار' : 'Approve & Issue'}
                                 >
-                                  إصدار
+                                  {isAr ? 'إصدار' : 'Issue'}
                                 </button>
                                 <button
                                   onClick={() => { setSelectedChequeForEdit(cheque); setActiveTab('create'); }}
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                                  title="تعديل المسودة"
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                  title={isAr ? 'تعديل المسودة' : 'Edit Draft'}
                                 >
                                   <Edit3 className="w-3.5 h-3.5" />
                                 </button>
                                 <button
                                   onClick={() => handleDeleteCheque(cheque)}
-                                  className="p-1.5 rounded-lg text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
-                                  title="حذف المسودة"
+                                  className="p-1.5 rounded-lg text-rose-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                                  title={isAr ? 'حذف المسودة' : 'Delete Draft'}
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -553,22 +569,22 @@ export const IssuedCheques: React.FC = () => {
                               <>
                                 <button
                                   onClick={() => setSelectedChequeForPay(cheque)}
-                                  className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-bold text-[11px] transition-colors"
-                                  title="تسجيل الصرف والسداد"
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-bold text-[11px] transition-colors cursor-pointer"
+                                  title={isAr ? 'تسجيل الصرف والسداد' : 'Record Clearance'}
                                 >
-                                  صرف
+                                  {isAr ? 'صرف' : 'Clear'}
                                 </button>
                                 <button
                                   onClick={() => setSelectedChequeForPostpone(cheque)}
-                                  className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors"
-                                  title="تأجيل الاستحقاق"
+                                  className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors cursor-pointer"
+                                  title={isAr ? 'تأجيل الاستحقاق' : 'Postpone Due Date'}
                                 >
                                   <Clock className="w-3.5 h-3.5" />
                                 </button>
                                 <button
                                   onClick={() => setSelectedChequeForReturn(cheque)}
-                                  className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
-                                  title="تسجيل ارتداد"
+                                  className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                                  title={isAr ? 'تسجيل ارتداد' : 'Record Return'}
                                 >
                                   <RotateCcw className="w-3.5 h-3.5" />
                                 </button>
@@ -579,8 +595,8 @@ export const IssuedCheques: React.FC = () => {
                             {['DRAFT', 'ISSUED', 'POSTPONED'].includes(cheque.status) && (
                               <button
                                 onClick={() => setSelectedChequeForCancel(cheque)}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
-                                title="إلغاء الشيك"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                                title={isAr ? 'إلغاء الشيك' : 'Cancel Cheque'}
                               >
                                 <Ban className="w-3.5 h-3.5" />
                               </button>
@@ -599,15 +615,17 @@ export const IssuedCheques: React.FC = () => {
             {totalPages > 1 && (
               <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
                 <span>
-                  عرض {((currentPage - 1) * itemsPerPage) + 1} إلى {Math.min(currentPage * itemsPerPage, filteredCheques.length)} من أصل {filteredCheques.length} شيك
+                  {isAr 
+                    ? `عرض ${((currentPage - 1) * itemsPerPage) + 1} إلى ${Math.min(currentPage * itemsPerPage, filteredCheques.length)} من أصل ${filteredCheques.length} شيك`
+                    : `Showing ${((currentPage - 1) * itemsPerPage) + 1} to ${Math.min(currentPage * itemsPerPage, filteredCheques.length)} of ${filteredCheques.length} cheques`}
                 </span>
                 <div className="flex items-center gap-1">
                   <button
                     disabled={currentPage === 1}
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    {isAr ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
                   </button>
                   <span className="px-3 font-mono font-bold text-slate-800 dark:text-slate-200">
                     {currentPage} / {totalPages}
@@ -615,9 +633,9 @@ export const IssuedCheques: React.FC = () => {
                   <button
                     disabled={currentPage === totalPages}
                     onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    {isAr ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
@@ -646,7 +664,7 @@ export const IssuedCheques: React.FC = () => {
           setSelectedChequeForDetails(null);
           // Auto issue
           issuedChequeService.issueCheque(cheque.id).then(() => {
-            showSuccess('تم إصدار الشيك بنجاح.');
+            showSuccess(isAr ? 'تم إصدار الشيك بنجاح.' : 'Cheque issued successfully.');
             fetchData();
           }).catch(err => showError(err.message));
         }}

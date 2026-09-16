@@ -3,6 +3,7 @@ import { X, CheckCircle2, AlertCircle, DollarSign, Building2, Calendar, Wallet }
 import { IssuedCheque, PaymentMethod, Account } from '../../types';
 import { issuedChequeService } from '../../services/issuedChequeService';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 interface ChequePaymentModalProps {
   isOpen: boolean;
@@ -22,6 +23,9 @@ export const ChequePaymentModal: React.FC<ChequePaymentModalProps> = ({
   accounts = []
 }) => {
   const { showSuccess, showError } = useNotification();
+  const { language, dir } = useLanguage();
+  const isAr = language === 'ar';
+
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
   const [selectedAccountId, setSelectedAccountId] = useState('');
@@ -61,20 +65,25 @@ export const ChequePaymentModal: React.FC<ChequePaymentModalProps> = ({
       }
     });
 
-    // 2. From Accounts with cash/bank usage not already covered
+    // 2. From General Ledger Accounts
     accounts.forEach(acc => {
-      if (validCashUsages.includes(acc.account_usage || '')) {
-        const alreadyInPm = paymentMethods.some(pm => pm.account_id === acc.id || pm.id === acc.id);
-        if (!alreadyInPm) {
-          const isBank = acc.account_usage === 'bank';
+      const isAlreadyInPM = paymentMethods.some(pm => pm.id === acc.id || pm.name === acc.name);
+      if (!isAlreadyInPM) {
+        const isCashOrBank = validCashUsages.includes(acc.usage_type || '') ||
+                             acc.account_type?.toLowerCase().includes('cash') ||
+                             acc.account_type?.toLowerCase().includes('bank') ||
+                             acc.name.includes('بنك') || acc.name.includes('خزينة') || acc.name.includes('خزنة') ||
+                             acc.code.startsWith('101') || acc.code.startsWith('102');
+        if (isCashOrBank) {
+          const isBankAcc = acc.usage_type === 'bank' || acc.name.includes('بنك');
           const isDefault = acc.id === cheque?.bank_account_id;
           const item = {
             id: acc.id,
-            name: `${acc.code ? `${acc.code} - ` : ''}${acc.name}`,
-            type: acc.account_usage || 'cash',
+            name: `${acc.name} (${acc.code})`,
+            type: isBankAcc ? 'bank' : 'cash',
             isDefault
           };
-          if (isBank) {
+          if (isBankAcc) {
             banks.push(item);
           } else {
             cashList.push(item);
@@ -83,7 +92,7 @@ export const ChequePaymentModal: React.FC<ChequePaymentModalProps> = ({
       }
     });
 
-    // Sort banks so that the cheque's default bank is first
+    // Sort banks so that cheque's selected bank is on top
     banks.sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0));
 
     return { bankOptions: banks, cashAndOtherOptions: cashList };
@@ -93,8 +102,8 @@ export const ChequePaymentModal: React.FC<ChequePaymentModalProps> = ({
   const selectedAccountName = useMemo(() => {
     const all = [...bankOptions, ...cashAndOtherOptions];
     const found = all.find(a => a.id === selectedAccountId);
-    return found?.name || cheque?.bank_name || 'حساب البنك';
-  }, [bankOptions, cashAndOtherOptions, selectedAccountId, cheque?.bank_name]);
+    return found?.name || cheque?.bank_name || (isAr ? 'حساب البنك' : 'Bank Account');
+  }, [bankOptions, cashAndOtherOptions, selectedAccountId, cheque?.bank_name, isAr]);
 
   if (!isOpen || !cheque) return null;
 
@@ -105,18 +114,18 @@ export const ChequePaymentModal: React.FC<ChequePaymentModalProps> = ({
   const handleConfirmPay = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedAccountId) {
-      showError('يرجى اختيار حساب الصرف والخصم.');
+      showError(isAr ? 'يرجى اختيار حساب الصرف والخصم.' : 'Please select the payment / clearance account.');
       return;
     }
     setLoading(true);
     try {
       await issuedChequeService.payCheque(cheque.id, paymentDate, notes, selectedAccountId);
-      showSuccess('تم تسجيل صرف وسداد الشيك وترحيل القيد بنجاح.');
+      showSuccess(isAr ? 'تم تسجيل صرف وسداد الشيك وترحيل القيد بنجاح.' : 'Cheque clearance and journal entry posted successfully.');
       onSuccess();
       onClose();
     } catch (err: any) {
       console.error('Error clearing cheque:', err);
-      showError(err.message || 'فشل في تسجيل صرف الشيك.');
+      showError(err.message || (isAr ? 'فشل في تسجيل صرف الشيك.' : 'Failed to clear cheque.'));
     } finally {
       setLoading(false);
     }
@@ -124,7 +133,7 @@ export const ChequePaymentModal: React.FC<ChequePaymentModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200" dir="rtl">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200" dir={dir}>
         
         {/* Header */}
         <div className="px-6 py-5 bg-emerald-50/50 dark:bg-emerald-950/20 border-b border-emerald-100 dark:border-emerald-900/30 flex items-center justify-between">
@@ -134,16 +143,16 @@ export const ChequePaymentModal: React.FC<ChequePaymentModalProps> = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                تسجيل صرف وسداد الشيك
+                {isAr ? 'تسجيل صرف وسداد الشيك' : 'Record Cheque Clearance & Payment'}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                خصم قيمة الشيك وتوليد قيد التسوية المحاسبي
+                {isAr ? 'خصم قيمة الشيك وتوليد قيد التسوية المحاسبي' : 'Deduct cheque amount and generate settlement journal entry'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -155,27 +164,27 @@ export const ChequePaymentModal: React.FC<ChequePaymentModalProps> = ({
           {/* Summary Card */}
           <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 space-y-2 text-xs">
             <div className="flex justify-between items-center text-slate-500">
-              <span>رقم الشيك:</span>
+              <span>{isAr ? 'رقم الشيك:' : 'Cheque #:'}</span>
               <span className="font-mono font-bold text-slate-900 dark:text-white">{cheque.cheque_number}</span>
             </div>
             <div className="flex justify-between items-center text-slate-500">
-              <span>المورد المستفيد:</span>
+              <span>{isAr ? 'المورد المستفيد:' : 'Beneficiary / Supplier:'}</span>
               <span className="font-bold text-slate-900 dark:text-white">{cheque.supplier_name || cheque.payee_name}</span>
             </div>
             <div className="flex justify-between items-center text-slate-500">
-              <span>البنك الأصلي المسحوب عليه:</span>
-              <span className="font-bold text-slate-900 dark:text-white">{cheque.bank_name || 'بنك الشيك'}</span>
+              <span>{isAr ? 'البنك الأصلي المسحوب عليه:' : 'Drawn On Bank:'}</span>
+              <span className="font-bold text-slate-900 dark:text-white">{cheque.bank_name || (isAr ? 'بنك الشيك' : 'Cheque Bank')}</span>
             </div>
             
             <div className="flex justify-between items-center text-slate-500 pt-2 border-t border-slate-200 dark:border-slate-700">
-              <span className="text-sm font-bold text-slate-700 dark:text-slate-200">المبلغ المطلوب خصمه:</span>
-              <div className="text-left">
+              <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{isAr ? 'المبلغ المطلوب خصمه:' : 'Amount to Deduct:'}</span>
+              <div className={isAr ? "text-left" : "text-right"}>
                 <span className="text-base font-mono font-black text-emerald-600 dark:text-emerald-400">
-                  {Number(cheque.amount).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} {cheque.currency || 'ج.م'}
+                  {Number(cheque.amount).toLocaleString(isAr ? 'ar-EG' : 'en-US', { minimumFractionDigits: 2 })} {cheque.currency || (isAr ? 'ج.م' : 'EGP')}
                 </span>
                 {isForeign && (
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
-                    يعادل: {Number(equivalentEgp).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م (بسعر صرف {exchangeRate})
+                    {isAr ? `يعادل: ${Number(equivalentEgp).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م (بسعر صرف ${exchangeRate})` : `Equivalent: ${Number(equivalentEgp).toLocaleString('en-US', { minimumFractionDigits: 2 })} EGP (Rate ${exchangeRate})`}
                   </p>
                 )}
               </div>
@@ -185,9 +194,9 @@ export const ChequePaymentModal: React.FC<ChequePaymentModalProps> = ({
           {/* Bank / Cash Account Selector */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
-              <span>حساب الصرف والخصم (النقدية والبنوك والوسائل المالية) <span className="text-rose-500">*</span></span>
+              <span>{isAr ? 'حساب الصرف والخصم (النقدية والبنوك والوسائل المالية)' : 'Clearing Account (Cash, Bank, Financial Methods)'} <span className="text-rose-500">*</span></span>
               <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                {bankOptions.some(b => b.id === selectedAccountId) ? 'حساب بنكي' : 'خزينة / وسيلة مالية'}
+                {bankOptions.some(b => b.id === selectedAccountId) ? (isAr ? 'حساب بنكي' : 'Bank Account') : (isAr ? 'خزينة / وسيلة مالية' : 'Cash / Other Account')}
               </span>
             </label>
             <div className="relative group">
@@ -197,15 +206,15 @@ export const ChequePaymentModal: React.FC<ChequePaymentModalProps> = ({
                 onChange={e => setSelectedAccountId(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
               >
-                <optgroup label="الحسابات البنكية (البنك الافتراضي للشيك أولاً)">
+                <optgroup label={isAr ? "الحسابات البنكية (البنك الافتراضي للشيك أولاً)" : "Bank Accounts (Cheque default bank first)"}>
                   {bankOptions.map(b => (
                     <option key={b.id} value={b.id}>
-                      {b.name} {b.id === cheque.bank_account_id ? ' ★ (الافتراضي للشيك)' : ''}
+                      {b.name} {b.id === cheque.bank_account_id ? (isAr ? ' ★ (الافتراضي للشيك)' : ' ★ (Cheque Default)') : ''}
                     </option>
                   ))}
                 </optgroup>
                 {cashAndOtherOptions.length > 0 && (
-                  <optgroup label="الخزائن والنقدية والوسائل المالية الأخرى">
+                  <optgroup label={isAr ? "الخزائن والنقدية والوسائل المالية الأخرى" : "Cash & Other Financial Accounts"}>
                     {cashAndOtherOptions.map(c => (
                       <option key={c.id} value={c.id}>
                         {c.name}
@@ -216,13 +225,13 @@ export const ChequePaymentModal: React.FC<ChequePaymentModalProps> = ({
               </select>
             </div>
             <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
-              * تم تعيين البنك المسحوب عليه كافتراضي، ويمكنك تغييره لأي حساب نقدية أو بنك آخر مسجل بالنظام.
+              {isAr ? '* تم تعيين البنك المسحوب عليه كافتراضي، ويمكنك تغييره لأي حساب نقدية أو بنك آخر مسجل بالنظام.' : '* Default is set to the drawn-on bank; you may change it to any other bank or cash account.'}
             </p>
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              تاريخ الخصم والصرف الفعلي من الحساب <span className="text-rose-500">*</span>
+              {isAr ? 'تاريخ الخصم والصرف الفعلي من الحساب' : 'Actual Clearance / Value Date'} <span className="text-rose-500">*</span>
             </label>
             <input
               type="date"
@@ -235,11 +244,11 @@ export const ChequePaymentModal: React.FC<ChequePaymentModalProps> = ({
 
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              ملاحظات عملية السداد
+              {isAr ? 'ملاحظات عملية السداد' : 'Payment Notes / Memo'}
             </label>
             <input
               type="text"
-              placeholder="مثال: خصم وفق كشف حساب البنك لشهر ..."
+              placeholder={isAr ? "مثال: خصم وفق كشف حساب البنك لشهر ..." : "E.g. Deducted per bank statement for month..."}
               value={notes}
               onChange={e => setNotes(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-sm transition-all"
@@ -247,7 +256,9 @@ export const ChequePaymentModal: React.FC<ChequePaymentModalProps> = ({
           </div>
 
           <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 text-amber-700 dark:text-amber-300 text-[11px] leading-relaxed">
-            ⚠️ <strong>ملاحظة محاسبية:</strong> سيتم إنشاء قيد يومية آلياً (من حـ/ {cheque.credit_account_name || 'أوراق الدفع'} إلى حـ/ {selectedAccountName}) وتحديث حالة الشيك إلى <strong>مدفوع</strong>.
+            ⚠️ <strong>{isAr ? 'ملاحظة محاسبية:' : 'Accounting Notice:'}</strong> {isAr 
+              ? `سيتم إنشاء قيد يومية آلياً (من حـ/ ${cheque.credit_account_name || 'أوراق الدفع'} إلى حـ/ ${selectedAccountName}) وتحديث حالة الشيك إلى مدفوع.`
+              : `A journal entry will be generated automatically (Dr. ${cheque.credit_account_name || 'Notes Payable'}, Cr. ${selectedAccountName}) and status set to Paid.`}
           </div>
 
           {/* Actions */}
@@ -255,17 +266,17 @@ export const ChequePaymentModal: React.FC<ChequePaymentModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
-              إلغاء
+              {isAr ? 'إلغاء' : 'Cancel'}
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition-all disabled:opacity-50"
+              className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>{loading ? 'جاري التأكيد...' : 'تأكيد السداد والخصم'}</span>
+              <span>{loading ? (isAr ? 'جاري التأكيد...' : 'Confirming...') : (isAr ? 'تأكيد السداد والخصم' : 'Confirm Clearance')}</span>
             </button>
           </div>
 
