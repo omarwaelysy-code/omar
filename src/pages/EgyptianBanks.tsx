@@ -59,23 +59,28 @@ export const EgyptianBanks: React.FC = () => {
   }, []);
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto" dir={dir}>
+    <div className="p-4 sm:p-6 space-y-6 w-full" dir={dir}>
       
       {/* Top Header Card */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 border border-emerald-900/40 p-6 sm:p-8 text-white shadow-xl">
+      <div className="relative overflow-hidden rounded-3xl bg-emerald-600 border border-emerald-500/40 p-6 sm:p-8 text-white shadow-xl shadow-emerald-600/20">
         {/* Subtle Watermark Art */}
-        <div className="absolute top-0 left-0 right-0 bottom-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#10b981 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+        <div className="absolute top-0 right-0 p-8 opacity-10 scale-150 pointer-events-none rotate-12">
+          <Building2 size={160} />
+        </div>
+        <div className="absolute -bottom-10 -left-10 opacity-10 pointer-events-none">
+          <Landmark size={200} />
+        </div>
         
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold">
-              <ShieldCheck className="w-3.5 h-3.5" />
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/20 border border-white/30 text-white text-xs font-bold backdrop-blur-sm">
+              <ShieldCheck className="w-3.5 h-3.5 text-white" />
               <span>{isAr ? 'البنك المركزي المصري • CBE' : 'Central Bank of Egypt Reference'}</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
               {isAr ? 'دليل ومرجع البنوك المصرية' : 'Egyptian Banks Directory & SWIFT Reference'}
             </h1>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+            <p className="text-xs sm:text-sm text-emerald-100 max-w-2xl leading-relaxed">
               {isAr 
                 ? 'الدليل المعتمد للبنوك العاملة في جمهورية مصر العربية، رموز السويفت (SWIFT/BIC)، الأكواد المصرفية، وخطوط خدمة العملاء المباشرة.' 
                 : 'Official directory of operating commercial and Islamic banks in Egypt, SWIFT/BIC codes, bank identifiers, and direct hotlines.'}
@@ -89,9 +94,9 @@ export const EgyptianBanks: React.FC = () => {
                 const event = new CustomEvent('navigate-to', { detail: { page: 'issued_cheques' } });
                 window.dispatchEvent(event);
               }}
-              className="px-3.5 py-2 rounded-xl bg-emerald-600/90 hover:bg-emerald-600 text-white font-bold text-xs flex items-center gap-2 transition-all shadow-md active:scale-95"
+              className="px-4 py-2 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 font-bold text-xs flex items-center gap-2 transition-all shadow-md active:scale-95"
             >
-              <Landmark className="w-4 h-4" />
+              <Landmark className="w-4 h-4 text-emerald-700" />
               <span>{isAr ? 'شاشة الشيكات' : 'Cheques Screen'}</span>
             </button>
             <button
@@ -99,35 +104,35 @@ export const EgyptianBanks: React.FC = () => {
                 const event = new CustomEvent('navigate-to', { detail: { page: 'payment_methods' } });
                 window.dispatchEvent(event);
               }}
-              className="px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs flex items-center gap-2 transition-all shadow-xs active:scale-95"
+              className="px-4 py-2 rounded-xl bg-emerald-700/80 hover:bg-emerald-700 border border-emerald-400/40 text-white font-bold text-xs flex items-center gap-2 transition-all shadow-xs active:scale-95 backdrop-blur-sm"
             >
-              <Building2 className="w-4 h-4 text-emerald-400" />
+              <Building2 className="w-4 h-4 text-emerald-200" />
               <span>{isAr ? 'طرق السداد والحسابات' : 'Payment Methods'}</span>
             </button>
           </div>
         </div>
 
         {/* Stats Strip */}
-        <div className="relative z-10 grid grid-cols-2 sm:grid-cols-5 gap-3 mt-6 pt-6 border-t border-white/10">
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/5">
-            <span className="text-[11px] text-slate-400 font-medium block">{isAr ? 'إجمالي البنوك' : 'Total Banks'}</span>
-            <span className="text-xl font-black font-mono text-white">{stats.total}</span>
+        <div className="relative z-10 grid grid-cols-2 sm:grid-cols-5 gap-3 mt-6 pt-6 border-t border-white/20">
+          <div className="p-3.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 backdrop-blur-sm transition-colors">
+            <span className="text-[11px] text-emerald-100 font-semibold block">{isAr ? 'إجمالي البنوك' : 'Total Banks'}</span>
+            <span className="text-2xl font-black font-mono text-white">{stats.total}</span>
           </div>
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/5">
-            <span className="text-[11px] text-emerald-400 font-medium block">{isAr ? 'بنوك وطنية / عامة' : 'Public Sector'}</span>
-            <span className="text-xl font-black font-mono text-emerald-300">{stats.public}</span>
+          <div className="p-3.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 backdrop-blur-sm transition-colors">
+            <span className="text-[11px] text-emerald-100 font-semibold block">{isAr ? 'بنوك وطنية / عامة' : 'Public Sector'}</span>
+            <span className="text-2xl font-black font-mono text-white">{stats.public}</span>
           </div>
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/5">
-            <span className="text-[11px] text-cyan-400 font-medium block">{isAr ? 'بنوك تجارية خاصة' : 'Private Commercial'}</span>
-            <span className="text-xl font-black font-mono text-cyan-300">{stats.commercial}</span>
+          <div className="p-3.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 backdrop-blur-sm transition-colors">
+            <span className="text-[11px] text-emerald-100 font-semibold block">{isAr ? 'بنوك تجارية خاصة' : 'Private Commercial'}</span>
+            <span className="text-2xl font-black font-mono text-white">{stats.commercial}</span>
           </div>
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/5">
-            <span className="text-[11px] text-amber-400 font-medium block">{isAr ? 'بنوك إسلامية' : 'Islamic Banks'}</span>
-            <span className="text-xl font-black font-mono text-amber-300">{stats.islamic}</span>
+          <div className="p-3.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 backdrop-blur-sm transition-colors">
+            <span className="text-[11px] text-emerald-100 font-semibold block">{isAr ? 'بنوك إسلامية' : 'Islamic Banks'}</span>
+            <span className="text-2xl font-black font-mono text-white">{stats.islamic}</span>
           </div>
-          <div className="p-3 rounded-2xl bg-white/5 border border-white/5 col-span-2 sm:col-span-1">
-            <span className="text-[11px] text-purple-400 font-medium block">{isAr ? 'بنوك دولية وعربية' : 'International'}</span>
-            <span className="text-xl font-black font-mono text-purple-300">{stats.international}</span>
+          <div className="p-3.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 backdrop-blur-sm transition-colors col-span-2 sm:col-span-1">
+            <span className="text-[11px] text-emerald-100 font-semibold block">{isAr ? 'بنوك دولية وعربية' : 'International'}</span>
+            <span className="text-2xl font-black font-mono text-white">{stats.international}</span>
           </div>
         </div>
       </div>
