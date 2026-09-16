@@ -69,13 +69,12 @@ export const ChequePaymentModal: React.FC<ChequePaymentModalProps> = ({
     accounts.forEach(acc => {
       const isAlreadyInPM = paymentMethods.some(pm => pm.id === acc.id || pm.name === acc.name);
       if (!isAlreadyInPM) {
-        const isCashOrBank = validCashUsages.includes(acc.usage_type || '') ||
-                             acc.account_type?.toLowerCase().includes('cash') ||
-                             acc.account_type?.toLowerCase().includes('bank') ||
+        const usage = (acc as any).account_usage || (acc as any).usage_type || '';
+        const isCashOrBank = validCashUsages.includes(usage) ||
                              acc.name.includes('بنك') || acc.name.includes('خزينة') || acc.name.includes('خزنة') ||
                              acc.code.startsWith('101') || acc.code.startsWith('102');
         if (isCashOrBank) {
-          const isBankAcc = acc.usage_type === 'bank' || acc.name.includes('بنك');
+          const isBankAcc = usage === 'bank' || acc.name.includes('بنك');
           const isDefault = acc.id === cheque?.bank_account_id;
           const item = {
             id: acc.id,

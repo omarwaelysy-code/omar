@@ -44,6 +44,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
   inline = false
 }) => {
   const { showSuccess, showError } = useNotification();
+  const { user } = useAuth();
   const { language, dir } = useLanguage();
   const isAr = language === 'ar';
 
