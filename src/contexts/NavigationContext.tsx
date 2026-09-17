@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { dbService } from '../services/dbService';
 
 interface Tab {
   id: string;
@@ -301,6 +302,68 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setActiveTabId(id);
     setCurrentPage(id);
   };
+
+  // Track screen visits and stay duration for user behavior analysis
+  const currentVisitRef = React.useRef<{
+    screenId: string;
+    screenLabel: string;
+    enterTime: number;
+  } | null>(null);
+
+  const recordScreenStay = React.useCallback((visit: { screenId: string; screenLabel: string; enterTime: number }) => {
+    if (!visit || !user) return;
+    const durationSec = Math.round((Date.now() - visit.enterTime) / 1000);
+    // Log if user stayed for at least 2 seconds (avoids logging accidental micro-clicks)
+    if (durationSec >= 2) {
+      const min = Math.floor(durationSec / 60);
+      const sec = durationSec % 60;
+      const durationText = min > 0
+        ? (sec > 0 ? `${min} دقيقة و ${sec} ثانية` : `${min} دقيقة`)
+        : `${sec} ثانية`;
+
+      dbService.logClientAudit(
+        'SCREEN_VISIT',
+        visit.screenLabel,
+        `زيارة شاشة (${visit.screenLabel}) - مدة البقاء: ${durationText}`,
+        {
+          screen_id: visit.screenId,
+          screen_title: visit.screenLabel,
+          duration_seconds: durationSec,
+          duration_text: durationText,
+          entry_time: new Date(visit.enterTime).toISOString(),
+          exit_time: new Date().toISOString()
+        }
+      ).catch(() => {});
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!activeTabId || !user) return;
+
+    // Conclude previous screen visit if screen changed
+    if (currentVisitRef.current && currentVisitRef.current.screenId !== activeTabId) {
+      recordScreenStay(currentVisitRef.current);
+    }
+
+    // Begin tracking new active screen
+    const label = pageLabels[activeTabId] || activeTabId;
+    currentVisitRef.current = {
+      screenId: activeTabId,
+      screenLabel: label,
+      enterTime: Date.now()
+    };
+  }, [activeTabId, user, recordScreenStay]);
+
+  // Record stay on window/tab close or refresh
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (currentVisitRef.current && user) {
+        recordScreenStay(currentVisitRef.current);
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [user, recordScreenStay]);
 
   return (
     <NavigationContext.Provider value={{ 

@@ -728,7 +728,11 @@ router.use(async (req: any, res: any, next: any) => {
       else if (req.query._search) action = 'SEARCH';
       else if (Object.keys(req.query).some(k => !k.startsWith('_') && k !== 'company_id')) action = 'FILTER';
       else if (req.query._refresh === 'true') action = 'REFRESH';
-      else action = 'VIEW';
+      else {
+        // Routine internal GET reads (fetching products, customers, accounts, etc.)
+        // must NOT flood the audit logs table with spammy 'VIEW' rows.
+        return;
+      }
     }
 
     if (!recordId) {
@@ -3136,24 +3140,84 @@ router.get('/audit_logs', authenticateToken, async (req: AuthRequest, res) => {
 
     let query = 'SELECT * FROM audit_logs';
     const params: any[] = [];
+    const conditions: string[] = [];
 
     if (targetCompanyId) {
-      // SECURITY FIX: Only show records belonging to this company (no NULL company_id leak)
-      query += ' WHERE company_id = $1';
       params.push(targetCompanyId);
+      conditions.push(`company_id = $${params.length}`);
     } else if (!isSuperAdmin) {
-      // If no company_id known and not super_admin, return empty to prevent data leak
       return res.json([]);
+    }
+
+    // Optional user filtering (by user_ids or usernames)
+    if (req.query.user_ids) {
+      const rawUserList = String(req.query.user_ids).split(',').map(s => s.trim()).filter(Boolean);
+      if (rawUserList.length > 0 && !rawUserList.includes('all')) {
+        params.push(rawUserList);
+        const pIdx = params.length;
+        conditions.push(`(user_id = ANY($${pIdx}) OR username = ANY($${pIdx}) OR user_email = ANY($${pIdx}))`);
+      }
+    }
+
+    if (req.query.start_date) {
+      params.push(req.query.start_date);
+      conditions.push(`created_at >= $${params.length}`);
+    }
+
+    if (req.query.end_date) {
+      params.push(`${req.query.end_date} 23:59:59`);
+      conditions.push(`created_at <= $${params.length}`);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
     }
 
     query += ' ORDER BY created_at DESC';
 
-    console.log(`[AUDIT_LOGS] user=${req.user?.email} isSuperAdmin=${isSuperAdmin} targetCompanyId=${targetCompanyId}`);
+    const safeLimit = Math.min(Math.max(parseInt(String(req.query.limit || '2500'), 10) || 2500, 10), 10000);
+    params.push(safeLimit);
+    query += ` LIMIT $${params.length}`;
+
     const result = await pool.query(query, params);
-    console.log(`[AUDIT_LOGS] returned ${result.rows.length} rows`);
     res.json(result.rows);
   } catch (err: any) {
     console.error('[AUDIT_LOGS] Error fetching audit_logs:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/audit_logs', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { action, module, details, metadata, duration_seconds, screen_id } = req.body;
+    const user = req.user;
+    const companyId = req.body.company_id || user?.company_id;
+    const userId = req.body.user_id || user?.id;
+    const username = req.body.username || user?.username || user?.email;
+    const userEmail = req.body.user_email || user?.email;
+    const ipAddress = getIp(req);
+    const { browser, os, device } = parseUserAgent(req.headers['user-agent'] || '');
+    const logId = uuidv4();
+    const branch = req.body.branch || user?.branch || 'Main';
+    const executionTime = duration_seconds ? Math.round(Number(duration_seconds) * 1000) : (req.body.execution_time || 0);
+
+    await pool.query(
+      `INSERT INTO audit_logs (
+        id, company_id, user_id, username, user_email, action, module, details,
+        entity_type, entity_id, ip_address, browser, operating_system, device,
+        branch, record_name, record_id, metadata, success, execution_time
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+      ON CONFLICT DO NOTHING`,
+      [
+        logId, companyId, userId, username, userEmail, action || 'SCREEN_VISIT', module || 'SYSTEM', details || '',
+        'SCREEN', screen_id || '', ipAddress, browser, os, device,
+        branch, module, screen_id || '', JSON.stringify(metadata || {}), true, executionTime
+      ]
+    );
+
+    res.json({ success: true, id: logId });
+  } catch (err: any) {
+    console.error('[AUDIT_LOGS] Error inserting audit log:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -3166,21 +3230,36 @@ router.get('/activity_logs', authenticateToken, async (req: AuthRequest, res) =>
 
     let query = 'SELECT * FROM activity_logs';
     const params: any[] = [];
+    const conditions: string[] = [];
 
     if (targetCompanyId) {
-      // SECURITY FIX: Only show records belonging to this company (no NULL company_id leak)
-      query += ' WHERE company_id = $1';
       params.push(targetCompanyId);
+      conditions.push(`company_id = $${params.length}`);
     } else if (!isSuperAdmin) {
-      // If no company_id known and not super_admin, return empty to prevent data leak
       return res.json([]);
+    }
+
+    // Optional user filtering
+    if (req.query.user_ids) {
+      const rawUserList = String(req.query.user_ids).split(',').map(s => s.trim()).filter(Boolean);
+      if (rawUserList.length > 0 && !rawUserList.includes('all')) {
+        params.push(rawUserList);
+        const pIdx = params.length;
+        conditions.push(`(user_id = ANY($${pIdx}) OR username = ANY($${pIdx}))`);
+      }
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
     }
 
     query += ' ORDER BY id DESC';
 
-    console.log(`[ACTIVITY_LOGS] user=${req.user?.email} isSuperAdmin=${isSuperAdmin} targetCompanyId=${targetCompanyId}`);
+    const safeLimit = Math.min(Math.max(parseInt(String(req.query.limit || '2500'), 10) || 2500, 10), 10000);
+    params.push(safeLimit);
+    query += ` LIMIT $${params.length}`;
+
     const result = await pool.query(query, params);
-    console.log(`[ACTIVITY_LOGS] returned ${result.rows.length} rows`);
     res.json(result.rows);
   } catch (err: any) {
     console.error('[ACTIVITY_LOGS] Error fetching activity_logs:', err.message);

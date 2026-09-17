@@ -695,9 +695,11 @@ export const dbService = {
       const user = authUserStr ? JSON.parse(authUserStr) : null;
       await apiRequest('/audit_logs', 'POST', {
         action,
-        module: moduleName.toUpperCase(),
+        module: moduleName,
         details,
         metadata: metadata || {},
+        duration_seconds: metadata?.duration_seconds,
+        screen_id: metadata?.screen_id,
         user_id: user?.id || user?.user?.id,
         username: user?.username || user?.user?.username,
         user_email: user?.email || user?.user?.email,

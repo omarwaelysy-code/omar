@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigation } from '../contexts/NavigationContext';
+import { useNavigation, pageLabels } from '../contexts/NavigationContext';
 import { ActivityLog } from '../types';
 import { 
   Search, Clock, User, Activity, Filter, RefreshCw, Layers, 
   ShieldCheck, ExternalLink, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Calendar, 
   Download, FileSpreadsheet, Printer, CheckCircle2, XCircle, 
   Smartphone, Monitor, Tablet, Globe, RotateCcw,
-  Trash2, Edit3, Eye, FileText, BookOpen, X, AlertTriangle
+  Trash2, Edit3, Eye, FileText, BookOpen, X, AlertTriangle, ChevronDown, Check
 } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { formatDateTime } from '../utils/formatUtils';
@@ -158,6 +158,7 @@ export function matchesActionCategory(action: string, details: string, mode: Act
     if (matchesActionCategory(action, details, 'prints')) return false;
 
     return (
+      act.includes('SCREEN_VISIT') ||
       act.includes('VIEW') ||
       act.includes('LOGIN') ||
       act.includes('LOGOUT') ||
@@ -168,6 +169,7 @@ export function matchesActionCategory(action: string, details: string, mode: Act
       act.includes('FILTER') ||
       act.includes('SEARCH') ||
       act.includes('REFRESH') ||
+      combined.includes('زيارة شاشة') ||
       combined.includes('دخول') ||
       combined.includes('خروج') ||
       combined.includes('مشاهدة') ||
@@ -211,6 +213,36 @@ export function matchesActionCategory(action: string, details: string, mode: Act
   return true;
 }
 
+// Format stay duration nicely in human readable format
+export function formatStayDuration(log: any, language: string): string {
+  const meta = log.metadata || {};
+  let sec = meta.duration_seconds || (log.execution_time ? Math.round(log.execution_time / 1000) : 0);
+  if (!sec && meta.duration_text) return meta.duration_text;
+  if (!sec || sec < 1) return '-';
+  const min = Math.floor(sec / 60);
+  const remainingSec = sec % 60;
+  if (language === 'ar') {
+    if (min > 0) {
+      return remainingSec > 0 ? `${min} د و ${remainingSec} ث` : `${min} دقيقة`;
+    }
+    return `${remainingSec} ثانية`;
+  }
+  if (min > 0) {
+    return remainingSec > 0 ? `${min}m ${remainingSec}s` : `${min}m`;
+  }
+  return `${remainingSec}s`;
+}
+
+// Convert module/screen code to clean Arabic display name
+export function getDisplayScreenName(moduleName: string, meta: any, language: string): string {
+  if (meta?.screen_title) return meta.screen_title;
+  const modKey = String(moduleName || '').toLowerCase().replace(/[\s-]/g, '_');
+  if (pageLabels[modKey]) return pageLabels[modKey];
+  // If already Arabic text
+  if (/[\u0600-\u06FF]/.test(moduleName)) return moduleName;
+  return moduleName || (language === 'ar' ? 'شاشة النظام' : 'System Screen');
+}
+
 export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 'all' }) => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
@@ -218,15 +250,21 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
   
   const [activeMode, setActiveMode] = useState<ActivityLogMode>(initialMode);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
-  const [docLookupMap, setDocLookupMap] = useState<Map<string, { docNumber?: string; entryNumber?: string }>>(new Map());
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [hasLoadedData, setHasLoadedData] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+
+  // Users Multi-Select State
+  const [availableUsers, setAvailableUsers] = useState<{ id: string; name?: string; username: string; email?: string }[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>(['all']);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [userSearchText, setUserSearchText] = useState('');
+  const userDropdownRef = useRef<HTMLDivElement>(null);
 
   // Advanced Filters State
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [userFilter, setUserFilter] = useState('all');
   const [companyFilter, setCompanyFilter] = useState('all');
   const [branchFilter, setBranchFilter] = useState('all');
   const [moduleFilter, setModuleFilter] = useState('all');
@@ -236,7 +274,7 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
   const [browserFilter, setBrowserFilter] = useState('all');
   const [ipFilter, setIpFilter] = useState('');
   
-  // NEW: Document & Entry filters
+  // Document & Entry filters
   const [documentNumberFilter, setDocumentNumberFilter] = useState('');
   const [entryNumberFilter, setEntryNumberFilter] = useState('');
 
@@ -249,11 +287,53 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
     setPage(1);
   }, [initialMode]);
 
+  // Click outside listener for user dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userDropdownRef.current && !userDropdownRef.current.contains(e.target as Node)) {
+        setUserDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Pre-load company users list on mount (lightweight metadata only)
+  useEffect(() => {
+    if (!user) return;
+    const loadCompanyUsers = async () => {
+      try {
+        const params = user.company_id ? { company_id: user.company_id } : undefined;
+        const usersData = await dbService.list<any>('users', params).catch(() => []);
+        if (Array.isArray(usersData) && usersData.length > 0) {
+          const list = usersData.map(u => ({
+            id: u.id,
+            name: u.name || u.username,
+            username: u.username || u.name || u.email || 'مستخدم',
+            email: u.email || ''
+          }));
+          setAvailableUsers(list);
+        }
+      } catch (err) {
+        console.warn('Failed to load users for filter:', err);
+      }
+    };
+    loadCompanyUsers();
+  }, [user]);
+
+  // Dedicated fetchLogs: only runs on explicit user click / request
   const fetchLogs = async () => {
     if (!user) return;
     setLoading(true);
+    setHasLoadedData(true);
     try {
-      const params = user.company_id ? { company_id: user.company_id } : undefined;
+      const params: any = user.company_id ? { company_id: user.company_id } : {};
+      if (selectedUsers.length > 0 && !selectedUsers.includes('all')) {
+        params.user_ids = selectedUsers.join(',');
+      }
+      if (startDate) params.start_date = startDate;
+      if (endDate) params.end_date = endDate;
+
       const [auditData, activityData] = await Promise.all([
         dbService.list<any>('audit_logs', params).catch(() => []),
         dbService.list<any>('activity_logs', params).catch(() => [])
@@ -316,6 +396,7 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
         record_id: l.record_id || l.entity_id || '',
         old_values: l.old_values || (l.changes?.before) || {},
         new_values: l.new_values || (l.changes?.after) || {},
+        metadata: l.metadata || {},
         success: l.success !== false,
         execution_time: Number(l.execution_time || 0)
       }));
@@ -332,29 +413,7 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
       combined.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       setLogs(combined);
-
-      // Preload invoices, purchase invoices, and journal entries to build id -> { docNumber, entryNumber } lookup map
-      try {
-        const [invs, pinvs, jes] = await Promise.all([
-          dbService.list<any>('invoices', params).catch(() => []),
-          dbService.list<any>('purchase_invoices', params).catch(() => []),
-          dbService.list<any>('journal_entries', params).catch(() => [])
-        ]);
-        const map = new Map<string, { docNumber?: string; entryNumber?: string }>();
-        (invs || []).forEach((i: any) => {
-          if (i.id) map.set(i.id, { docNumber: i.invoice_number, entryNumber: i.entry_number ? String(i.entry_number) : undefined });
-        });
-        (pinvs || []).forEach((i: any) => {
-          if (i.id) map.set(i.id, { docNumber: i.invoice_number, entryNumber: i.entry_number ? String(i.entry_number) : undefined });
-        });
-        (jes || []).forEach((j: any) => {
-          if (j.id) map.set(j.id, { entryNumber: j.entry_number ? String(j.entry_number) : undefined, docNumber: j.reference_number || undefined });
-        });
-        setDocLookupMap(map);
-      } catch (err) {
-        console.warn('Doc lookup map build error (non-fatal):', err);
-      }
-
+      setPage(1);
     } catch (error) {
       console.error('Failed to fetch audit/activity logs:', error);
     } finally {
@@ -362,15 +421,11 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
     }
   };
 
-  useEffect(() => {
-    fetchLogs();
-  }, [user]);
-
   // Reset all filters
   const handleResetFilters = () => {
     setStartDate('');
     setEndDate('');
-    setUserFilter('all');
+    setSelectedUsers(['all']);
     setCompanyFilter('all');
     setBranchFilter('all');
     setModuleFilter('all');
@@ -385,6 +440,68 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
     setPage(1);
   };
 
+  // Compile full user options (from users table and existing logs)
+  const userOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; username: string; email?: string }>();
+    availableUsers.forEach(u => {
+      map.set(u.username || u.name, u);
+    });
+    logs.forEach(l => {
+      if (l.username && !map.has(l.username)) {
+        map.set(l.username, { id: l.user_id || l.username, name: l.username, username: l.username, email: l.user_email });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => (a.name || a.username).localeCompare(b.name || b.username));
+  }, [availableUsers, logs]);
+
+  const filteredUserOptions = useMemo(() => {
+    if (!userSearchText.trim()) return userOptions;
+    const term = userSearchText.trim().toLowerCase();
+    return userOptions.filter(u => 
+      (u.name && u.name.toLowerCase().includes(term)) ||
+      (u.username && u.username.toLowerCase().includes(term)) ||
+      (u.email && u.email.toLowerCase().includes(term))
+    );
+  }, [userOptions, userSearchText]);
+
+  // Handle multi-user selection toggle
+  const toggleUser = (uname: string) => {
+    setPage(1);
+    if (uname === 'all') {
+      if (selectedUsers.includes('all')) {
+        setSelectedUsers([]);
+      } else {
+        setSelectedUsers(['all']);
+      }
+      return;
+    }
+
+    let next = selectedUsers.filter(u => u !== 'all');
+    if (next.includes(uname)) {
+      next = next.filter(u => u !== uname);
+    } else {
+      next.push(uname);
+    }
+
+    if (next.length === userOptions.length || next.length === 0) {
+      setSelectedUsers(next.length === 0 ? [] : ['all']);
+    } else {
+      setSelectedUsers(next);
+    }
+  };
+
+  const getUserButtonLabel = () => {
+    if (selectedUsers.length === 0) return language === 'ar' ? 'اختر المستخدمين...' : 'Select Users...';
+    if (selectedUsers.includes('all') || (userOptions.length > 0 && selectedUsers.length === userOptions.length)) {
+      return language === 'ar' ? 'الكل (جميع المستخدمين)' : 'All Users';
+    }
+    if (selectedUsers.length === 1) {
+      const found = userOptions.find(u => u.username === selectedUsers[0] || u.id === selectedUsers[0]);
+      return found?.name || found?.username || selectedUsers[0];
+    }
+    return language === 'ar' ? `${selectedUsers.length} مستخدمين محددين` : `${selectedUsers.length} users selected`;
+  };
+
   // Compile Modules list dynamically
   const dynamicModulesList = useMemo(() => {
     const schemaKeys = Object.keys(EXPECTED_SCHEMA).map(k => k.replace(/_/g, ' ').toUpperCase());
@@ -394,12 +511,9 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
   }, [logs]);
 
   // Extract unique filter dropdown values
-  const uniqueUsers = useMemo(() => Array.from(new Set(logs.map(l => l.username).filter(Boolean))).sort(), [logs]);
   const uniqueBranches = useMemo(() => Array.from(new Set(logs.map(l => (l as any).branch).filter(Boolean))).sort(), [logs]);
   const uniqueBrowsers = useMemo(() => Array.from(new Set(logs.map(l => (l as any).browser).filter(Boolean))).sort(), [logs]);
   const uniqueDevices = useMemo(() => Array.from(new Set(logs.map(l => (l as any).device).filter(Boolean))).sort(), [logs]);
-
-
 
   // Filter logs by activeMode first, then by the user filters
   const filteredLogs = useMemo(() => {
@@ -410,7 +524,7 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
       }
 
       // Extract document number & entry number
-      const { documentNumber, entryNumber } = extractDocAndEntryNumbers(log, docLookupMap);
+      const { documentNumber, entryNumber } = extractDocAndEntryNumbers(log);
 
       // 1. Search term match (searches all fields + doc number + entry number)
       const matchesSearch = 
@@ -441,7 +555,14 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
       // 3. Date & Category Filters
       const matchesStartDate = !startDate || new Date(log.created_at) >= new Date(startDate);
       const matchesEndDate = !endDate || new Date(log.created_at) <= new Date(`${endDate}T23:59:59`);
-      const matchesUser = userFilter === 'all' || log.username === userFilter || log.user_email === userFilter;
+      
+      // Multi-User Match
+      const matchesUser = 
+        selectedUsers.includes('all') ||
+        selectedUsers.includes(log.username) ||
+        selectedUsers.includes(log.user_email) ||
+        selectedUsers.includes(log.user_id);
+
       const matchesCompany = companyFilter === 'all' || log.company_id === companyFilter;
       const matchesBranch = branchFilter === 'all' || (log as any).branch === branchFilter;
       const matchesModule = moduleFilter === 'all' || String(log.module || '').toUpperCase() === moduleFilter.toUpperCase();
@@ -462,8 +583,8 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
       );
     });
   }, [
-    logs, activeMode, docLookupMap, searchTerm, documentNumberFilter, entryNumberFilter,
-    startDate, endDate, userFilter, companyFilter, branchFilter,
+    logs, activeMode, searchTerm, documentNumberFilter, entryNumberFilter,
+    startDate, endDate, selectedUsers, companyFilter, branchFilter,
     moduleFilter, actionFilter, statusFilter, deviceFilter, browserFilter, ipFilter
   ]);
 
@@ -479,7 +600,7 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
       'Record Name', 'Record ID', 'Success', 'Execution Time (ms)'
     ];
     const rows = filteredLogs.map(l => {
-      const { documentNumber, entryNumber } = extractDocAndEntryNumbers(l, docLookupMap);
+      const { documentNumber, entryNumber } = extractDocAndEntryNumbers(l);
       return [
         l.created_at,
         l.username || '',
@@ -521,7 +642,7 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
       'Record Name', 'Record ID', 'Success', 'Execution Time (ms)'
     ];
     const rows = filteredLogs.map(l => {
-      const { documentNumber, entryNumber } = extractDocAndEntryNumbers(l, docLookupMap);
+      const { documentNumber, entryNumber } = extractDocAndEntryNumbers(l);
       return [
         l.created_at,
         l.username || '',
@@ -851,17 +972,110 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
             />
           </div>
 
-          {/* User Filter */}
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">{language === 'ar' ? 'المستخدم' : 'User'}</label>
-            <select 
-              value={userFilter}
-              onChange={(e) => { setUserFilter(e.target.value); setPage(1); }}
-              className="bg-zinc-50 border border-zinc-200 rounded-xl px-2 py-1.5 text-xs font-bold outline-none focus:border-emerald-500 cursor-pointer"
+          {/* Multi-Select User Filter */}
+          <div className="flex flex-col gap-1 relative" ref={userDropdownRef}>
+            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-wider flex items-center justify-between">
+              <span>{language === 'ar' ? 'المستخدم' : 'User'}</span>
+              {!selectedUsers.includes('all') && selectedUsers.length > 0 && (
+                <span className="text-[9px] px-1.5 py-0.2 bg-emerald-100 text-emerald-700 rounded-full font-bold">
+                  {selectedUsers.length}
+                </span>
+              )}
+            </label>
+            
+            <button
+              type="button"
+              onClick={() => setUserDropdownOpen(prev => !prev)}
+              className="bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-200 rounded-xl px-2.5 py-1.5 text-xs font-bold text-zinc-800 flex items-center justify-between transition-all cursor-pointer text-right w-full"
             >
-              <option value="all">{language === 'ar' ? 'الكل' : 'All Users'}</option>
-              {uniqueUsers.map(u => <option key={u} value={u}>{u}</option>)}
-            </select>
+              <span className="truncate pr-1">
+                {getUserButtonLabel()}
+              </span>
+              <ChevronDown size={14} className={`text-zinc-400 shrink-0 transition-transform ${userDropdownOpen ? 'rotate-180 text-emerald-600' : ''}`} />
+            </button>
+
+            {/* Dropdown Menu with Checkboxes */}
+            {userDropdownOpen && (
+              <div className="absolute top-full mt-1.5 right-0 z-50 w-72 bg-white rounded-2xl shadow-xl border border-zinc-200 p-2.5 space-y-2 animate-in fade-in slide-in-from-top-1 duration-150">
+                {/* Search Input */}
+                <div className="relative">
+                  <Search size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+                  <input
+                    type="text"
+                    placeholder={language === 'ar' ? 'بحث عن مستخدم...' : 'Search user...'}
+                    value={userSearchText}
+                    onChange={(e) => setUserSearchText(e.target.value)}
+                    className="w-full bg-zinc-50 border border-zinc-200 rounded-lg pr-7 pl-2 py-1 text-xs outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 font-bold"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+
+                {/* Option: Select All [✓] الكل */}
+                <label 
+                  onClick={() => toggleUser('all')}
+                  className="flex items-center gap-2 px-2.5 py-2 rounded-xl bg-zinc-50/80 hover:bg-zinc-100/80 cursor-pointer text-xs font-black text-zinc-900 border border-zinc-100 select-none transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedUsers.includes('all')}
+                    onChange={() => {}}
+                    className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                  />
+                  <span>{language === 'ar' ? 'الكل (جميع المستخدمين)' : 'All Users'}</span>
+                </label>
+
+                {/* Individual Users List */}
+                <div className="max-h-48 overflow-y-auto space-y-0.5 pr-0.5 divide-y divide-zinc-50">
+                  {filteredUserOptions.length === 0 ? (
+                    <div className="p-3 text-center text-xs text-zinc-400">
+                      {language === 'ar' ? 'لا يوجد مستخدمين مطابقين' : 'No users found'}
+                    </div>
+                  ) : (
+                    filteredUserOptions.map(u => {
+                      const isChecked = selectedUsers.includes('all') || selectedUsers.includes(u.username) || selectedUsers.includes(u.id);
+                      return (
+                        <label
+                          key={u.id || u.username}
+                          onClick={() => toggleUser(u.username || u.id)}
+                          className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer text-xs transition-colors select-none ${
+                            isChecked ? 'bg-emerald-50/60 text-emerald-950 font-bold' : 'hover:bg-zinc-50 text-zinc-700'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {}}
+                            className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
+                          />
+                          <div className="flex flex-col min-w-0">
+                            <span className="truncate">{u.name || u.username}</span>
+                            {u.email && u.email !== (u.name || u.username) && (
+                              <span className="text-[10px] text-zinc-400 font-mono truncate">{u.email}</span>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Footer status */}
+                <div className="pt-1.5 border-t border-zinc-100 flex items-center justify-between text-[11px]">
+                  <span className="text-zinc-400 font-medium">
+                    {selectedUsers.includes('all') 
+                      ? (language === 'ar' ? 'تم اختيار الكل' : 'All selected')
+                      : `${selectedUsers.length} ${language === 'ar' ? 'محدد' : 'selected'}`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setUserDropdownOpen(false)}
+                    className="px-3 py-1 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 text-xs shadow-2xs cursor-pointer"
+                  >
+                    {language === 'ar' ? 'تم' : 'Done'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Module / Department Filter */}
@@ -930,42 +1144,94 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
         <div className="overflow-x-auto">
           <table className="w-full text-right border-collapse min-w-[1250px] print:min-w-full">
             <thead>
-              <tr className="bg-zinc-50/70 border-b border-zinc-100">
-                <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider text-center w-12">#</th>
-                <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider">{language === 'ar' ? 'المستخدم' : 'User'}</th>
-                <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider">{language === 'ar' ? 'الفرع/الشركة' : 'Branch / Company'}</th>
-                <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider">{language === 'ar' ? 'القسم' : 'Module'}</th>
-                <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider text-center">{language === 'ar' ? 'الإجراء' : 'Action'}</th>
-                
-                {/* NEW COLUMNS: Document Number & Entry Number */}
-                <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider text-center">
-                  <div className="flex items-center justify-center gap-1">
-                    <FileText size={12} className="text-emerald-600" />
-                    <span>{language === 'ar' ? 'رقم المستند' : 'Document No.'}</span>
-                  </div>
-                </th>
-                <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider text-center">
-                  <div className="flex items-center justify-center gap-1">
-                    <BookOpen size={12} className="text-blue-600" />
-                    <span>{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</span>
-                  </div>
-                </th>
-
-                <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider">{language === 'ar' ? 'تفاصيل السجل' : 'Details'}</th>
-                <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider text-center">{language === 'ar' ? 'الجهاز والشبكة' : 'Device / IP'}</th>
-                <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider">{language === 'ar' ? 'التوقيت' : 'Timestamp'}</th>
-              </tr>
+              {activeMode === 'views' ? (
+                /* Specialized Header for Logins, Views & User Behavior */
+                <tr className="bg-zinc-50/70 border-b border-zinc-100">
+                  <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider text-center w-12">#</th>
+                  <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider">{language === 'ar' ? 'المستخدم' : 'User'}</th>
+                  <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider">{language === 'ar' ? 'الشاشة / الوجهة' : 'Screen / Destination'}</th>
+                  <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider text-center">{language === 'ar' ? 'نوع الحركة' : 'Activity Type'}</th>
+                  <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <Clock size={12} className="text-amber-600" />
+                      <span>{language === 'ar' ? 'مدة البقاء في الشاشة' : 'Stay Duration'}</span>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider">
+                    <div className="flex items-center gap-1">
+                      <FileText size={12} className="text-emerald-600" />
+                      <span>{language === 'ar' ? 'الحركات المنفذة وأرقامها' : 'Actions & Doc Numbers'}</span>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider text-center">{language === 'ar' ? 'الجهاز والشبكة' : 'Device / IP'}</th>
+                  <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider">{language === 'ar' ? 'التوقيت' : 'Timestamp'}</th>
+                </tr>
+              ) : (
+                /* Standard Audit Logs Header */
+                <tr className="bg-zinc-50/70 border-b border-zinc-100">
+                  <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider text-center w-12">#</th>
+                  <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider">{language === 'ar' ? 'المستخدم' : 'User'}</th>
+                  <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider">{language === 'ar' ? 'الفرع/الشركة' : 'Branch / Company'}</th>
+                  <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider">{language === 'ar' ? 'القسم' : 'Module'}</th>
+                  <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider text-center">{language === 'ar' ? 'الإجراء' : 'Action'}</th>
+                  <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <FileText size={12} className="text-emerald-600" />
+                      <span>{language === 'ar' ? 'رقم المستند' : 'Document No.'}</span>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <BookOpen size={12} className="text-blue-600" />
+                      <span>{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</span>
+                    </div>
+                  </th>
+                  <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider">{language === 'ar' ? 'تفاصيل السجل' : 'Details'}</th>
+                  <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider text-center">{language === 'ar' ? 'الجهاز والشبكة' : 'Device / IP'}</th>
+                  <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider">{language === 'ar' ? 'التوقيت' : 'Timestamp'}</th>
+                </tr>
+              )}
             </thead>
             <tbody className="divide-y divide-zinc-50">
               {loading ? (
                 [1,2,3,4,5,6,7,8,9,10].map(i => (
                   <tr key={i} className="animate-pulse">
-                    <td colSpan={10} className="px-4 py-4 h-14 bg-zinc-50/10" />
+                    <td colSpan={activeMode === 'views' ? 8 : 10} className="px-4 py-4 h-14 bg-zinc-50/10" />
                   </tr>
                 ))
+              ) : !hasLoadedData ? (
+                /* Initial Friendly Prompt: Don't load massive data without user request */
+                <tr>
+                  <td colSpan={activeMode === 'views' ? 8 : 10} className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center justify-center max-w-md mx-auto text-center space-y-3">
+                      <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shadow-xs">
+                        <RefreshCw size={24} />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-black text-zinc-900 mb-1">
+                          {language === 'ar' ? 'جاهز لتحميل السجلات بطلبك' : 'Ready to Load Activity Logs'}
+                        </h3>
+                        <p className="text-xs text-zinc-500 leading-relaxed">
+                          {language === 'ar' 
+                            ? 'تم إيقاف التحميل التلقائي لحماية سرعة وأداء النظام وتفادي تحميل آلاف السجلات غير المطلوبة. يرجى اختيار المستخدمين ثم الضغط على زر "تحديث".'
+                            : 'Automatic bulk loading is stopped to keep the system fast. Select users and click "Refresh" to view records.'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={fetchLogs}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-sm transition-all active:scale-95 cursor-pointer mt-1"
+                      >
+                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                        <span>{language === 'ar' ? 'تحديث وتحميل السجلات الآن' : 'Refresh and Load Logs Now'}</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
               ) : paginatedLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-16 text-center">
+                  <td colSpan={activeMode === 'views' ? 8 : 10} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-zinc-400">
                       <Search size={36} className="opacity-25" />
                       <span className="font-bold text-sm">{language === 'ar' ? 'لا توجد سجلات مطابقة للبحث أو الفلترة في هذا السجل' : 'No logs matching your search or filters in this log view'}</span>
@@ -974,7 +1240,164 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
                 </tr>
               ) : paginatedLogs.map((log, idx) => {
                 const isExpanded = expandedRowId === log.id;
-                const { documentNumber, entryNumber } = extractDocAndEntryNumbers(log, docLookupMap);
+                const { documentNumber, entryNumber } = extractDocAndEntryNumbers(log);
+
+                if (activeMode === 'views') {
+                  /* Dedicated User Behavior & Screen Visit Row */
+                  const screenName = getDisplayScreenName(log.module, (log as any).metadata, language);
+                  const stayDuration = formatStayDuration(log, language);
+                  const isScreenVisit = log.action === 'SCREEN_VISIT';
+                  const isLogin = log.action === 'LOGIN';
+                  const isLogout = log.action === 'LOGOUT';
+
+                  return (
+                    <React.Fragment key={log.id}>
+                      <tr 
+                        onClick={() => setExpandedRowId(isExpanded ? null : log.id)}
+                        className="hover:bg-zinc-50/80 cursor-pointer transition-all group print:bg-transparent"
+                      >
+                        <td className="px-4 py-3 text-xs font-mono text-zinc-400 text-center">
+                          {(page - 1) * itemsPerPage + idx + 1}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-zinc-100 text-zinc-600 flex items-center justify-center border border-zinc-200 group-hover:bg-emerald-100 group-hover:text-emerald-600 group-hover:border-emerald-200 transition-colors shrink-0">
+                              <User size={15} />
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-bold text-zinc-900 text-xs truncate">{log.username || '-'}</span>
+                              {log.user_email && <span className="text-[10px] text-zinc-400 font-mono tracking-tight truncate">{log.user_email}</span>}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 shrink-0">
+                              <Monitor size={14} />
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-bold text-zinc-900 text-xs">{screenName}</span>
+                              <span className="text-[10px] text-zinc-400 font-mono">{log.module}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black border tracking-wider ${
+                            isScreenVisit ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                            isLogin ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                            isLogout ? 'bg-zinc-100 text-zinc-700 border-zinc-200' :
+                            'bg-purple-50 text-purple-700 border-purple-200'
+                          }`}>
+                            {isScreenVisit ? (language === 'ar' ? 'دخول واستعراض شاشة' : 'Screen Visit') :
+                             isLogin ? (language === 'ar' ? 'تسجيل دخول' : 'Login') :
+                             isLogout ? (language === 'ar' ? 'تسجيل خروج' : 'Logout') :
+                             (language === 'ar' ? 'حركة مستند' : log.action)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {stayDuration !== '-' ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-black shadow-2xs">
+                              <Clock size={12} className="text-amber-600" />
+                              <span>{stayDuration}</span>
+                            </span>
+                          ) : (
+                            <span className="text-zinc-300 font-mono text-xs">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col gap-1 max-w-sm">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {documentNumber && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-mono font-bold">
+                                  <FileText size={10} className="text-emerald-600" />
+                                  <span>{language === 'ar' ? `مستند: ${documentNumber}` : `Doc: ${documentNumber}`}</span>
+                                </span>
+                              )}
+                              {entryNumber && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200 text-xs font-mono font-bold">
+                                  <BookOpen size={10} className="text-blue-600" />
+                                  <span>{language === 'ar' ? `قيد: ${entryNumber}` : `Entry: ${entryNumber}`}</span>
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-zinc-600 font-medium leading-relaxed truncate">
+                              {isScreenVisit 
+                                ? (language === 'ar' ? `تم استعراض شاشة (${screenName})` : `Browsed screen (${screenName})`)
+                                : (log.details || '-')}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex flex-col items-center gap-0.5">
+                            <div className="flex items-center gap-1 text-[10px] font-mono text-zinc-600 font-bold">
+                              {getDeviceIcon((log as any).device)}
+                              <span>{log.ip_address || '0.0.0.0'}</span>
+                            </div>
+                            <span className="text-[9px] text-zinc-400 font-mono italic">{(log as any).browser} / {(log as any).operating_system}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col text-xs text-zinc-500">
+                            <div className="flex items-center gap-1.5 font-bold text-zinc-700">
+                              <Calendar size={10} className="text-emerald-500" />
+                              <span>{formatDateTime(log.created_at).split(',')[0]}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 opacity-70 font-mono text-[10px]">
+                              <Clock size={10} />
+                              <span>{formatDateTime(log.created_at).split(',')[1]}</span>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Expandable details view */}
+                      {isExpanded && (
+                        <tr className="bg-zinc-50/40 print:hidden animate-in slide-in-from-top-1 duration-200">
+                          <td colSpan={8} className="px-6 py-4 border-y border-zinc-100 bg-zinc-50/20">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div className="bg-white p-4 rounded-xl border border-zinc-100 shadow-2xs space-y-2">
+                                <h4 className="font-black text-xs text-zinc-800 border-b pb-1.5 flex items-center gap-1.5">
+                                  <Globe size={13} className="text-blue-500" />
+                                  <span>{language === 'ar' ? 'بيانات الشبكة والعميل' : 'Client & Network Details'}</span>
+                                </h4>
+                                <div className="space-y-1 text-xs text-zinc-600 font-medium">
+                                  <div className="flex justify-between"><span>{language === 'ar' ? 'المتصفح:' : 'Browser:'}</span><span className="font-bold text-zinc-800">{(log as any).browser}</span></div>
+                                  <div className="flex justify-between"><span>{language === 'ar' ? 'نظام التشغيل:' : 'OS:'}</span><span className="font-bold text-zinc-800">{(log as any).operating_system}</span></div>
+                                  <div className="flex justify-between"><span>{language === 'ar' ? 'نوع الجهاز:' : 'Device:'}</span><span className="font-bold text-zinc-800">{(log as any).device}</span></div>
+                                  <div className="flex justify-between"><span>{language === 'ar' ? 'عنوان IP:' : 'IP:'}</span><span className="font-mono font-bold text-zinc-800">{log.ip_address}</span></div>
+                                </div>
+                              </div>
+
+                              <div className="bg-white p-4 rounded-xl border border-zinc-100 shadow-2xs space-y-2">
+                                <h4 className="font-black text-xs text-zinc-800 border-b pb-1.5 flex items-center gap-1.5">
+                                  <Clock size={13} className="text-amber-500" />
+                                  <span>{language === 'ar' ? 'تفاصيل البقاء والسلوك' : 'Behavior & Stay Details'}</span>
+                                </h4>
+                                <div className="space-y-1 text-xs text-zinc-600 font-medium">
+                                  <div className="flex justify-between"><span>{language === 'ar' ? 'الشاشة:' : 'Screen:'}</span><span className="font-bold text-zinc-800">{screenName}</span></div>
+                                  <div className="flex justify-between"><span>{language === 'ar' ? 'مدة البقاء:' : 'Stay Duration:'}</span><span className="font-bold text-amber-700">{stayDuration}</span></div>
+                                  <div className="flex justify-between"><span>{language === 'ar' ? 'رقم المستند:' : 'Doc No:'}</span><span className="font-mono font-bold text-emerald-700">{documentNumber || '-'}</span></div>
+                                  <div className="flex justify-between"><span>{language === 'ar' ? 'رقم القيد:' : 'Entry No:'}</span><span className="font-mono font-bold text-blue-700">{entryNumber || '-'}</span></div>
+                                </div>
+                              </div>
+
+                              <div className="bg-white p-4 rounded-xl border border-zinc-100 shadow-2xs space-y-2">
+                                <h4 className="font-black text-xs text-zinc-800 border-b pb-1.5">
+                                  {language === 'ar' ? 'بيانات الجلسة (Metadata)' : 'Session Metadata'}
+                                </h4>
+                                <pre className="p-2 bg-zinc-50 rounded-lg overflow-x-auto text-[9px] font-mono text-zinc-600 max-h-[120px]">
+                                  {JSON.stringify((log as any).metadata || {}, null, 2)}
+                                </pre>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                }
+
+                /* Standard Audit Logs Row */
 
                 return (
                   <React.Fragment key={log.id}>
