@@ -592,6 +592,7 @@ export interface IssuedCheque {
   payment_journal_entry_id?: string | null;
   cancel_journal_entry_id?: string | null;
   attachments?: IssuedChequeAttachment[];
+  settlements?: any[];
   created_by?: string;
   updated_by?: string;
   created_at?: string;

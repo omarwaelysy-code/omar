@@ -506,10 +506,103 @@ export const PaymentMethods: React.FC = () => {
     return (Number(method.opening_balance) || 0) + delta;
   };
 
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+
+  const toggleGroupCollapse = (groupKey: string) => {
+    setCollapsedGroups(prev => ({
+      ...prev,
+      [groupKey]: !prev[groupKey]
+    }));
+  };
+
+  const collapseAllGroups = () => {
+    setCollapsedGroups({
+      bank: true,
+      cash: true,
+      wallet: true,
+      other: true
+    });
+  };
+
+  const expandAllGroups = () => {
+    setCollapsedGroups({});
+  };
+
+  const isAllCollapsed = useMemo(() => {
+    return ['bank', 'cash', 'wallet', 'other'].every(k => collapsedGroups[k]);
+  }, [collapsedGroups]);
+
+  const PAYMENT_METHOD_GROUPS = useMemo(() => [
+    {
+      key: 'bank',
+      titleAr: 'البنوك والحسابات المصرفية',
+      titleEn: 'Banks & Bank Accounts',
+      icon: Landmark,
+      colorClass: 'text-indigo-600 bg-indigo-50 border-indigo-200',
+      badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200'
+    },
+    {
+      key: 'cash',
+      titleAr: 'الخزائن والنقدية',
+      titleEn: 'Cash & Safes',
+      icon: Wallet,
+      colorClass: 'text-emerald-600 bg-emerald-50 border-emerald-200',
+      badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    },
+    {
+      key: 'wallet',
+      titleAr: 'المحافظ الإلكترونية والدفع الإلكتروني',
+      titleEn: 'E-Wallets & Digital Payments',
+      icon: Phone,
+      colorClass: 'text-purple-600 bg-purple-50 border-purple-200',
+      badgeClass: 'bg-purple-50 text-purple-700 border-purple-200'
+    },
+    {
+      key: 'other',
+      titleAr: 'طرق سداد أخرى',
+      titleEn: 'Other Payment Methods',
+      icon: CreditCard,
+      colorClass: 'text-slate-600 bg-slate-50 border-slate-200',
+      badgeClass: 'bg-slate-50 text-slate-700 border-slate-200'
+    }
+  ], []);
+
   const filteredMethods = methods.filter(m => 
     m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const groupedMethods = useMemo(() => {
+    const groups: Record<string, PaymentMethod[]> = {
+      bank: [],
+      cash: [],
+      wallet: [],
+      other: []
+    };
+
+    filteredMethods.forEach(method => {
+      const t = (method.type || '').toLowerCase();
+      if (t === 'bank') {
+        groups.bank.push(method);
+      } else if (t === 'cash') {
+        groups.cash.push(method);
+      } else if (t === 'wallet') {
+        groups.wallet.push(method);
+      } else {
+        groups.other.push(method);
+      }
+    });
+
+    return PAYMENT_METHOD_GROUPS.map(g => {
+      const items = groups[g.key] || [];
+      const totalBalance = items.reduce((sum, m) => sum + getMethodCurrentBalance(m), 0);
+      return {
+        ...g,
+        items,
+        totalBalance
+      };
+    }).filter(g => g.items.length > 0 || !searchTerm);
+  }, [filteredMethods, PAYMENT_METHOD_GROUPS, searchTerm, journalEntries, receiptVouchers, paymentVouchers, cashTransfers]);
 
   return (
     <div className="h-full flex flex-col space-y-2 animate-in fade-in duration-500 overflow-hidden w-full px-1 sm:px-3 py-1" dir={dir}>
@@ -582,23 +675,38 @@ export const PaymentMethods: React.FC = () => {
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
-                <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 shadow-inner w-fit">
+
+                <div className="flex items-center gap-1.5">
                   <button
-                    onClick={() => setView('table')}
-                    className={`p-1 px-2 rounded-md transition-all flex items-center gap-1 font-bold text-xs ${view === 'table' ? 'bg-white text-indigo-600 shadow-xs border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}
-                    title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
+                    type="button"
+                    onClick={isAllCollapsed ? expandAllGroups : collapseAllGroups}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                    title={isAllCollapsed ? (language === 'ar' ? 'فتح كل الأقسام' : 'Expand All') : (language === 'ar' ? 'طي كل الأقسام' : 'Collapse All')}
                   >
-                    <List size={14} />
-                    <span className="hidden sm:inline">{language === 'ar' ? 'مسرد' : 'Table'}</span>
+                    <ChevronDown size={14} className={`transition-transform duration-200 ${isAllCollapsed ? (dir === 'rtl' ? 'rotate-90' : '-rotate-90') : 'rotate-0'}`} />
+                    <span className="hidden md:inline">
+                      {isAllCollapsed ? (language === 'ar' ? 'فتح الكل' : 'Expand All') : (language === 'ar' ? 'طي الكل' : 'Collapse All')}
+                    </span>
                   </button>
-                  <button
-                    onClick={() => setView('card')}
-                    className={`p-1 px-2 rounded-md transition-all flex items-center gap-1 font-bold text-xs ${view === 'card' ? 'bg-white text-indigo-600 shadow-xs border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}
-                    title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
-                  >
-                    <LayoutGrid size={14} />
-                    <span className="hidden sm:inline">{language === 'ar' ? 'بطاقات' : 'Cards'}</span>
-                  </button>
+
+                  <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 shadow-inner w-fit">
+                    <button
+                      onClick={() => setView('table')}
+                      className={`p-1 px-2 rounded-md transition-all flex items-center gap-1 font-bold text-xs cursor-pointer ${view === 'table' ? 'bg-white text-indigo-600 shadow-xs border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}
+                      title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
+                    >
+                      <List size={14} />
+                      <span className="hidden sm:inline">{language === 'ar' ? 'مسرد' : 'Table'}</span>
+                    </button>
+                    <button
+                      onClick={() => setView('card')}
+                      className={`p-1 px-2 rounded-md transition-all flex items-center gap-1 font-bold text-xs cursor-pointer ${view === 'card' ? 'bg-white text-indigo-600 shadow-xs border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}
+                      title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
+                    >
+                      <LayoutGrid size={14} />
+                      <span className="hidden sm:inline">{language === 'ar' ? 'بطاقات' : 'Cards'}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -607,194 +715,295 @@ export const PaymentMethods: React.FC = () => {
                   <div className="py-12 text-center">
                     <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
                   </div>
+                ) : filteredMethods.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 font-bold text-xs">
+                    {language === 'ar' ? 'لا توجد طرق سداد مطابقة للبحث' : 'No methods found.'}
+                  </div>
                 ) : view === 'card' ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 p-3">
-                    {filteredMethods.map((method) => (
-                      <motion.div
-                        layout
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        key={method.id}
-                        onClick={() => openModal(method)}
-                        className="p-3 space-y-2 rounded-xl border bg-white border-slate-100 hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer group relative overflow-hidden"
-                      >
-                        <div className="flex items-start justify-between">
-                           <div className="w-9 h-9 rounded-xl shadow-xs border border-slate-100 flex items-center justify-center text-slate-400 group-hover:text-indigo-600 transition-all overflow-hidden bg-white">
-                             {method.type === 'bank' && findEgyptianBank(method) ? (
-                               <BankLogoBadge bank={findEgyptianBank(method)!} size="sm" className="!w-full !h-full !p-0.5 border-none shadow-none rounded-none" />
-                             ) : (
-                               <div className="w-full h-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:text-indigo-600 group-hover:bg-indigo-50 transition-all">
-                                 <CreditCard size={16} />
-                               </div>
-                             )}
-                           </div>
-                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                  <div className="p-3 space-y-4">
+                    {groupedMethods.map((group) => {
+                      const isCollapsed = Boolean(collapsedGroups[group.key]);
+                      const GroupIcon = group.icon;
+                      return (
+                        <div key={group.key} className="rounded-2xl border border-slate-200/90 overflow-hidden bg-slate-50/40 shadow-2xs">
+                          {/* Accordion Group Header */}
+                          <div
+                            onClick={() => toggleGroupCollapse(group.key)}
+                            className="px-3.5 py-2.5 bg-white border-b border-slate-200/80 flex items-center justify-between cursor-pointer hover:bg-slate-50/90 transition-colors select-none"
+                          >
+                            <div className="flex items-center gap-2.5">
                               <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteClick(method);
-                                }} 
-                                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                                title={language === 'ar' ? 'حذف' : 'Delete'}
+                                type="button" 
+                                className="p-1 rounded-md text-slate-400 hover:text-slate-600"
+                                onClick={(e) => { e.stopPropagation(); toggleGroupCollapse(group.key); }}
                               >
-                                <Trash2 size={14} />
+                                <ChevronDown size={16} className={`transition-transform duration-200 ${isCollapsed ? (dir === 'rtl' ? 'rotate-90' : '-rotate-90') : 'rotate-0'}`} />
                               </button>
-                           </div>
-                        </div>
+                              <div className={`w-7 h-7 rounded-lg flex items-center justify-center border shadow-2xs ${group.colorClass}`}>
+                                <GroupIcon size={15} />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-xs font-black text-slate-800">
+                                  {language === 'ar' ? group.titleAr : group.titleEn}
+                                </h3>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${group.badgeClass}`}>
+                                  {group.items.length} {language === 'ar' ? 'طريقة' : 'methods'}
+                                </span>
+                              </div>
+                            </div>
 
-                        <div className="space-y-1">
-                           <div className="flex items-center gap-1.5 flex-wrap">
-                             <h3 className="text-sm font-bold text-slate-900 line-clamp-1 group-hover:text-indigo-700 transition-colors">{method.name}</h3>
-                             <span className="inline-block px-1.5 py-0.2 bg-emerald-50 text-emerald-700 rounded text-[9px] font-bold border border-emerald-200">
-                               {method.currency || 'EGP'}
-                             </span>
-                             {method.type === 'bank' && (
-                               <span className="inline-block px-1.5 py-0.2 bg-indigo-50 text-indigo-700 rounded text-[9px] font-bold border border-indigo-100">
-                                 {language === 'ar' ? 'بنك' : 'Bank'}
-                               </span>
-                             )}
-                           </div>
-                           <div className="flex items-center gap-1 flex-wrap">
-                             <span className="inline-block px-1.5 py-0.2 bg-slate-100 text-slate-500 rounded text-[10px] font-bold border border-slate-200 font-mono">{method.code}</span>
-                             {method.type === 'bank' && method.swift_code && (
-                               <span className="inline-block px-1.5 py-0.2 bg-emerald-50 text-emerald-800 rounded text-[9px] font-mono font-black border border-emerald-200">
-                                 SWIFT: {method.swift_code}
-                               </span>
-                             )}
-                             {method.type === 'bank' && method.account_number && (
-                               <span className="inline-block px-1.5 py-0.2 bg-slate-50 text-slate-600 rounded text-[10px] font-mono font-bold border border-slate-200">
-                                 #{method.account_number}
-                               </span>
-                             )}
-                             {method.type === 'bank' && (method.bank_name_en || method.bank_name) && (
-                               <span className="inline-block px-1.5 py-0.2 bg-slate-50 text-slate-500 rounded text-[10px] font-medium border border-slate-200">
-                                 {method.bank_name_en || method.bank_name}
-                               </span>
-                             )}
-                             {method.type === 'bank' && method.bank_hotline && (
-                               <span className="inline-block px-1.5 py-0.2 bg-slate-50 text-slate-600 rounded text-[9px] font-mono font-bold border border-slate-200">
-                                 📞 {method.bank_hotline}
-                               </span>
-                             )}
-                           </div>
-                        </div>
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="text-[10px] font-bold text-slate-400">{language === 'ar' ? 'إجمالي الرصيد:' : 'Total:'}</span>
+                              <span className={`font-black font-mono ${group.totalBalance < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                                {formatNumber(group.totalBalance)} EGP
+                              </span>
+                            </div>
+                          </div>
 
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-                           <div className="flex items-center gap-3">
-                             <div>
-                               <p className="text-[9px] font-bold text-slate-400 uppercase">{language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}</p>
-                               <p className="font-bold text-xs text-slate-600 tracking-tight leading-none mt-0.5">{formatNumber(method.opening_balance || 0)} <span className="text-[9px] font-normal text-slate-400">{method.currency || t('invoices.currency')}</span></p>
-                             </div>
-                             <div className="h-6 w-[1px] bg-slate-100" />
-                             <div>
-                               <p className="text-[9px] font-bold text-slate-400 uppercase">{language === 'ar' ? 'الرصيد الحالي' : 'Current Balance'}</p>
-                               {(() => {
-                                 const currentBal = getMethodCurrentBalance(method);
-                                 const isPositive = currentBal > 0;
-                                 const isNegative = currentBal < 0;
-                                 return (
-                                   <p className={`font-black text-sm tracking-tight leading-none mt-0.5 ${
-                                     isNegative ? 'text-rose-600' : isPositive ? 'text-emerald-600' : 'text-slate-800'
-                                   }`}>
-                                     {formatNumber(currentBal)} <span className="text-[9px] font-normal text-slate-400">{method.currency || t('invoices.currency')}</span>
-                                   </p>
-                                 );
-                               })()}
-                             </div>
-                           </div>
-                           <div className="p-1 bg-slate-50 rounded-md text-slate-300 group-hover:bg-indigo-600 group-hover:text-white transition-all shrink-0">
-                              {dir === 'rtl' ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
-                           </div>
+                          {/* Accordion Cards Grid */}
+                          {!isCollapsed && (
+                            <div className="p-3">
+                              {group.items.length === 0 ? (
+                                <div className="py-4 text-center text-slate-400 text-xs font-medium">
+                                  {language === 'ar' ? 'لا توجد طرق سداد في هذا القسم' : 'No payment methods in this category.'}
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
+                                  {group.items.map((method) => (
+                                    <motion.div
+                                      layout
+                                      initial={{ opacity: 0, scale: 0.95 }}
+                                      animate={{ opacity: 1, scale: 1 }}
+                                      key={method.id}
+                                      onClick={() => openModal(method)}
+                                      className="p-3 space-y-2 rounded-xl border bg-white border-slate-100 hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer group relative overflow-hidden"
+                                    >
+                                      <div className="flex items-start justify-between">
+                                        <div className="w-9 h-9 rounded-xl shadow-xs border border-slate-100 flex items-center justify-center text-slate-400 group-hover:text-indigo-600 transition-all overflow-hidden bg-white">
+                                          {method.type === 'bank' && findEgyptianBank(method) ? (
+                                            <BankLogoBadge bank={findEgyptianBank(method)!} size="sm" className="!w-full !h-full !p-0.5 border-none shadow-none rounded-none" />
+                                          ) : (
+                                            <div className="w-full h-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:text-indigo-600 group-hover:bg-indigo-50 transition-all">
+                                              <CreditCard size={16} />
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                          <button 
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDeleteClick(method);
+                                            }} 
+                                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                            title={language === 'ar' ? 'حذف' : 'Delete'}
+                                          >
+                                            <Trash2 size={14} />
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      <div className="space-y-1">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <h3 className="text-sm font-bold text-slate-900 line-clamp-1 group-hover:text-indigo-700 transition-colors">{method.name}</h3>
+                                          <span className="inline-block px-1.5 py-0.2 bg-emerald-50 text-emerald-700 rounded text-[9px] font-bold border border-emerald-200">
+                                            {method.currency || 'EGP'}
+                                          </span>
+                                          {method.type === 'bank' && (
+                                            <span className="inline-block px-1.5 py-0.2 bg-indigo-50 text-indigo-700 rounded text-[9px] font-bold border border-indigo-100">
+                                              {language === 'ar' ? 'بنك' : 'Bank'}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-1 flex-wrap">
+                                          <span className="inline-block px-1.5 py-0.2 bg-slate-100 text-slate-500 rounded text-[10px] font-bold border border-slate-200 font-mono">{method.code}</span>
+                                          {method.type === 'bank' && method.swift_code && (
+                                            <span className="inline-block px-1.5 py-0.2 bg-emerald-50 text-emerald-800 rounded text-[9px] font-mono font-black border border-emerald-200">
+                                              SWIFT: {method.swift_code}
+                                            </span>
+                                          )}
+                                          {method.type === 'bank' && method.account_number && (
+                                            <span className="inline-block px-1.5 py-0.2 bg-slate-50 text-slate-600 rounded text-[10px] font-mono font-bold border border-slate-200">
+                                              #{method.account_number}
+                                            </span>
+                                          )}
+                                          {method.type === 'bank' && (method.bank_name_en || method.bank_name) && (
+                                            <span className="inline-block px-1.5 py-0.2 bg-slate-50 text-slate-500 rounded text-[10px] font-medium border border-slate-200">
+                                              {method.bank_name_en || method.bank_name}
+                                            </span>
+                                          )}
+                                          {method.type === 'bank' && method.bank_hotline && (
+                                            <span className="inline-block px-1.5 py-0.2 bg-slate-50 text-slate-600 rounded text-[9px] font-mono font-bold border border-slate-200">
+                                              📞 {method.bank_hotline}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-3">
+                                          <div>
+                                            <p className="text-[9px] font-bold text-slate-400 uppercase">{language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}</p>
+                                            <p className="font-bold text-xs text-slate-600 tracking-tight leading-none mt-0.5">{formatNumber(method.opening_balance || 0)} <span className="text-[9px] font-normal text-slate-400">{method.currency || t('invoices.currency')}</span></p>
+                                          </div>
+                                          <div className="h-6 w-[1px] bg-slate-100" />
+                                          <div>
+                                            <p className="text-[9px] font-bold text-slate-400 uppercase">{language === 'ar' ? 'الرصيد الحالي' : 'Current Balance'}</p>
+                                            {(() => {
+                                              const currentBal = getMethodCurrentBalance(method);
+                                              const isPositive = currentBal > 0;
+                                              const isNegative = currentBal < 0;
+                                              return (
+                                                <p className={`font-black text-sm tracking-tight leading-none mt-0.5 ${
+                                                  isNegative ? 'text-rose-600' : isPositive ? 'text-emerald-600' : 'text-slate-800'
+                                                }`}>
+                                                  {formatNumber(currentBal)} <span className="text-[9px] font-normal text-slate-400">{method.currency || t('invoices.currency')}</span>
+                                                </p>
+                                              );
+                                            })()}
+                                          </div>
+                                        </div>
+                                        <div className="p-1 bg-slate-50 rounded-md text-slate-300 group-hover:bg-indigo-600 group-hover:text-white transition-all shrink-0">
+                                          {dir === 'rtl' ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+                                        </div>
+                                      </div>
+                                    </motion.div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      </motion.div>
-                    ))}
-                    {filteredMethods.length === 0 && (
-                      <div className="col-span-full py-8 text-center text-slate-400 font-bold text-xs">{language === 'ar' ? 'لا توجد طرق سداد حالياً' : 'No methods found.'}</div>
-                    )}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="overflow-x-auto h-full">
                     <table className="w-full text-right border-collapse">
-                      <thead className="sticky top-0 bg-white/90 backdrop-blur-md z-10 border-b border-slate-100">
+                      <thead className="sticky top-0 bg-white/95 backdrop-blur-md z-10 border-b border-slate-200">
                         <tr className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">
-                          <th className="px-4 py-2">{language === 'ar' ? 'كود طريقة السداد' : 'Code'}</th>
-                          <th className="px-4 py-2">{language === 'ar' ? 'طريقة السداد' : 'Name'}</th>
-                          <th className="px-4 py-2">{language === 'ar' ? 'العملة' : 'Currency'}</th>
-                          <th className="px-4 py-2">{language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}</th>
-                          <th className="px-4 py-2">{language === 'ar' ? 'الرصيد الحالي' : 'Current Balance'}</th>
-                          <th className="px-4 py-2 text-left">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
+                          <th className="px-4 py-2.5">{language === 'ar' ? 'كود طريقة السداد' : 'Code'}</th>
+                          <th className="px-4 py-2.5">{language === 'ar' ? 'طريقة السداد' : 'Name'}</th>
+                          <th className="px-4 py-2.5">{language === 'ar' ? 'العملة' : 'Currency'}</th>
+                          <th className="px-4 py-2.5">{language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}</th>
+                          <th className="px-4 py-2.5">{language === 'ar' ? 'الرصيد الحالي' : 'Current Balance'}</th>
+                          <th className="px-4 py-2.5 text-left">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-50">
-                        {filteredMethods.length === 0 ? (
-                          <tr>
-                            <td colSpan={6} className="px-4 py-8 text-center text-slate-400 text-xs italic">{language === 'ar' ? 'لا توجد طرق سداد حالياً' : 'No methods found.'}</td>
-                          </tr>
-                        ) : filteredMethods.map((method) => {
-                          const currentBal = getMethodCurrentBalance(method);
-                          const isPositive = currentBal > 0;
-                          const isNegative = currentBal < 0;
+                      <tbody className="divide-y divide-slate-100">
+                        {groupedMethods.map((group) => {
+                          const isCollapsed = Boolean(collapsedGroups[group.key]);
+                          const GroupIcon = group.icon;
                           return (
-                            <tr 
-                              key={method.id} 
-                              className="hover:bg-slate-50/50 transition-colors group cursor-pointer text-xs"
-                              onClick={() => openModal(method)}
-                            >
-                              <td className="px-4 py-2">
-                                <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold border border-slate-200">{method.code}</span>
-                              </td>
-                              <td className="px-4 py-2 font-bold text-slate-900">
-                                <div className="flex items-center gap-2">
-                                  {method.type === 'bank' && findEgyptianBank(method) && (
-                                    <BankLogoBadge bank={findEgyptianBank(method)!} size="sm" className="!w-6 !h-6 !p-0.5 rounded-md shrink-0 shadow-2xs" />
-                                  )}
-                                  <div>
-                                    <span className="font-bold text-slate-900">{method.name}</span>
-                                    {method.type === 'bank' && method.swift_code && (
-                                      <span className="block text-[10px] font-mono text-emerald-700 font-bold">
-                                        SWIFT: {method.swift_code}
+                            <React.Fragment key={group.key}>
+                              {/* Group Accordion Header Row */}
+                              <tr 
+                                onClick={() => toggleGroupCollapse(group.key)}
+                                className="bg-slate-100/90 hover:bg-slate-200/80 cursor-pointer transition-colors border-y border-slate-200/90 select-none"
+                              >
+                                <td colSpan={6} className="px-4 py-2.5">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2.5">
+                                      <ChevronDown size={15} className={`text-slate-500 transition-transform duration-200 ${isCollapsed ? (dir === 'rtl' ? 'rotate-90' : '-rotate-90') : 'rotate-0'}`} />
+                                      <div className={`w-6 h-6 rounded-md flex items-center justify-center border shadow-2xs ${group.colorClass}`}>
+                                        <GroupIcon size={13} />
+                                      </div>
+                                      <span className="font-black text-xs text-slate-800">
+                                        {language === 'ar' ? group.titleAr : group.titleEn}
                                       </span>
-                                    )}
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${group.badgeClass}`}>
+                                        {group.items.length} {language === 'ar' ? 'طريقة' : 'methods'}
+                                      </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 text-xs">
+                                      <span className="text-[10px] font-bold text-slate-500">{language === 'ar' ? 'إجمالي الرصيد:' : 'Total:'}</span>
+                                      <span className={`font-black font-mono ${group.totalBalance < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                                        {formatNumber(group.totalBalance)} EGP
+                                      </span>
+                                    </div>
                                   </div>
-                                </div>
-                              </td>
-                              <td className="px-4 py-2">
-                                <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                  {method.currency || 'EGP'}
-                                </span>
-                              </td>
-                              <td className="px-4 py-2">
-                                <span className="font-bold text-slate-600">{formatNumber(method.opening_balance || 0)} {method.currency || 'ج.م'}</span>
-                              </td>
-                              <td className="px-4 py-2">
-                                <span className={`font-black ${
-                                  isNegative ? 'text-rose-600' : isPositive ? 'text-emerald-600' : 'text-slate-800'
-                                }`}>
-                                  {formatNumber(currentBal)} {method.currency || 'ج.م'}
-                                </span>
-                              </td>
-                              <td className="px-4 py-2 text-left" onClick={(e) => e.stopPropagation()}>
-                                <div className="flex items-center justify-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button 
-                                    onClick={() => openModal(method)}
-                                    className="p-1 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-                                    title={language === 'ar' ? 'تعديل' : 'Edit'}
-                                  >
-                                    <FileText size={14} />
-                                  </button>
-                                  <button 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteClick(method);
-                                    }}
-                                    className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                                    title={language === 'ar' ? 'حذف' : 'Delete'}
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
+                                </td>
+                              </tr>
+
+                              {/* Rows in Group */}
+                              {!isCollapsed && (
+                                group.items.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={6} className="px-4 py-4 text-center text-slate-400 text-xs italic">
+                                      {language === 'ar' ? 'لا توجد طرق سداد في هذا القسم' : 'No methods in this category'}
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  group.items.map((method) => {
+                                    const currentBal = getMethodCurrentBalance(method);
+                                    const isPositive = currentBal > 0;
+                                    const isNegative = currentBal < 0;
+                                    return (
+                                      <tr 
+                                        key={method.id} 
+                                        className="hover:bg-indigo-50/30 transition-colors group cursor-pointer text-xs"
+                                        onClick={() => openModal(method)}
+                                      >
+                                        <td className="px-4 py-2">
+                                          <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold border border-slate-200">{method.code}</span>
+                                        </td>
+                                        <td className="px-4 py-2 font-bold text-slate-900">
+                                          <div className="flex items-center gap-2">
+                                            {method.type === 'bank' && findEgyptianBank(method) && (
+                                              <BankLogoBadge bank={findEgyptianBank(method)!} size="sm" className="!w-6 !h-6 !p-0.5 rounded-md shrink-0 shadow-2xs" />
+                                            )}
+                                            <div>
+                                              <span className="font-bold text-slate-900">{method.name}</span>
+                                              {method.type === 'bank' && method.swift_code && (
+                                                <span className="block text-[10px] font-mono text-emerald-700 font-bold">
+                                                  SWIFT: {method.swift_code}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </td>
+                                        <td className="px-4 py-2">
+                                          <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                            {method.currency || 'EGP'}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-2">
+                                          <span className="font-bold text-slate-600">{formatNumber(method.opening_balance || 0)} {method.currency || 'ج.م'}</span>
+                                        </td>
+                                        <td className="px-4 py-2">
+                                          <span className={`font-black ${
+                                            isNegative ? 'text-rose-600' : isPositive ? 'text-emerald-600' : 'text-slate-800'
+                                          }`}>
+                                            {formatNumber(currentBal)} {method.currency || 'ج.م'}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-2 text-left" onClick={(e) => e.stopPropagation()}>
+                                          <div className="flex items-center justify-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button 
+                                              onClick={() => openModal(method)}
+                                              className="p-1 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                                              title={language === 'ar' ? 'تعديل' : 'Edit'}
+                                            >
+                                              <FileText size={14} />
+                                            </button>
+                                            <button 
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteClick(method);
+                                              }}
+                                              className="p-1 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                              title={language === 'ar' ? 'حذف' : 'Delete'}
+                                            >
+                                              <Trash2 size={14} />
+                                            </button>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })
+                                )
+                              )}
+                            </React.Fragment>
                           );
                         })}
                       </tbody>

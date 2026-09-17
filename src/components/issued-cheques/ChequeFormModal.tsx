@@ -2,14 +2,16 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, Save, AlertCircle, Calendar, DollarSign, Building2, User, 
   FileText, Paperclip, Trash2, ArrowLeft, CheckCircle2, ShieldCheck, 
-  Layers, Landmark, RefreshCw, Hash, Stamp
+  Layers, Landmark, RefreshCw, Hash, Stamp, Copy
 } from 'lucide-react';
 import { IssuedCheque, Supplier, PaymentMethod, IssuedChequeAttachment, Account } from '../../types';
 import { issuedChequeService } from '../../services/issuedChequeService';
+import { dbService } from '../../services/dbService';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { tafqeetAr } from '../../utils/tafqeet';
+import { formatNumber } from '../../utils/formatUtils';
 
 interface ChequeFormModalProps {
   isOpen: boolean;
@@ -65,6 +67,18 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
   const [attachments, setAttachments] = useState<IssuedChequeAttachment[]>([]);
   const [loading, setLoading] = useState(false);
   const [validationError, setValidationError] = useState('');
+  const [isDuplicateDraft, setIsDuplicateDraft] = useState(false);
+
+  // Invoice Settlements state
+  const [purchaseInvoices, setPurchaseInvoices] = useState<any[]>([]);
+  const [formSettlements, setFormSettlements] = useState<Array<{
+    target_id: string;
+    settlement_number: string;
+    settlement_date: string;
+    settled_amount: number;
+    full_settle?: boolean;
+    payment_amount_settle?: boolean;
+  }>>([]);
 
   // Valid account usages for "النقدية والبنوك والوسائل المالية"
   const validCashUsages = ['cash', 'petty_cash', 'bank', 'wallet', 'credit_card', 'debit_card', 'main_cash'];
@@ -152,6 +166,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
 
   useEffect(() => {
     if (chequeToEdit) {
+      setIsDuplicateDraft(false);
       setChequeNumber(chequeToEdit.cheque_number || '');
       setSupplierId(chequeToEdit.supplier_id || '');
       setCreditAccountId(chequeToEdit.credit_account_id || defaultCreditAcc?.id || '');
@@ -166,7 +181,13 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
       setDescription(chequeToEdit.description || '');
       setNotes(chequeToEdit.notes || '');
       setAttachments(Array.isArray(chequeToEdit.attachments) ? chequeToEdit.attachments : []);
+      if (chequeToEdit.settlements && Array.isArray(chequeToEdit.settlements)) {
+        setFormSettlements(chequeToEdit.settlements);
+      } else {
+        setFormSettlements([]);
+      }
     } else {
+      setIsDuplicateDraft(false);
       setChequeNumber('');
       setSupplierId('');
       setCreditAccountId(defaultCreditAcc?.id || '');
@@ -181,9 +202,70 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
       setDescription('');
       setNotes('');
       setAttachments([]);
+      setFormSettlements([]);
     }
     setValidationError('');
   }, [chequeToEdit, isOpen, defaultCreditAcc, bankOptions, user]);
+
+  // Subscribe to purchase invoices for company & selected supplier
+  useEffect(() => {
+    if (!user?.company_id || !supplierId) {
+      setPurchaseInvoices([]);
+      return;
+    }
+
+    const unsub = dbService.subscribe<any>('purchase_invoices', user.company_id, (allPInvs) => {
+      const suppInvs = (allPInvs || []).filter(inv => 
+        inv.supplier_id === supplierId && 
+        inv.status !== 'CANCELLED'
+      );
+      setPurchaseInvoices(suppInvs);
+    });
+
+    return () => {
+      unsub();
+    };
+  }, [user?.company_id, supplierId]);
+
+  // Open transactions for supplier
+  const openTransactions = useMemo(() => {
+    if (!supplierId) return [];
+
+    return purchaseInvoices.map(inv => {
+      const totalAmount = Number(inv.total_amount) || 0;
+      const paid = Number(inv.paid_amount) || 0;
+      const openAmount = Math.max(0, totalAmount - paid);
+
+      return {
+        id: inv.id,
+        date: inv.date || inv.issue_date || inv.created_at?.slice(0, 10) || '',
+        type: 'purchase_invoice',
+        type_label: isAr ? 'فاتورة مشتريات' : 'Purchase Invoice',
+        reference_number: inv.invoice_number || inv.id?.slice(0, 8),
+        entry_number: inv.entry_number || inv.journal_entry_number || '-',
+        original_amount: totalAmount,
+        open_amount: openAmount > 0 ? openAmount : totalAmount
+      };
+    }).filter(t => t.open_amount > 0.01);
+  }, [supplierId, purchaseInvoices, isAr]);
+
+  const handleDuplicateCheque = () => {
+    setIsDuplicateDraft(true);
+    let newChequeNo = '';
+    const digitsMatch = chequeNumber.match(/(\d+)$/);
+    if (digitsMatch) {
+      const numStr = digitsMatch[1];
+      const nextNum = (BigInt(numStr) + 1n).toString().padStart(numStr.length, '0');
+      newChequeNo = chequeNumber.slice(0, chequeNumber.length - numStr.length) + nextNum;
+    } else if (chequeNumber) {
+      newChequeNo = `${chequeNumber}-01`;
+    } else {
+      newChequeNo = `${Date.now().toString().slice(-8)}`;
+    }
+
+    setChequeNumber(newChequeNo);
+    showSuccess(isAr ? `تم نسخ بيانات الشيك برقم جديد (${newChequeNo})، يمكنك الآن التعديل والحفظ كشيك جديد.` : `Cheque data duplicated with new number (${newChequeNo}).`);
+  };
 
   // When supplier changes, auto-populate payee name if empty
   const handleSupplierChange = (sId: string) => {
@@ -341,10 +423,11 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
         payee_name: payeeName.trim() || selectedSupplier?.name || '',
         description: description.trim(),
         notes: notes.trim(),
-        attachments: attachments
+        attachments: attachments,
+        settlements: formSettlements.filter(s => Number(s.settled_amount) > 0)
       };
 
-      if (chequeToEdit) {
+      if (chequeToEdit && !isDuplicateDraft) {
         await issuedChequeService.update(chequeToEdit.id, chequeData);
         showSuccess('تم تحديث بيانات الشيك بنجاح.');
       } else {
@@ -367,14 +450,16 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
     <div className={`bg-slate-100/80 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 w-full ${inline ? 'rounded-2xl shadow-sm' : 'max-w-5xl rounded-3xl shadow-2xl'} overflow-hidden animate-in fade-in duration-200`} dir={dir}>
       
       {/* Top Header Controls */}
-      <div className="px-5 py-3.5 bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
+      <div className="px-5 py-3.5 bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center font-bold text-lg shadow-sm">
             🏦
           </div>
           <div>
             <h3 className="text-base font-black text-slate-900 dark:text-white leading-tight">
-              {chequeToEdit 
+              {isDuplicateDraft
+                ? (isAr ? 'إصدار شيك جديد (منسوخ)' : 'Issue New Cheque (Copy)')
+                : chequeToEdit 
                 ? (isAr ? 'تعديل مسودة الشيك الصادر' : 'Edit Issued Cheque Draft') 
                 : (isAr ? 'تحرير وإصدار شيك بنكي جديد' : 'Issue New Bank Cheque')}
             </h3>
@@ -385,23 +470,50 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
             </p>
           </div>
         </div>
-        {inline ? (
+
+        {/* Action Buttons at the Top Header */}
+        <div className="flex items-center gap-2">
+          {/* Save Button */}
           <button
             type="button"
-            onClick={onClose}
-            className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-2 border border-slate-200 dark:border-slate-700 shadow-xs cursor-pointer"
+            onClick={handleSubmit}
+            disabled={loading}
+            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 flex items-center gap-1.5 transition-all disabled:opacity-50 active:scale-95 cursor-pointer"
           >
-            <span>{isAr ? 'الرجوع للقائمة' : 'Back to List'}</span>
-            <ArrowLeft className={`w-3.5 h-3.5 ${dir === 'ltr' ? 'rotate-180' : ''}`} />
+            <Save className="w-4 h-4" />
+            <span>{loading ? (isAr ? 'جاري الحفظ...' : 'Saving...') : (chequeToEdit && !isDuplicateDraft ? (isAr ? 'حفظ تعديلات الشيك' : 'Save Changes') : (isAr ? 'حفظ الشيك الصادر' : 'Save Cheque'))}</span>
           </button>
-        ) : (
+
+          {/* Copy / Duplicate Button */}
           <button
-            onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            type="button"
+            onClick={handleDuplicateCheque}
+            className="px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-xs"
+            title={isAr ? 'نسخ بيانات الشيك لإنشاء شيك جديد' : 'Duplicate Cheque Data'}
           >
-            <X className="w-5 h-5" />
+            <Copy className="w-4 h-4" />
+            <span>{isAr ? 'نسخ' : 'Copy'}</span>
           </button>
-        )}
+
+          {/* Close / Back to List Button */}
+          {inline ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 shadow-xs cursor-pointer"
+            >
+              <span>{isAr ? 'الرجوع للقائمة' : 'Back to List'}</span>
+              <ArrowLeft className={`w-3.5 h-3.5 ${dir === 'ltr' ? 'rotate-180' : ''}`} />
+            </button>
+          ) : (
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5">
@@ -720,27 +832,30 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
         </div>
 
         {/* ========================================================================= */}
-        {/* ACCOUNTING & SUPPORTING CONTROLS (ربط الحسابات المحاسبية والمرفقات)         */}
+        {/* ACCOUNTING & SUPPORTING CONTROLS (ربط الحسابات المحاسبية والمرفقات - مدمج ومضغوط) */}
         {/* ========================================================================= */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
-          <h4 className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-2">
-            <Layers className="w-4 h-4 text-emerald-600" />
-            <span>التوجيه المحاسبي والبيانات المتممة للشيك</span>
-          </h4>
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl p-3 sm:p-3.5 space-y-2.5 shadow-2xs">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-1.5">
+            <h4 className="text-xs font-black text-slate-800 dark:text-white flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-emerald-600" />
+              <span>التوجيه المحاسبي والبيانات المتممة للشيك</span>
+            </h4>
+            <span className="text-[10px] text-slate-400 font-medium">القيود والتوجيهات المحاسبية</span>
+          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             
-            {/* Bank Account Selection (Requirement 1: Cash/Banks usage with Bank as default) */}
+            {/* Bank Account Selection */}
             <div>
-              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+              <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-0.5 flex items-center justify-between">
                 <span>الحساب المسحوب عليه (النقدية والبنوك) <span className="text-rose-500">*</span></span>
-                <span className="text-[10px] text-emerald-600 font-bold">البنك الافتراضي</span>
+                <span className="text-[9px] text-emerald-600 font-bold">البنك الافتراضي</span>
               </label>
               <select
                 required
                 value={bankAccountId}
                 onChange={e => setBankAccountId(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                className="w-full px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold text-xs focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all h-8"
               >
                 <optgroup label="الحسابات البنكية (الافتراضي)">
                   {bankOptions.map(b => (
@@ -763,14 +878,14 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
 
             {/* Credit Account Selection (أوراق الدفع) */}
             <div>
-              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+              <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-0.5">
                 الحساب الدائن (أوراق الدفع) <span className="text-rose-500">*</span>
               </label>
               <select
                 required
                 value={creditAccountId}
                 onChange={e => setCreditAccountId(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50/30 dark:bg-emerald-950/20 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-xs font-semibold transition-all"
+                className="w-full px-2.5 py-1 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50/20 dark:bg-emerald-950/20 text-slate-900 dark:text-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs font-semibold transition-all h-8"
               >
                 <option value="">
                   {notesPayableAccounts.length === 0
@@ -785,9 +900,9 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
               </select>
             </div>
 
-            {/* Issue / Registration Date (تاريخ التحرير والتسجيل) */}
+            {/* Issue / Registration Date */}
             <div>
-              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+              <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-0.5">
                 تاريخ التحرير والتسجيل <span className="text-rose-500">*</span>
               </label>
               <input
@@ -795,13 +910,13 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                 required
                 value={issueDate}
                 onChange={e => setIssueDate(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                className="w-full px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all h-8"
               />
             </div>
 
-            {/* Description / Purpose (البيان / الغرض من الصرف) */}
+            {/* Description / Purpose */}
             <div className="sm:col-span-2 lg:col-span-3">
-              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+              <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-0.5">
                 البيان / الغرض من الصرف
               </label>
               <input
@@ -809,32 +924,32 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                 placeholder="سداد دفعة تحت الحساب / سداد فاتورة توريد رقم ..."
                 value={description}
                 onChange={e => setDescription(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-xs transition-all"
+                className="w-full px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs transition-all h-8"
               />
             </div>
 
           </div>
 
-          {/* Row: Notes & Attachments */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          {/* Compact Notes & Attachments Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1.5 border-t border-slate-100 dark:border-slate-800">
             <div>
-              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+              <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-0.5">
                 ملاحظات إضافية
               </label>
               <textarea
-                rows={2}
+                rows={1}
                 placeholder="أي ملاحظات داخلية خاصة بالإدارة المالية..."
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-xs transition-all resize-none"
+                className="w-full px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs transition-all resize-none h-8"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+              <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-0.5">
                 صورة الشيك / المرفقات المؤيدة
               </label>
-              <div className="border border-dashed border-slate-300 dark:border-slate-700 rounded-lg p-2.5 text-center hover:border-emerald-500 transition-colors">
+              <div className="border border-dashed border-slate-300 dark:border-slate-700 rounded-lg p-1 text-center hover:border-emerald-500 transition-colors flex items-center justify-between px-2.5 h-8">
                 <input
                   type="file"
                   id="cheque-attachments-input"
@@ -845,39 +960,45 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                 />
                 <label
                   htmlFor="cheque-attachments-input"
-                  className="cursor-pointer flex items-center justify-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-emerald-600"
+                  className="cursor-pointer flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:text-emerald-600 truncate"
                 >
-                  <Paperclip className="w-4 h-4 text-emerald-600" />
-                  <span>اضغط لرفع صورة الشيك البنكي أو المستند (حتى 10MB)</span>
+                  <Paperclip className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span className="truncate">اضغط لرفع صورة الشيك أو المستند</span>
                 </label>
 
-                {/* Uploaded attachments preview */}
                 {attachments.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {attachments.map(att => (
-                      <div
-                        key={att.id}
-                        className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-[11px]"
-                      >
-                        <span className="truncate max-w-[120px]">{att.name}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeAttachment(att.id)}
-                          className="text-rose-500 hover:text-rose-700"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full shrink-0">
+                    {attachments.length} مرفق
+                  </span>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Accounting Alert */}
-          <div className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30 text-emerald-800 dark:text-emerald-300 text-[11px] flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+          {/* Attachments chips */}
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {attachments.map(att => (
+                <div
+                  key={att.id}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-[10px]"
+                >
+                  <span className="truncate max-w-[120px]">{att.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(att.id)}
+                    className="text-rose-500 hover:text-rose-700"
+                  >
+                    <Trash2 className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Compact Accounting Alert */}
+          <div className="p-2 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30 text-emerald-800 dark:text-emerald-300 text-[10px] flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
             <span>
               <strong>الأثر المالي:</strong> عند اعتماد وإصدار الشيك، يتم إنشاء قيد يومية آلياً: 
               <span className="font-mono mx-1 font-bold">من حـ/ {suppliers.find(s => s.id === supplierId)?.name || 'المورد'} إلى حـ/ {accounts.find(a => a.id === creditAccountId)?.name || 'أوراق الدفع'}</span> 
@@ -885,6 +1006,156 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
             </span>
           </div>
 
+        </div>
+
+        {/* ========================================================================= */}
+        {/* INVOICE SETTLEMENTS TABLE (جدول تسويات الفاتورة)                          */}
+        {/* ========================================================================= */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
+          {/* Header Strip with Badges */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-zinc-100 dark:border-slate-800 pb-3">
+            <div className="flex items-center gap-2 text-emerald-600">
+              <Layers className="w-5 h-5" />
+              <h2 className="font-black text-sm text-zinc-900 dark:text-white">
+                {language === 'ar' ? 'جدول تسويات الفاتورة' : 'Invoice Settlements Table'}
+              </h2>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-3 text-xs font-bold font-mono">
+              <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800 text-xs font-sans">
+                <span className="text-zinc-500 dark:text-slate-400">{language === 'ar' ? 'إجمالي المسوى:' : 'Total Settled:'}</span>
+                <span className="font-mono font-black">{formatNumber(totalSettled)} {currency}</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-700 text-xs font-sans">
+                <span className="text-zinc-500 dark:text-slate-400">{language === 'ar' ? 'الفرق:' : 'Difference:'}</span>
+                <span className={`font-mono font-black ${difference > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                  {formatNumber(difference)} {currency}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {!supplierId ? (
+            <div className="py-6 text-center text-slate-400 text-xs font-medium bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+              {language === 'ar' 
+                ? 'يرجى اختيار المورد من بيانات الشيك أعلاه لعرض فواتيره المستحقة وتسويتها'
+                : 'Please select a supplier above to display and settle outstanding invoices.'}
+            </div>
+          ) : openTransactions.length === 0 ? (
+            <div className="py-6 text-center text-slate-400 text-xs font-bold bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+              {language === 'ar' 
+                ? 'لا توجد فواتير مشتريات مفتوحة أو حركات غير مسواة لهذا المورد حالياً'
+                : 'No outstanding purchase invoices or unsettled transactions for this supplier.'}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className={`w-full text-xs ${dir === 'rtl' ? 'text-right' : 'text-left'} border-collapse`}>
+                <thead>
+                  <tr className="border-b border-zinc-100 dark:border-slate-800 text-zinc-400 dark:text-slate-500 text-[11px] font-bold uppercase tracking-wider pb-2">
+                    <th className="pb-2 text-right">{language === 'ar' ? 'رقم القيد' : 'Entry No'}</th>
+                    <th className="pb-2 text-right">{language === 'ar' ? 'نوع الحركة' : 'Type'}</th>
+                    <th className="pb-2 text-right">{language === 'ar' ? 'رقم الحركة / المرجع' : 'Ref No'}</th>
+                    <th className="pb-2 text-right">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                    <th className="pb-2 text-center w-28">{language === 'ar' ? 'رقم التسوية' : 'Settlement No'}</th>
+                    <th className="pb-2 text-center w-32">{language === 'ar' ? 'تاريخ التسوية' : 'Settlement Date'}</th>
+                    <th className="pb-2 text-right">{language === 'ar' ? 'المبلغ الأصلي' : 'Original Amt'}</th>
+                    <th className="pb-2 text-right">{language === 'ar' ? 'المبلغ المفتوح' : 'Open Amt'}</th>
+                    <th className="pb-2 text-center w-24">{language === 'ar' ? 'تسوية كاملة' : 'Full Settle'}</th>
+                    <th className="pb-2 text-center w-28">{language === 'ar' ? 'تسوية بمبلغ الدفعة' : 'Settle with Payment'}</th>
+                    <th className="pb-2 text-center w-28">{language === 'ar' ? 'تسوية جزئية' : 'Partial Settle'}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-50 dark:divide-slate-800 text-zinc-700 dark:text-slate-200 font-bold">
+                  {openTransactions.map((t) => {
+                    const settlement = formSettlements.find(s => s.target_id === t.id);
+                    const settledAmount = settlement ? Number(settlement.settled_amount) : 0;
+                    const isFullySettled = settledAmount > 0 && Math.abs(settledAmount - t.open_amount) < 0.01;
+
+                    const otherSettledSum = formSettlements
+                      .filter(s => s.target_id !== t.id)
+                      .reduce((sum, s) => sum + Number(s.settled_amount), 0);
+                    const remainingChequeAmount = Math.max(0, numAmount - otherSettledSum);
+                    const maxAllocation = Math.min(remainingChequeAmount, t.open_amount);
+                    const isPaymentAmountSettled = settledAmount > 0 && Math.abs(settledAmount - maxAllocation) < 0.01;
+
+                    return (
+                      <tr key={t.id} className="hover:bg-zinc-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="py-2.5">
+                          {t.entry_number && t.entry_number !== '-' ? (
+                            <span className="text-emerald-600 dark:text-emerald-400 font-mono font-black">
+                              {t.entry_number}
+                            </span>
+                          ) : (
+                            <span className="text-zinc-400 font-mono font-normal">-</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 text-zinc-500 dark:text-slate-400 font-semibold">{t.type_label}</td>
+                        <td className="py-2.5">
+                          <span className="text-emerald-600 dark:text-emerald-400 font-mono font-black">
+                            {t.reference_number}
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-zinc-400 dark:text-slate-500 font-normal font-mono">{t.date}</td>
+                        <td className="py-2.5 text-center">
+                          <input
+                            disabled
+                            type="text"
+                            className="w-28 bg-zinc-50 dark:bg-slate-800 border border-zinc-200 dark:border-slate-700 rounded-lg px-2 py-1 text-center text-zinc-500 dark:text-slate-400 font-mono text-[11px] font-black"
+                            value={settlement?.settlement_number || '-'}
+                            placeholder="-"
+                          />
+                        </td>
+                        <td className="py-2.5 text-center">
+                          <input
+                            type="date"
+                            className="w-32 bg-white dark:bg-slate-800 border border-zinc-200 dark:border-slate-700 rounded-lg px-2 py-1 text-center text-zinc-700 dark:text-slate-200 text-[11px] font-bold focus:ring-1 focus:ring-emerald-500"
+                            value={settlement?.settlement_date ? settlement.settlement_date.slice(0, 10) : issueDate.slice(0, 10)}
+                            onChange={(e) => handleSettlementDateChange(t, e.target.value)}
+                          />
+                        </td>
+                        <td className="py-2.5 text-zinc-500 dark:text-slate-400 font-semibold">{formatNumber(t.original_amount)}</td>
+                        <td className="py-2.5 text-zinc-900 dark:text-white font-black">{formatNumber(t.open_amount)}</td>
+                        
+                        {/* تسوية كاملة */}
+                        <td className="py-2.5 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isFullySettled}
+                            onChange={() => handleFullSettleToggle(t)}
+                            className="w-4 h-4 text-emerald-600 rounded border-zinc-300 dark:border-slate-600 focus:ring-emerald-500 cursor-pointer"
+                          />
+                        </td>
+
+                        {/* تسوية بمبلغ الدفعة */}
+                        <td className="py-2.5 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isPaymentAmountSettled && !isFullySettled}
+                            onChange={() => handlePaymentAmountSettleToggle(t)}
+                            className="w-4 h-4 text-emerald-600 rounded border-zinc-300 dark:border-slate-600 focus:ring-emerald-500 cursor-pointer"
+                          />
+                        </td>
+
+                        {/* تسوية جزئية */}
+                        <td className="py-2.5 text-center">
+                          <input
+                            type="number"
+                            step="any"
+                            min={0}
+                            max={t.open_amount}
+                            placeholder="0"
+                            value={settledAmount > 0 ? settledAmount : ''}
+                            onChange={(e) => handlePartialSettleChange(t, e.target.value)}
+                            className="w-24 bg-white dark:bg-slate-800 border border-zinc-200 dark:border-slate-700 rounded-lg px-2 py-1 text-center text-zinc-900 dark:text-white font-mono text-[11px] font-black focus:ring-1 focus:ring-emerald-500"
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Modal Footer Controls */}
