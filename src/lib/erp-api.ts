@@ -3198,7 +3198,7 @@ router.post('/audit_logs', authenticateToken, async (req: AuthRequest, res) => {
     const ipAddress = getIp(req);
     const { browser, os, device } = parseUserAgent(req.headers['user-agent'] || '');
     const logId = uuidv4();
-    const branch = req.body.branch || user?.branch || 'Main';
+    const branch = req.body.branch || (user as any)?.branch || 'Main';
     const executionTime = duration_seconds ? Math.round(Number(duration_seconds) * 1000) : (req.body.execution_time || 0);
 
     await pool.query(

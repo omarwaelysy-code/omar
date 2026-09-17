@@ -442,16 +442,16 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
 
   // Compile full user options (from users table and existing logs)
   const userOptions = useMemo(() => {
-    const map = new Map<string, { id: string; name: string; username: string; email?: string }>();
+    const map = new Map<string, { id: string; name?: string; username: string; email?: string }>();
     availableUsers.forEach(u => {
-      map.set(u.username || u.name, u);
+      map.set(u.username || u.name || u.id, u);
     });
     logs.forEach(l => {
       if (l.username && !map.has(l.username)) {
         map.set(l.username, { id: l.user_id || l.username, name: l.username, username: l.username, email: l.user_email });
       }
     });
-    return Array.from(map.values()).sort((a, b) => (a.name || a.username).localeCompare(b.name || b.username));
+    return Array.from(map.values()).sort((a, b) => (a.name || a.username || '').localeCompare(b.name || b.username || ''));
   }, [availableUsers, logs]);
 
   const filteredUserOptions = useMemo(() => {
