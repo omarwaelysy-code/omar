@@ -43,14 +43,19 @@ export const formatDateTime = (date: string | Date | undefined | null): string =
     const d = new Date(date);
     if (isNaN(d.getTime())) return String(date);
     
-    // For date-time, we show local time but maintain the Egyptian DD/MM/YYYY format
+    // For date-time, we show local time with Egyptian DD/MM/YYYY format and 12-hour AM/PM
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const year = d.getFullYear();
-    const hours = String(d.getHours()).padStart(2, '0');
-    const minutes = String(d.getMinutes()).padStart(2, '0');
     
-    return `${day}/${month}/${year} ${hours}:${minutes}`;
+    let hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'م' : 'ص';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const strHours = String(hours).padStart(2, '0');
+    
+    return `${day}/${month}/${year}, ${strHours}:${minutes} ${ampm}`;
   } catch (e) {
     return String(date);
   }

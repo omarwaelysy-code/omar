@@ -159,16 +159,12 @@ export function matchesActionCategory(action: string, details: string, mode: Act
 
     return (
       act.includes('SCREEN_VISIT') ||
-      act.includes('VIEW') ||
       act.includes('LOGIN') ||
       act.includes('LOGOUT') ||
       act.includes('ACCESS') ||
       act.includes('OPEN') ||
       act.includes('BROWSE') ||
       act.includes('SESSION') ||
-      act.includes('FILTER') ||
-      act.includes('SEARCH') ||
-      act.includes('REFRESH') ||
       combined.includes('زيارة شاشة') ||
       combined.includes('دخول') ||
       combined.includes('خروج') ||
@@ -401,9 +397,21 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
         execution_time: Number(l.execution_time || 0)
       }));
 
+      // Filter out internal background noise (FILTER queries, generic VIEW calls, routine token refreshes)
+      const isNoise = (item: any) => {
+        const act = String(item.action || '').toUpperCase();
+        const det = String(item.details || '');
+        if (act === 'FILTER') return true;
+        if (det.startsWith('VIEW in module')) return true;
+        if (det.startsWith('FILTER in module')) return true;
+        if (det.startsWith('CREATE in module AUTH')) return true;
+        return false;
+      };
+
       // Combine and sort DESC
       const combinedMap = new Map<string, ActivityLog>();
       [...normalizedAudit, ...normalizedActivity].forEach(item => {
+        if (isNoise(item)) return;
         const key = item.id && item.id.length > 20 ? item.id : `${item.user_id}_${item.created_at}_${item.action}`;
         if (!combinedMap.has(key)) {
           combinedMap.set(key, item as any);
@@ -520,6 +528,13 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
     return logs.filter(log => {
       // 0. Screen Mode Category Match
       if (!matchesActionCategory(log.action, log.details, activeMode)) {
+        return false;
+      }
+
+      // Filter out internal background noise
+      const act = String(log.action || '').toUpperCase();
+      const det = String(log.details || '');
+      if (act === 'FILTER' || det.startsWith('VIEW in module') || det.startsWith('FILTER in module') || det.startsWith('CREATE in module AUTH')) {
         return false;
       }
 
@@ -897,9 +912,98 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
         </div>
       </div>
 
+      {/* View Mode Switching Tabs */}
+      <div className="flex items-center gap-1.5 p-1.5 bg-white rounded-2xl border border-zinc-100 shadow-xs overflow-x-auto print:hidden">
+        <button
+          type="button"
+          onClick={() => { setActiveMode('views'); setPage(1); }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+            activeMode === 'views'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
+          }`}
+        >
+          <Eye size={15} />
+          <span>{language === 'ar' ? 'سجل الدخول والمشاهدات وسلوك المستخدم وزمن البقاء' : 'Logins, Views & Stay Duration'}</span>
+          {activeMode === 'views' && hasLoadedData && (
+            <span className="px-1.5 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-mono">
+              {filteredLogs.length}
+            </span>
+          )}
+        </button>
 
+        <button
+          type="button"
+          onClick={() => { setActiveMode('modifications'); setPage(1); }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+            activeMode === 'modifications'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
+          }`}
+        >
+          <Edit3 size={15} />
+          <span>{language === 'ar' ? 'سجل الإنشاء والتعديلات' : 'Creations & Modifications'}</span>
+          {activeMode === 'modifications' && hasLoadedData && (
+            <span className="px-1.5 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-mono">
+              {filteredLogs.length}
+            </span>
+          )}
+        </button>
 
-      {/* Advanced Filter Section */}
+        <button
+          type="button"
+          onClick={() => { setActiveMode('cancellations'); setPage(1); }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+            activeMode === 'cancellations'
+              ? 'bg-rose-600 text-white shadow-sm'
+              : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
+          }`}
+        >
+          <Trash2 size={15} />
+          <span>{language === 'ar' ? 'سجل الإلغاءات والمحذوفات' : 'Cancellations & Deletions'}</span>
+          {activeMode === 'cancellations' && hasLoadedData && (
+            <span className="px-1.5 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-mono">
+              {filteredLogs.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { setActiveMode('prints'); setPage(1); }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+            activeMode === 'prints'
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
+          }`}
+        >
+          <Printer size={15} />
+          <span>{language === 'ar' ? 'سجل الطباعة والتقارير' : 'Prints & Reports'}</span>
+          {activeMode === 'prints' && hasLoadedData && (
+            <span className="px-1.5 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-mono">
+              {filteredLogs.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { setActiveMode('all'); setPage(1); }}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+            activeMode === 'all'
+              ? 'bg-zinc-900 text-white shadow-sm'
+              : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
+          }`}
+        >
+          <ShieldCheck size={15} />
+          <span>{language === 'ar' ? 'السجل العام الشامل' : 'Central Audit Log'}</span>
+          {activeMode === 'all' && hasLoadedData && (
+            <span className="px-1.5 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-mono">
+              {filteredLogs.length}
+            </span>
+          )}
+        </button>
+      </div>
       <div className="bg-white p-5 rounded-2xl border border-zinc-100 shadow-xs space-y-4 print:hidden">
         
         {/* Row 1: Search + Date Range */}
@@ -1154,7 +1258,7 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
                   <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider text-center">
                     <div className="flex items-center justify-center gap-1">
                       <Clock size={12} className="text-amber-600" />
-                      <span>{language === 'ar' ? 'مدة البقاء في الشاشة' : 'Stay Duration'}</span>
+                      <span>{language === 'ar' ? 'زمن المشاهدة / مدة البقاء' : 'View Duration / Stay Time'}</span>
                     </div>
                   </th>
                   <th className="px-4 py-3.5 text-xs font-black text-zinc-600 uppercase tracking-wider">
@@ -1337,14 +1441,14 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex flex-col text-xs text-zinc-500">
-                            <div className="flex items-center gap-1.5 font-bold text-zinc-700">
-                              <Calendar size={10} className="text-emerald-500" />
+                          <div className="flex flex-col text-xs">
+                            <div className="flex items-center gap-1.5 font-bold text-zinc-800">
+                              <Calendar size={11} className="text-emerald-600" />
                               <span>{formatDateTime(log.created_at).split(',')[0]}</span>
                             </div>
-                            <div className="flex items-center gap-1.5 opacity-70 font-mono text-[10px]">
-                              <Clock size={10} />
-                              <span>{formatDateTime(log.created_at).split(',')[1]}</span>
+                            <div className="flex items-center gap-1.5 font-bold text-blue-700 text-[11px] mt-0.5">
+                              <Clock size={11} className="text-blue-500" />
+                              <span>{formatDateTime(log.created_at).split(',')[1] || ''}</span>
                             </div>
                           </div>
                         </td>
@@ -1464,10 +1568,16 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
                       </td>
 
                       <td className="px-4 py-3">
-                        <div className="flex flex-col gap-0.5 max-w-xs">
-                          <p className="text-xs text-zinc-600 leading-relaxed font-semibold truncate">
+                        <div className="flex flex-col gap-1 max-w-xs">
+                          <p className="text-xs text-zinc-800 leading-relaxed font-bold truncate">
                             {log.details || '-'}
                           </p>
+                          {formatStayDuration(log, language) !== '-' && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-[10px] font-black w-fit shadow-2xs">
+                              <Clock size={11} className="text-amber-600" />
+                              <span>{language === 'ar' ? `زمن المشاهدة: ${formatStayDuration(log, language)}` : `Stay: ${formatStayDuration(log, language)}`}</span>
+                            </span>
+                          )}
                           {((log as any).record_name || (log as any).record_id) && (
                             <span className="text-[9px] font-mono text-zinc-400 flex items-center gap-1 truncate">
                               <ExternalLink size={8} />
@@ -1486,14 +1596,14 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex flex-col text-xs text-zinc-500">
-                          <div className="flex items-center gap-1.5 font-bold text-zinc-700">
-                            <Calendar size={10} className="text-emerald-500" />
+                        <div className="flex flex-col text-xs">
+                          <div className="flex items-center gap-1.5 font-bold text-zinc-800">
+                            <Calendar size={11} className="text-emerald-600" />
                             <span>{formatDateTime(log.created_at).split(',')[0]}</span>
                           </div>
-                          <div className="flex items-center gap-1.5 opacity-70 font-mono text-[10px]">
-                            <Clock size={10} />
-                            <span>{formatDateTime(log.created_at).split(',')[1]}</span>
+                          <div className="flex items-center gap-1.5 font-bold text-blue-700 text-[11px] mt-0.5">
+                            <Clock size={11} className="text-blue-500" />
+                            <span>{formatDateTime(log.created_at).split(',')[1] || ''}</span>
                           </div>
                         </div>
                       </td>

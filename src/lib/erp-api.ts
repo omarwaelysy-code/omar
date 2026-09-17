@@ -617,7 +617,7 @@ router.use(async (req: any, res: any, next: any) => {
   const path = req.path || '';
   const isPolling = req.query._polling === 'true' || req.headers['x-polling'] === 'true';
   const isLogRetrieval = path.includes('/activity_logs') || path.includes('/audit_logs');
-  const isHealthOrMe = path.includes('/health') || path.includes('/auth/me');
+  const isHealthOrMe = path.includes('/health') || path.includes('/auth/me') || path.includes('/auth/refresh') || path.includes('/auth/ping');
 
   if (isPolling || isLogRetrieval || isHealthOrMe) {
     return next();
@@ -725,12 +725,10 @@ router.use(async (req: any, res: any, next: any) => {
     } else if (req.method === 'GET') {
       if (path.includes('/export')) action = 'EXPORT';
       else if (path.includes('/import')) action = 'IMPORT';
-      else if (req.query._search) action = 'SEARCH';
-      else if (Object.keys(req.query).some(k => !k.startsWith('_') && k !== 'company_id')) action = 'FILTER';
-      else if (req.query._refresh === 'true') action = 'REFRESH';
       else {
-        // Routine internal GET reads (fetching products, customers, accounts, etc.)
-        // must NOT flood the audit logs table with spammy 'VIEW' rows.
+        // Routine internal GET reads (fetching records, filtering tables, searching dropdowns, refreshing)
+        // must NEVER flood the audit logs with internal noise.
+        // User behavior on screens is accurately logged via client-side SCREEN_VISIT and NavigationContext.
         return;
       }
     }
@@ -3140,7 +3138,12 @@ router.get('/audit_logs', authenticateToken, async (req: AuthRequest, res) => {
 
     let query = 'SELECT * FROM audit_logs';
     const params: any[] = [];
-    const conditions: string[] = [];
+    const conditions: string[] = [
+      "action NOT IN ('FILTER')",
+      "details NOT LIKE 'VIEW in module%'",
+      "details NOT LIKE 'FILTER in module%'",
+      "details NOT LIKE 'CREATE in module AUTH%'"
+    ];
 
     if (targetCompanyId) {
       params.push(targetCompanyId);
@@ -4199,12 +4202,12 @@ modules.forEach(moduleName => {
           ? (requested || req.user?.company_id)
           : (isRequestedAuthorized ? requested : req.user?.company_id);
 
-        let query = 'SELECT * FROM audit_logs';
+        let query = "SELECT * FROM audit_logs WHERE action NOT IN ('FILTER') AND details NOT LIKE 'VIEW in module%' AND details NOT LIKE 'FILTER in module%' AND details NOT LIKE 'CREATE in module AUTH%'";
         let params: any[] = [];
 
         if (targetCompanyId) {
           // SECURITY FIX: Strict company isolation — no NULL company_id leak
-          query += ' WHERE company_id = $1';
+          query += ' AND company_id = $1';
           params.push(targetCompanyId);
         } else if (!isSuperAdminUser) {
           rows = [];
