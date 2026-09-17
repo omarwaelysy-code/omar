@@ -283,6 +283,102 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
     return isNaN(parsed) || parsed < 0 ? 0 : parsed;
   }, [amount]);
 
+  const totalSettled = useMemo(() => {
+    return formSettlements.reduce((sum, s) => sum + (Number(s.settled_amount) || 0), 0);
+  }, [formSettlements]);
+
+  const difference = useMemo(() => {
+    return Math.max(0, numAmount - totalSettled);
+  }, [numAmount, totalSettled]);
+
+  const handleFullSettleToggle = (t: any) => {
+    setFormSettlements(prev => {
+      const existing = prev.find(s => s.target_id === t.id);
+      if (existing && existing.settled_amount > 0) {
+        return prev.filter(s => s.target_id !== t.id);
+      } else {
+        const otherSettledSum = prev.filter(s => s.target_id !== t.id).reduce((sum, s) => sum + Number(s.settled_amount), 0);
+        const remainingCheque = Math.max(0, numAmount - otherSettledSum);
+        const amountToSettle = remainingCheque > 0 ? Math.min(t.open_amount, remainingCheque) : t.open_amount;
+        
+        const dateStr = (issueDate || new Date().toISOString()).slice(0, 10);
+        const parts = dateStr.split('-');
+        const serial = `SET-${parts[0]}-${parts[1] || '01'}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        const filtered = prev.filter(s => s.target_id !== t.id);
+        return [...filtered, {
+          target_id: t.id,
+          settlement_number: serial,
+          settlement_date: dateStr,
+          settled_amount: amountToSettle,
+          full_settle: true
+        }];
+      }
+    });
+  };
+
+  const handlePaymentAmountSettleToggle = (t: any) => {
+    setFormSettlements(prev => {
+      const existing = prev.find(s => s.target_id === t.id);
+      if (existing && existing.settled_amount > 0) {
+        return prev.filter(s => s.target_id !== t.id);
+      } else {
+        const otherSettledSum = prev.filter(s => s.target_id !== t.id).reduce((sum, s) => sum + Number(s.settled_amount), 0);
+        const remainingCheque = Math.max(0, numAmount - otherSettledSum);
+        const amountToSettle = Math.min(t.open_amount, remainingCheque);
+
+        const dateStr = (issueDate || new Date().toISOString()).slice(0, 10);
+        const parts = dateStr.split('-');
+        const serial = `SET-${parts[0]}-${parts[1] || '01'}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        const filtered = prev.filter(s => s.target_id !== t.id);
+        return [...filtered, {
+          target_id: t.id,
+          settlement_number: serial,
+          settlement_date: dateStr,
+          settled_amount: amountToSettle,
+          payment_amount_settle: true
+        }];
+      }
+    });
+  };
+
+  const handlePartialSettleChange = (t: any, rawVal: string) => {
+    const val = parseFloat(rawVal);
+    setFormSettlements(prev => {
+      const filtered = prev.filter(s => s.target_id !== t.id);
+      if (isNaN(val) || val <= 0) {
+        return filtered;
+      }
+      const existing = prev.find(s => s.target_id === t.id);
+      const serial = existing?.settlement_number || `SET-${issueDate.slice(0, 7)}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const date = existing?.settlement_date || issueDate;
+      const amountToSettle = Math.min(t.open_amount, val);
+
+      return [...filtered, {
+        target_id: t.id,
+        settlement_number: serial,
+        settlement_date: date,
+        settled_amount: amountToSettle
+      }];
+    });
+  };
+
+  const handleSettlementDateChange = (t: any, newDate: string) => {
+    setFormSettlements(prev => {
+      const existing = prev.find(s => s.target_id === t.id);
+      if (!existing) {
+        return [...prev, {
+          target_id: t.id,
+          settlement_number: `SET-${newDate.slice(0, 7)}-${Math.floor(1000 + Math.random() * 9000)}`,
+          settlement_date: newDate,
+          settled_amount: 0
+        }];
+      }
+      return prev.map(s => s.target_id === t.id ? { ...s, settlement_date: newDate } : s);
+    });
+  };
+
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     const clean = val.replace(/,/g, '');
