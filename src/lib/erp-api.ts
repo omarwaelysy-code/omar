@@ -2568,7 +2568,8 @@ export const SEQUENCE_MODULE_CONFIG: Record<string, { table: string; field: stri
   'purchase_orders': { table: 'purchase_orders', field: 'order_number', prefix: 'PO', padLength: 6, periodType: 'month' },
   'goods_receipts': { table: 'goods_receipts', field: 'receipt_number', prefix: 'GR', padLength: 6, periodType: 'month' },
   'employees': { table: 'employees', field: 'employee_code', prefix: 'EMP', padLength: 5, periodType: 'month' },
-  'cash_transfers': { table: 'cash_transfers', field: 'transfer_number', prefix: 'CT', padLength: 6, periodType: 'month' }
+  'cash_transfers': { table: 'cash_transfers', field: 'transfer_number', prefix: 'CT', padLength: 6, periodType: 'month' },
+  'issued_cheques': { table: 'issued_cheques', field: 'serial_number', prefix: 'CHQ', padLength: 6, periodType: 'month' }
 };
 
 export async function getNextAtomicSequence(
@@ -2598,6 +2599,7 @@ export async function getNextAtomicSequence(
     'purchase_returns': { table: 'purchase_returns', field: 'return_number', prefix: 'PRET' },
     'payment_vouchers': { table: 'payment_vouchers', field: 'voucher_number', prefix: 'PV' },
     'receipt_vouchers': { table: 'receipt_vouchers', field: 'voucher_number', prefix: 'RV' },
+    'issued_cheques': { table: 'issued_cheques', field: 'serial_number', prefix: 'CHQ' },
     'journal_entries': { table: 'journal_entries', field: 'entry_number', prefix: 'JE' },
     'sales_orders': { table: 'sales_orders', field: 'order_number', prefix: 'SO' },
     'purchase_orders': { table: 'purchase_orders', field: 'order_number', prefix: 'PO' },
@@ -2744,6 +2746,7 @@ export async function generateNextSequence(client: any, companyId: string, modul
     case 'stock_adjustments': prefix = 'ADJ'; break;
     case 'cash_transfers': prefix = 'CT'; break;
     case 'goods_receipts': prefix = 'GR'; break;
+    case 'issued_cheques': prefix = 'CHQ'; break;
     default: prefix = 'DOC';
   }
 
@@ -2777,6 +2780,7 @@ export async function generateNextSequence(client: any, companyId: string, modul
       'purchase_returns': { table: 'purchase_returns', field: 'return_number', prefix: 'PRET' },
       'payment_vouchers': { table: 'payment_vouchers', field: 'voucher_number', prefix: 'PV' },
       'receipt_vouchers': { table: 'receipt_vouchers', field: 'voucher_number', prefix: 'RV' },
+      'issued_cheques': { table: 'issued_cheques', field: 'serial_number', prefix: 'CHQ' },
       'journal_entries': { table: 'journal_entries', field: 'entry_number', prefix: 'JE' },
       'sales_orders': { table: 'sales_orders', field: 'order_number', prefix: 'SO' },
       'purchase_orders': { table: 'purchase_orders', field: 'order_number', prefix: 'PO' },
@@ -4737,7 +4741,7 @@ modules.forEach(moduleName => {
             payloadToPersist = authorizedUserPayload;
           }
 
-          const dateStr = req.body.date || new Date().toISOString().slice(0, 10);
+          const dateStr = req.body.date || req.body.issue_date || new Date().toISOString().slice(0, 10);
           if (moduleName === 'employees') {
             req.body.employee_code = await ensureUniqueSequenceNumber(pool, companyId, 'employees', '', req.body.employee_code);
           } else if (moduleName === 'cash_transfers') {
@@ -4746,6 +4750,8 @@ modules.forEach(moduleName => {
             req.body.voucher_number = await ensureUniqueSequenceNumber(pool, companyId, 'payment_vouchers', dateStr, req.body.voucher_number);
           } else if (moduleName === 'receipt_vouchers') {
             req.body.voucher_number = await ensureUniqueSequenceNumber(pool, companyId, 'receipt_vouchers', dateStr, req.body.voucher_number);
+          } else if (moduleName === 'issued_cheques') {
+            payloadToPersist.serial_number = await ensureUniqueSequenceNumber(pool, companyId, 'issued_cheques', dateStr, req.body.serial_number);
           }
 
           const sanitizedData = sanitizeData(moduleName, payloadToPersist);
@@ -4781,7 +4787,7 @@ modules.forEach(moduleName => {
             await client.query('RELEASE SAVEPOINT insert_sp').catch(() => {});
           } catch (insertError: any) {
             await client.query('ROLLBACK TO SAVEPOINT insert_sp').catch(() => {});
-            if (insertError.code === '23505' && ['payment_vouchers', 'receipt_vouchers', 'cash_transfers', 'employees'].includes(moduleName)) {
+            if (insertError.code === '23505' && ['payment_vouchers', 'receipt_vouchers', 'cash_transfers', 'employees', 'issued_cheques'].includes(moduleName)) {
               console.warn(`[RETRY RECOVERY] Unique constraint violation code 23505 for ${moduleName}. Forcing new atomic sequence...`);
               const target = SEQUENCE_MODULE_CONFIG[moduleName];
               const safeDateStr = (dateStr || new Date().toISOString()).slice(0, 10);
@@ -4798,7 +4804,8 @@ modules.forEach(moduleName => {
                 'payment_vouchers': 'voucher_number',
                 'receipt_vouchers': 'voucher_number',
                 'cash_transfers': 'transfer_number',
-                'employees': 'employee_code'
+                'employees': 'employee_code',
+                'issued_cheques': 'serial_number'
               };
               const seqField = fieldMap[moduleName];
               if (seqField) {

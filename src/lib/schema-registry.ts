@@ -125,7 +125,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'paid_to_type', 'paid_to_employee_id', 'paid_to_external_name', 'currency_id', 'exchange_rate'
   ],
   issued_cheques: [
-    'id', 'company_id', 'cheque_number', 'supplier_id', 'bank_account_id', 'credit_account_id', 'credit_account_name',
+    'id', 'company_id', 'serial_number', 'cheque_number', 'is_crossed', 'is_not_negotiable', 'supplier_id', 'bank_account_id', 'credit_account_id', 'credit_account_name',
     'bank_name', 'account_number',
     'amount', 'currency', 'exchange_rate', 'issue_date', 'due_date', 'status', 'description', 'notes',
     'payee_name', 'payment_date', 'return_date', 'return_reason', 'old_due_date', 'new_due_date',

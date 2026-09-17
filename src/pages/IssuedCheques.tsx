@@ -462,9 +462,14 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
                         <td className="px-3 py-2 font-mono font-bold text-slate-900 dark:text-white">
                           <button
                             onClick={() => setSelectedChequeForDetails(cheque)}
-                            className="hover:text-emerald-600 transition-colors cursor-pointer"
+                            className="hover:text-emerald-600 transition-colors cursor-pointer text-start block"
                           >
-                            {cheque.cheque_number}
+                            <span>{cheque.cheque_number}</span>
+                            {cheque.serial_number && (
+                              <span className="block text-[10px] font-mono text-slate-400 dark:text-slate-500 font-normal">
+                                {cheque.serial_number}
+                              </span>
+                            )}
                           </button>
                         </td>
                         <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-200">
@@ -512,6 +517,17 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
                               <Eye className="w-4 h-4" />
                             </button>
 
+                            {/* Edit Cheque (Available for Draft, Issued, Postponed) */}
+                            {['DRAFT', 'ISSUED', 'POSTPONED'].includes(cheque.status) && (
+                              <button
+                                onClick={() => { setSelectedChequeForEdit(cheque); setActiveTab('create'); }}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                title={isAr ? 'تعديل بيانات الشيك' : 'Edit Cheque'}
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+
                             {/* Issue Draft */}
                             {cheque.status === 'DRAFT' && (
                               <>
@@ -531,13 +547,6 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
                                   title={isAr ? 'اعتماد وإصدار' : 'Approve & Issue'}
                                 >
                                   {isAr ? 'إصدار' : 'Issue'}
-                                </button>
-                                <button
-                                  onClick={() => { setSelectedChequeForEdit(cheque); setActiveTab('create'); }}
-                                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                                  title={isAr ? 'تعديل المسودة' : 'Edit Draft'}
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
                                 </button>
                                 <button
                                   onClick={() => handleDeleteCheque(cheque)}

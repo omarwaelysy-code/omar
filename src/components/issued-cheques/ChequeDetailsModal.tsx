@@ -134,11 +134,26 @@ export const ChequeDetailsModal: React.FC<ChequeDetailsModalProps> = ({
               </div>
             )}
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                   {isAr ? 'شيك رقم:' : 'Cheque #:'} <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{cheque.cheque_number}</span>
                 </h3>
+                {cheque.serial_number && (
+                  <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                    {cheque.serial_number}
+                  </span>
+                )}
                 {getStatusBadge(cheque.status, isOverdue)}
+                {cheque.is_crossed && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                    {isAr ? 'مسطر //' : 'Crossed //'}
+                  </span>
+                )}
+                {cheque.is_not_negotiable && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                    {isAr ? 'غير قابل للتداول' : 'Not Negotiable'}
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 {isAr ? 'تفاصيل الشيك الصادر والسجل المحاسبي وحالة المعالجة' : 'Issued cheque details, accounting records, and processing state'}

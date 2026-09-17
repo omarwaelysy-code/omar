@@ -52,6 +52,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
   const isAr = language === 'ar';
 
   const [chequeNumber, setChequeNumber] = useState('');
+  const [serialNumber, setSerialNumber] = useState('');
   const [supplierId, setSupplierId] = useState('');
   const [creditAccountId, setCreditAccountId] = useState('');
   const [bankAccountId, setBankAccountId] = useState('');
@@ -64,6 +65,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
   const [dueDate, setDueDate] = useState(new Date().toISOString().slice(0, 10));
   const [payeeName, setPayeeName] = useState('');
   const [isCrossed, setIsCrossed] = useState(true);
+  const [isNotNegotiable, setIsNotNegotiable] = useState(true);
   const [signatoryName, setSignatoryName] = useState('');
   const [description, setDescription] = useState('');
   const [notes, setNotes] = useState('');
@@ -300,6 +302,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
     if (chequeToEdit) {
       setIsDuplicateDraft(false);
       setChequeNumber(chequeToEdit.cheque_number || '');
+      setSerialNumber(chequeToEdit.serial_number || '');
       setSupplierId(chequeToEdit.supplier_id || '');
       setCreditAccountId(chequeToEdit.credit_account_id || defaultCreditAcc?.id || '');
       setBankAccountId(chequeToEdit.bank_account_id || bankOptions[0]?.id || '');
@@ -310,6 +313,8 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
       setIssueDate(chequeToEdit.issue_date ? chequeToEdit.issue_date.slice(0, 10) : new Date().toISOString().slice(0, 10));
       setDueDate(chequeToEdit.due_date ? chequeToEdit.due_date.slice(0, 10) : new Date().toISOString().slice(0, 10));
       setPayeeName(chequeToEdit.payee_name || '');
+      setIsCrossed(chequeToEdit.is_crossed !== undefined ? Boolean(chequeToEdit.is_crossed) : true);
+      setIsNotNegotiable(chequeToEdit.is_not_negotiable !== undefined ? Boolean(chequeToEdit.is_not_negotiable) : true);
       setSignatoryName((chequeToEdit as any).signatory_name || user?.username || 'المفوض بالتوقيع');
       setDescription(chequeToEdit.description || '');
       setNotes(chequeToEdit.notes || '');
@@ -334,14 +339,25 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
         setExchangeRate('1.0');
         setRateSource('default');
       }
-      setIssueDate(new Date().toISOString().slice(0, 10));
-      setDueDate(new Date().toISOString().slice(0, 10));
+      const todayStr = new Date().toISOString().slice(0, 10);
+      setIssueDate(todayStr);
+      setDueDate(todayStr);
       setPayeeName('');
+      setIsCrossed(true);
+      setIsNotNegotiable(true);
       setSignatoryName(user?.username || 'المفوض بالتوقيع');
       setDescription('');
       setNotes('');
       setAttachments([]);
       setFormSettlements([]);
+
+      // Generate next sequence for new cheque
+      dbService.getNextSequence('issued_cheques', todayStr)
+        .then(seq => setSerialNumber(seq))
+        .catch(() => {
+          const parts = todayStr.split('-');
+          setSerialNumber(`CHQ-${parts[0]}-${parts[1] || '01'}-000001`);
+        });
     }
     setValidationError('');
   }, [chequeToEdit, isOpen, defaultCreditAcc, bankOptions, user]);
@@ -652,6 +668,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
     setLoading(true);
     try {
       const chequeData: Partial<IssuedCheque> = {
+        serial_number: serialNumber || undefined,
         cheque_number: chequeNumber.trim(),
         supplier_id: supplierId,
         supplier_name: selectedSupplier?.name || '',
@@ -666,6 +683,8 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
         issue_date: issueDate,
         due_date: dueDate,
         payee_name: payeeName.trim() || selectedSupplier?.name || '',
+        is_crossed: isCrossed,
+        is_not_negotiable: isNotNegotiable,
         description: description.trim(),
         notes: notes.trim(),
         attachments: attachments,
@@ -840,15 +859,30 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsCrossed(!isCrossed)}
-                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1 cursor-pointer ${
                     isCrossed 
                       ? 'bg-slate-800 text-white border-slate-900 shadow-xs' 
                       : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
                   }`}
-                  title={isAr ? 'تفعيل أو إلغاء تسطير الشيك' : 'Toggle crossing (Not Negotiable)'}
+                  title={isAr ? 'تفعيل أو إلغاء تسطير الشيك' : 'Toggle cheque crossing lines'}
+                >
+                  <span className="font-mono font-bold text-xs tracking-tighter">//</span>
+                  <span>{isCrossed ? (isAr ? 'تسطير // ✓' : 'Crossed // ✓') : (isAr ? 'بدون تسطير' : 'Uncrossed')}</span>
+                </button>
+
+                {/* Not Negotiable Stamp Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setIsNotNegotiable(!isNotNegotiable)}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                    isNotNegotiable 
+                      ? 'bg-emerald-800 text-white border-emerald-900 shadow-xs' 
+                      : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                  }`}
+                  title={isAr ? 'تفعيل أو إلغاء ختم غير قابل للتداول' : 'Toggle Not Negotiable stamp'}
                 >
                   <Stamp className="w-3 h-3" />
-                  <span>{isCrossed ? (isAr ? 'تسطير: غير قابل للتداول ✓' : 'Crossed: Not Negotiable ✓') : (isAr ? 'بدون تسطير' : 'Uncrossed')}</span>
+                  <span>{isNotNegotiable ? (isAr ? 'غير قابل للتداول ✓' : 'Not Negotiable ✓') : (isAr ? 'قابل للتداول' : 'Negotiable')}</span>
                 </button>
               </div>
 
@@ -868,15 +902,12 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                         ? (isAr ? matchedBank.nameAr : (matchedBank.nameEn || matchedBank.nameAr))
                         : (selectedFinancialAccount?.bankName || selectedFinancialAccount?.name || (isAr ? 'بنك مصر' : 'Banque Misr'))}
                     </span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-                      {selectedFinancialAccount?.isBank ? (isAr ? 'بنك تجاري' : 'Commercial Bank') : (isAr ? 'خزينة مالية' : 'Treasury')}
-                    </span>
                   </div>
-                  <p className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
-                    {selectedFinancialAccount?.accNo 
-                      ? (isAr ? `حساب: #${selectedFinancialAccount.accNo}` : `A/C: #${selectedFinancialAccount.accNo}`) 
-                      : (isAr ? 'فرع الشركات والمعاملات' : 'Corporate Banking Branch')}
-                  </p>
+                  {selectedFinancialAccount?.accNo && (
+                    <p className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                      {isAr ? `حساب: #${selectedFinancialAccount.accNo}` : `A/C: #${selectedFinancialAccount.accNo}`}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1056,7 +1087,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                         {isAr ? 'المعادل بالجنيه المصري:' : 'Equivalent in EGP:'}
                       </span>
                       <span className="font-mono font-black text-sm text-emerald-800 dark:text-emerald-300">
-                        {equivalentInEgp.toLocaleString(isAr ? 'ar-EG' : 'en-US', { minimumFractionDigits: 2 })} {currency === 'EGP' ? (isAr ? 'ج.م' : 'EGP') : currency}
+                        {equivalentInEgp.toLocaleString(isAr ? 'ar-EG' : 'en-US', { minimumFractionDigits: 2 })} {isAr ? 'ج.م' : 'EGP'}
                       </span>
                     </div>
                   </div>
@@ -1067,7 +1098,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-3 border-t border-emerald-900/10 dark:border-emerald-700/20">
                 {/* Right in RTL: Crossing Stamp Box */}
                 <div className="min-w-[140px]">
-                  {isCrossed ? (
+                  {isNotNegotiable ? (
                     <div className="inline-block px-3 py-1 border-2 border-slate-800 dark:border-slate-300 rounded font-black text-xs text-slate-800 dark:text-slate-200 tracking-wider bg-white/80 dark:bg-slate-900/80 shadow-xs select-none text-center">
                       <div>{isAr ? 'غير قابل للتداول' : 'NOT NEGOTIABLE'}</div>
                       <div className="text-[8px] font-sans font-bold opacity-75">{isAr ? 'A/C PAYEE ONLY' : 'غير قابل للتداول'}</div>
@@ -1132,8 +1163,22 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
             
+            {/* Auto Sequence Serial (CHQ-YYYY-MM-000001) - Read-only / Fixed */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-0.5 flex items-center justify-between">
+                <span>{isAr ? 'المسلسل التلقائي' : 'Auto Serial'}</span>
+                <span className="text-[9px] text-emerald-600 font-bold">{isAr ? 'ثابت لا يتغير' : 'Fixed'}</span>
+              </label>
+              <input
+                type="text"
+                readOnly
+                value={serialNumber || (isAr ? 'يحدد تلقائياً عند الحفظ' : 'Auto-generated on save')}
+                className="w-full px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-xs font-black outline-none cursor-not-allowed select-all h-8 tracking-wider"
+              />
+            </div>
+
             {/* Bank Account Selection */}
             <div>
               <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-0.5 flex items-center justify-between">
@@ -1198,13 +1243,24 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                 type="date"
                 required
                 value={issueDate}
-                onChange={e => setIssueDate(e.target.value)}
+                onChange={e => {
+                  const newDate = e.target.value;
+                  setIssueDate(newDate);
+                  if (!chequeToEdit) {
+                    dbService.getNextSequence('issued_cheques', newDate)
+                      .then(seq => setSerialNumber(seq))
+                      .catch(() => {
+                        const parts = newDate.split('-');
+                        setSerialNumber(`CHQ-${parts[0]}-${parts[1] || '01'}-000001`);
+                      });
+                  }
+                }}
                 className="w-full px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all h-8"
               />
             </div>
 
             {/* Description / Purpose */}
-            <div className="sm:col-span-2 lg:col-span-3">
+            <div className="sm:col-span-2 lg:col-span-4">
               <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-0.5">
                 {isAr ? 'البيان / الغرض من الصرف' : 'Description / Disbursement Purpose'}
               </label>

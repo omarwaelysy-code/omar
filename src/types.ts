@@ -562,7 +562,10 @@ export interface IssuedChequeAttachment {
 export interface IssuedCheque {
   id: string;
   company_id: string;
+  serial_number?: string;
   cheque_number: string;
+  is_crossed?: boolean;
+  is_not_negotiable?: boolean;
   supplier_id: string;
   supplier_name?: string;
   bank_account_id: string;
