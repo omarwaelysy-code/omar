@@ -187,7 +187,8 @@ const getTabIcon = (id: string) => {
     case 'create_template':
       return <LayoutTemplate {...iconProps} />;
     case 'issued_cheques': return <Landmark {...iconProps} />;
-    case 'create_issued_cheque': return <Plus {...iconProps} />;
+    case 'create_issued_cheque':
+    case 'create_other_cheque': return <Plus {...iconProps} />;
     default: return <Folder {...iconProps} />;
   }
 };
@@ -614,7 +615,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         subItems: [
           { id: 'receipts', label: t('nav.receipts'), icon: Receipt },
           { id: 'payment_vouchers', label: t('nav.payment_vouchers'), icon: CreditCard },
-          { id: 'issued_cheques', label: language === 'ar' ? 'الشيكات' : 'Cheques', icon: Landmark },
+          { id: 'issued_cheques', label: language === 'ar' ? 'الشيكات الصادرة' : 'Issued Cheques', icon: Landmark },
           { id: 'cash_transfers', label: t('nav.cash_transfers'), icon: ArrowLeftRight },
           { id: 'egyptian_banks', label: language === 'ar' ? 'دليل البنوك المصرية' : 'Egyptian Banks Directory', icon: Building2 }
         ]
@@ -624,8 +625,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         label: language === 'ar' ? 'الشيكات' : 'Cheques',
         icon: Landmark,
         subItems: [
-          { id: 'issued_cheques', label: language === 'ar' ? 'قائمة الشيكات' : 'Cheques List', icon: Landmark },
-          { id: 'create_issued_cheque', label: language === 'ar' ? 'تحرير شيك مورد' : 'Issue Supplier Cheque', icon: Plus }
+          { id: 'issued_cheques', label: language === 'ar' ? 'الشيكات الصادرة' : 'Issued Cheques', icon: Landmark },
+          { id: 'create_issued_cheque', label: language === 'ar' ? 'تحرير شيك مورد' : 'Issue Supplier Cheque', icon: Plus },
+          { id: 'create_other_cheque', label: language === 'ar' ? 'تحرير شيك' : 'Issue Cheque', icon: Plus }
         ]
       },
       {
@@ -782,7 +784,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       if (item.subItems) {
         const visibleSubItems = (item.subItems as any[]).filter((sub: any) => {
           if (sub.isDivider || sub.isHeader) return true;
-          if (sub.id === 'create_issued_cheque') return hasPermission('issued_cheques', 'create') || hasPermission('issued_cheques', 'view');
+          if (sub.id === 'create_issued_cheque' || sub.id === 'create_other_cheque') return hasPermission('issued_cheques', 'create') || hasPermission('issued_cheques', 'view');
           if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking' || sub.id === 'pos_connected_branches' || sub.id === 'eta_dashboard' || sub.id === 'eta_received_invoices' || sub.id === 'eta_detailed_invoices' || sub.id === 'eta_supplier_mapping' || sub.id === 'eta_item_mapping' || sub.id === 'eta_sent_item_mapping' || sub.id === 'eta_tax_types') return true;
           return hasPermission(sub.id, 'view');
         });

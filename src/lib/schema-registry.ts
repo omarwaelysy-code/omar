@@ -125,12 +125,12 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'paid_to_type', 'paid_to_employee_id', 'paid_to_external_name', 'currency_id', 'exchange_rate'
   ],
   issued_cheques: [
-    'id', 'company_id', 'serial_number', 'cheque_number', 'is_crossed', 'is_not_negotiable', 'supplier_id', 'bank_account_id', 'credit_account_id', 'credit_account_name',
+    'id', 'company_id', 'serial_number', 'cheque_number', 'cheque_type', 'is_crossed', 'is_not_negotiable', 'supplier_id', 'bank_account_id', 'debit_account_id', 'debit_account_name', 'credit_account_id', 'credit_account_name',
     'bank_name', 'account_number',
     'amount', 'currency', 'exchange_rate', 'issue_date', 'due_date', 'status', 'description', 'notes',
-    'payee_name', 'payment_date', 'return_date', 'return_reason', 'old_due_date', 'new_due_date',
+    'payee_name', 'signatory_name', 'payment_date', 'return_date', 'return_reason', 'old_due_date', 'new_due_date',
     'postponement_reason', 'cancelled_at', 'cancelled_by', 'cancel_reason', 'issue_journal_entry_id',
-    'payment_journal_entry_id', 'cancel_journal_entry_id', 'attachments', 'created_by', 'updated_by',
+    'payment_journal_entry_id', 'cancel_journal_entry_id', 'attachments', 'settlements', 'created_by', 'updated_by',
     'created_at', 'updated_at'
   ],
   customer_discounts: [

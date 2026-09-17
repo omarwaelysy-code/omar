@@ -23,6 +23,7 @@ interface ChequeFormModalProps {
   paymentMethods: PaymentMethod[];
   accounts?: Account[];
   inline?: boolean;
+  initialChequeType?: 'supplier' | 'other';
 }
 
 const SUPPORTED_CURRENCIES = [
@@ -44,16 +45,19 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
   suppliers,
   paymentMethods,
   accounts = [],
-  inline = false
+  inline = false,
+  initialChequeType = 'supplier'
 }) => {
   const { showSuccess, showError } = useNotification();
   const { user } = useAuth();
   const { language, dir } = useLanguage();
   const isAr = language === 'ar';
 
+  const [chequeType, setChequeType] = useState<'supplier' | 'other'>(initialChequeType || 'supplier');
   const [chequeNumber, setChequeNumber] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
   const [supplierId, setSupplierId] = useState('');
+  const [debitAccountId, setDebitAccountId] = useState('');
   const [creditAccountId, setCreditAccountId] = useState('');
   const [bankAccountId, setBankAccountId] = useState('');
   const [amount, setAmount] = useState('');
@@ -298,9 +302,22 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
     return notesPayableAccounts[0] || null;
   }, [notesPayableAccounts]);
 
+  // Selectable debit accounts for other cheques (expenses, assets, partner, payroll, etc.)
+  const debitAccountOptions = useMemo(() => {
+    return accounts
+      .filter(a => {
+        const usage = a.account_usage || '';
+        return usage !== 'notes_payable' && usage !== 'bank' && usage !== 'main_cash' && usage !== 'petty_cash';
+      })
+      .sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+  }, [accounts]);
+
   useEffect(() => {
     if (chequeToEdit) {
       setIsDuplicateDraft(false);
+      const mode = (chequeToEdit as any).cheque_type || (chequeToEdit.supplier_id ? 'supplier' : 'other');
+      setChequeType(mode);
+      setDebitAccountId((chequeToEdit as any).debit_account_id || '');
       setChequeNumber(chequeToEdit.cheque_number || '');
       setSerialNumber(chequeToEdit.serial_number || '');
       setSupplierId(chequeToEdit.supplier_id || '');
@@ -326,6 +343,8 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
       }
     } else {
       setIsDuplicateDraft(false);
+      setChequeType(initialChequeType || 'supplier');
+      setDebitAccountId('');
       setChequeNumber('');
       setSupplierId('');
       setCreditAccountId(defaultCreditAcc?.id || '');
@@ -360,7 +379,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
         });
     }
     setValidationError('');
-  }, [chequeToEdit, isOpen, defaultCreditAcc, bankOptions, user]);
+  }, [chequeToEdit, isOpen, defaultCreditAcc, bankOptions, user, initialChequeType]);
 
   // Subscribe to purchase invoices for company & selected supplier
   useEffect(() => {
@@ -629,9 +648,20 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
       setValidationError(isAr ? 'يرجى إدخال رقم الشيك الفعلي المطبوع.' : 'Please enter the physical printed cheque number.');
       return;
     }
-    if (!supplierId) {
-      setValidationError(isAr ? 'يرجى اختيار المورد المستفيد.' : 'Please select the beneficiary supplier.');
-      return;
+    if (chequeType === 'supplier') {
+      if (!supplierId) {
+        setValidationError(isAr ? 'يرجى اختيار المورد المستفيد.' : 'Please select the beneficiary supplier.');
+        return;
+      }
+    } else {
+      if (!payeeName.trim()) {
+        setValidationError(isAr ? 'يرجى كتابة اسم المستفيد على الشيك.' : 'Please enter the beneficiary name on the cheque.');
+        return;
+      }
+      if (!debitAccountId) {
+        setValidationError(isAr ? 'يرجى اختيار الحساب المدين (المصروف / طبيعة الصرف).' : 'Please select the debit account (expense / disbursement nature).');
+        return;
+      }
     }
     if (!creditAccountId) {
       setValidationError(isAr ? 'يرجى اختيار الحساب الدائن (أوراق الدفع).' : 'Please select the credit account (Notes Payable).');
@@ -662,7 +692,8 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
       return;
     }
 
-    const selectedSupplier = suppliers.find(s => s.id === supplierId);
+    const selectedSupplier = chequeType === 'supplier' ? suppliers.find(s => s.id === supplierId) : null;
+    const selectedDebitAcc = chequeType === 'other' ? accounts.find(a => a.id === debitAccountId) : null;
     const selectedCreditAcc = accounts.find(a => a.id === creditAccountId);
 
     setLoading(true);
@@ -670,8 +701,11 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
       const chequeData: Partial<IssuedCheque> = {
         serial_number: serialNumber || undefined,
         cheque_number: chequeNumber.trim(),
-        supplier_id: supplierId,
-        supplier_name: selectedSupplier?.name || '',
+        cheque_type: chequeType,
+        supplier_id: chequeType === 'supplier' ? supplierId : undefined,
+        supplier_name: chequeType === 'supplier' ? (selectedSupplier?.name || '') : undefined,
+        debit_account_id: chequeType === 'other' ? debitAccountId : undefined,
+        debit_account_name: chequeType === 'other' ? (selectedDebitAcc?.name || '') : undefined,
         bank_account_id: bankAccountId,
         bank_name: selectedFinancialAccount?.bankName || selectedFinancialAccount?.name || (isAr ? 'بنك مصر' : 'Banque Misr'),
         account_number: selectedFinancialAccount?.accNo || '',
@@ -682,13 +716,14 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
         exchange_rate: isForeign ? numExchangeRate : 1.0,
         issue_date: issueDate,
         due_date: dueDate,
-        payee_name: payeeName.trim() || selectedSupplier?.name || '',
+        payee_name: payeeName.trim() || (chequeType === 'supplier' ? selectedSupplier?.name : '') || '',
         is_crossed: isCrossed,
         is_not_negotiable: isNotNegotiable,
+        signatory_name: signatoryName.trim() || user?.username || 'المفوض بالتوقيع',
         description: description.trim(),
         notes: notes.trim(),
         attachments: attachments,
-        settlements: formSettlements.filter(s => Number(s.settled_amount) > 0)
+        settlements: chequeType === 'supplier' ? formSettlements.filter(s => Number(s.settled_amount) > 0) : []
       };
 
       if (chequeToEdit && !isDuplicateDraft) {
@@ -724,13 +759,13 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
               {isDuplicateDraft
                 ? (isAr ? 'إصدار شيك جديد (منسوخ)' : 'Issue New Cheque (Copy)')
                 : chequeToEdit 
-                ? (isAr ? 'تعديل مسودة الشيك الصادر' : 'Edit Issued Cheque Draft') 
-                : (isAr ? 'تحرير وإصدار شيك بنكي جديد' : 'Issue New Bank Cheque')}
+                ? (isAr ? `تعديل شيك (${chequeType === 'supplier' ? 'سداد مورد' : 'جهات أخرى / عام'})` : `Edit Cheque (${chequeType === 'supplier' ? 'Supplier' : 'Other'})`)
+                : (isAr ? (chequeType === 'supplier' ? 'تحرير شيك مورد صادر' : 'تحرير شيك صادر (جهات أخرى / عام)') : (chequeType === 'supplier' ? 'Issue Supplier Cheque' : 'Issue Cheque (Other / General)'))}
             </h3>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
               {isAr 
-                ? 'نموذج الشيك البنكي الرسمي المعتمد مع التفقيط التلقائي وإدارة العملات'
-                : 'Official bank cheque form with automated words conversion & currency management'}
+                ? (chequeType === 'supplier' ? 'تحرير وإصدار شيك سداد للموردين وربطه بالفواتير والتوجيه المحاسبي' : 'تحرير وإصدار شيك لجهات أخرى ومصروفات عامة مع التوجيه المحاسبي')
+                : (chequeType === 'supplier' ? 'Issue supplier payment cheque linked to purchase invoices' : 'Issue cheque for general expenses, entities, or payroll')}
             </p>
           </div>
         </div>
@@ -780,8 +815,44 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5">
+      <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
         
+        {/* Cheque Type Switcher (سداد مورد / شيك جهات أخرى وعام) */}
+        <div className="flex flex-wrap items-center justify-between gap-3 p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xs">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+            <button
+              type="button"
+              onClick={() => { setChequeType('supplier'); setValidationError(''); }}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                chequeType === 'supplier'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>{isAr ? 'تحرير شيك مورد' : 'Issue Supplier Cheque'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setChequeType('other'); setValidationError(''); }}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                chequeType === 'other'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>{isAr ? 'تحرير شيك (جهات أخرى / عام)' : 'Issue Cheque (Other / General)'}</span>
+            </button>
+          </div>
+
+          <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+            {chequeType === 'supplier'
+              ? (isAr ? '• نموذج سداد مورد مرتبط بحساب الموردين وفواتير الشراء' : '• Supplier cheque linked to supplier account & purchase invoices')
+              : (isAr ? '• نموذج شيك حر للمصروفات، الإيجارات، الضرائب، الرواتب والعهد' : '• General cheque for expenses, rent, taxes, payroll, or petty cash')}
+          </div>
+        </div>
+
         {validationError && (
           <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2 font-medium">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -925,33 +996,49 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                 
                 {/* Middle: Payee inputs */}
                 <div className="flex-1 flex flex-col sm:flex-row items-center gap-2">
-                  {/* Supplier Select */}
-                  <div className="w-full sm:w-2/5">
-                    <select
-                      required
-                      value={supplierId}
-                      onChange={e => handleSupplierChange(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white/90 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-bold outline-none focus:border-emerald-600 shadow-xs"
-                    >
-                      <option value="">{isAr ? '-- اختر المورد المستفيد --' : '-- Select Payee Supplier --'}</option>
-                      {suppliers.map(s => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} {s.code ? `(${s.code})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {chequeType === 'supplier' ? (
+                    <>
+                      {/* Supplier Select */}
+                      <div className="w-full sm:w-2/5">
+                        <select
+                          required
+                          value={supplierId}
+                          onChange={e => handleSupplierChange(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white/90 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-bold outline-none focus:border-emerald-600 shadow-xs"
+                        >
+                          <option value="">{isAr ? '-- اختر المورد المستفيد --' : '-- Select Payee Supplier --'}</option>
+                          {suppliers.map(s => (
+                            <option key={s.id} value={s.id}>
+                              {s.name} {s.code ? `(${s.code})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                  {/* Beneficiary Name on Cheque (Drawn line) */}
-                  <div className="w-full sm:w-3/5 relative">
-                    <input
-                      type="text"
-                      placeholder={isAr ? "اسم المستفيد المكتوب نصاً على الشيك..." : "Payee name written on cheque..."}
-                      value={payeeName}
-                      onChange={e => setPayeeName(e.target.value)}
-                      className="w-full bg-transparent border-b-2 border-slate-700 dark:border-slate-400 px-2 py-1 text-sm sm:text-base font-black text-slate-900 dark:text-white outline-none placeholder:text-slate-400 placeholder:font-normal"
-                    />
-                  </div>
+                      {/* Beneficiary Name on Cheque (Drawn line) */}
+                      <div className="w-full sm:w-3/5 relative">
+                        <input
+                          type="text"
+                          placeholder={isAr ? "اسم المستفيد المكتوب نصاً على الشيك..." : "Payee name written on cheque..."}
+                          value={payeeName}
+                          onChange={e => setPayeeName(e.target.value)}
+                          className="w-full bg-transparent border-b-2 border-slate-700 dark:border-slate-400 px-2 py-1 text-sm sm:text-base font-black text-slate-900 dark:text-white outline-none placeholder:text-slate-400 placeholder:font-normal"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    /* Other / General Cheque: Direct payee name across full width */
+                    <div className="w-full relative">
+                      <input
+                        type="text"
+                        required
+                        placeholder={isAr ? "اكتب اسم المستفيد المحرر لأمره الشيك (جهة الصرف / الشخص / الجهة المستفيدة)..." : "Payee / beneficiary name written on cheque..."}
+                        value={payeeName}
+                        onChange={e => setPayeeName(e.target.value)}
+                        className="w-full bg-transparent border-b-2 border-blue-600 dark:border-blue-400 px-2 py-1 text-sm sm:text-base font-black text-slate-900 dark:text-white outline-none placeholder:text-slate-400 placeholder:font-normal"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Left: English Translation */}
@@ -1163,7 +1250,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 ${chequeType === 'other' ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-2`}>
             
             {/* Auto Sequence Serial (CHQ-YYYY-MM-000001) - Read-only / Fixed */}
             <div>
@@ -1178,6 +1265,31 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                 className="w-full px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-xs font-black outline-none cursor-not-allowed select-all h-8 tracking-wider"
               />
             </div>
+
+            {/* If other cheque: Debit Account Selector (طرف القيد المدين) */}
+            {chequeType === 'other' && (
+              <div>
+                <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-0.5 flex items-center justify-between">
+                  <span>{isAr ? 'الحساب المدين (طرف القيد)' : 'Debit Account'} <span className="text-rose-500">*</span></span>
+                  <span className="text-[9px] text-blue-600 font-bold">{isAr ? 'مصروف/أصل/جهة' : 'Expense/Asset'}</span>
+                </label>
+                <select
+                  required
+                  value={debitAccountId}
+                  onChange={e => setDebitAccountId(e.target.value)}
+                  className="w-full px-2.5 py-1 rounded-lg border border-blue-300 dark:border-blue-700 bg-blue-50/20 dark:bg-blue-950/20 text-slate-900 dark:text-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-xs font-semibold transition-all h-8"
+                >
+                  <option value="">
+                    {isAr ? '-- اختر الحساب المدين --' : '-- Select Debit Account --'}
+                  </option>
+                  {debitAccountOptions.map(acc => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.code ? `${acc.code} - ` : ''}{acc.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Bank Account Selection */}
             <div>
@@ -1260,13 +1372,16 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
             </div>
 
             {/* Description / Purpose */}
-            <div className="sm:col-span-2 lg:col-span-4">
+            <div className={chequeType === 'other' ? 'sm:col-span-2 lg:col-span-5' : 'sm:col-span-2 lg:col-span-4'}>
               <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-0.5">
                 {isAr ? 'البيان / الغرض من الصرف' : 'Description / Disbursement Purpose'}
               </label>
               <input
                 type="text"
-                placeholder={isAr ? "سداد دفعة تحت الحساب / سداد فاتورة توريد رقم ..." : "Payment on account / Payment of supplier invoice #..."}
+                placeholder={chequeType === 'supplier'
+                  ? (isAr ? "سداد دفعة تحت الحساب / سداد فاتورة توريد رقم ..." : "Payment on account / Payment of supplier invoice #...")
+                  : (isAr ? "سداد إيجار مقر / سداد ضرائب / سلفة موظف / مصاريف تشغيلية ..." : "Rent payment / Tax payment / Employee advance / Operational expense...")
+                }
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 className="w-full px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs transition-all h-8"
@@ -1347,10 +1462,17 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
             <span>
               <strong>{isAr ? 'الأثر المالي:' : 'Financial Impact:'}</strong>{' '}
               {isAr ? 'عند اعتماد وإصدار الشيك، يتم إنشاء قيد يومية آلياً:' : 'Upon approving and issuing the cheque, an automatic journal entry is created:'}{' '}
-              <span className="font-mono mx-1 font-bold">
-                {isAr ? 'من حـ/' : 'Dr.'} {suppliers.find(s => s.id === supplierId)?.name || (isAr ? 'المورد' : 'Supplier')}{' '}
-                {isAr ? 'إلى حـ/' : 'Cr.'} {accounts.find(a => a.id === creditAccountId)?.name || (isAr ? 'أوراق الدفع' : 'Notes Payable')}
-              </span>{' '}
+              {chequeType === 'supplier' ? (
+                <span className="font-mono mx-1 font-bold">
+                  {isAr ? 'من حـ/' : 'Dr.'} {suppliers.find(s => s.id === supplierId)?.name || (isAr ? 'المورد' : 'Supplier')}{' '}
+                  {isAr ? 'إلى حـ/' : 'Cr.'} {accounts.find(a => a.id === creditAccountId)?.name || (isAr ? 'أوراق الدفع' : 'Notes Payable')}
+                </span>
+              ) : (
+                <span className="font-mono mx-1 font-bold">
+                  {isAr ? 'من حـ/' : 'Dr.'} {accounts.find(a => a.id === debitAccountId)?.name || (isAr ? 'الحساب المدين' : 'Debit Account')}{' '}
+                  {isAr ? 'إلى حـ/' : 'Cr.'} {accounts.find(a => a.id === creditAccountId)?.name || (isAr ? 'أوراق الدفع' : 'Notes Payable')}
+                </span>
+              )}{' '}
               {isAr ? 'بمبلغ' : 'for the amount of'}{' '}
               {Number(isForeign ? equivalentInEgp : numAmount).toLocaleString(isAr ? 'ar-EG' : 'en-US', { minimumFractionDigits: 2 })} {currency === 'EGP' ? (isAr ? 'ج.م' : 'EGP') : currency}.
             </span>
@@ -1359,112 +1481,113 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
         </div>
 
         {/* ========================================================================= */}
-        {/* INVOICE SETTLEMENTS TABLE (جدول تسويات الفاتورة)                          */}
+        {/* INVOICE SETTLEMENTS TABLE (جدول تسويات الفاتورة - خاص بشيكات الموردين فقط)  */}
         {/* ========================================================================= */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
-          {/* Header Strip with Badges */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-zinc-100 dark:border-slate-800 pb-3">
-            <div className="flex items-center gap-2 text-emerald-600">
-              <Layers className="w-5 h-5" />
-              <h2 className="font-black text-sm text-zinc-900 dark:text-white">
-                {language === 'ar' ? 'جدول تسويات الفاتورة' : 'Invoice Settlements Table'}
-              </h2>
-            </div>
-            
-            <div className="flex flex-wrap items-center gap-3 text-xs font-bold font-mono">
-              <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800 text-xs font-sans">
-                <span className="text-zinc-500 dark:text-slate-400">{language === 'ar' ? 'إجمالي المسوى:' : 'Total Settled:'}</span>
-                <span className="font-mono font-black">{formatNumber(totalSettled)} {currency}</span>
+        {chequeType === 'supplier' && (
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
+            {/* Header Strip with Badges */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-zinc-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2 text-emerald-600">
+                <Layers className="w-5 h-5" />
+                <h2 className="font-black text-sm text-zinc-900 dark:text-white">
+                  {language === 'ar' ? 'جدول تسويات الفاتورة' : 'Invoice Settlements Table'}
+                </h2>
               </div>
-              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-700 text-xs font-sans">
-                <span className="text-zinc-500 dark:text-slate-400">{language === 'ar' ? 'الفرق:' : 'Difference:'}</span>
-                <span className={`font-mono font-black ${difference > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                  {formatNumber(difference)} {currency}
-                </span>
+              
+              <div className="flex flex-wrap items-center gap-3 text-xs font-bold font-mono">
+                <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800 text-xs font-sans">
+                  <span className="text-zinc-500 dark:text-slate-400">{language === 'ar' ? 'إجمالي المسوى:' : 'Total Settled:'}</span>
+                  <span className="font-mono font-black">{formatNumber(totalSettled)} {currency}</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-700 text-xs font-sans">
+                  <span className="text-zinc-500 dark:text-slate-400">{language === 'ar' ? 'الفرق:' : 'Difference:'}</span>
+                  <span className={`font-mono font-black ${difference > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                    {formatNumber(difference)} {currency}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
 
-          {!supplierId ? (
-            <div className="py-6 text-center text-slate-400 text-xs font-medium bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
-              {language === 'ar' 
-                ? 'يرجى اختيار المورد من بيانات الشيك أعلاه لعرض فواتيره المستحقة وتسويتها'
-                : 'Please select a supplier above to display and settle outstanding invoices.'}
-            </div>
-          ) : openTransactions.length === 0 ? (
-            <div className="py-6 text-center text-slate-400 text-xs font-bold bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
-              {language === 'ar' 
-                ? 'لا توجد فواتير مشتريات مفتوحة أو حركات غير مسواة لهذا المورد حالياً'
-                : 'No outstanding purchase invoices or unsettled transactions for this supplier.'}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className={`w-full text-xs ${dir === 'rtl' ? 'text-right' : 'text-left'} border-collapse`}>
-                <thead>
-                  <tr className="border-b border-zinc-100 dark:border-slate-800 text-zinc-400 dark:text-slate-500 text-[11px] font-bold uppercase tracking-wider pb-2">
-                    <th className="pb-2 text-right">{language === 'ar' ? 'رقم القيد' : 'Entry No'}</th>
-                    <th className="pb-2 text-right">{language === 'ar' ? 'نوع الحركة' : 'Type'}</th>
-                    <th className="pb-2 text-right">{language === 'ar' ? 'رقم الحركة / المرجع' : 'Ref No'}</th>
-                    <th className="pb-2 text-right">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
-                    <th className="pb-2 text-center w-28">{language === 'ar' ? 'رقم التسوية' : 'Settlement No'}</th>
-                    <th className="pb-2 text-center w-32">{language === 'ar' ? 'تاريخ التسوية' : 'Settlement Date'}</th>
-                    <th className="pb-2 text-right">{language === 'ar' ? 'المبلغ الأصلي' : 'Original Amt'}</th>
-                    <th className="pb-2 text-right">{language === 'ar' ? 'المبلغ المفتوح' : 'Open Amt'}</th>
-                    <th className="pb-2 text-center w-24">{language === 'ar' ? 'تسوية كاملة' : 'Full Settle'}</th>
-                    <th className="pb-2 text-center w-28">{language === 'ar' ? 'تسوية بمبلغ الدفعة' : 'Settle with Payment'}</th>
-                    <th className="pb-2 text-center w-28">{language === 'ar' ? 'تسوية جزئية' : 'Partial Settle'}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-50 dark:divide-slate-800 text-zinc-700 dark:text-slate-200 font-bold">
-                  {openTransactions.map((t) => {
-                    const settlement = formSettlements.find(s => s.target_id === t.id);
-                    const settledAmount = settlement ? Number(settlement.settled_amount) : 0;
-                    const isFullySettled = settledAmount > 0 && Math.abs(settledAmount - t.open_amount) < 0.01;
+            {!supplierId ? (
+              <div className="py-6 text-center text-slate-400 text-xs font-medium bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+                {language === 'ar' 
+                  ? 'يرجى اختيار المورد من بيانات الشيك أعلاه لعرض فواتيره المستحقة وتسويتها'
+                  : 'Please select a supplier above to display and settle outstanding invoices.'}
+              </div>
+            ) : openTransactions.length === 0 ? (
+              <div className="py-6 text-center text-slate-400 text-xs font-bold bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+                {language === 'ar' 
+                  ? 'لا توجد فواتير مشتريات مفتوحة أو حركات غير مسواة لهذا المورد حالياً'
+                  : 'No outstanding purchase invoices or unsettled transactions for this supplier.'}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className={`w-full text-xs ${dir === 'rtl' ? 'text-right' : 'text-left'} border-collapse`}>
+                  <thead>
+                    <tr className="border-b border-zinc-100 dark:border-slate-800 text-zinc-400 dark:text-slate-500 text-[11px] font-bold uppercase tracking-wider pb-2">
+                      <th className="pb-2 text-right">{language === 'ar' ? 'رقم القيد' : 'Entry No'}</th>
+                      <th className="pb-2 text-right">{language === 'ar' ? 'نوع الحركة' : 'Type'}</th>
+                      <th className="pb-2 text-right">{language === 'ar' ? 'رقم الحركة / المرجع' : 'Ref No'}</th>
+                      <th className="pb-2 text-right">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                      <th className="pb-2 text-center w-28">{language === 'ar' ? 'رقم التسوية' : 'Settlement No'}</th>
+                      <th className="pb-2 text-center w-32">{language === 'ar' ? 'تاريخ التسوية' : 'Settlement Date'}</th>
+                      <th className="pb-2 text-right">{language === 'ar' ? 'المبلغ الأصلي' : 'Original Amt'}</th>
+                      <th className="pb-2 text-right">{language === 'ar' ? 'المبلغ المفتوح' : 'Open Amt'}</th>
+                      <th className="pb-2 text-center w-24">{language === 'ar' ? 'تسوية كاملة' : 'Full Settle'}</th>
+                      <th className="pb-2 text-center w-28">{language === 'ar' ? 'تسوية بمبلغ الدفعة' : 'Settle with Payment'}</th>
+                      <th className="pb-2 text-center w-28">{language === 'ar' ? 'تسوية جزئية' : 'Partial Settle'}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-50 dark:divide-slate-800 text-zinc-700 dark:text-slate-200 font-bold">
+                    {openTransactions.map((t) => {
+                      const settlement = formSettlements.find(s => s.target_id === t.id);
+                      const settledAmount = settlement ? Number(settlement.settled_amount) : 0;
+                      const isFullySettled = settledAmount > 0 && Math.abs(settledAmount - t.open_amount) < 0.01;
 
-                    const otherSettledSum = formSettlements
-                      .filter(s => s.target_id !== t.id)
-                      .reduce((sum, s) => sum + Number(s.settled_amount), 0);
-                    const remainingChequeAmount = Math.max(0, numAmount - otherSettledSum);
-                    const maxAllocation = Math.min(remainingChequeAmount, t.open_amount);
-                    const isPaymentAmountSettled = settledAmount > 0 && Math.abs(settledAmount - maxAllocation) < 0.01;
+                      const otherSettledSum = formSettlements
+                        .filter(s => s.target_id !== t.id)
+                        .reduce((sum, s) => sum + Number(s.settled_amount), 0);
+                      const remainingChequeAmount = Math.max(0, numAmount - otherSettledSum);
+                      const maxAllocation = Math.min(remainingChequeAmount, t.open_amount);
+                      const isPaymentAmountSettled = settledAmount > 0 && Math.abs(settledAmount - maxAllocation) < 0.01;
 
-                    return (
-                      <tr key={t.id} className="hover:bg-zinc-50/50 dark:hover:bg-slate-800/40 transition-colors">
-                        <td className="py-2.5">
-                          {t.entry_number && t.entry_number !== '-' ? (
+                      return (
+                        <tr key={t.id} className="hover:bg-zinc-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-2.5">
+                            {t.entry_number && t.entry_number !== '-' ? (
+                              <span className="text-emerald-600 dark:text-emerald-400 font-mono font-black">
+                                {t.entry_number}
+                              </span>
+                            ) : (
+                              <span className="text-zinc-400 font-mono font-normal">-</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 text-zinc-500 dark:text-slate-400 font-semibold">{t.type_label}</td>
+                          <td className="py-2.5">
                             <span className="text-emerald-600 dark:text-emerald-400 font-mono font-black">
-                              {t.entry_number}
+                              {t.reference_number}
                             </span>
-                          ) : (
-                            <span className="text-zinc-400 font-mono font-normal">-</span>
-                          )}
-                        </td>
-                        <td className="py-2.5 text-zinc-500 dark:text-slate-400 font-semibold">{t.type_label}</td>
-                        <td className="py-2.5">
-                          <span className="text-emerald-600 dark:text-emerald-400 font-mono font-black">
-                            {t.reference_number}
-                          </span>
-                        </td>
-                        <td className="py-2.5 text-zinc-400 dark:text-slate-500 font-normal font-mono">{t.date}</td>
-                        <td className="py-2.5 text-center">
-                          <input
-                            disabled
-                            type="text"
-                            className="w-28 bg-zinc-50 dark:bg-slate-800 border border-zinc-200 dark:border-slate-700 rounded-lg px-2 py-1 text-center text-zinc-500 dark:text-slate-400 font-mono text-[11px] font-black"
-                            value={settlement?.settlement_number || '-'}
-                            placeholder="-"
-                          />
-                        </td>
-                        <td className="py-2.5 text-center">
-                          <input
-                            type="date"
-                            className="w-32 bg-white dark:bg-slate-800 border border-zinc-200 dark:border-slate-700 rounded-lg px-2 py-1 text-center text-zinc-700 dark:text-slate-200 text-[11px] font-bold focus:ring-1 focus:ring-emerald-500"
-                            value={settlement?.settlement_date ? settlement.settlement_date.slice(0, 10) : issueDate.slice(0, 10)}
-                            onChange={(e) => handleSettlementDateChange(t, e.target.value)}
-                          />
-                        </td>
-                        <td className="py-2.5 text-zinc-500 dark:text-slate-400 font-semibold">{formatNumber(t.original_amount)}</td>
-                        <td className="py-2.5 text-zinc-900 dark:text-white font-black">{formatNumber(t.open_amount)}</td>
+                          </td>
+                          <td className="py-2.5 text-zinc-400 dark:text-slate-500 font-normal font-mono">{t.date}</td>
+                          <td className="py-2.5 text-center">
+                            <input
+                              disabled
+                              type="text"
+                              className="w-28 bg-zinc-50 dark:bg-slate-800 border border-zinc-200 dark:border-slate-700 rounded-lg px-2 py-1 text-center text-zinc-500 dark:text-slate-400 font-mono text-[11px] font-black"
+                              value={settlement?.settlement_number || '-'}
+                              placeholder="-"
+                            />
+                          </td>
+                          <td className="py-2.5 text-center">
+                            <input
+                              type="date"
+                              className="w-32 bg-white dark:bg-slate-800 border border-zinc-200 dark:border-slate-700 rounded-lg px-2 py-1 text-center text-zinc-700 dark:text-slate-200 text-[11px] font-bold focus:ring-1 focus:ring-emerald-500"
+                              value={settlement?.settlement_date ? settlement.settlement_date.slice(0, 10) : issueDate.slice(0, 10)}
+                              onChange={(e) => handleSettlementDateChange(t, e.target.value)}
+                            />
+                          </td>
+                          <td className="py-2.5 text-zinc-500 dark:text-slate-400 font-semibold">{formatNumber(t.original_amount)}</td>
+                          <td className="py-2.5 text-zinc-900 dark:text-white font-black">{formatNumber(t.open_amount)}</td>
                         
                         {/* تسوية كاملة */}
                         <td className="py-2.5 text-center">
@@ -1507,6 +1630,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
             </div>
           )}
         </div>
+        )}
 
         {/* Modal Footer Controls */}
         <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-end gap-3">

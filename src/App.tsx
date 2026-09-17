@@ -241,7 +241,8 @@ export default function App() {
       case 'payment_vouchers': return <PaymentVouchers />;
       case 'supplier_payment_vouchers': return <SupplierPaymentVouchers />;
       case 'issued_cheques': return <IssuedCheques initialTab="all" />;
-      case 'create_issued_cheque': return <IssuedCheques initialTab="create" />;
+      case 'create_issued_cheque': return <IssuedCheques initialTab="create_supplier" />;
+      case 'create_other_cheque': return <IssuedCheques initialTab="create_other" />;
       case 'egyptian_banks': return <EgyptianBanks />;
       case 'returns': return <Returns />;
       case 'purchase_returns': return <PurchaseReturns />;

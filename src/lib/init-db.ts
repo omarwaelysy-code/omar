@@ -620,6 +620,10 @@ export async function initDatabase() {
     await safeQuery(`ALTER TABLE "issued_cheques" ADD COLUMN IF NOT EXISTS "serial_number" VARCHAR(100);`, 'add serial_number to issued_cheques');
     await safeQuery(`ALTER TABLE "issued_cheques" ADD COLUMN IF NOT EXISTS "is_crossed" BOOLEAN DEFAULT TRUE;`, 'add is_crossed to issued_cheques');
     await safeQuery(`ALTER TABLE "issued_cheques" ADD COLUMN IF NOT EXISTS "is_not_negotiable" BOOLEAN DEFAULT TRUE;`, 'add is_not_negotiable to issued_cheques');
+    await safeQuery(`ALTER TABLE "issued_cheques" ALTER COLUMN "supplier_id" DROP NOT NULL;`, 'alter supplier_id drop not null in issued_cheques');
+    await safeQuery(`ALTER TABLE "issued_cheques" ADD COLUMN IF NOT EXISTS "cheque_type" VARCHAR(50) DEFAULT 'supplier';`, 'add cheque_type to issued_cheques');
+    await safeQuery(`ALTER TABLE "issued_cheques" ADD COLUMN IF NOT EXISTS "debit_account_id" VARCHAR(36) REFERENCES "accounts"("id");`, 'add debit_account_id to issued_cheques');
+    await safeQuery(`ALTER TABLE "issued_cheques" ADD COLUMN IF NOT EXISTS "debit_account_name" VARCHAR(255);`, 'add debit_account_name to issued_cheques');
 
     await safeQuery(`CREATE INDEX IF NOT EXISTS "idx_issued_cheques_company_status" ON "issued_cheques"("company_id", "status");`, 'idx_issued_cheques_company_status');
     await safeQuery(`CREATE INDEX IF NOT EXISTS "idx_issued_cheques_due_date" ON "issued_cheques"("company_id", "due_date");`, 'idx_issued_cheques_due_date');
@@ -627,6 +631,8 @@ export async function initDatabase() {
     await safeQuery(`CREATE INDEX IF NOT EXISTS "idx_issued_cheques_bank_account" ON "issued_cheques"("company_id", "bank_account_id");`, 'idx_issued_cheques_bank_account');
     await safeQuery(`CREATE INDEX IF NOT EXISTS "idx_issued_cheques_cheque_number" ON "issued_cheques"("company_id", "cheque_number");`, 'idx_issued_cheques_cheque_number');
     await safeQuery(`CREATE INDEX IF NOT EXISTS "idx_issued_cheques_serial_number" ON "issued_cheques"("company_id", "serial_number");`, 'idx_issued_cheques_serial_number');
+    await safeQuery(`CREATE INDEX IF NOT EXISTS "idx_issued_cheques_type" ON "issued_cheques"("company_id", "cheque_type");`, 'idx_issued_cheques_type');
+    await safeQuery(`CREATE INDEX IF NOT EXISTS "idx_issued_cheques_debit_account" ON "issued_cheques"("company_id", "debit_account_id");`, 'idx_issued_cheques_debit_account');
 
     await safeQuery(`
       CREATE TABLE IF NOT EXISTS "cash_transfers" (

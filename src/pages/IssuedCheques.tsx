@@ -21,7 +21,7 @@ import { ChequesDashboardTab } from '../components/issued-cheques/ChequesDashboa
 import { ChequesReportsTab } from '../components/issued-cheques/ChequesReportsTab';
 
 interface IssuedChequesProps {
-  initialTab?: 'dashboard' | 'all' | 'create' | 'due' | 'reports';
+  initialTab?: 'dashboard' | 'all' | 'create' | 'create_supplier' | 'create_other' | 'due' | 'reports';
 }
 
 export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all' }) => {
@@ -30,8 +30,8 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
   const { language, dir } = useLanguage();
   const isAr = language === 'ar';
 
-  // Active Main Tab (Default: 'all' - قائمة الشيكات)
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'all' | 'create' | 'due' | 'reports'>(initialTab);
+  // Active Main Tab (Default: 'all' - الشيكات الصادرة)
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'all' | 'create' | 'create_supplier' | 'create_other' | 'due' | 'reports'>(initialTab);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -266,7 +266,7 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
 
       </div>
 
-      {/* Main Navigation Tabs - Compact (All Cheques is First Tab) */}
+      {/* Main Navigation Tabs - Compact (Issued Cheques is First Tab) */}
       <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 w-fit overflow-x-auto max-w-full">
         <button
           onClick={() => { setActiveTab('all'); setCurrentPage(1); }}
@@ -277,7 +277,31 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
           }`}
         >
           <ListOrdered className="w-3.5 h-3.5" />
-          <span>{isAr ? `كل الشيكات (${cheques.length})` : `All Cheques (${cheques.length})`}</span>
+          <span>{isAr ? `الشيكات الصادرة (${cheques.length})` : `Issued Cheques (${cheques.length})`}</span>
+        </button>
+
+        <button
+          onClick={() => { setSelectedChequeForEdit(null); setActiveTab('create_supplier'); setCurrentPage(1); }}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            activeTab === 'create_supplier' || activeTab === 'create'
+              ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Plus className="w-3.5 h-3.5 text-emerald-600" />
+          <span>{isAr ? 'تحرير شيك مورد' : 'Issue Supplier Cheque'}</span>
+        </button>
+
+        <button
+          onClick={() => { setSelectedChequeForEdit(null); setActiveTab('create_other'); setCurrentPage(1); }}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            activeTab === 'create_other'
+              ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Plus className="w-3.5 h-3.5 text-blue-600" />
+          <span>{isAr ? 'تحرير شيك' : 'Issue Cheque'}</span>
         </button>
 
         <button
@@ -324,17 +348,33 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
           upcomingCheques={upcomingCheques}
           loading={loading}
           onRefresh={fetchData}
-          onCreateNew={() => { setSelectedChequeForEdit(null); setActiveTab('create'); }}
+          onCreateNew={() => { setSelectedChequeForEdit(null); setActiveTab('create_supplier'); }}
           onViewCheque={cheque => setSelectedChequeForDetails(cheque)}
           onPayCheque={cheque => setSelectedChequeForPay(cheque)}
         />
       )}
 
-      {/* In-Page Form Tab: تحرير وإضافة شيك صادر في صلب الصفحة */}
-      {activeTab === 'create' && (
+      {/* In-Page Form Tab: تحرير شيك مورد */}
+      {(activeTab === 'create_supplier' || activeTab === 'create') && (
         <ChequeFormModal
           isOpen={true}
           inline={true}
+          initialChequeType="supplier"
+          onClose={() => { setActiveTab('all'); setSelectedChequeForEdit(null); }}
+          onSuccess={() => { fetchData(); setActiveTab('all'); setSelectedChequeForEdit(null); }}
+          chequeToEdit={selectedChequeForEdit}
+          suppliers={suppliers}
+          paymentMethods={paymentMethods}
+          accounts={accounts}
+        />
+      )}
+
+      {/* In-Page Form Tab: تحرير شيك عام (جهات أخرى بخلاف الموردين) */}
+      {activeTab === 'create_other' && (
+        <ChequeFormModal
+          isOpen={true}
+          inline={true}
+          initialChequeType="other"
           onClose={() => { setActiveTab('all'); setSelectedChequeForEdit(null); }}
           onSuccess={() => { fetchData(); setActiveTab('all'); setSelectedChequeForEdit(null); }}
           chequeToEdit={selectedChequeForEdit}
@@ -473,7 +513,14 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
                           </button>
                         </td>
                         <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-200">
-                          {cheque.supplier_name || cheque.payee_name || '-'}
+                          <div>
+                            <span className="font-bold">{cheque.payee_name || cheque.supplier_name || '-'}</span>
+                            {((cheque as any).cheque_type === 'other' || !cheque.supplier_id) && (
+                              <span className="block text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
+                                {cheque.debit_account_name ? `${isAr ? 'حـ/ ' : 'Acc: '}${cheque.debit_account_name}` : (isAr ? 'شيك جهات أخرى' : 'Other Cheque')}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-3 py-2 text-slate-700 dark:text-slate-300 font-medium">
                           {cheque.credit_account_name || (isAr ? 'أوراق دفع' : 'Notes Payable')}
@@ -520,7 +567,11 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
                             {/* Edit Cheque (Available for Draft, Issued, Postponed) */}
                             {['DRAFT', 'ISSUED', 'POSTPONED'].includes(cheque.status) && (
                               <button
-                                onClick={() => { setSelectedChequeForEdit(cheque); setActiveTab('create'); }}
+                                onClick={() => {
+                                  setSelectedChequeForEdit(cheque);
+                                  const isOther = (cheque as any).cheque_type === 'other' || !cheque.supplier_id;
+                                  setActiveTab(isOther ? 'create_other' : 'create_supplier');
+                                }}
                                 className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                                 title={isAr ? 'تعديل بيانات الشيك' : 'Edit Cheque'}
                               >

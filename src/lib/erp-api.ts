@@ -3400,18 +3400,30 @@ const chequeIssueHandler = async (req: AuthRequest, res: any) => {
       return sendError(res, 400, `لا يمكن إصدار هذا الشيك لأن حالته الحالية هي (${cheque.status}). يجب أن يكون في حالة مسودة (DRAFT).`);
     }
 
-    // Fetch Supplier and Accounts for Journal Entry
-    const { rows: suppRows } = await client.query(`SELECT * FROM suppliers WHERE id = $1`, [cheque.supplier_id]);
+    // Fetch Beneficiary Account and Notes Payable Account for Journal Entry
     const { rows: accRows } = await client.query(`SELECT * FROM accounts WHERE company_id = $1`, [companyId]);
 
-    const supplier = suppRows[0] || null;
-    let supplierAccId = supplier?.account_id;
-    let supplierAccName = supplier?.account_name || 'حساب الموردين';
+    let debitAccId = '';
+    let debitAccName = 'حساب الموردين';
+    let beneficiaryName = cheque.payee_name || '';
+    let supplierObj: any = null;
 
-    if (!supplierAccId) {
+    if (cheque.supplier_id) {
+      const { rows: suppRows } = await client.query(`SELECT * FROM suppliers WHERE id = $1`, [cheque.supplier_id]);
+      supplierObj = suppRows[0] || null;
+      debitAccId = supplierObj?.account_id;
+      debitAccName = supplierObj?.account_name || 'حساب الموردين';
+      beneficiaryName = supplierObj?.name || beneficiaryName || 'المورد';
+    } else if (cheque.debit_account_id) {
+      debitAccId = cheque.debit_account_id;
+      const explicitDebit = accRows.find((a: any) => a.id === debitAccId);
+      debitAccName = explicitDebit?.name || cheque.debit_account_name || 'حساب المصروف / المستفيد';
+    }
+
+    if (!debitAccId) {
       const defSuppAcc = accRows.find((a: any) => a.account_usage === 'supplier' || a.account_usage === 'accounts_payable' || a.code === '210101');
-      supplierAccId = defSuppAcc?.id;
-      supplierAccName = defSuppAcc?.name || supplierAccName;
+      debitAccId = defSuppAcc?.id;
+      debitAccName = defSuppAcc?.name || debitAccName;
     }
 
     let notesPayableAccId = '';
@@ -3427,7 +3439,7 @@ const chequeIssueHandler = async (req: AuthRequest, res: any) => {
         notesPayableAccName = notesAcc.name;
       } else {
         const fallbackAcc = accRows.find((a: any) => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
-        notesPayableAccId = fallbackAcc?.id || supplierAccId;
+        notesPayableAccId = fallbackAcc?.id || debitAccId;
         notesPayableAccName = fallbackAcc?.name || 'أوراق دفع';
       }
     }
@@ -3440,7 +3452,7 @@ const chequeIssueHandler = async (req: AuthRequest, res: any) => {
 
     const jeId = await createChequeJournalEntry(client, companyId, {
       date: issueDateStr,
-      description: `قيد إصدار شيك رقم: ${cheque.cheque_number} للمورد: ${supplier?.name || cheque.payee_name || ''}${isForeign ? ` (${cheque.amount} ${cheque.currency})` : ''}`,
+      description: `قيد إصدار شيك رقم: ${cheque.cheque_number} لصالح: ${beneficiaryName || cheque.payee_name || ''}${isForeign ? ` (${cheque.amount} ${cheque.currency})` : ''}`,
       reference_id: cheque.id,
       reference_type: 'issued_cheque',
       reference_number: cheque.cheque_number,
@@ -3449,15 +3461,15 @@ const chequeIssueHandler = async (req: AuthRequest, res: any) => {
       created_by: req.user?.username || req.user?.email || 'system',
       items: [
         {
-          account_id: supplierAccId,
-          account_name: supplierAccName,
+          account_id: debitAccId,
+          account_name: debitAccName,
           debit: amount,
           credit: 0,
-          description: `إصدار شيك رقم ${cheque.cheque_number} - لصالح ${supplier?.name || cheque.payee_name || 'المورد'}`,
-          supplier_id: cheque.supplier_id,
-          supplier_name: supplier?.name || cheque.payee_name,
-          sub_account_id: cheque.supplier_id,
-          sub_account_type: 'supplier'
+          description: `إصدار شيك رقم ${cheque.cheque_number} - لصالح ${beneficiaryName || cheque.payee_name || 'المستفيد'}`,
+          supplier_id: cheque.supplier_id || null,
+          supplier_name: cheque.supplier_id ? (beneficiaryName || cheque.payee_name) : null,
+          sub_account_id: cheque.supplier_id || null,
+          sub_account_type: cheque.supplier_id ? 'supplier' : undefined
         },
         {
           account_id: notesPayableAccId,
@@ -3465,8 +3477,8 @@ const chequeIssueHandler = async (req: AuthRequest, res: any) => {
           debit: 0,
           credit: amount,
           description: `أوراق دفع - شيك رقم ${cheque.cheque_number} (استحقاق ${dueDateStr})`,
-          supplier_id: cheque.supplier_id,
-          supplier_name: supplier?.name || cheque.payee_name
+          supplier_id: cheque.supplier_id || null,
+          supplier_name: cheque.supplier_id ? (beneficiaryName || cheque.payee_name) : null
         }
       ]
     });
@@ -3781,18 +3793,29 @@ const chequeReturnHandler = async (req: AuthRequest, res: any) => {
       return sendError(res, 400, `لا يمكن تسجيل ارتداد هذا الشيك لأن حالته هي (${cheque.status}).`);
     }
 
-    // Fetch Supplier and Accounts for Reversal Journal Entry
-    const { rows: suppRows } = await client.query(`SELECT * FROM suppliers WHERE id = $1`, [cheque.supplier_id]);
+    // Fetch Beneficiary Account and Notes Payable Account for Reversal Journal Entry
     const { rows: accRows } = await client.query(`SELECT * FROM accounts WHERE company_id = $1`, [companyId]);
 
-    const supplier = suppRows[0] || null;
-    let supplierAccId = supplier?.account_id;
-    let supplierAccName = supplier?.account_name || 'حساب الموردين';
+    let debitAccId = '';
+    let debitAccName = 'حساب الموردين';
+    let beneficiaryName = cheque.payee_name || '';
 
-    if (!supplierAccId) {
+    if (cheque.supplier_id) {
+      const { rows: suppRows } = await client.query(`SELECT * FROM suppliers WHERE id = $1`, [cheque.supplier_id]);
+      const supplier = suppRows[0] || null;
+      debitAccId = supplier?.account_id;
+      debitAccName = supplier?.account_name || 'حساب الموردين';
+      beneficiaryName = supplier?.name || beneficiaryName || 'المورد';
+    } else if (cheque.debit_account_id) {
+      debitAccId = cheque.debit_account_id;
+      const explicitDebit = accRows.find((a: any) => a.id === debitAccId);
+      debitAccName = explicitDebit?.name || cheque.debit_account_name || 'حساب المصروف / المستفيد';
+    }
+
+    if (!debitAccId) {
       const defSuppAcc = accRows.find((a: any) => a.account_usage === 'supplier' || a.account_usage === 'accounts_payable' || a.code === '210101');
-      supplierAccId = defSuppAcc?.id;
-      supplierAccName = defSuppAcc?.name || supplierAccName;
+      debitAccId = defSuppAcc?.id;
+      debitAccName = defSuppAcc?.name || debitAccName;
     }
 
     let notesPayableAccId = '';
@@ -3808,7 +3831,7 @@ const chequeReturnHandler = async (req: AuthRequest, res: any) => {
         notesPayableAccName = notesAcc.name;
       } else {
         const fallbackAcc = accRows.find((a: any) => a.account_usage === 'current_liability' || a.code?.startsWith('21'));
-        notesPayableAccId = fallbackAcc?.id || supplierAccId;
+        notesPayableAccId = fallbackAcc?.id || debitAccId;
         notesPayableAccName = fallbackAcc?.name || 'أوراق دفع';
       }
     }
@@ -3818,7 +3841,7 @@ const chequeReturnHandler = async (req: AuthRequest, res: any) => {
 
     const jeId = await createChequeJournalEntry(client, companyId, {
       date: retDate,
-      description: `قيد ارتداد شيك رقم: ${cheque.cheque_number} للمورد: ${supplier?.name || cheque.payee_name || ''} - سبب: ${reason || ''}`,
+      description: `قيد ارتداد شيك رقم: ${cheque.cheque_number} لصالح: ${beneficiaryName || cheque.payee_name || ''} - سبب: ${reason || ''}`,
       reference_id: cheque.id,
       reference_type: 'cheque_return',
       reference_number: cheque.cheque_number,
@@ -3832,19 +3855,19 @@ const chequeReturnHandler = async (req: AuthRequest, res: any) => {
           debit: amount,
           credit: 0,
           description: `إلغاء ورقة دفع لارتداد شيك رقم ${cheque.cheque_number} - سبب: ${reason || 'غير محدد'}`,
-          supplier_id: cheque.supplier_id,
-          supplier_name: supplier?.name || cheque.payee_name
+          supplier_id: cheque.supplier_id || null,
+          supplier_name: cheque.supplier_id ? (beneficiaryName || cheque.payee_name) : null
         },
         {
-          account_id: supplierAccId,
-          account_name: supplierAccName,
+          account_id: debitAccId,
+          account_name: debitAccName,
           debit: 0,
           credit: amount,
-          description: `إعادة إثبات مديونية لارتداد شيك رقم ${cheque.cheque_number} - ${supplier?.name || ''}`,
-          supplier_id: cheque.supplier_id,
-          supplier_name: supplier?.name || cheque.payee_name,
-          sub_account_id: cheque.supplier_id,
-          sub_account_type: 'supplier'
+          description: `إعادة إثبات مديونية لارتداد شيك رقم ${cheque.cheque_number} - لصالح ${beneficiaryName || cheque.payee_name || ''}`,
+          supplier_id: cheque.supplier_id || null,
+          supplier_name: cheque.supplier_id ? (beneficiaryName || cheque.payee_name) : null,
+          sub_account_id: cheque.supplier_id || null,
+          sub_account_type: cheque.supplier_id ? 'supplier' : undefined
         }
       ]
     });
