@@ -20,14 +20,22 @@ import { ChequeCancelModal } from '../components/issued-cheques/ChequeCancelModa
 import { ChequesDashboardTab } from '../components/issued-cheques/ChequesDashboardTab';
 import { ChequesReportsTab } from '../components/issued-cheques/ChequesReportsTab';
 
-export const IssuedCheques: React.FC = () => {
+interface IssuedChequesProps {
+  initialTab?: 'dashboard' | 'all' | 'create' | 'due' | 'reports';
+}
+
+export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all' }) => {
   const { showSuccess, showError } = useNotification();
   const { user } = useAuth();
   const { language, dir } = useLanguage();
   const isAr = language === 'ar';
 
-  // Active Main Tab
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'all' | 'create' | 'due' | 'reports'>('dashboard');
+  // Active Main Tab (Default: 'all' - قائمة الشيكات)
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'all' | 'create' | 'due' | 'reports'>(initialTab);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   // Data States
   const [cheques, setCheques] = useState<IssuedCheque[]>([]);
@@ -256,35 +264,10 @@ export const IssuedCheques: React.FC = () => {
           </div>
         </div>
 
-        {/* Primary Action Button (hidden on dashboard to avoid duplicate button) */}
-        {activeTab !== 'dashboard' && (
-          <button
-            onClick={() => {
-              setSelectedChequeForEdit(null);
-              setActiveTab('create');
-            }}
-            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{isAr ? 'تحرير شيك جديد' : 'Issue New Cheque'}</span>
-          </button>
-        )}
       </div>
 
-      {/* Main Navigation Tabs - Compact */}
+      {/* Main Navigation Tabs - Compact (All Cheques is First Tab) */}
       <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 w-fit overflow-x-auto max-w-full">
-        <button
-          onClick={() => { setActiveTab('dashboard'); setCurrentPage(1); }}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-            activeTab === 'dashboard'
-              ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <LayoutDashboard className="w-3.5 h-3.5" />
-          <span>{isAr ? 'لوحة التحكم' : 'Dashboard'}</span>
-        </button>
-
         <button
           onClick={() => { setActiveTab('all'); setCurrentPage(1); }}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
@@ -298,19 +281,15 @@ export const IssuedCheques: React.FC = () => {
         </button>
 
         <button
-          onClick={() => { setActiveTab('create'); }}
+          onClick={() => { setActiveTab('dashboard'); setCurrentPage(1); }}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-            activeTab === 'create'
+            activeTab === 'dashboard'
               ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
-          <Plus className="w-3.5 h-3.5" />
-          <span>
-            {selectedChequeForEdit 
-              ? (isAr ? 'تعديل مسودة الشيك' : 'Edit Cheque Draft') 
-              : (isAr ? 'تحرير شيك صادر' : 'Issue Cheque')}
-          </span>
+          <LayoutDashboard className="w-3.5 h-3.5" />
+          <span>{isAr ? 'لوحة التحكم' : 'Dashboard'}</span>
         </button>
 
         <button

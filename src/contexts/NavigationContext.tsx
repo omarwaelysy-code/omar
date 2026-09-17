@@ -143,6 +143,8 @@ export const pageLabels: { [key: string]: string } = {
   'eta_item_mapping': 'ربط الأصناف المستلمة (ETA)',
   'eta_sent_item_mapping': 'ربط الأصناف الصادرة (ETA)',
   'eta_tax_types': 'دليل أنواع الضرائب والرسوم (ETA)',
+  'issued_cheques': 'قائمة الشيكات',
+  'create_issued_cheque': 'تحرير شيك مورد',
 };
 
 const getStorageKey = (companyId?: string) => {

@@ -240,7 +240,8 @@ export default function App() {
       case 'receipts': return <Receipts />;
       case 'payment_vouchers': return <PaymentVouchers />;
       case 'supplier_payment_vouchers': return <SupplierPaymentVouchers />;
-      case 'issued_cheques': return <IssuedCheques />;
+      case 'issued_cheques': return <IssuedCheques initialTab="all" />;
+      case 'create_issued_cheque': return <IssuedCheques initialTab="create" />;
       case 'egyptian_banks': return <EgyptianBanks />;
       case 'returns': return <Returns />;
       case 'purchase_returns': return <PurchaseReturns />;

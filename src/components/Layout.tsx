@@ -186,6 +186,8 @@ const getTabIcon = (id: string) => {
     case 'templates':
     case 'create_template':
       return <LayoutTemplate {...iconProps} />;
+    case 'issued_cheques': return <Landmark {...iconProps} />;
+    case 'create_issued_cheque': return <Plus {...iconProps} />;
     default: return <Folder {...iconProps} />;
   }
 };
@@ -622,7 +624,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         label: language === 'ar' ? 'الشيكات' : 'Cheques',
         icon: Landmark,
         subItems: [
-          { id: 'issued_cheques', label: language === 'ar' ? 'إدارة الشيكات' : 'Cheques Management', icon: Landmark }
+          { id: 'issued_cheques', label: language === 'ar' ? 'قائمة الشيكات' : 'Cheques List', icon: Landmark },
+          { id: 'create_issued_cheque', label: language === 'ar' ? 'تحرير شيك مورد' : 'Issue Supplier Cheque', icon: Plus }
         ]
       },
       {
@@ -779,6 +782,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       if (item.subItems) {
         const visibleSubItems = (item.subItems as any[]).filter((sub: any) => {
           if (sub.isDivider || sub.isHeader) return true;
+          if (sub.id === 'create_issued_cheque') return hasPermission('issued_cheques', 'create') || hasPermission('issued_cheques', 'view');
           if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking' || sub.id === 'pos_connected_branches' || sub.id === 'eta_dashboard' || sub.id === 'eta_received_invoices' || sub.id === 'eta_detailed_invoices' || sub.id === 'eta_supplier_mapping' || sub.id === 'eta_item_mapping' || sub.id === 'eta_sent_item_mapping' || sub.id === 'eta_tax_types') return true;
           return hasPermission(sub.id, 'view');
         });

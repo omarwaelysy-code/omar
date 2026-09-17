@@ -4,9 +4,9 @@ import {
   FileText, Paperclip, Trash2, ArrowLeft, CheckCircle2, ShieldCheck, 
   Layers, Landmark, RefreshCw, Hash, Stamp, Copy
 } from 'lucide-react';
-import { IssuedCheque, Supplier, PaymentMethod, IssuedChequeAttachment, Account } from '../../types';
+import { IssuedCheque, Supplier, PaymentMethod, IssuedChequeAttachment, Account, Currency, ExchangeRate, Company } from '../../types';
 import { issuedChequeService } from '../../services/issuedChequeService';
-import { dbService } from '../../services/dbService';
+import { dbService, apiRequest } from '../../services/dbService';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -58,6 +58,8 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState('EGP');
   const [exchangeRate, setExchangeRate] = useState('1.0');
+  const [loadingExchangeRate, setLoadingExchangeRate] = useState(false);
+  const [rateSource, setRateSource] = useState<'auto' | 'manual' | 'default'>('default');
   const [issueDate, setIssueDate] = useState(new Date().toISOString().slice(0, 10));
   const [dueDate, setDueDate] = useState(new Date().toISOString().slice(0, 10));
   const [payeeName, setPayeeName] = useState('');
@@ -168,12 +170,114 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
     return null;
   }, [selectedFinancialAccount, paymentMethods]);
 
+  // Fetch exchange rate from Currency Management (auto or manual)
+  const fetchRateForCurrency = async (targetCurrency: string) => {
+    if (!targetCurrency || targetCurrency.toUpperCase() === 'EGP') {
+      setExchangeRate('1.0');
+      setRateSource('default');
+      return;
+    }
+    if (!user?.company_id) return;
+
+    setLoadingExchangeRate(true);
+    try {
+      // 1. Check company settings for rate update method ('auto' vs 'manual')
+      const company = await dbService.get<Company>('companies', user.company_id);
+      const updateMethod = company?.settings?.exchange_rate_update_method || 'manual';
+
+      // 2. Fetch list of company currencies to get currency ID
+      const companyCurrs = await dbService.list<Currency>('currencies', user.company_id);
+      const matchedCurr = (companyCurrs || []).find(c => c.code?.toUpperCase() === targetCurrency.toUpperCase());
+      const currId = matchedCurr?.id;
+
+      // 3. Try Auto rate first if updateMethod === 'auto'
+      if (updateMethod === 'auto') {
+        try {
+          const latestAutoRates = await apiRequest<Array<{
+            currency_id: string;
+            rate: number | null;
+            rate_date: string | null;
+          }>>(`/currency-rates/latest?company_id=${user.company_id}`);
+          const rateObj = currId ? latestAutoRates.find(r => r.currency_id === currId) : null;
+          if (rateObj && rateObj.rate !== null && Number(rateObj.rate) > 0) {
+            setExchangeRate(String(Number(rateObj.rate)));
+            setRateSource('auto');
+            setLoadingExchangeRate(false);
+            return;
+          }
+        } catch (err) {
+          console.error('Error fetching auto rate in ChequeFormModal:', err);
+        }
+      }
+
+      // 4. Try Manual rate from exchange_rates table
+      if (currId) {
+        try {
+          const manualRates = await dbService.list<ExchangeRate>('exchange_rates', {
+            currency_id: currId,
+            company_id: user.company_id,
+            _limit: 1,
+            _sort: 'rate_date',
+            _order: 'desc'
+          });
+          if (manualRates && manualRates.length > 0 && Number(manualRates[0].exchange_rate) > 0) {
+            setExchangeRate(String(Number(manualRates[0].exchange_rate)));
+            setRateSource('manual');
+            setLoadingExchangeRate(false);
+            return;
+          }
+        } catch (err) {
+          console.error('Error fetching manual exchange rate in ChequeFormModal:', err);
+        }
+      }
+
+      // 5. Try currency object directly if it has exchange_rate
+      if (matchedCurr && (matchedCurr as any).exchange_rate && Number((matchedCurr as any).exchange_rate) > 0) {
+        setExchangeRate(String(Number((matchedCurr as any).exchange_rate)));
+        setRateSource('manual');
+        setLoadingExchangeRate(false);
+        return;
+      }
+
+      // 6. If updateMethod was not 'auto', try auto rates as fallback
+      if (currId) {
+        try {
+          const latestAutoRates = await apiRequest<Array<{
+            currency_id: string;
+            rate: number | null;
+            rate_date: string | null;
+          }>>(`/currency-rates/latest?company_id=${user.company_id}`);
+          const rateObj = latestAutoRates.find(r => r.currency_id === currId);
+          if (rateObj && rateObj.rate !== null && Number(rateObj.rate) > 0) {
+            setExchangeRate(String(Number(rateObj.rate)));
+            setRateSource('auto');
+            setLoadingExchangeRate(false);
+            return;
+          }
+        } catch (err) {
+          // ignore
+        }
+      }
+
+      // Default fallback
+      setRateSource('default');
+    } catch (e) {
+      console.error('Failed to load currency exchange rate:', e);
+    } finally {
+      setLoadingExchangeRate(false);
+    }
+  };
+
   // Keep currency in sync with selected financial account (payment method)
   useEffect(() => {
     if (selectedFinancialAccount?.currency) {
-      setCurrency(selectedFinancialAccount.currency);
+      const newCurr = selectedFinancialAccount.currency;
+      setCurrency(newCurr);
+      if (!chequeToEdit) {
+        fetchRateForCurrency(newCurr);
+      }
     }
-  }, [selectedFinancialAccount]);
+  }, [selectedFinancialAccount, chequeToEdit]);
 
   // Restrict selectable credit accounts ONLY to accounts with usage 'notes_payable'
   const notesPayableAccounts = useMemo(() => {
@@ -200,7 +304,8 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
       setCreditAccountId(chequeToEdit.credit_account_id || defaultCreditAcc?.id || '');
       setBankAccountId(chequeToEdit.bank_account_id || bankOptions[0]?.id || '');
       setAmount(chequeToEdit.amount ? Number(chequeToEdit.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
-      setCurrency(chequeToEdit.currency || selectedFinancialAccount?.currency || 'EGP');
+      const curr = chequeToEdit.currency || selectedFinancialAccount?.currency || 'EGP';
+      setCurrency(curr);
       setExchangeRate(chequeToEdit.exchange_rate ? String(chequeToEdit.exchange_rate) : '1.0');
       setIssueDate(chequeToEdit.issue_date ? chequeToEdit.issue_date.slice(0, 10) : new Date().toISOString().slice(0, 10));
       setDueDate(chequeToEdit.due_date ? chequeToEdit.due_date.slice(0, 10) : new Date().toISOString().slice(0, 10));
@@ -221,8 +326,14 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
       setCreditAccountId(defaultCreditAcc?.id || '');
       setBankAccountId(bankOptions[0]?.id || '');
       setAmount('');
-      setCurrency(selectedFinancialAccount?.currency || 'EGP');
-      setExchangeRate('1.0');
+      const defaultCurr = selectedFinancialAccount?.currency || 'EGP';
+      setCurrency(defaultCurr);
+      if (defaultCurr !== 'EGP') {
+        fetchRateForCurrency(defaultCurr);
+      } else {
+        setExchangeRate('1.0');
+        setRateSource('default');
+      }
       setIssueDate(new Date().toISOString().slice(0, 10));
       setDueDate(new Date().toISOString().slice(0, 10));
       setPayeeName('');
@@ -911,9 +1022,23 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
 
                   <div className="flex items-center gap-3">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-0.5">
-                        {isAr ? 'سعر الصرف (مقابل ج.م)' : 'Exchange Rate (vs EGP)'} <span className="text-rose-500">*</span>
-                      </label>
+                      <div className="flex items-center justify-between mb-0.5 gap-2">
+                        <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                          {isAr ? 'سعر الصرف (مقابل ج.م)' : 'Exchange Rate (vs EGP)'} <span className="text-rose-500">*</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => fetchRateForCurrency(currency)}
+                          disabled={loadingExchangeRate}
+                          title={isAr ? 'تحديث سعر الصرف من إدارة العملات' : 'Refresh rate from Currency Management'}
+                          className="text-[10px] text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 inline-flex items-center gap-0.5 transition-colors cursor-pointer"
+                        >
+                          <RefreshCw className={`w-2.5 h-2.5 ${loadingExchangeRate ? 'animate-spin' : ''}`} />
+                          <span className="text-[9px] font-medium">
+                            {rateSource === 'auto' ? (isAr ? 'تلقائي' : 'Auto') : rateSource === 'manual' ? (isAr ? 'يدوي' : 'Manual') : (isAr ? 'تحديث' : 'Refresh')}
+                          </span>
+                        </button>
+                      </div>
                       <input
                         type="number"
                         step="0.0001"
@@ -922,7 +1047,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                         value={exchangeRate}
                         onChange={e => setExchangeRate(e.target.value)}
                         placeholder="50.00"
-                        className="w-24 px-2 py-1 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-800 text-xs font-mono font-bold text-slate-900 dark:text-white outline-none"
+                        className="w-28 px-2 py-1 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-800 text-xs font-mono font-bold text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-emerald-500"
                       />
                     </div>
 
