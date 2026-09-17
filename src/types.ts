@@ -567,6 +567,7 @@ export interface IssuedCheque {
   cheque_type?: 'supplier' | 'other';
   is_crossed?: boolean;
   is_not_negotiable?: boolean;
+  signatory_name?: string;
   supplier_id?: string;
   supplier_name?: string;
   debit_account_id?: string;
