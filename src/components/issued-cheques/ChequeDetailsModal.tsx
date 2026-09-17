@@ -4,8 +4,9 @@ import {
   RotateCcw, Ban, Paperclip, Printer, ExternalLink, ShieldCheck, ArrowUpRight 
 } from 'lucide-react';
 import { IssuedCheque } from '../../types';
-import { tafqeetAr } from '../../utils/tafqeet';
+import { tafqeetAr, tafqeetEn } from '../../utils/tafqeet';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { EGYPTIAN_BANKS_DATA, BankLogoBadge, EgyptianBank } from '../../data/egyptianBanks';
 
 interface ChequeDetailsModalProps {
   isOpen: boolean;
@@ -38,7 +39,27 @@ export const ChequeDetailsModal: React.FC<ChequeDetailsModalProps> = ({
   const isForeign = cheque.currency && cheque.currency !== 'EGP';
   const exchangeRate = Number(cheque.exchange_rate) || 1.0;
   const equivalentEgp = isForeign ? Number(cheque.amount) * exchangeRate : Number(cheque.amount);
-  const tafqeetText = tafqeetAr(Number(cheque.amount) || 0, cheque.currency || 'EGP');
+
+  const matchedBank = React.useMemo<EgyptianBank | null>(() => {
+    if (!cheque) return null;
+    const nameToSearch = (cheque.bank_name || '').trim().toLowerCase();
+    if (nameToSearch) {
+      const b = EGYPTIAN_BANKS_DATA.find(x => 
+        x.nameAr.toLowerCase() === nameToSearch ||
+        nameToSearch.includes(x.nameAr.toLowerCase()) ||
+        x.nameAr.toLowerCase().includes(nameToSearch) ||
+        x.nameEn.toLowerCase() === nameToSearch ||
+        nameToSearch.includes(x.code.toLowerCase()) ||
+        x.code.toLowerCase() === nameToSearch
+      );
+      if (b) return b;
+    }
+    return null;
+  }, [cheque]);
+
+  const tafqeetText = isAr 
+    ? tafqeetAr(Number(cheque.amount) || 0, cheque.currency || 'EGP')
+    : tafqeetEn(Number(cheque.amount) || 0, cheque.currency || 'EGP');
 
   const getStatusBadge = (status: string, isOverdue?: boolean) => {
     if (isOverdue && (status === 'ISSUED' || status === 'POSTPONED')) {
@@ -105,9 +126,13 @@ export const ChequeDetailsModal: React.FC<ChequeDetailsModalProps> = ({
         {/* Modal Header - Compact */}
         <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-lg font-bold">
-              🏦
-            </div>
+            {matchedBank ? (
+              <BankLogoBadge bank={matchedBank} size="sm" className="shadow-xs" />
+            ) : (
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-lg font-bold">
+                🏦
+              </div>
+            )}
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -193,9 +218,12 @@ export const ChequeDetailsModal: React.FC<ChequeDetailsModalProps> = ({
               <span className="text-[10px] text-slate-400 flex items-center gap-1 font-bold">
                 <Building2 className="w-3 h-3" /> {isAr ? 'الحساب البنكي المسحوب عليه' : 'Drawn-On Bank Account'}
               </span>
-              <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
-                {cheque.bank_name || (isAr ? 'الحساب البنكي' : 'Bank Account')}
-              </p>
+              <div className="flex items-center gap-1.5">
+                {matchedBank && <BankLogoBadge bank={matchedBank} size="sm" className="w-5 h-5 p-0.5 shadow-none" />}
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+                  {matchedBank ? (isAr ? matchedBank.nameAr : (matchedBank.nameEn || matchedBank.nameAr)) : (cheque.bank_name || (isAr ? 'الحساب البنكي' : 'Bank Account'))}
+                </p>
+              </div>
               {cheque.account_number && (
                 <p className="text-[10px] font-mono text-slate-500">{isAr ? 'رقم الحساب:' : 'Account #:'} {cheque.account_number}</p>
               )}

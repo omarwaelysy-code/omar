@@ -10,8 +10,9 @@ import { dbService } from '../../services/dbService';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { tafqeetAr } from '../../utils/tafqeet';
+import { tafqeetAr, tafqeetEn } from '../../utils/tafqeet';
 import { formatNumber } from '../../utils/formatUtils';
+import { EGYPTIAN_BANKS_DATA, BankLogoBadge, EgyptianBank } from '../../data/egyptianBanks';
 
 interface ChequeFormModalProps {
   isOpen: boolean;
@@ -139,6 +140,33 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
     const all = [...bankOptions, ...cashOptions];
     return all.find(a => a.id === bankAccountId) || bankOptions[0] || null;
   }, [bankOptions, cashOptions, bankAccountId]);
+
+  // Official Egyptian Bank matching for verified bank logo and names
+  const matchedBank = useMemo<EgyptianBank | null>(() => {
+    if (!selectedFinancialAccount) return null;
+    const pm = paymentMethods.find(p => p.id === selectedFinancialAccount.id);
+    if (pm?.bank_code) {
+      const b = EGYPTIAN_BANKS_DATA.find(x => x.code.toUpperCase() === pm.bank_code?.toUpperCase());
+      if (b) return b;
+    }
+    if (pm?.swift_code) {
+      const b = EGYPTIAN_BANKS_DATA.find(x => x.swift.toUpperCase() === pm.swift_code?.toUpperCase());
+      if (b) return b;
+    }
+    const nameToSearch = (selectedFinancialAccount.bankName || selectedFinancialAccount.name || '').trim().toLowerCase();
+    if (nameToSearch) {
+      const b = EGYPTIAN_BANKS_DATA.find(x => 
+        x.nameAr.toLowerCase() === nameToSearch ||
+        nameToSearch.includes(x.nameAr.toLowerCase()) ||
+        x.nameAr.toLowerCase().includes(nameToSearch) ||
+        x.nameEn.toLowerCase() === nameToSearch ||
+        nameToSearch.includes(x.code.toLowerCase()) ||
+        x.code.toLowerCase() === nameToSearch
+      );
+      if (b) return b;
+    }
+    return null;
+  }, [selectedFinancialAccount, paymentMethods]);
 
   // Keep currency in sync with selected financial account (payment method)
   useEffect(() => {
@@ -413,16 +441,26 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
     return isForeign ? numAmount * numExchangeRate : numAmount;
   }, [numAmount, numExchangeRate, isForeign]);
 
-  // Live Arabic Tafqeet in words
-  const tafqeetWords = useMemo(() => {
+  // Live Tafqeet in words (Arabic & English)
+  const tafqeetWordsAr = useMemo(() => {
     if (numAmount === 0) return 'فقط صفر لا غير';
     return tafqeetAr(numAmount, currency);
   }, [numAmount, currency]);
 
+  const tafqeetWordsEn = useMemo(() => {
+    if (numAmount === 0) return 'Zero Only';
+    return tafqeetEn(numAmount, currency);
+  }, [numAmount, currency]);
+
   // Egyptian Pound Equivalent Tafqeet (when foreign)
-  const egpTafqeetWords = useMemo(() => {
+  const egpTafqeetWordsAr = useMemo(() => {
     if (!isForeign || equivalentInEgp === 0) return '';
     return tafqeetAr(equivalentInEgp, 'EGP');
+  }, [isForeign, equivalentInEgp]);
+
+  const egpTafqeetWordsEn = useMemo(() => {
+    if (!isForeign || equivalentInEgp === 0) return '';
+    return tafqeetEn(equivalentInEgp, 'EGP');
   }, [isForeign, equivalentInEgp]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -432,7 +470,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       if (file.size > 10 * 1024 * 1024) {
-        showError('حجم الملف كبير جداً (الحد الأقصى 10 ميجابايت)');
+        showError(isAr ? 'حجم الملف كبير جداً (الحد الأقصى 10 ميجابايت)' : 'File size is too large (Maximum 10 MB)');
         continue;
       }
 
@@ -461,39 +499,39 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
     setValidationError('');
 
     if (!chequeNumber.trim()) {
-      setValidationError('يرجى إدخال رقم الشيك الفعلي المطبوع.');
+      setValidationError(isAr ? 'يرجى إدخال رقم الشيك الفعلي المطبوع.' : 'Please enter the physical printed cheque number.');
       return;
     }
     if (!supplierId) {
-      setValidationError('يرجى اختيار المورد المستفيد.');
+      setValidationError(isAr ? 'يرجى اختيار المورد المستفيد.' : 'Please select the beneficiary supplier.');
       return;
     }
     if (!creditAccountId) {
-      setValidationError('يرجى اختيار الحساب الدائن (أوراق الدفع).');
+      setValidationError(isAr ? 'يرجى اختيار الحساب الدائن (أوراق الدفع).' : 'Please select the credit account (Notes Payable).');
       return;
     }
     if (!bankAccountId) {
-      setValidationError('يرجى اختيار الحساب البنكي المسحوب عليه الشيك.');
+      setValidationError(isAr ? 'يرجى اختيار الحساب البنكي المسحوب عليه الشيك.' : 'Please select the bank account drawn on.');
       return;
     }
     if (numAmount <= 0) {
-      setValidationError('يرجى إدخال مبلغ صحيح أكبر من الصفر.');
+      setValidationError(isAr ? 'يرجى إدخال مبلغ صحيح أكبر من الصفر.' : 'Please enter a valid amount greater than zero.');
       return;
     }
     if (isForeign && numExchangeRate <= 0) {
-      setValidationError('يرجى إدخال سعر صرف صحيح أكبر من الصفر.');
+      setValidationError(isAr ? 'يرجى إدخال سعر صرف صحيح أكبر من الصفر.' : 'Please enter a valid exchange rate greater than zero.');
       return;
     }
     if (!issueDate) {
-      setValidationError('يرجى إدخال تاريخ التحرير والإصدار.');
+      setValidationError(isAr ? 'يرجى إدخال تاريخ التحرير والإصدار.' : 'Please enter the issue date.');
       return;
     }
     if (!dueDate) {
-      setValidationError('يرجى إدخال تاريخ الاستحقاق والصرف.');
+      setValidationError(isAr ? 'يرجى إدخال تاريخ الاستحقاق والصرف.' : 'Please enter the due date.');
       return;
     }
     if (dueDate < issueDate) {
-      setValidationError('تاريخ الاستحقاق لا يمكن أن يكون قبل تاريخ التحرير.');
+      setValidationError(isAr ? 'تاريخ الاستحقاق لا يمكن أن يكون قبل تاريخ التحرير.' : 'Due date cannot be before the issue date.');
       return;
     }
 
@@ -507,10 +545,10 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
         supplier_id: supplierId,
         supplier_name: selectedSupplier?.name || '',
         bank_account_id: bankAccountId,
-        bank_name: selectedFinancialAccount?.bankName || selectedFinancialAccount?.name || 'بنك مصر',
+        bank_name: selectedFinancialAccount?.bankName || selectedFinancialAccount?.name || (isAr ? 'بنك مصر' : 'Banque Misr'),
         account_number: selectedFinancialAccount?.accNo || '',
         credit_account_id: creditAccountId,
-        credit_account_name: selectedCreditAcc?.name || 'أوراق دفع - شيكات صادرة',
+        credit_account_name: selectedCreditAcc?.name || (isAr ? 'أوراق دفع - شيكات صادرة' : 'Notes Payable - Issued Cheques'),
         amount: numAmount,
         currency: currency,
         exchange_rate: isForeign ? numExchangeRate : 1.0,
@@ -525,16 +563,16 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
 
       if (chequeToEdit && !isDuplicateDraft) {
         await issuedChequeService.update(chequeToEdit.id, chequeData);
-        showSuccess('تم تحديث بيانات الشيك بنجاح.');
+        showSuccess(isAr ? 'تم تحديث بيانات الشيك بنجاح.' : 'Cheque updated successfully.');
       } else {
         await issuedChequeService.create(chequeData);
-        showSuccess('تم حفظ مسودة الشيك الصادر بنجاح.');
+        showSuccess(isAr ? 'تم حفظ مسودة الشيك الصادر بنجاح.' : 'Issued cheque draft saved successfully.');
       }
       onSuccess();
       onClose();
     } catch (err: any) {
       console.error('Error saving cheque:', err);
-      showError(err.message || 'حدث خطأ أثناء حفظ الشيك.');
+      showError(err.message || (isAr ? 'حدث خطأ أثناء حفظ الشيك.' : 'An error occurred while saving the cheque.'));
     } finally {
       setLoading(false);
     }
@@ -622,9 +660,9 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
         )}
 
         {/* ========================================================================= */}
-        {/* REAL BANK CHEQUE CONTAINER (محاكاة الشيك البنكي الحقيقي)                 */}
+        {/* REAL BANK CHEQUE CONTAINER (محاكاة الشيك البنكي الحقيقي - اتجاه ثابت RTL)  */}
         {/* ========================================================================= */}
-        <div className="relative rounded-2xl border-2 border-emerald-800/30 dark:border-emerald-700/50 bg-[#faf8f2] dark:bg-slate-900 p-4 sm:p-6 shadow-xl overflow-hidden">
+        <div dir="rtl" className="relative rounded-2xl border-2 border-emerald-800/30 dark:border-emerald-700/50 bg-[#faf8f2] dark:bg-slate-900 p-4 sm:p-6 shadow-xl overflow-hidden text-right">
           
           {/* Subtle Security Background Watermark Pattern */}
           <div 
@@ -659,7 +697,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                 {/* Due Date Box (تاريخ الاستحقاق والصرف / DATE) */}
                 <div className="bg-white dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 shadow-inner">
                   <div className="flex items-center justify-between gap-2 text-[9px] font-bold text-slate-400">
-                    <span>تاريخ الاستحقاق</span>
+                    <span>{isAr ? 'تاريخ الاستحقاق' : 'Due Date'}</span>
                     <span className="font-sans uppercase">DATE</span>
                   </div>
                   <input
@@ -674,7 +712,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                 {/* Cheque Number Slot */}
                 <div className="bg-white dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 shadow-inner">
                   <div className="flex items-center justify-between gap-2 text-[9px] font-bold text-slate-400">
-                    <span>شيك رقم</span>
+                    <span>{isAr ? 'شيك رقم' : 'Cheque #'}</span>
                     <span className="font-sans uppercase">CHEQUE NO.</span>
                   </div>
                   <input
@@ -691,34 +729,42 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsCrossed(!isCrossed)}
-                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1.5 ${
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
                     isCrossed 
                       ? 'bg-slate-800 text-white border-slate-900 shadow-xs' 
                       : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
                   }`}
-                  title="تفعيل أو إلغاء تسطير الشيك"
+                  title={isAr ? 'تفعيل أو إلغاء تسطير الشيك' : 'Toggle crossing (Not Negotiable)'}
                 >
                   <Stamp className="w-3 h-3" />
-                  <span>{isCrossed ? 'تسطير: غير قابل للتداول ✓' : 'بدون تسطير'}</span>
+                  <span>{isCrossed ? (isAr ? 'تسطير: غير قابل للتداول ✓' : 'Crossed: Not Negotiable ✓') : (isAr ? 'بدون تسطير' : 'Uncrossed')}</span>
                 </button>
               </div>
 
-              {/* Header Left in RTL: Bank Selection & Details */}
+              {/* Header Left in RTL: Bank Selection & Details with Official Verified Logo */}
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-xl bg-emerald-700/10 text-emerald-800 dark:text-emerald-400 flex items-center justify-center text-xl border border-emerald-700/20">
-                  🏦
-                </div>
+                {matchedBank ? (
+                  <BankLogoBadge bank={matchedBank} size="md" className="shadow-xs" />
+                ) : (
+                  <div className="w-12 h-12 rounded-xl bg-emerald-700/10 text-emerald-800 dark:text-emerald-400 flex items-center justify-center text-xl border border-emerald-700/20 shrink-0">
+                    <Landmark className="w-6 h-6 text-emerald-700 dark:text-emerald-400" />
+                  </div>
+                )}
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-base font-black text-emerald-900 dark:text-emerald-300 tracking-tight">
-                      {selectedFinancialAccount?.bankName || selectedFinancialAccount?.name || 'بنك مصر'}
+                      {matchedBank 
+                        ? (isAr ? matchedBank.nameAr : (matchedBank.nameEn || matchedBank.nameAr))
+                        : (selectedFinancialAccount?.bankName || selectedFinancialAccount?.name || (isAr ? 'بنك مصر' : 'Banque Misr'))}
                     </span>
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-                      {selectedFinancialAccount?.isBank ? 'بنك تجاري' : 'خزينة مالية'}
+                      {selectedFinancialAccount?.isBank ? (isAr ? 'بنك تجاري' : 'Commercial Bank') : (isAr ? 'خزينة مالية' : 'Treasury')}
                     </span>
                   </div>
                   <p className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
-                    {selectedFinancialAccount?.accNo ? `حساب: #${selectedFinancialAccount.accNo}` : 'فرع المعاملات والشركات'}
+                    {selectedFinancialAccount?.accNo 
+                      ? (isAr ? `حساب: #${selectedFinancialAccount.accNo}` : `A/C: #${selectedFinancialAccount.accNo}`) 
+                      : (isAr ? 'فرع الشركات والمعاملات' : 'Corporate Banking Branch')}
                   </p>
                 </div>
               </div>
@@ -730,9 +776,9 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
               
               {/* Row 1: Pay to the Order of (ادفعوا بموجب هذا الشيك لأمر) */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                {/* Right: Arabic Label */}
+                {/* Right: Arabic / English Label */}
                 <span className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-200 whitespace-nowrap font-serif">
-                  ادفعوا بموجب هذا الشيك لأمر:
+                  {isAr ? 'ادفعوا بموجب هذا الشيك لأمر:' : 'Pay against this cheque to the order of:'}
                 </span>
                 
                 {/* Middle: Payee inputs */}
@@ -745,7 +791,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                       onChange={e => handleSupplierChange(e.target.value)}
                       className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white/90 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-bold outline-none focus:border-emerald-600 shadow-xs"
                     >
-                      <option value="">-- اختر المورد المستفيد --</option>
+                      <option value="">{isAr ? '-- اختر المورد المستفيد --' : '-- Select Payee Supplier --'}</option>
                       {suppliers.map(s => (
                         <option key={s.id} value={s.id}>
                           {s.name} {s.code ? `(${s.code})` : ''}
@@ -758,7 +804,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                   <div className="w-full sm:w-3/5 relative">
                     <input
                       type="text"
-                      placeholder="اسم المستفيد المكتوب نصاً على الشيك..."
+                      placeholder={isAr ? "اسم المستفيد المكتوب نصاً على الشيك..." : "Payee name written on cheque..."}
                       value={payeeName}
                       onChange={e => setPayeeName(e.target.value)}
                       className="w-full bg-transparent border-b-2 border-slate-700 dark:border-slate-400 px-2 py-1 text-sm sm:text-base font-black text-slate-900 dark:text-white outline-none placeholder:text-slate-400 placeholder:font-normal"
@@ -779,14 +825,14 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                 {/* Right in RTL: "مبلغاً وقدره:" + Amount Box */}
                 <div className="flex items-center gap-2.5 shrink-0">
                   <span className="text-xs sm:text-sm font-black text-slate-800 dark:text-slate-200 whitespace-nowrap font-serif">
-                    مبلغاً وقدره:
+                    {isAr ? 'مبلغاً وقدره:' : 'The sum of:'}
                   </span>
 
                   {/* Amount Box (# 500,000.89 (ج.م) EGP #) */}
                   <div className="bg-white dark:bg-slate-800 border-2 border-slate-900 dark:border-slate-500 rounded-xl p-1.5 shadow-md flex items-center gap-2">
                     {/* Fixed currency badge from payment method - non-editable */}
                     <div className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-xs font-black text-emerald-800 dark:text-emerald-300 select-none">
-                      {currency === 'EGP' ? '(ج.م) EGP' : currency}
+                      {currency === 'EGP' ? (isAr ? '(ج.م) EGP' : 'EGP (ج.م)') : currency}
                     </div>
 
                     <span className="text-sm font-mono font-black text-slate-400">#</span>
@@ -810,15 +856,29 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                 {/* Middle in RTL: Tafqeet Line */}
                 <div className="flex-1 w-full space-y-1">
                   <div className="border-b-2 border-slate-700 dark:border-slate-400 px-2 py-1 min-h-[38px] flex items-center">
-                    <span className="text-xs sm:text-sm font-black text-emerald-950 dark:text-emerald-200 font-serif leading-relaxed">
-                      {tafqeetWords}
-                    </span>
+                    {isAr ? (
+                      <span className="text-xs sm:text-sm font-black text-emerald-950 dark:text-emerald-200 font-serif leading-relaxed">
+                        {tafqeetWordsAr}
+                      </span>
+                    ) : (
+                      <div className="flex flex-col text-right">
+                        <span className="text-xs sm:text-sm font-black text-emerald-950 dark:text-emerald-200 font-sans leading-tight">
+                          {tafqeetWordsEn}
+                        </span>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-serif">
+                          {tafqeetWordsAr}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* If foreign currency, show the Egyptian Pound Equivalent Tafqeet */}
                   {isForeign && (
                     <div className="pr-2 text-[11px] text-emerald-700 dark:text-emerald-400 font-bold">
-                      المعادل بالمصري: <span className="underline decoration-emerald-500/50">{egpTafqeetWords}</span>
+                      {isAr ? 'المعادل بالمصري:' : 'EGP Equivalent:'}{' '}
+                      <span className="underline decoration-emerald-500/50">
+                        {isAr ? egpTafqeetWordsAr : `${egpTafqeetWordsEn} (${egpTafqeetWordsAr})`}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -839,10 +899,12 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                     </span>
                     <div>
                       <span className="font-bold text-emerald-900 dark:text-emerald-200">
-                        معاملات العملات الأجنبية وسعر الصرف
+                        {isAr ? 'معاملات العملات الأجنبية وسعر الصرف' : 'Foreign Currency & Exchange Rate'}
                       </span>
                       <p className="text-[10px] text-emerald-700 dark:text-emerald-400">
-                        سيتم حفظ الشيك بقيمته الأجنبية مع توثيق المعادل المصري المحاسبي
+                        {isAr 
+                          ? 'سيتم حفظ الشيك بقيمته الأجنبية مع توثيق المعادل المصري المحاسبي'
+                          : 'Cheque is saved in foreign currency with calculated EGP accounting equivalent'}
                       </p>
                     </div>
                   </div>
@@ -850,7 +912,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                   <div className="flex items-center gap-3">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-0.5">
-                        سعر الصرف (مقابل ج.م) <span className="text-rose-500">*</span>
+                        {isAr ? 'سعر الصرف (مقابل ج.م)' : 'Exchange Rate (vs EGP)'} <span className="text-rose-500">*</span>
                       </label>
                       <input
                         type="number"
@@ -866,10 +928,10 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
 
                     <div className="text-left pl-2">
                       <span className="block text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                        المعادل بالجنيه المصري:
+                        {isAr ? 'المعادل بالجنيه المصري:' : 'Equivalent in EGP:'}
                       </span>
                       <span className="font-mono font-black text-sm text-emerald-800 dark:text-emerald-300">
-                        {equivalentInEgp.toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م
+                        {equivalentInEgp.toLocaleString(isAr ? 'ar-EG' : 'en-US', { minimumFractionDigits: 2 })} {currency === 'EGP' ? (isAr ? 'ج.م' : 'EGP') : currency}
                       </span>
                     </div>
                   </div>
@@ -881,42 +943,46 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                 {/* Right in RTL: Crossing Stamp Box */}
                 <div className="min-w-[140px]">
                   {isCrossed ? (
-                    <div className="inline-block px-3 py-1 border-2 border-slate-800 dark:border-slate-300 rounded font-black text-xs text-slate-800 dark:text-slate-200 tracking-wider bg-white/80 dark:bg-slate-900/80 shadow-xs select-none">
-                      غير قابل للتداول
+                    <div className="inline-block px-3 py-1 border-2 border-slate-800 dark:border-slate-300 rounded font-black text-xs text-slate-800 dark:text-slate-200 tracking-wider bg-white/80 dark:bg-slate-900/80 shadow-xs select-none text-center">
+                      <div>{isAr ? 'غير قابل للتداول' : 'NOT NEGOTIABLE'}</div>
+                      <div className="text-[8px] font-sans font-bold opacity-75">{isAr ? 'A/C PAYEE ONLY' : 'غير قابل للتداول'}</div>
                     </div>
                   ) : (
-                    <span className="text-[10px] text-slate-400 font-medium">شيك قابل للصرف المباشر</span>
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      {isAr ? 'شيك قابل للصرف المباشر' : 'Payable to Bearer'}
+                    </span>
                   )}
                 </div>
 
                 {/* Center: Cheque Warning Note */}
-                <div className="text-[10px] text-slate-400 font-medium text-center select-none">
-                  (( نرجو عدم الكتابة أو وضع أختام على هذا الجزء أو خلفه ))
+                <div className="text-[10px] text-slate-400 font-medium text-center select-none leading-tight">
+                  <div>{isAr ? '(( نرجو عدم الكتابة أو وضع أختام على هذا الجزء أو خلفه ))' : '(( PLEASE DO NOT WRITE OR STAMP BELOW THIS LINE OR ON REVERSE ))'}</div>
+                  <div className="text-[8px] opacity-75">{isAr ? 'PLEASE DO NOT WRITE OR STAMP IN THIS SPACE' : 'نرجو عدم الكتابة أو وضع أختام على هذا الجزء'}</div>
                 </div>
 
                 {/* Left in RTL: Signatory & Signature */}
                 <div className="flex items-center gap-4 text-left sm:text-left shrink-0">
                   <div className="text-right sm:text-right">
                     <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
-                      <span>اسم الموقع</span>
-                      <span className="font-sans font-normal text-[9px]">/ Signatory Name</span>
+                      <span>{isAr ? 'اسم الموقع' : 'Signatory Name'}</span>
+                      <span className="font-sans font-normal text-[9px]">/ {isAr ? 'Signatory Name' : 'اسم الموقع'}</span>
                     </div>
                     <input
                       type="text"
                       value={signatoryName}
                       onChange={e => setSignatoryName(e.target.value)}
-                      placeholder="المفوض بالتوقيع"
+                      placeholder={isAr ? 'المفوض بالتوقيع' : 'Authorized Signatory'}
                       className="bg-transparent border-b border-dashed border-slate-400 dark:border-slate-500 text-xs font-black text-slate-800 dark:text-slate-200 py-0.5 outline-none w-32"
                     />
                   </div>
 
                   <div className="text-right sm:text-right">
                     <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
-                      <span>التوقيع</span>
-                      <span className="font-sans font-normal text-[9px]">/ Signature</span>
+                      <span>{isAr ? 'التوقيع' : 'Signature'}</span>
+                      <span className="font-sans font-normal text-[9px]">/ {isAr ? 'Signature' : 'التوقيع'}</span>
                     </div>
                     <div className="w-24 h-6 border-b-2 border-slate-700 dark:border-slate-400 flex items-center justify-center text-slate-400 text-xs font-serif italic">
-                      ✓ معتمد
+                      ✓ {isAr ? 'معتمد' : 'Authorized'}
                     </div>
                   </div>
                 </div>
@@ -934,9 +1000,11 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
           <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-1.5">
             <h4 className="text-xs font-black text-slate-800 dark:text-white flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5 text-emerald-600" />
-              <span>التوجيه المحاسبي والبيانات المتممة للشيك</span>
+              <span>{isAr ? 'التوجيه المحاسبي والبيانات المتممة للشيك' : 'Accounting Routing & Complementary Cheque Data'}</span>
             </h4>
-            <span className="text-[10px] text-slate-400 font-medium">القيود والتوجيهات المحاسبية</span>
+            <span className="text-[10px] text-slate-400 font-medium">
+              {isAr ? 'القيود والتوجيهات المحاسبية' : 'Journal Entries & Directives'}
+            </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -944,8 +1012,8 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
             {/* Bank Account Selection */}
             <div>
               <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-0.5 flex items-center justify-between">
-                <span>الحساب المسحوب عليه (النقدية والبنوك) <span className="text-rose-500">*</span></span>
-                <span className="text-[9px] text-emerald-600 font-bold">البنك الافتراضي</span>
+                <span>{isAr ? 'الحساب المسحوب عليه (النقدية والبنوك)' : 'Drawee Account (Cash & Banks)'} <span className="text-rose-500">*</span></span>
+                <span className="text-[9px] text-emerald-600 font-bold">{isAr ? 'البنك الافتراضي' : 'Default Bank'}</span>
               </label>
               <select
                 required
@@ -953,7 +1021,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                 onChange={e => setBankAccountId(e.target.value)}
                 className="w-full px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold text-xs focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all h-8"
               >
-                <optgroup label="الحسابات البنكية (الافتراضي)">
+                <optgroup label={isAr ? 'الحسابات البنكية (الافتراضي)' : 'Bank Accounts (Default)'}>
                   {bankOptions.map(b => (
                     <option key={b.id} value={b.id}>
                       {b.name} {b.accNo ? `(#${b.accNo})` : ''}
@@ -961,7 +1029,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                   ))}
                 </optgroup>
                 {cashOptions.length > 0 && (
-                  <optgroup label="الخزائن والنقدية والوسائل المالية الأخرى">
+                  <optgroup label={isAr ? 'الخزائن والنقدية والوسائل المالية الأخرى' : 'Cash Treasuries & Other Financial Methods'}>
                     {cashOptions.map(c => (
                       <option key={c.id} value={c.id}>
                         {c.name}
@@ -975,7 +1043,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
             {/* Credit Account Selection (أوراق الدفع) */}
             <div>
               <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-0.5">
-                الحساب الدائن (أوراق الدفع) <span className="text-rose-500">*</span>
+                {isAr ? 'الحساب الدائن (أوراق الدفع)' : 'Credit Account (Notes Payable)'} <span className="text-rose-500">*</span>
               </label>
               <select
                 required
@@ -985,8 +1053,8 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
               >
                 <option value="">
                   {notesPayableAccounts.length === 0
-                    ? '-- لا يوجد حساب أوراق دفع مُعرّف --'
-                    : '-- اختر حساب أوراق الدفع --'}
+                    ? (isAr ? '-- لا يوجد حساب أوراق دفع مُعرّف --' : '-- No notes payable account defined --')
+                    : (isAr ? '-- اختر حساب أوراق الدفع --' : '-- Select Notes Payable Account --')}
                 </option>
                 {notesPayableAccounts.map(acc => (
                   <option key={acc.id} value={acc.id}>
@@ -999,7 +1067,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
             {/* Issue / Registration Date */}
             <div>
               <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-0.5">
-                تاريخ التحرير والتسجيل <span className="text-rose-500">*</span>
+                {isAr ? 'تاريخ التحرير والتسجيل' : 'Issue / Registration Date'} <span className="text-rose-500">*</span>
               </label>
               <input
                 type="date"
@@ -1013,11 +1081,11 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
             {/* Description / Purpose */}
             <div className="sm:col-span-2 lg:col-span-3">
               <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-0.5">
-                البيان / الغرض من الصرف
+                {isAr ? 'البيان / الغرض من الصرف' : 'Description / Disbursement Purpose'}
               </label>
               <input
                 type="text"
-                placeholder="سداد دفعة تحت الحساب / سداد فاتورة توريد رقم ..."
+                placeholder={isAr ? "سداد دفعة تحت الحساب / سداد فاتورة توريد رقم ..." : "Payment on account / Payment of supplier invoice #..."}
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 className="w-full px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs transition-all h-8"
@@ -1030,11 +1098,11 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1.5 border-t border-slate-100 dark:border-slate-800">
             <div>
               <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-0.5">
-                ملاحظات إضافية
+                {isAr ? 'ملاحظات إضافية' : 'Additional Notes'}
               </label>
               <textarea
                 rows={1}
-                placeholder="أي ملاحظات داخلية خاصة بالإدارة المالية..."
+                placeholder={isAr ? "أي ملاحظات داخلية خاصة بالإدارة المالية..." : "Any internal notes for financial management..."}
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 className="w-full px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs transition-all resize-none h-8"
@@ -1043,7 +1111,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
 
             <div>
               <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-300 mb-0.5">
-                صورة الشيك / المرفقات المؤيدة
+                {isAr ? 'صورة الشيك / المرفقات المؤيدة' : 'Cheque Image / Supporting Attachments'}
               </label>
               <div className="border border-dashed border-slate-300 dark:border-slate-700 rounded-lg p-1 text-center hover:border-emerald-500 transition-colors flex items-center justify-between px-2.5 h-8">
                 <input
@@ -1059,12 +1127,12 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                   className="cursor-pointer flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:text-emerald-600 truncate"
                 >
                   <Paperclip className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span className="truncate">اضغط لرفع صورة الشيك أو المستند</span>
+                  <span className="truncate">{isAr ? 'اضغط لرفع صورة الشيك أو المستند' : 'Click to upload cheque image or document'}</span>
                 </label>
 
                 {attachments.length > 0 && (
                   <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full shrink-0">
-                    {attachments.length} مرفق
+                    {attachments.length} {isAr ? 'مرفق' : 'attachment(s)'}
                   </span>
                 )}
               </div>
@@ -1083,7 +1151,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
                   <button
                     type="button"
                     onClick={() => removeAttachment(att.id)}
-                    className="text-rose-500 hover:text-rose-700"
+                    className="text-rose-500 hover:text-rose-700 cursor-pointer"
                   >
                     <Trash2 className="w-2.5 h-2.5" />
                   </button>
@@ -1096,9 +1164,14 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
           <div className="p-2 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30 text-emerald-800 dark:text-emerald-300 text-[10px] flex items-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
             <span>
-              <strong>الأثر المالي:</strong> عند اعتماد وإصدار الشيك، يتم إنشاء قيد يومية آلياً: 
-              <span className="font-mono mx-1 font-bold">من حـ/ {suppliers.find(s => s.id === supplierId)?.name || 'المورد'} إلى حـ/ {accounts.find(a => a.id === creditAccountId)?.name || 'أوراق الدفع'}</span> 
-              بمبلغ {Number(isForeign ? equivalentInEgp : numAmount).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م.
+              <strong>{isAr ? 'الأثر المالي:' : 'Financial Impact:'}</strong>{' '}
+              {isAr ? 'عند اعتماد وإصدار الشيك، يتم إنشاء قيد يومية آلياً:' : 'Upon approving and issuing the cheque, an automatic journal entry is created:'}{' '}
+              <span className="font-mono mx-1 font-bold">
+                {isAr ? 'من حـ/' : 'Dr.'} {suppliers.find(s => s.id === supplierId)?.name || (isAr ? 'المورد' : 'Supplier')}{' '}
+                {isAr ? 'إلى حـ/' : 'Cr.'} {accounts.find(a => a.id === creditAccountId)?.name || (isAr ? 'أوراق الدفع' : 'Notes Payable')}
+              </span>{' '}
+              {isAr ? 'بمبلغ' : 'for the amount of'}{' '}
+              {Number(isForeign ? equivalentInEgp : numAmount).toLocaleString(isAr ? 'ar-EG' : 'en-US', { minimumFractionDigits: 2 })} {currency === 'EGP' ? (isAr ? 'ج.م' : 'EGP') : currency}.
             </span>
           </div>
 
@@ -1259,17 +1332,17 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-xs"
+            className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-xs cursor-pointer"
           >
-            إلغاء
+            {isAr ? 'إلغاء' : 'Cancel'}
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="px-6 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-500/20 flex items-center gap-2 transition-all disabled:opacity-50 active:scale-95"
+            className="px-6 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-500/20 flex items-center gap-2 transition-all disabled:opacity-50 active:scale-95 cursor-pointer"
           >
             <Save className="w-4 h-4" />
-            <span>{loading ? 'جاري الحفظ...' : chequeToEdit ? 'حفظ تعديلات الشيك' : 'حفظ الشيك الصادر'}</span>
+            <span>{loading ? (isAr ? 'جاري الحفظ...' : 'Saving...') : (chequeToEdit ? (isAr ? 'حفظ تعديلات الشيك' : 'Save Changes') : (isAr ? 'حفظ الشيك الصادر' : 'Save Issued Cheque'))}</span>
           </button>
         </div>
 

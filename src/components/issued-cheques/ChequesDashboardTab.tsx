@@ -218,6 +218,7 @@ export const ChequesDashboardTab: React.FC<ChequesDashboardTabProps> = ({
                   <th className="px-6 py-3.5">{isAr ? 'المورد المستفيد' : 'Beneficiary / Supplier'}</th>
                   <th className="px-6 py-3.5">{isAr ? 'الحساب البنكي' : 'Bank Account'}</th>
                   <th className="px-6 py-3.5">{isAr ? 'المبلغ' : 'Amount'}</th>
+                  <th className="px-6 py-3.5">{isAr ? 'العملة' : 'Currency'}</th>
                   <th className="px-6 py-3.5">{isAr ? 'تاريخ الاستحقاق' : 'Due Date'}</th>
                   <th className="px-6 py-3.5">{isAr ? 'الحالة' : 'Status'}</th>
                   <th className="px-6 py-3.5 text-center">{isAr ? 'إجراءات' : 'Actions'}</th>
@@ -238,7 +239,12 @@ export const ChequesDashboardTab: React.FC<ChequesDashboardTabProps> = ({
                         {cheque.bank_name || '-'}
                       </td>
                       <td className="px-6 py-3.5 font-mono font-black text-emerald-600 dark:text-emerald-400">
-                        {formatMoney(cheque.amount)} {currencyLabel}
+                        {formatMoney(cheque.amount)}
+                      </td>
+                      <td className="px-6 py-3.5">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md font-mono font-bold text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                          {cheque.currency || 'EGP'}
+                        </span>
                       </td>
                       <td className="px-6 py-3.5 font-mono">
                         <span className={isOverdue ? 'text-rose-600 font-bold' : 'text-slate-600 dark:text-slate-400'}>

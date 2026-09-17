@@ -470,6 +470,7 @@ export const IssuedCheques: React.FC = () => {
                       <th className="px-3 py-2 text-[11px]">{isAr ? 'الحساب الدائن' : 'Credit Account'}</th>
                       <th className="px-3 py-2 text-[11px]">{isAr ? 'الحساب البنكي' : 'Bank Account'}</th>
                       <th className="px-3 py-2 text-[11px]">{isAr ? 'المبلغ' : 'Amount'}</th>
+                      <th className="px-3 py-2 text-[11px]">{isAr ? 'العملة' : 'Currency'}</th>
                       <th className="px-3 py-2 text-[11px]">{isAr ? 'تاريخ التحرير' : 'Issue Date'}</th>
                       <th className="px-3 py-2 text-[11px]">{isAr ? 'تاريخ الاستحقاق' : 'Due Date'}</th>
                       <th className="px-3 py-2 text-[11px]">{isAr ? 'الحالة' : 'Status'}</th>
@@ -498,13 +499,18 @@ export const IssuedCheques: React.FC = () => {
                         </td>
                         <td className="px-3 py-2 font-mono font-black text-slate-900 dark:text-white">
                           <div>
-                            <span>{formatMoney(cheque.amount)} {cheque.currency || currencyLabel}</span>
+                            <span>{formatMoney(cheque.amount)}</span>
                             {cheque.currency && cheque.currency !== 'EGP' && (
                               <span className="block text-[10px] font-normal text-emerald-600 dark:text-emerald-400">
                                 ({formatMoney(Number(cheque.amount) * (Number(cheque.exchange_rate) || 1))} {currencyLabel})
                               </span>
                             )}
                           </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md font-mono font-bold text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                            {cheque.currency || 'EGP'}
+                          </span>
                         </td>
                         <td className="px-3 py-2 font-mono text-slate-500">
                           {String(cheque.issue_date).slice(0, 10)}
