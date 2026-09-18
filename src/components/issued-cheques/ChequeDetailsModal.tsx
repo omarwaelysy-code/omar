@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   X, Calendar, Building2, User, FileText, CheckCircle2, Clock, 
-  RotateCcw, Ban, Paperclip, Printer, ExternalLink, ShieldCheck, ArrowUpRight 
+  RotateCcw, Ban, Paperclip, Printer, ExternalLink, ShieldCheck, ArrowUpRight,
+  Eye, Download
 } from 'lucide-react';
 import { IssuedCheque } from '../../types';
 import { tafqeetAr, tafqeetEn } from '../../utils/tafqeet';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { EGYPTIAN_BANKS_DATA, BankLogoBadge, EgyptianBank } from '../../data/egyptianBanks';
+import { AttachmentPreviewModal, ChequeAttachmentData } from '../common/AttachmentPreviewModal';
 
 interface ChequeDetailsModalProps {
   isOpen: boolean;
@@ -33,6 +35,28 @@ export const ChequeDetailsModal: React.FC<ChequeDetailsModalProps> = ({
 }) => {
   const { language, dir } = useLanguage();
   const isAr = language === 'ar';
+
+  const [selectedPreviewAttachment, setSelectedPreviewAttachment] = useState<ChequeAttachmentData | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  const handlePreviewAttachment = (att: ChequeAttachmentData) => {
+    setSelectedPreviewAttachment(att);
+    setIsPreviewOpen(true);
+  };
+
+  const handleDownloadAttachment = (att: ChequeAttachmentData) => {
+    if (!att?.url) return;
+    try {
+      const a = document.createElement('a');
+      a.href = att.url;
+      a.download = att.name || 'cheque_document';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      window.open(att.url, '_blank');
+    }
+  };
 
   if (!isOpen || !cheque) return null;
 
@@ -322,25 +346,36 @@ export const ChequeDetailsModal: React.FC<ChequeDetailsModalProps> = ({
               </h4>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {cheque.attachments.map(att => (
-                  <a
+                  <div
                     key={att.id}
-                    href={att.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/50 flex items-center gap-2.5 transition-all text-xs group"
+                    className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100/80 dark:hover:bg-slate-700/50 flex items-center justify-between gap-2.5 transition-all text-xs"
                   >
-                    {att.type.startsWith('image/') ? (
-                      <img src={att.url} alt={att.name} className="w-8 h-8 object-cover rounded-lg" />
-                    ) : (
-                      <FileText className="w-8 h-8 text-slate-400" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-800 dark:text-slate-200 truncate group-hover:text-emerald-600">{att.name}</p>
-                      <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                        {isAr ? 'عرض الملف' : 'View File'} <ExternalLink className="w-2.5 h-2.5" />
-                      </p>
+                    <div
+                      onClick={() => handlePreviewAttachment(att)}
+                      className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer group"
+                    >
+                      {att.type?.startsWith('image/') || att.url?.startsWith('data:image/') ? (
+                        <img src={att.url} alt={att.name} className="w-8 h-8 object-cover rounded-lg shrink-0 border border-slate-200 dark:border-slate-700" />
+                      ) : (
+                        <FileText className="w-8 h-8 text-slate-400 shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-slate-800 dark:text-slate-200 truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400">{att.name}</p>
+                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-semibold">
+                          <Eye className="w-2.5 h-2.5" /> {isAr ? 'معاينة' : 'Preview'}
+                        </p>
+                      </div>
                     </div>
-                  </a>
+
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleDownloadAttachment(att); }}
+                      className="p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-slate-600 dark:text-slate-300 hover:text-emerald-600 transition-colors shrink-0 cursor-pointer"
+                      title={isAr ? 'تحميل المرفق' : 'Download'}
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -430,9 +465,14 @@ export const ChequeDetailsModal: React.FC<ChequeDetailsModalProps> = ({
               {isAr ? 'إغلاق' : 'Close'}
             </button>
           </div>
-        </div>
-
       </div>
+
+      {/* Attachment Preview Modal */}
+      <AttachmentPreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        attachment={selectedPreviewAttachment}
+      />
     </div>
   );
 };

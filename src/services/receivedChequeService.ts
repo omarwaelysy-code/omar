@@ -70,6 +70,8 @@ export const receivedChequeService = {
       is_crossed: boolean;
       is_not_negotiable: boolean;
       bank_name: string;
+      attachment?: any;
+      attachments?: any[];
     }>;
   }): Promise<{ success: boolean; count: number; ids: string[]; receipt_number: string }> {
     const headers = getAuthHeaders();

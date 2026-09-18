@@ -20,6 +20,7 @@ import { ReceivedChequeCancelModal } from '../components/received-cheques/Receiv
 import { ReceivedChequesDashboardTab } from '../components/received-cheques/ReceivedChequesDashboardTab';
 import { ReceivedChequesReportsTab } from '../components/received-cheques/ReceivedChequesReportsTab';
 import { EGYPTIAN_BANKS_DATA, BankLogoBadge } from '../data/egyptianBanks';
+import { AttachmentPreviewModal, ChequeAttachmentData } from '../components/common/AttachmentPreviewModal';
 
 interface ReceivedChequesProps {
   initialTab?: 'dashboard' | 'all' | 'receive_customer' | 'receive_other' | 'due' | 'reports';
@@ -30,6 +31,10 @@ export const ReceivedCheques: React.FC<ReceivedChequesProps> = ({ initialTab = '
   const { user } = useAuth();
   const { language, dir } = useLanguage();
   const isAr = language === 'ar';
+
+  // Attachment Preview Modal State
+  const [selectedPreviewAttachment, setSelectedPreviewAttachment] = useState<ChequeAttachmentData | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<'dashboard' | 'all' | 'receive_customer' | 'receive_other' | 'due' | 'reports'>(initialTab);
@@ -486,6 +491,21 @@ export const ReceivedCheques: React.FC<ReceivedChequesProps> = ({ initialTab = '
                               </span>
                             )}
                           </button>
+                          {cheque.attachments && cheque.attachments.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedPreviewAttachment(cheque.attachments![0]);
+                                setIsPreviewOpen(true);
+                              }}
+                              className="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-sans font-bold bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800/60 mt-1 cursor-pointer transition-colors"
+                              title={isAr ? `معاينة المرفق (${cheque.attachments.length})` : `View Attachment (${cheque.attachments.length})`}
+                            >
+                              <Paperclip className="w-2.5 h-2.5" />
+                              <span>{isAr ? 'مرفق' : 'Scan'}</span>
+                            </button>
+                          )}
                         </td>
                         <td className="px-3 py-2 font-mono font-bold text-blue-600 dark:text-blue-400">
                           {cheque.receipt_number || '-'}
@@ -556,6 +576,20 @@ export const ReceivedCheques: React.FC<ReceivedChequesProps> = ({ initialTab = '
                             >
                               <Eye className="w-4 h-4" />
                             </button>
+
+                            {/* Attachment Action Button */}
+                            {cheque.attachments && cheque.attachments.length > 0 && (
+                              <button
+                                onClick={() => {
+                                  setSelectedPreviewAttachment(cheque.attachments![0]);
+                                  setIsPreviewOpen(true);
+                                }}
+                                className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors cursor-pointer relative"
+                                title={isAr ? `معاينة وتحميل المرفق (${cheque.attachments.length})` : `View Attachment (${cheque.attachments.length})`}
+                              >
+                                <Paperclip className="w-4 h-4" />
+                              </button>
+                            )}
 
                             {/* Collect & Deposit */}
                             {['RECEIVED', 'UNDER_COLLECTION', 'POSTPONED'].includes(cheque.status) && (
@@ -702,6 +736,13 @@ export const ReceivedCheques: React.FC<ReceivedChequesProps> = ({ initialTab = '
         onClose={() => setSelectedChequeForCancel(null)}
         onSuccess={fetchData}
         cheque={selectedChequeForCancel}
+      />
+
+      {/* Attachment Preview & Download Modal */}
+      <AttachmentPreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        attachment={selectedPreviewAttachment}
       />
 
     </div>

@@ -2,17 +2,19 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, Save, Plus, Trash2, Calendar, User, FileText, Paperclip, 
   CheckCircle2, ShieldCheck, Layers, Building2, AlertCircle, 
-  ArrowLeft, RefreshCw, Hash, DollarSign, Coins, TrendingUp
+  ArrowLeft, RefreshCw, Hash, DollarSign, Coins, TrendingUp,
+  Eye, Download
 } from 'lucide-react';
-import { ReceivedCheque, Customer, PaymentMethod, Account, IssuedChequeAttachment, Currency, ExchangeRate } from '../../types';
+import { ReceivedCheque, Customer, PaymentMethod, Account, IssuedChequeAttachment, Currency, ExchangeRate, Company } from '../../types';
 import { receivedChequeService } from '../../services/receivedChequeService';
-import { dbService } from '../../services/dbService';
+import { dbService, apiRequest } from '../../services/dbService';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { tafqeetAr } from '../../utils/tafqeet';
 import { formatNumber } from '../../utils/formatUtils';
 import { EGYPTIAN_BANKS_DATA, BankLogoBadge, EgyptianBank } from '../../data/egyptianBanks';
+import { AttachmentPreviewModal, ChequeAttachmentData } from '../common/AttachmentPreviewModal';
 
 interface ChequeRow {
   id: string;
@@ -22,6 +24,7 @@ interface ChequeRow {
   is_crossed: boolean;
   is_not_negotiable: boolean;
   bank_name: string;
+  attachment?: IssuedChequeAttachment;
 }
 
 interface InvoiceSettlementRow {
@@ -45,17 +48,6 @@ interface ReceivedChequeFormModalProps {
   mode?: 'CUSTOMER' | 'OTHER' | 'customer' | 'other';
   chequeToEdit?: ReceivedCheque | null;
 }
-
-const DEFAULT_SUPPORTED_CURRENCIES = [
-  { code: 'EGP', nameAr: 'جنيه مصري', symbol: 'ج.م' },
-  { code: 'USD', nameAr: 'دولار أمريكي', symbol: '$' },
-  { code: 'EUR', nameAr: 'يورو أوروبي', symbol: '€' },
-  { code: 'SAR', nameAr: 'ريال سعودي', symbol: 'ر.س' },
-  { code: 'AED', nameAr: 'درهم إماراتي', symbol: 'د.إ' },
-  { code: 'KWD', nameAr: 'دينار كويتي', symbol: 'د.ك' },
-  { code: 'QAR', nameAr: 'ريال قطري', symbol: 'ر.ق' },
-  { code: 'GBP', nameAr: 'جنيه إسترليني', symbol: '£' },
-];
 
 export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = ({
   isOpen,
@@ -88,7 +80,12 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
   const [loading, setLoading] = useState(false);
   const [validationError, setValidationError] = useState('');
 
-  // Currencies & Exchange Rate from Currency Management
+  // Attachment Preview Modal State
+  const [previewAttachment, setPreviewAttachment] = useState<ChequeAttachmentData | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  // Currencies & Exchange Rate from Currency Management (System-only)
+  const [company, setCompany] = useState<Company | null>(null);
   const [companyCurrencies, setCompanyCurrencies] = useState<Currency[]>([]);
   const [currency, setCurrency] = useState<string>('EGP');
   const [exchangeRate, setExchangeRate] = useState<string>('1.0');
@@ -137,32 +134,56 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
     }).sort((a, b) => (a.code || '').localeCompare(b.code || ''));
   }, [accounts]);
 
-  // Load Currencies from DB
+  // Load Currencies & Company from DB (Only system registered currencies)
   useEffect(() => {
     if (!user?.company_id) return;
-    dbService.list<Currency>('currencies', user.company_id)
-      .then(currs => {
+    Promise.all([
+      dbService.list<Currency>('currencies', user.company_id),
+      dbService.get<Company>('companies', user.company_id)
+    ])
+      .then(([currs, comp]) => {
         if (Array.isArray(currs)) {
           setCompanyCurrencies(currs.filter(c => c.is_active !== false));
         }
+        if (comp) {
+          setCompany(comp);
+          const baseCurr = (comp.settings?.currency || comp.currency || 'EGP').toUpperCase();
+          if (!currency || currency === 'EGP') {
+            setCurrency(baseCurr);
+          }
+        }
       })
-      .catch(err => console.error('Error fetching currencies:', err));
+      .catch(err => console.error('Error fetching currencies/company:', err));
   }, [user?.company_id]);
 
-  // Available currencies combined
+  // ONLY currencies registered in the system (إدارة العملات)
   const availableCurrencies = useMemo(() => {
-    const list = [...DEFAULT_SUPPORTED_CURRENCIES];
-    companyCurrencies.forEach(c => {
-      if (!list.some(x => x.code.toUpperCase() === c.code.toUpperCase())) {
-        list.push({
-          code: c.code.toUpperCase(),
-          nameAr: c.name_ar || c.code,
-          symbol: c.symbol || c.code
-        });
-      }
-    });
+    const baseCode = (company?.settings?.currency || company?.currency || 'EGP').toUpperCase();
+    const baseItem = {
+      id: 'base',
+      code: baseCode,
+      nameAr: baseCode === 'EGP' ? 'جنيه مصري' : baseCode,
+      symbol: baseCode === 'EGP' ? 'ج.م' : baseCode
+    };
+
+    const list = [baseItem];
+
+    (companyCurrencies || [])
+      .filter(c => c && c.code && c.is_active !== false)
+      .forEach(c => {
+        const code = c.code.toUpperCase();
+        if (code !== baseCode && !list.some(x => x.code === code)) {
+          list.push({
+            id: c.id,
+            code,
+            nameAr: c.name_ar || c.name || code,
+            symbol: c.symbol || code
+          });
+        }
+      });
+
     return list;
-  }, [companyCurrencies]);
+  }, [companyCurrencies, company]);
 
   const selectedCurrency = useMemo(() => {
     return availableCurrencies.find(c => c.code.toUpperCase() === currency.toUpperCase()) || {
@@ -172,18 +193,20 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
     };
   }, [availableCurrencies, currency]);
 
-  // Handle currency change & fetch exchange rate
+  // Handle currency change & fetch exchange rate (System rate auto, user can edit manually)
   const handleCurrencyChange = async (newCurr: string) => {
     setCurrency(newCurr);
-    if (newCurr === 'EGP') {
+    const baseCode = (company?.settings?.currency || company?.currency || 'EGP').toUpperCase();
+    if (newCurr.toUpperCase() === baseCode) {
       setExchangeRate('1.0');
       return;
     }
 
     setLoadingExchangeRate(true);
     try {
-      const matched = companyCurrencies.find(c => c.code.toUpperCase() === newCurr.toUpperCase());
-      if (matched?.id) {
+      const matched = availableCurrencies.find(c => c.code.toUpperCase() === newCurr.toUpperCase());
+      if (matched?.id && matched.id !== 'base') {
+        // 1. Check manual rates in exchange_rates
         const rates = await dbService.list<ExchangeRate>('exchange_rates', {
           currency_id: matched.id,
           company_id: user?.company_id,
@@ -195,14 +218,24 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
           setExchangeRate(String(Number(rates[0].exchange_rate)));
           return;
         }
+
+        // 2. Check automated live system rates in currency_rates
+        try {
+          const autoRates = await apiRequest<Array<{
+            currency_id: string;
+            rate: number | null;
+            rate_date: string | null;
+          }>>(`/currency-rates/latest?company_id=${user?.company_id}`);
+          const found = autoRates?.find(r => r.currency_id === matched.id && Number(r.rate) > 0);
+          if (found && Number(found.rate) > 0) {
+            setExchangeRate(String(Number(found.rate)));
+            return;
+          }
+        } catch {
+          // ignore
+        }
       }
-      // Defaults if not found
-      if (newCurr === 'USD') setExchangeRate('50.0');
-      else if (newCurr === 'EUR') setExchangeRate('55.0');
-      else if (newCurr === 'SAR') setExchangeRate('13.3');
-      else if (newCurr === 'AED') setExchangeRate('13.6');
-      else if (newCurr === 'KWD') setExchangeRate('163.0');
-      else setExchangeRate('1.0');
+      setExchangeRate('1.0');
     } catch (err) {
       console.error('Error fetching exchange rate:', err);
       setExchangeRate('1.0');
@@ -322,7 +355,51 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
     setChequeRows(prev => prev.map(r => r.id === id ? { ...r, [field]: val } : r));
   };
 
-  // Attachment upload
+  // Row-level Attachment upload & handlers
+  const handleRowFileUpload = (rowId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const newAtt: IssuedChequeAttachment = {
+        id: crypto.randomUUID(),
+        name: file.name,
+        size: file.size,
+        type: file.type || 'application/octet-stream',
+        url: reader.result as string,
+        uploaded_at: new Date().toISOString()
+      };
+      setChequeRows(prev => prev.map(r => r.id === rowId ? { ...r, attachment: newAtt } : r));
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleRemoveRowAttachment = (rowId: string) => {
+    setChequeRows(prev => prev.map(r => r.id === rowId ? { ...r, attachment: undefined } : r));
+  };
+
+  const handlePreviewAttachment = (att: ChequeAttachmentData) => {
+    setPreviewAttachment(att);
+    setIsPreviewOpen(true);
+  };
+
+  const handleDirectDownload = (att: ChequeAttachmentData) => {
+    if (!att?.url) return;
+    try {
+      const a = document.createElement('a');
+      a.href = att.url;
+      a.download = att.name || 'cheque_document';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      window.open(att.url, '_blank');
+    }
+  };
+
+  // Global Attachment upload (Receipt envelope)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -397,7 +474,9 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
           due_date: r.due_date,
           is_crossed: r.is_crossed,
           is_not_negotiable: r.is_not_negotiable,
-          bank_name: r.bank_name
+          bank_name: r.bank_name,
+          attachment: r.attachment || undefined,
+          attachments: r.attachment ? [r.attachment] : undefined
         }))
       });
 
@@ -668,6 +747,7 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
                   <th className="py-3 px-3 min-w-[140px]">{isAr ? 'تاريخ الاستحقاق' : 'Due Date'} <span className="text-rose-500">*</span></th>
                   <th className="py-3 px-3 w-16 text-center">{isAr ? 'لوجو' : 'Logo'}</th>
                   <th className="py-3 px-3 min-w-[200px]">{isAr ? 'البنك المسحوب عليه' : 'Drawee Bank'}</th>
+                  <th className="py-3 px-3 min-w-[150px] text-center">{isAr ? 'صورة / مستند الشيك' : 'Cheque Attachment'}</th>
                   <th className="py-3 px-3 w-20 text-center">{isAr ? 'مسطر' : 'Crossed'}</th>
                   <th className="py-3 px-3 w-24 text-center">{isAr ? 'غير قابل للتداول' : 'Not Negotiable'}</th>
                   <th className="py-3 px-3 w-14 text-center">{isAr ? 'إجراء' : 'Action'}</th>
@@ -747,6 +827,52 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
                             </option>
                           ))}
                         </select>
+                      </td>
+
+                      {/* Cheque Attachment Column */}
+                      <td className="py-1 px-2 text-center border-r border-slate-100 dark:border-slate-800/60">
+                        {row.attachment ? (
+                          <div className="inline-flex items-center gap-1.5 p-1 px-2 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800/60 text-xs">
+                            <button
+                              type="button"
+                              onClick={() => handlePreviewAttachment(row.attachment!)}
+                              className="flex items-center gap-1 font-bold text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 transition-colors cursor-pointer truncate max-w-[100px]"
+                              title={isAr ? `معاينة ${row.attachment.name}` : `Preview ${row.attachment.name}`}
+                            >
+                              <Eye className="w-3.5 h-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
+                              <span className="truncate">{row.attachment.name}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDirectDownload(row.attachment!)}
+                              className="p-1 hover:bg-blue-200 dark:hover:bg-blue-800 rounded text-blue-700 dark:text-blue-300 transition-colors cursor-pointer"
+                              title={isAr ? 'تحميل المرفق' : 'Download'}
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveRowAttachment(row.id)}
+                              className="p-1 hover:bg-rose-100 dark:hover:bg-rose-900/40 rounded text-rose-500 hover:text-rose-700 transition-colors cursor-pointer"
+                              title={isAr ? 'حذف المرفق' : 'Remove'}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50/40 dark:hover:bg-blue-900/20 text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors">
+                            <Paperclip className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{isAr ? 'إرفاق مستند/صورة' : 'Attach'}</span>
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept="image/*,.pdf,.doc,.docx"
+                              onChange={e => handleRowFileUpload(row.id, e)}
+                            />
+                          </label>
+                        )}
                       </td>
 
                       {/* Crossed */}
@@ -993,6 +1119,13 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
         </div>
 
       </form>
+
+      {/* Attachment Preview & Download Modal */}
+      <AttachmentPreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        attachment={previewAttachment}
+      />
     </div>
   );
 

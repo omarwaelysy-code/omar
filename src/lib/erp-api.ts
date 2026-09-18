@@ -4348,6 +4348,12 @@ const receivedChequeReceiveHandler = async (req: AuthRequest, res: any) => {
       const chqSerial = `${receiptNumber}-${String(i + 1).padStart(2, '0')}`;
       const chqDueDate = chq.due_date || receive_date;
 
+      const rowAttachments = Array.isArray(chq.attachments) && chq.attachments.length > 0
+        ? chq.attachments
+        : chq.attachment
+          ? [chq.attachment]
+          : (Array.isArray(attachments) ? attachments : []);
+
       await client.query(`
         INSERT INTO received_cheques (
           id, company_id, receipt_number, serial_number, cheque_number, cheque_type,
@@ -4366,7 +4372,7 @@ const receivedChequeReceiveHandler = async (req: AuthRequest, res: any) => {
         chqId, companyId, receiptNumber, chqSerial, String(chq.cheque_number || '').trim(), cheque_type,
         customer_id || null, customer_name || null, chq.payer_name || payer_name || customer_name || null, chq.bank_name || null,
         chqAmount, finalCurrency, finalExchangeRate, receive_date, chqDueDate, chq.is_crossed !== false, chq.is_not_negotiable !== false,
-        purpose || null, purpose || notes || null, notes || null, JSON.stringify(attachments),
+        purpose || null, purpose || notes || null, notes || null, JSON.stringify(rowAttachments),
         JSON.stringify(settlement_details), finalDebitAccId, finalDebitAccName,
         finalCreditAccId, finalCreditAccName, req.user?.id || req.user?.username || 'system'
       ]);
