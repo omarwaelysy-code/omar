@@ -4259,6 +4259,9 @@ const receivedChequeReceiveHandler = async (req: AuthRequest, res: any) => {
       cheque_type = 'customer',
       customer_id,
       customer_name,
+      payer_name,
+      currency = 'EGP',
+      exchange_rate = 1.0,
       receive_date = new Date().toISOString().slice(0, 10),
       debit_account_id,
       debit_account_name,
@@ -4270,6 +4273,9 @@ const receivedChequeReceiveHandler = async (req: AuthRequest, res: any) => {
       settlement_details = [],
       cheques = []
     } = req.body;
+
+    const finalExchangeRate = Number(exchange_rate) > 0 ? Number(exchange_rate) : 1.0;
+    const finalCurrency = String(currency || 'EGP').toUpperCase();
 
     if (!Array.isArray(cheques) || cheques.length === 0) {
       await client.query('ROLLBACK');
@@ -4358,8 +4364,8 @@ const receivedChequeReceiveHandler = async (req: AuthRequest, res: any) => {
         )
       `, [
         chqId, companyId, receiptNumber, chqSerial, String(chq.cheque_number || '').trim(), cheque_type,
-        customer_id || null, customer_name || null, chq.payer_name || customer_name || null, chq.bank_name || null,
-        chqAmount, 'EGP', 1.0, receive_date, chqDueDate, chq.is_crossed !== false, chq.is_not_negotiable !== false,
+        customer_id || null, customer_name || null, chq.payer_name || payer_name || customer_name || null, chq.bank_name || null,
+        chqAmount, finalCurrency, finalExchangeRate, receive_date, chqDueDate, chq.is_crossed !== false, chq.is_not_negotiable !== false,
         purpose || null, purpose || notes || null, notes || null, JSON.stringify(attachments),
         JSON.stringify(settlement_details), finalDebitAccId, finalDebitAccName,
         finalCreditAccId, finalCreditAccName, req.user?.id || req.user?.username || 'system'
@@ -4369,22 +4375,26 @@ const receivedChequeReceiveHandler = async (req: AuthRequest, res: any) => {
     // Optional Journal Entry for Receipt if accounts are resolved
     let jeId: string | null = null;
     if (finalDebitAccId && finalCreditAccId && totalAmount > 0) {
+      const baseTotalAmount = Number((totalAmount * finalExchangeRate).toFixed(2));
+      const isForeign = finalCurrency !== 'EGP' && finalExchangeRate !== 1;
+      const currencySuffix = isForeign ? ` (${totalAmount} ${finalCurrency} × ${finalExchangeRate})` : '';
+
       jeId = await createChequeJournalEntry(client, companyId, {
         date: receive_date,
-        description: `إثبات استلام شيكات حافظة رقم ${receiptNumber} - من ${customer_name || 'عميل / جهة'} (عدد ${cheques.length} شيك)`,
+        description: `إثبات استلام شيكات حافظة رقم ${receiptNumber} - من ${customer_name || payer_name || 'عميل / جهة'} (عدد ${cheques.length} شيك)${currencySuffix}`,
         reference_id: insertedIds[0],
         reference_type: 'received_cheque',
         reference_number: receiptNumber,
-        total_debit: totalAmount,
-        total_credit: totalAmount,
+        total_debit: baseTotalAmount,
+        total_credit: baseTotalAmount,
         created_by: req.user?.username || req.user?.email || 'system',
         items: [
           {
             account_id: finalDebitAccId,
             account_name: finalDebitAccName,
-            debit: totalAmount,
+            debit: baseTotalAmount,
             credit: 0,
-            description: `أوراق قبض - استلام شيكات إيصال ${receiptNumber}`,
+            description: `أوراق قبض - استلام شيكات إيصال ${receiptNumber}${currencySuffix}`,
             customer_id: customer_id || null,
             customer_name: customer_name || null,
             sub_account_id: customer_id || null,
@@ -4394,8 +4404,8 @@ const receivedChequeReceiveHandler = async (req: AuthRequest, res: any) => {
             account_id: finalCreditAccId,
             account_name: finalCreditAccName,
             debit: 0,
-            credit: totalAmount,
-            description: `سداد بشيكات إيصال ${receiptNumber} - ${customer_name || ''}`,
+            credit: baseTotalAmount,
+            description: `سداد بشيكات إيصال ${receiptNumber} - ${customer_name || payer_name || ''}${currencySuffix}`,
             customer_id: customer_id || null,
             customer_name: customer_name || null,
             sub_account_id: customer_id || null,

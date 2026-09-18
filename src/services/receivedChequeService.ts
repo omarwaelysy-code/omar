@@ -57,6 +57,8 @@ export const receivedChequeService = {
     debit_account_name?: string;
     credit_account_id?: string;
     credit_account_name?: string;
+    currency?: string;
+    exchange_rate?: number;
     purpose?: string;
     notes?: string;
     attachments?: any[];

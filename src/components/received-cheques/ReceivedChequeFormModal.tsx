@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, Save, Plus, Trash2, Calendar, User, FileText, Paperclip, 
   CheckCircle2, ShieldCheck, Layers, Building2, AlertCircle, 
-  ArrowLeft, RefreshCw, Hash, DollarSign
+  ArrowLeft, RefreshCw, Hash, DollarSign, Coins, TrendingUp
 } from 'lucide-react';
-import { ReceivedCheque, Customer, PaymentMethod, Account, IssuedChequeAttachment } from '../../types';
+import { ReceivedCheque, Customer, PaymentMethod, Account, IssuedChequeAttachment, Currency, ExchangeRate } from '../../types';
 import { receivedChequeService } from '../../services/receivedChequeService';
 import { dbService } from '../../services/dbService';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -12,7 +12,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { tafqeetAr } from '../../utils/tafqeet';
 import { formatNumber } from '../../utils/formatUtils';
-import { EGYPTIAN_BANKS_DATA } from '../../data/egyptianBanks';
+import { EGYPTIAN_BANKS_DATA, BankLogoBadge, EgyptianBank } from '../../data/egyptianBanks';
 
 interface ChequeRow {
   id: string;
@@ -46,6 +46,17 @@ interface ReceivedChequeFormModalProps {
   chequeToEdit?: ReceivedCheque | null;
 }
 
+const DEFAULT_SUPPORTED_CURRENCIES = [
+  { code: 'EGP', nameAr: 'جنيه مصري', symbol: 'ج.م' },
+  { code: 'USD', nameAr: 'دولار أمريكي', symbol: '$' },
+  { code: 'EUR', nameAr: 'يورو أوروبي', symbol: '€' },
+  { code: 'SAR', nameAr: 'ريال سعودي', symbol: 'ر.س' },
+  { code: 'AED', nameAr: 'درهم إماراتي', symbol: 'د.إ' },
+  { code: 'KWD', nameAr: 'دينار كويتي', symbol: 'د.ك' },
+  { code: 'QAR', nameAr: 'ريال قطري', symbol: 'ر.ق' },
+  { code: 'GBP', nameAr: 'جنيه إسترليني', symbol: '£' },
+];
+
 export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = ({
   isOpen,
   onClose,
@@ -76,6 +87,12 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
   const [attachments, setAttachments] = useState<IssuedChequeAttachment[]>([]);
   const [loading, setLoading] = useState(false);
   const [validationError, setValidationError] = useState('');
+
+  // Currencies & Exchange Rate from Currency Management
+  const [companyCurrencies, setCompanyCurrencies] = useState<Currency[]>([]);
+  const [currency, setCurrency] = useState<string>('EGP');
+  const [exchangeRate, setExchangeRate] = useState<string>('1.0');
+  const [loadingExchangeRate, setLoadingExchangeRate] = useState(false);
 
   // Table of cheques
   const [chequeRows, setChequeRows] = useState<ChequeRow[]>([
@@ -120,13 +137,88 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
     }).sort((a, b) => (a.code || '').localeCompare(b.code || ''));
   }, [accounts]);
 
+  // Load Currencies from DB
+  useEffect(() => {
+    if (!user?.company_id) return;
+    dbService.list<Currency>('currencies', user.company_id)
+      .then(currs => {
+        if (Array.isArray(currs)) {
+          setCompanyCurrencies(currs.filter(c => c.is_active !== false));
+        }
+      })
+      .catch(err => console.error('Error fetching currencies:', err));
+  }, [user?.company_id]);
+
+  // Available currencies combined
+  const availableCurrencies = useMemo(() => {
+    const list = [...DEFAULT_SUPPORTED_CURRENCIES];
+    companyCurrencies.forEach(c => {
+      if (!list.some(x => x.code.toUpperCase() === c.code.toUpperCase())) {
+        list.push({
+          code: c.code.toUpperCase(),
+          nameAr: c.name_ar || c.code,
+          symbol: c.symbol || c.code
+        });
+      }
+    });
+    return list;
+  }, [companyCurrencies]);
+
+  const selectedCurrency = useMemo(() => {
+    return availableCurrencies.find(c => c.code.toUpperCase() === currency.toUpperCase()) || {
+      code: currency,
+      nameAr: currency,
+      symbol: currency === 'EGP' ? 'ج.م' : currency
+    };
+  }, [availableCurrencies, currency]);
+
+  // Handle currency change & fetch exchange rate
+  const handleCurrencyChange = async (newCurr: string) => {
+    setCurrency(newCurr);
+    if (newCurr === 'EGP') {
+      setExchangeRate('1.0');
+      return;
+    }
+
+    setLoadingExchangeRate(true);
+    try {
+      const matched = companyCurrencies.find(c => c.code.toUpperCase() === newCurr.toUpperCase());
+      if (matched?.id) {
+        const rates = await dbService.list<ExchangeRate>('exchange_rates', {
+          currency_id: matched.id,
+          company_id: user?.company_id,
+          _limit: 1,
+          _sort: 'rate_date',
+          _order: 'desc'
+        });
+        if (rates && rates.length > 0 && Number(rates[0].exchange_rate) > 0) {
+          setExchangeRate(String(Number(rates[0].exchange_rate)));
+          return;
+        }
+      }
+      // Defaults if not found
+      if (newCurr === 'USD') setExchangeRate('50.0');
+      else if (newCurr === 'EUR') setExchangeRate('55.0');
+      else if (newCurr === 'SAR') setExchangeRate('13.3');
+      else if (newCurr === 'AED') setExchangeRate('13.6');
+      else if (newCurr === 'KWD') setExchangeRate('163.0');
+      else setExchangeRate('1.0');
+    } catch (err) {
+      console.error('Error fetching exchange rate:', err);
+      setExchangeRate('1.0');
+    } finally {
+      setLoadingExchangeRate(false);
+    }
+  };
+
   // Initialize defaults
   useEffect(() => {
-    setChequeType(initialChequeType);
+    const effective = mode ? (mode.toLowerCase() as 'customer' | 'other') : initialChequeType;
+    setChequeType(effective);
     if (!debitAccountId && notesReceivableAccounts.length > 0) {
       setDebitAccountId(notesReceivableAccounts[0].id);
     }
-  }, [initialChequeType, notesReceivableAccounts]);
+  }, [initialChequeType, mode, notesReceivableAccounts]);
 
   // Generate sequence number on mount or date change
   useEffect(() => {
@@ -141,57 +233,68 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
       });
   }, [user?.company_id, receiveDate, chequeToEdit]);
 
-  // Load unpaid sales invoices when customer is selected
+  // Load Sales Invoices when Customer changes
   useEffect(() => {
-    if (!user?.company_id || !customerId || chequeType !== 'customer') {
+    if (!customerId || chequeType !== 'customer' || !user?.company_id) {
       setSalesInvoices([]);
       setSettlementRows([]);
       return;
     }
 
-    const unsub = dbService.subscribe<any>('invoices', user.company_id, (allInvs) => {
-      const custInvs = (allInvs || []).filter(inv => 
-        inv.customer_id === customerId && 
-        inv.status !== 'CANCELLED' &&
-        inv.payment_status !== 'PAID'
-      );
-      setSalesInvoices(custInvs);
+    const fetchInvoices = async () => {
+      try {
+        const invs = await dbService.list<any>('invoices', { customer_id: customerId });
+        const openInvs = (invs || []).filter(inv => {
+          const total = Number(inv.total_amount || inv.total || 0);
+          const paid = Number(inv.paid_amount || 0);
+          const open = total - paid;
+          return open > 0.01 && inv.status !== 'cancelled';
+        });
 
-      // Create settlement rows with open amount > 0.01
-      const rows: InvoiceSettlementRow[] = custInvs.map(inv => {
-        const total = Number(inv.total_amount || inv.grand_total) || 0;
-        const paid = Number(inv.paid_amount) || 0;
-        const open = Math.max(0, total - paid);
-        return {
+        setSalesInvoices(openInvs);
+        setSettlementRows(openInvs.map(inv => ({
           invoice_id: inv.id,
-          invoice_number: inv.invoice_number || inv.id?.slice(0, 8),
-          invoice_date: inv.date || inv.invoice_date || '',
-          total_amount: total,
-          open_amount: open,
+          invoice_number: inv.invoice_number || inv.serial_number || inv.id,
+          invoice_date: inv.invoice_date || inv.date || '',
+          total_amount: Number(inv.total_amount || inv.total || 0),
+          open_amount: Number(inv.total_amount || inv.total || 0) - Number(inv.paid_amount || 0),
           settled_amount: 0
-        };
-      }).filter(r => r.open_amount > 0.01);
+        })));
+      } catch (err) {
+        console.error('Error fetching sales invoices:', err);
+      }
+    };
 
-      setSettlementRows(rows);
-    });
+    fetchInvoices();
+  }, [customerId, chequeType, user?.company_id]);
 
-    return () => unsub();
-  }, [user?.company_id, customerId, chequeType]);
-
-  // Calculate totals
+  // Total amount from dynamic cheques
   const totalChequesAmount = useMemo(() => {
     return chequeRows.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
   }, [chequeRows]);
 
-  const totalSettledAmount = useMemo(() => {
-    return settlementRows.reduce((sum, r) => sum + (Number(r.settled_amount) || 0), 0);
-  }, [settlementRows]);
+  // Total equivalent in system currency (EGP)
+  const numRate = Number(exchangeRate) > 0 ? Number(exchangeRate) : 1.0;
+  const totalEquivalentAmount = useMemo(() => {
+    return totalChequesAmount * numRate;
+  }, [totalChequesAmount, numRate]);
 
-  const remainingToSettle = useMemo(() => {
-    return Math.max(0, totalChequesAmount - totalSettledAmount);
-  }, [totalChequesAmount, totalSettledAmount]);
+  const isForeign = currency !== 'EGP' && numRate !== 1;
 
-  // Add new cheque row
+  // Auto-distribute cheques amount over open sales invoices
+  const handleAutoDistribute = () => {
+    let remaining = totalChequesAmount;
+    setSettlementRows(prev => prev.map(row => {
+      if (remaining <= 0) {
+        return { ...row, settled_amount: 0 };
+      }
+      const canPay = Math.min(row.open_amount, remaining);
+      remaining -= canPay;
+      return { ...row, settled_amount: Number(canPay.toFixed(2)) };
+    }));
+  };
+
+  // Row operations
   const handleAddChequeRow = () => {
     setChequeRows(prev => [
       ...prev,
@@ -207,50 +310,35 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
     ]);
   };
 
-  // Remove cheque row
   const handleRemoveChequeRow = (id: string) => {
-    if (chequeRows.length <= 1) {
-      showError(isAr ? 'يجب إبقاء شيك واحد على الأقل في الحافظة' : 'At least one cheque row is required');
+    if (chequeRows.length === 1) {
+      showError(isAr ? 'يجب أن يحتوي الإيصال على شيك واحد على الأقل.' : 'Must keep at least one cheque.');
       return;
     }
     setChequeRows(prev => prev.filter(r => r.id !== id));
   };
 
-  // Update cheque row field
-  const handleUpdateChequeRow = (id: string, field: keyof ChequeRow, value: any) => {
-    setChequeRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
+  const handleUpdateChequeRow = (id: string, field: keyof ChequeRow, val: any) => {
+    setChequeRows(prev => prev.map(r => r.id === id ? { ...r, [field]: val } : r));
   };
 
-  // Auto-distribute cheques amount over open sales invoices
-  const handleAutoDistribute = () => {
-    let unallocated = totalChequesAmount;
-    setSettlementRows(prev => prev.map(row => {
-      if (unallocated <= 0) return { ...row, settled_amount: 0 };
-      const settleAmount = Math.min(row.open_amount, unallocated);
-      unallocated -= settleAmount;
-      return { ...row, settled_amount: Number(settleAmount.toFixed(2)) };
-    }));
-  };
-
-  // Handle Attachment Upload
+  // Attachment upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     Array.from(files).forEach(file => {
       const reader = new FileReader();
-      reader.onload = () => {
-        setAttachments(prev => [
-          ...prev,
-          {
-            id: crypto.randomUUID(),
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            url: reader.result as string,
-            uploaded_at: new Date().toISOString()
-          }
-        ]);
+      reader.onloadend = () => {
+        const newAtt: IssuedChequeAttachment = {
+          id: crypto.randomUUID(),
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          url: reader.result as string,
+          uploaded_at: new Date().toISOString()
+        };
+        setAttachments(prev => [...prev, newAtt]);
       };
       reader.readAsDataURL(file);
     });
@@ -260,7 +348,7 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
     setAttachments(prev => prev.filter(a => a.id !== id));
   };
 
-  // Submit Handler
+  // Form Submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError('');
@@ -270,61 +358,42 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
       return;
     }
 
-    if (chequeType === 'other' && !payerName && !creditAccountId) {
-      setValidationError(isAr ? 'يرجى كتابة اسم الجهة المسددة أو اختيار الحساب الدائن.' : 'Please enter payer name or select credit account.');
+    if (chequeType === 'other' && !payerName.trim()) {
+      setValidationError(isAr ? 'يرجى كتابة اسم الجهة المسددة / الساحب.' : 'Please enter payer name.');
       return;
     }
 
-    // Validate rows
-    for (let i = 0; i < chequeRows.length; i++) {
-      const r = chequeRows[i];
-      if (!r.cheque_number.trim()) {
-        setValidationError(isAr ? `يرجى إدخال رقم الشيك في السطر رقم (${i + 1}).` : `Cheque number is required at row ${i + 1}.`);
-        return;
-      }
-      const val = parseFloat(r.amount);
-      if (!val || val <= 0) {
-        setValidationError(isAr ? `مبلغ الشيك في السطر رقم (${i + 1}) غير صحيح.` : `Invalid cheque amount at row ${i + 1}.`);
-        return;
-      }
-      if (!r.due_date) {
-        setValidationError(isAr ? `تاريخ استحقاق الشيك في السطر رقم (${i + 1}) مطلوب.` : `Due date is required at row ${i + 1}.`);
-        return;
-      }
+    const invalidCheque = chequeRows.find(r => !r.cheque_number.trim() || !(parseFloat(r.amount) > 0));
+    if (invalidCheque) {
+      setValidationError(isAr ? 'يرجى إدخال رقم ومبلغ صحيح لكل شيك في الجدول.' : 'Please enter valid cheque number and amount for all rows.');
+      return;
     }
 
     setLoading(true);
     try {
       const selectedCustomer = customers.find(c => c.id === customerId);
-      const selectedDebitAccount = accounts.find(a => a.id === debitAccountId);
-      const selectedCreditAccount = accounts.find(a => a.id === creditAccountId);
-
-      // Active settlements
-      const activeSettlements = settlementRows
-        .filter(s => s.settled_amount > 0)
-        .map(s => ({
-          invoice_id: s.invoice_id,
-          invoice_number: s.invoice_number,
-          settled_amount: s.settled_amount
-        }));
+      const selectedDebitAcc = notesReceivableAccounts.find(a => a.id === debitAccountId);
+      const selectedCreditAcc = accounts.find(a => a.id === creditAccountId);
 
       const res = await receivedChequeService.receiveCheques({
         receipt_number: receiptNumber,
         cheque_type: chequeType,
         customer_id: customerId || undefined,
-        customer_name: selectedCustomer?.name || payerName || undefined,
+        customer_name: selectedCustomer?.name || undefined,
         receive_date: receiveDate,
+        currency,
+        exchange_rate: numRate,
         debit_account_id: debitAccountId || undefined,
-        debit_account_name: selectedDebitAccount?.name || undefined,
-        credit_account_id: creditAccountId || selectedCustomer?.account_id || undefined,
-        credit_account_name: selectedCreditAccount?.name || selectedCustomer?.account_name || undefined,
-        purpose: purpose || (isAr ? `استلام شيكات حافظة ${receiptNumber}` : `Received cheques ${receiptNumber}`),
+        debit_account_name: selectedDebitAcc?.name || undefined,
+        credit_account_id: creditAccountId || undefined,
+        credit_account_name: selectedCreditAcc?.name || undefined,
+        purpose: purpose || undefined,
         notes: notes || undefined,
-        attachments: attachments,
-        settlement_details: activeSettlements,
+        attachments,
+        settlement_details: settlementRows.filter(r => r.settled_amount > 0),
         cheques: chequeRows.map(r => ({
           cheque_number: r.cheque_number.trim(),
-          amount: parseFloat(r.amount),
+          amount: parseFloat(r.amount) || 0,
           due_date: r.due_date,
           is_crossed: r.is_crossed,
           is_not_negotiable: r.is_not_negotiable,
@@ -348,92 +417,67 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
     : "fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto";
 
   const contentBox = (
-    <div className={inline ? "w-full" : "bg-white dark:bg-slate-900 w-full max-w-5xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 my-8 overflow-hidden flex flex-col max-h-[92vh]"} dir={dir}>
+    <div className={inline ? "w-full" : "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-5xl overflow-hidden shadow-2xl p-4 sm:p-6 max-h-[90vh] overflow-y-auto"} dir={dir}>
       
-      {/* Top Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+      {/* Header bar */}
+      <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 mb-5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-teal-600 text-white flex items-center justify-center shadow-md shadow-teal-500/20">
-            <CheckCircle2 className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-lg shadow-md shadow-blue-500/20">
+            📥
           </div>
           <div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
               {chequeType === 'customer' 
-                ? (isAr ? 'استلام شيكات من عميل' : 'Receive Cheques from Customer')
-                : (isAr ? 'استلام شيك (جهات أخرى / أوراق قبض عامة)' : 'Receive General Cheque')}
+                ? (isAr ? 'حافظة استلام شيكات من عميل' : 'Receive Customer Cheques')
+                : (isAr ? 'حافظة استلام شيك (أوراق قبض أخرى)' : 'Receive Other Cheque')}
             </h2>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              {isAr ? 'توثيق الحافظة، بيانات الشيكات المسحوبة، وتسويات مديونية العميل' : 'Document receipt, drawee cheques, and customer settlements'}
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {chequeType === 'customer'
+                ? (isAr ? 'استلام شيكات متعددة، تسوية فواتير المبيعات، وإثبات قيود أوراق القبض' : 'Multi-cheque receipt from customer with invoice settlements')
+                : (isAr ? 'استلام شيكات من جهات أخرى أو إيرادات متنوعة' : 'Receive cheques from non-customer entities')}
             </p>
           </div>
         </div>
 
-        {/* Cheque Type Toggle */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center p-1 bg-slate-200/70 dark:bg-slate-800 rounded-xl">
-            <button
-              type="button"
-              onClick={() => setChequeType('customer')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                chequeType === 'customer'
-                  ? 'bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-400 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-            >
-              <User className="w-3.5 h-3.5" />
-              <span>{isAr ? 'شيكات عميل' : 'Customer'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setChequeType('other')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                chequeType === 'other'
-                  ? 'bg-white dark:bg-slate-900 text-blue-700 dark:text-blue-400 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-            >
-              <Building2 className="w-3.5 h-3.5" />
-              <span>{isAr ? 'جهات أخرى' : 'Other Parties'}</span>
-            </button>
-          </div>
-
-          {!inline && (
-            <button
-              onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          )}
-        </div>
+        {!inline && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
-      {/* Main Form Body */}
-      <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
-        
-        {validationError && (
-          <div className="flex items-center gap-2 p-3 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 text-xs font-semibold rounded-xl border border-rose-200 dark:border-rose-800/40">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{validationError}</span>
-          </div>
-        )}
+      {validationError && (
+        <div className="mb-4 p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 flex items-center gap-2.5 text-xs text-rose-700 dark:text-rose-300">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{validationError}</span>
+        </div>
+      )}
 
-        {/* Section 1: Basic Information */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-xl bg-slate-50/70 dark:bg-slate-800/30 border border-slate-200/70 dark:border-slate-800">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        
+        {/* Section 1: Basic Header Information Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-2xl bg-slate-50/75 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
           
-          {/* Automatic Receipt Number */}
+          {/* Receipt / Portfolio Number */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              {isAr ? 'رقم الحافظة / الإيصال' : 'Receipt No.'}
+              {isAr ? 'رقم الحافظة / الإيصال' : 'Receipt #'}
             </label>
             <div className="relative">
               <input
                 type="text"
                 value={receiptNumber}
-                readOnly
-                className="w-full bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-white text-xs font-mono font-bold px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 select-all"
+                onChange={e => setReceiptNumber(e.target.value)}
+                placeholder="RCV-YYYY-MM-000001"
+                className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-mono font-bold px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
               />
-              <span className="absolute left-2.5 top-2 text-[10px] text-slate-400 font-semibold uppercase">Auto</span>
+              <span className={`absolute ${isAr ? 'left-2.5' : 'right-2.5'} top-2 text-[10px] px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/50 text-blue-600 font-bold`}>
+                AUTO
+              </span>
             </div>
           </div>
 
@@ -447,11 +491,11 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
               value={receiveDate}
               onChange={e => setReceiveDate(e.target.value)}
               required
-              className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-semibold px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-teal-500 outline-none"
+              className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-mono font-semibold px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
 
-          {/* Customer / Payer */}
+          {/* Customer (if customer) OR Payer (if other) */}
           {chequeType === 'customer' ? (
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
@@ -461,12 +505,12 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
                 value={customerId}
                 onChange={e => setCustomerId(e.target.value)}
                 required
-                className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-semibold px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-teal-500 outline-none"
+                className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="">{isAr ? '-- اختر العميل --' : '-- Select Customer --'}</option>
                 {customers.map(c => (
                   <option key={c.id} value={c.id}>
-                    {c.name} {c.code ? `(${c.code})` : ''}
+                    {c.code ? `${c.code} - ` : ''}{c.name}
                   </option>
                 ))}
               </select>
@@ -482,12 +526,12 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
                 onChange={e => setPayerName(e.target.value)}
                 placeholder={isAr ? 'اسم الجهة أو الشخص' : 'Payer Name'}
                 required
-                className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-semibold px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
               />
             </div>
           )}
 
-          {/* Debit Account (أوراق قبض من الدليل القائم) */}
+          {/* Notes Receivable Account */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
               {isAr ? 'حساب أوراق القبض' : 'Notes Receivable Account'}
@@ -495,13 +539,63 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
             <select
               value={debitAccountId}
               onChange={e => setDebitAccountId(e.target.value)}
-              className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-semibold px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-teal-500 outline-none"
+              className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
             >
               <option value="">{isAr ? '-- الحساب الافتراضي لأوراق القبض --' : '-- Default Notes Receivable --'}</option>
               {notesReceivableAccounts.map(a => (
                 <option key={a.id} value={a.id}>{a.code ? `${a.code} - ` : ''}{a.name}</option>
               ))}
             </select>
+          </div>
+
+          {/* Currency Selector (Requirement 1) */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1">
+                <Coins className="w-3.5 h-3.5 text-blue-600" />
+                {isAr ? 'عملة الشيكات' : 'Currency'}
+              </span>
+              {isForeign && (
+                <span className="text-[10px] text-blue-600 font-bold bg-blue-50 dark:bg-blue-950/50 px-1.5 py-0.5 rounded">
+                  {isAr ? 'عملة أجنبية' : 'Foreign'}
+                </span>
+              )}
+            </label>
+            <select
+              value={currency}
+              onChange={e => handleCurrencyChange(e.target.value)}
+              className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-bold px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+            >
+              {availableCurrencies.map(c => (
+                <option key={c.code} value={c.code}>
+                  {c.code} - {c.nameAr} ({c.symbol})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Exchange Rate (Requirement 1) */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+              <span>{isAr ? 'سعر الصرف (مقابل ج.م)' : 'Exchange Rate'}</span>
+              {loadingExchangeRate && <RefreshCw className="w-3 h-3 animate-spin text-blue-500" />}
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                step="0.0001"
+                min="0.0001"
+                value={exchangeRate}
+                onChange={e => setExchangeRate(e.target.value)}
+                disabled={currency === 'EGP'}
+                className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-mono font-bold px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 dark:disabled:bg-slate-800/60 disabled:text-slate-400"
+              />
+              {isForeign && (
+                <span className={`absolute ${isAr ? 'left-3' : 'right-3'} top-2 text-[10px] text-slate-400 font-mono`}>
+                  1 {currency} = {exchangeRate} ج.م
+                </span>
+              )}
+            </div>
           </div>
 
           {/* General Credit Account (for other cheques) */}
@@ -513,7 +607,7 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
               <select
                 value={creditAccountId}
                 onChange={e => setCreditAccountId(e.target.value)}
-                className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-semibold px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="">{isAr ? '-- اختر الحساب الدائن من الشجرة القائمة --' : '-- Select Existing Credit Account --'}</option>
                 {generalCreditAccounts.map(a => (
@@ -524,7 +618,7 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
           )}
 
           {/* Purpose / Statement */}
-          <div className={chequeType === 'other' ? "sm:col-span-2" : "sm:col-span-2 lg:col-span-4"}>
+          <div className={chequeType === 'other' ? "sm:col-span-2" : "sm:col-span-2"}>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
               {isAr ? 'بيان / غرض الاستلام' : 'Purpose / Statement'}
             </label>
@@ -533,16 +627,16 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
               value={purpose}
               onChange={e => setPurpose(e.target.value)}
               placeholder={isAr ? 'اكتب بياناً مختصراً عن الغرض من استلام الشيكات...' : 'Brief purpose of cheque receipt...'}
-              className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-semibold px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-teal-500 outline-none"
+              className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
         </div>
 
-        {/* Section 2: Table of Received Cheques */}
+        {/* Section 2: Table of Received Cheques (Requirement 2 & 3) */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-teal-500"></span>
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                 {isAr ? 'جدول بيانات الشيكات المستلمة' : 'Received Cheques Table'}
               </h3>
@@ -554,135 +648,181 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
             <button
               type="button"
               onClick={handleAddChequeRow}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800/50 hover:bg-teal-100 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 hover:bg-blue-100 transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>{isAr ? 'إضافة شيك آخر' : 'Add Another Cheque'}</span>
             </button>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-bold">
+          {/* Clean table: No boxes around text, seamless grid with Bank Logo */}
+          <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+            <table className="w-full text-right text-xs border-collapse">
+              <thead className="bg-slate-50 dark:bg-slate-800/70 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-bold">
                 <tr>
-                  <th className="p-3 w-12 text-center">#</th>
-                  <th className="p-3 min-w-[150px]">{isAr ? 'رقم الشيك' : 'Cheque No.'} <span className="text-rose-500">*</span></th>
-                  <th className="p-3 min-w-[140px]">{isAr ? 'مبلغ الشيك (ج.م)' : 'Amount (EGP)'} <span className="text-rose-500">*</span></th>
-                  <th className="p-3 min-w-[140px]">{isAr ? 'تاريخ الاستحقاق' : 'Due Date'} <span className="text-rose-500">*</span></th>
-                  <th className="p-3 min-w-[180px]">{isAr ? 'البنك المسحوب عليه' : 'Drawee Bank'}</th>
-                  <th className="p-3 w-24 text-center">{isAr ? 'مسطر' : 'Crossed'}</th>
-                  <th className="p-3 w-28 text-center">{isAr ? 'غير قابل للتداول' : 'Not Negotiable'}</th>
-                  <th className="p-3 w-14 text-center">{isAr ? 'إجراء' : 'Action'}</th>
+                  <th className="py-3 px-3 w-12 text-center">#</th>
+                  <th className="py-3 px-3 min-w-[150px]">{isAr ? 'رقم الشيك' : 'Cheque No.'} <span className="text-rose-500">*</span></th>
+                  <th className="py-3 px-3 min-w-[140px] text-left">
+                    {isAr ? `مبلغ الشيك (${selectedCurrency.symbol})` : `Amount (${selectedCurrency.symbol})`} <span className="text-rose-500">*</span>
+                  </th>
+                  <th className="py-3 px-3 min-w-[140px]">{isAr ? 'تاريخ الاستحقاق' : 'Due Date'} <span className="text-rose-500">*</span></th>
+                  <th className="py-3 px-3 w-16 text-center">{isAr ? 'لوجو' : 'Logo'}</th>
+                  <th className="py-3 px-3 min-w-[200px]">{isAr ? 'البنك المسحوب عليه' : 'Drawee Bank'}</th>
+                  <th className="py-3 px-3 w-20 text-center">{isAr ? 'مسطر' : 'Crossed'}</th>
+                  <th className="py-3 px-3 w-24 text-center">{isAr ? 'غير قابل للتداول' : 'Not Negotiable'}</th>
+                  <th className="py-3 px-3 w-14 text-center">{isAr ? 'إجراء' : 'Action'}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {chequeRows.map((row, idx) => (
-                  <tr key={row.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                    <td className="p-3 text-center text-slate-400 font-bold">{idx + 1}</td>
-                    
-                    {/* Cheque Number */}
-                    <td className="p-2">
-                      <input
-                        type="text"
-                        value={row.cheque_number}
-                        onChange={e => handleUpdateChequeRow(row.id, 'cheque_number', e.target.value)}
-                        placeholder="000123456"
-                        required
-                        className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-mono font-bold focus:bg-white focus:ring-1 focus:ring-teal-500 outline-none"
-                      />
-                    </td>
+                {chequeRows.map((row, idx) => {
+                  const matchedBank = EGYPTIAN_BANKS_DATA.find(b => 
+                    b.nameAr === row.bank_name || 
+                    b.nameEn === row.bank_name ||
+                    (row.bank_name && b.nameAr && row.bank_name.includes(b.nameAr)) ||
+                    (row.bank_name && b.nameAr && b.nameAr.includes(row.bank_name))
+                  );
 
-                    {/* Amount */}
-                    <td className="p-2">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0.01"
-                        value={row.amount}
-                        onChange={e => handleUpdateChequeRow(row.id, 'amount', e.target.value)}
-                        placeholder="0.00"
-                        required
-                        className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-mono font-bold focus:bg-white focus:ring-1 focus:ring-teal-500 outline-none text-left"
-                      />
-                    </td>
+                  return (
+                    <tr key={row.id} className="hover:bg-blue-50/20 dark:hover:bg-slate-800/40 transition-colors">
+                      <td className="py-2 px-3 text-center text-slate-400 font-mono font-bold">{idx + 1}</td>
+                      
+                      {/* Cheque Number - Plain borderless cell input */}
+                      <td className="py-1 px-2 border-r border-slate-100 dark:border-slate-800/60">
+                        <input
+                          type="text"
+                          value={row.cheque_number}
+                          onChange={e => handleUpdateChequeRow(row.id, 'cheque_number', e.target.value)}
+                          placeholder="000123456"
+                          required
+                          className="w-full bg-transparent border-0 px-2 py-1.5 text-xs font-mono font-bold text-slate-900 dark:text-white placeholder:text-slate-300 placeholder:font-normal focus:bg-blue-50/50 dark:focus:bg-blue-900/20 focus:outline-none rounded transition-colors"
+                        />
+                      </td>
 
-                    {/* Due Date */}
-                    <td className="p-2">
-                      <input
-                        type="date"
-                        value={row.due_date}
-                        onChange={e => handleUpdateChequeRow(row.id, 'due_date', e.target.value)}
-                        required
-                        className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-semibold focus:bg-white focus:ring-1 focus:ring-teal-500 outline-none"
-                      />
-                    </td>
+                      {/* Amount - Plain borderless cell input */}
+                      <td className="py-1 px-2 border-r border-slate-100 dark:border-slate-800/60">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          value={row.amount}
+                          onChange={e => handleUpdateChequeRow(row.id, 'amount', e.target.value)}
+                          placeholder="0.00"
+                          required
+                          className="w-full bg-transparent border-0 px-2 py-1.5 text-xs font-mono font-black text-slate-900 dark:text-white text-left placeholder:text-slate-300 focus:bg-blue-50/50 dark:focus:bg-blue-900/20 focus:outline-none rounded transition-colors"
+                        />
+                      </td>
 
-                    {/* Drawee Bank */}
-                    <td className="p-2">
-                      <select
-                        value={row.bank_name}
-                        onChange={e => handleUpdateChequeRow(row.id, 'bank_name', e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-semibold focus:bg-white focus:ring-1 focus:ring-teal-500 outline-none"
-                      >
-                        {EGYPTIAN_BANKS_DATA.map(b => (
-                          <option key={b.code} value={b.nameAr}>{b.nameAr}</option>
-                        ))}
-                      </select>
-                    </td>
+                      {/* Due Date - Plain borderless cell input */}
+                      <td className="py-1 px-2 border-r border-slate-100 dark:border-slate-800/60">
+                        <input
+                          type="date"
+                          value={row.due_date}
+                          onChange={e => handleUpdateChequeRow(row.id, 'due_date', e.target.value)}
+                          required
+                          className="w-full bg-transparent border-0 px-2 py-1.5 text-xs font-mono font-semibold text-slate-800 dark:text-slate-200 focus:bg-blue-50/50 dark:focus:bg-blue-900/20 focus:outline-none rounded transition-colors"
+                        />
+                      </td>
 
-                    {/* Crossed */}
-                    <td className="p-2 text-center">
-                      <input
-                        type="checkbox"
-                        checked={row.is_crossed}
-                        onChange={e => handleUpdateChequeRow(row.id, 'is_crossed', e.target.checked)}
-                        className="w-4 h-4 text-teal-600 rounded cursor-pointer accent-teal-600"
-                      />
-                    </td>
+                      {/* Bank Logo Column (Requirement 3) */}
+                      <td className="py-1 px-2 text-center border-r border-slate-100 dark:border-slate-800/60">
+                        {matchedBank ? (
+                          <BankLogoBadge bank={matchedBank} size="sm" className="mx-auto shadow-xs" />
+                        ) : (
+                          <div className="w-7 h-7 mx-auto rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs">
+                            🏦
+                          </div>
+                        )}
+                      </td>
 
-                    {/* Not Negotiable */}
-                    <td className="p-2 text-center">
-                      <input
-                        type="checkbox"
-                        checked={row.is_not_negotiable}
-                        onChange={e => handleUpdateChequeRow(row.id, 'is_not_negotiable', e.target.checked)}
-                        className="w-4 h-4 text-teal-600 rounded cursor-pointer accent-teal-600"
-                      />
-                    </td>
+                      {/* Drawee Bank - Clean borderless dropdown */}
+                      <td className="py-1 px-2 border-r border-slate-100 dark:border-slate-800/60">
+                        <select
+                          value={row.bank_name}
+                          onChange={e => handleUpdateChequeRow(row.id, 'bank_name', e.target.value)}
+                          className="w-full bg-transparent border-0 px-2 py-1.5 text-xs font-bold text-slate-900 dark:text-white focus:bg-blue-50/50 dark:focus:bg-blue-900/20 focus:outline-none rounded cursor-pointer transition-colors"
+                        >
+                          {EGYPTIAN_BANKS_DATA.map(b => (
+                            <option key={b.code} value={b.nameAr} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white py-1">
+                              {b.nameAr}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
 
-                    {/* Delete Row Action */}
-                    <td className="p-2 text-center">
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveChequeRow(row.id)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      {/* Crossed */}
+                      <td className="py-1 px-2 text-center border-r border-slate-100 dark:border-slate-800/60">
+                        <input
+                          type="checkbox"
+                          checked={row.is_crossed}
+                          onChange={e => handleUpdateChequeRow(row.id, 'is_crossed', e.target.checked)}
+                          className="w-4 h-4 text-blue-600 rounded cursor-pointer accent-blue-600"
+                        />
+                      </td>
+
+                      {/* Not Negotiable */}
+                      <td className="py-1 px-2 text-center border-r border-slate-100 dark:border-slate-800/60">
+                        <input
+                          type="checkbox"
+                          checked={row.is_not_negotiable}
+                          onChange={e => handleUpdateChequeRow(row.id, 'is_not_negotiable', e.target.checked)}
+                          className="w-4 h-4 text-blue-600 rounded cursor-pointer accent-blue-600"
+                        />
+                      </td>
+
+                      {/* Delete Row Action */}
+                      <td className="py-1 px-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveChequeRow(row.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors cursor-pointer"
+                          title={isAr ? 'حذف الشيك' : 'Delete'}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
-          {/* Total Amount & Tafqeet Bar */}
-          <div className="p-4 rounded-xl bg-teal-50/50 dark:bg-teal-950/20 border border-teal-200/80 dark:border-teal-900/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div>
-              <span className="text-[11px] font-bold text-teal-700 dark:text-teal-400 block mb-0.5">
+          {/* Total Amount, Tafqeet & System Currency Equivalent Bar */}
+          <div className="p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block">
                 {isAr ? 'إجمالي مبالغ الشيكات كتابةً (تفقيط)' : 'Total in Words'}
               </span>
-              <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                {totalChequesAmount > 0 ? tafqeetAr(totalChequesAmount) : (isAr ? 'صفر جنيه مصري لا غير' : 'Zero')}
+              <p className="text-xs font-bold text-slate-900 dark:text-white">
+                {totalChequesAmount > 0 ? tafqeetAr(totalChequesAmount, currency) : (isAr ? 'صفر' : 'Zero')}
               </p>
+              {isForeign && (
+                <p className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5">
+                  ({isAr ? 'يعادل بالجنيه المصري:' : 'EGP Equivalent:'} {tafqeetAr(totalEquivalentAmount, 'EGP')})
+                </p>
+              )}
             </div>
-            <div className="text-right">
-              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block mb-0.5">
-                {isAr ? 'إجمالي قيمة الشيكات' : 'Total Cheques Amount'}
-              </span>
-              <span className="text-base font-black text-teal-700 dark:text-teal-300 font-mono">
-                {formatNumber(totalChequesAmount)} ج.م
-              </span>
+
+            <div className="flex flex-wrap items-center gap-5 text-right">
+              <div>
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block mb-0.5">
+                  {isAr ? 'إجمالي قيمة الشيكات' : 'Total Cheques'}
+                </span>
+                <span className="text-lg font-black text-slate-900 dark:text-white font-mono">
+                  {formatNumber(totalChequesAmount)} {selectedCurrency.symbol}
+                </span>
+              </div>
+
+              {isForeign && (
+                <div className="pr-4 border-r border-slate-200 dark:border-slate-700">
+                  <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 block mb-0.5">
+                    {isAr ? 'المعادل بعملة النظام (ج.م)' : 'System Equivalent (EGP)'}
+                  </span>
+                  <span className="text-lg font-black text-blue-600 dark:text-blue-400 font-mono">
+                    {formatNumber(totalEquivalentAmount)} ج.م
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -705,7 +845,7 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
                 <button
                   type="button"
                   onClick={handleAutoDistribute}
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition-colors cursor-pointer"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   <span>{isAr ? 'توزيع تلقائي للمبلغ' : 'Auto Distribute'}</span>
@@ -718,27 +858,27 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
                 {isAr ? 'لا توجد فواتير مبيعات معلقة أو متبقيات مديونية لهذا العميل حالياً.' : 'No open sales invoices for this customer.'}
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+              <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
                 <table className="w-full text-right text-xs">
                   <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-bold">
                     <tr>
                       <th className="p-3 w-12 text-center">#</th>
-                      <th className="p-3">{isAr ? 'رقم الفاتورة / الحركة' : 'Invoice / Ref'}</th>
-                      <th className="p-3">{isAr ? 'التاريخ' : 'Date'}</th>
-                      <th className="p-3">{isAr ? 'إجمالي الفاتورة' : 'Total Amount'}</th>
-                      <th className="p-3">{isAr ? 'المبلغ المتبقي' : 'Open Balance'}</th>
-                      <th className="p-3 min-w-[150px]">{isAr ? 'المسدد بالشيكات' : 'Settled by Cheques'}</th>
+                      <th className="p-3">{isAr ? 'رقم الفاتورة' : 'Invoice #'}</th>
+                      <th className="p-3">{isAr ? 'تاريخ الفاتورة' : 'Invoice Date'}</th>
+                      <th className="p-3 text-left">{isAr ? 'إجمالي الفاتورة' : 'Total'}</th>
+                      <th className="p-3 text-left">{isAr ? 'المتبقي المستحق' : 'Remaining'}</th>
+                      <th className="p-3 min-w-[140px] text-left">{isAr ? 'المسدد بالشيكات' : 'To Settle'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {settlementRows.map((row, idx) => (
                       <tr key={row.invoice_id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                         <td className="p-3 text-center text-slate-400 font-bold">{idx + 1}</td>
-                        <td className="p-3 font-mono font-bold text-slate-900 dark:text-white">{row.invoice_number}</td>
-                        <td className="p-3 text-slate-600 dark:text-slate-400">{row.invoice_date?.slice(0, 10) || '-'}</td>
-                        <td className="p-3 font-mono text-slate-600 dark:text-slate-300">{formatNumber(row.total_amount)}</td>
-                        <td className="p-3 font-mono font-bold text-rose-600 dark:text-rose-400">{formatNumber(row.open_amount)}</td>
-                        <td className="p-2">
+                        <td className="p-3 font-mono font-bold text-blue-600 dark:text-blue-400">{row.invoice_number}</td>
+                        <td className="p-3 font-mono text-slate-600 dark:text-slate-300">{row.invoice_date ? String(row.invoice_date).slice(0, 10) : '-'}</td>
+                        <td className="p-3 font-mono text-slate-800 dark:text-slate-200 text-left">{formatNumber(row.total_amount)} {selectedCurrency.symbol}</td>
+                        <td className="p-3 font-mono font-bold text-rose-600 dark:text-rose-400 text-left">{formatNumber(row.open_amount)} {selectedCurrency.symbol}</td>
+                        <td className="p-2 border-r border-slate-100 dark:border-slate-800/60">
                           <input
                             type="number"
                             step="0.01"
@@ -750,7 +890,7 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
                               setSettlementRows(prev => prev.map(r => r.invoice_id === row.invoice_id ? { ...r, settled_amount: Math.min(row.open_amount, val) } : r));
                             }}
                             placeholder="0.00"
-                            className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-mono font-bold focus:bg-white focus:ring-1 focus:ring-blue-500 outline-none text-left"
+                            className="w-full bg-transparent border-0 px-2 py-1.5 text-xs font-mono font-bold text-slate-900 dark:text-white focus:bg-blue-50/50 dark:focus:bg-blue-900/20 focus:outline-none rounded transition-colors text-left"
                           />
                         </td>
                       </tr>
@@ -762,13 +902,13 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
 
             {/* Settlements Summary */}
             {settlementRows.length > 0 && (
-              <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800">
+              <div className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-2xl text-xs font-bold border border-slate-200 dark:border-slate-800">
                 <div className="flex items-center gap-4">
                   <span className="text-slate-600 dark:text-slate-400">
-                    {isAr ? 'المسدد من الفواتير:' : 'Total Settled:'} <strong className="text-slate-900 dark:text-white font-mono">{formatNumber(totalSettledAmount)} ج.م</strong>
+                    {isAr ? 'المسدد من الفواتير:' : 'Total Settled:'} <strong className="text-slate-900 dark:text-white font-mono">{formatNumber(settlementRows.reduce((s, r) => s + r.settled_amount, 0))} {selectedCurrency.symbol}</strong>
                   </span>
                   <span className="text-slate-600 dark:text-slate-400">
-                    {isAr ? 'المتبقي كدفعة مقدمة / رصيد:' : 'Remaining Advance:'} <strong className="text-teal-600 dark:text-teal-400 font-mono">{formatNumber(remainingToSettle)} ج.م</strong>
+                    {isAr ? 'المتبقي كدفعة مقدمة / رصيد:' : 'Remaining Advance:'} <strong className="text-blue-600 dark:text-blue-400 font-mono">{formatNumber(Math.max(0, totalChequesAmount - settlementRows.reduce((s, r) => s + r.settled_amount, 0)))} {selectedCurrency.symbol}</strong>
                   </span>
                 </div>
               </div>
@@ -788,7 +928,7 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
               onChange={e => setNotes(e.target.value)}
               rows={3}
               placeholder={isAr ? 'أي تعليمات أو ملاحظات إضافية بخصوص الشيكات...' : 'Any additional instructions...'}
-              className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-medium p-3 rounded-xl border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-teal-500 outline-none resize-none"
+              className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-medium p-3 rounded-2xl border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
             />
           </div>
 
@@ -797,9 +937,9 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
               {isAr ? 'إرفاق صور الشيكات أو المستندات' : 'Attach Cheque Images / Files'}
             </label>
-            <div className="p-3 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-800/20 text-center">
-              <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 transition-colors shadow-sm">
-                <Paperclip className="w-3.5 h-3.5 text-teal-600" />
+            <div className="p-3 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl bg-slate-50/50 dark:bg-slate-800/20 text-center">
+              <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 transition-colors shadow-sm">
+                <Paperclip className="w-3.5 h-3.5 text-blue-600" />
                 <span>{isAr ? 'اختر ملفات الشيكات' : 'Choose Files'}</span>
                 <input
                   type="file"
@@ -813,7 +953,7 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
               {attachments.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {attachments.map(att => (
-                    <div key={att.id} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-teal-50 dark:bg-teal-900/30 text-teal-800 dark:text-teal-300 text-[11px] font-bold border border-teal-200 dark:border-teal-800">
+                    <div key={att.id} className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 text-[11px] font-bold border border-blue-200 dark:border-blue-800">
                       <span className="max-w-[120px] truncate">{att.name}</span>
                       <button
                         type="button"
@@ -845,7 +985,7 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
           <button
             type="submit"
             disabled={loading}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 shadow-md shadow-teal-500/20 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50"
+            className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50"
           >
             {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             <span>{isAr ? 'حفظ واستلام الشيكات' : 'Save & Receive Cheques'}</span>

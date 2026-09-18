@@ -19,6 +19,7 @@ import { ReceivedChequeReturnModal } from '../components/received-cheques/Receiv
 import { ReceivedChequeCancelModal } from '../components/received-cheques/ReceivedChequeCancelModal';
 import { ReceivedChequesDashboardTab } from '../components/received-cheques/ReceivedChequesDashboardTab';
 import { ReceivedChequesReportsTab } from '../components/received-cheques/ReceivedChequesReportsTab';
+import { EGYPTIAN_BANKS_DATA, BankLogoBadge } from '../data/egyptianBanks';
 
 interface ReceivedChequesProps {
   initialTab?: 'dashboard' | 'all' | 'receive_customer' | 'receive_other' | 'due' | 'reports';
@@ -503,7 +504,23 @@ export const ReceivedCheques: React.FC<ReceivedChequesProps> = ({ initialTab = '
                           {cheque.debit_account_name || (isAr ? 'أوراق قبض' : 'Notes Receivable')}
                         </td>
                         <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
-                          {cheque.drawee_bank || '-'}
+                          {(() => {
+                            const matchedBank = EGYPTIAN_BANKS_DATA.find(b => 
+                              b.nameAr === cheque.drawee_bank || 
+                              b.nameEn.toLowerCase() === (cheque.drawee_bank || '').toLowerCase() ||
+                              (cheque.drawee_bank && b.nameAr && (cheque.drawee_bank.includes(b.nameAr) || b.nameAr.includes(cheque.drawee_bank)))
+                            );
+                            return (
+                              <div className="flex items-center gap-2">
+                                {matchedBank ? (
+                                  <BankLogoBadge bank={matchedBank} size="sm" />
+                                ) : (
+                                  <span className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] text-slate-400">🏦</span>
+                                )}
+                                <span>{cheque.drawee_bank || '-'}</span>
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-3 py-2 font-mono font-black text-slate-900 dark:text-white">
                           <div>
