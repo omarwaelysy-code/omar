@@ -1063,9 +1063,10 @@ async function getTransactionDate(moduleName: string, body: any, id?: string): P
       }
     }
 
-    if (!rawDate && id) {
+    if (!rawDate && id && isUUID(id)) {
       try {
-        const res = await pool.query(`SELECT * FROM "${moduleName}" WHERE id = $1`, [id]);
+        const tableName = moduleName.replace(/-/g, '_');
+        const res = await pool.query(`SELECT * FROM "${tableName}" WHERE id = $1`, [id]);
         if (res.rows.length > 0) {
           const row = res.rows[0];
           if (row.date) {
@@ -1075,7 +1076,7 @@ async function getTransactionDate(moduleName: string, body: any, id?: string): P
           } else if (row.timestamp) {
             rawDate = row.timestamp;
           } else {
-            const relation = parentKeys[moduleName];
+            const relation = parentKeys[tableName] || parentKeys[moduleName];
             if (relation && row[relation[0]]) {
               const parentRes = await pool.query(`SELECT date FROM "${relation[1]}" WHERE id = $1`, [row[relation[0]]]);
               if (parentRes.rows.length > 0 && parentRes.rows[0].date) {

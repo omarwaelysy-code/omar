@@ -455,11 +455,14 @@ fixedAssetsRouter.get(['/fixed-assets', '/fixed_assets'], authenticateToken, asy
   }
 });
 
-fixedAssetsRouter.get(['/fixed-assets/:id', '/fixed_assets/:id'], authenticateToken, async (req: AuthRequest, res: any) => {
+fixedAssetsRouter.get(['/fixed-assets/:id', '/fixed_assets/:id'], authenticateToken, async (req: AuthRequest, res: any, next: any) => {
   try {
+    const { id } = req.params;
+    if (['depreciation', 'reports', 'categories', 'dashboard', 'next-number'].includes(id)) {
+      return next();
+    }
     const companyId = getAuthenticatedCompanyId(req);
     if (!companyId) return sendError(res, 401, 'Unauthorized');
-    const { id } = req.params;
 
     const { rows } = await pool.query(`
       SELECT 
