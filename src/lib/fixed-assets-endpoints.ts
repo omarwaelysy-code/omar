@@ -26,14 +26,19 @@ async function logAudit(poolClient: any, data: {
   metadata?: any;
 }) {
   try {
-    const id = uuidv4();
     await poolClient.query(`
       INSERT INTO activity_logs (
-        id, company_id, user_id, username, action, entity, entity_id, description, ip_address, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
+        company_id, user_id, username, action, details, entity, document_id, ip_address, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, CURRENT_TIMESTAMP)
     `, [
-      id, data.company_id, data.user_id || null, data.username || 'system',
-      data.action, data.entity_type, data.entity_id, data.details, data.ip_address || null
+      data.company_id,
+      data.user_id || null,
+      data.username || 'system',
+      data.action,
+      data.details,
+      JSON.stringify([data.entity_type]),
+      data.entity_id,
+      data.ip_address || null
     ]);
   } catch (e) {
     console.error('Audit log failed:', e);
