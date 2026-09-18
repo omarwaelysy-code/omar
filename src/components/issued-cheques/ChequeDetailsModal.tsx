@@ -465,6 +465,8 @@ export const ChequeDetailsModal: React.FC<ChequeDetailsModalProps> = ({
               {isAr ? 'إغلاق' : 'Close'}
             </button>
           </div>
+        </div>
+
       </div>
 
       {/* Attachment Preview Modal */}
