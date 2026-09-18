@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  X, CheckCircle2, AlertTriangle, User, DollarSign, Tool, 
+  X, CheckCircle2, AlertTriangle, User, DollarSign, Wrench, 
   TrendingUp, Printer, ArrowRightLeft, ShieldCheck, AlertCircle 
 } from 'lucide-react';
 import { FixedAsset } from '../../types/fixedAssets';
@@ -417,7 +417,7 @@ export const AssetMaintenanceModal: React.FC<{
       <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <div className="flex items-center gap-2 text-purple-400 font-bold">
-            <Tool className="w-5 h-5" />
+            <Wrench className="w-5 h-5" />
             <h3>تسجيل صيانة للأصل الثابت</h3>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>

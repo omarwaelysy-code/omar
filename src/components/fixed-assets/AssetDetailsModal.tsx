@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, Building2, Calendar, DollarSign, User, Printer, FileText, 
-  Clock, Tool, TrendingUp, AlertTriangle, CheckCircle2, ChevronRight,
+  Clock, Wrench, TrendingUp, AlertTriangle, CheckCircle2, ChevronRight,
   Download, Paperclip, Share2, Layers, Tag
 } from 'lucide-react';
 import { FixedAsset, DepreciationScheduleItem } from '../../types/fixedAssets';
@@ -150,7 +150,7 @@ export const AssetDetailsModal: React.FC<AssetDetailsModalProps> = ({
                     onClick={() => onMaintain(assetData)}
                     className="flex items-center gap-1.5 px-3 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg text-xs font-semibold transition-colors"
                   >
-                    <Tool className="w-3.5 h-3.5" />
+                    <Wrench className="w-3.5 h-3.5" />
                     تسجيل صيانة
                   </button>
                 )}

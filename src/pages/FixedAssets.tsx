@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Building2, Plus, Search, Filter, RefreshCw, Printer, FileSpreadsheet, 
   Calculator, User, DollarSign, Layers, ChevronLeft, ChevronRight,
-  TrendingUp, Tool, AlertTriangle, CheckCircle2, Clock, MoreVertical,
+  TrendingUp, Wrench, AlertTriangle, CheckCircle2, Clock, MoreVertical,
   Eye, Edit3, Trash2, ArrowRightLeft, ShieldCheck, BarChart3, HelpCircle
 } from 'lucide-react';
 import { FixedAsset, AssetCategory, AssetDashboardStats, AssetDepreciationRun } from '../types/fixedAssets';
@@ -365,7 +365,7 @@ export const FixedAssets: React.FC<FixedAssetsProps> = ({ initialTab = 'dashboar
             </div>
 
             <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-4 flex items-center gap-3">
-              <div className="p-2.5 bg-purple-500/10 text-purple-400 rounded-lg"><Tool className="w-5 h-5" /></div>
+              <div className="p-2.5 bg-purple-500/10 text-purple-400 rounded-lg"><Wrench className="w-5 h-5" /></div>
               <div>
                 <span className="text-[11px] text-slate-400 block">أصول تحت الصيانة</span>
                 <strong className="text-lg text-white font-mono">{stats.under_maintenance_count}</strong>
@@ -648,7 +648,7 @@ export const FixedAssets: React.FC<FixedAssetsProps> = ({ initialTab = 'dashboar
                                 className="p-1.5 text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 rounded-lg transition-colors"
                                 title="تسجيل صيانة"
                               >
-                                <Tool className="w-4 h-4" />
+                                <Wrench className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => { setOperationAsset(asset); setIsDisposalModalOpen(true); }}

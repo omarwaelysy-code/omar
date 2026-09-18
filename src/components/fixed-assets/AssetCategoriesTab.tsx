@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit3, Trash2, Tag, Layers, CheckCircle2, XCircle, Search } from 'lucide-react';
+import { Plus, Edit3, Trash2, Tag, Layers, CheckCircle2, XCircle, Search, X } from 'lucide-react';
 import { AssetCategory } from '../../types/fixedAssets';
 import { fixedAssetService } from '../../services/fixedAssetService';
 import { useNotification } from '../../contexts/NotificationContext';
