@@ -2342,9 +2342,7 @@ const modules = [
   'sales_orders', 'sales_order_items', 'purchase_orders', 'purchase_order_items', 'employees',
   'warehouse_transfers', 'warehouse_transfer_items', 'opening_stock_balances', 'opening_stock_items',
   'stock_adjustments', 'stock_adjustment_items', 'templates', 'paper_sizes', 'template_versions', 'print_profiles',
-  'dashboards', 'widgets', 'goods_receipts', 'goods_receipt_items', 'purchase_invoice_goods_receipts',
-  'asset_categories', 'fixed_assets', 'asset_components', 'asset_depreciation_runs', 'asset_depreciation_items',
-  'asset_transfers', 'asset_maintenance', 'asset_revaluations', 'asset_disposals'
+  'dashboards', 'widgets', 'goods_receipts', 'goods_receipt_items', 'purchase_invoice_goods_receipts'
 ];
 
 // --- Flexible Operations Logic ---
