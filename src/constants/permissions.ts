@@ -260,6 +260,9 @@ export const MODULE_PERMISSIONS_META: { [moduleId: string]: { labelAr: string; l
   currencies: { labelAr: 'العملات وأسعار الصرف', labelEn: 'Currencies & Exchange Rates', hasCrud: true },
   departments: { labelAr: 'الإدارات', labelEn: 'Departments', hasCrud: true },
   cost_centers: { labelAr: 'مراكز التكلفة', labelEn: 'Cost Centers', hasCrud: true },
+  operations: { labelAr: 'العمليات', labelEn: 'Operations', hasCrud: true },
+  operation_categories: { labelAr: 'تصنيفات العمليات', labelEn: 'Operation Categories', hasCrud: true },
+  operation_fields: { labelAr: 'حقول البيانات', labelEn: 'Operation Fields', hasCrud: true },
   // Sales
   quotations: { labelAr: 'عروض الأسعار', labelEn: 'Quotations', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy'] },
   sales_orders: { labelAr: 'أوامر البيع', labelEn: 'Sales Orders', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved'] },

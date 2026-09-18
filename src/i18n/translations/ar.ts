@@ -187,7 +187,7 @@ export const ar = {
   'nav.warehouse_transfers': 'تحويل بين المخازن',
   'nav.opening_stock_balances': 'أرصدة أول المدة للمخزون',
   'nav.stock_adjustments': 'تسوية الأصناف',
-  'nav.flexible_operations': 'نظام العمليات',
+  'nav.flexible_operations': 'العمليات',
   'nav.operations': 'العمليات',
   'nav.departments': 'الإدارات والهيكل',
   'nav.cost_centers': 'مراكز التكلفة',

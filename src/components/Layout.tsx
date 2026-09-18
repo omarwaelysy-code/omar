@@ -632,7 +632,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       },
       {
         id: 'flexible_operations',
-        label: t('nav.flexible_operations') || 'نظام العمليات',
+        label: t('nav.flexible_operations') || 'العمليات',
         icon: Layers,
         subItems: [
           { id: 'operations', label: t('nav.operations') || 'العمليات', icon: List },
@@ -762,8 +762,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         'purchases': 'purchases',
         'warehouses_menu': 'inventory',
         'general_ledger': 'accounting',
-        'cash': 'accounting',
-        'flexible_operations': 'flexible_operations'
+        'cash': 'accounting'
       };
       
       filteredByFeatures = navItems.filter(item => {
@@ -779,13 +778,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
     return filteredByFeatures.map(item => {
       // Check if top-level item should be visible
-      const canView = hasPermission(item.id, 'view') || item.id === 'currencies' || item.id === 'templates_menu' || item.id === 'pos_menu' || item.id === 'eta_menu';
+      const canView = hasPermission(item.id, 'view') || item.id === 'currencies' || item.id === 'templates_menu' || item.id === 'pos_menu' || item.id === 'eta_menu' || item.id === 'flexible_operations';
       
       if (item.subItems) {
         const visibleSubItems = (item.subItems as any[]).filter((sub: any) => {
           if (sub.isDivider || sub.isHeader) return true;
           if (sub.id === 'create_issued_cheque' || sub.id === 'create_other_cheque') return hasPermission('issued_cheques', 'create') || hasPermission('issued_cheques', 'view');
-          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking' || sub.id === 'pos_connected_branches' || sub.id === 'eta_dashboard' || sub.id === 'eta_received_invoices' || sub.id === 'eta_detailed_invoices' || sub.id === 'eta_supplier_mapping' || sub.id === 'eta_item_mapping' || sub.id === 'eta_sent_item_mapping' || sub.id === 'eta_tax_types') return true;
+          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking' || sub.id === 'pos_connected_branches' || sub.id === 'eta_dashboard' || sub.id === 'eta_received_invoices' || sub.id === 'eta_detailed_invoices' || sub.id === 'eta_supplier_mapping' || sub.id === 'eta_item_mapping' || sub.id === 'eta_sent_item_mapping' || sub.id === 'eta_tax_types' || sub.id === 'operations' || sub.id === 'operation_categories' || sub.id === 'operation_fields') return true;
           return hasPermission(sub.id, 'view');
         });
         

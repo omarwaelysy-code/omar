@@ -66,7 +66,8 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies 
       'pos': 'نقاط البيع (POS)',
       'reports': 'التقارير المتقدمة',
       'ai': 'الذكاء الاصطناعي',
-      'api': 'الربط البرمجي (API)'
+      'api': 'الربط البرمجي (API)',
+      'flexible_operations': 'العمليات'
     };
     return names[name] || name;
   };

@@ -76,7 +76,8 @@ export class FeatureService {
     // Default features if none explicitly exist
     const defaultFeatures = [
       'inventory', 'sales', 'purchases', 'manufacturing', 
-      'crm', 'hr', 'accounting', 'pos', 'reports', 'ai', 'api'
+      'crm', 'hr', 'accounting', 'pos', 'reports', 'ai', 'api',
+      'flexible_operations'
     ];
 
     const currentFeatures = new Map(rows.map(r => [r.feature_name, r.is_enabled]));
