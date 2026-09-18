@@ -218,7 +218,7 @@ export const ReceivedChequeDetailsModal: React.FC<ReceivedChequeDetailsModalProp
               </p>
               {cheque.cheque_type && (
                 <p className="text-[10px] text-blue-600 font-semibold">
-                  {cheque.cheque_type === 'CUSTOMER' ? (isAr ? 'شيك عميل' : 'Customer Cheque') : (isAr ? 'شيك أوراق قبض أخرى' : 'Other Cheque')}
+                  {String(cheque.cheque_type).toUpperCase() === 'CUSTOMER' ? (isAr ? 'شيك عميل' : 'Customer Cheque') : (isAr ? 'شيك أوراق قبض أخرى' : 'Other Cheque')}
                 </p>
               )}
             </div>

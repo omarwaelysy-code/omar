@@ -634,15 +634,19 @@ export interface ReceivedCheque {
   receipt_number?: string;
   serial_number?: string;
   cheque_number: string;
-  cheque_type?: 'customer' | 'other';
+  cheque_type?: 'CUSTOMER' | 'OTHER' | 'customer' | 'other';
   customer_id?: string;
   customer_name?: string;
   payer_name?: string;
   bank_name?: string;
+  drawee_bank?: string;
+  deposit_bank_name?: string;
+  deposit_account_number?: string;
   amount: number;
   currency?: string;
   exchange_rate?: number;
-  receive_date: string;
+  receive_date?: string;
+  receipt_date?: string;
   due_date: string;
   status: ReceivedChequeStatus;
   is_crossed?: boolean;
@@ -659,6 +663,7 @@ export interface ReceivedCheque {
   deposit_account_id?: string;
   deposit_account_name?: string;
   collection_date?: string | null;
+  collected_date?: string | null;
   return_date?: string | null;
   return_reason?: string | null;
   old_due_date?: string | null;
@@ -692,8 +697,10 @@ export interface ReceivedChequeStats {
   returnedCount: number;
   cancelledAmount: number;
   cancelledCount: number;
-  futureReceivablesAmount: number;
-  futureReceivablesCount: number;
+  futureCollectionsAmount?: number;
+  futureCollectionsCount?: number;
+  futureReceivablesAmount?: number;
+  futureReceivablesCount?: number;
 }
 
 export interface Return {

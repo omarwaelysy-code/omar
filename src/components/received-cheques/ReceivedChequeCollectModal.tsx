@@ -12,6 +12,7 @@ interface ReceivedChequeCollectModalProps {
   onSuccess: () => void;
   cheque: ReceivedCheque | null;
   paymentMethods?: PaymentMethod[];
+  accounts?: any[];
 }
 
 export const ReceivedChequeCollectModal: React.FC<ReceivedChequeCollectModalProps> = ({
@@ -19,7 +20,8 @@ export const ReceivedChequeCollectModal: React.FC<ReceivedChequeCollectModalProp
   onClose,
   onSuccess,
   cheque,
-  paymentMethods = []
+  paymentMethods = [],
+  accounts = []
 }) => {
   const { showSuccess, showError } = useNotification();
   const { language, dir } = useLanguage();

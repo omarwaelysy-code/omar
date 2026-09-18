@@ -3301,7 +3301,9 @@ async function createChequeJournalEntry(
       description?: string;
       supplier_id?: string;
       supplier_name?: string;
-      sub_account_id?: string;
+      customer_id?: string | null;
+      customer_name?: string | null;
+      sub_account_id?: string | null;
       sub_account_type?: string;
     }>;
   }

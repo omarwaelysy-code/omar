@@ -492,7 +492,7 @@ export const ReceivedCheques: React.FC<ReceivedChequesProps> = ({ initialTab = '
                         <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-200">
                           <div>
                             <span className="font-bold">{cheque.customer_name || cheque.payer_name || '-'}</span>
-                            {cheque.cheque_type === 'OTHER' && (
+                            {String(cheque.cheque_type).toUpperCase() === 'OTHER' && (
                               <span className="block text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">
                                 {isAr ? 'أوراق قبض أخرى' : 'Other Payer'}
                               </span>

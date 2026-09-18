@@ -42,6 +42,7 @@ interface ReceivedChequeFormModalProps {
   accounts?: Account[];
   inline?: boolean;
   initialChequeType?: 'customer' | 'other';
+  mode?: 'CUSTOMER' | 'OTHER' | 'customer' | 'other';
   chequeToEdit?: ReceivedCheque | null;
 }
 
@@ -54,6 +55,7 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
   accounts = [],
   inline = false,
   initialChequeType = 'customer',
+  mode,
   chequeToEdit
 }) => {
   const { showSuccess, showError } = useNotification();
@@ -61,7 +63,8 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
   const { language, dir } = useLanguage();
   const isAr = language === 'ar';
 
-  const [chequeType, setChequeType] = useState<'customer' | 'other'>(initialChequeType);
+  const defaultType = mode ? (mode.toLowerCase() as 'customer' | 'other') : initialChequeType;
+  const [chequeType, setChequeType] = useState<'customer' | 'other'>(defaultType);
   const [receiptNumber, setReceiptNumber] = useState('');
   const [receiveDate, setReceiveDate] = useState(new Date().toISOString().slice(0, 10));
   const [customerId, setCustomerId] = useState('');
@@ -329,7 +332,7 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
         }))
       });
 
-      showSuccess(res.message || (isAr ? 'تم استلام الشيكات وحفظ الحافظة بنجاح.' : 'Cheques received successfully.'));
+      showSuccess((res as any).message || (isAr ? 'تم استلام الشيكات وحفظ الحافظة بنجاح.' : 'Cheques received successfully.'));
       onSuccess();
       onClose();
     } catch (err: any) {
