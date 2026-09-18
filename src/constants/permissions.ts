@@ -46,7 +46,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     id: 'general_ledger',
     nameAr: 'الحسابات العامة',
     nameEn: 'General Ledger',
-    modules: ['account_types', 'accounts', 'chart_of_accounts']
+    modules: ['account_types', 'accounts', 'chart_of_accounts', 'ifrs_guide']
   },
   {
     id: 'journal_entries',
@@ -334,6 +334,7 @@ export const MODULE_PERMISSIONS_META: { [moduleId: string]: { labelAr: string; l
   account_types: { labelAr: 'أنواع الحسابات', labelEn: 'Account Types', hasCrud: true },
   accounts: { labelAr: 'دليل الحسابات', labelEn: 'Accounts', hasCrud: true },
   chart_of_accounts: { labelAr: 'شجرة الحسابات', labelEn: 'Chart of Accounts', hasCrud: true },
+  ifrs_guide: { labelAr: 'دليل معايير IFRS 2026', labelEn: 'IFRS Standards Guide 2026', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
   // Journal entries
   create_journal_entry: { labelAr: 'إضافة قيد يومية', labelEn: 'Create Journal Entry', hasCrud: true, special: ['print', 'export_pdf', 'export_excel'] },
   journal_entries: { labelAr: 'قيود اليومية', labelEn: 'Journal Entries', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved', 'repost'] },

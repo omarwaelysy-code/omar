@@ -36,7 +36,7 @@ export function getDefaultRolePermissions(roleName: string): any {
     // Has full GL, JE, Reports, Cash & Banks, and approvals
     Object.keys(perms).forEach(modId => {
       const isFin = [
-        'account_types', 'accounts', 'chart_of_accounts', 'create_journal_entry', 
+        'account_types', 'accounts', 'chart_of_accounts', 'ifrs_guide', 'create_journal_entry', 
         'journal_entries', 'detailed_journal_entries', 'receipts', 'payment_vouchers', 'supplier_payment_vouchers', 
         'cash_transfers', 'cash_balances', 'issued_cheques', 'received_cheques', 'fixed_assets', 'asset_categories', 'asset_depreciation', 'customer_statement', 'supplier_statement', 
         'customer_balances', 'supplier_balances', 'sales_report', 'expenses_report', 
@@ -60,7 +60,7 @@ export function getDefaultRolePermissions(roleName: string): any {
     // Has GL, JE, Cash & Banks, Reports (cannot delete, cannot cancel_approval or open_closed_period)
     Object.keys(perms).forEach(modId => {
       const isAcc = [
-        'account_types', 'accounts', 'chart_of_accounts', 'create_journal_entry', 
+        'account_types', 'accounts', 'chart_of_accounts', 'ifrs_guide', 'create_journal_entry', 
         'journal_entries', 'detailed_journal_entries', 'receipts', 'payment_vouchers', 'supplier_payment_vouchers', 
         'cash_transfers', 'cash_balances', 'issued_cheques', 'received_cheques', 'fixed_assets', 'asset_categories', 'asset_depreciation'
       ].includes(modId);

@@ -100,6 +100,7 @@ export const pageLabels: { [key: string]: string } = {
   'chart_of_accounts': 'شجرة الحسابات',
   'journal_entries': 'قيود اليومية',
   'create_journal_entry': 'إضافة قيد يومية',
+  'ifrs_guide': 'دليل معايير IFRS 2026',
   'general_ledger_report': 'حساب الأستاذ',
   'trial_balance': 'ميزان المراجعة',
   'income_statement': 'قائمة الدخل',

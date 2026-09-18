@@ -157,6 +157,7 @@ const getTabIcon = (id: string) => {
       return <PieChart {...iconProps} />;
     case 'accounts':
     case 'general_ledger_report':
+    case 'ifrs_guide':
       return <BookOpen {...iconProps} />;
     case 'currencies': return <Coins {...iconProps} />;
     case 'create_journal_entry': return <Plus {...iconProps} />;
@@ -663,7 +664,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'chart_of_accounts', label: t('nav.chart_of_accounts'), icon: PieChart },
           { id: 'create_journal_entry', label: t('nav.create_journal_entry'), icon: Plus },
           { id: 'journal_entries', label: t('nav.journal_entries'), icon: FileText },
-          { id: 'detailed_journal_entries', label: t('nav.detailed_journal_entries') || 'قيود يومية تفصيلية', icon: FileSpreadsheet }
+          { id: 'detailed_journal_entries', label: t('nav.detailed_journal_entries') || 'قيود يومية تفصيلية', icon: FileSpreadsheet },
+          { id: 'ifrs_guide', label: t('nav.ifrs_guide') || 'دليل معايير IFRS 2026', icon: BookOpen }
         ]
       },
       { 
