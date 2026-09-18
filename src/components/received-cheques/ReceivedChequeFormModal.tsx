@@ -147,7 +147,7 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
         }
         if (comp) {
           setCompany(comp);
-          const baseCurr = (comp.settings?.currency || comp.currency || 'EGP').toUpperCase();
+          const baseCurr = (comp.settings?.currency || (comp as any)?.currency || 'EGP').toUpperCase();
           if (!currency || currency === 'EGP') {
             setCurrency(baseCurr);
           }
@@ -158,7 +158,7 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
 
   // ONLY currencies registered in the system (إدارة العملات)
   const availableCurrencies = useMemo(() => {
-    const baseCode = (company?.settings?.currency || company?.currency || 'EGP').toUpperCase();
+    const baseCode = (company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase();
     const baseItem = {
       id: 'base',
       code: baseCode,
@@ -176,7 +176,7 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
           list.push({
             id: c.id,
             code,
-            nameAr: c.name_ar || c.name || code,
+            nameAr: c.name_ar || (c as any).name || c.code,
             symbol: c.symbol || code
           });
         }
@@ -196,7 +196,7 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
   // Handle currency change & fetch exchange rate (System rate auto, user can edit manually)
   const handleCurrencyChange = async (newCurr: string) => {
     setCurrency(newCurr);
-    const baseCode = (company?.settings?.currency || company?.currency || 'EGP').toUpperCase();
+    const baseCode = (company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase();
     if (newCurr.toUpperCase() === baseCode) {
       setExchangeRate('1.0');
       return;
