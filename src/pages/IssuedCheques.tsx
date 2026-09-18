@@ -19,6 +19,7 @@ import { ChequeReturnModal } from '../components/issued-cheques/ChequeReturnModa
 import { ChequeCancelModal } from '../components/issued-cheques/ChequeCancelModal';
 import { ChequesDashboardTab } from '../components/issued-cheques/ChequesDashboardTab';
 import { ChequesReportsTab } from '../components/issued-cheques/ChequesReportsTab';
+import { AttachmentPreviewModal, ChequeAttachmentData } from '../components/common/AttachmentPreviewModal';
 
 interface IssuedChequesProps {
   initialTab?: 'dashboard' | 'all' | 'create' | 'create_supplier' | 'create_other' | 'due' | 'reports';
@@ -60,6 +61,15 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
   const [selectedChequeForPostpone, setSelectedChequeForPostpone] = useState<IssuedCheque | null>(null);
   const [selectedChequeForReturn, setSelectedChequeForReturn] = useState<IssuedCheque | null>(null);
   const [selectedChequeForCancel, setSelectedChequeForCancel] = useState<IssuedCheque | null>(null);
+
+  // Attachment Preview Modal State
+  const [selectedPreviewAttachment, setSelectedPreviewAttachment] = useState<ChequeAttachmentData | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  const handlePreviewAttachment = (att: ChequeAttachmentData) => {
+    setSelectedPreviewAttachment(att);
+    setIsPreviewOpen(true);
+  };
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -510,6 +520,19 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
                                 {cheque.serial_number}
                               </span>
                             )}
+                            {Array.isArray(cheque.attachments) && cheque.attachments.length > 0 && (
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handlePreviewAttachment(cheque.attachments[0]);
+                                }}
+                                className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors cursor-pointer mt-0.5"
+                                title={isAr ? `عرض المرفق (${cheque.attachments.length})` : `View Attachment (${cheque.attachments.length})`}
+                              >
+                                <Paperclip className="w-2.5 h-2.5" />
+                                <span>{cheque.attachments.length} {isAr ? 'مرفق' : 'att.'}</span>
+                              </span>
+                            )}
                           </button>
                         </td>
                         <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-200">
@@ -563,6 +586,17 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
                             >
                               <Eye className="w-4 h-4" />
                             </button>
+
+                            {/* View & Download Attachment */}
+                            {Array.isArray(cheque.attachments) && cheque.attachments.length > 0 && (
+                              <button
+                                onClick={() => handlePreviewAttachment(cheque.attachments[0])}
+                                className="p-1.5 rounded-lg text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
+                                title={isAr ? `معاينة وتحميل المرفقات (${cheque.attachments.length})` : `Preview & Download Attachments (${cheque.attachments.length})`}
+                              >
+                                <Paperclip className="w-4 h-4" />
+                              </button>
+                            )}
 
                             {/* Edit Cheque (Available for Draft, Issued, Postponed) */}
                             {['DRAFT', 'ISSUED', 'POSTPONED'].includes(cheque.status) && (
@@ -748,6 +782,13 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
         onClose={() => setSelectedChequeForCancel(null)}
         onSuccess={fetchData}
         cheque={selectedChequeForCancel}
+      />
+
+      {/* Attachment Preview Modal */}
+      <AttachmentPreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        attachment={selectedPreviewAttachment}
       />
 
     </div>

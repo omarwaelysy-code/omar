@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, Save, AlertCircle, Calendar, DollarSign, Building2, User, 
   FileText, Paperclip, Trash2, ArrowLeft, CheckCircle2, ShieldCheck, 
-  Layers, Landmark, RefreshCw, Hash, Stamp, Copy
+  Layers, Landmark, RefreshCw, Hash, Stamp, Copy, Eye, Download
 } from 'lucide-react';
 import { IssuedCheque, Supplier, PaymentMethod, IssuedChequeAttachment, Account, Currency, ExchangeRate, Company } from '../../types';
 import { issuedChequeService } from '../../services/issuedChequeService';
@@ -13,6 +13,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { tafqeetAr, tafqeetEn } from '../../utils/tafqeet';
 import { formatNumber } from '../../utils/formatUtils';
 import { EGYPTIAN_BANKS_DATA, BankLogoBadge, EgyptianBank } from '../../data/egyptianBanks';
+import { AttachmentPreviewModal, ChequeAttachmentData } from '../common/AttachmentPreviewModal';
 
 interface ChequeFormModalProps {
   isOpen: boolean;
@@ -77,6 +78,36 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [validationError, setValidationError] = useState('');
   const [isDuplicateDraft, setIsDuplicateDraft] = useState(false);
+
+  // Attachment Preview Modal State
+  const [selectedPreviewAttachment, setSelectedPreviewAttachment] = useState<ChequeAttachmentData | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  const handlePreviewAttachment = (att: IssuedChequeAttachment) => {
+    setSelectedPreviewAttachment({
+      id: att.id,
+      name: att.name,
+      size: att.size,
+      type: att.type,
+      url: att.url,
+      uploaded_at: att.uploaded_at
+    });
+    setIsPreviewOpen(true);
+  };
+
+  const handleDownloadAttachment = (att: IssuedChequeAttachment) => {
+    if (!att?.url) return;
+    try {
+      const a = document.createElement('a');
+      a.href = att.url;
+      a.download = att.name || 'cheque_document';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      window.open(att.url, '_blank');
+    }
+  };
 
   // Invoice Settlements state
   const [purchaseInvoices, setPurchaseInvoices] = useState<any[]>([]);
@@ -177,6 +208,7 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
   }, [selectedFinancialAccount, paymentMethods]);
 
   // Fetch exchange rate from Currency Management (auto or manual)
+  // Fetch exchange rate from Currency Management (prioritizing live auto rates)
   const fetchRateForCurrency = async (targetCurrency: string) => {
     if (!targetCurrency || targetCurrency.toUpperCase() === 'EGP') {
       setExchangeRate('1.0');
@@ -187,36 +219,39 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
 
     setLoadingExchangeRate(true);
     try {
-      // 1. Check company settings for rate update method ('auto' vs 'manual')
-      const company = await dbService.get<Company>('companies', user.company_id);
-      const updateMethod = company?.settings?.exchange_rate_update_method || 'manual';
-
-      // 2. Fetch list of company currencies to get currency ID
+      // 1. Fetch list of company currencies to get currency ID & code
       const companyCurrs = await dbService.list<Currency>('currencies', user.company_id);
-      const matchedCurr = (companyCurrs || []).find(c => c.code?.toUpperCase() === targetCurrency.toUpperCase());
+      const matchedCurr = (companyCurrs || []).find(c => c.code?.trim().toUpperCase() === targetCurrency.trim().toUpperCase());
       const currId = matchedCurr?.id;
 
-      // 3. Try Auto rate first if updateMethod === 'auto'
-      if (updateMethod === 'auto') {
-        try {
-          const latestAutoRates = await apiRequest<Array<{
-            currency_id: string;
-            rate: number | null;
-            rate_date: string | null;
-          }>>(`/currency-rates/latest?company_id=${user.company_id}`);
-          const rateObj = currId ? latestAutoRates.find(r => r.currency_id === currId) : null;
-          if (rateObj && rateObj.rate !== null && Number(rateObj.rate) > 0) {
-            setExchangeRate(String(Number(rateObj.rate)));
-            setRateSource('auto');
-            setLoadingExchangeRate(false);
-            return;
-          }
-        } catch (err) {
-          console.error('Error fetching auto rate in ChequeFormModal:', err);
+      // 2. Prioritize live auto rate from /currency-rates/latest
+      try {
+        const latestAutoRates = await apiRequest<Array<{
+          currency_id: string;
+          currency_code?: string;
+          code?: string;
+          rate: number | null;
+          rate_date: string | null;
+        }>>(`/currency-rates/latest?company_id=${user.company_id}`);
+
+        const rateObj = latestAutoRates?.find(r => 
+          (currId && r.currency_id === currId) || 
+          (r.currency_code && r.currency_code.trim().toUpperCase() === targetCurrency.trim().toUpperCase()) ||
+          (r.code && r.code.trim().toUpperCase() === targetCurrency.trim().toUpperCase())
+        );
+
+        if (rateObj && rateObj.rate !== null && Number(rateObj.rate) > 0) {
+          const formatted = Number(Number(rateObj.rate).toFixed(4)).toString();
+          setExchangeRate(formatted);
+          setRateSource('auto');
+          setLoadingExchangeRate(false);
+          return;
         }
+      } catch (err) {
+        console.error('Error fetching auto rate in ChequeFormModal:', err);
       }
 
-      // 4. Try Manual rate from exchange_rates table
+      // 3. Fallback to manual rate from exchange_rates table
       if (currId) {
         try {
           const manualRates = await dbService.list<ExchangeRate>('exchange_rates', {
@@ -227,7 +262,8 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
             _order: 'desc'
           });
           if (manualRates && manualRates.length > 0 && Number(manualRates[0].exchange_rate) > 0) {
-            setExchangeRate(String(Number(manualRates[0].exchange_rate)));
+            const formatted = Number(Number(manualRates[0].exchange_rate).toFixed(4)).toString();
+            setExchangeRate(formatted);
             setRateSource('manual');
             setLoadingExchangeRate(false);
             return;
@@ -237,32 +273,13 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
         }
       }
 
-      // 5. Try currency object directly if it has exchange_rate
+      // 4. Try currency object directly if it has exchange_rate
       if (matchedCurr && (matchedCurr as any).exchange_rate && Number((matchedCurr as any).exchange_rate) > 0) {
-        setExchangeRate(String(Number((matchedCurr as any).exchange_rate)));
+        const formatted = Number(Number((matchedCurr as any).exchange_rate).toFixed(4)).toString();
+        setExchangeRate(formatted);
         setRateSource('manual');
         setLoadingExchangeRate(false);
         return;
-      }
-
-      // 6. If updateMethod was not 'auto', try auto rates as fallback
-      if (currId) {
-        try {
-          const latestAutoRates = await apiRequest<Array<{
-            currency_id: string;
-            rate: number | null;
-            rate_date: string | null;
-          }>>(`/currency-rates/latest?company_id=${user.company_id}`);
-          const rateObj = latestAutoRates.find(r => r.currency_id === currId);
-          if (rateObj && rateObj.rate !== null && Number(rateObj.rate) > 0) {
-            setExchangeRate(String(Number(rateObj.rate)));
-            setRateSource('auto');
-            setLoadingExchangeRate(false);
-            return;
-          }
-        } catch (err) {
-          // ignore
-        }
       }
 
       // Default fallback
@@ -1435,22 +1452,53 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
             </div>
           </div>
 
-          {/* Attachments chips */}
+          {/* Attachments list with preview, download and delete */}
           {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 pt-1">
+            <div className="flex flex-wrap gap-2 pt-1">
               {attachments.map(att => (
                 <div
                   key={att.id}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-[10px]"
+                  className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs shadow-xs"
                 >
-                  <span className="truncate max-w-[120px]">{att.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeAttachment(att.id)}
-                    className="text-rose-500 hover:text-rose-700 cursor-pointer"
+                  <span
+                    onClick={() => handlePreviewAttachment(att)}
+                    className="truncate max-w-[140px] font-medium cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400 text-slate-700 dark:text-slate-300"
+                    title={isAr ? 'اضغط للمعاينة' : 'Click to preview'}
                   >
-                    <Trash2 className="w-2.5 h-2.5" />
-                  </button>
+                    {att.name}
+                  </span>
+                  
+                  <div className="flex items-center gap-1">
+                    {/* Preview Button */}
+                    <button
+                      type="button"
+                      onClick={() => handlePreviewAttachment(att)}
+                      className="p-1 rounded text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer transition-colors"
+                      title={isAr ? 'معاينة المرفق' : 'Preview'}
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* Download Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadAttachment(att)}
+                      className="p-1 rounded text-blue-600 hover:text-blue-800 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 cursor-pointer transition-colors"
+                      title={isAr ? 'تحميل المرفق' : 'Download'}
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* Remove Button */}
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(att.id)}
+                      className="p-1 rounded text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer transition-colors"
+                      title={isAr ? 'حذف المرفق' : 'Delete'}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1652,6 +1700,13 @@ export const ChequeFormModal: React.FC<ChequeFormModalProps> = ({
         </div>
 
       </form>
+
+      {/* Attachment Preview Modal */}
+      <AttachmentPreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        attachment={selectedPreviewAttachment}
+      />
     </div>
   );
 

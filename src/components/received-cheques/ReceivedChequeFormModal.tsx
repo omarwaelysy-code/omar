@@ -89,6 +89,7 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
   const [companyCurrencies, setCompanyCurrencies] = useState<Currency[]>([]);
   const [currency, setCurrency] = useState<string>('EGP');
   const [exchangeRate, setExchangeRate] = useState<string>('1.0');
+  const [rateSource, setRateSource] = useState<'auto' | 'manual' | 'default'>('default');
   const [loadingExchangeRate, setLoadingExchangeRate] = useState(false);
 
   // Table of cheques
@@ -193,52 +194,82 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
     };
   }, [availableCurrencies, currency]);
 
-  // Handle currency change & fetch exchange rate (System rate auto, user can edit manually)
+  // Handle currency change & fetch exchange rate (System rate auto prioritized, user can edit manually)
   const handleCurrencyChange = async (newCurr: string) => {
     setCurrency(newCurr);
     const baseCode = (company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase();
     if (newCurr.toUpperCase() === baseCode) {
       setExchangeRate('1.0');
+      setRateSource('default');
       return;
     }
 
     setLoadingExchangeRate(true);
     try {
-      const matched = availableCurrencies.find(c => c.code.toUpperCase() === newCurr.toUpperCase());
-      if (matched?.id && matched.id !== 'base') {
-        // 1. Check manual rates in exchange_rates
-        const rates = await dbService.list<ExchangeRate>('exchange_rates', {
-          currency_id: matched.id,
-          company_id: user?.company_id,
-          _limit: 1,
-          _sort: 'rate_date',
-          _order: 'desc'
-        });
-        if (rates && rates.length > 0 && Number(rates[0].exchange_rate) > 0) {
-          setExchangeRate(String(Number(rates[0].exchange_rate)));
+      const matched = availableCurrencies.find(c => c.code?.trim().toUpperCase() === newCurr.trim().toUpperCase());
+      const currId = matched?.id;
+
+      // 1. Prioritize automated live system rates in currency_rates
+      try {
+        const autoRates = await apiRequest<Array<{
+          currency_id: string;
+          currency_code?: string;
+          code?: string;
+          rate: number | null;
+          rate_date: string | null;
+        }>>(`/currency-rates/latest?company_id=${user?.company_id}`);
+        
+        const found = autoRates?.find(r => 
+          (currId && currId !== 'base' && r.currency_id === currId) ||
+          (r.currency_code && r.currency_code.trim().toUpperCase() === newCurr.trim().toUpperCase()) ||
+          (r.code && r.code.trim().toUpperCase() === newCurr.trim().toUpperCase())
+        );
+
+        if (found && found.rate !== null && Number(found.rate) > 0) {
+          const formatted = Number(Number(found.rate).toFixed(4)).toString();
+          setExchangeRate(formatted);
+          setRateSource('auto');
           return;
         }
+      } catch (err) {
+        console.error('Error fetching live auto rate in ReceivedCheques:', err);
+      }
 
-        // 2. Check automated live system rates in currency_rates
+      // 2. Fallback to manual rates in exchange_rates
+      if (currId && currId !== 'base') {
         try {
-          const autoRates = await apiRequest<Array<{
-            currency_id: string;
-            rate: number | null;
-            rate_date: string | null;
-          }>>(`/currency-rates/latest?company_id=${user?.company_id}`);
-          const found = autoRates?.find(r => r.currency_id === matched.id && Number(r.rate) > 0);
-          if (found && Number(found.rate) > 0) {
-            setExchangeRate(String(Number(found.rate)));
+          const rates = await dbService.list<ExchangeRate>('exchange_rates', {
+            currency_id: currId,
+            company_id: user?.company_id,
+            _limit: 1,
+            _sort: 'rate_date',
+            _order: 'desc'
+          });
+          if (rates && rates.length > 0 && Number(rates[0].exchange_rate) > 0) {
+            const formatted = Number(Number(rates[0].exchange_rate).toFixed(4)).toString();
+            setExchangeRate(formatted);
+            setRateSource('manual');
             return;
           }
-        } catch {
-          // ignore
+        } catch (err) {
+          console.error('Error fetching manual rate in ReceivedCheques:', err);
         }
       }
+
+      // 3. Fallback to currency object directly
+      if (matched && (matched as any).exchange_rate && Number((matched as any).exchange_rate) > 0) {
+        const formatted = Number(Number((matched as any).exchange_rate).toFixed(4)).toString();
+        setExchangeRate(formatted);
+        setRateSource('manual');
+        return;
+      }
+
       setExchangeRate('1.0');
+      setRateSource('default');
     } catch (err) {
       console.error('Error fetching exchange rate:', err);
       setExchangeRate('1.0');
+      setRateSource('default');
     } finally {
       setLoadingExchangeRate(false);
     }
@@ -656,8 +687,26 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
           {/* Exchange Rate (Requirement 1) */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
-              <span>{isAr ? 'سعر الصرف (مقابل ج.م)' : 'Exchange Rate'}</span>
-              {loadingExchangeRate && <RefreshCw className="w-3 h-3 animate-spin text-blue-500" />}
+              <span className="flex items-center gap-1.5">
+                <span>{isAr ? 'سعر الصرف (مقابل ج.م)' : 'Exchange Rate'}</span>
+                {isForeign && (
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${rateSource === 'auto' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>
+                    {rateSource === 'auto' ? (isAr ? 'سعر تلقائي' : 'Auto Rate') : rateSource === 'manual' ? (isAr ? 'سعر يدوي' : 'Manual') : ''}
+                  </span>
+                )}
+              </span>
+              {isForeign && (
+                <button
+                  type="button"
+                  onClick={() => handleCurrencyChange(currency)}
+                  disabled={loadingExchangeRate}
+                  title={isAr ? 'تحديث سعر الصرف من النظام' : 'Refresh live rate'}
+                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 p-0.5 cursor-pointer transition-colors inline-flex items-center gap-1 text-[10px]"
+                >
+                  <RefreshCw className={`w-3 h-3 ${loadingExchangeRate ? 'animate-spin' : ''}`} />
+                  <span>{isAr ? 'تحديث' : 'Refresh'}</span>
+                </button>
+              )}
             </label>
             <div className="relative">
               <input
@@ -1080,11 +1129,34 @@ export const ReceivedChequeFormModal: React.FC<ReceivedChequeFormModalProps> = (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {attachments.map(att => (
                     <div key={att.id} className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 text-[11px] font-bold border border-blue-200 dark:border-blue-800">
-                      <span className="max-w-[120px] truncate">{att.name}</span>
+                      <span 
+                        onClick={() => handlePreviewAttachment(att)}
+                        className="max-w-[120px] truncate cursor-pointer hover:underline"
+                        title={isAr ? 'اضغط للمعاينة' : 'Click to preview'}
+                      >
+                        {att.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handlePreviewAttachment(att)}
+                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 p-0.5 rounded cursor-pointer transition-colors"
+                        title={isAr ? 'معاينة المرفق' : 'Preview'}
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDirectDownload(att)}
+                        className="text-slate-600 hover:text-slate-800 dark:text-slate-300 p-0.5 rounded cursor-pointer transition-colors"
+                        title={isAr ? 'تحميل المرفق' : 'Download'}
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         type="button"
                         onClick={() => handleRemoveAttachment(att.id)}
-                        className="text-slate-400 hover:text-rose-600 transition-colors"
+                        className="text-slate-400 hover:text-rose-600 transition-colors p-0.5 rounded cursor-pointer"
+                        title={isAr ? 'حذف المرفق' : 'Remove'}
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>

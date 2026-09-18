@@ -11313,8 +11313,10 @@ router.get('/currency-rates/latest', authenticateToken, async (req: AuthRequest,
     // LEFT JOIN ensures currencies with no currency_rates row are included (rate = NULL).
     const { rows } = await pool.query(
       `SELECT DISTINCT ON (c.id)
-          c.id             AS currency_id,
-          cr.rate          AS rate,
+          c.id               AS currency_id,
+          c.code             AS currency_code,
+          c.code             AS code,
+          cr.rate            AS rate,
           cr.rate_date::text AS rate_date
        FROM currencies c
        LEFT JOIN currency_rates cr ON cr.currency_id = c.id
