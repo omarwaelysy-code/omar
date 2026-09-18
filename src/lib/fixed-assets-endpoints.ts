@@ -845,7 +845,7 @@ fixedAssetsRouter.post(['/fixed-assets/:id/capitalize', '/fixed_assets/:id/capit
       `SELECT fa.*, ac.asset_account_id AS cat_asset_account, ac.accumulated_depreciation_account_id AS cat_acc_account
        FROM fixed_assets fa
        LEFT JOIN asset_categories ac ON ac.id = fa.category_id
-       WHERE fa.id = $1 AND fa.company_id = $2 FOR UPDATE`,
+       WHERE fa.id = $1 AND fa.company_id = $2 FOR UPDATE OF fa`,
       [id, companyId]
     );
 
@@ -1444,7 +1444,7 @@ fixedAssetsRouter.post(['/fixed-assets/:id/maintenance', '/fixed_assets/:id/main
       `SELECT fa.*, ac.asset_account_id AS cat_asset_acc
        FROM fixed_assets fa
        LEFT JOIN asset_categories ac ON ac.id = fa.category_id
-       WHERE fa.id = $1 AND fa.company_id = $2 FOR UPDATE`,
+       WHERE fa.id = $1 AND fa.company_id = $2 FOR UPDATE OF fa`,
       [id, companyId]
     );
     if (assetRows.length === 0) {
@@ -1644,7 +1644,7 @@ fixedAssetsRouter.post(['/fixed-assets/:id/dispose', '/fixed_assets/:id/dispose'
         ac.loss_account_id AS cat_loss_acc
       FROM fixed_assets fa
       LEFT JOIN asset_categories ac ON ac.id = fa.category_id
-      WHERE fa.id = $1 AND fa.company_id = $2 FOR UPDATE
+      WHERE fa.id = $1 AND fa.company_id = $2 FOR UPDATE OF fa
     `, [id, companyId]);
 
     if (assetRows.length === 0) {
@@ -1837,7 +1837,7 @@ fixedAssetsRouter.get(['/fixed-assets/:id/schedule', '/fixed_assets/:id/schedule
     if (assetRows.length === 0) return sendError(res, 404, 'الأصل غير موجود');
     const asset = assetRows[0];
 
-    const capCost = Number(asset.capitalized_cost) || 0;
+    const capCost = Number(asset.capitalized_cost) || (Number(asset.acquisition_cost) + Number(asset.additional_cost)) || 0;
     const salvage = Number(asset.salvage_value) || 0;
     const usefulLife = Number(asset.useful_life) || 5;
     const isMonths = asset.useful_life_unit === 'MONTHS';
