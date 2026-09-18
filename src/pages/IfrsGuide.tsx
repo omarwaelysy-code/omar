@@ -131,7 +131,8 @@ export default function IfrsGuide() {
 
   // Print PDF
   const handlePrint = () => {
-    printElement('ifrs-guide-printable-content');
+    const el = document.getElementById('ifrs-guide-printable-content');
+    printElement(el, language === 'ar' ? 'دليل معايير IFRS الشامل — 2026' : 'IFRS Complete Practical Guide — 2026');
   };
 
   return (
