@@ -40,7 +40,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     id: 'cash_banks',
     nameAr: 'الخزينة والبنوك والشيكات',
     nameEn: 'Cash, Banks & Cheques',
-    modules: ['receipts', 'payment_vouchers', 'cash_transfers', 'cash_balances', 'issued_cheques']
+    modules: ['receipts', 'payment_vouchers', 'cash_transfers', 'cash_balances', 'issued_cheques', 'received_cheques']
   },
   {
     id: 'general_ledger',
@@ -285,7 +285,8 @@ export const MODULE_PERMISSIONS_META: { [moduleId: string]: { labelAr: string; l
   supplier_payment_vouchers: { labelAr: 'سند صرف مورد', labelEn: 'Supplier Payment Vouchers', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved'] },
   cash_transfers: { labelAr: 'حوالات الخزينة', labelEn: 'Cash Transfers', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'edit_approved', 'delete_approved'] },
   cash_balances: { labelAr: 'أرصدة النقدية والخزائن', labelEn: 'Cash Balances', hasCrud: true },
-  issued_cheques: { labelAr: 'الشيكات', labelEn: 'Cheques', hasCrud: true, special: ['issue', 'pay', 'postpone', 'cancel', 'return', 'print', 'export_pdf', 'export_excel'] },
+  issued_cheques: { labelAr: 'إدارة الشيكات الصادرة', labelEn: 'Issued Cheques Management', hasCrud: true, special: ['issue', 'pay', 'postpone', 'cancel', 'return', 'print', 'export_pdf', 'export_excel'] },
+  received_cheques: { labelAr: 'إدارة الشيكات الواردة', labelEn: 'Received Cheques Management', hasCrud: true, special: ['collect', 'postpone', 'cancel', 'return', 'print', 'export_pdf', 'export_excel'] },
   egyptian_banks: { labelAr: 'دليل البنوك المصرية', labelEn: 'Egyptian Banks Directory', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
   // GL
   account_types: { labelAr: 'أنواع الحسابات', labelEn: 'Account Types', hasCrud: true },

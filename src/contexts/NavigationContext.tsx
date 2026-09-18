@@ -81,7 +81,7 @@ export const pageLabels: { [key: string]: string } = {
   'receipts': 'سند القبض / قبض من عميل',
   'payment_vouchers': 'سند الصرف / صرف لمورد',
   'supplier_payment_vouchers': 'سند صرف مورد',
-  'issued_cheques': 'الشيكات الصادرة',
+  'issued_cheques': 'إدارة الشيكات الصادرة',
   'egyptian_banks': 'دليل البنوك المصرية',
   'returns': 'مرتجع مبيعات',
   'purchase_returns': 'مرتجع مشتريات',
@@ -146,6 +146,9 @@ export const pageLabels: { [key: string]: string } = {
   'eta_tax_types': 'دليل أنواع الضرائب والرسوم (ETA)',
   'create_issued_cheque': 'تحرير شيك مورد',
   'create_other_cheque': 'تحرير شيك',
+  'received_cheques': 'إدارة الشيكات الواردة',
+  'receive_customer_cheque': 'استلام شيكات من عميل',
+  'receive_other_cheque': 'استلام شيك',
 };
 
 const getStorageKey = (companyId?: string) => {

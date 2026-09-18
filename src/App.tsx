@@ -54,6 +54,7 @@ const Receipts = React.lazy(() => import('./pages/Receipts').then(m => ({ defaul
 const PaymentVouchers = React.lazy(() => import('./pages/PaymentVouchers').then(m => ({ default: m.PaymentVouchers })));
 const SupplierPaymentVouchers = React.lazy(() => import('./pages/SupplierPaymentVouchers').then(m => ({ default: m.SupplierPaymentVouchers })));
 const IssuedCheques = React.lazy(() => import('./pages/IssuedCheques').then(m => ({ default: m.IssuedCheques })));
+const ReceivedCheques = React.lazy(() => import('./pages/ReceivedCheques').then(m => ({ default: m.ReceivedCheques })));
 const EgyptianBanks = React.lazy(() => import('./pages/EgyptianBanks').then(m => ({ default: m.EgyptianBanks })));
 const Returns = React.lazy(() => import('./pages/Returns').then(m => ({ default: m.Returns })));
 const PurchaseReturns = React.lazy(() => import('./pages/PurchaseReturns').then(m => ({ default: m.PurchaseReturns })));
@@ -243,6 +244,9 @@ export default function App() {
       case 'issued_cheques': return <IssuedCheques initialTab="all" />;
       case 'create_issued_cheque': return <IssuedCheques initialTab="create_supplier" />;
       case 'create_other_cheque': return <IssuedCheques initialTab="create_other" />;
+      case 'received_cheques': return <ReceivedCheques initialTab="all" />;
+      case 'receive_customer_cheque': return <ReceivedCheques initialTab="receive_customer" />;
+      case 'receive_other_cheque': return <ReceivedCheques initialTab="receive_other" />;
       case 'egyptian_banks': return <EgyptianBanks />;
       case 'returns': return <Returns />;
       case 'purchase_returns': return <PurchaseReturns />;

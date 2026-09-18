@@ -626,6 +626,76 @@ export interface IssuedChequeStats {
   futureObligationsCount: number;
 }
 
+export type ReceivedChequeStatus = 'DRAFT' | 'RECEIVED' | 'UNDER_COLLECTION' | 'COLLECTED' | 'POSTPONED' | 'RETURNED' | 'CANCELLED';
+
+export interface ReceivedCheque {
+  id: string;
+  company_id: string;
+  receipt_number?: string;
+  serial_number?: string;
+  cheque_number: string;
+  cheque_type?: 'customer' | 'other';
+  customer_id?: string;
+  customer_name?: string;
+  payer_name?: string;
+  bank_name?: string;
+  amount: number;
+  currency?: string;
+  exchange_rate?: number;
+  receive_date: string;
+  due_date: string;
+  status: ReceivedChequeStatus;
+  is_crossed?: boolean;
+  is_not_negotiable?: boolean;
+  purpose?: string;
+  description?: string;
+  notes?: string;
+  attachments?: IssuedChequeAttachment[];
+  settlement_details?: any[];
+  debit_account_id?: string;
+  debit_account_name?: string;
+  credit_account_id?: string;
+  credit_account_name?: string;
+  deposit_account_id?: string;
+  deposit_account_name?: string;
+  collection_date?: string | null;
+  return_date?: string | null;
+  return_reason?: string | null;
+  old_due_date?: string | null;
+  new_due_date?: string | null;
+  postponement_reason?: string | null;
+  cancelled_at?: string | null;
+  cancelled_by?: string | null;
+  cancel_reason?: string | null;
+  receive_journal_entry_id?: string | null;
+  collection_journal_entry_id?: string | null;
+  cancel_journal_entry_id?: string | null;
+  created_by?: string;
+  updated_by?: string;
+  created_at?: string;
+  updated_at?: string;
+  is_overdue?: boolean;
+}
+
+export interface ReceivedChequeStats {
+  totalAmount: number;
+  totalCount: number;
+  dueWithin7DaysAmount: number;
+  dueWithin7DaysCount: number;
+  dueWithin30DaysAmount: number;
+  dueWithin30DaysCount: number;
+  overdueAmount: number;
+  overdueCount: number;
+  collectedAmount: number;
+  collectedCount: number;
+  returnedAmount: number;
+  returnedCount: number;
+  cancelledAmount: number;
+  cancelledCount: number;
+  futureReceivablesAmount: number;
+  futureReceivablesCount: number;
+}
+
 export interface Return {
   id: string;
   return_number: string;

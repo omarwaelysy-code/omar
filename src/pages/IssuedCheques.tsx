@@ -253,7 +253,7 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
             </div>
             <div>
               <h1 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-                {isAr ? 'إدارة الشيكات' : 'Cheques Management'}
+                {isAr ? 'إدارة الشيكات الصادرة' : 'Issued Cheques Management'}
               </h1>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 {isAr 
@@ -337,7 +337,7 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
           }`}
         >
           <BarChart3 className="w-3.5 h-3.5" />
-          <span>{isAr ? 'التقارير المالية والتحليلية' : 'Financial & Analytical Reports'}</span>
+          <span>{isAr ? 'التقارير المالية والتحليلية للشيكات الصادرة' : 'Financial & Analytical Reports (Issued)'}</span>
         </button>
       </div>
 

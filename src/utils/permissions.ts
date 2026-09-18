@@ -38,7 +38,7 @@ export function getDefaultRolePermissions(roleName: string): any {
       const isFin = [
         'account_types', 'accounts', 'chart_of_accounts', 'create_journal_entry', 
         'journal_entries', 'detailed_journal_entries', 'receipts', 'payment_vouchers', 'supplier_payment_vouchers', 
-        'cash_transfers', 'cash_balances', 'issued_cheques', 'customer_statement', 'supplier_statement', 
+        'cash_transfers', 'cash_balances', 'issued_cheques', 'received_cheques', 'customer_statement', 'supplier_statement', 
         'customer_balances', 'supplier_balances', 'sales_report', 'expenses_report', 
         'cash_report', 'general_ledger_report', 'trial_balance', 'income_statement', 
         'balance_sheet'
@@ -62,7 +62,7 @@ export function getDefaultRolePermissions(roleName: string): any {
       const isAcc = [
         'account_types', 'accounts', 'chart_of_accounts', 'create_journal_entry', 
         'journal_entries', 'detailed_journal_entries', 'receipts', 'payment_vouchers', 'supplier_payment_vouchers', 
-        'cash_transfers', 'cash_balances', 'issued_cheques'
+        'cash_transfers', 'cash_balances', 'issued_cheques', 'received_cheques'
       ].includes(modId);
       
       const isRep = modId.endsWith('_report') || [

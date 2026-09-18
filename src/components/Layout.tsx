@@ -615,7 +615,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         subItems: [
           { id: 'receipts', label: t('nav.receipts'), icon: Receipt },
           { id: 'payment_vouchers', label: t('nav.payment_vouchers'), icon: CreditCard },
-          { id: 'issued_cheques', label: language === 'ar' ? 'الشيكات الصادرة' : 'Issued Cheques', icon: Landmark },
+          { id: 'issued_cheques', label: language === 'ar' ? 'إدارة الشيكات الصادرة' : 'Issued Cheques', icon: Landmark },
+          { id: 'received_cheques', label: language === 'ar' ? 'إدارة الشيكات الواردة' : 'Received Cheques', icon: ArrowDownToLine },
           { id: 'cash_transfers', label: t('nav.cash_transfers'), icon: ArrowLeftRight },
           { id: 'egyptian_banks', label: language === 'ar' ? 'دليل البنوك المصرية' : 'Egyptian Banks Directory', icon: Building2 }
         ]
@@ -625,9 +626,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         label: language === 'ar' ? 'الشيكات' : 'Cheques',
         icon: Landmark,
         subItems: [
-          { id: 'issued_cheques', label: language === 'ar' ? 'الشيكات الصادرة' : 'Issued Cheques', icon: Landmark },
+          { id: 'issued_cheques', label: language === 'ar' ? 'إدارة الشيكات الصادرة' : 'Issued Cheques Management', icon: Landmark },
           { id: 'create_issued_cheque', label: language === 'ar' ? 'تحرير شيك مورد' : 'Issue Supplier Cheque', icon: Plus },
-          { id: 'create_other_cheque', label: language === 'ar' ? 'تحرير شيك' : 'Issue Cheque', icon: Plus }
+          { id: 'create_other_cheque', label: language === 'ar' ? 'تحرير شيك' : 'Issue Cheque', icon: Plus },
+          { id: 'received_cheques', label: language === 'ar' ? 'الشيكات الواردة' : 'Received Cheques', icon: ArrowDownToLine },
+          { id: 'receive_customer_cheque', label: language === 'ar' ? 'استلام شيكات من عميل' : 'Receive Cheques from Customer', icon: Plus },
+          { id: 'receive_other_cheque', label: language === 'ar' ? 'استلام شيك' : 'Receive Other Cheque', icon: Plus }
         ]
       },
       {

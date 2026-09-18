@@ -133,6 +133,15 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'payment_journal_entry_id', 'cancel_journal_entry_id', 'attachments', 'settlements', 'created_by', 'updated_by',
     'created_at', 'updated_at'
   ],
+  received_cheques: [
+    'id', 'company_id', 'receipt_number', 'serial_number', 'cheque_number', 'cheque_type', 'customer_id', 'customer_name',
+    'payer_name', 'bank_name', 'amount', 'currency', 'exchange_rate', 'receive_date', 'due_date', 'status',
+    'is_crossed', 'is_not_negotiable', 'purpose', 'description', 'notes', 'attachments', 'settlement_details',
+    'debit_account_id', 'debit_account_name', 'credit_account_id', 'credit_account_name', 'deposit_account_id',
+    'collection_date', 'return_date', 'return_reason', 'old_due_date', 'new_due_date', 'postponement_reason',
+    'cancelled_at', 'cancelled_by', 'cancel_reason', 'receive_journal_entry_id', 'collection_journal_entry_id',
+    'cancel_journal_entry_id', 'created_by', 'updated_by', 'created_at', 'updated_at'
+  ],
   customer_discounts: [
     'id', 'company_id', 'customer_id', 'customer_name', 'date', 'amount', 'description'
   ],
