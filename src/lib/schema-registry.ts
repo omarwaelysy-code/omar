@@ -318,6 +318,57 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   eta_item_mappings: [
     'id', 'company_id', 'eta_item_code', 'eta_item_name', 'eta_item_type', 'product_id', 'notes', 'created_at', 'updated_at'
+  ],
+  asset_categories: [
+    'id', 'company_id', 'parent_id', 'code', 'name', 'name_en', 'description', 'asset_account_id',
+    'accumulated_depreciation_account_id', 'depreciation_expense_account_id', 'gain_account_id',
+    'loss_account_id', 'default_depreciation_method', 'default_useful_life', 'default_salvage_value',
+    'is_active', 'created_at', 'updated_at'
+  ],
+  fixed_assets: [
+    'id', 'company_id', 'asset_number', 'name', 'name_ar', 'name_en', 'category_id', 'description',
+    'serial_number', 'barcode', 'manufacturer', 'model', 'acquisition_date', 'capitalization_date',
+    'depreciation_start_date', 'last_depreciation_date', 'acquisition_cost', 'additional_cost',
+    'capitalized_cost', 'salvage_value', 'useful_life', 'useful_life_unit', 'depreciation_method',
+    'accumulated_depreciation', 'net_book_value', 'warehouse_id', 'department_id', 'cost_center_id',
+    'location_name', 'custodian_id', 'custodian_name', 'custody_date', 'supplier_id',
+    'purchase_invoice_id', 'purchase_order_number', 'invoice_date', 'asset_account_id',
+    'accumulated_depreciation_account_id', 'depreciation_expense_account_id', 'gain_account_id',
+    'loss_account_id', 'status', 'capitalization_journal_entry_id', 'disposal_journal_entry_id',
+    'attachments', 'created_by', 'updated_by', 'created_at', 'updated_at'
+  ],
+  asset_components: [
+    'id', 'asset_id', 'name', 'serial_number', 'cost', 'useful_life', 'depreciation_method',
+    'depreciation_start_date', 'status', 'created_at'
+  ],
+  asset_depreciation_runs: [
+    'id', 'company_id', 'run_number', 'period_name', 'from_date', 'to_date', 'total_assets',
+    'total_depreciation', 'status', 'journal_entry_id', 'notes', 'created_by', 'created_at'
+  ],
+  asset_depreciation_items: [
+    'id', 'run_id', 'asset_id', 'opening_nbv', 'depreciation_amount', 'accumulated_depreciation',
+    'closing_nbv', 'journal_entry_id', 'created_at'
+  ],
+  asset_transfers: [
+    'id', 'company_id', 'asset_id', 'transfer_date', 'from_warehouse_id', 'to_warehouse_id',
+    'from_department_id', 'to_department_id', 'from_cost_center_id', 'to_cost_center_id',
+    'from_custodian_id', 'to_custodian_id', 'from_location', 'to_location', 'reason', 'notes',
+    'created_by', 'created_at'
+  ],
+  asset_maintenance: [
+    'id', 'company_id', 'asset_id', 'maintenance_date', 'maintenance_type', 'supplier_id',
+    'cost', 'description', 'invoice_number', 'next_maintenance_date', 'is_capitalized',
+    'journal_entry_id', 'created_by', 'created_at'
+  ],
+  asset_revaluations: [
+    'id', 'company_id', 'asset_id', 'revaluation_date', 'old_value', 'new_value', 'difference',
+    'reason', 'journal_entry_id', 'status', 'created_by', 'created_at'
+  ],
+  asset_disposals: [
+    'id', 'company_id', 'asset_id', 'disposal_date', 'disposal_type', 'original_cost',
+    'accumulated_depreciation', 'net_book_value', 'disposal_proceeds', 'gain_loss_amount',
+    'buyer_name', 'customer_id', 'payment_account_id', 'invoice_number', 'journal_entry_id',
+    'notes', 'created_by', 'created_at'
   ]
 };
 

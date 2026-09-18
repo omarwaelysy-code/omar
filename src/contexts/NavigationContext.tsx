@@ -149,6 +149,9 @@ export const pageLabels: { [key: string]: string } = {
   'received_cheques': 'إدارة الشيكات الواردة',
   'receive_customer_cheque': 'استلام شيكات من عميل',
   'receive_other_cheque': 'استلام شيك',
+  'fixed_assets': 'إدارة الأصول الثابتة',
+  'asset_categories': 'تصنيفات الأصول',
+  'asset_depreciation': 'تشغيل إهلاك الأصول',
 };
 
 const getStorageKey = (companyId?: string) => {

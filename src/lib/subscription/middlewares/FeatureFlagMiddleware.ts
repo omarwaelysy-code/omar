@@ -65,6 +65,10 @@ const featureMap: Record<string, string> = {
   'detailed-journal-entries': 'accounting',
   'expenses': 'accounting',
   'expenses_report': 'accounting',
+  'fixed_assets': 'accounting',
+  'fixed-assets': 'accounting',
+  'asset_categories': 'accounting',
+  'asset_depreciation': 'accounting',
 
   // HR
   'employees': 'hr',

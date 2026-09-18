@@ -78,6 +78,12 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     modules: ['company_settings', 'discount_settings', 'backup_restore', 'templates', 'create_template', 'operation_categories', 'operation_fields', 'operations']
   },
   {
+    id: 'fixed_assets',
+    nameAr: 'الأصول الثابتة',
+    nameEn: 'Fixed Assets',
+    modules: ['fixed_assets', 'asset_categories', 'asset_depreciation']
+  },
+  {
     id: 'eta',
     nameAr: 'الفاتورة الإلكترونية (ETA)',
     nameEn: 'ETA e-Invoicing',
@@ -241,6 +247,42 @@ export const SPECIAL_PERMISSIONS_DESC: { [key: string]: { ar: string; en: string
     en: 'Cancel Cheque',
     descAr: 'يسمح بإلغاء الشيك وعكس أي أثر محاسبي له.',
     descEn: 'Allows cancelling the cheque and reversing any associated journal entries.'
+  },
+  capitalize: {
+    ar: 'رسملة واعتماد الأصل',
+    en: 'Capitalize Asset',
+    descAr: 'يسمح باعتماد الأصل ورسملته وتوليد قيد اليومية الرأسمالي وبدء الإهلاك.',
+    descEn: 'Allows capitalizing the asset, generating capitalization entry, and starting depreciation.'
+  },
+  depreciate: {
+    ar: 'تشغيل الإهلاك',
+    en: 'Run Depreciation',
+    descAr: 'يسمح بتشغيل دورة الإهلاك الدوري وترحيل قيود مصروف ومجمع الإهلاك.',
+    descEn: 'Allows running periodic depreciation and posting depreciation expense entries.'
+  },
+  transfer: {
+    ar: 'نقل الأصل وتغيير العهدة',
+    en: 'Transfer Asset / Custody',
+    descAr: 'يسمح بنقل الأصل بين الفروع والأقسام وتغيير الموظف المسؤول (العهدة).',
+    descEn: 'Allows transferring the asset between branches/departments and changing custodian.'
+  },
+  maintain: {
+    ar: 'تسجيل الصيانة',
+    en: 'Record Maintenance',
+    descAr: 'يسمح بتسجيل عمليات وتكاليف الصيانة وتحديد إن كانت مصروفاً أو مرسملة.',
+    descEn: 'Allows recording maintenance operations and deciding if capitalized or expensed.'
+  },
+  revalue: {
+    ar: 'إعادة تقييم الأصل',
+    en: 'Revalue Asset',
+    descAr: 'يسمح بإعادة تقييم القيمة الدفترية للأصل وإثبات فروق التقييم.',
+    descEn: 'Allows revaluing asset book value and recording revaluation difference.'
+  },
+  dispose: {
+    ar: 'استبعاد وبيع الأصل',
+    en: 'Dispose / Sell Asset',
+    descAr: 'يسمح باستبعاد أو بيع الأصل وحساب الأرباح والخسائر الرأسمالية وتوليد قيد الإقفال.',
+    descEn: 'Allows disposing or selling the asset, calculating gain/loss, and posting disposal entries.'
   }
 };
 
@@ -334,7 +376,25 @@ export const MODULE_PERMISSIONS_META: { [moduleId: string]: { labelAr: string; l
   eta_supplier_mapping: { labelAr: 'ربط الموردين (ETA)', labelEn: 'ETA Supplier Mapping', hasCrud: true, special: ['print', 'export_pdf', 'export_excel'] },
   eta_item_mapping: { labelAr: 'ربط الأصناف المستلمة (ETA)', labelEn: 'ETA Received Item Mapping', hasCrud: true, special: ['print', 'export_pdf', 'export_excel'] },
   eta_sent_item_mapping: { labelAr: 'ربط الأصناف الصادرة (ETA)', labelEn: 'ETA Issued Item Mapping', hasCrud: true, special: ['print', 'export_pdf', 'export_excel'] },
-  eta_tax_types: { labelAr: 'دليل أنواع الضرائب والرسوم (ETA)', labelEn: 'ETA Tax Types Guide', hasCrud: true, special: ['print', 'export_pdf', 'export_excel'] }
+  eta_tax_types: { labelAr: 'دليل أنواع الضرائب والرسوم (ETA)', labelEn: 'ETA Tax Types Guide', hasCrud: true, special: ['print', 'export_pdf', 'export_excel'] },
+  // Fixed Assets
+  fixed_assets: { 
+    labelAr: 'إدارة الأصول الثابتة', 
+    labelEn: 'Fixed Assets Management', 
+    hasCrud: true, 
+    special: ['capitalize', 'depreciate', 'transfer', 'maintain', 'revalue', 'dispose', 'print', 'export_pdf', 'export_excel'] 
+  },
+  asset_categories: { 
+    labelAr: 'تصنيفات الأصول الثابتة', 
+    labelEn: 'Asset Categories', 
+    hasCrud: true 
+  },
+  asset_depreciation: { 
+    labelAr: 'تشغيل وترحيل إهلاك الأصول', 
+    labelEn: 'Asset Depreciation Run', 
+    hasCrud: true, 
+    special: ['preview', 'post', 'print', 'export_excel'] 
+  }
 };
 
 export interface BusinessPermissionMeta {

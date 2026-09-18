@@ -31,6 +31,7 @@ import { EtaDocumentService } from '../services/eta/EtaDocumentService';
 import { EtaSupplierMappingService } from '../services/eta/EtaSupplierMappingService';
 import { EtaItemMappingService } from '../services/eta/EtaItemMappingService';
 import { EtaSubmissionService } from '../services/eta/EtaSubmissionService';
+import { fixedAssetsRouter } from './fixed-assets-endpoints';
 
 export function getEffectiveModule(moduleName: string): string {
   const mapping: { [key: string]: string } = {
@@ -45,6 +46,12 @@ export function getEffectiveModule(moduleName: string): string {
     opening_stock_items: 'opening_stock_balances',
     stock_adjustment_items: 'stock_adjustments',
     goods_receipt_items: 'goods_receipts',
+    asset_components: 'fixed_assets',
+    asset_depreciation_items: 'fixed_assets',
+    asset_transfers: 'fixed_assets',
+    asset_maintenance: 'fixed_assets',
+    asset_revaluations: 'fixed_assets',
+    asset_disposals: 'fixed_assets',
     roles: 'users'
   };
   return mapping[moduleName] || moduleName;
@@ -59,7 +66,7 @@ export function getInitialPermissionsState() {
     'customer_discounts', 'customer_settlements', 'purchase_orders', 'purchase_invoices',
     'purchase_returns', 'supplier_discounts', 'supplier_settlements', 'warehouses',
     'goods_receipts', 'warehouse_transfers', 'opening_stock_balances', 'stock_adjustments',
-    'receipts', 'payment_vouchers', 'cash_transfers', 'cash_balances', 'issued_cheques', 'received_cheques', 'account_types',
+    'receipts', 'payment_vouchers', 'cash_transfers', 'cash_balances', 'issued_cheques', 'received_cheques', 'fixed_assets', 'asset_categories', 'asset_depreciation', 'account_types',
     'accounts', 'chart_of_accounts', 'create_journal_entry', 'journal_entries',
     'detailed_journal_entries', 'customer_statement', 'supplier_statement',
     'customer_balances', 'supplier_balances', 'sales_report', 'expenses_report',
@@ -72,6 +79,9 @@ export function getInitialPermissionsState() {
   
   const specials: any = {
     period_closing: ['reopen', 'bulk_close', 'bypass'],
+    fixed_assets: ['capitalize', 'depreciate', 'transfer', 'maintain', 'revalue', 'dispose', 'print', 'export_pdf', 'export_excel'],
+    asset_categories: ['create', 'edit', 'delete'],
+    asset_depreciation: ['preview', 'post', 'print', 'export_excel'],
     quotations: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy'],
     sales_orders: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved'],
     invoices: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved', 'view_cost', 'view_profit_margin', 'change_prices', 'allow_negative'],
@@ -2332,7 +2342,9 @@ const modules = [
   'sales_orders', 'sales_order_items', 'purchase_orders', 'purchase_order_items', 'employees',
   'warehouse_transfers', 'warehouse_transfer_items', 'opening_stock_balances', 'opening_stock_items',
   'stock_adjustments', 'stock_adjustment_items', 'templates', 'paper_sizes', 'template_versions', 'print_profiles',
-  'dashboards', 'widgets', 'goods_receipts', 'goods_receipt_items', 'purchase_invoice_goods_receipts'
+  'dashboards', 'widgets', 'goods_receipts', 'goods_receipt_items', 'purchase_invoice_goods_receipts',
+  'asset_categories', 'fixed_assets', 'asset_components', 'asset_depreciation_runs', 'asset_depreciation_items',
+  'asset_transfers', 'asset_maintenance', 'asset_revaluations', 'asset_disposals'
 ];
 
 // --- Flexible Operations Logic ---
@@ -2574,7 +2586,8 @@ export const SEQUENCE_MODULE_CONFIG: Record<string, { table: string; field: stri
   'employees': { table: 'employees', field: 'employee_code', prefix: 'EMP', padLength: 5, periodType: 'month' },
   'cash_transfers': { table: 'cash_transfers', field: 'transfer_number', prefix: 'CT', padLength: 6, periodType: 'month' },
   'issued_cheques': { table: 'issued_cheques', field: 'serial_number', prefix: 'CHQ', padLength: 6, periodType: 'month' },
-  'received_cheques': { table: 'received_cheques', field: 'serial_number', prefix: 'RCV', padLength: 6, periodType: 'month' }
+  'received_cheques': { table: 'received_cheques', field: 'serial_number', prefix: 'RCV', padLength: 6, periodType: 'month' },
+  'fixed_assets': { table: 'fixed_assets', field: 'asset_number', prefix: 'AST', padLength: 6, periodType: 'month' }
 };
 
 export async function getNextAtomicSequence(
@@ -2611,7 +2624,8 @@ export async function getNextAtomicSequence(
     'purchase_orders': { table: 'purchase_orders', field: 'order_number', prefix: 'PO' },
     'goods_receipts': { table: 'goods_receipts', field: 'receipt_number', prefix: 'GR' },
     'employees': { table: 'employees', field: 'employee_code', prefix: 'EMP' },
-    'cash_transfers': { table: 'cash_transfers', field: 'transfer_number', prefix: 'CT' }
+    'cash_transfers': { table: 'cash_transfers', field: 'transfer_number', prefix: 'CT' },
+    'fixed_assets': { table: 'fixed_assets', field: 'asset_number', prefix: 'AST' }
   };
 
   const target = tableNames[module];
@@ -4821,6 +4835,9 @@ const receivedChequeCancelHandler = async (req: AuthRequest, res: any) => {
 };
 
 router.post(['/received-cheques/:id/cancel', '/received_cheques/:id/cancel'], authenticateToken, receivedChequeCancelHandler);
+
+// Mount Fixed Assets Module Router
+router.use(fixedAssetsRouter);
 
 modules.forEach(moduleName => {
   const hyphenName = moduleName.replace(/_/g, '-');

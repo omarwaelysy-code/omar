@@ -80,6 +80,7 @@ const EtaSupplierMapping = React.lazy(() => import('./pages/EtaSupplierMapping')
 const EtaItemMapping = React.lazy(() => import('./pages/EtaItemMapping').then(m => ({ default: m.EtaItemMapping })));
 const EtaSentItemMapping = React.lazy(() => import('./pages/EtaSentItemMapping').then(m => ({ default: m.EtaSentItemMapping })));
 const EtaTaxTypesGuide = React.lazy(() => import('./pages/EtaTaxTypesGuide').then(m => ({ default: m.EtaTaxTypesGuide })));
+const FixedAssets = React.lazy(() => import('./pages/FixedAssets').then(m => ({ default: m.FixedAssets })));
 
 import { useNavigation } from './contexts/NavigationContext';
 import { useLanguage } from './contexts/LanguageContext';
@@ -308,6 +309,10 @@ export default function App() {
       case 'eta_item_mapping': return <EtaItemMapping />;
       case 'eta_sent_item_mapping': return <EtaSentItemMapping />;
       case 'eta_tax_types': return <EtaTaxTypesGuide />;
+      case 'fixed_assets': return <FixedAssets initialTab="register" />;
+      case 'asset_categories': return <FixedAssets initialTab="categories" />;
+      case 'asset_depreciation': return <FixedAssets initialTab="depreciation" />;
+      case 'fixed_assets_reports': return <FixedAssets initialTab="reports" />;
       default: return <Dashboard />;
     }
   }

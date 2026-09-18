@@ -236,6 +236,11 @@ export const ar = {
 
   'operation_fields.title': 'حقول البيانات',
   'operation_fields.add': 'إضافة تعريف حقل',
+  'nav.fixed_assets': 'الأصول الثابتة',
+  'nav.fixed_assets_register': 'سجل الأصول الثابتة',
+  'nav.asset_categories': 'تصنيفات الأصول',
+  'nav.asset_depreciation': 'تشغيل الإهلاك',
+  'nav.fixed_assets_reports': 'تقارير الأصول الثابتة',
   'nav.general_ledger': 'الحسابات العامة',
   'nav.account_types': 'أنواع الحسابات',
   'nav.accounts': 'دليل الحسابات',

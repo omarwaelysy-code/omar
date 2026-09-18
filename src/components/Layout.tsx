@@ -61,7 +61,8 @@ import {
   Trash2,
   Edit3,
   Printer,
-  Monitor
+  Monitor,
+  Briefcase
 } from 'lucide-react';
 
 import { useAuth } from '../contexts/AuthContext';
@@ -145,6 +146,11 @@ const getTabIcon = (id: string) => {
     case 'company_settings':
     case 'companies':
       return <Building2 {...iconProps} />;
+    case 'fixed_assets':
+    case 'asset_categories':
+    case 'asset_depreciation':
+    case 'fixed_assets_reports':
+      return <Briefcase {...iconProps} />;
     case 'cost_centers':
     case 'account_types':
     case 'chart_of_accounts':
@@ -660,6 +666,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'detailed_journal_entries', label: t('nav.detailed_journal_entries') || 'قيود يومية تفصيلية', icon: FileSpreadsheet }
         ]
       },
+      { 
+        id: 'fixed_assets_menu', 
+        label: t('nav.fixed_assets') || 'الأصول الثابتة', 
+        icon: Briefcase,
+        subItems: [
+          { id: 'fixed_assets', label: t('nav.fixed_assets_register') || 'سجل الأصول الثابتة', icon: Briefcase },
+          { id: 'asset_categories', label: t('nav.asset_categories') || 'تصنيفات الأصول', icon: Folder },
+          { id: 'asset_depreciation', label: t('nav.asset_depreciation') || 'تشغيل الإهلاك', icon: History },
+          { id: 'fixed_assets_reports', label: t('nav.fixed_assets_reports') || 'تقارير الأصول الثابتة', icon: BarChart3 }
+        ]
+      },
       {
         id: 'templates_menu',
         label: t('nav.templates') || 'القوالب',
@@ -766,6 +783,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         'purchases': 'purchases',
         'warehouses_menu': 'inventory',
         'general_ledger': 'accounting',
+        'fixed_assets_menu': 'accounting',
         'cash': 'accounting'
       };
       

@@ -236,6 +236,11 @@ export const en = {
 
   'operation_fields.title': 'Data Fields',
   'operation_fields.add': 'Add Field Definition',
+  'nav.fixed_assets': 'Fixed Assets',
+  'nav.fixed_assets_register': 'Asset Register',
+  'nav.asset_categories': 'Asset Categories',
+  'nav.asset_depreciation': 'Depreciation Run',
+  'nav.fixed_assets_reports': 'Fixed Assets Reports',
   'nav.general_ledger': 'General Ledger',
   'nav.account_types': 'Account Types',
   'nav.accounts': 'Chart of Accounts',
