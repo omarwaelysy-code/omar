@@ -2621,11 +2621,12 @@ export const Receipts: React.FC = () => {
             <button
               type="button"
               onClick={() => setShowAiInput(!showAiInput)}
-              className={`absolute ${dir === 'rtl' ? 'left-0 rounded-r-xl border-l-0' : 'right-0 rounded-l-xl border-r-0'} top-1/4 z-[60] flex items-center gap-2 px-2 py-3 bg-indigo-600 text-white font-black text-[10px] shadow-lg hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all [writing-mode:vertical-lr] border border-indigo-500 ${showAiInput ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+              title={language === 'ar' ? 'الإنشاء الذكي بالذكاء الاصطناعي' : 'Smart AI Creation'}
+              className={`absolute ${dir === 'rtl' ? 'left-0 rounded-r-lg border-l-0' : 'right-0 rounded-l-lg border-r-0'} top-24 z-[60] flex items-center gap-1 px-1 py-1.5 bg-indigo-600 text-white font-bold text-[8px] tracking-tight shadow-md hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all [writing-mode:vertical-lr] border border-indigo-500/80 ${showAiInput ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
               style={{ direction: 'ltr' }}
             >
-              <Sparkles size={12} className="animate-bounce mb-1" />
-              <span>{language === 'ar' ? 'الإنشاء الذكي بالذكاء الاصطناعي' : 'Smart AI Creation'}</span>
+              <Sparkles size={10} className="animate-pulse mb-0.5 text-indigo-200" />
+              <span>{language === 'ar' ? 'الإنشاء الذكي' : 'Smart AI'}</span>
             </button>
 
             {/* AI Drawer (Smart Creation) sliding from the side */}

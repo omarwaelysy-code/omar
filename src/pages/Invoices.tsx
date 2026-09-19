@@ -4863,11 +4863,12 @@ export const Invoices: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowAiInput(!showAiInput)}
-                className={`absolute ${dir === 'rtl' ? 'left-0 rounded-r-xl border-l-0' : 'right-0 rounded-l-xl border-r-0'} top-1/4 z-[60] flex items-center gap-2 px-2 py-3 bg-indigo-600 text-white font-black text-[10px] shadow-lg hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all [writing-mode:vertical-lr] border border-indigo-500 ${showAiInput ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+                title={language === 'ar' ? 'الإنشاء الذكي بالذكاء الاصطناعي' : 'Smart AI Creation'}
+                className={`absolute ${dir === 'rtl' ? 'left-0 rounded-r-lg border-l-0' : 'right-0 rounded-l-lg border-r-0'} top-24 z-[60] flex items-center gap-1 px-1 py-1.5 bg-indigo-600 text-white font-bold text-[8px] tracking-tight shadow-md hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all [writing-mode:vertical-lr] border border-indigo-500/80 ${showAiInput ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
                 style={{ direction: 'ltr' }}
               >
-                <Sparkles size={12} className="animate-bounce mb-1" />
-                <span>{language === 'ar' ? 'الإنشاء الذكي بالذكاء الاصطناعي' : 'Smart AI Creation'}</span>
+                <Sparkles size={10} className="animate-pulse mb-0.5 text-indigo-200" />
+                <span>{language === 'ar' ? 'الإنشاء الذكي' : 'Smart AI'}</span>
               </button>
 
               <div className="flex-1 p-1.5 md:p-2.5 space-y-1.5 overflow-y-auto pb-3">
@@ -5550,7 +5551,7 @@ export const Invoices: React.FC = () => {
                         </div>
 
                       <div className="overflow-x-auto rounded-xl border border-zinc-200 overflow-hidden">
-                        <table className="w-full text-sm text-right border-collapse table-fixed min-w-[1150px]">
+                        <table className="w-full text-sm text-right border-collapse table-fixed min-w-[1250px]">
                           <thead>
                             <tr className="bg-zinc-100 border-b border-zinc-200 text-zinc-700 text-xs font-bold">
                               <th className="p-1 border-r border-zinc-200 text-right w-80 min-w-[320px]">{t('invoices.item_name')}</th>
@@ -5568,6 +5569,7 @@ export const Invoices: React.FC = () => {
                                 </>
                               )}
                               <th className="p-1 border-r border-zinc-200 text-center w-16">{language === 'ar' ? 'ض.خ.إ %' : 'WHT %'}</th>
+                              <th className="p-1 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'مبلغ ض.خ.إ' : 'WHT Amount'}</th>
                               <th className="p-1 border-r border-zinc-200 text-center w-24">{t('invoices.item_total')}</th>
                               <th className="p-1 w-10"></th>
                             </tr>
@@ -5876,8 +5878,35 @@ export const Invoices: React.FC = () => {
                                     <span className="text-xs text-zinc-700 font-bold">%</span>
                                   </div>
                                 </td>
+                                <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-amber-700 text-xs">
+                                  {(() => {
+                                    const qty = Number(item.quantity) || 0;
+                                    const price = Number(item.unit_price) || 0;
+                                    const rate = Number(item.withholding_tax_rate) || 0;
+                                    const wAmount = (item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null && Number(item.withholding_tax_amount) > 0)
+                                      ? Number(item.withholding_tax_amount)
+                                      : (qty * price * (rate / 100));
+                                    return wAmount > 0 ? `-${formatMoney(wAmount)}` : formatMoney(0);
+                                  })()}
+                                </td>
                                 <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-emerald-600 text-xs">
-                                  {formatMoney(item.total)}
+                                  {(() => {
+                                    const qty = Number(item.quantity) || 0;
+                                    const price = Number(item.unit_price) || 0;
+                                    const base = qty * price;
+                                    const vatRate = Number(item.vat_rate) || 0;
+                                    const vatAmount = isVatEnabled
+                                      ? ((item.vat_amount !== undefined && item.vat_amount !== null && Number(item.vat_amount) > 0)
+                                          ? Number(item.vat_amount)
+                                          : (base * (vatRate / 100)))
+                                      : 0;
+                                    const whtRate = Number(item.withholding_tax_rate) || 0;
+                                    const whtAmount = (item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null && Number(item.withholding_tax_amount) > 0)
+                                      ? Number(item.withholding_tax_amount)
+                                      : (base * (whtRate / 100));
+                                    const rowTotal = base + vatAmount - whtAmount;
+                                    return formatMoney(rowTotal);
+                                  })()}
                                 </td>
                                 <td className="p-0.5 border-b border-zinc-200 w-10 text-center">
                                   <button 
@@ -5892,7 +5921,7 @@ export const Invoices: React.FC = () => {
                             ))}
                             {items.length === 0 && (
                               <tr>
-                                <td colSpan={isVatEnabled ? 11 : 10} className="px-3 py-6 text-center text-zinc-400 italic text-xs">
+                                <td colSpan={isVatEnabled ? 14 : 12} className="px-3 py-6 text-center text-zinc-400 italic text-xs">
                                   {t('common.no_items')}
                                 </td>
                               </tr>

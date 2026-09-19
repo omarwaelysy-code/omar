@@ -5064,7 +5064,7 @@ export const PurchaseInvoices: React.FC = () => {
                     <div className="p-4 border-b border-zinc-100 flex items-center justify-between">
                       <div className="flex items-center gap-2 text-indigo-600 font-bold">
                         <Sparkles size={20} className="animate-pulse" />
-                        <span className="text-sm font-black">{language === 'ar' ? '\u0627\u0644\u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0630\u0643\u064a \u0628\u0627\u0644\u0630\u0643\u0627\u0621 \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064a' : 'Smart AI Creation'}</span>
+                        <span className="text-sm font-black">{language === 'ar' ? '\u0627\u0644\u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0630\u0643\u064a \u0628\u0627\u0644\u0630\u0643\u0627\u0621 \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0641\u064a' : 'Smart AI Creation'}</span>
                       </div>
                       <button onClick={() => setShowAiInput(false)} className="p-2 text-zinc-400 hover:text-zinc-655 rounded-lg hover:bg-zinc-50 transition-all">
                         <X size={20} />
@@ -5084,11 +5084,12 @@ export const PurchaseInvoices: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowAiInput(!showAiInput)}
-                className={`absolute ${dir === 'rtl' ? 'left-0 rounded-r-xl border-l-0' : 'right-0 rounded-l-xl border-r-0'} top-1/4 z-[60] flex items-center gap-2 px-2 py-3 bg-indigo-600 text-white font-black text-[10px] shadow-lg hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all [writing-mode:vertical-lr] border border-indigo-500 ${showAiInput ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+                title={language === 'ar' ? 'الإنشاء الذكي بالذكاء الاصطناعي' : 'Smart AI Creation'}
+                className={`absolute ${dir === 'rtl' ? 'left-0 rounded-r-lg border-l-0' : 'right-0 rounded-l-lg border-r-0'} top-24 z-[60] flex items-center gap-1 px-1 py-1.5 bg-indigo-600 text-white font-bold text-[8px] tracking-tight shadow-md hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all [writing-mode:vertical-lr] border border-indigo-500/80 ${showAiInput ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
                 style={{ direction: 'ltr' }}
               >
-                <Sparkles size={12} className="animate-bounce mb-1" />
-                <span>{language === 'ar' ? '\u0627\u0644\u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0630\u0643\u064a \u0628\u0627\u0644\u0630\u0643\u0627\u0621 \u0627\u0644\u0627\u0635\u0637\u0646\u0627\u0639\u064a' : 'Smart AI Creation'}</span>
+                <Sparkles size={10} className="animate-pulse mb-0.5 text-indigo-200" />
+                <span>{language === 'ar' ? 'الإنشاء الذكي' : 'Smart AI'}</span>
               </button>
 
               <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32 md:pb-8">
@@ -5604,7 +5605,7 @@ export const PurchaseInvoices: React.FC = () => {
                         </div>
 
                         <div className="overflow-x-auto rounded-xl border border-zinc-200 overflow-hidden shadow-sm">
-                          <table className="w-full text-sm text-right border-collapse table-fixed min-w-[1250px]">
+                          <table className="w-full text-sm text-right border-collapse table-fixed min-w-[1300px]">
                             <thead>
                               <tr className="bg-zinc-100 border-b border-zinc-200 text-zinc-700 text-xs font-bold">
                                 <th className="p-2 border-r border-zinc-200 text-right w-80 min-w-[320px]">{invoiceData.purchase_type === 'items' ? t('pi.item') : t('pi.expense_item')}</th>
@@ -5622,6 +5623,7 @@ export const PurchaseInvoices: React.FC = () => {
                                   </>
                                 )}
                                 <th className="p-2 border-r border-zinc-200 text-center w-16">{language === 'ar' ? 'ض.خ.إ %' : 'WHT %'}</th>
+                                <th className="p-2 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'مبلغ ض.خ.إ' : 'WHT Amount'}</th>
                                 <th className="p-2 border-r border-zinc-200 text-center w-24">{t('pi.total')}</th>
                                 <th className="p-2 w-10"></th>
                               </tr>
@@ -5629,7 +5631,7 @@ export const PurchaseInvoices: React.FC = () => {
                             <tbody className="divide-y divide-zinc-100">
                               {items.length === 0 ? (
                                 <tr>
-                                  <td colSpan={isVatEnabled ? 12 : 10} className="px-6 py-12 text-center text-slate-400 italic font-medium">{t('pi.no_items_added')}</td>
+                                  <td colSpan={isVatEnabled ? 14 : 12} className="px-6 py-12 text-center text-slate-400 italic font-medium">{t('pi.no_items_added')}</td>
                                 </tr>
                               ) : items.map((item, index) => (
                                 <tr key={index} className="group hover:bg-zinc-50 transition-colors">
@@ -5761,7 +5763,7 @@ export const PurchaseInvoices: React.FC = () => {
                                           <button
                                             type="button"
                                             onClick={() => updateItem(index, 'operation_id', '')}
-                                            className={`absolute ${dir === 'rtl' ? 'left-1' : 'right-1'} inset-y-0 flex items-center px-1 text-zinc-400 hover:text-red-505`}
+                                            className={`absolute ${dir === 'rtl' ? 'left-1' : 'right-1'} inset-y-0 flex items-center px-1 text-zinc-400 hover:text-red-500`}
                                           >
                                             <X size={10} />
                                           </button>
@@ -5824,7 +5826,7 @@ export const PurchaseInvoices: React.FC = () => {
                                           <button
                                             type="button"
                                             onClick={() => updateItem(index, 'department_id', '')}
-                                            className={`absolute ${dir === 'rtl' ? 'left-1' : 'right-1'} inset-y-0 flex items-center px-1 text-zinc-400 hover:text-red-550`}
+                                            className={`absolute ${dir === 'rtl' ? 'left-1' : 'right-1'} inset-y-0 flex items-center px-1 text-zinc-400 hover:text-red-500`}
                                           >
                                             <X size={10} />
                                           </button>
@@ -5961,9 +5963,38 @@ export const PurchaseInvoices: React.FC = () => {
                                     </div>
                                   </td>
 
+                                  {/* WHT Amount */}
+                                  <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-amber-700 text-xs">
+                                    {(() => {
+                                      const qty = Number(item.quantity) || 0;
+                                      const price = Number(item.cost_price || (item as any).unit_price || 0);
+                                      const rate = Number((item as any).withholding_tax_rate) || 0;
+                                      const wAmount = ((item as any).withholding_tax_amount !== undefined && (item as any).withholding_tax_amount !== null && Number((item as any).withholding_tax_amount) > 0)
+                                        ? Number((item as any).withholding_tax_amount)
+                                        : (qty * price * (rate / 100));
+                                      return wAmount > 0 ? `-${formatMoney(wAmount)}` : formatMoney(0);
+                                    })()}
+                                  </td>
+
                                   {/* Total */}
                                   <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-emerald-600 text-xs">
-                                    {formatMoney(item.total || 0)}
+                                    {(() => {
+                                      const qty = Number(item.quantity) || 0;
+                                      const price = Number(item.cost_price || (item as any).unit_price || 0);
+                                      const base = qty * price;
+                                      const vatRate = Number((item as any).vat_rate) || 0;
+                                      const vatAmount = isVatEnabled
+                                        ? (((item as any).vat_amount !== undefined && (item as any).vat_amount !== null && Number((item as any).vat_amount) > 0)
+                                            ? Number((item as any).vat_amount)
+                                            : (base * (vatRate / 100)))
+                                        : 0;
+                                      const whtRate = Number((item as any).withholding_tax_rate) || 0;
+                                      const whtAmount = ((item as any).withholding_tax_amount !== undefined && (item as any).withholding_tax_amount !== null && Number((item as any).withholding_tax_amount) > 0)
+                                        ? Number((item as any).withholding_tax_amount)
+                                        : (base * (whtRate / 100));
+                                      const rowTotal = base + vatAmount - whtAmount;
+                                      return formatMoney(rowTotal);
+                                    })()}
                                   </td>
 
                                   {/* Delete button */}

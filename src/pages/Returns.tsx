@@ -3309,17 +3309,38 @@ export const Returns: React.FC = () => {
                                   <span className="text-xs text-zinc-900 font-bold">%</span>
                                 </div>
                               </td>
-                              <td className="p-0.5 border-b border-r border-zinc-200 w-20 text-center font-bold text-amber-600 text-xs">
-                                {formatMoney(
-                                  (item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null && Number(item.withholding_tax_amount) > 0)
+                              <td className="p-0.5 border-b border-r border-zinc-200 w-20 text-center font-bold text-amber-700 text-xs">
+                                {(() => {
+                                  const qty = Number(item.quantity) || 0;
+                                  const price = Number(item.unit_price) || 0;
+                                  const rate = Number(item.withholding_tax_rate) || 0;
+                                  const wAmount = (item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null && Number(item.withholding_tax_amount) > 0)
                                     ? Number(item.withholding_tax_amount)
-                                    : ((Number(item.quantity) || 0) * (Number(item.unit_price) || 0) * ((Number(item.withholding_tax_rate) || 0) / 100))
-                                )}
+                                    : (qty * price * (rate / 100));
+                                  return wAmount > 0 ? `-${formatMoney(wAmount)}` : formatMoney(0);
+                                })()}
                               </td>
                             </>
                             )}
                             <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-emerald-600 text-xs">
-                              {formatMoney(item.total)}
+                              {(() => {
+                                const qty = Number(item.quantity) || 0;
+                                const price = Number(item.unit_price) || 0;
+                                const base = qty * price;
+                                const isVat = ((company?.settings?.vat_enabled !== false && company?.vat_enabled !== false) ? true : false);
+                                const vatRate = Number(item.vat_rate) || 0;
+                                const vatAmount = isVat
+                                  ? ((item.vat_amount !== undefined && item.vat_amount !== null && Number(item.vat_amount) > 0)
+                                      ? Number(item.vat_amount)
+                                      : (base * (vatRate / 100)))
+                                  : 0;
+                                const whtRate = Number(item.withholding_tax_rate) || 0;
+                                const whtAmount = (item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null && Number(item.withholding_tax_amount) > 0)
+                                  ? Number(item.withholding_tax_amount)
+                                  : (base * (whtRate / 100));
+                                const rowTotal = base + vatAmount - whtAmount;
+                                return formatMoney(rowTotal);
+                              })()}
                             </td>
                             <td className="p-0.5 border-b border-zinc-200 w-10 text-center">
                               <button 
