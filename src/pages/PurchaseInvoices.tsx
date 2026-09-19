@@ -70,6 +70,7 @@ export const PurchaseInvoices: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [companyData, setCompanyData] = useState<Company | null>(null);
   const isVatEnabled = companyData?.settings?.vat_enabled !== false && companyData?.vat_enabled !== false;
+  const isPurchaseWhtEnabled = !!(companyData?.settings?.purchase_wht_enabled ?? companyData?.purchase_wht_enabled);
   const isMultiCurrencyEnabled = companyData?.settings?.enable_multi_currency || (companyData as any)?.enable_multi_currency || false;
   const [settings, setSettings] = useState<any>(null);
   const [purchaseInvoices, setPurchaseInvoices] = useState<any[]>([]);
@@ -2296,7 +2297,7 @@ export const PurchaseInvoices: React.FC = () => {
           return sum + vAmount;
         }, 0)
       : 0;
-    const whtTotal = calculateWithholdingTax();
+    const whtTotal = isPurchaseWhtEnabled ? calculateWithholdingTax() : 0;
     return subtotal + vatTotal - (invoiceData.discount || 0) - whtTotal;
   };
 
@@ -3739,7 +3740,7 @@ export const PurchaseInvoices: React.FC = () => {
     if (visibleColumns.remaining_foreign && isMultiCurrencyEnabled) keyMap['formatted_remaining_foreign'] = 'الباقي بالعملة الأجنبية';
     if (visibleColumns.subtotal && isVatEnabled) keyMap['formatted_subtotal'] = 'قبل الضريبة';
     if (visibleColumns.tax_amount && isVatEnabled) keyMap['formatted_tax_amount'] = 'الضريبة';
-    if (visibleColumns.withholding_tax_amount) keyMap['formatted_withholding_tax'] = language === 'ar' ? 'ض.خ.إ (خصم وإضافة)' : 'Withholding Tax';
+    if (visibleColumns.withholding_tax_amount && isPurchaseWhtEnabled) keyMap['formatted_withholding_tax'] = language === 'ar' ? 'ض.خ.إ (خصم وإضافة)' : 'Withholding Tax';
     if (visibleColumns.base_amount) keyMap['formatted_base_amount'] = 'القيمة المعادلة بالعملة المحلية';
     if (visibleColumns.remaining) keyMap['formatted_remaining'] = 'الباقي من الفاتورة';
     if (visibleColumns.entry_number) keyMap['formatted_entry_number'] = 'رقم القيد';
@@ -4015,6 +4016,9 @@ export const PurchaseInvoices: React.FC = () => {
                         if (colKey === 'subtotal' || colKey === 'tax_amount') {
                           return isVatEnabled;
                         }
+                        if (colKey === 'withholding_tax_amount') {
+                          return isPurchaseWhtEnabled;
+                        }
                         return true;
                       }).map((colKey) => {
                         const labels: Record<string, string> = {
@@ -4269,7 +4273,7 @@ export const PurchaseInvoices: React.FC = () => {
                           {renderResizeHandles('tax_amount')}
                         </th>
                       )}
-                      {visibleColumns.withholding_tax_amount && (
+                      {visibleColumns.withholding_tax_amount && isPurchaseWhtEnabled && (
                         <th 
                           style={{ width: columnWidths.withholding_tax_amount || 110, minWidth: columnWidths.withholding_tax_amount || 110 }} 
                           className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
@@ -4406,6 +4410,9 @@ export const PurchaseInvoices: React.FC = () => {
                             if (colKey === 'subtotal' || colKey === 'tax_amount') {
                               return isVatEnabled;
                             }
+                            if (colKey === 'withholding_tax_amount') {
+                              return isPurchaseWhtEnabled;
+                            }
                             return true;
                           }).map((colKey) => {
                             if (!visibleColumns[colKey]) return null;
@@ -4426,6 +4433,7 @@ export const PurchaseInvoices: React.FC = () => {
                           if (!visibleColumns[k]) return false;
                           if (k === 'currency' || k === 'foreign_amount' || k === 'remaining_foreign') return isMultiCurrencyEnabled;
                           if (k === 'subtotal' || k === 'tax_amount') return isVatEnabled;
+                          if (k === 'withholding_tax_amount') return isPurchaseWhtEnabled;
                           return true;
                         }).length + 2} className="px-6 py-12 text-center text-slate-500 italic font-medium whitespace-nowrap">{t('common.no_data')}</td>
                       </tr>
@@ -4571,7 +4579,7 @@ export const PurchaseInvoices: React.FC = () => {
                               {formatMoney((Number(inv.tax_amount) || 0) * (Number(inv.exchange_rate) || 1))}
                             </td>
                           )}
-                          {visibleColumns.withholding_tax_amount && (
+                          {visibleColumns.withholding_tax_amount && isPurchaseWhtEnabled && (
                             <td style={{ width: columnWidths.withholding_tax_amount || 110, minWidth: columnWidths.withholding_tax_amount || 110 }} className={`px-6 py-0.5 font-bold text-amber-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {formatMoney((Number(inv.withholding_tax_amount) || 0) * (Number(inv.exchange_rate) || 1))}
                             </td>
@@ -5525,7 +5533,7 @@ export const PurchaseInvoices: React.FC = () => {
                               </div>
                             );
                           })()}
-                          {(() => {
+                          {isPurchaseWhtEnabled && (() => {
                             const calculatedWhtAmount = calculateWithholdingTax();
                             if (calculatedWhtAmount <= 0) return null;
                             return (
@@ -5622,8 +5630,12 @@ export const PurchaseInvoices: React.FC = () => {
                                     <th className="p-2 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'مبلغ الضريبة' : 'VAT Amount'}</th>
                                   </>
                                 )}
-                                <th className="p-2 border-r border-zinc-200 text-center w-16">{language === 'ar' ? 'ض.خ.إ %' : 'WHT %'}</th>
-                                <th className="p-2 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'مبلغ ض.خ.إ' : 'WHT Amount'}</th>
+                                {isPurchaseWhtEnabled && (
+                                  <>
+                                    <th className="p-2 border-r border-zinc-200 text-center w-16">{language === 'ar' ? 'ض.خ.إ %' : 'WHT %'}</th>
+                                    <th className="p-2 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'مبلغ ض.خ.إ' : 'WHT Amount'}</th>
+                                  </>
+                                )}
                                 <th className="p-2 border-r border-zinc-200 text-center w-24">{t('pi.total')}</th>
                                 <th className="p-2 w-10"></th>
                               </tr>
@@ -5631,7 +5643,7 @@ export const PurchaseInvoices: React.FC = () => {
                             <tbody className="divide-y divide-zinc-100">
                               {items.length === 0 ? (
                                 <tr>
-                                  <td colSpan={isVatEnabled ? 14 : 12} className="px-6 py-12 text-center text-slate-400 italic font-medium">{t('pi.no_items_added')}</td>
+                                  <td colSpan={10 + (isVatEnabled ? 2 : 0) + (isPurchaseWhtEnabled ? 2 : 0)} className="px-6 py-12 text-center text-slate-400 italic font-medium">{t('pi.no_items_added')}</td>
                                 </tr>
                               ) : items.map((item, index) => (
                                 <tr key={index} className="group hover:bg-zinc-50 transition-colors">
@@ -5946,35 +5958,39 @@ export const PurchaseInvoices: React.FC = () => {
                                     </>
                                   )}
 
-                                  {/* WHT % */}
-                                  <td className="p-0.5 border-b border-r border-zinc-200 w-16">
-                                    <div className="flex items-center justify-center gap-0.5">
-                                      <input 
-                                        type="number" 
-                                        min={0}
-                                        max={100}
-                                        step="0.01"
-                                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                        value={(item as any).withholding_tax_rate !== undefined && (item as any).withholding_tax_rate !== null ? Number((item as any).withholding_tax_rate) : ''}
-                                        placeholder="0"
-                                        onChange={(e) => updateItem(index, 'withholding_tax_rate', parseFloat(e.target.value) || 0)}
-                                      />
-                                      <span className="text-xs text-zinc-700 font-bold">%</span>
-                                    </div>
-                                  </td>
+                                  {isPurchaseWhtEnabled && (
+                                    <>
+                                      {/* WHT % */}
+                                      <td className="p-0.5 border-b border-r border-zinc-200 w-16">
+                                        <div className="flex items-center justify-center gap-0.5">
+                                          <input 
+                                            type="number" 
+                                            min={0}
+                                            max={100}
+                                            step="0.01"
+                                            className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            value={(item as any).withholding_tax_rate !== undefined && (item as any).withholding_tax_rate !== null ? Number((item as any).withholding_tax_rate) : ''}
+                                            placeholder="0"
+                                            onChange={(e) => updateItem(index, 'withholding_tax_rate', parseFloat(e.target.value) || 0)}
+                                          />
+                                          <span className="text-xs text-zinc-700 font-bold">%</span>
+                                        </div>
+                                      </td>
 
-                                  {/* WHT Amount */}
-                                  <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-amber-700 text-xs">
-                                    {(() => {
-                                      const qty = Number(item.quantity) || 0;
-                                      const price = Number(item.cost_price || (item as any).unit_price || 0);
-                                      const rate = Number((item as any).withholding_tax_rate) || 0;
-                                      const wAmount = ((item as any).withholding_tax_amount !== undefined && (item as any).withholding_tax_amount !== null && Number((item as any).withholding_tax_amount) > 0)
-                                        ? Number((item as any).withholding_tax_amount)
-                                        : (qty * price * (rate / 100));
-                                      return wAmount > 0 ? `-${formatMoney(wAmount)}` : formatMoney(0);
-                                    })()}
-                                  </td>
+                                      {/* WHT Amount */}
+                                      <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-amber-700 text-xs">
+                                        {(() => {
+                                          const qty = Number(item.quantity) || 0;
+                                          const price = Number(item.cost_price || (item as any).unit_price || 0);
+                                          const rate = Number((item as any).withholding_tax_rate) || 0;
+                                          const wAmount = ((item as any).withholding_tax_amount !== undefined && (item as any).withholding_tax_amount !== null && Number((item as any).withholding_tax_amount) > 0)
+                                            ? Number((item as any).withholding_tax_amount)
+                                            : (qty * price * (rate / 100));
+                                          return wAmount > 0 ? `-${formatMoney(wAmount)}` : formatMoney(0);
+                                        })()}
+                                      </td>
+                                    </>
+                                  )}
 
                                   {/* Total */}
                                   <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-emerald-600 text-xs">
@@ -5988,10 +6004,12 @@ export const PurchaseInvoices: React.FC = () => {
                                             ? Number((item as any).vat_amount)
                                             : (base * (vatRate / 100)))
                                         : 0;
-                                      const whtRate = Number((item as any).withholding_tax_rate) || 0;
-                                      const whtAmount = ((item as any).withholding_tax_amount !== undefined && (item as any).withholding_tax_amount !== null && Number((item as any).withholding_tax_amount) > 0)
-                                        ? Number((item as any).withholding_tax_amount)
-                                        : (base * (whtRate / 100));
+                                      const whtRate = isPurchaseWhtEnabled ? (Number((item as any).withholding_tax_rate) || 0) : 0;
+                                      const whtAmount = isPurchaseWhtEnabled
+                                        ? (((item as any).withholding_tax_amount !== undefined && (item as any).withholding_tax_amount !== null && Number((item as any).withholding_tax_amount) > 0)
+                                            ? Number((item as any).withholding_tax_amount)
+                                            : (base * (whtRate / 100)))
+                                        : 0;
                                       const rowTotal = base + vatAmount - whtAmount;
                                       return formatMoney(rowTotal);
                                     })()}
@@ -6558,7 +6576,7 @@ export const PurchaseInvoices: React.FC = () => {
                             <td className="px-6 py-3 text-zinc-750 text-base">+{formatNumber(viewInvoice.tax_amount)} {viewInvoiceCurrency}</td>
                           </tr>
                         )}
-                        {Number(viewInvoice.withholding_tax_amount) > 0 && (
+                        {isPurchaseWhtEnabled && Number(viewInvoice.withholding_tax_amount) > 0 && (
                           <tr>
                             <td colSpan={4} className={`px-6 py-3 ${t('dir') === 'rtl' ? 'text-left' : 'text-right'} text-amber-600 font-bold text-[10px] uppercase tracking-wider`}>{language === 'ar' ? 'ضريبة الخصم والإضافة (ض.خ.إ)' : 'Withholding Tax'}</td>
                             <td className="px-6 py-3 text-amber-700 text-base">-{formatNumber(viewInvoice.withholding_tax_amount)} {viewInvoiceCurrency}</td>

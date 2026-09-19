@@ -11,7 +11,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'logo_url', 'website', 'country', 'currency', 'fiscal_year_end',
     'subscription_status', 'subscription_plan', 'subscription_start',
     'subscription_end', 'subscription_expiry', 'subscription_days', 'users_limit', 
-    'transactions_limit', 'company_status', 'features', 'settings', 'vat_enabled', 'wht_enabled', 'pos_enabled', 'purchase_workflow_mode', 'goods_receipt_matching_mode', 'created_at', 'updated_at'
+    'transactions_limit', 'company_status', 'features', 'settings', 'vat_enabled', 'wht_enabled', 'sales_wht_enabled', 'purchase_wht_enabled', 'pos_enabled', 'purchase_workflow_mode', 'goods_receipt_matching_mode', 'created_at', 'updated_at'
   ],
   users: [
     'id', 'username', 'name', 'email', 'password_hash', 'mobile', 'role', 'company_id',

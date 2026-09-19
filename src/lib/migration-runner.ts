@@ -126,6 +126,8 @@ export async function runMigrations() {
       { table: 'purchase_return_items', column: 'withholding_tax_amount', type: 'DECIMAL(18,4) DEFAULT 0' },
       { table: 'companies', column: 'vat_enabled', type: 'BOOLEAN DEFAULT FALSE' },
       { table: 'companies', column: 'wht_enabled', type: 'BOOLEAN DEFAULT FALSE' },
+      { table: 'companies', column: 'sales_wht_enabled', type: 'BOOLEAN DEFAULT FALSE' },
+      { table: 'companies', column: 'purchase_wht_enabled', type: 'BOOLEAN DEFAULT FALSE' },
       { table: 'accounts', column: 'required_sub_account', type: 'BOOLEAN DEFAULT FALSE' },
       { table: 'journal_entry_lines', column: 'company_id', type: 'VARCHAR(36)' },
       { table: 'journal_entry_lines', column: 'account_name', type: 'VARCHAR(255)' },

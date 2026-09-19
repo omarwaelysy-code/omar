@@ -1247,6 +1247,10 @@ export const ar = {
   'company_settings.vat_enabled_desc': 'تفعيل حساب ضريبة القيمة المضافة للمعاملات والفواتير.',
   'company_settings.wht_enabled': 'هل الشركة تعمل بنظام ضرائب الخصم والاضافة؟',
   'company_settings.wht_enabled_desc': 'تفعيل حساب ضريبة الخصم والإضافة في المعاملات والفواتير.',
+  'company_settings.sales_wht_enabled': 'هل الشركة تعمل بنظام ضرائب الخصم والإضافة في المبيعات؟',
+  'company_settings.sales_wht_enabled_desc': 'تفعيل حساب ضريبة الخصم والإضافة في فواتير ومرتجعات المبيعات وعملاء المنشأة.',
+  'company_settings.purchase_wht_enabled': 'هل الشركة تعمل بنظام ضرائب الخصم والإضافة في المشتريات؟',
+  'company_settings.purchase_wht_enabled_desc': 'تفعيل حساب ضريبة الخصم والإضافة في فواتير ومرتجعات المشتريات وموردي المنشأة.',
 
   'currencies.title': 'إدارة العملات والعملات المتعددة',
   'currencies.subtitle': 'إدارة العملات المتاحة وأسعار الصرف للفواتير والقيود.',

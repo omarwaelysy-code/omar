@@ -621,6 +621,7 @@ export const PurchaseReturns: React.FC = () => {
   }, [pendingEtaInvoiceForReturn, user?.company_id]);
 
   const isVatEnabled = company?.settings?.vat_enabled !== false && company?.vat_enabled !== false;
+  const isPurchaseWhtEnabled = !!(company?.settings?.purchase_wht_enabled ?? (company as any)?.purchase_wht_enabled);
   const isMultiCurrencyEnabled = company?.settings?.enable_multi_currency || (company as any)?.enable_multi_currency || false;
 
   const prevExchangeRateRef = useRef<number>(1);
@@ -2409,9 +2410,11 @@ export const PurchaseReturns: React.FC = () => {
                           </span>
                         </div>
                       </th>
-                      <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                        {language === 'ar' ? 'ض.خ.إ' : 'WHT'}
-                      </th>
+                      {isPurchaseWhtEnabled && (
+                        <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                          {language === 'ar' ? 'ض.خ.إ' : 'WHT'}
+                        </th>
+                      )}
                       <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                         {language === 'ar' ? 'رقم القيد' : 'Journal Entry'}
                       </th>
@@ -2421,7 +2424,7 @@ export const PurchaseReturns: React.FC = () => {
                   <tbody className="divide-y divide-zinc-50">
                     {filteredReturns.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-6 py-12 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد مرتجعات مشتريات حالياً' : 'No purchase returns currently'}</td>
+                        <td colSpan={isPurchaseWhtEnabled ? 8 : 7} className="px-6 py-12 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد مرتجعات مشتريات حالياً' : 'No purchase returns currently'}</td>
                       </tr>
                     ) : (
                       filteredReturns.map((ret) => (
@@ -2448,6 +2451,11 @@ export const PurchaseReturns: React.FC = () => {
                             </span>
                           </td>
                           <td className="px-6 py-4 font-bold text-zinc-900">{formatNumber(ret.total_amount)} {t('common.currency')}</td>
+                          {isPurchaseWhtEnabled && (
+                            <td className="px-6 py-4 font-bold text-amber-600">
+                              {ret.withholding_tax_amount ? `${formatMoney(ret.withholding_tax_amount)}` : '-'}
+                            </td>
+                          )}
                           <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                             {ret.entry_number ? (
                               <button
@@ -3332,7 +3340,7 @@ export const PurchaseReturns: React.FC = () => {
                         </div>
                       );
                     })()}
-                    {(() => {
+                    {isPurchaseWhtEnabled && (() => {
                       const calculatedWhtAmount = items.reduce((sum, i) => {
                         const qty = Number(i.quantity) || 0;
                         const price = Number(i.unit_price) || 0;
@@ -3364,12 +3372,12 @@ export const PurchaseReturns: React.FC = () => {
                               return sum + ((i.vat_amount !== undefined && i.vat_amount !== null && Number(i.vat_amount) > 0) ? Number(i.vat_amount) : (qty * price * (rate / 100)));
                             }, 0) : 0) - 
                             discount -
-                            items.reduce((sum, i) => {
+                            (isPurchaseWhtEnabled ? items.reduce((sum, i) => {
                               const qty = Number(i.quantity) || 0;
                               const price = Number(i.unit_price) || 0;
                               const rate = Number(i.withholding_tax_rate) || 0;
                               return sum + ((i.withholding_tax_amount !== undefined && i.withholding_tax_amount !== null && Number(i.withholding_tax_amount) > 0) ? Number(i.withholding_tax_amount) : (qty * price * (rate / 100)));
-                            }, 0)
+                            }, 0) : 0)
                           )} {currentInvoiceCurrencyCode}
                         </span>
                       </div>
@@ -3433,10 +3441,18 @@ export const PurchaseReturns: React.FC = () => {
                         <th className="p-2 border-r border-zinc-200 text-center w-28">مركز التكلفة</th>
                         <th className="p-2 border-r border-zinc-200 text-center w-16">الكمية</th>
                         <th className="p-2 border-r border-zinc-200 text-center w-24">السعر</th>
-                        <th className="p-2 border-r border-zinc-200 text-center w-14">ض ق م %</th>
-                        <th className="p-2 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'مبلغ الضريبة' : 'VAT Amount'}</th>
-                        <th className="p-2 border-r border-zinc-200 text-center w-14">{language === 'ar' ? 'ض.خ.إ %' : 'WHT %'}</th>
-                        <th className="p-2 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'مبلغ ض.خ.إ' : 'WHT Amount'}</th>
+                        {isVatEnabled && (
+                          <>
+                            <th className="p-2 border-r border-zinc-200 text-center w-14">ض ق م %</th>
+                            <th className="p-2 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'مبلغ الضريبة' : 'VAT Amount'}</th>
+                          </>
+                        )}
+                        {isPurchaseWhtEnabled && (
+                          <>
+                            <th className="p-2 border-r border-zinc-200 text-center w-14">{language === 'ar' ? 'ض.خ.إ %' : 'WHT %'}</th>
+                            <th className="p-2 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'مبلغ ض.خ.إ' : 'WHT Amount'}</th>
+                          </>
+                        )}
                         <th className="p-2 border-r border-zinc-200 text-center w-24">الإجمالي</th>
                         <th className="p-2 w-10"></th>
                       </tr>
@@ -3709,51 +3725,59 @@ export const PurchaseReturns: React.FC = () => {
                               }}
                             />
                           </td>
-                              <td className="p-0.5 border-b border-r border-zinc-200 w-14">
-                                <div className="flex items-center justify-center gap-0.5">
-                                  <input 
-                                    type="number" 
-                                    min={0}
-                                    max={100}
-                                    className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs"
-                                    value={item.vat_rate !== undefined && item.vat_rate !== null ? Number(item.vat_rate) : 0}
-                                    onChange={(e) => updateItem(index, 'vat_rate', parseFloat(e.target.value) || 0)}
-                                  />
-                                  <span className="text-sm text-zinc-900 font-black">%</span>
-                                </div>
-                              </td>
-                              <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-amber-700 text-xs">
-                                {formatMoney(
-                                  (item.vat_amount !== undefined && item.vat_amount !== null && Number(item.vat_amount) > 0)
-                                    ? Number(item.vat_amount)
-                                    : ((Number(item.quantity) || 0) * (Number(item.unit_price) || 0) * ((Number(item.vat_rate) || 0) / 100))
-                                )}
-                              </td>
-                              <td className="p-0.5 border-b border-r border-zinc-200 w-14">
-                                <div className="flex items-center justify-center gap-0.5">
-                                  <input 
-                                    type="number" 
-                                    step="any"
-                                    min={0}
-                                    max={100}
-                                    className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                    value={item.withholding_tax_rate !== undefined && item.withholding_tax_rate !== null ? Number(item.withholding_tax_rate) : 0}
-                                    onChange={(e) => updateItem(index, 'withholding_tax_rate', parseFloat(e.target.value) || 0)}
-                                  />
-                                  <span className="text-xs text-zinc-900 font-bold">%</span>
-                                </div>
-                              </td>
-                              <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-amber-700 text-xs">
-                                {(() => {
-                                  const qty = Number(item.quantity) || 0;
-                                  const price = Number(item.unit_price) || 0;
-                                  const rate = Number(item.withholding_tax_rate) || 0;
-                                  const wAmount = (item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null && Number(item.withholding_tax_amount) > 0)
-                                    ? Number(item.withholding_tax_amount)
-                                    : (qty * price * (rate / 100));
-                                  return wAmount > 0 ? `-${formatMoney(wAmount)}` : formatMoney(0);
-                                })()}
-                              </td>
+                              {isVatEnabled && (
+                                <>
+                                  <td className="p-0.5 border-b border-r border-zinc-200 w-14">
+                                    <div className="flex items-center justify-center gap-0.5">
+                                      <input 
+                                        type="number" 
+                                        min={0}
+                                        max={100}
+                                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs"
+                                        value={item.vat_rate !== undefined && item.vat_rate !== null ? Number(item.vat_rate) : 0}
+                                        onChange={(e) => updateItem(index, 'vat_rate', parseFloat(e.target.value) || 0)}
+                                      />
+                                      <span className="text-sm text-zinc-900 font-black">%</span>
+                                    </div>
+                                  </td>
+                                  <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-amber-700 text-xs">
+                                    {formatMoney(
+                                      (item.vat_amount !== undefined && item.vat_amount !== null && Number(item.vat_amount) > 0)
+                                        ? Number(item.vat_amount)
+                                        : ((Number(item.quantity) || 0) * (Number(item.unit_price) || 0) * ((Number(item.vat_rate) || 0) / 100))
+                                    )}
+                                  </td>
+                                </>
+                              )}
+                              {isPurchaseWhtEnabled && (
+                                <>
+                                  <td className="p-0.5 border-b border-r border-zinc-200 w-14">
+                                    <div className="flex items-center justify-center gap-0.5">
+                                      <input 
+                                        type="number" 
+                                        step="any"
+                                        min={0}
+                                        max={100}
+                                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        value={item.withholding_tax_rate !== undefined && item.withholding_tax_rate !== null ? Number(item.withholding_tax_rate) : 0}
+                                        onChange={(e) => updateItem(index, 'withholding_tax_rate', parseFloat(e.target.value) || 0)}
+                                      />
+                                      <span className="text-xs text-zinc-900 font-bold">%</span>
+                                    </div>
+                                  </td>
+                                  <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-amber-700 text-xs">
+                                    {(() => {
+                                      const qty = Number(item.quantity) || 0;
+                                      const price = Number(item.unit_price) || 0;
+                                      const rate = Number(item.withholding_tax_rate) || 0;
+                                      const wAmount = (item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null && Number(item.withholding_tax_amount) > 0)
+                                        ? Number(item.withholding_tax_amount)
+                                        : (qty * price * (rate / 100));
+                                      return wAmount > 0 ? `-${formatMoney(wAmount)}` : formatMoney(0);
+                                    })()}
+                                  </td>
+                                </>
+                              )}
                           <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-emerald-600 text-xs">
                             {(() => {
                               const qty = Number(item.quantity) || 0;
@@ -3766,10 +3790,12 @@ export const PurchaseReturns: React.FC = () => {
                                     ? Number(item.vat_amount)
                                     : (base * (vatRate / 100)))
                                 : 0;
-                              const whtRate = Number(item.withholding_tax_rate) || 0;
-                              const whtAmount = (item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null && Number(item.withholding_tax_amount) > 0)
-                                ? Number(item.withholding_tax_amount)
-                                : (base * (whtRate / 100));
+                              const whtRate = isPurchaseWhtEnabled ? (Number(item.withholding_tax_rate) || 0) : 0;
+                              const whtAmount = isPurchaseWhtEnabled
+                                ? ((item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null && Number(item.withholding_tax_amount) > 0)
+                                    ? Number(item.withholding_tax_amount)
+                                    : (base * (whtRate / 100)))
+                                : 0;
                               const rowTotal = base + vatAmount - whtAmount;
                               return formatMoney(rowTotal);
                             })()}
@@ -3787,7 +3813,7 @@ export const PurchaseReturns: React.FC = () => {
                       ))}
                       {items.length === 0 && (
                         <tr>
-                          <td colSpan={14} className="px-3 py-6 text-center text-zinc-400 italic text-xs">
+                          <td colSpan={10 + (isVatEnabled ? 2 : 0) + (isPurchaseWhtEnabled ? 2 : 0)} className="px-3 py-6 text-center text-zinc-400 italic text-xs">
                             لا توجد أصناف حالياً
                           </td>
                         </tr>
@@ -4229,7 +4255,7 @@ export const PurchaseReturns: React.FC = () => {
                                 <td className="px-6 py-2 text-zinc-700 text-base">+{formatMoney(viewReturn.tax_amount || viewReturn.tax || viewReturn.items?.reduce((sum: number, i: any) => sum + (Number(i.vat_amount) || 0), 0))} {currencyCode}</td>
                               </tr>
                             )}
-                            {(Number((viewReturn as any).withholding_tax_amount || 0) > 0 || (viewReturn.items || []).some((i: any) => Number(i.withholding_tax_amount || 0) > 0)) && (
+                            {isPurchaseWhtEnabled && (Number((viewReturn as any).withholding_tax_amount || 0) > 0 || (viewReturn.items || []).some((i: any) => Number(i.withholding_tax_amount || 0) > 0)) && (
                               <tr>
                                 <td colSpan={7} className={`px-6 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-amber-600 font-bold text-xs`}>{language === 'ar' ? 'ضريبة الخصم والإضافة (ض.خ.إ)' : 'Withholding Tax'}</td>
                                 <td className="px-6 py-2 text-amber-600 text-base">-{formatMoney((viewReturn as any).withholding_tax_amount || viewReturn.items?.reduce((sum: number, i: any) => sum + (Number(i.withholding_tax_amount) || 0), 0))} {currencyCode}</td>

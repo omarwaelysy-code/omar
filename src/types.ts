@@ -92,6 +92,8 @@ export interface Company {
   created_at: string;
   vat_enabled?: boolean;
   wht_enabled?: boolean;
+  sales_wht_enabled?: boolean;
+  purchase_wht_enabled?: boolean;
   pos_enabled?: boolean;
   settings: {
     currency: string;
@@ -109,6 +111,8 @@ export interface Company {
     inventory_cost_method_level?: 'company' | 'item';
     vat_enabled?: boolean;
     wht_enabled?: boolean;
+    sales_wht_enabled?: boolean;
+    purchase_wht_enabled?: boolean;
     pos_enabled?: boolean;
     purchase_workflow_mode?: 'Simple' | 'Enterprise Strict' | 'Enterprise Flexible';
     barcode_scanner?: any;

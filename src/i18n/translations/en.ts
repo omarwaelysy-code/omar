@@ -1248,6 +1248,10 @@ export const en = {
   'company_settings.vat_enabled_desc': 'Enable Value Added Tax calculations for transactions and invoices.',
   'company_settings.wht_enabled': 'Does the company operate under the Withholding Tax (WHT) system?',
   'company_settings.wht_enabled_desc': 'Enable Withholding Tax calculations for transactions and invoices.',
+  'company_settings.sales_wht_enabled': 'Does the company operate under the Sales Withholding Tax system?',
+  'company_settings.sales_wht_enabled_desc': 'Enable Withholding Tax calculations for sales invoices, returns, and customers.',
+  'company_settings.purchase_wht_enabled': 'Does the company operate under the Purchase Withholding Tax system?',
+  'company_settings.purchase_wht_enabled_desc': 'Enable Withholding Tax calculations for purchase invoices, returns, and suppliers.',
 
   'currencies.title': 'Currency Management',
   'currencies.subtitle': 'Manage available currencies and exchange rates for invoices and entries.',

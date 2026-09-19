@@ -59,6 +59,8 @@ interface CompanyData {
   inventory_cost_method_level?: 'company' | 'item';
   vat_enabled: boolean;
   wht_enabled: boolean;
+  sales_wht_enabled: boolean;
+  purchase_wht_enabled: boolean;
   pos_enabled: boolean;
   purchase_workflow_mode?: 'Simple' | 'Enterprise Strict' | 'Enterprise Flexible';
   goods_receipt_matching_mode?: 'SupplierProduct' | 'ProductOnly' | 'SupplierProductWarehouse' | 'SmartMatching';
@@ -192,6 +194,8 @@ export function CompanySettings() {
     inventory_cost_method_level: 'item',
     vat_enabled: false,
     wht_enabled: false,
+    sales_wht_enabled: false,
+    purchase_wht_enabled: false,
     pos_enabled: false,
     purchase_workflow_mode: 'Simple',
     goods_receipt_matching_mode: 'SmartMatching'
@@ -405,7 +409,9 @@ export function CompanySettings() {
             inventory_cost_method: settings.inventory_cost_method || 'wac',
             inventory_cost_method_level: 'item',
             vat_enabled: settings.vat_enabled || company.vat_enabled || false,
-            wht_enabled: settings.wht_enabled || company.wht_enabled || false,
+            wht_enabled: settings.sales_wht_enabled ?? (company as any).sales_wht_enabled ?? settings.wht_enabled ?? company.wht_enabled ?? false,
+            sales_wht_enabled: settings.sales_wht_enabled ?? (company as any).sales_wht_enabled ?? settings.wht_enabled ?? company.wht_enabled ?? false,
+            purchase_wht_enabled: settings.purchase_wht_enabled ?? (company as any).purchase_wht_enabled ?? false,
             pos_enabled: settings.pos_enabled === true || company.pos_enabled === true,
             purchase_workflow_mode: company.purchase_workflow_mode || settings.purchase_workflow_mode || 'Simple',
             goods_receipt_matching_mode: company.goods_receipt_matching_mode || 'SmartMatching',
@@ -640,7 +646,9 @@ export function CompanySettings() {
         inventory_cost_method_level: 'item',
         inventory_cost_method: data.inventory_cost_method || 'wac',
         vat_enabled: data.vat_enabled,
-        wht_enabled: data.wht_enabled,
+        wht_enabled: data.sales_wht_enabled,
+        sales_wht_enabled: data.sales_wht_enabled,
+        purchase_wht_enabled: data.purchase_wht_enabled,
         pos_enabled: data.pos_enabled,
         purchase_workflow_mode: data.purchase_workflow_mode || 'Simple',
         goods_receipt_matching_mode: data.goods_receipt_matching_mode || 'SmartMatching',
@@ -657,7 +665,9 @@ export function CompanySettings() {
         address: data.address,
         fiscal_year_end: fiscalYearEnd,
         vat_enabled: data.vat_enabled,
-        wht_enabled: data.wht_enabled,
+        wht_enabled: data.sales_wht_enabled,
+        sales_wht_enabled: data.sales_wht_enabled,
+        purchase_wht_enabled: data.purchase_wht_enabled,
         pos_enabled: data.pos_enabled,
         purchase_workflow_mode: data.purchase_workflow_mode || 'Simple',
         goods_receipt_matching_mode: data.goods_receipt_matching_mode || 'SmartMatching',
@@ -900,26 +910,53 @@ export function CompanySettings() {
                 </div>
               </div>
 
-              {/* WHT Toggle */}
+              {/* Sales WHT Toggle */}
               <div 
                 className="flex items-center justify-between cursor-pointer select-none p-2 rounded-xl border border-slate-100 hover:bg-slate-50/80 transition-colors"
-                onClick={() => setData(prev => ({ ...prev, wht_enabled: !prev.wht_enabled }))}
+                onClick={() => setData(prev => {
+                  const nextVal = !prev.sales_wht_enabled;
+                  return { ...prev, sales_wht_enabled: nextVal, wht_enabled: nextVal };
+                })}
               >
                 <div className="flex flex-col gap-0.5">
                   <span className="font-bold text-slate-800 text-sm">
-                    {t('company_settings.wht_enabled')}
+                    {t('company_settings.sales_wht_enabled')}
                   </span>
                   <span className="text-[11px] font-medium text-slate-400">
-                    {t('company_settings.wht_enabled_desc')}
+                    {t('company_settings.sales_wht_enabled_desc')}
                   </span>
                 </div>
                 <div 
-                  className={`relative w-9 h-5 rounded-full transition-all duration-300 shadow-inner ms-3 flex-shrink-0 ${data.wht_enabled ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                  className={`relative w-9 h-5 rounded-full transition-all duration-300 shadow-inner ms-3 flex-shrink-0 ${data.sales_wht_enabled ? 'bg-indigo-600' : 'bg-slate-200'}`}
                 >
                   <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-xs transition-all duration-300 transform ${
                     dir === 'rtl'
-                      ? (data.wht_enabled ? 'translate-x-[-110%]' : 'translate-x-[-5%]')
-                      : (data.wht_enabled ? 'translate-x-[110%]' : 'translate-x-[5%]')
+                      ? (data.sales_wht_enabled ? 'translate-x-[-110%]' : 'translate-x-[-5%]')
+                      : (data.sales_wht_enabled ? 'translate-x-[110%]' : 'translate-x-[5%]')
+                  }`} />
+                </div>
+              </div>
+
+              {/* Purchase WHT Toggle */}
+              <div 
+                className="flex items-center justify-between cursor-pointer select-none p-2 rounded-xl border border-slate-100 hover:bg-slate-50/80 transition-colors"
+                onClick={() => setData(prev => ({ ...prev, purchase_wht_enabled: !prev.purchase_wht_enabled }))}
+              >
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-bold text-slate-800 text-sm">
+                    {t('company_settings.purchase_wht_enabled')}
+                  </span>
+                  <span className="text-[11px] font-medium text-slate-400">
+                    {t('company_settings.purchase_wht_enabled_desc')}
+                  </span>
+                </div>
+                <div 
+                  className={`relative w-9 h-5 rounded-full transition-all duration-300 shadow-inner ms-3 flex-shrink-0 ${data.purchase_wht_enabled ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-xs transition-all duration-300 transform ${
+                    dir === 'rtl'
+                      ? (data.purchase_wht_enabled ? 'translate-x-[-110%]' : 'translate-x-[-5%]')
+                      : (data.purchase_wht_enabled ? 'translate-x-[110%]' : 'translate-x-[5%]')
                   }`} />
                 </div>
               </div>
