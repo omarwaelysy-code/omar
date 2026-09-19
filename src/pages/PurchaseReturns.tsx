@@ -764,7 +764,14 @@ export const PurchaseReturns: React.FC = () => {
         ? (items || []).reduce((sum, item) => sum + (Number(item.vat_amount) || 0), 0)
         : 0;
       const discountVal = Number(discount) || 0;
-      const total_amount = Number((subtotalVal + vatTotal - discountVal).toFixed(2)) || 0;
+      const whtTotalVal = (items || []).reduce((sum, item) => {
+        const itemTot = (Number(item.quantity) || 0) * (Number(item.unit_price) || 0);
+        const wRate = Number(item.withholding_tax_rate) || 0;
+        return sum + ((item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null && Number(item.withholding_tax_amount) > 0)
+          ? Number(item.withholding_tax_amount)
+          : (itemTot * (wRate / 100)));
+      }, 0);
+      const total_amount = Number((subtotalVal + vatTotal - discountVal - whtTotalVal).toFixed(2)) || 0;
 
       if (subtotalVal <= 0) {
         setPreviewJournalEntry(null);
@@ -793,6 +800,10 @@ export const PurchaseReturns: React.FC = () => {
         const itemTotalFC = (Number(item.quantity) || 0) * (Number(item.unit_price) || 0);
         const itemVatFC = isVatEnabled ? (Number(item.vat_amount) || 0) : 0;
         const itemDiscountFC = subtotalVal > 0 ? (itemTotalFC / subtotalVal) * discountVal : 0;
+        const itemWhtRate = Number(item.withholding_tax_rate) || 0;
+        const itemWhtFC = (item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null && Number(item.withholding_tax_amount) > 0)
+          ? Number(item.withholding_tax_amount)
+          : Number((itemTotalFC * (itemWhtRate / 100)).toFixed(2));
         const itemNetTotalFC = itemTotalFC + itemVatFC - itemDiscountFC - itemWhtFC;
 
         // Convert to local currency and round once
