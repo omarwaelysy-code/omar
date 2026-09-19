@@ -793,12 +793,13 @@ export const PurchaseReturns: React.FC = () => {
         const itemTotalFC = (Number(item.quantity) || 0) * (Number(item.unit_price) || 0);
         const itemVatFC = isVatEnabled ? (Number(item.vat_amount) || 0) : 0;
         const itemDiscountFC = subtotalVal > 0 ? (itemTotalFC / subtotalVal) * discountVal : 0;
-        const itemNetTotalFC = itemTotalFC + itemVatFC - itemDiscountFC;
+        const itemNetTotalFC = itemTotalFC + itemVatFC - itemDiscountFC - itemWhtFC;
 
         // Convert to local currency and round once
         const itemTotal = Number((itemTotalFC * rate).toFixed(2));
         const itemVat = Number((itemVatFC * rate).toFixed(2));
         const itemDiscount = Number((itemDiscountFC * rate).toFixed(2));
+        const itemWht = Number((itemWhtFC * rate).toFixed(2));
         const itemNetTotal = Number((itemNetTotalFC * rate).toFixed(2));
 
         let creditAccountId = '';
@@ -868,6 +869,35 @@ export const PurchaseReturns: React.FC = () => {
             debit: itemDiscount,
             credit: 0,
             description: `تسوية خصم صنف: ${item.product_name} - مرتجع مشتريات رقم ${return_number}`
+          });
+        }
+
+        // 3.5 Debit Withholding Tax (reverse supplier withholding tax payable)
+        if (itemWht > 0) {
+          let whtAccountId = product?.purchase_withholding_tax_account_id || '';
+          let whtAccountName = product?.purchase_withholding_tax_account_name || (language === 'ar' ? 'حساب ضريبة الخصم والإضافة' : 'Withholding Tax Account');
+          if (!whtAccountId) {
+            const globalWhtAccount = accounts.find(a => 
+              a.id === (settings as any)?.withholding_tax_suppliers_account_id ||
+              (a.usage_type && a.usage_type === 'withholding_tax_suppliers') ||
+              a.name.includes('خصم من الموردين') ||
+              a.name.includes('خصم على الموردين') ||
+              a.name.includes('ضرائب خصم')
+            );
+            whtAccountId = globalWhtAccount?.id || '';
+            whtAccountName = globalWhtAccount?.name || whtAccountName;
+          }
+          const whtAcc = accounts.find(a => a.id === whtAccountId);
+          const whtAccountCode = whtAcc?.code || '';
+
+          journalItems.push({
+            account_id: whtAccountId,
+            account_name: whtAccountName,
+            account_code: whtAccountCode,
+            product_name: item.product_name,
+            debit: itemWht,
+            credit: 0,
+            description: `تسوية ضريبة الخصم والإضافة صنف: ${item.product_name} - مرتجع مشتريات رقم ${return_number}`
           });
         }
 
@@ -996,7 +1026,9 @@ export const PurchaseReturns: React.FC = () => {
             const qty = item.quantity + 1;
             const total = Number((qty * item.unit_price).toFixed(4));
             const vat_amount = isVatEnabled ? Number((total * (item.vat_rate / 100)).toFixed(4)) : 0;
-            return { ...item, quantity: qty, total, vat_amount };
+            const wht_rate = Number(item.withholding_tax_rate) || 0;
+            const wht_amount = Number((total * (wht_rate / 100)).toFixed(4));
+            return { ...item, quantity: qty, total, vat_amount, withholding_tax_amount: wht_amount };
           }
           return item;
         }));
@@ -1024,6 +1056,8 @@ export const PurchaseReturns: React.FC = () => {
     const total = price;
     const vat_rate = product.vat_rate || 0;
     const vat_amount = isVatEnabled ? Number((total * (vat_rate / 100)).toFixed(4)) : 0;
+    const wht_rate = product.purchase_withholding_tax_rate || 0;
+    const wht_amount = Number((total * (wht_rate / 100)).toFixed(4));
 
     setItems((prev: any[]) => [
       ...prev,
@@ -1039,6 +1073,8 @@ export const PurchaseReturns: React.FC = () => {
         total,
         vat_rate,
         vat_amount,
+        withholding_tax_rate: wht_rate,
+        withholding_tax_amount: wht_amount,
         operation_id: selectedOperationId || null,
         department_id: selectedDepartmentId || null,
         cost_center_id: selectedCostCenterId || null,
@@ -1070,6 +1106,8 @@ export const PurchaseReturns: React.FC = () => {
         total: 0,
         vat_rate: 0,
         vat_amount: 0,
+        withholding_tax_rate: 0,
+        withholding_tax_amount: 0,
         operation_id: selectedOperationId || null,
         department_id: selectedDepartmentId || null,
         cost_center_id: selectedCostCenterId || null,
@@ -1110,6 +1148,8 @@ export const PurchaseReturns: React.FC = () => {
           item.vat_rate = prod.vat_rate || 0;
           item.total = Number((item.quantity * item.unit_price).toFixed(4));
           item.vat_amount = isVatEnabled ? Number((item.total * (item.vat_rate / 100)).toFixed(4)) : 0;
+          item.withholding_tax_rate = prod.purchase_withholding_tax_rate || 0;
+          item.withholding_tax_amount = Number((item.total * (item.withholding_tax_rate / 100)).toFixed(4));
         } else {
           item.product_id = '';
           item.product_name = '';
@@ -1124,7 +1164,7 @@ export const PurchaseReturns: React.FC = () => {
         }
       } else {
         (item as any)[field] = value;
-        if (field === 'quantity' || field === 'unit_price' || field === 'vat_rate') {
+      if (field === 'quantity' || field === 'unit_price' || field === 'vat_rate' || field === 'withholding_tax_rate') {
           if ((item.vat_rate === undefined || item.vat_rate === null || item.vat_rate === 0) && item.product_id) {
             const p = products.find(prod => prod.id === item.product_id);
             if (p && p.vat_rate) item.vat_rate = Number(p.vat_rate);
@@ -1413,6 +1453,8 @@ export const PurchaseReturns: React.FC = () => {
           total: total,
           vat_rate: rate,
           vat_amount: vat_amount,
+          withholding_tax_rate: Number(item.withholding_tax_rate) || 0,
+          withholding_tax_amount: Number(item.withholding_tax_amount) || 0,
           operation_id: item.operation_id || null,
           department_id: item.department_id || null,
           cost_center_id: item.cost_center_id || null,
@@ -1423,7 +1465,8 @@ export const PurchaseReturns: React.FC = () => {
         ? Number(sanitizedItems.reduce((sum, item) => sum + (Number(item.vat_amount) || 0), 0).toFixed(2))
         : 0;
 
-      const total_amount = Number((subtotal + vatTotal - discount_amount).toFixed(2));
+      const whtTotal = Number(sanitizedItems.reduce((sum, item) => sum + (Number(item.withholding_tax_amount) || 0), 0).toFixed(2)) || 0;
+      const total_amount = Number((subtotal + vatTotal - discount_amount - whtTotal).toFixed(2));
 
       // تحقق من مطابقة إجماليات الوثيقة الإلكترونية عند الحفظ (السماح بالتعديل ولكن بشرط تطابق الإجماليات)
       if (etaLockData) {
@@ -1635,6 +1678,7 @@ export const PurchaseReturns: React.FC = () => {
         discount: discount_amount,
         discount_amount,
         tax_amount: vatTotal,
+        withholding_tax_amount: whtTotal,
         total_amount,
         payment_type: returnData.payment_type,
         payment_method_id: returnData.payment_type === 'cash' ? (returnData.payment_method_id || null) : null,
@@ -1665,12 +1709,17 @@ export const PurchaseReturns: React.FC = () => {
         const itemTotalFC = (Number(item.quantity) || 0) * (Number(item.unit_price) || 0);
         const itemVatFC = isVatEnabled ? (Number(item.vat_amount) || 0) : 0;
         const itemDiscountFC = subtotal > 0 ? (itemTotalFC / subtotal) * discount_amount : 0;
-        const itemNetTotalFC = itemTotalFC + itemVatFC - itemDiscountFC;
+        const itemWhtRate = Number(item.withholding_tax_rate) || 0;
+        const itemWhtFC = (item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null && Number(item.withholding_tax_amount) > 0)
+          ? Number(item.withholding_tax_amount)
+          : Number((itemTotalFC * (itemWhtRate / 100)).toFixed(2));
+        const itemNetTotalFC = itemTotalFC + itemVatFC - itemDiscountFC - itemWhtFC;
         
         // Convert to local currency and round once
         const itemTotal = Number((itemTotalFC * rate).toFixed(2));
         const itemVat = Number((itemVatFC * rate).toFixed(2));
         const itemDiscount = Number((itemDiscountFC * rate).toFixed(2));
+        const itemWht = Number((itemWhtFC * rate).toFixed(2));
         const itemNetTotal = Number((itemNetTotalFC * rate).toFixed(2));
 
         let creditAccountId = '';
@@ -1740,6 +1789,35 @@ export const PurchaseReturns: React.FC = () => {
             debit: itemDiscount,
             credit: 0,
             description: `تسوية خصم صنف: ${item.product_name} - مرتجع مشتريات رقم ${return_number}`
+          });
+        }
+
+        // 3.5 Debit Withholding Tax (reverse supplier withholding tax payable)
+        if (itemWht > 0) {
+          let whtAccountId = product?.purchase_withholding_tax_account_id || '';
+          let whtAccountName = product?.purchase_withholding_tax_account_name || (language === 'ar' ? 'حساب ضريبة الخصم والإضافة' : 'Withholding Tax Account');
+          if (!whtAccountId) {
+            const globalWhtAccount = accounts.find(a => 
+              a.id === (settings as any)?.withholding_tax_suppliers_account_id ||
+              (a.usage_type && a.usage_type === 'withholding_tax_suppliers') ||
+              a.name.includes('خصم من الموردين') ||
+              a.name.includes('خصم على الموردين') ||
+              a.name.includes('ضرائب خصم')
+            );
+            whtAccountId = globalWhtAccount?.id || '';
+            whtAccountName = globalWhtAccount?.name || whtAccountName;
+          }
+          const whtAcc = accounts.find(a => a.id === whtAccountId);
+          const whtAccountCode = whtAcc?.code || '';
+
+          journalItems.push({
+            account_id: whtAccountId,
+            account_name: whtAccountName,
+            account_code: whtAccountCode,
+            product_name: item.product_name,
+            debit: itemWht,
+            credit: 0,
+            description: `تسوية ضريبة الخصم والإضافة صنف: ${item.product_name} - مرتجع مشتريات رقم ${return_number}`
           });
         }
 
@@ -2059,6 +2137,12 @@ export const PurchaseReturns: React.FC = () => {
           total: total,
           vat_rate: vatRate,
           vat_amount: vatAmount,
+          withholding_tax_rate: (item.withholding_tax_rate !== undefined && item.withholding_tax_rate !== null)
+            ? Number(item.withholding_tax_rate)
+            : (prod?.purchase_withholding_tax_rate ? Number(prod.purchase_withholding_tax_rate) : 0),
+          withholding_tax_amount: (item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null)
+            ? Number(item.withholding_tax_amount)
+            : Number((total * (((item.withholding_tax_rate !== undefined && item.withholding_tax_rate !== null) ? Number(item.withholding_tax_rate) : (prod?.purchase_withholding_tax_rate ? Number(prod.purchase_withholding_tax_rate) : 0)) / 100)).toFixed(2)),
           operation_id: item.operation_id || null,
           department_id: item.department_id || null,
           cost_center_id: item.cost_center_id || null
@@ -2315,6 +2399,9 @@ export const PurchaseReturns: React.FC = () => {
                         </div>
                       </th>
                       <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {language === 'ar' ? 'ض.خ.إ' : 'WHT'}
+                      </th>
+                      <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                         {language === 'ar' ? 'رقم القيد' : 'Journal Entry'}
                       </th>
                       <th className="px-6 py-4 font-bold text-left">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
@@ -2323,7 +2410,7 @@ export const PurchaseReturns: React.FC = () => {
                   <tbody className="divide-y divide-zinc-50">
                     {filteredReturns.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد مرتجعات مشتريات حالياً' : 'No purchase returns currently'}</td>
+                        <td colSpan={8} className="px-6 py-12 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد مرتجعات مشتريات حالياً' : 'No purchase returns currently'}</td>
                       </tr>
                     ) : (
                       filteredReturns.map((ret) => (
@@ -3233,6 +3320,25 @@ export const PurchaseReturns: React.FC = () => {
                         </div>
                       );
                     })()}
+                    {(() => {
+                      const calculatedWhtAmount = items.reduce((sum, i) => {
+                        const qty = Number(i.quantity) || 0;
+                        const price = Number(i.unit_price) || 0;
+                        const rate = Number(i.withholding_tax_rate) || 0;
+                        return sum + ((i.withholding_tax_amount !== undefined && i.withholding_tax_amount !== null && Number(i.withholding_tax_amount) > 0)
+                          ? Number(i.withholding_tax_amount)
+                          : (qty * price * (rate / 100)));
+                      }, 0);
+                      if (calculatedWhtAmount <= 0) return null;
+                      return (
+                        <div className="flex justify-between items-center text-amber-700 text-xs pt-1 border-t border-dashed border-zinc-200">
+                          <span className="font-medium">{language === 'ar' ? 'ض.خ.إ (خصم وإضافة)' : 'WHT'}</span>
+                          <span className="font-bold">
+                            -{formatMoney(calculatedWhtAmount)}
+                          </span>
+                        </div>
+                      );
+                    })()}
                     <div className="flex justify-between items-center text-emerald-650 text-xs pt-1.5 border-t border-zinc-200">
                       <span className="font-black text-sm">{language === 'ar' ? 'الصافي النهائي' : 'Net Total'}</span>
                       <div className="flex flex-col items-end">
@@ -3245,7 +3351,13 @@ export const PurchaseReturns: React.FC = () => {
                               const rate = Number(i.vat_rate) || 0;
                               return sum + ((i.vat_amount !== undefined && i.vat_amount !== null && Number(i.vat_amount) > 0) ? Number(i.vat_amount) : (qty * price * (rate / 100)));
                             }, 0) : 0) - 
-                            discount
+                            discount -
+                            items.reduce((sum, i) => {
+                              const qty = Number(i.quantity) || 0;
+                              const price = Number(i.unit_price) || 0;
+                              const rate = Number(i.withholding_tax_rate) || 0;
+                              return sum + ((i.withholding_tax_amount !== undefined && i.withholding_tax_amount !== null && Number(i.withholding_tax_amount) > 0) ? Number(i.withholding_tax_amount) : (qty * price * (rate / 100)));
+                            }, 0)
                           )} {currentInvoiceCurrencyCode}
                         </span>
                       </div>
@@ -3298,7 +3410,7 @@ export const PurchaseReturns: React.FC = () => {
                 </div>
 
                 <div className="overflow-x-auto rounded-xl border border-zinc-200 overflow-hidden">
-                  <table className="w-full text-sm text-right border-collapse table-fixed min-w-[1150px]">
+                  <table className="w-full text-sm text-right border-collapse table-fixed min-w-[1300px]">
                     <thead>
                       <tr className="bg-zinc-100 border-b border-zinc-200 text-zinc-700 text-xs font-bold">
                         <th className="p-2 border-r border-zinc-200 text-right w-80 min-w-[320px]">اسم الصنف</th>
@@ -3311,6 +3423,8 @@ export const PurchaseReturns: React.FC = () => {
                         <th className="p-2 border-r border-zinc-200 text-center w-24">السعر</th>
                         <th className="p-2 border-r border-zinc-200 text-center w-14">ض ق م %</th>
                         <th className="p-2 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'مبلغ الضريبة' : 'VAT Amount'}</th>
+                        <th className="p-2 border-r border-zinc-200 text-center w-14">{language === 'ar' ? 'ض.خ.إ %' : 'WHT %'}</th>
+                        <th className="p-2 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'مبلغ ض.خ.إ' : 'WHT Amount'}</th>
                         <th className="p-2 border-r border-zinc-200 text-center w-24">الإجمالي</th>
                         <th className="p-2 w-10"></th>
                       </tr>
@@ -3603,6 +3717,27 @@ export const PurchaseReturns: React.FC = () => {
                                     : ((Number(item.quantity) || 0) * (Number(item.unit_price) || 0) * ((Number(item.vat_rate) || 0) / 100))
                                 )}
                               </td>
+                              <td className="p-0.5 border-b border-r border-zinc-200 w-14">
+                                <div className="flex items-center justify-center gap-0.5">
+                                  <input 
+                                    type="number" 
+                                    step="any"
+                                    min={0}
+                                    max={100}
+                                    className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    value={item.withholding_tax_rate !== undefined && item.withholding_tax_rate !== null ? Number(item.withholding_tax_rate) : 0}
+                                    onChange={(e) => updateItem(index, 'withholding_tax_rate', parseFloat(e.target.value) || 0)}
+                                  />
+                                  <span className="text-xs text-zinc-900 font-bold">%</span>
+                                </div>
+                              </td>
+                              <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-amber-600 text-xs">
+                                {formatMoney(
+                                  (item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null && Number(item.withholding_tax_amount) > 0)
+                                    ? Number(item.withholding_tax_amount)
+                                    : ((Number(item.quantity) || 0) * (Number(item.unit_price) || 0) * ((Number(item.withholding_tax_rate) || 0) / 100))
+                                )}
+                              </td>
                           <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-emerald-600 text-xs">
                             {formatMoney(item.total)}
                           </td>
@@ -3619,7 +3754,7 @@ export const PurchaseReturns: React.FC = () => {
                       ))}
                       {items.length === 0 && (
                         <tr>
-                          <td colSpan={12} className="px-3 py-6 text-center text-zinc-400 italic text-xs">
+                          <td colSpan={14} className="px-3 py-6 text-center text-zinc-400 italic text-xs">
                             لا توجد أصناف حالياً
                           </td>
                         </tr>
@@ -4060,6 +4195,12 @@ export const PurchaseReturns: React.FC = () => {
                                 <td colSpan={7} className={`px-6 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-zinc-650 font-bold text-[10px] uppercase tracking-wider`}>ضريبة القيمة المضافة</td>
                                 <td className="px-6 py-2 text-zinc-700 text-base">+{formatMoney(viewReturn.tax_amount || viewReturn.tax || viewReturn.items?.reduce((sum: number, i: any) => sum + (Number(i.vat_amount) || 0), 0))} {currencyCode}</td>
                               </tr>
+                        {(Number((viewReturn as any).withholding_tax_amount || 0) > 0 || (viewReturn.items || []).some((i: any) => Number(i.withholding_tax_amount || 0) > 0)) && (
+                          <tr>
+                            <td colSpan={4} className={`px-6 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-amber-600 font-bold text-xs`}>{language === 'ar' ? 'ضريبة الخصم والإضافة (ض.خ.إ)' : 'Withholding Tax'}</td>
+                            <td className="px-6 py-2 text-amber-600 text-base">-{formatMoney((viewReturn as any).withholding_tax_amount || viewReturn.items?.reduce((sum: number, i: any) => sum + (Number(i.withholding_tax_amount) || 0), 0))} {currencyCode}</td>
+                          </tr>
+                        )}
                             )}
                             <tr className="bg-slate-900 text-white font-bold">
                               <td colSpan={7} className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'} font-black text-lg uppercase tracking-tight`}>الصافي الإجمالي</td>

@@ -168,6 +168,72 @@ export class PostingService {
       });
     }
 
+    
+    // Withholding Tax (Debit side for sales: Current Asset - Tax Withheld by Customers)
+    const whtSalesGroup: Record<string, { account_id: string; account_name: string; amount: number }> = {};
+    invoice.items?.forEach(item => {
+      const prod = products.find(p => p.id === item.product_id);
+      const whtAccountId = prod?.sales_withholding_tax_account_id || '';
+      const whtAccountName = prod?.sales_withholding_tax_account_name || 'ضرائب خصم من العملاء';
+      const rateVal = item.withholding_tax_rate !== undefined ? item.withholding_tax_rate : (prod?.sales_withholding_tax_rate || 0);
+      const itemTotal = Number(item.total) || 0;
+      const itemWht = Number(item.withholding_tax_amount !== undefined ? item.withholding_tax_amount : (itemTotal * (rateVal / 100)).toFixed(2));
+
+      if (itemWht > 0) {
+        let finalWhtAccountId = whtAccountId;
+        let finalWhtAccountName = whtAccountName;
+
+        if (!finalWhtAccountId) {
+          const globalWhtAccount = accounts.find(a => 
+            a.account_usage === 'withholding_tax_customers' || 
+            a.name.includes('خصم من العملاء') ||
+            a.name.includes('خصم عملاء') ||
+            a.code?.startsWith('118')
+          );
+          finalWhtAccountId = globalWhtAccount?.id || '';
+          finalWhtAccountName = globalWhtAccount?.name || finalWhtAccountName;
+        }
+
+        if (finalWhtAccountId) {
+          if (!whtSalesGroup[finalWhtAccountId]) {
+            whtSalesGroup[finalWhtAccountId] = {
+              account_id: finalWhtAccountId,
+              account_name: finalWhtAccountName,
+              amount: 0
+            };
+          }
+          whtSalesGroup[finalWhtAccountId].amount += itemWht;
+        }
+      }
+    });
+
+    const invoiceWhtTotal = Number(invoice.withholding_tax_amount || 0);
+    if (Object.keys(whtSalesGroup).length > 0) {
+      Object.values(whtSalesGroup).forEach(wht => {
+        journalItems.push({
+          account_id: wht.account_id,
+          account_name: wht.account_name,
+          debit: Number(wht.amount.toFixed(2)),
+          credit: 0,
+          description: `ضريبة خصم وإضافة مبيعات (خصم من العملاء) - فاتورة رقم ${invoice.invoice_number}`
+        });
+      });
+    } else if (invoiceWhtTotal > 0) {
+      const globalWhtAccount = accounts.find(a => 
+        a.account_usage === 'withholding_tax_customers' || 
+        a.name.includes('خصم من العملاء') ||
+        a.name.includes('خصم عملاء') ||
+        a.code?.startsWith('118')
+      );
+      journalItems.push({
+        account_id: globalWhtAccount?.id || '',
+        account_name: globalWhtAccount?.name || 'ضرائب خصم من العملاء',
+        debit: invoiceWhtTotal,
+        credit: 0,
+        description: `ضريبة خصم وإضافة مبيعات (خصم من العملاء) - فاتورة رقم ${invoice.invoice_number}`
+      });
+    }
+
     return {
       date: invoice.date,
       reference_number: invoice.invoice_number,
@@ -357,6 +423,72 @@ export class PostingService {
       });
     }
 
+    
+    // Withholding Tax credit line for returns (reversal of tax withheld by customers)
+    const whtReturnGroup: Record<string, { account_id: string; account_name: string; amount: number }> = {};
+    doc.items?.forEach(item => {
+      const prod = products.find(p => p.id === item.product_id);
+      const whtAccountId = prod?.sales_withholding_tax_account_id || '';
+      const whtAccountName = prod?.sales_withholding_tax_account_name || 'ضرائب خصم من العملاء';
+      const rateVal = item.withholding_tax_rate !== undefined ? item.withholding_tax_rate : (prod?.sales_withholding_tax_rate || 0);
+      const itemTotal = Number(item.total) || 0;
+      const itemWht = Number(item.withholding_tax_amount !== undefined ? item.withholding_tax_amount : (itemTotal * (rateVal / 100)).toFixed(2));
+
+      if (itemWht > 0) {
+        let finalWhtAccountId = whtAccountId;
+        let finalWhtAccountName = whtAccountName;
+
+        if (!finalWhtAccountId) {
+          const globalWhtAccount = accounts.find(a => 
+            a.account_usage === 'withholding_tax_customers' || 
+            a.name.includes('خصم من العملاء') ||
+            a.name.includes('خصم عملاء') ||
+            a.code?.startsWith('118')
+          );
+          finalWhtAccountId = globalWhtAccount?.id || '';
+          finalWhtAccountName = globalWhtAccount?.name || finalWhtAccountName;
+        }
+
+        if (finalWhtAccountId) {
+          if (!whtReturnGroup[finalWhtAccountId]) {
+            whtReturnGroup[finalWhtAccountId] = {
+              account_id: finalWhtAccountId,
+              account_name: finalWhtAccountName,
+              amount: 0
+            };
+          }
+          whtReturnGroup[finalWhtAccountId].amount += itemWht;
+        }
+      }
+    });
+
+    const returnWhtTotal = Number(doc.withholding_tax_amount || 0);
+    if (Object.keys(whtReturnGroup).length > 0) {
+      Object.values(whtReturnGroup).forEach(wht => {
+        journalItems.push({
+          account_id: wht.account_id,
+          account_name: wht.account_name,
+          debit: 0,
+          credit: Number(wht.amount.toFixed(2)),
+          description: `تسوية ضريبة خصم وإضافة - مرتجع مبيعات رقم ${doc.return_number || doc.id.slice(-6)}`
+        });
+      });
+    } else if (returnWhtTotal > 0) {
+      const globalWhtAccount = accounts.find(a => 
+        a.account_usage === 'withholding_tax_customers' || 
+        a.name.includes('خصم من العملاء') ||
+        a.name.includes('خصم عملاء') ||
+        a.code?.startsWith('118')
+      );
+      journalItems.push({
+        account_id: globalWhtAccount?.id || '',
+        account_name: globalWhtAccount?.name || 'ضرائب خصم من العملاء',
+        debit: 0,
+        credit: returnWhtTotal,
+        description: `تسوية ضريبة خصم وإضافة - مرتجع مبيعات رقم ${doc.return_number || doc.id.slice(-6)}`
+      });
+    }
+
     return {
       date: doc.date,
       reference_number: doc.return_number || doc.id.slice(-6),
@@ -502,6 +634,74 @@ export class PostingService {
       });
     }
 
+    
+    // Withholding Tax credit line for purchases (Current Liability - Tax Withheld for Suppliers)
+    const whtPurchaseGroup: Record<string, { account_id: string; account_name: string; amount: number }> = {};
+    doc.items?.forEach(item => {
+      const prod = products.find(p => p.id === item.product_id);
+      const whtAccountId = prod?.purchase_withholding_tax_account_id || '';
+      const whtAccountName = prod?.purchase_withholding_tax_account_name || 'ضرائب خصم على الموردين';
+      const rateVal = item.withholding_tax_rate !== undefined ? item.withholding_tax_rate : (prod?.purchase_withholding_tax_rate || 0);
+      const itemTotal = Number(item.total) || 0;
+      const itemWht = Number(item.withholding_tax_amount !== undefined ? item.withholding_tax_amount : (itemTotal * (rateVal / 100)).toFixed(2));
+
+      if (itemWht > 0) {
+        let finalWhtAccountId = whtAccountId;
+        let finalWhtAccountName = whtAccountName;
+
+        if (!finalWhtAccountId) {
+          const globalWhtAccount = accounts.find(a => 
+            a.account_usage === 'withholding_tax_suppliers' || 
+            a.name.includes('خصم على الموردين') ||
+            a.name.includes('خصم من الموردين') ||
+            a.name.includes('خصم موردين') ||
+            a.code?.startsWith('222')
+          );
+          finalWhtAccountId = globalWhtAccount?.id || '';
+          finalWhtAccountName = globalWhtAccount?.name || finalWhtAccountName;
+        }
+
+        if (finalWhtAccountId) {
+          if (!whtPurchaseGroup[finalWhtAccountId]) {
+            whtPurchaseGroup[finalWhtAccountId] = {
+              account_id: finalWhtAccountId,
+              account_name: finalWhtAccountName,
+              amount: 0
+            };
+          }
+          whtPurchaseGroup[finalWhtAccountId].amount += itemWht;
+        }
+      }
+    });
+
+    const docWhtTotal = Number(doc.withholding_tax_amount || 0);
+    if (Object.keys(whtPurchaseGroup).length > 0) {
+      Object.values(whtPurchaseGroup).forEach(wht => {
+        journalItems.push({
+          account_id: wht.account_id,
+          account_name: wht.account_name,
+          debit: 0,
+          credit: Number(wht.amount.toFixed(2)),
+          description: `ضريبة خصم وإضافة مشتريات (خصم على الموردين) - فاتورة مشتريات رقم ${doc.invoice_number}`
+        });
+      });
+    } else if (docWhtTotal > 0) {
+      const globalWhtAccount = accounts.find(a => 
+        a.account_usage === 'withholding_tax_suppliers' || 
+        a.name.includes('خصم على الموردين') ||
+        a.name.includes('خصم من الموردين') ||
+        a.name.includes('خصم موردين') ||
+        a.code?.startsWith('222')
+      );
+      journalItems.push({
+        account_id: globalWhtAccount?.id || '',
+        account_name: globalWhtAccount?.name || 'ضرائب خصم على الموردين',
+        debit: 0,
+        credit: docWhtTotal,
+        description: `ضريبة خصم وإضافة مشتريات (خصم على الموردين) - فاتورة مشتريات رقم ${doc.invoice_number}`
+      });
+    }
+
     return {
       date: doc.date,
       reference_number: doc.invoice_number,
@@ -644,6 +844,74 @@ export class PostingService {
         debit: 0,
         credit: taxAmountPurchaseReturn,
         description: `ضريبة القيمة المضافة - مرتجع مشتريات رقم ${doc.return_number || doc.id.slice(-6)}`
+      });
+    }
+
+    
+    // Withholding Tax debit line for purchase returns (reversal of tax withheld for suppliers)
+    const whtPurchReturnGroup: Record<string, { account_id: string; account_name: string; amount: number }> = {};
+    doc.items?.forEach(item => {
+      const prod = products.find(p => p.id === item.product_id);
+      const whtAccountId = prod?.purchase_withholding_tax_account_id || '';
+      const whtAccountName = prod?.purchase_withholding_tax_account_name || 'ضرائب خصم على الموردين';
+      const rateVal = item.withholding_tax_rate !== undefined ? item.withholding_tax_rate : (prod?.purchase_withholding_tax_rate || 0);
+      const itemTotal = Number(item.total) || 0;
+      const itemWht = Number(item.withholding_tax_amount !== undefined ? item.withholding_tax_amount : (itemTotal * (rateVal / 100)).toFixed(2));
+
+      if (itemWht > 0) {
+        let finalWhtAccountId = whtAccountId;
+        let finalWhtAccountName = whtAccountName;
+
+        if (!finalWhtAccountId) {
+          const globalWhtAccount = accounts.find(a => 
+            a.account_usage === 'withholding_tax_suppliers' || 
+            a.name.includes('خصم على الموردين') ||
+            a.name.includes('خصم من الموردين') ||
+            a.name.includes('خصم موردين') ||
+            a.code?.startsWith('222')
+          );
+          finalWhtAccountId = globalWhtAccount?.id || '';
+          finalWhtAccountName = globalWhtAccount?.name || finalWhtAccountName;
+        }
+
+        if (finalWhtAccountId) {
+          if (!whtPurchReturnGroup[finalWhtAccountId]) {
+            whtPurchReturnGroup[finalWhtAccountId] = {
+              account_id: finalWhtAccountId,
+              account_name: finalWhtAccountName,
+              amount: 0
+            };
+          }
+          whtPurchReturnGroup[finalWhtAccountId].amount += itemWht;
+        }
+      }
+    });
+
+    const purchReturnWhtTotal = Number(doc.withholding_tax_amount || 0);
+    if (Object.keys(whtPurchReturnGroup).length > 0) {
+      Object.values(whtPurchReturnGroup).forEach(wht => {
+        journalItems.push({
+          account_id: wht.account_id,
+          account_name: wht.account_name,
+          debit: Number(wht.amount.toFixed(2)),
+          credit: 0,
+          description: `تسوية ضريبة خصم وإضافة - مرتجع مشتريات رقم ${doc.return_number || doc.id.slice(-6)}`
+        });
+      });
+    } else if (purchReturnWhtTotal > 0) {
+      const globalWhtAccount = accounts.find(a => 
+        a.account_usage === 'withholding_tax_suppliers' || 
+        a.name.includes('خصم على الموردين') ||
+        a.name.includes('خصم من الموردين') ||
+        a.name.includes('خصم موردين') ||
+        a.code?.startsWith('222')
+      );
+      journalItems.push({
+        account_id: globalWhtAccount?.id || '',
+        account_name: globalWhtAccount?.name || 'ضرائب خصم على الموردين',
+        debit: purchReturnWhtTotal,
+        credit: 0,
+        description: `تسوية ضريبة خصم وإضافة - مرتجع مشتريات رقم ${doc.return_number || doc.id.slice(-6)}`
       });
     }
 

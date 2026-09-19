@@ -113,6 +113,7 @@ export interface NormalizedDocument {
   net_total?: number;
   paid_amount?: number;
   remaining_amount?: number;
+  withholding_tax_amount?: number;
   items: Array<{
     product_code: string;
     product_name: string;
@@ -123,6 +124,8 @@ export interface NormalizedDocument {
     discount: number;
     vat_amount: number;
     vat_rate?: string;
+    withholding_tax_rate?: string;
+    withholding_tax_amount?: number;
     total: number;
   }>;
   dynamicFields?: { [key: string]: string };
@@ -194,6 +197,7 @@ export function normalizeDocumentData(
     doc.net_total = Number(data.total_amount || 0);
     doc.paid_amount = Number(data.total_amount || 0);
     doc.remaining_amount = 0;
+    doc.withholding_tax_amount = Number(data.withholding_tax_amount || data.withholding_tax_total || 0);
 
     const itemsRaw = data.invoice_items || data.items || [];
     doc.items = itemsRaw.map((itm: any) => ({
@@ -206,6 +210,8 @@ export function normalizeDocumentData(
       discount: Number(itm.discount || 0),
       vat_amount: Number(itm.vat_amount || 0),
       vat_rate: itm.vat_rate !== undefined ? `% ${itm.vat_rate}` : (itm.tax_rate !== undefined ? `% ${itm.tax_rate}` : '% 14'),
+      withholding_tax_rate: itm.withholding_tax_rate !== undefined ? `% ${itm.withholding_tax_rate}` : '% 0',
+      withholding_tax_amount: Number(itm.withholding_tax_amount || 0),
       total: Number(itm.total || 0)
     }));
   } 
@@ -221,6 +227,7 @@ export function normalizeDocumentData(
     doc.net_total = Number(data.total_amount || 0);
     doc.paid_amount = Number(data.total_amount || 0);
     doc.remaining_amount = 0;
+    doc.withholding_tax_amount = Number(data.withholding_tax_amount || data.withholding_tax_total || 0);
 
     const itemsRaw = data.purchase_invoice_items || data.items || [];
     doc.items = itemsRaw.map((itm: any) => ({
@@ -233,6 +240,8 @@ export function normalizeDocumentData(
       discount: Number(itm.discount || 0),
       vat_amount: Number(itm.vat_amount || 0),
       vat_rate: itm.vat_rate !== undefined ? `% ${itm.vat_rate}` : (itm.tax_rate !== undefined ? `% ${itm.tax_rate}` : '% 14'),
+      withholding_tax_rate: itm.withholding_tax_rate !== undefined ? `% ${itm.withholding_tax_rate}` : '% 0',
+      withholding_tax_amount: Number(itm.withholding_tax_amount || 0),
       total: Number(itm.total || 0)
     }));
   } 
@@ -242,6 +251,7 @@ export function normalizeDocumentData(
     doc.supplier_name = data.supplier_name || data.customer_name || '';
     doc.customer_tax_number = data.customer_tax_number || data.supplier_tax_number || data.tax_number || '';
     doc.supplier_tax_number = data.supplier_tax_number || data.customer_tax_number || data.tax_number || '';
+    doc.withholding_tax_amount = Number(data.withholding_tax_amount || data.withholding_tax_total || 0);
     
     const itemsRaw = data.return_items || data.purchase_return_items || data.items || [];
     doc.items = itemsRaw.map((itm: any) => {
@@ -278,6 +288,8 @@ export function normalizeDocumentData(
         discount: Number(itm.discount || 0),
         vat_amount: vatAmt,
         vat_rate: `${vatRateNum}%`,
+        withholding_tax_rate: itm.withholding_tax_rate !== undefined ? `% ${itm.withholding_tax_rate}` : '% 0',
+        withholding_tax_amount: Number(itm.withholding_tax_amount || 0),
         total: total
       };
     });

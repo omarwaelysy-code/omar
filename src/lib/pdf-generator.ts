@@ -971,6 +971,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             else if (b === 'subtotal') val = formatNumberValue(dto.subtotal);
             else if (b === 'vat_amount') val = formatNumberValue(dto.vat_amount);
             else if (b === 'discount_amount') val = formatNumberValue(dto.discount_amount);
+            else if (b === 'withholding_tax_amount' || b === 'withholding_tax' || b === 'wht') val = formatNumberValue(dto.withholding_tax_amount || dto.withholding_tax_total);
             else val = dto[el.binding] !== undefined ? String(dto[el.binding]) : '';
 
             if (txt.includes('{')) {
@@ -1289,6 +1290,11 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               drawCardRow(isEn ? 'VAT' : 'ضريبة القيمة المضافة', effectiveVatAmount);
             }
 
+            const whtAmt = Number(dto.withholding_tax_amount || dto.withholding_tax_total || 0);
+            if (whtAmt > 0) {
+              drawCardRow(isEn ? 'Withholding Tax' : 'ضريبة الخصم والإضافة', `-${formatNumberValue(whtAmt)}`, false, '#d97706');
+            }
+
             // Card Divider Line
             rowY += isThermal ? 1 : 2;
             doc.strokeColor('#cbd5e1').lineWidth(0.5).moveTo(cardX + 8, rowY).lineTo(cardX + cardWidth - 8, rowY).stroke();
@@ -1297,7 +1303,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             // Calculate Net Total accurately: Subtotal + VAT - Discount
             const rawVatAmt = isVatEnabled ? effectiveVatAmount : 0;
             const rawDiscAmt = Number(dto.discount_amount || 0);
-            let calcNetTotal = Number((subtotalVal + rawVatAmt - rawDiscAmt).toFixed(2));
+            let calcNetTotal = Number((subtotalVal + rawVatAmt - rawDiscAmt - (Number(dto.withholding_tax_amount || dto.withholding_tax_total) || 0)).toFixed(2));
             if (calcNetTotal <= 0) calcNetTotal = Number(dto.net_total || 0);
             
             const currencyCode = dto.currency_code || dto.currency || dto.company?.currency || 'AED';

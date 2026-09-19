@@ -33,7 +33,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   products: [
     'id', 'company_id', 'revenue_account_id', 'cost_account_id', 'revenue_account_name', 'cost_account_name', 'name', 'code', 'barcode',
     'type', 'description', 'image_url', 'category', 'unit', 'cost_price', 'sale_price', 'stock', 'min_stock', 
-    'current_stock', 'is_service', 'counter_account_id', 'inventory_account_id', 'inventory_account_name', 'vat_account_id', 'vat_account_name', 'sales_vat_account_id', 'sales_vat_account_name', 'purchase_vat_account_id', 'purchase_vat_account_name', 'vat_rate', 'inventory_cost_method', 'item_group_id', 'item_group_name', 'barcode_settings', 'allow_issue_fraction', 'allow_receipt_fraction', 'allow_issue_fraction_pct', 'allow_receipt_fraction_pct', 'tax_item_code', 'tax_code_type', 'eta_item_code', 'eta_code_type', 'created_at'
+    'current_stock', 'is_service', 'counter_account_id', 'inventory_account_id', 'inventory_account_name', 'vat_account_id', 'vat_account_name', 'sales_vat_account_id', 'sales_vat_account_name', 'purchase_vat_account_id', 'purchase_vat_account_name', 'vat_rate', 'purchase_vat_rate', 'sales_withholding_tax_account_id', 'sales_withholding_tax_account_name', 'sales_withholding_tax_rate', 'purchase_withholding_tax_account_id', 'purchase_withholding_tax_account_name', 'purchase_withholding_tax_rate', 'inventory_cost_method', 'item_group_id', 'item_group_name', 'barcode_settings', 'allow_issue_fraction', 'allow_receipt_fraction', 'allow_issue_fraction_pct', 'allow_receipt_fraction_pct', 'tax_item_code', 'tax_code_type', 'eta_item_code', 'eta_code_type', 'created_at'
   ],
   item_groups: [
     'id', 'company_id', 'name', 'code', 'type', 'sequence_number', 'description', 'created_at'
@@ -46,7 +46,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   invoices: [
     'id', 'company_id', 'customer_id', 'customer_name', 'warehouse_id', 'invoice_number', 'date', 'due_date', 'subtotal',
-    'tax_amount', 'discount_amount', 'total_amount', 'status', 'payment_type', 
+    'tax_amount', 'withholding_tax_amount', 'discount_amount', 'total_amount', 'status', 'payment_type', 
     'payment_method_id', 'payment_method_name', 'description', 'notes', 'source_orders', 'created_by', 'created_at',
     'payment_terms', 'payment_terms_days', 'advance_percentage',
     'settlements', 'settlement_number', 'settlement_date',
@@ -57,7 +57,8 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'id', 'invoice_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
     'product_name', 'product_code', 'product_image_url', 'image_url', 'barcode',
     'unit_cost', 'total_cost', 'costing_method_used', 'company_id',
-    'operation_id', 'department_id', 'cost_center_id', 'vat_rate', 'vat_amount'
+    'operation_id', 'department_id', 'cost_center_id', 'vat_rate', 'vat_amount',
+    'withholding_tax_rate', 'withholding_tax_amount'
   ],
   sales_orders: [
     'id', 'company_id', 'customer_id', 'customer_name', 'warehouse_id', 'order_number', 'date', 'delivery_date', 'subtotal',
@@ -80,18 +81,19 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'operation_id', 'department_id', 'cost_center_id'
   ],
   returns: [
-    'id', 'company_id', 'customer_id', 'customer_name', 'warehouse_id', 'return_number', 'date', 'total_amount', 
+    'id', 'company_id', 'customer_id', 'customer_name', 'warehouse_id', 'return_number', 'date', 'subtotal', 'tax', 'discount', 'shipping', 'withholding_tax_amount', 'total_amount', 
     'payment_type', 'payment_method_id', 'payment_method_name', 'description', 'notes', 'created_at',
     'currency_id', 'exchange_rate', 'eta_uuid', 'eta_invoice_number'
   ],
   return_items: [
     'id', 'return_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
     'product_name', 'product_code', 'product_image_url', 'unit_cost',
-    'operation_id', 'department_id', 'cost_center_id'
+    'operation_id', 'department_id', 'cost_center_id', 'vat_rate', 'vat_amount',
+    'withholding_tax_rate', 'withholding_tax_amount'
   ],
   purchase_invoices: [
     'id', 'company_id', 'supplier_id', 'supplier_name', 'warehouse_id', 'invoice_number', 'date', 'due_date', 'subtotal',
-    'tax_amount', 'discount_amount', 'total_amount', 'status', 'payment_type', 
+    'tax_amount', 'withholding_tax_amount', 'discount_amount', 'total_amount', 'status', 'payment_type', 
     'payment_method_id', 'payment_method_name', 'description', 'notes', 'source_orders', 'created_at',
     'payment_terms', 'payment_terms_days', 'advance_percentage',
     'settlements', 'settlement_number', 'settlement_date',
@@ -100,17 +102,19 @@ export const EXPECTED_SCHEMA: TableSchema = {
   purchase_invoice_items: [
     'id', 'invoice_id', 'product_id', 'expense_category_id', 'description', 'quantity', 'unit_price', 'total',
     'product_name', 'category_name', 'product_code', 'product_image_url',
-    'operation_id', 'department_id', 'cost_center_id', 'vat_rate', 'vat_amount'
+    'operation_id', 'department_id', 'cost_center_id', 'vat_rate', 'vat_amount',
+    'withholding_tax_rate', 'withholding_tax_amount'
   ],
   purchase_returns: [
-    'id', 'company_id', 'supplier_id', 'supplier_name', 'warehouse_id', 'return_number', 'date', 'total_amount', 
+    'id', 'company_id', 'supplier_id', 'supplier_name', 'warehouse_id', 'return_number', 'date', 'subtotal', 'tax', 'discount', 'shipping', 'withholding_tax_amount', 'total_amount', 
     'payment_type', 'payment_method_id', 'payment_method_name', 'description', 'notes', 'created_at',
     'currency_id', 'exchange_rate', 'eta_uuid', 'eta_invoice_number'
   ],
   purchase_return_items: [
     'id', 'return_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
     'product_name', 'product_code', 'product_image_url', 'unit_cost',
-    'operation_id', 'department_id', 'cost_center_id'
+    'operation_id', 'department_id', 'cost_center_id', 'vat_rate', 'vat_amount',
+    'withholding_tax_rate', 'withholding_tax_amount'
   ],
   receipt_vouchers: [
     'id', 'company_id', 'customer_id', 'customer_name', 'voucher_number', 'date', 'amount', 'description', 

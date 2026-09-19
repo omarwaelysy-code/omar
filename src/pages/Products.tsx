@@ -305,6 +305,13 @@ export const Products: React.FC = () => {
     sales_vat_account_id: '',
     purchase_vat_account_id: '',
     vat_rate: 0,
+    purchase_vat_rate: 14,
+    sales_withholding_tax_account_id: '',
+    sales_withholding_tax_account_name: '',
+    sales_withholding_tax_rate: 0,
+    purchase_withholding_tax_account_id: '',
+    purchase_withholding_tax_account_name: '',
+    purchase_withholding_tax_rate: 0,
     counter_account_id: '',
     item_group_id: '',
     tax_item_code: '',
@@ -584,6 +591,8 @@ export const Products: React.FC = () => {
       const inventoryAccount = accounts.find(a => a.id === formData.inventory_account_id);
       const salesVatAccount = accounts.find(a => a.id === formData.sales_vat_account_id);
       const purchaseVatAccount = accounts.find(a => a.id === formData.purchase_vat_account_id);
+      const salesWhtAccount = accounts.find(a => a.id === formData.sales_withholding_tax_account_id);
+      const purchaseWhtAccount = accounts.find(a => a.id === formData.purchase_withholding_tax_account_id);
       const vatAccount = accounts.find(a => a.id === formData.vat_account_id) || salesVatAccount || purchaseVatAccount;
       const itemGroupObj = itemGroups.find(g => g.id === formData.item_group_id);
 
@@ -630,7 +639,15 @@ export const Products: React.FC = () => {
         purchase_vat_account_id: formData.purchase_vat_account_id || null,
         purchase_vat_account_name: purchaseVatAccount?.name || '',
         vat_account_id: formData.sales_vat_account_id || formData.purchase_vat_account_id || formData.vat_account_id || null,
-        vat_account_name: salesVatAccount?.name || purchaseVatAccount?.name || vatAccount?.name || ''
+        vat_account_name: salesVatAccount?.name || purchaseVatAccount?.name || vatAccount?.name || '',
+        vat_rate: Number(formData.vat_rate) || 0,
+        purchase_vat_rate: Number(formData.purchase_vat_rate !== undefined ? formData.purchase_vat_rate : formData.vat_rate) || 0,
+        sales_withholding_tax_account_id: formData.sales_withholding_tax_account_id || null,
+        sales_withholding_tax_account_name: salesWhtAccount?.name || '',
+        sales_withholding_tax_rate: Number(formData.sales_withholding_tax_rate) || 0,
+        purchase_withholding_tax_account_id: formData.purchase_withholding_tax_account_id || null,
+        purchase_withholding_tax_account_name: purchaseWhtAccount?.name || '',
+        purchase_withholding_tax_rate: Number(formData.purchase_withholding_tax_rate) || 0
       };
 
       if (editingProduct) {
@@ -679,6 +696,8 @@ export const Products: React.FC = () => {
     const defaultVat = accounts.find(a => a.account_usage === 'vat');
     const defaultSalesVat = accounts.find(a => a.account_usage === 'output_vat') || defaultVat || accounts.find(a => a.code?.startsWith('222'));
     const defaultPurchaseVat = accounts.find(a => a.account_usage === 'input_vat') || defaultVat || accounts.find(a => a.code?.startsWith('118') || a.code?.startsWith('222'));
+    const defaultSalesWht = accounts.find(a => a.account_usage === 'withholding_tax_customers' || a.name.includes('خصم من العملاء'));
+    const defaultPurchaseWht = accounts.find(a => a.account_usage === 'withholding_tax_suppliers' || a.name.includes('خصم على الموردين') || a.name.includes('خصم من الموردين'));
 
     setEditingProduct(null);
     setFormData({ 
@@ -696,7 +715,15 @@ export const Products: React.FC = () => {
       vat_account_id: defaultSalesVat?.id || defaultPurchaseVat?.id || defaultVat?.id || '',
       sales_vat_account_id: defaultSalesVat?.id || defaultVat?.id || '',
       purchase_vat_account_id: defaultPurchaseVat?.id || defaultVat?.id || '',
-      vat_rate: 0, counter_account_id: '', item_group_id: '', 
+      vat_rate: 0, 
+      purchase_vat_rate: 14,
+      sales_withholding_tax_account_id: defaultSalesWht?.id || '',
+      sales_withholding_tax_account_name: defaultSalesWht?.name || '',
+      sales_withholding_tax_rate: 0,
+      purchase_withholding_tax_account_id: defaultPurchaseWht?.id || '',
+      purchase_withholding_tax_account_name: defaultPurchaseWht?.name || '',
+      purchase_withholding_tax_rate: 0,
+      counter_account_id: '', item_group_id: '', 
       tax_item_code: '',
       tax_code_type: 'EGS',
       eta_item_code: '',
@@ -737,6 +764,13 @@ export const Products: React.FC = () => {
         sales_vat_account_id: product.sales_vat_account_id || product.vat_account_id || '',
         purchase_vat_account_id: product.purchase_vat_account_id || product.vat_account_id || '',
         vat_rate: product.vat_rate || 0,
+        purchase_vat_rate: product.purchase_vat_rate !== undefined ? product.purchase_vat_rate : (product.vat_rate || 14),
+        sales_withholding_tax_account_id: product.sales_withholding_tax_account_id || '',
+        sales_withholding_tax_account_name: product.sales_withholding_tax_account_name || '',
+        sales_withholding_tax_rate: product.sales_withholding_tax_rate || 0,
+        purchase_withholding_tax_account_id: product.purchase_withholding_tax_account_id || '',
+        purchase_withholding_tax_account_name: product.purchase_withholding_tax_account_name || '',
+        purchase_withholding_tax_rate: product.purchase_withholding_tax_rate || 0,
         counter_account_id: product.counter_account_id || '',
         item_group_id: product.item_group_id || '',
         tax_item_code: product.tax_item_code || '',
@@ -2559,64 +2593,154 @@ export const Products: React.FC = () => {
                                      </>
                                    )}
 
-                                   {/* VAT Fields if Company is VAT registered */}
+                                   {/* VAT & Withholding Tax Fields */}
                                    {isVatEnabled && (
                                      <>
-                                       {/* ضريبة مبيعات (مخرجات) */}
+                                       {/* ضريبة مبيعات (مخرجات) مع النسبة */}
                                        <div className="space-y-0.5">
                                          <label className="block text-[10px] font-bold text-slate-600 px-0.5 flex items-center justify-between">
                                            <span>{language === 'ar' ? 'ضريبة القيمة المضافة (مبيعات)' : 'Sales VAT Account'}</span>
                                            <span className="text-[8.5px] text-emerald-700 bg-emerald-100 px-1 py-0.2 rounded font-black">مخرجات</span>
                                          </label>
-                                         <select 
-                                           className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all" 
-                                           value={formData.sales_vat_account_id || ''} 
-                                           onChange={(e) => setFormData({ ...formData, sales_vat_account_id: e.target.value })}
-                                         >
-                                           <option value="">{language === 'ar' ? '-- اختر حساب ضريبة المبيعات --' : '-- Select Sales VAT Account --'}</option>
-                                           {accounts.filter(a => ['vat', 'output_vat', 'withholding_tax'].includes(a.account_usage || '') || a.name.includes('مبيعات') || a.name.includes('مخرجات') || a.code?.startsWith('222')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
-                                         </select>
-                                       </div>
-
-                                       {/* ضريبة مشتريات (مدخلات) */}
-                                       <div className="space-y-0.5">
-                                         <label className="block text-[10px] font-bold text-slate-600 px-0.5 flex items-center justify-between">
-                                           <span>{language === 'ar' ? 'ضريبة القيمة المضافة (مشتريات)' : 'Purchase VAT Account'}</span>
-                                           <span className="text-[8.5px] text-blue-700 bg-blue-100 px-1 py-0.2 rounded font-black">مدخلات</span>
-                                         </label>
-                                         <select 
-                                           className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-blue-500 transition-all" 
-                                           value={formData.purchase_vat_account_id || ''} 
-                                           onChange={(e) => setFormData({ ...formData, purchase_vat_account_id: e.target.value })}
-                                         >
-                                           <option value="">{language === 'ar' ? '-- اختر حساب ضريبة المشتريات --' : '-- Select Purchase VAT Account --'}</option>
-                                           {accounts.filter(a => ['vat', 'input_vat', 'withholding_tax'].includes(a.account_usage || '') || a.name.includes('مشتريات') || a.name.includes('مدخلات') || a.code?.startsWith('118') || a.code?.startsWith('222')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
-                                         </select>
-                                       </div>
-
-                                       {/* نسبة ضريبة القيمة المضافة */}
-                                       <div className="space-y-0.5 sm:col-span-2">
-                                         <label className="block text-[10px] font-bold text-slate-500 px-0.5">
-                                           {t('products.form_vat_rate')}
-                                         </label>
-                                         <div className="relative">
-                                           <input 
-                                             type="number" 
-                                             step="0.01" 
-                                             min="0" 
-                                             max="100" 
-                                             placeholder="14" 
-                                             className="w-full pl-2 pr-6 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500 transition-all text-left" 
-                                             value={formData.vat_rate || ''} 
-                                             onChange={(e) => setFormData({ ...formData, vat_rate: parseFloat(e.target.value) || 0 })} 
-                                           />
-                                           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs select-none pointer-events-none">
-                                             %
-                                           </span>
+                                         <div className="flex items-center gap-1.5">
+                                           <select 
+                                             className="flex-1 min-w-0 px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all truncate" 
+                                             value={formData.sales_vat_account_id || ''} 
+                                             onChange={(e) => setFormData({ ...formData, sales_vat_account_id: e.target.value })}
+                                           >
+                                             <option value="">{language === 'ar' ? '-- اختر حساب ضريبة المبيعات --' : '-- Select Sales VAT Account --'}</option>
+                                             {(accounts.filter(a => a.id === formData.sales_vat_account_id || ['vat', 'output_vat'].includes(a.account_usage || '') || a.name.includes('مبيعات') || a.name.includes('مخرجات') || a.code?.startsWith('222')).length > 0
+                                               ? accounts.filter(a => a.id === formData.sales_vat_account_id || ['vat', 'output_vat'].includes(a.account_usage || '') || a.name.includes('مبيعات') || a.name.includes('مخرجات') || a.code?.startsWith('222'))
+                                               : accounts
+                                             ).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                           </select>
+                                           <div className="relative w-16 shrink-0">
+                                             <input 
+                                               type="number" 
+                                               step="0.01" 
+                                               min="0" 
+                                               max="100" 
+                                               placeholder="14" 
+                                               className="w-full pl-1.5 pr-5 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500 transition-all text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                                               value={formData.vat_rate !== undefined && formData.vat_rate !== null ? formData.vat_rate : ''} 
+                                               onChange={(e) => setFormData({ ...formData, vat_rate: parseFloat(e.target.value) || 0 })} 
+                                             />
+                                             <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs select-none pointer-events-none">
+                                               %
+                                             </span>
+                                           </div>
                                          </div>
                                        </div>
-                                     </>
-                                   )}
+
+                                       {/* ضريبة مشتريات (مدخلات) مع النسبة */}
+                                        <div className="space-y-0.5">
+                                          <label className="block text-[10px] font-bold text-slate-600 px-0.5 flex items-center justify-between">
+                                            <span>{language === 'ar' ? 'ضريبة القيمة المضافة (مشتريات)' : 'Purchase VAT Account'}</span>
+                                            <span className="text-[8.5px] text-blue-700 bg-blue-100 px-1 py-0.2 rounded font-black">مدخلات</span>
+                                          </label>
+                                          <div className="flex items-center gap-1.5">
+                                            <select 
+                                              className="flex-1 min-w-0 px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all truncate" 
+                                              value={formData.purchase_vat_account_id || ''} 
+                                              onChange={(e) => setFormData({ ...formData, purchase_vat_account_id: e.target.value })}
+                                            >
+                                              <option value="">{language === 'ar' ? '-- اختر حساب ضريبة المشتريات --' : '-- Select Purchase VAT Account --'}</option>
+                                              {(accounts.filter(a => a.id === formData.purchase_vat_account_id || ['vat', 'input_vat'].includes(a.account_usage || '') || a.name.includes('مشتريات') || a.name.includes('مدخلات') || a.code?.startsWith('118') || a.code?.startsWith('222')).length > 0
+                                                ? accounts.filter(a => a.id === formData.purchase_vat_account_id || ['vat', 'input_vat'].includes(a.account_usage || '') || a.name.includes('مشتريات') || a.name.includes('مدخلات') || a.code?.startsWith('118') || a.code?.startsWith('222'))
+                                                : accounts
+                                              ).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                            </select>
+                                            <div className="relative w-16 shrink-0">
+                                              <input 
+                                                type="number" 
+                                                step="0.01" 
+                                                min="0" 
+                                                max="100" 
+                                                placeholder="14" 
+                                                className="w-full pl-1.5 pr-5 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500 transition-all text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                                                value={formData.purchase_vat_rate !== undefined && formData.purchase_vat_rate !== null ? formData.purchase_vat_rate : ''} 
+                                                onChange={(e) => setFormData({ ...formData, purchase_vat_rate: parseFloat(e.target.value) || 0 })} 
+                                              />
+                                              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs select-none pointer-events-none">
+                                                %
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* ضرائب خصم من العملاء (مبيعات) مع النسبة */}
+                                        <div className="space-y-0.5">
+                                          <label className="block text-[10px] font-bold text-slate-600 px-0.5 flex items-center justify-between">
+                                            <span>{language === 'ar' ? 'ضرائب خصم من العملاء' : 'Sales Withholding Tax'}</span>
+                                            <span className="text-[8.5px] text-amber-700 bg-amber-100 px-1 py-0.2 rounded font-black">خصم مبيعات</span>
+                                          </label>
+                                          <div className="flex items-center gap-1.5">
+                                            <select 
+                                              className="flex-1 min-w-0 px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all truncate" 
+                                              value={formData.sales_withholding_tax_account_id || ''} 
+                                              onChange={(e) => setFormData({ ...formData, sales_withholding_tax_account_id: e.target.value })}
+                                            >
+                                              <option value="">{language === 'ar' ? '-- اختر حساب خصم من العملاء --' : '-- Select Customer WHT Account --'}</option>
+                                              {(accounts.filter(a => a.id === formData.sales_withholding_tax_account_id || ['withholding_tax_customers', 'withholding_tax'].includes(a.account_usage || '') || a.name.includes('خصم من العملاء') || a.name.includes('خصم عملاء') || a.code?.startsWith('118')).length > 0
+                                                ? accounts.filter(a => a.id === formData.sales_withholding_tax_account_id || ['withholding_tax_customers', 'withholding_tax'].includes(a.account_usage || '') || a.name.includes('خصم من العملاء') || a.name.includes('خصم عملاء') || a.code?.startsWith('118'))
+                                                : accounts
+                                              ).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                            </select>
+                                            <div className="relative w-16 shrink-0">
+                                              <input 
+                                                type="number" 
+                                                step="0.01" 
+                                                min="0" 
+                                                max="100" 
+                                                placeholder="1" 
+                                                className="w-full pl-1.5 pr-5 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500 transition-all text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                                                value={formData.sales_withholding_tax_rate !== undefined && formData.sales_withholding_tax_rate !== null ? formData.sales_withholding_tax_rate : ''} 
+                                                onChange={(e) => setFormData({ ...formData, sales_withholding_tax_rate: parseFloat(e.target.value) || 0 })} 
+                                              />
+                                              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs select-none pointer-events-none">
+                                                %
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* ضرائب خصم على الموردين (مشتريات) مع النسبة */}
+                                        <div className="space-y-0.5">
+                                          <label className="block text-[10px] font-bold text-slate-600 px-0.5 flex items-center justify-between">
+                                            <span>{language === 'ar' ? 'ضرائب خصم على الموردين' : 'Purchase Withholding Tax'}</span>
+                                            <span className="text-[8.5px] text-purple-700 bg-purple-100 px-1 py-0.2 rounded font-black">خصم مشتريات</span>
+                                          </label>
+                                          <div className="flex items-center gap-1.5">
+                                            <select 
+                                              className="flex-1 min-w-0 px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all truncate" 
+                                              value={formData.purchase_withholding_tax_account_id || ''} 
+                                              onChange={(e) => setFormData({ ...formData, purchase_withholding_tax_account_id: e.target.value })}
+                                            >
+                                              <option value="">{language === 'ar' ? '-- اختر حساب خصم على الموردين --' : '-- Select Supplier WHT Account --'}</option>
+                                              {(accounts.filter(a => a.id === formData.purchase_withholding_tax_account_id || ['withholding_tax_suppliers', 'withholding_tax'].includes(a.account_usage || '') || a.name.includes('خصم على الموردين') || a.name.includes('خصم من الموردين') || a.name.includes('خصم موردين') || a.code?.startsWith('222')).length > 0
+                                                ? accounts.filter(a => a.id === formData.purchase_withholding_tax_account_id || ['withholding_tax_suppliers', 'withholding_tax'].includes(a.account_usage || '') || a.name.includes('خصم على الموردين') || a.name.includes('خصم من الموردين') || a.name.includes('خصم موردين') || a.code?.startsWith('222'))
+                                                : accounts
+                                              ).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                            </select>
+                                            <div className="relative w-16 shrink-0">
+                                              <input 
+                                                type="number" 
+                                                step="0.01" 
+                                                min="0" 
+                                                max="100" 
+                                                placeholder="1" 
+                                                className="w-full pl-1.5 pr-5 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500 transition-all text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                                                value={formData.purchase_withholding_tax_rate !== undefined && formData.purchase_withholding_tax_rate !== null ? formData.purchase_withholding_tax_rate : ''} 
+                                                onChange={(e) => setFormData({ ...formData, purchase_withholding_tax_rate: parseFloat(e.target.value) || 0 })} 
+                                              />
+                                              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs select-none pointer-events-none">
+                                                %
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </>
+                                    )}
                                 </div>
                              </div>
                           </div>

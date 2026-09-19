@@ -350,6 +350,13 @@ export interface Product {
   purchase_vat_account_id?: string;
   purchase_vat_account_name?: string;
   vat_rate?: number;
+  purchase_vat_rate?: number;
+  sales_withholding_tax_account_id?: string;
+  sales_withholding_tax_account_name?: string;
+  sales_withholding_tax_rate?: number;
+  purchase_withholding_tax_account_id?: string;
+  purchase_withholding_tax_account_name?: string;
+  purchase_withholding_tax_rate?: number;
   inventory_cost_method?: 'wac' | 'fifo' | 'lifo';
   counter_account_id?: string;
   item_group_id?: string;
@@ -384,6 +391,7 @@ export interface Invoice {
   discount?: number;
   discount_amount?: number;
   tax_amount?: number;
+  withholding_tax_amount?: number;
   total_amount: number;
   payment_type: 'credit' | 'cash';
   payment_method_id?: string;
@@ -429,6 +437,7 @@ export interface PurchaseInvoice {
   subtotal?: number;
   discount?: number;
   tax_amount?: number;
+  withholding_tax_amount?: number;
   total_amount: number;
   payment_type: 'credit' | 'cash';
   payment_method_id?: string;
@@ -472,6 +481,8 @@ export interface InvoiceItem {
   cost_center_id?: string | null;
   vat_rate?: number;
   vat_amount?: number;
+  withholding_tax_rate?: number;
+  withholding_tax_amount?: number;
 }
 
 export interface ReceiptVoucherItem {
@@ -714,6 +725,7 @@ export interface Return {
   notes?: string;
   discount?: number;
   tax?: number;
+  withholding_tax_amount?: number;
   shipping?: number;
   subtotal?: number;
   total_amount: number;
@@ -749,6 +761,7 @@ export interface PurchaseReturn {
   notes?: string;
   discount?: number;
   tax?: number;
+  withholding_tax_amount?: number;
   shipping?: number;
   subtotal?: number;
   total_amount: number;
@@ -779,6 +792,8 @@ export interface ReturnItem {
   description?: string;
   vat_rate?: number;
   vat_amount?: number;
+  withholding_tax_rate?: number;
+  withholding_tax_amount?: number;
 }
 
 export interface CustomerDiscount {
