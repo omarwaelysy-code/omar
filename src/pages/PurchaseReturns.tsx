@@ -8,7 +8,7 @@ import {
   Save, Eye, Download, History, Printer, Edit, Phone, Mail, MapPin, Wallet, Box, 
   Maximize2, Minimize2, ChevronRight, ChevronLeft, FileText, FileSpreadsheet, Layers, ChevronDown, 
   LayoutGrid, List, CheckCheck, Coins, ImageIcon, ExternalLink, ChevronUp, Copy
-, Lock, CheckCircle2, AlertTriangle, Link2} from 'lucide-react';
+, Lock, CheckCircle2, AlertTriangle, Link2, Sparkles} from 'lucide-react';
 
 import { motion, AnimatePresence } from 'framer-motion';
 import Barcode from 'react-barcode';
