@@ -1460,7 +1460,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             { id: 'description', label: 'البيان', width: 38, align: 'right' },
             { id: 'debit', label: 'مدين', width: 11, align: 'right' },
             { id: 'credit', label: 'دائن', width: 11, align: 'right' },
-            { id: 'balance', label: 'الرصيد', width: 10, align: 'right' }
+            { id: 'balance', label: 'الرصيد (عملة النظام)', width: 10, align: 'right' }
           ];
           
           const totals = isThermal ? {

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Supplier, PurchaseInvoice, PaymentVoucher, PurchaseReturn } from '../types';
+import { Supplier, PurchaseInvoice, PaymentVoucher, PurchaseReturn, Currency, Company } from '../types';
 import { Search, Calendar, FileText, Download, User, ArrowUpRight, ArrowDownLeft, Wallet, RefreshCcw } from 'lucide-react';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
@@ -15,17 +15,203 @@ interface StatementItem {
   type: string;
   reference: string;
   entry_number?: string;
+  currency?: string;
+  amount?: number;
+  signed_amount?: number;
   debit: number; // المبلغ المستحق علينا (مشتريات)
   credit: number; // المبلغ المدفوع منا (سندات صرف، مرتجعات، خصومات)
   notes: string;
   balance?: number;
 }
 
+const buildSupplierStatement = ({
+  allJournalEntries,
+  invoices,
+  returns,
+  vouchers,
+  currencies,
+  company,
+  supplier,
+  accounts,
+  selectedSupplierId,
+  startDate,
+  endDate,
+  language
+}: {
+  allJournalEntries: any[];
+  invoices: PurchaseInvoice[];
+  returns: PurchaseReturn[];
+  vouchers: PaymentVoucher[];
+  currencies: Currency[];
+  company: Company | null;
+  supplier: Supplier | null | undefined;
+  accounts: any[];
+  selectedSupplierId: string;
+  startDate: string;
+  endDate: string;
+  language: string;
+}): { items: StatementItem[]; startBalance: number; systemCurrency: string } => {
+  const sysCurr = company?.settings?.currency || 'EGP';
+
+  const currenciesMap = (currencies || []).reduce((acc, c) => {
+    acc[c.id] = c;
+    return acc;
+  }, {} as Record<string, Currency>);
+
+  const invoicesMap = invoices.reduce((acc, inv) => {
+    acc[inv.invoice_number] = inv;
+    return acc;
+  }, {} as Record<string, PurchaseInvoice>);
+
+  const vouchersMap = vouchers.reduce((acc, v) => {
+    const ref = v.voucher_number || v.manual_reference || v.internal_reference;
+    if (ref) acc[ref] = v;
+    if (v.voucher_number) acc[v.voucher_number] = v;
+    return acc;
+  }, {} as Record<string, PaymentVoucher>);
+
+  const returnsMap = returns.reduce((acc, ret) => {
+    acc[ret.return_number] = ret;
+    return acc;
+  }, {} as Record<string, PurchaseReturn>);
+
+  const allItems: StatementItem[] = [];
+
+  allJournalEntries.forEach((je: any) => {
+    je.items?.forEach((item: any) => {
+      const matchesEntity = item.supplier_id === selectedSupplierId || item.sub_account_id === selectedSupplierId;
+      if (matchesEntity && isSupplierAccount(item.account_id, supplier, accounts)) {
+        let notes = item.description || je.description || (language === 'ar' ? 'قيد مالي' : 'Journal Entry');
+        let mappedType = je.reference_type || 'manual';
+        if (mappedType === 'payment') mappedType = 'payment_voucher';
+
+        let currencyCode = sysCurr;
+        let rawAmount = 0;
+
+        if (item.currency && item.currency !== 'local') {
+          currencyCode = currenciesMap[item.currency]?.code || item.currency;
+          if (item.foreign_amount && Number(item.foreign_amount) > 0) {
+            rawAmount = Number(item.foreign_amount);
+          }
+        }
+
+        if (je.reference_type === 'purchase_invoice' && je.reference_number) {
+          const inv = invoicesMap[je.reference_number];
+          notes = inv?.description || (language === 'ar' ? 'فاتورة مشتريات' : 'Purchase Invoice');
+          if (currencyCode === sysCurr && inv) {
+            if (inv.currency_id && currenciesMap[inv.currency_id]) {
+              currencyCode = currenciesMap[inv.currency_id].code;
+            } else if (inv.currency_code) {
+              currencyCode = inv.currency_code;
+            }
+            if (currencyCode !== sysCurr && inv.total_amount) {
+              rawAmount = Number(inv.total_amount);
+            }
+          }
+        } else if ((je.reference_type === 'payment_voucher' || je.reference_type === 'payment') && je.reference_number) {
+          const voucher = vouchersMap[je.reference_number];
+          notes = voucher?.description || (language === 'ar' ? 'سند صرف' : 'Payment Voucher');
+          if (currencyCode === sysCurr && voucher) {
+            const vAny = voucher as any;
+            if (vAny.currency_id && currenciesMap[vAny.currency_id]) {
+              currencyCode = currenciesMap[vAny.currency_id].code;
+            } else if (vAny.currency_code) {
+              currencyCode = vAny.currency_code;
+            }
+            if (currencyCode !== sysCurr && voucher.amount) {
+              rawAmount = Number(voucher.amount);
+            }
+          }
+        } else if (je.reference_type === 'purchase_return' && je.reference_number) {
+          const ret = returnsMap[je.reference_number];
+          notes = ret?.description || ret?.notes || (language === 'ar' ? 'مرتجع مشتريات' : 'Purchase Return');
+          if (currencyCode === sysCurr && ret) {
+            const retAny = ret as any;
+            if (retAny.currency_id && currenciesMap[retAny.currency_id]) {
+              currencyCode = currenciesMap[retAny.currency_id].code;
+            } else if (retAny.currency_code) {
+              currencyCode = retAny.currency_code;
+            }
+            if (currencyCode !== sysCurr && ret.total_amount) {
+              rawAmount = Number(ret.total_amount);
+            }
+          }
+        }
+
+        if (!rawAmount) {
+          rawAmount = Number(item.credit || 0) > 0 ? Number(item.credit) : Number(item.debit || 0);
+        }
+
+        // For supplier: Credit is positive (+) (owed to supplier), Debit is negative (-) (payment/return)
+        const isCredit = Number(item.credit || 0) > 0;
+        const isDebit = Number(item.debit || 0) > 0;
+        const signedAmount = isCredit ? rawAmount : (isDebit ? -rawAmount : 0);
+
+        allItems.push({
+          id: `je-${je.id}-${Math.random()}`,
+          date: je.date,
+          type: mappedType,
+          reference: je.reference_number || '-',
+          entry_number: je.entry_number || '',
+          currency: currencyCode,
+          amount: rawAmount,
+          signed_amount: signedAmount,
+          debit: item.debit || 0,
+          credit: item.credit || 0,
+          notes: notes
+        });
+      }
+    });
+  });
+
+  allItems.sort((a, b) => {
+    const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+    if (dateDiff !== 0) return dateDiff;
+    return a.id.localeCompare(b.id);
+  });
+
+  const startVal = startDate || '';
+  const endVal = endDate || new Date().toISOString().slice(0, 10);
+
+  const filteredItems = allItems.filter(item => {
+    const itemDateStr = (item.date || '').slice(0, 10);
+    return (!startVal || itemDateStr >= startVal) && (!endVal || itemDateStr <= endVal);
+  });
+
+  const supplierOpBal = Number(supplier?.opening_balance || 0);
+  const hasOpeningBalanceInItems = allItems.some(item => item.type === 'opening_balance' || item.notes.includes(language === 'ar' ? 'رصيد افتتاحي' : 'Opening Balance'));
+  const manualOpBal = hasOpeningBalanceInItems ? 0 : supplierOpBal;
+  let balanceBefore = 0;
+  
+  if (startVal) {
+    const itemsBefore = allItems.filter(item => (item.date || '').slice(0, 10) < startVal);
+    balanceBefore = manualOpBal + itemsBefore.reduce((sum, item) => sum + (Number(item.credit || 0) - Number(item.debit || 0)), 0);
+  } else {
+    if (manualOpBal !== 0) {
+      balanceBefore = manualOpBal;
+    }
+  }
+  
+  const initialBalance = balanceBefore;
+  let currentBalance = initialBalance;
+  const finalItems = filteredItems.map(item => {
+    currentBalance += (item.credit - item.debit);
+    return { ...item, balance: currentBalance };
+  });
+
+  return {
+    items: finalItems,
+    startBalance: initialBalance,
+    systemCurrency: sysCurr
+  };
+};
+
 export const SupplierStatement: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { setCurrentPage, setPendingViewDoc } = useNavigation();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [systemCurrency, setSystemCurrency] = useState<string>('EGP');
 
   const handleTransactionClick = (type: string, reference: string) => {
     if (!reference || reference === '-') return;
@@ -59,6 +245,14 @@ export const SupplierStatement: React.FC = () => {
   const [startBalance, setStartBalance] = useState(0);
   const reportRef = useRef<HTMLDivElement>(null);
 
+  const showCurrencyColumn = useMemo(() => {
+    const currenciesSet = new Set<string>();
+    statement.forEach(e => {
+      if (e.currency) currenciesSet.add(e.currency);
+    });
+    return currenciesSet.size > 1 || (currenciesSet.size === 1 && !currenciesSet.has(systemCurrency));
+  }, [statement, systemCurrency]);
+
   useEffect(() => {
     if (user) {
       const unsub = dbService.subscribe<Supplier>('suppliers', user.company_id, setSuppliers);
@@ -89,96 +283,35 @@ export const SupplierStatement: React.FC = () => {
             const opBal = supplier?.opening_balance || 0;
             setOpeningBalance(opBal);
 
-            const [invoices, returns, vouchers, discounts, journalEntries, accounts] = await Promise.all([
+            const [invoices, returns, vouchers, discounts, journalEntries, accounts, currencies, company] = await Promise.all([
               dbService.list<PurchaseInvoice>('purchase_invoices', user.company_id),
               dbService.list<PurchaseReturn>('purchase_returns', user.company_id),
               dbService.list<PaymentVoucher>('payment_vouchers', user.company_id),
               dbService.list<any>('supplier_discounts', user.company_id),
               dbService.list<any>('journal_entries', user.company_id),
-              dbService.list<any>('accounts', user.company_id)
+              dbService.list<any>('accounts', user.company_id),
+              dbService.list<Currency>('currencies', user.company_id),
+              dbService.get<Company>('companies', user.company_id)
             ]);
 
-            const invoicesMap = invoices.reduce((acc, inv) => { acc[inv.invoice_number] = inv; return acc; }, {} as Record<string, PurchaseInvoice>);
-            const vouchersMap = vouchers.reduce((acc, v) => {
-              const ref = v.voucher_number || v.manual_reference || v.internal_reference;
-              if (ref) acc[ref] = v;
-              return acc;
-            }, {} as Record<string, PaymentVoucher>);
-            const returnsMap = returns.reduce((acc, ret) => { acc[ret.return_number] = ret; return acc; }, {} as Record<string, PurchaseReturn>);
-
-            const allItems: StatementItem[] = [];
-
-            journalEntries.forEach((je: any) => {
-              je.items?.forEach((item: any) => {
-                const matchesEntity = item.supplier_id === savedSupId || item.sub_account_id === savedSupId;
-                if (matchesEntity && isSupplierAccount(item.account_id, supplier, accounts)) {
-                  let notes = item.description || je.description || (language === 'ar' ? 'قيد مالي' : 'Journal Entry');
-                  let mappedType = je.reference_type || 'manual';
-                  if (mappedType === 'payment') mappedType = 'payment_voucher';
-
-                  if (je.reference_type === 'purchase_invoice' && je.reference_number) {
-                    const inv = invoicesMap[je.reference_number];
-                    notes = inv?.description || (language === 'ar' ? 'فاتورة مشتريات' : 'Purchase Invoice');
-                  } else if ((je.reference_type === 'payment_voucher' || je.reference_type === 'payment') && je.reference_number) {
-                    const voucher = vouchersMap[je.reference_number];
-                    notes = voucher?.description || (language === 'ar' ? 'سند صرف' : 'Payment Voucher');
-                  } else if (je.reference_type === 'purchase_return' && je.reference_number) {
-                    const ret = returnsMap[je.reference_number];
-                    notes = ret?.description || ret?.notes || (language === 'ar' ? 'مرتجع مشتريات' : 'Purchase Return');
-                  }
-
-                  allItems.push({
-                    id: `je-${je.id}-${Math.random()}`,
-                    date: je.date,
-                    type: mappedType,
-                    reference: je.reference_number || '-',
-                    entry_number: je.entry_number || '',
-                    debit: item.debit || 0,
-                    credit: item.credit || 0,
-                    notes: notes
-                  });
-                }
-              });
+            const res = buildSupplierStatement({
+              allJournalEntries: journalEntries,
+              invoices,
+              returns,
+              vouchers,
+              currencies,
+              company,
+              supplier,
+              accounts,
+              selectedSupplierId: savedSupId,
+              startDate: savedStart || '',
+              endDate: savedEnd || new Date().toISOString().slice(0, 10),
+              language
             });
 
-            allItems.sort((a, b) => {
-              const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
-              if (dateDiff !== 0) return dateDiff;
-              return a.id.localeCompare(b.id);
-            });
-
-            const startVal = savedStart || '';
-            const endVal = savedEnd || new Date().toISOString().slice(0, 10);
-
-            const filteredItems = allItems.filter(item => {
-              const itemDateStr = (item.date || '').slice(0, 10);
-              return (!startVal || itemDateStr >= startVal) && (!endVal || itemDateStr <= endVal);
-            });
-
-            const supplierOpBal = Number(supplier?.opening_balance || 0);
-            const hasOpeningBalanceInItems = allItems.some(item => item.type === 'opening_balance' || item.notes.includes(language === 'ar' ? 'رصيد افتتاحي' : 'Opening Balance'));
-            const manualOpBal = hasOpeningBalanceInItems ? 0 : supplierOpBal;
-            let balanceBefore = 0;
-            
-            if (startVal) {
-              const itemsBefore = allItems.filter(item => (item.date || '').slice(0, 10) < startVal);
-              balanceBefore = manualOpBal + itemsBefore.reduce((sum, item) => sum + (Number(item.credit || 0) - Number(item.debit || 0)), 0);
-            } else {
-              if (manualOpBal !== 0) {
-                balanceBefore = manualOpBal;
-              }
-            }
-            
-            const initialBalance = balanceBefore;
-            setStartBalance(initialBalance);
-            
-            let currentBalance = initialBalance;
-            const finalItems = filteredItems.map(item => {
-              currentBalance += (item.credit - item.debit);
-              return { ...item, balance: currentBalance };
-            });
-
-            setStatement(finalItems);
+            setSystemCurrency(res.systemCurrency);
+            setStartBalance(res.startBalance);
+            setStatement(res.items);
           } catch (e) {
             console.error(e);
           } finally {
@@ -198,102 +331,35 @@ export const SupplierStatement: React.FC = () => {
       const opBal = supplier?.opening_balance || 0;
       setOpeningBalance(opBal);
 
-      const [invoices, returns, vouchers, discounts, journalEntries, accounts] = await Promise.all([
+      const [invoices, returns, vouchers, discounts, journalEntries, accounts, currencies, company] = await Promise.all([
         dbService.list<PurchaseInvoice>('purchase_invoices', user.company_id),
         dbService.list<PurchaseReturn>('purchase_returns', user.company_id),
         dbService.list<PaymentVoucher>('payment_vouchers', user.company_id),
         dbService.list<any>('supplier_discounts', user.company_id),
         dbService.list<any>('journal_entries', user.company_id),
-        dbService.list<any>('accounts', user.company_id)
+        dbService.list<any>('accounts', user.company_id),
+        dbService.list<Currency>('currencies', user.company_id),
+        dbService.get<Company>('companies', user.company_id)
       ]);
 
-      const invoicesMap = invoices.reduce((acc, inv) => {
-        acc[inv.invoice_number] = inv;
-        return acc;
-      }, {} as Record<string, PurchaseInvoice>);
-
-      const vouchersMap = vouchers.reduce((acc, v) => {
-        const ref = v.voucher_number || v.manual_reference || v.internal_reference;
-        if (ref) acc[ref] = v;
-        return acc;
-      }, {} as Record<string, PaymentVoucher>);
-
-      const returnsMap = returns.reduce((acc, ret) => {
-        acc[ret.return_number] = ret;
-        return acc;
-      }, {} as Record<string, PurchaseReturn>);
-
-      const allItems: StatementItem[] = [];
-
-      journalEntries.forEach((je: any) => {
-        je.items?.forEach((item: any) => {
-          const matchesEntity = item.supplier_id === selectedSupplierId || item.sub_account_id === selectedSupplierId;
-          if (matchesEntity && isSupplierAccount(item.account_id, supplier, accounts)) {
-            let notes = item.description || je.description || (language === 'ar' ? 'قيد مالي' : 'Journal Entry');
-            let mappedType = je.reference_type || 'manual';
-            if (mappedType === 'payment') mappedType = 'payment_voucher';
-
-            if (je.reference_type === 'purchase_invoice' && je.reference_number) {
-              const inv = invoicesMap[je.reference_number];
-              notes = inv?.description || (language === 'ar' ? 'فاتورة مشتريات' : 'Purchase Invoice');
-            } else if ((je.reference_type === 'payment_voucher' || je.reference_type === 'payment') && je.reference_number) {
-              const voucher = vouchersMap[je.reference_number];
-              notes = voucher?.description || (language === 'ar' ? 'سند صرف' : 'Payment Voucher');
-            } else if (je.reference_type === 'purchase_return' && je.reference_number) {
-              const ret = returnsMap[je.reference_number];
-              notes = ret?.description || ret?.notes || (language === 'ar' ? 'مرتجع مشتريات' : 'Purchase Return');
-            }
-
-            allItems.push({
-              id: `je-${je.id}-${Math.random()}`,
-              date: je.date,
-              type: mappedType,
-              reference: je.reference_number || '-',
-              entry_number: je.entry_number || '',
-              debit: item.debit || 0,
-              credit: item.credit || 0,
-              notes: notes
-            });
-          }
-        });
+      const res = buildSupplierStatement({
+        allJournalEntries: journalEntries,
+        invoices,
+        returns,
+        vouchers,
+        currencies,
+        company,
+        supplier,
+        accounts,
+        selectedSupplierId,
+        startDate,
+        endDate,
+        language
       });
 
-      allItems.sort((a, b) => {
-        const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
-        if (dateDiff !== 0) return dateDiff;
-        return a.id.localeCompare(b.id);
-      });
-
-      const filteredItems = allItems.filter(item => {
-        const itemDateStr = (item.date || '').slice(0, 10);
-        return (!startDate || itemDateStr >= startDate) && (!endDate || itemDateStr <= endDate);
-      });
-
-      const supplierOpBal = Number(supplier?.opening_balance || 0);
-      const hasOpeningBalanceInItems = allItems.some(item => item.type === 'opening_balance' || item.notes.includes(language === 'ar' ? 'رصيد افتتاحي' : 'Opening Balance'));
-      
-      const manualOpBal = hasOpeningBalanceInItems ? 0 : supplierOpBal;
-      let balanceBefore = 0;
-      
-      if (startDate) {
-        const itemsBefore = allItems.filter(item => (item.date || '').slice(0, 10) < startDate);
-        balanceBefore = manualOpBal + itemsBefore.reduce((sum, item) => sum + (Number(item.credit || 0) - Number(item.debit || 0)), 0);
-      } else {
-        if (manualOpBal !== 0) {
-          balanceBefore = manualOpBal;
-        }
-      }
-      
-      const initialBalance = balanceBefore;
-      setStartBalance(initialBalance);
-      
-      let currentBalance = initialBalance;
-      const finalItems = filteredItems.map(item => {
-        currentBalance += (item.credit - item.debit);
-        return { ...item, balance: currentBalance };
-      });
-
-      setStatement(finalItems);
+      setSystemCurrency(res.systemCurrency);
+      setStartBalance(res.startBalance);
+      setStatement(res.items);
     } catch (e) {
       console.error(e);
     } finally {
@@ -306,19 +372,31 @@ export const SupplierStatement: React.FC = () => {
     return balance > 0 ? `+${formatNumber(balance)}` : formatNumber(balance);
   };
 
+  const formatSigned = (val: number) => {
+    if (val === 0) return '0';
+    return val > 0 ? `+${formatNumber(val)}` : formatNumber(val);
+  };
+
   const handleExportExcel = () => {
     if (statement.length === 0 || !selectedSupplierId) return;
     const supplier = suppliers.find(s => s.id === selectedSupplierId);
-    const data = statement.map(entry => ({
-      [language === 'ar' ? 'التاريخ' : 'Date']: entry.date,
-      [language === 'ar' ? 'النوع' : 'Type']: entry.type,
-      [language === 'ar' ? 'رقم القيد' : 'Entry No.']: entry.entry_number || '-',
-      [language === 'ar' ? 'المرجع' : 'Reference']: entry.reference,
-      [language === 'ar' ? 'البيان' : 'Description']: entry.notes,
-      [language === 'ar' ? 'مدين (-)' : 'Debit (-)']: entry.debit,
-      [language === 'ar' ? 'دائن (+)' : 'Credit (+)']: entry.credit,
-      [language === 'ar' ? 'الرصيد' : 'Balance']: entry.balance
-    }));
+    const data = statement.map(entry => {
+      const row: Record<string, any> = {
+        [language === 'ar' ? 'التاريخ' : 'Date']: entry.date,
+        [language === 'ar' ? 'النوع' : 'Type']: entry.type,
+        [language === 'ar' ? 'رقم القيد' : 'Entry No.']: entry.entry_number || '-',
+        [language === 'ar' ? 'المرجع' : 'Reference']: entry.reference,
+        [language === 'ar' ? 'البيان' : 'Description']: entry.notes,
+      };
+      if (showCurrencyColumn) {
+        row[language === 'ar' ? 'العملة' : 'Currency'] = entry.currency || systemCurrency;
+      }
+      row[language === 'ar' ? 'المبلغ (±)' : 'Amount (±)'] = entry.signed_amount || 0;
+      row[language === 'ar' ? 'مدين (-)' : 'Debit (-)'] = entry.debit;
+      row[language === 'ar' ? 'دائن (+)' : 'Credit (+)'] = entry.credit;
+      row[language === 'ar' ? 'الرصيد (عملة النظام)' : 'Balance (System Currency)'] = entry.balance;
+      return row;
+    });
     
     exportToExcel(data, { 
       filename: `statement_${supplier?.name}_${new Date().toISOString().slice(0,10)}`,
@@ -339,6 +417,9 @@ export const SupplierStatement: React.FC = () => {
       console.error(e);
     }
   };
+
+  const totalCredit = statement.reduce((sum, e) => sum + (Number(e.credit) || 0), 0) + (startBalance > 0 ? startBalance : 0);
+  const totalDebit = statement.reduce((sum, e) => sum + (Number(e.debit) || 0), 0) + (startBalance < 0 ? Math.abs(startBalance) : 0);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
@@ -447,9 +528,13 @@ export const SupplierStatement: React.FC = () => {
                       <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</th>
                       <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'المرجع' : 'Reference'}</th>
                       <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'البيان' : 'Description'}</th>
+                      {showCurrencyColumn && (
+                        <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'العملة' : 'Currency'}</th>
+                      )}
+                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'المبلغ (±)' : 'Amount (±)'}</th>
                       <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'مدين' : 'Debit'}</th>
                       <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'دائن' : 'Credit'}</th>
-                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'الرصيد' : 'Balance'}</th>
+                      <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'الرصيد (عملة النظام)' : 'Balance (System Currency)'}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -461,8 +546,18 @@ export const SupplierStatement: React.FC = () => {
                         <td className="px-4 py-3 text-sm font-mono">-</td>
                         <td className="px-4 py-3 text-sm font-mono">-</td>
                         <td className="px-4 py-3 text-sm">{startDate ? (language === 'ar' ? 'رصيد منقول' : 'Balance Forward') : (language === 'ar' ? 'رصيد افتتاحي' : 'Opening Balance')}</td>
-                        <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance > 0 ? formatNumber(startBalance) : '-'}</td>
+                        {showCurrencyColumn && (
+                          <td className="px-4 py-3 text-sm font-mono font-bold text-zinc-600">
+                            <span className="px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200 text-xs">
+                              {systemCurrency}
+                            </span>
+                          </td>
+                        )}
+                        <td className={`px-4 py-3 text-sm font-bold font-mono ${startBalance > 0 ? 'text-emerald-600' : (startBalance < 0 ? 'text-rose-600' : 'text-zinc-600')}`}>
+                          {formatSigned(startBalance)}
+                        </td>
                         <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance < 0 ? formatNumber(Math.abs(startBalance)) : '-'}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-emerald-600">{startBalance > 0 ? formatNumber(startBalance) : '-'}</td>
                         <td className="px-4 py-3 text-sm font-bold text-zinc-900">{formatBalance(startBalance)}</td>
                       </tr>
                     )}
@@ -511,6 +606,16 @@ export const SupplierStatement: React.FC = () => {
                           {item.reference}
                         </td>
                         <td className="px-4 py-3 text-sm">{item.notes}</td>
+                        {showCurrencyColumn && (
+                          <td className="px-4 py-3 text-sm font-mono font-bold text-zinc-600">
+                            <span className="px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200 text-xs">
+                              {item.currency || systemCurrency}
+                            </span>
+                          </td>
+                        )}
+                        <td className={`px-4 py-3 text-sm font-bold font-mono ${(item.signed_amount || 0) > 0 ? 'text-emerald-600' : ((item.signed_amount || 0) < 0 ? 'text-rose-600' : 'text-zinc-600')}`}>
+                          {formatSigned(item.signed_amount || 0)}
+                        </td>
                         <td className="px-4 py-3 text-sm font-bold text-emerald-600">{item.debit > 0 ? formatNumber(item.debit) : '-'}</td>
                         <td className="px-4 py-3 text-sm font-bold text-emerald-600">{item.credit > 0 ? formatNumber(item.credit) : '-'}</td>
                         <td className="px-4 py-3 text-sm font-bold text-zinc-900">{formatBalance(item.balance || 0)}</td>
@@ -518,15 +623,16 @@ export const SupplierStatement: React.FC = () => {
                     ))}
                     {statement.length === 0 && (
                       <tr>
-                        <td colSpan={8} className="px-4 py-8 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد حركات في هذه الفترة' : 'No transactions in this period'}</td>
+                        <td colSpan={showCurrencyColumn ? 10 : 9} className="px-4 py-8 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد حركات في هذه الفترة' : 'No transactions in this period'}</td>
                       </tr>
                     )}
                   </tbody>
                   <tfoot>
                     <tr className="bg-zinc-900 text-white font-bold">
-                      <td colSpan={5} className="px-4 py-3 text-left">{language === 'ar' ? 'الرصيد الختامي' : 'Ending Balance'}</td>
-                      <td className="px-4 py-3">{formatNumber(statement.reduce((sum, e) => sum + (Number(e.debit) || 0), 0) + (startBalance < 0 ? Math.abs(startBalance) : 0))}</td>
-                      <td className="px-4 py-3">{formatNumber(statement.reduce((sum, e) => sum + (Number(e.credit) || 0), 0) + (startBalance > 0 ? startBalance : 0))}</td>
+                      <td colSpan={showCurrencyColumn ? 6 : 5} className="px-4 py-3 text-left">{language === 'ar' ? 'الرصيد الختامي' : 'Ending Balance'}</td>
+                      <td className="px-4 py-3 font-mono">{formatSigned(totalCredit - totalDebit)}</td>
+                      <td className="px-4 py-3">{formatNumber(totalDebit)}</td>
+                      <td className="px-4 py-3">{formatNumber(totalCredit)}</td>
                       <td className="px-4 py-3">{formatBalance(statement.length > 0 ? (statement[statement.length - 1].balance || 0) : startBalance)}</td>
                     </tr>
                   </tfoot>
