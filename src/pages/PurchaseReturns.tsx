@@ -4195,12 +4195,12 @@ export const PurchaseReturns: React.FC = () => {
                                 <td colSpan={7} className={`px-6 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-zinc-650 font-bold text-[10px] uppercase tracking-wider`}>ضريبة القيمة المضافة</td>
                                 <td className="px-6 py-2 text-zinc-700 text-base">+{formatMoney(viewReturn.tax_amount || viewReturn.tax || viewReturn.items?.reduce((sum: number, i: any) => sum + (Number(i.vat_amount) || 0), 0))} {currencyCode}</td>
                               </tr>
-                        {(Number((viewReturn as any).withholding_tax_amount || 0) > 0 || (viewReturn.items || []).some((i: any) => Number(i.withholding_tax_amount || 0) > 0)) && (
-                          <tr>
-                            <td colSpan={4} className={`px-6 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-amber-600 font-bold text-xs`}>{language === 'ar' ? 'ضريبة الخصم والإضافة (ض.خ.إ)' : 'Withholding Tax'}</td>
-                            <td className="px-6 py-2 text-amber-600 text-base">-{formatMoney((viewReturn as any).withholding_tax_amount || viewReturn.items?.reduce((sum: number, i: any) => sum + (Number(i.withholding_tax_amount) || 0), 0))} {currencyCode}</td>
-                          </tr>
-                        )}
+                            )}
+                            {(Number((viewReturn as any).withholding_tax_amount || 0) > 0 || (viewReturn.items || []).some((i: any) => Number(i.withholding_tax_amount || 0) > 0)) && (
+                              <tr>
+                                <td colSpan={7} className={`px-6 py-2 ${dir === 'rtl' ? 'text-left' : 'text-right'} text-amber-600 font-bold text-xs`}>{language === 'ar' ? 'ضريبة الخصم والإضافة (ض.خ.إ)' : 'Withholding Tax'}</td>
+                                <td className="px-6 py-2 text-amber-600 text-base">-{formatMoney((viewReturn as any).withholding_tax_amount || viewReturn.items?.reduce((sum: number, i: any) => sum + (Number(i.withholding_tax_amount) || 0), 0))} {currencyCode}</td>
+                              </tr>
                             )}
                             <tr className="bg-slate-900 text-white font-bold">
                               <td colSpan={7} className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'} font-black text-lg uppercase tracking-tight`}>الصافي الإجمالي</td>
