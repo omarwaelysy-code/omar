@@ -95,78 +95,116 @@ const buildCustomerStatement = ({
         if (mappedType === 'receipt') mappedType = 'receipt_voucher';
 
         let currencyCode = sysCurr;
-        let rawAmount = 0;
-
-        if (item.currency && item.currency !== 'local') {
-          currencyCode = currenciesMap[item.currency]?.code || item.currency;
-          if (item.foreign_amount && Number(item.foreign_amount) > 0) {
-            rawAmount = Number(item.foreign_amount);
-          }
-        }
+        let rate = 1;
+        let docTotal = 0;
 
         if (je.reference_type === 'invoice' && je.reference_number) {
           const inv = invoicesMap[je.reference_number];
           description = inv?.description || (language === 'ar' ? 'فاتورة مبيعات' : 'Sales Invoice');
-          if (currencyCode === sysCurr && inv) {
+          if (inv) {
             if (inv.currency_id && currenciesMap[inv.currency_id]) {
               currencyCode = currenciesMap[inv.currency_id].code;
-            } else if (inv.currency_code) {
-              currencyCode = inv.currency_code;
+            } else if ((inv as any).currency_code) {
+              currencyCode = (inv as any).currency_code;
             }
-            if (currencyCode !== sysCurr && inv.total_amount) {
-              rawAmount = Number(inv.total_amount);
-            }
+            rate = Number(inv.exchange_rate) || 1;
+            docTotal = Number(inv.total_amount) || 0;
           }
         } else if ((je.reference_type === 'receipt' || je.reference_type === 'receipt_voucher') && je.reference_number) {
           const rect = receiptsMap[je.reference_number];
           description = rect?.description || (language === 'ar' ? 'سند قبض' : 'Receipt Voucher');
-          if (currencyCode === sysCurr && rect) {
+          if (rect) {
             const rAny = rect as any;
             if (rAny.currency_id && currenciesMap[rAny.currency_id]) {
               currencyCode = currenciesMap[rAny.currency_id].code;
             } else if (rAny.currency_code) {
               currencyCode = rAny.currency_code;
             }
-            if (currencyCode !== sysCurr && rect.amount) {
-              rawAmount = Number(rect.amount);
-            }
+            rate = Number(rAny.exchange_rate) || 1;
+            docTotal = Number(rect.amount) || 0;
           }
         } else if ((je.reference_type === 'payment' || je.reference_type === 'payment_voucher') && je.reference_number) {
           const pv = vouchersMap[je.reference_number];
           description = pv?.description || (language === 'ar' ? 'سند صرف' : 'Payment Voucher');
-          if (currencyCode === sysCurr && pv) {
+          if (pv) {
             const pAny = pv as any;
             if (pAny.currency_id && currenciesMap[pAny.currency_id]) {
               currencyCode = currenciesMap[pAny.currency_id].code;
             } else if (pAny.currency_code) {
               currencyCode = pAny.currency_code;
             }
-            if (currencyCode !== sysCurr && pv.amount) {
-              rawAmount = Number(pv.amount);
-            }
+            rate = Number(pAny.exchange_rate) || 1;
+            docTotal = Number(pv.amount) || 0;
           }
         } else if (je.reference_type === 'return' && je.reference_number) {
           const ret = returnsMap[je.reference_number];
           description = ret?.description || ret?.notes || (language === 'ar' ? 'مرتجع مبيعات' : 'Sales Return');
-          if (currencyCode === sysCurr && ret) {
+          if (ret) {
             const retAny = ret as any;
             if (ret.currency_id && currenciesMap[ret.currency_id]) {
               currencyCode = currenciesMap[ret.currency_id].code;
             } else if (retAny.currency_code) {
               currencyCode = retAny.currency_code;
             }
-            if (currencyCode !== sysCurr && ret.total_amount) {
-              rawAmount = Number(ret.total_amount);
-            }
+            rate = Number(ret.exchange_rate) || 1;
+            docTotal = Number(ret.total_amount) || 0;
           }
         }
 
-        if (!rawAmount) {
-          rawAmount = Number(item.debit || 0) > 0 ? Number(item.debit) : Number(item.credit || 0);
+        if (item.currency && item.currency !== 'local') {
+          const itemCurrCode = currenciesMap[item.currency]?.code || item.currency;
+          if (itemCurrCode) currencyCode = itemCurrCode;
+          if (item.exchange_rate && Number(item.exchange_rate) > 0) {
+            rate = Number(item.exchange_rate);
+          }
         }
 
-        const isDebit = Number(item.debit || 0) > 0;
-        const isCredit = Number(item.credit || 0) > 0;
+        const itemDebit = Number(item.debit) || 0;
+        const itemCredit = Number(item.credit) || 0;
+        const isForeign = currencyCode !== sysCurr && rate > 0 && rate !== 1;
+
+        let finalDebit = itemDebit;
+        let finalCredit = itemCredit;
+        let rawAmount = 0;
+
+        if (isForeign) {
+          if (item.foreign_amount && Number(item.foreign_amount) > 0) {
+            rawAmount = Number(item.foreign_amount);
+            finalDebit = itemDebit;
+            finalCredit = itemCredit;
+          } else {
+            const isDebitUnconverted = itemDebit > 0 && (
+              (docTotal > 0 && Math.abs(itemDebit - docTotal) < 0.05) ||
+              (docTotal > 0 && Math.abs(itemDebit - docTotal) < Math.abs(itemDebit - docTotal * rate))
+            );
+            const isCreditUnconverted = itemCredit > 0 && (
+              (docTotal > 0 && Math.abs(itemCredit - docTotal) < 0.05) ||
+              (docTotal > 0 && Math.abs(itemCredit - docTotal) < Math.abs(itemCredit - docTotal * rate))
+            );
+
+            if (isDebitUnconverted) {
+              rawAmount = itemDebit;
+              finalDebit = Number((itemDebit * rate).toFixed(2));
+              finalCredit = 0;
+            } else if (isCreditUnconverted) {
+              rawAmount = itemCredit;
+              finalCredit = Number((itemCredit * rate).toFixed(2));
+              finalDebit = 0;
+            } else {
+              finalDebit = itemDebit;
+              finalCredit = itemCredit;
+              const val = itemDebit > 0 ? itemDebit : itemCredit;
+              rawAmount = Number((val / rate).toFixed(2));
+            }
+          }
+        } else {
+          finalDebit = itemDebit;
+          finalCredit = itemCredit;
+          rawAmount = itemDebit > 0 ? itemDebit : itemCredit;
+        }
+
+        const isDebit = finalDebit > 0 || itemDebit > 0;
+        const isCredit = finalCredit > 0 || itemCredit > 0;
         const signedAmount = isDebit ? rawAmount : (isCredit ? -rawAmount : 0);
 
         allEntries.push({
@@ -179,8 +217,8 @@ const buildCustomerStatement = ({
           currency: currencyCode,
           amount: rawAmount,
           signed_amount: signedAmount,
-          debit: item.debit || 0,
-          credit: item.credit || 0,
+          debit: finalDebit,
+          credit: finalCredit,
           balance: 0
         });
       }
