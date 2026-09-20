@@ -85,27 +85,114 @@ export const SupplierBalances: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [sups, journalEntries, accounts] = await Promise.all([
+      const [sups, journalEntries, accounts, purchaseInvoices, paymentVouchers, purchaseReturns, currencies] = await Promise.all([
         dbService.list<Supplier>('suppliers', user.company_id),
         dbService.list<any>('journal_entries', user.company_id),
-        dbService.list<any>('accounts', user.company_id)
+        dbService.list<any>('accounts', user.company_id),
+        dbService.list<any>('purchase_invoices', user.company_id),
+        dbService.list<any>('payment_vouchers', user.company_id),
+        dbService.list<any>('purchase_returns', user.company_id),
+        dbService.list<any>('currencies', user.company_id)
       ]);
+
+      const currenciesMap = (currencies || []).reduce((acc: any, c: any) => {
+        acc[c.id] = c;
+        return acc;
+      }, {});
+
+      const invoicesMap = (purchaseInvoices || []).reduce((acc: any, inv: any) => {
+        acc[inv.invoice_number] = inv;
+        return acc;
+      }, {});
+
+      const returnsMap = (purchaseReturns || []).reduce((acc: any, ret: any) => {
+        acc[ret.return_number] = ret;
+        return acc;
+      }, {});
 
       const balances = sups.map((supplier: any) => {
         // Find all journal entry lines matching this supplier and their ledger account
         const supplierLines: any[] = [];
         journalEntries.forEach((je: any) => {
-          je.items?.forEach((item: any) => {
+          const supplierItems = (je.items || []).filter((item: any) => {
             const matchesEntity = item.supplier_id === supplier.id || item.sub_account_id === supplier.id;
-            if (matchesEntity && isSupplierAccount(item.account_id, supplier, accounts)) {
-              supplierLines.push({
-                date: je.date,
-                reference_type: je.reference_type,
-                debit: Number(item.debit) || 0,
-                credit: Number(item.credit) || 0,
-                description: item.description || je.description || ''
-              });
+            return matchesEntity && isSupplierAccount(item.account_id, supplier, accounts);
+          });
+          if (supplierItems.length === 0) return;
+
+          let currencyCode = 'EGP';
+          let rate = 1;
+          let docTotal = 0;
+
+          if ((je.reference_type === 'purchase_invoice' || je.reference_type === 'invoice') && je.reference_number) {
+            const inv = invoicesMap[je.reference_number];
+            if (inv) {
+              if (inv.currency_id && currenciesMap[inv.currency_id]) {
+                currencyCode = currenciesMap[inv.currency_id].code;
+              } else if (inv.currency_code) {
+                currencyCode = inv.currency_code;
+              }
+              rate = Number(inv.exchange_rate) || 1;
+              docTotal = Number(inv.total_amount) || 0;
             }
+          } else if ((je.reference_type === 'purchase_return' || je.reference_type === 'return') && je.reference_number) {
+            const ret = returnsMap[je.reference_number];
+            if (ret) {
+              if (ret.currency_id && currenciesMap[ret.currency_id]) {
+                currencyCode = currenciesMap[ret.currency_id].code;
+              }
+              rate = Number(ret.exchange_rate) || 1;
+              docTotal = Number(ret.total_amount) || 0;
+            }
+          }
+
+          for (const item of supplierItems) {
+            if (item.currency && item.currency !== 'local') {
+              const itemCurrCode = currenciesMap[item.currency]?.code || item.currency;
+              if (itemCurrCode) currencyCode = itemCurrCode;
+              if (item.exchange_rate && Number(item.exchange_rate) > 0) {
+                rate = Number(item.exchange_rate);
+              }
+              break;
+            }
+          }
+
+          const sumDebit = Number(supplierItems.reduce((sum: number, item: any) => sum + (Number(item.debit) || 0), 0).toFixed(2));
+          const sumCredit = Number(supplierItems.reduce((sum: number, item: any) => sum + (Number(item.credit) || 0), 0).toFixed(2));
+          const sumForeign = Number(supplierItems.reduce((sum: number, item: any) => sum + (Number(item.foreign_amount) || 0), 0).toFixed(2));
+
+          const isForeign = currencyCode !== 'EGP' && rate > 0 && rate !== 1;
+
+          let finalDebit = sumDebit;
+          let finalCredit = sumCredit;
+
+          if (isForeign) {
+            if (sumForeign > 0) {
+              finalDebit = sumDebit;
+              finalCredit = sumCredit;
+            } else {
+              const isDebitUnconverted = sumDebit > 0 && docTotal > 0 && Math.abs(sumDebit - docTotal) < 0.05;
+              const isCreditUnconverted = sumCredit > 0 && docTotal > 0 && Math.abs(sumCredit - docTotal) < 0.05;
+
+              if (isDebitUnconverted) {
+                finalDebit = Number((sumDebit * rate).toFixed(2));
+                finalCredit = 0;
+              } else if (isCreditUnconverted) {
+                finalCredit = Number((sumCredit * rate).toFixed(2));
+                finalDebit = 0;
+              } else {
+                finalDebit = sumDebit;
+                finalCredit = sumCredit;
+              }
+            }
+          }
+
+          supplierLines.push({
+            date: je.date,
+            reference_type: je.reference_type,
+            debit: finalDebit,
+            credit: finalCredit,
+            description: supplierItems[0]?.description || je.description || ''
           });
         });
 

@@ -17,6 +17,7 @@ interface StatementEntry {
   entry_number?: string;
   description: string;
   currency?: string;
+  exchange_rate?: number;
   amount?: number;
   signed_amount?: number;
   debit: number;
@@ -227,6 +228,7 @@ const buildCustomerStatement = ({
       entry_number: je.entry_number || '',
       description: description,
       currency: currencyCode,
+      exchange_rate: rate,
       amount: rawAmount,
       signed_amount: signedAmount,
       debit: finalDebit,
@@ -488,6 +490,9 @@ export const CustomerStatement: React.FC = () => {
       };
       if (showCurrencyColumn) {
         row[language === 'ar' ? 'العملة' : 'Currency'] = entry.currency || systemCurrency;
+        row[language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'] = (entry.exchange_rate && entry.exchange_rate > 0 && entry.currency !== systemCurrency)
+          ? entry.exchange_rate
+          : '-';
       }
       row[language === 'ar' ? 'المبلغ (±)' : 'Amount (±)'] = entry.signed_amount || 0;
       row[language === 'ar' ? 'مدين (+)' : 'Debit (+)'] = entry.debit;
@@ -623,7 +628,10 @@ export const CustomerStatement: React.FC = () => {
                       <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'المرجع' : 'Reference'}</th>
                       <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'البيان' : 'Description'}</th>
                       {showCurrencyColumn && (
-                        <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'العملة' : 'Currency'}</th>
+                        <>
+                          <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'العملة' : 'Currency'}</th>
+                          <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
+                        </>
                       )}
                       <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'المبلغ (±)' : 'Amount (±)'}</th>
                       <th className="px-4 py-3 text-sm font-bold text-zinc-700">{language === 'ar' ? 'مدين' : 'Debit'}</th>
@@ -682,11 +690,18 @@ export const CustomerStatement: React.FC = () => {
                         </td>
                         <td className="px-4 py-3 text-sm">{entry.description}</td>
                         {showCurrencyColumn && (
-                          <td className="px-4 py-3 text-sm font-mono font-bold text-zinc-600">
-                            <span className="px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200 text-xs">
-                              {entry.currency || systemCurrency}
-                            </span>
-                          </td>
+                          <>
+                            <td className="px-4 py-3 text-sm font-mono font-bold text-zinc-600">
+                              <span className="px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200 text-xs">
+                                {entry.currency || systemCurrency}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm font-mono font-bold text-zinc-600">
+                              {entry.exchange_rate && entry.exchange_rate > 0 && entry.currency !== systemCurrency
+                                ? Number(entry.exchange_rate.toFixed(4)).toString()
+                                : '-'}
+                            </td>
+                          </>
                         )}
                         <td className={`px-4 py-3 text-sm font-bold font-mono ${(entry.signed_amount || 0) > 0 ? 'text-emerald-600' : ((entry.signed_amount || 0) < 0 ? 'text-rose-600' : 'text-zinc-600')}`}>
                           {formatSigned(entry.signed_amount || 0)}
@@ -698,13 +713,13 @@ export const CustomerStatement: React.FC = () => {
                     ))}
                     {entries.length === 1 && entries[0].id === 'balance-forward' && (
                       <tr>
-                        <td colSpan={showCurrencyColumn ? 10 : 9} className="px-4 py-8 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد حركات في هذه الفترة' : 'No transactions in this period'}</td>
+                        <td colSpan={showCurrencyColumn ? 11 : 9} className="px-4 py-8 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد حركات في هذه الفترة' : 'No transactions in this period'}</td>
                       </tr>
                     )}
                   </tbody>
                   <tfoot>
                     <tr className="bg-zinc-900 text-white font-bold">
-                      <td colSpan={showCurrencyColumn ? 6 : 5} className="px-4 py-3 text-left">{language === 'ar' ? 'الرصيد الختامي' : 'Ending Balance'}</td>
+                      <td colSpan={showCurrencyColumn ? 7 : 5} className="px-4 py-3 text-left">{language === 'ar' ? 'الرصيد الختامي' : 'Ending Balance'}</td>
                       <td className="px-4 py-3 font-mono">{formatSigned(entries.reduce((sum, e) => sum + (Number(e.debit) || 0) - (Number(e.credit) || 0), 0))}</td>
                       <td className="px-4 py-3">{formatNumber(entries.reduce((sum, e) => sum + (Number(e.debit) || 0), 0))}</td>
                       <td className="px-4 py-3">{formatNumber(entries.reduce((sum, e) => sum + (Number(e.credit) || 0), 0))}</td>
