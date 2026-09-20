@@ -26,6 +26,11 @@ export class PostingService {
     const subtotal = Number(invoice.subtotal) || 0;
     const discount = Number(invoice.discount_amount || invoice.discount) || 0;
     const total_amount = Number(invoice.total_amount) || 0;
+    const rate = Number(invoice.exchange_rate) || 1;
+    const currencyCode = (invoice as any).currency_code || (invoice as any).currency || 'EGP';
+
+    const totalAmountLocal = Number((total_amount * rate).toFixed(2));
+    const discountLocal = Number((discount * rate).toFixed(2));
 
     const journalItems: JournalEntryItem[] = [];
     
@@ -37,11 +42,16 @@ export class PostingService {
     journalItems.push({
       account_id: customerAccountId,
       account_name: customerAccountName,
-      debit: total_amount,
+      debit: totalAmountLocal,
       credit: 0,
+      currency: currencyCode,
+      exchange_rate: rate,
+      foreign_amount: total_amount,
       description: `فاتورة مبيعات رقم ${invoice.invoice_number} - ${customer?.name || ''}`,
       customer_id: invoice.customer_id,
-      customer_name: customer?.name
+      customer_name: customer?.name,
+      sub_account_id: invoice.customer_id,
+      sub_account_type: 'customer'
     });
 
     // Cash payments logic
@@ -54,8 +64,11 @@ export class PostingService {
       journalItems.push({
         account_id: cashAccountId,
         account_name: cashAccountName,
-        debit: total_amount,
+        debit: totalAmountLocal,
         credit: 0,
+        currency: currencyCode,
+        exchange_rate: rate,
+        foreign_amount: total_amount,
         description: `تحصيل فاتورة مبيعات رقم ${invoice.invoice_number} - ${customer?.name || ''}`,
         sub_account_id: invoice.payment_method_id,
         sub_account_type: 'payment_method'
@@ -66,7 +79,10 @@ export class PostingService {
         account_id: customerAccountId,
         account_name: customerAccountName,
         debit: 0,
-        credit: total_amount,
+        credit: totalAmountLocal,
+        currency: currencyCode,
+        exchange_rate: rate,
+        foreign_amount: total_amount,
         description: `سداد فاتورة مبيعات رقم ${invoice.invoice_number} - ${customer?.name || ''}`,
         customer_id: invoice.customer_id,
         customer_name: customer?.name,
@@ -76,14 +92,17 @@ export class PostingService {
     }
 
     // Discount
-    if (discount > 0) {
+    if (discountLocal > 0) {
       const discountAccountId = settings?.customer_discount_account_id || '';
       const discountAccount = accounts.find(a => a.id === discountAccountId);
       journalItems.push({
         account_id: discountAccountId,
         account_name: discountAccount?.name || 'حساب الخصم المسموح به',
-        debit: discount,
+        debit: discountLocal,
         credit: 0,
+        currency: currencyCode,
+        exchange_rate: rate,
+        foreign_amount: discount,
         description: `خصم مسموح به - فاتورة رقم ${invoice.invoice_number}`
       });
     }
@@ -93,12 +112,17 @@ export class PostingService {
       const product = products.find(p => p.id === item.product_id);
       let salesAccountId = product?.revenue_account_id || '';
       let salesAccountName = product?.revenue_account_name || 'حساب المبيعات';
+      const itemTotalFC = Number(item.total) || 0;
+      const itemTotalLocal = Number((itemTotalFC * rate).toFixed(2));
 
       journalItems.push({
         account_id: salesAccountId,
         account_name: salesAccountName,
         debit: 0,
-        credit: Number(item.total) || 0,
+        credit: itemTotalLocal,
+        currency: currencyCode,
+        exchange_rate: rate,
+        foreign_amount: itemTotalFC,
         description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoice.invoice_number}`
       });
     });
@@ -119,9 +143,12 @@ export class PostingService {
         
         if (!finalVatAccountId) {
           const globalVatAccount = accounts.find(a => 
+            a.account_usage === 'vat' ||
+            a.account_usage === 'vat_sales' ||
             a.name.includes('ضريبة القيمة المضافة') || 
             a.name.includes('قيمة مضافة') || 
-            a.name.includes('ضريبة مبيعات')
+            a.name.includes('ضريبة مبيعات') ||
+            a.code === '2221'
           );
           finalVatAccountId = globalVatAccount?.id || '';
           finalVatAccountName = globalVatAccount?.name || finalVatAccountName;
@@ -143,32 +170,42 @@ export class PostingService {
     const taxAmount = Number(invoice.tax_amount || 0);
     if (Object.keys(vatGroup).length > 0) {
       Object.values(vatGroup).forEach(vat => {
+        const vatLocal = Number((vat.amount * rate).toFixed(2));
         journalItems.push({
           account_id: vat.account_id,
           account_name: vat.account_name,
           debit: 0,
-          credit: vat.amount,
+          credit: vatLocal,
+          currency: currencyCode,
+          exchange_rate: rate,
+          foreign_amount: vat.amount,
           description: `ضريبة القيمة المضافة - فاتورة مبيعات رقم ${invoice.invoice_number}`
         });
       });
     } else if (taxAmount > 0) {
       const vatAccount = accounts.find(a => 
+        a.account_usage === 'vat' ||
+        a.account_usage === 'vat_sales' ||
         a.name.includes('ضريبة القيمة المضافة') || 
         a.name.includes('قيمة مضافة') || 
-        a.name.includes('ضريبة مبيعات')
+        a.name.includes('ضريبة مبيعات') ||
+        a.code === '2221'
       );
       const vatAccountId = vatAccount?.id || '';
       const vatAccountName = vatAccount?.name || 'حساب ضريبة القيمة المضافة';
+      const taxLocal = Number((taxAmount * rate).toFixed(2));
       journalItems.push({
         account_id: vatAccountId,
         account_name: vatAccountName,
         debit: 0,
-        credit: taxAmount,
+        credit: taxLocal,
+        currency: currencyCode,
+        exchange_rate: rate,
+        foreign_amount: taxAmount,
         description: `ضريبة القيمة المضافة - فاتورة مبيعات رقم ${invoice.invoice_number}`
       });
     }
 
-    
     // Withholding Tax (Debit side for sales: Current Asset - Tax Withheld by Customers)
     const whtSalesGroup: Record<string, { account_id: string; account_name: string; amount: number }> = {};
     invoice.items?.forEach(item => {
@@ -186,8 +223,10 @@ export class PostingService {
         if (!finalWhtAccountId) {
           const globalWhtAccount = accounts.find(a => 
             a.account_usage === 'withholding_tax_customers' || 
+            a.name.includes('تحت حساب الضريبة') ||
             a.name.includes('خصم من العملاء') ||
             a.name.includes('خصم عملاء') ||
+            a.code === '112' ||
             a.code?.startsWith('118')
           );
           finalWhtAccountId = globalWhtAccount?.id || '';
@@ -210,28 +249,54 @@ export class PostingService {
     const invoiceWhtTotal = Number(invoice.withholding_tax_amount || 0);
     if (Object.keys(whtSalesGroup).length > 0) {
       Object.values(whtSalesGroup).forEach(wht => {
+        const whtLocal = Number((wht.amount * rate).toFixed(2));
         journalItems.push({
           account_id: wht.account_id,
           account_name: wht.account_name,
-          debit: Number(wht.amount.toFixed(2)),
+          debit: whtLocal,
           credit: 0,
+          currency: currencyCode,
+          exchange_rate: rate,
+          foreign_amount: wht.amount,
           description: `ضريبة خصم وإضافة مبيعات (خصم من العملاء) - فاتورة رقم ${invoice.invoice_number}`
         });
       });
     } else if (invoiceWhtTotal > 0) {
       const globalWhtAccount = accounts.find(a => 
         a.account_usage === 'withholding_tax_customers' || 
+        a.name.includes('تحت حساب الضريبة') ||
         a.name.includes('خصم من العملاء') ||
         a.name.includes('خصم عملاء') ||
+        a.code === '112' ||
         a.code?.startsWith('118')
       );
+      const whtLocal = Number((invoiceWhtTotal * rate).toFixed(2));
       journalItems.push({
         account_id: globalWhtAccount?.id || '',
         account_name: globalWhtAccount?.name || 'ضرائب خصم من العملاء',
-        debit: invoiceWhtTotal,
+        debit: whtLocal,
         credit: 0,
+        currency: currencyCode,
+        exchange_rate: rate,
+        foreign_amount: invoiceWhtTotal,
         description: `ضريبة خصم وإضافة مبيعات (خصم من العملاء) - فاتورة رقم ${invoice.invoice_number}`
       });
+    }
+
+    let total_debit = Number(journalItems.reduce((sum, i) => sum + (Number(i.debit) || 0), 0).toFixed(2));
+    let total_credit = Number(journalItems.reduce((sum, i) => sum + (Number(i.credit) || 0), 0).toFixed(2));
+
+    const diff = Number((total_debit - total_credit).toFixed(2));
+    if (diff !== 0 && journalItems.length > 0) {
+      if (diff > 0) {
+        const creditItem = journalItems.find(item => (Number(item.credit) || 0) > 0);
+        if (creditItem) creditItem.credit = Number((Number(creditItem.credit) + diff).toFixed(2));
+      } else {
+        const debitItem = journalItems.find(item => (Number(item.debit) || 0) > 0);
+        if (debitItem) debitItem.debit = Number((Number(debitItem.debit) + Math.abs(diff)).toFixed(2));
+      }
+      total_debit = Number(journalItems.reduce((sum, i) => sum + (Number(i.debit) || 0), 0).toFixed(2));
+      total_credit = Number(journalItems.reduce((sum, i) => sum + (Number(i.credit) || 0), 0).toFixed(2));
     }
 
     return {
@@ -241,8 +306,8 @@ export class PostingService {
       reference_type: 'invoice',
       description: `قيد فاتورة مبيعات رقم: ${invoice.invoice_number}`,
       items: journalItems,
-      total_debit: Number(journalItems.reduce((sum, i) => sum + (Number(i.debit) || 0), 0).toFixed(2)),
-      total_credit: Number(journalItems.reduce((sum, i) => sum + (Number(i.credit) || 0), 0).toFixed(2)),
+      total_debit,
+      total_credit,
       company_id: invoice.company_id || '',
       created_at: new Date().toISOString(),
       created_by: invoice.id // Placeholder or system

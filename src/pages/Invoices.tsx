@@ -1682,7 +1682,9 @@ export const Invoices: React.FC = () => {
       const vatTotal = isVatEnabled
         ? (items || []).reduce((sum, item) => sum + (Number(item.vat_amount) || 0), 0)
         : 0;
-      const total_amount = subtotal + vatTotal - Number(discount || 0);
+      const whtTotal = (items || []).reduce((sum, item) => sum + (Number(item.withholding_tax_amount) || 0), 0);
+      const discountVal = Number(discount || 0);
+      const total_amount = Number(subtotal + vatTotal - discountVal - whtTotal) || 0;
       if (subtotal <= 0) {
         setPreviewJournalEntry(null);
         setPreviewActivityLog(null);
@@ -1705,144 +1707,176 @@ export const Invoices: React.FC = () => {
       // Preview Journal Entry
       const journalItems: JournalEntryItem[] = [];
       const rate = Number(exchangeRate) || 1;
+      const currencyObj = companyCurrencies.find(c => c.id === selectedCurrencyId);
+      const currencyCode = currencyObj?.code || (companyData?.settings?.currency || 'EGP');
 
-      const subtotalVal = Number(items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)), 0)) || 0;
-      const discountVal = Number(discount) || 0;
+      const totalAmountLocal = Number((total_amount * rate).toFixed(2));
+      const whtTotalLocal = Number((whtTotal * rate).toFixed(2));
+      const discountLocal = Number((discountVal * rate).toFixed(2));
 
+      // 1. Debit: Customer or Cash
+      if (paymentType === 'cash') {
+        const pm = paymentMethods.find(p => p.id === paymentMethodId);
+        const cashAccountId = pm?.account_id || '';
+        const cashAccountName = pm?.account_name || 'حساب النقدية';
+        const cashAccount = accounts.find(a => a.id === cashAccountId);
+
+        journalItems.push({
+          account_id: cashAccountId,
+          account_name: cashAccountName,
+          account_code: cashAccount?.code || '',
+          debit: totalAmountLocal,
+          credit: 0,
+          currency: currencyCode,
+          exchange_rate: rate,
+          foreign_amount: total_amount,
+          description: `تحصيل نقدي - فاتورة رقم ${invoice_number}`,
+          sub_account_id: paymentMethodId,
+          sub_account_type: 'payment_method'
+        });
+      } else {
+        const debitAccountId = customer?.account_id || '';
+        const debitAccountName = customer?.account_name || 'حساب العملاء';
+        const debitAcc = accounts.find(a => a.id === debitAccountId);
+
+        journalItems.push({
+          account_id: debitAccountId,
+          account_name: debitAccountName,
+          account_code: debitAcc?.code || '',
+          debit: totalAmountLocal,
+          credit: 0,
+          currency: currencyCode,
+          exchange_rate: rate,
+          foreign_amount: total_amount,
+          description: `فاتورة مبيعات رقم ${invoice_number} - ${customer?.name || ''}`,
+          customer_id: selectedCustomerId,
+          customer_name: customer?.name,
+          sub_account_id: selectedCustomerId,
+          sub_account_type: 'customer'
+        });
+      }
+
+      // 2. Debit: Withholding Tax Account (Current Asset - Tax Withheld by Customers)
+      if (whtTotalLocal > 0) {
+        let whtAccountId = '';
+        let whtAccountName = language === 'ar' ? 'ضرائب خصم من العملاء' : 'Sales Withholding Tax Account';
+
+        const productWithWht = products.find(p => (items || []).some(i => i.product_id === p.id && (i.withholding_tax_amount || 0) > 0) && p.sales_withholding_tax_account_id);
+        if (productWithWht?.sales_withholding_tax_account_id) {
+          whtAccountId = productWithWht.sales_withholding_tax_account_id;
+          whtAccountName = productWithWht.sales_withholding_tax_account_name || whtAccountName;
+        }
+
+        if (!whtAccountId) {
+          const globalWhtAccount = accounts.find(a => 
+            a.account_usage === 'withholding_tax_customers' || 
+            a.name.includes('تحت حساب الضريبة') ||
+            a.name.includes('خصم من العملاء') ||
+            a.name.includes('خصم عملاء') ||
+            a.code === '112' ||
+            a.code?.startsWith('118')
+          );
+          whtAccountId = globalWhtAccount?.id || '';
+          whtAccountName = globalWhtAccount?.name || whtAccountName;
+        }
+        const whtAccount = accounts.find(a => a.id === whtAccountId);
+
+        journalItems.push({
+          account_id: whtAccountId,
+          account_name: whtAccountName,
+          account_code: whtAccount?.code || '',
+          debit: whtTotalLocal,
+          credit: 0,
+          currency: currencyCode,
+          exchange_rate: rate,
+          foreign_amount: whtTotal,
+          description: `ضريبة خصم وإضافة (خصم من العملاء) - فاتورة رقم ${invoice_number}`
+        });
+      }
+
+      // 3. Debit: Discount Account
+      if (discountLocal > 0) {
+        const discountAccountId = settings?.customer_discount_account_id || '';
+        let discountAccount = accounts.find(a => a.id === discountAccountId);
+        if (!discountAccount) {
+          discountAccount = accounts.find(a => 
+            a.account_usage === 'earned_discounts' || 
+            a.name.includes('مسموح به') || 
+            a.name.includes('خصم مبيعات')
+          );
+        }
+        journalItems.push({
+          account_id: discountAccount?.id || discountAccountId,
+          account_name: discountAccount?.name || 'حساب الخصم المسموح به',
+          account_code: discountAccount?.code || '',
+          debit: discountLocal,
+          credit: 0,
+          currency: currencyCode,
+          exchange_rate: rate,
+          foreign_amount: discountVal,
+          description: `خصم مسموح به - فاتورة رقم ${invoice_number}`
+        });
+      }
+
+      // 4. Credit: Sales Accounts
       (items || []).forEach(item => {
         if (!item.product_id) return;
         const product = products.find(p => p.id === item.product_id);
         if (!product) return;
 
-        // Calculate in foreign currency first (no rounding)
         const itemTotalFC = Number((Number(item.quantity) || 0) * (Number(item.unit_price) || 0)) || 0;
-        const itemVatFC = isVatEnabled ? Number(item.vat_amount) || 0 : 0;
-        const itemDiscountFC = subtotalVal > 0 ? (itemTotalFC / subtotalVal) * discountVal : 0;
-        const itemWhtRate = Number(item.withholding_tax_rate !== undefined ? item.withholding_tax_rate : (product.sales_withholding_tax_rate || 0));
-        const itemWhtFC = Number(item.withholding_tax_amount !== undefined ? item.withholding_tax_amount : (itemTotalFC * (itemWhtRate / 100)));
-        const itemNetTotalFC = itemTotalFC + itemVatFC - itemDiscountFC - itemWhtFC;
-
-        // Convert to local currency and round once
         const itemTotal = Number((itemTotalFC * rate).toFixed(2));
-        const itemVat = Number((itemVatFC * rate).toFixed(2));
-        const itemDiscount = Number((itemDiscountFC * rate).toFixed(2));
-        const itemWht = Number((itemWhtFC * rate).toFixed(2));
-        const itemNetTotal = Number((itemNetTotalFC * rate).toFixed(2));
+        if (itemTotal <= 0 && itemTotalFC <= 0) return;
 
-        // 1. Debit: Customer or Payment Method (Cash)
-        let debitAccountId = '';
-        let debitAccountName = '';
-
-        if (paymentType === 'cash') {
-          const pm = paymentMethods.find(p => p.id === paymentMethodId);
-          debitAccountId = pm?.account_id || '';
-          debitAccountName = pm?.account_name || 'حساب النقدية';
-        } else {
-          debitAccountId = customer?.account_id || '';
-          debitAccountName = customer?.account_name || 'حساب العملاء';
-        }
-
-        const debitAcc = accounts.find(a => a.id === debitAccountId);
-        const debitAccountCode = debitAcc?.code || '';
-
-        if (paymentType === 'cash') {
-          journalItems.push({
-            account_id: debitAccountId,
-            account_name: debitAccountName,
-            account_code: debitAccountCode,
-            product_name: item.product_name,
-            debit: itemNetTotal,
-            credit: 0,
-            description: `تحصيل نقدي - صنف: ${item.product_name} - فاتورة رقم ${invoice_number}`,
-            sub_account_id: paymentMethodId,
-            sub_account_type: 'payment_method'
-          });
-        } else {
-          journalItems.push({
-            account_id: debitAccountId,
-            account_name: debitAccountName,
-            account_code: debitAccountCode,
-            product_name: item.product_name,
-            debit: itemNetTotal,
-            credit: 0,
-            description: `مبيعات عملاء - صنف: ${item.product_name} - فاتورة رقم ${invoice_number}`,
-            sub_account_id: customer?.id,
-            sub_account_type: 'customer'
-          });
-        }
-
-        // 2. Debit: Discount Account (if proportional discount > 0)
-        if (itemDiscount > 0) {
-          const discountAccountId = settings?.customer_discount_account_id || '';
-          const discountAccount = accounts.find(a => a.id === discountAccountId);
-          journalItems.push({
-            account_id: discountAccountId,
-            account_name: discountAccount?.name || 'حساب الخصم المسموح به',
-            account_code: discountAccount?.code || '',
-            product_name: item.product_name,
-            debit: itemDiscount,
-            credit: 0,
-            description: `خصم مسموح به - صنف: ${item.product_name} - فاتورة رقم ${invoice_number}`
-          });
-        }
-
-        // Withholding Tax Debit (Current Asset - Tax Withheld by Customers)
-        if (itemWht > 0) {
-          let whtAccountId = product.sales_withholding_tax_account_id || '';
-          let whtAccountName = product.sales_withholding_tax_account_name || (language === 'ar' ? 'ضرائب خصم من العملاء' : 'Sales Withholding Tax Account');
-          if (!whtAccountId) {
-            const globalWhtAccount = accounts.find(a => 
-              a.account_usage === 'withholding_tax_customers' || 
-              a.name.includes('خصم من العملاء') ||
-              a.name.includes('خصم عملاء') ||
-              a.code?.startsWith('118')
-            );
-            whtAccountId = globalWhtAccount?.id || '';
-            whtAccountName = globalWhtAccount?.name || whtAccountName;
-          }
-          const whtAccount = accounts.find(a => a.id === whtAccountId);
-          journalItems.push({
-            account_id: whtAccountId,
-            account_name: whtAccountName,
-            account_code: whtAccount?.code || '',
-            product_name: item.product_name,
-            debit: itemWht,
-            credit: 0,
-            description: `ضريبة خصم وإضافة - صنف: ${item.product_name} - فاتورة رقم ${invoice_number}`
-          });
-        }
-
-        // 3. Credit: Sales Accounts
         let creditAccountId = product.revenue_account_id || '';
         let creditAccountName = product.revenue_account_name || 'حساب المبيعات';
+        if (!creditAccountId) {
+          const defaultRev = accounts.find(a => a.account_usage === 'revenue' || a.name.includes('مبيعات'));
+          creditAccountId = defaultRev?.id || '';
+          creditAccountName = defaultRev?.name || creditAccountName;
+        }
         const creditAcc = accounts.find(a => a.id === creditAccountId);
-        const creditAccountCode = creditAcc?.code || '';
 
         journalItems.push({
           account_id: creditAccountId,
           account_name: creditAccountName,
-          account_code: creditAccountCode,
+          account_code: creditAcc?.code || '',
           product_name: item.product_name,
           debit: 0,
           credit: itemTotal,
-          description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoice_number}`
+          currency: currencyCode,
+          exchange_rate: rate,
+          foreign_amount: itemTotalFC,
+          description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoice_number}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`
         });
+      });
 
-        // 4. Credit: VAT Liability Account
-        if (itemVat > 0) {
-          let vatAccountId = product.vat_account_id || '';
-          let vatAccountName = product.vat_account_name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Liability Account');
+      // 5. Credit: VAT Liability Account
+      if (isVatEnabled) {
+        (items || []).forEach(item => {
+          if (!item.product_id) return;
+          const itemVatFC = Number(item.vat_amount) || 0;
+          const itemVat = Number((itemVatFC * rate).toFixed(2));
+          if (itemVat <= 0 && itemVatFC <= 0) return;
+
+          const product = products.find(p => p.id === item.product_id);
+          let vatAccountId = product?.sales_vat_account_id || product?.vat_account_id || '';
+          let vatAccountName = product?.sales_vat_account_name || product?.vat_account_name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Liability Account');
 
           if (!vatAccountId) {
             const globalVatAccount = accounts.find(a => 
+              a.account_usage === 'vat' || 
+              a.account_usage === 'vat_sales' ||
               a.name.includes('ضريبة القيمة المضافة') || 
               a.name.includes('قيمة مضافة') || 
-              a.name.includes('ضريبة مبيعات')
+              a.name.includes('ضريبة مبيعات') ||
+              a.code === '2221'
             );
             vatAccountId = globalVatAccount?.id || '';
             vatAccountName = globalVatAccount?.name || vatAccountName;
           }
           const vatAccount = accounts.find(a => a.id === vatAccountId);
+
           journalItems.push({
             account_id: vatAccountId,
             account_name: vatAccountName,
@@ -1850,57 +1884,62 @@ export const Invoices: React.FC = () => {
             product_name: item.product_name,
             debit: 0,
             credit: itemVat,
+            currency: currencyCode,
+            exchange_rate: rate,
+            foreign_amount: itemVatFC,
             description: `ضريبة القيمة المضافة - صنف: ${item.product_name} - فاتورة رقم ${invoice_number}`
           });
-        }
+        });
+      }
 
-        // 5. Debit COGS & Credit Inventory (for physical products)
-        if (product.type !== 'service') {
-          const itemCost = Number((item.quantity * (product.cost_price || 0)).toFixed(2));
-          if (itemCost > 0) {
-            // Debit: COGS Account
-            let costAccId = product.cost_account_id || '';
-            let costAccName = product.cost_account_name || 'تكلفة المبيعات';
-            if (!costAccId) {
-              const fallbackCostAcc = accounts.find(a => a.name.includes('تكلفة المبيعات') || a.name.includes('تكلفة مبيعات') || a.name.includes('تكلفة البضاعة المباعة'));
-              if (fallbackCostAcc) {
-                costAccId = fallbackCostAcc.id;
-                costAccName = fallbackCostAcc.name;
-              }
-            }
-            const costAcc = accounts.find(a => a.id === costAccId);
-            journalItems.push({
-              account_id: costAccId,
-              account_name: costAccName,
-              account_code: costAcc?.code || '',
-              product_name: item.product_name,
-              debit: itemCost,
-              credit: 0,
-              description: `تكلفة البضاعة المباعة - صنف: ${item.product_name} - فاتورة ${invoice_number}`
-            });
+      // 6. Debit COGS & Credit Inventory (for physical products)
+      (items || []).forEach(item => {
+        if (!item.product_id) return;
+        const product = products.find(p => p.id === item.product_id);
+        if (!product || product.type === 'service') return;
 
-            // Credit: Inventory Account
-            let invAccId = product.inventory_account_id || '';
-            let invAccName = product.inventory_account_name || 'المخزون';
-            if (!invAccId) {
-              const fallbackInvAcc = accounts.find(a => a.name.includes('مخزون') || a.name.includes('مخازن'));
-              if (fallbackInvAcc) {
-                invAccId = fallbackInvAcc.id;
-                invAccName = fallbackInvAcc.name;
-              }
-            }
-            const invAcc = accounts.find(a => a.id === invAccId);
-            journalItems.push({
-              account_id: invAccId,
-              account_name: invAccName,
-              account_code: invAcc?.code || '',
-              product_name: item.product_name,
-              debit: 0,
-              credit: itemCost,
-              description: `تخفيض المخزون - صنف: ${item.product_name} - فاتورة ${invoice_number}`
-            });
+        const itemCost = Number((item.quantity * (product.cost_price || 0)).toFixed(2));
+        if (itemCost <= 0) return;
+
+        let costAccId = product.cost_account_id || '';
+        let costAccName = product.cost_account_name || 'تكلفة المبيعات';
+        if (!costAccId) {
+          const fallbackCostAcc = accounts.find(a => a.account_usage === 'cost_of_goods_sold' || a.name.includes('تكلفة المبيعات') || a.name.includes('تكلفة مبيعات') || a.name.includes('تكلفة البضاعة المباعة'));
+          if (fallbackCostAcc) {
+            costAccId = fallbackCostAcc.id;
+            costAccName = fallbackCostAcc.name;
           }
         }
+        const costAcc = accounts.find(a => a.id === costAccId);
+        journalItems.push({
+          account_id: costAccId,
+          account_name: costAccName,
+          account_code: costAcc?.code || '',
+          product_name: item.product_name,
+          debit: itemCost,
+          credit: 0,
+          description: `تكلفة البضاعة المباعة - صنف: ${item.product_name} - فاتورة ${invoice_number}`
+        });
+
+        let invAccId = product.inventory_account_id || '';
+        let invAccName = product.inventory_account_name || 'المخزون';
+        if (!invAccId) {
+          const fallbackInvAcc = accounts.find(a => a.account_usage === 'inventory' || a.name.includes('مخزون') || a.name.includes('مخازن'));
+          if (fallbackInvAcc) {
+            invAccId = fallbackInvAcc.id;
+            invAccName = fallbackInvAcc.name;
+          }
+        }
+        const invAcc = accounts.find(a => a.id === invAccId);
+        journalItems.push({
+          account_id: invAccId,
+          account_name: invAccName,
+          account_code: invAcc?.code || '',
+          product_name: item.product_name,
+          debit: 0,
+          credit: itemCost,
+          description: `تخفيض المخزون - صنف: ${item.product_name} - فاتورة ${invoice_number}`
+        });
       });
 
       const sumDebits = Number(journalItems.reduce((s, x) => s + (Number(x.debit) || 0), 0).toFixed(2)) || 0;
@@ -2356,170 +2395,241 @@ export const Invoices: React.FC = () => {
       // Journal items generation
       const journalItems: any[] = [];
       const rate = Number(exchangeRate) || 1;
-      let customerAccountId = customer?.account_id || '';
-      let customerAccountName = customer?.account_name || 'حساب العملاء';
-      const custAcc = accounts.find(a => a.id === customerAccountId);
-      const customerAccountCode = custAcc?.code || '';
+      const currencyObj = companyCurrencies.find(c => c.id === selectedCurrencyId);
+      const currencyCode = currencyObj?.code || (companyData?.settings?.currency || 'EGP');
 
+      const totalAmountLocal = Number((total_amount * rate).toFixed(2));
+      const whtTotalLocal = Number((whtTotal * rate).toFixed(2));
+      const discountLocal = Number((discount_amount * rate).toFixed(2));
+
+      // 1. Debit: Customer or Cash
+      if (paymentType === 'cash') {
+        const pm = paymentMethods.find(p => p.id === paymentMethodId);
+        const cashAccountId = pm?.account_id || '';
+        const cashAccountName = pm?.account_name || 'حساب النقدية';
+        const cashAccount = accounts.find(a => a.id === cashAccountId);
+
+        journalItems.push({
+          account_id: cashAccountId,
+          account_name: cashAccountName,
+          account_code: cashAccount?.code || '',
+          debit: totalAmountLocal,
+          credit: 0,
+          currency: currencyCode,
+          exchange_rate: rate,
+          foreign_amount: total_amount,
+          description: `تحصيل نقدي - فاتورة رقم ${invoiceNumber}`,
+          sub_account_id: paymentMethodId,
+          sub_account_type: 'payment_method'
+        });
+      } else {
+        const customerAccountId = customer?.account_id || '';
+        const customerAccountName = customer?.account_name || 'حساب العملاء';
+        const custAcc = accounts.find(a => a.id === customerAccountId);
+
+        journalItems.push({
+          account_id: customerAccountId,
+          account_name: customerAccountName,
+          account_code: custAcc?.code || '',
+          debit: totalAmountLocal,
+          credit: 0,
+          currency: currencyCode,
+          exchange_rate: rate,
+          foreign_amount: total_amount,
+          description: `فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name || ''}`,
+          customer_id: selectedCustomerId,
+          customer_name: customer?.name,
+          sub_account_id: selectedCustomerId,
+          sub_account_type: 'customer'
+        });
+      }
+
+      // 2. Debit: Withholding Tax Account (Current Asset - Tax Withheld by Customers)
+      if (whtTotalLocal > 0) {
+        let whtAccountId = '';
+        let whtAccountName = language === 'ar' ? 'ضرائب خصم من العملاء' : 'Sales Withholding Tax Account';
+
+        const productWithWht = products.find(p => sanitizedItems.some(i => i.product_id === p.id && (i.withholding_tax_amount || 0) > 0) && p.sales_withholding_tax_account_id);
+        if (productWithWht?.sales_withholding_tax_account_id) {
+          whtAccountId = productWithWht.sales_withholding_tax_account_id;
+          whtAccountName = productWithWht.sales_withholding_tax_account_name || whtAccountName;
+        }
+
+        if (!whtAccountId) {
+          const globalWhtAccount = accounts.find(a => 
+            a.account_usage === 'withholding_tax_customers' || 
+            a.name.includes('تحت حساب الضريبة') ||
+            a.name.includes('خصم من العملاء') ||
+            a.name.includes('خصم عملاء') ||
+            a.code === '112' ||
+            a.code?.startsWith('118')
+          );
+          whtAccountId = globalWhtAccount?.id || '';
+          whtAccountName = globalWhtAccount?.name || whtAccountName;
+        }
+        const whtAccount = accounts.find(a => a.id === whtAccountId);
+
+        journalItems.push({
+          account_id: whtAccountId,
+          account_name: whtAccountName,
+          account_code: whtAccount?.code || '',
+          debit: whtTotalLocal,
+          credit: 0,
+          currency: currencyCode,
+          exchange_rate: rate,
+          foreign_amount: whtTotal,
+          description: `ضريبة خصم وإضافة (خصم من العملاء) - فاتورة رقم ${invoiceNumber}`
+        });
+      }
+
+      // 3. Debit: Discount Account
+      if (discountLocal > 0) {
+        const discountAccountId = settings?.customer_discount_account_id || '';
+        let discountAccount = accounts.find(a => a.id === discountAccountId);
+        if (!discountAccount) {
+          discountAccount = accounts.find(a => 
+            a.account_usage === 'earned_discounts' || 
+            a.name.includes('مسموح به') || 
+            a.name.includes('خصم مبيعات')
+          );
+        }
+        journalItems.push({
+          account_id: discountAccount?.id || discountAccountId,
+          account_name: discountAccount?.name || 'حساب الخصم المسموح به',
+          account_code: discountAccount?.code || '',
+          debit: discountLocal,
+          credit: 0,
+          currency: currencyCode,
+          exchange_rate: rate,
+          foreign_amount: discount_amount,
+          description: `خصم مسموح به - فاتورة رقم ${invoiceNumber}`
+        });
+      }
+
+      // 4. Credit: Sales Accounts
       sanitizedItems.forEach(item => {
         const product = products.find(p => p.id === item.product_id);
         if (!product) return;
 
-        // Calculate in foreign currency first (no rounding)
         const itemTotalFC = item.total || 0;
-        const itemVatFC = item.vat_amount || 0;
-        const itemDiscountFC = subtotal > 0 ? (itemTotalFC / subtotal) * discount_amount : 0;
-        const itemNetTotalFC = itemTotalFC + itemVatFC - itemDiscountFC;
-
-        // Convert to local currency and round once
         const itemTotal = Number((itemTotalFC * rate).toFixed(2));
-        const itemVat = Number((itemVatFC * rate).toFixed(2));
-        const itemDiscount = Number((itemDiscountFC * rate).toFixed(2));
-        const itemNetTotal = Number((itemNetTotalFC * rate).toFixed(2));
+        if (itemTotal <= 0 && itemTotalFC <= 0) return;
 
-        // 1. Debit: Customer or Payment Method (Cash)
-        if (paymentType === 'cash') {
-          const pm = paymentMethods.find(p => p.id === paymentMethodId);
-          let cashAccountId = pm?.account_id || '';
-          let cashAccountName = pm?.account_name || 'حساب النقدية';
-          const cashAccount = accounts.find(a => a.id === cashAccountId);
-
-          journalItems.push({
-            account_id: cashAccountId,
-            account_name: cashAccountName,
-            account_code: cashAccount?.code || '',
-            product_name: item.product_name,
-            debit: itemNetTotal,
-            credit: 0,
-            description: `تحصيل نقدي - صنف: ${item.product_name} - فاتورة رقم ${invoiceNumber}`,
-            sub_account_id: paymentMethodId,
-            sub_account_type: 'payment_method'
-          });
-        } else {
-          journalItems.push({
-            account_id: customerAccountId,
-            account_name: customerAccountName,
-            account_code: customerAccountCode,
-            product_name: item.product_name,
-            debit: itemNetTotal,
-            credit: 0,
-            description: `مبيعات عملاء - صنف: ${item.product_name} - فاتورة رقم ${invoiceNumber}`,
-            customer_id: selectedCustomerId,
-            customer_name: customer?.name,
-            sub_account_id: selectedCustomerId,
-            sub_account_type: 'customer'
-          });
-        }
-
-        // 2. Debit: Discount (if any)
-        if (itemDiscount > 0) {
-          const discountAccountId = settings?.customer_discount_account_id || '';
-          const discountAccount = accounts.find(a => a.id === discountAccountId);
-          journalItems.push({
-            account_id: discountAccountId,
-            account_name: discountAccount?.name || 'حساب الخصم المسموح به',
-            account_code: discountAccount?.code || '',
-            product_name: item.product_name,
-            debit: itemDiscount,
-            credit: 0,
-            description: `خصم مسموح به - صنف: ${item.product_name} - فاتورة رقم ${invoiceNumber}`
-          });
-        }
-
-        // 3. Credit: Sales Accounts
         let creditAccountId = product.revenue_account_id || '';
         let creditAccountName = product.revenue_account_name || 'حساب المبيعات';
+        if (!creditAccountId) {
+          const defaultRev = accounts.find(a => a.account_usage === 'revenue' || a.name.includes('مبيعات'));
+          creditAccountId = defaultRev?.id || '';
+          creditAccountName = defaultRev?.name || creditAccountName;
+        }
         const creditAccount = accounts.find(a => a.id === creditAccountId);
-        const creditAccountCode = creditAccount?.code || '';
 
         journalItems.push({
           account_id: creditAccountId,
           account_name: creditAccountName,
-          account_code: creditAccountCode,
+          account_code: creditAccount?.code || '',
           product_name: item.product_name,
           debit: 0,
           credit: itemTotal,
+          currency: currencyCode,
+          exchange_rate: rate,
+          foreign_amount: itemTotalFC,
           description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoiceNumber}${rate !== 1 ? ` (سعر صرف: ${rate})` : ''}`
         });
+      });
 
-        // 4. Credit: VAT Liability Account
-        if (itemVat > 0) {
-          let vatAccountId = product.vat_account_id || '';
-          let vatAccountName = product.vat_account_name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Liability Account');
+      // 5. Credit: VAT Liability Account
+      if (vatTotal > 0) {
+        sanitizedItems.forEach(item => {
+          const itemVatFC = Number(item.vat_amount) || 0;
+          const itemVat = Number((itemVatFC * rate).toFixed(2));
+          if (itemVat <= 0 && itemVatFC <= 0) return;
+
+          const product = products.find(p => p.id === item.product_id);
+          let vatAccountId = product?.sales_vat_account_id || product?.vat_account_id || '';
+          let vatAccountName = product?.sales_vat_account_name || product?.vat_account_name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Liability Account');
 
           if (!vatAccountId) {
             const globalVatAccount = accounts.find(a => 
+              a.account_usage === 'vat' || 
+              a.account_usage === 'vat_sales' ||
               a.name.includes('ضريبة القيمة المضافة') || 
               a.name.includes('قيمة مضافة') || 
-              a.name.includes('ضريبة مبيعات')
+              a.name.includes('ضريبة مبيعات') ||
+              a.code === '2221'
             );
             vatAccountId = globalVatAccount?.id || '';
             vatAccountName = globalVatAccount?.name || vatAccountName;
           }
           const vatAccount = accounts.find(a => a.id === vatAccountId);
-          const vatAccountCode = vatAccount?.code || '';
 
           journalItems.push({
             account_id: vatAccountId,
             account_name: vatAccountName,
-            account_code: vatAccountCode,
+            account_code: vatAccount?.code || '',
             product_name: item.product_name,
             debit: 0,
             credit: itemVat,
+            currency: currencyCode,
+            exchange_rate: rate,
+            foreign_amount: itemVatFC,
             description: `ضريبة القيمة المضافة - صنف: ${item.product_name} - فاتورة رقم ${invoiceNumber}`
           });
-        }
+        });
+      }
 
-        // 5. Debit COGS & Credit Inventory (for physical products)
-        if (product.type !== 'service') {
-          const itemCost = Number(product.cost_price) || 0;
-          const totalCost = Number((item.quantity * itemCost).toFixed(2));
+      // 6. Debit COGS & Credit Inventory (for physical products)
+      sanitizedItems.forEach(item => {
+        const product = products.find(p => p.id === item.product_id);
+        if (!product || product.type === 'service') return;
 
-          if (totalCost > 0) {
-            let costAccId = product.cost_account_id || '';
-            let costAccName = product.cost_account_name || 'تكلفة المبيعات';
-            if (!costAccId) {
-              const fallbackCostAcc = accounts.find(a => a.name.includes('تكلفة المبيعات') || a.name.includes('تكلفة مبيعات') || a.name.includes('تكلفة البضاعة المباعة'));
-              if (fallbackCostAcc) {
-                costAccId = fallbackCostAcc.id;
-                costAccName = fallbackCostAcc.name;
-              }
+        const itemCost = Number(product.cost_price) || 0;
+        const totalCost = Number((item.quantity * itemCost).toFixed(2));
+
+        if (totalCost > 0) {
+          let costAccId = product.cost_account_id || '';
+          let costAccName = product.cost_account_name || 'تكلفة المبيعات';
+          if (!costAccId) {
+            const fallbackCostAcc = accounts.find(a => a.account_usage === 'cost_of_goods_sold' || a.name.includes('تكلفة المبيعات') || a.name.includes('تكلفة مبيعات') || a.name.includes('تكلفة البضاعة المباعة'));
+            if (fallbackCostAcc) {
+              costAccId = fallbackCostAcc.id;
+              costAccName = fallbackCostAcc.name;
             }
-            const costAcc = accounts.find(a => a.id === costAccId);
-
-            let invAccId = product.inventory_account_id || '';
-            let invAccName = product.inventory_account_name || 'المخزون';
-            if (!invAccId) {
-              const fallbackInvAcc = accounts.find(a => a.name.includes('مخزون') || a.name.includes('مخازن'));
-              if (fallbackInvAcc) {
-                invAccId = fallbackInvAcc.id;
-                invAccName = fallbackInvAcc.name;
-              }
-            }
-            const invAcc = accounts.find(a => a.id === invAccId);
-
-            // Debit COGS
-            journalItems.push({
-              account_id: costAccId,
-              account_name: costAccName,
-              account_code: costAcc?.code || '',
-              product_name: item.product_name,
-              debit: Number(totalCost.toFixed(2)),
-              credit: 0,
-              description: `تكلفة البضاعة المباعة - صنف: ${item.product_name} - فاتورة رقم ${invoiceNumber}`
-            });
-
-            // Credit Inventory
-            journalItems.push({
-              account_id: invAccId,
-              account_name: invAccName,
-              account_code: invAcc?.code || '',
-              product_name: item.product_name,
-              debit: 0,
-              credit: Number(totalCost.toFixed(2)),
-              description: `تخفيض المخزون - صنف: ${item.product_name} - فاتورة رقم ${invoiceNumber}`
-            });
           }
+          const costAcc = accounts.find(a => a.id === costAccId);
+
+          let invAccId = product.inventory_account_id || '';
+          let invAccName = product.inventory_account_name || 'المخزون';
+          if (!invAccId) {
+            const fallbackInvAcc = accounts.find(a => a.account_usage === 'inventory' || a.name.includes('مخزون') || a.name.includes('مخازن'));
+            if (fallbackInvAcc) {
+              invAccId = fallbackInvAcc.id;
+              invAccName = fallbackInvAcc.name;
+            }
+          }
+          const invAcc = accounts.find(a => a.id === invAccId);
+
+          // Debit COGS
+          journalItems.push({
+            account_id: costAccId,
+            account_name: costAccName,
+            account_code: costAcc?.code || '',
+            product_name: item.product_name,
+            debit: Number(totalCost.toFixed(2)),
+            credit: 0,
+            description: `تكلفة البضاعة المباعة - صنف: ${item.product_name} - فاتورة رقم ${invoiceNumber}`
+          });
+
+          // Credit Inventory
+          journalItems.push({
+            account_id: invAccId,
+            account_name: invAccName,
+            account_code: invAcc?.code || '',
+            product_name: item.product_name,
+            debit: 0,
+            credit: Number(totalCost.toFixed(2)),
+            description: `تخفيض المخزون - صنف: ${item.product_name} - فاتورة رقم ${invoiceNumber}`
+          });
         }
       });
 
