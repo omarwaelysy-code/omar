@@ -982,6 +982,9 @@ export interface LedgerLine {
   sub_account_id?: string;
   sub_account_type?: string;
   reference_id?: string;
+  currency?: string;
+  foreign_amount?: number;
+  exchange_rate?: number;
 }
 
 export interface Department {

@@ -134,6 +134,10 @@ export class AccountingEngine {
               entityName = item.sub_account_type === 'payment_method' ? 'خزينة/بنك' : '';
             }
 
+            const itemRate = Number(item.exchange_rate) || 1;
+            const itemCurr = item.currency || 'EGP';
+            const foreignAmt = Number(item.foreign_amount) || 0;
+
             relevantEntries.push({
               id: entry.id || '',
               date: entry.date,
@@ -147,7 +151,10 @@ export class AccountingEngine {
               entry_number: entry.entry_number,
               sub_account_id: item.sub_account_id,
               sub_account_type: item.sub_account_type,
-              reference_id: entry.reference_id
+              reference_id: entry.reference_id,
+              currency: itemCurr,
+              foreign_amount: foreignAmt,
+              exchange_rate: itemRate
             });
           }
         }

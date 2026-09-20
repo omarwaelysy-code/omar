@@ -452,17 +452,29 @@ export const GeneralLedger: React.FC = () => {
       exportToExcel(data, { filename: 'Detailed_Journal_Entries' });
     } else {
       const account = accounts.find(a => a.id === selectedAccountId);
-      const data = ledgerData.map(tx => ({
-        [t('journal.column_date')]: tx.date,
-        [t('ledger.column_entity')]: tx.entity_name || '-',
-        [language === 'ar' ? 'الحساب الفرعي/الصنف' : 'Sub-account/Product']: getSubAccountOrProductSingle(tx),
-        [t('journal.column_description')]: tx.description,
-        [t('journal.column_reference')]: tx.reference || '-',
-        [language === 'ar' ? 'رقم القيد' : 'Entry No.']: tx.entry_number || '-',
-        [t('journal.column_debit')]: tx.debit,
-        [t('journal.column_credit')]: tx.credit,
-        [t('ledger.column_balance')]: tx.balance
-      }));
+      const data = ledgerData.map(tx => {
+        const isForeign = tx.currency && tx.currency !== 'EGP';
+        const rawAmt = (isForeign && tx.foreign_amount && tx.foreign_amount > 0)
+          ? tx.foreign_amount
+          : (tx.debit > 0 ? tx.debit : tx.credit);
+        const signedAmt = tx.debit > 0 ? `+${formatNumber(rawAmt)}` : (tx.credit > 0 ? `-${formatNumber(rawAmt)}` : '0.00');
+        const rate = (tx.exchange_rate && tx.exchange_rate > 0 && isForeign) ? tx.exchange_rate : 1;
+
+        return {
+          [t('journal.column_date')]: tx.date,
+          [t('ledger.column_entity')]: tx.entity_name || '-',
+          [language === 'ar' ? 'الحساب الفرعي/الصنف' : 'Sub-account/Product']: getSubAccountOrProductSingle(tx),
+          [t('journal.column_description')]: tx.description,
+          [t('journal.column_reference')]: tx.reference || '-',
+          [language === 'ar' ? 'رقم القيد' : 'Entry No.']: tx.entry_number || '-',
+          [language === 'ar' ? 'العملة' : 'Currency']: tx.currency || 'EGP',
+          [language === 'ar' ? 'المبلغ (±)' : 'Amount (±)']: signedAmt,
+          [language === 'ar' ? 'سعر الصرف' : 'Exchange Rate']: rate,
+          [t('journal.column_debit')]: tx.debit,
+          [t('journal.column_credit')]: tx.credit,
+          [t('ledger.column_balance')]: tx.balance
+        };
+      });
       exportToExcel(data, { filename: `General_Ledger_${account?.name || 'Account'}` });
     }
   };
@@ -488,60 +500,79 @@ export const GeneralLedger: React.FC = () => {
           <div className="flex bg-zinc-100 p-1 rounded-2xl border border-zinc-200/50 shadow-inner w-fit">
             <button
               onClick={() => setLedgerMode('single')}
-              className={`p-2 px-6 rounded-xl transition-all font-bold text-sm ${ledgerMode === 'single' ? 'bg-white text-emerald-600 shadow-sm border border-zinc-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                ledgerMode === 'single'
+                  ? 'bg-white text-zinc-900 shadow-sm'
+                  : 'text-zinc-500 hover:text-zinc-900'
+              }`}
             >
+              <LayoutGrid size={16} />
               {t('ledger.single_account')}
             </button>
             <button
               onClick={() => setLedgerMode('detailed')}
-              className={`p-2 px-6 rounded-xl transition-all font-bold text-sm ${ledgerMode === 'detailed' ? 'bg-white text-emerald-600 shadow-sm border border-zinc-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                ledgerMode === 'detailed'
+                  ? 'bg-white text-zinc-900 shadow-sm'
+                  : 'text-zinc-500 hover:text-zinc-900'
+              }`}
             >
-              {t('ledger.detailed_entries')}
+              <List size={16} />
+              {language === 'ar' ? 'القيود التفصيلية' : 'Detailed Entries'}
             </button>
           </div>
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={handleRefresh}
-              className="p-3 bg-white border border-zinc-200 text-zinc-600 rounded-2xl hover:bg-zinc-50 hover:text-emerald-600 transition-all hover:scale-105 active:scale-95 shadow-sm"
-              title={t('reports.update_data')}
-            >
-              <RefreshCcw size={20} className={loading ? 'animate-spin' : ''} />
-            </button>
-            <button onClick={handleExportPDF} disabled={isExportDisabled} className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 transition-all shadow-sm disabled:opacity-50"><Printer size={20} /></button>
-            <button onClick={handleExportExcel} disabled={isExportDisabled} className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 transition-all shadow-sm disabled:opacity-50"><Download size={20} /></button>
-          </div>
+          <button
+            onClick={handleRefresh}
+            className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 hover:text-emerald-600 transition-all active:scale-95 shadow-sm"
+            title={language === 'ar' ? 'تحديث البيانات' : 'Refresh Data'}
+          >
+            <RefreshCcw size={18} className={loading ? 'animate-spin' : ''} />
+          </button>
+          <button
+            onClick={handleExportPDF}
+            disabled={isExportDisabled}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-zinc-200 text-zinc-700 rounded-xl hover:bg-zinc-50 font-bold text-xs transition-all shadow-sm active:scale-95 disabled:opacity-50"
+          >
+            <Printer size={16} />
+            {t('journal.export_pdf')}
+          </button>
+          <button
+            onClick={handleExportExcel}
+            disabled={isExportDisabled}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-zinc-200 text-zinc-700 rounded-xl hover:bg-zinc-50 font-bold text-xs transition-all shadow-sm active:scale-95 disabled:opacity-50"
+          >
+            <Download size={16} />
+            {t('journal.export_excel')}
+          </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {ledgerMode === 'detailed' ? (
-          <div className="md:col-span-2 relative">
-            <Search className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3.5 text-zinc-400`} size={20} />
-            <input
-              type="text"
-              placeholder={t('journal.search_placeholder')}
-              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-white border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium`}
-              value={detailedSearchTerm}
-              onChange={(e) => setDetailedSearchTerm(e.target.value)}
-            />
-          </div>
-        ) : (
-          <div className="md:col-span-2 relative">
-            <BookOpen className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-zinc-400`} size={20} />
+        {ledgerMode === 'single' ? (
+          <div className="md:col-span-2">
             <select
-              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-white border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium appearance-none`}
+              className="w-full py-3 px-4 bg-white border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800"
               value={selectedAccountId}
-              onChange={(e) => {
-                setSelectedAccountId(e.target.value);
-              }}
+              onChange={(e) => setSelectedAccountId(e.target.value)}
             >
               <option value="">{t('ledger.select_account')}</option>
-              {accounts.map(account => (
-                <option key={account.id} value={account.id}>
-                  {account.code} - {account.name}
+              {accounts.map(acc => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.code} - {acc.name}
                 </option>
               ))}
             </select>
+          </div>
+        ) : (
+          <div className="md:col-span-2 relative">
+            <Search className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 text-zinc-400`} size={18} />
+            <input
+              type="text"
+              placeholder={language === 'ar' ? 'بحث في الحسابات، الأوصاف، الكيانات، أو الأرقام...' : 'Search accounts, descriptions, entities, numbers...'}
+              className={`w-full ${dir === 'rtl' ? 'pr-11 pl-4' : 'pl-11 pr-4'} py-3 bg-white border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium text-sm`}
+              value={detailedSearchTerm}
+              onChange={(e) => setDetailedSearchTerm(e.target.value)}
+            />
           </div>
         )}
         <div className="relative">
@@ -680,11 +711,11 @@ export const GeneralLedger: React.FC = () => {
                   {detailedLines.map((tx, idx) => (
                     <tr key={idx} className="hover:bg-zinc-50/50 transition-colors">
                       <td className="px-6 py-4 text-sm font-bold text-zinc-900">{formatDate(tx.date)}</td>
-                      <td className="px-6 py-4 text-sm font-bold text-indigo-600">
+                      <td className="px-6 py-4">
                         {tx.entry_number ? (
                           <span 
                             onClick={() => {
-                              setPendingViewDoc({ type: 'journal', idOrNumber: tx.entry_number! });
+                              setPendingViewDoc({ type: 'journal', idOrNumber: tx.entry_number });
                               setCurrentPage('journal_entries');
                             }}
                             className="px-3 py-1 bg-zinc-100 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 font-mono"
@@ -692,12 +723,16 @@ export const GeneralLedger: React.FC = () => {
                             {tx.entry_number}
                           </span>
                         ) : (
-                          '-'
+                          <span className="px-3 py-1 bg-zinc-100 text-zinc-400 rounded-lg text-xs font-bold font-mono">-</span>
                         )}
                       </td>
                       <td className="px-6 py-4 text-sm font-bold text-zinc-900">{tx.account_name}</td>
-                      <td className="px-6 py-4 text-sm text-zinc-500 font-bold">{tx.account_type}</td>
-                      <td className="px-6 py-4 text-sm">
+                      <td className="px-6 py-4 text-sm font-medium text-zinc-500">
+                        <span className="px-2.5 py-1 bg-zinc-100 rounded-lg text-xs font-bold text-zinc-600">
+                          {tx.account_type}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
                         {tx.reference && tx.reference !== '-' ? (
                           <span 
                             onClick={() => handleTransactionClick(tx.reference_type, tx.reference)}
@@ -706,15 +741,19 @@ export const GeneralLedger: React.FC = () => {
                             {tx.reference}
                           </span>
                         ) : (
-                          '-'
+                          <span className="px-3 py-1 bg-zinc-100 text-zinc-400 rounded-lg text-xs font-bold font-mono">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-zinc-500 font-bold">{t(`reference_types.${tx.reference_type}`) || tx.reference_type}</td>
+                      <td className="px-6 py-4 text-sm font-medium text-zinc-500">
+                        <span className="px-2 py-0.5 rounded text-xs bg-zinc-50 border border-zinc-200">
+                          {tx.reference_type || '-'}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 text-sm font-bold text-emerald-600">{tx.entity_name}</td>
                       <td className="px-6 py-4 text-sm font-medium text-zinc-600">{tx.sub_account_product}</td>
                       <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{tx.debit > 0 ? formatNumber(tx.debit) : '-'}</td>
                       <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{tx.credit > 0 ? formatNumber(tx.credit) : '-'}</td>
-                      <td className="px-6 py-4 text-sm font-medium text-zinc-500 max-w-xs truncate">{tx.description}</td>
+                      <td className="px-6 py-4 text-sm font-medium text-zinc-600 max-w-xs truncate">{tx.description}</td>
                     </tr>
                   ))}
                   {detailedLines.length === 0 && (
@@ -783,6 +822,9 @@ export const GeneralLedger: React.FC = () => {
                       <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_description')}</th>
                       <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_reference')}</th>
                       <th className="px-6 py-4 text-sm font-bold text-zinc-700">{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</th>
+                      <th className="px-4 py-4 text-sm font-bold text-zinc-700 text-center">{language === 'ar' ? 'العملة' : 'Currency'}</th>
+                      <th className="px-4 py-4 text-sm font-bold text-zinc-700 text-center">{language === 'ar' ? 'المبلغ (±)' : 'Amount (±)'}</th>
+                      <th className="px-4 py-4 text-sm font-bold text-zinc-700 text-center">{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
                       <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center">{t('journal.column_debit')}</th>
                       <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center">{t('journal.column_credit')}</th>
                       <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center">{t('ledger.column_balance')}</th>
@@ -797,61 +839,92 @@ export const GeneralLedger: React.FC = () => {
                       <td className="px-6 py-4 text-sm font-medium text-zinc-600">{t('ledger.opening_balance_row')}</td>
                       <td className="px-6 py-4 text-sm text-zinc-400 text-center">-</td>
                       <td className="px-6 py-4 text-sm text-zinc-400 text-center">-</td>
+                      <td className="px-4 py-4 text-sm font-mono font-bold text-zinc-500 text-center">EGP</td>
+                      <td className={`px-4 py-4 text-sm font-mono font-bold text-center ${startBalance > 0 ? 'text-emerald-600' : (startBalance < 0 ? 'text-rose-600' : 'text-zinc-500')}`}>
+                        {startBalance !== 0 ? (startBalance > 0 ? `+${formatNumber(startBalance)}` : formatNumber(startBalance)) : '-'}
+                      </td>
+                      <td className="px-4 py-4 text-sm font-mono text-zinc-500 text-center">1.00</td>
                       <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{startBalance > 0 ? formatNumber(startBalance) : '-'}</td>
                       <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{startBalance < 0 ? formatNumber(Math.abs(startBalance)) : '-'}</td>
                       <td className="px-6 py-4 text-sm font-black text-zinc-900 text-center">{formatNumber(startBalance)}</td>
                     </tr>
-                    {ledgerData.map((tx, idx) => (
-                      <tr key={idx} className="hover:bg-zinc-50/50 transition-colors">
-                        <td className="px-6 py-4 text-sm font-bold text-zinc-900">{formatDate(tx.date)}</td>
-                        <td className="px-6 py-4 text-sm font-bold text-emerald-600">
-                          {tx.entity_name || '-'}
-                        </td>
-                        <td className="px-6 py-4 text-sm font-medium text-zinc-600">
-                          {getSubAccountOrProductSingle(tx)}
-                        </td>
-                        <td className="px-6 py-4 text-sm font-medium text-zinc-600 max-w-xs truncate">
-                          {tx.description}
-                        </td>
-                        <td className="px-6 py-4">
-                          {tx.reference && tx.reference !== '-' ? (
-                            <span 
-                              onClick={() => handleTransactionClick(tx.reference_type, tx.reference)}
-                              className="px-3 py-1 bg-zinc-100 text-emerald-600 hover:text-emerald-705 hover:bg-emerald-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 font-mono"
-                            >
-                              {tx.reference}
+                    {ledgerData.map((tx, idx) => {
+                      const isForeign = tx.currency && tx.currency !== 'EGP';
+                      const rawAmt = (isForeign && tx.foreign_amount && tx.foreign_amount > 0)
+                        ? tx.foreign_amount
+                        : (tx.debit > 0 ? tx.debit : tx.credit);
+                      const signedAmt = tx.debit > 0 ? `+${formatNumber(rawAmt)}` : (tx.credit > 0 ? `-${formatNumber(rawAmt)}` : '0.00');
+                      const rate = (tx.exchange_rate && tx.exchange_rate > 0 && isForeign)
+                        ? Number(tx.exchange_rate.toFixed(4)).toString()
+                        : '1.00';
+
+                      return (
+                        <tr key={idx} className="hover:bg-zinc-50/50 transition-colors">
+                          <td className="px-6 py-4 text-sm font-bold text-zinc-900">{formatDate(tx.date)}</td>
+                          <td className="px-6 py-4 text-sm font-bold text-emerald-600">
+                            {tx.entity_name || '-'}
+                          </td>
+                          <td className="px-6 py-4 text-sm font-medium text-zinc-600">
+                            {getSubAccountOrProductSingle(tx)}
+                          </td>
+                          <td className="px-6 py-4 text-sm font-medium text-zinc-600 max-w-xs truncate">
+                            {tx.description}
+                          </td>
+                          <td className="px-6 py-4">
+                            {tx.reference && tx.reference !== '-' ? (
+                              <span 
+                                onClick={() => handleTransactionClick(tx.reference_type, tx.reference)}
+                                className="px-3 py-1 bg-zinc-100 text-emerald-600 hover:text-emerald-705 hover:bg-emerald-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 font-mono"
+                              >
+                                {tx.reference}
+                              </span>
+                            ) : (
+                              <span className="px-3 py-1 bg-zinc-100 text-zinc-400 rounded-lg text-xs font-bold font-mono">
+                                -
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            {tx.entry_number ? (
+                              <span 
+                                onClick={() => {
+                                  setPendingViewDoc({ type: 'journal', idOrNumber: tx.entry_number! });
+                                  setCurrentPage('journal_entries');
+                                }}
+                                className="px-3 py-1 bg-zinc-100 text-indigo-600 hover:text-indigo-707 hover:bg-indigo-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 font-mono"
+                              >
+                                {tx.entry_number}
+                              </span>
+                            ) : (
+                              <span className="px-3 py-1 bg-zinc-100 text-zinc-400 rounded-lg text-xs font-bold font-mono">
+                                -
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4 text-sm text-center">
+                            <span className={`px-2 py-0.5 rounded text-xs font-mono font-bold ${
+                              isForeign ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-zinc-100 text-zinc-600'
+                            }`}>
+                              {tx.currency || 'EGP'}
                             </span>
-                          ) : (
-                            <span className="px-3 py-1 bg-zinc-100 text-zinc-400 rounded-lg text-xs font-bold font-mono">
-                              -
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          {tx.entry_number ? (
-                            <span 
-                              onClick={() => {
-                                setPendingViewDoc({ type: 'journal', idOrNumber: tx.entry_number! });
-                                setCurrentPage('journal_entries');
-                              }}
-                              className="px-3 py-1 bg-zinc-100 text-indigo-600 hover:text-indigo-707 hover:bg-indigo-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 font-mono"
-                            >
-                              {tx.entry_number}
-                            </span>
-                          ) : (
-                            <span className="px-3 py-1 bg-zinc-100 text-zinc-400 rounded-lg text-xs font-bold font-mono">
-                              -
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{tx.debit > 0 ? formatNumber(tx.debit) : '-'}</td>
-                        <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{tx.credit > 0 ? formatNumber(tx.credit) : '-'}</td>
-                        <td className="px-6 py-4 text-sm font-black text-zinc-900 text-center">{formatNumber(tx.balance)}</td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className={`px-4 py-4 text-sm font-mono font-bold text-center ${
+                            tx.debit > 0 ? 'text-emerald-600' : (tx.credit > 0 ? 'text-rose-600' : 'text-zinc-600')
+                          }`}>
+                            {signedAmt}
+                          </td>
+                          <td className="px-4 py-4 text-sm font-mono font-semibold text-zinc-600 text-center">
+                            {rate}
+                          </td>
+                          <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{tx.debit > 0 ? formatNumber(tx.debit) : '-'}</td>
+                          <td className="px-6 py-4 text-sm font-black text-emerald-600 text-center">{tx.credit > 0 ? formatNumber(tx.credit) : '-'}</td>
+                          <td className="px-6 py-4 text-sm font-black text-zinc-900 text-center">{formatNumber(tx.balance)}</td>
+                        </tr>
+                      );
+                    })}
                     {ledgerData.length === 0 && (
                       <tr>
-                        <td colSpan={9} className="px-6 py-12 text-center text-zinc-500 font-medium">
+                        <td colSpan={12} className="px-6 py-12 text-center text-zinc-500 font-medium">
                           {t('ledger.no_transactions')}
                         </td>
                       </tr>
