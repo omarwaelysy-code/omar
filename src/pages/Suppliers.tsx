@@ -179,7 +179,9 @@ export const Suppliers: React.FC = () => {
         payment_terms: 'due_on_receipt',
         payment_terms_days: 0,
         advance_percentage: 0,
-        is_active: true
+        is_active: true,
+        attachments: [],
+        bank_accounts: []
       });
       setIsModalOpen(true);
     }
