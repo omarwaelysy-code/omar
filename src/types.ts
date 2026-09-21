@@ -178,6 +178,28 @@ export interface ExchangeRate {
   company_id: string;
 }
 
+export interface AttachmentItem {
+  id: string;
+  name: string;
+  size?: number;
+  type?: string;
+  url: string;
+  uploaded_at?: string;
+}
+
+export interface SupplierBankAccount {
+  id: string;
+  bank_code?: string;
+  bank_name: string;
+  account_number: string;
+  iban?: string;
+  swift?: string;
+  branch?: string;
+  is_active: boolean;
+  is_preferred: boolean;
+  attachments?: AttachmentItem[];
+}
+
 export interface Customer {
   id: string;
   code: string;
@@ -198,6 +220,7 @@ export interface Customer {
   payment_terms_days?: number;
   advance_percentage?: number;
   is_active?: boolean;
+  attachments?: AttachmentItem[];
 }
 
 export interface Supplier {
@@ -220,6 +243,8 @@ export interface Supplier {
   payment_terms_days?: number;
   advance_percentage?: number;
   is_active?: boolean;
+  attachments?: AttachmentItem[];
+  bank_accounts?: SupplierBankAccount[];
 }
 
 export interface Warehouse {

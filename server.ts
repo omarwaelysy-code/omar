@@ -207,6 +207,9 @@ async function startServer() {
       'ALTER TABLE "suppliers" ADD COLUMN IF NOT EXISTS "payment_terms" VARCHAR(100)',
       'ALTER TABLE "suppliers" ADD COLUMN IF NOT EXISTS "payment_terms_days" INTEGER DEFAULT 0',
       'ALTER TABLE "suppliers" ADD COLUMN IF NOT EXISTS "advance_percentage" DECIMAL(5, 2) DEFAULT 0',
+      'ALTER TABLE "customers" ADD COLUMN IF NOT EXISTS "attachments" JSONB DEFAULT \'[]\'::jsonb',
+      'ALTER TABLE "suppliers" ADD COLUMN IF NOT EXISTS "attachments" JSONB DEFAULT \'[]\'::jsonb',
+      'ALTER TABLE "suppliers" ADD COLUMN IF NOT EXISTS "bank_accounts" JSONB DEFAULT \'[]\'::jsonb',
 
       // Payment Terms on Invoices & Purchase Invoices
       'ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "payment_terms" VARCHAR(100)',

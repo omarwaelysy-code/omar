@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Supplier, Account, JournalEntry } from '../types';
+import { Supplier, Account, JournalEntry, AttachmentItem, SupplierBankAccount } from '../types';
 import { 
   Search, Plus, Trash2, Edit2, X, Truck, Phone, Mail, MapPin, 
   Wallet, Calendar, History, FileText, User, Hash, Box,
   LayoutGrid, List, ChevronRight, ChevronLeft, CreditCard, FileUp,
-  Link2, Sparkles, Loader2
+  Link2, Sparkles, Loader2, Landmark, Building2, Star, Check, Paperclip
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService, apiRequest } from '../services/dbService';
@@ -23,6 +23,8 @@ import { useRef } from 'react';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { FormattedNumberInput } from '../components/FormattedNumberInput';
 import { ExcelImportWizard } from '../components/ExcelImportWizard';
+import { BankLogoBadge, EGYPTIAN_BANKS_DATA, EgyptianBank } from '../data/egyptianBanks';
+import { AttachmentsManager } from '../components/common/AttachmentsManager';
 
 export const Suppliers: React.FC = () => {
   const { user } = useAuth();
@@ -50,6 +52,26 @@ export const Suppliers: React.FC = () => {
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [linkWithEta, setLinkWithEta] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Tabs state: General info vs Bank details
+  const [modalActiveTab, setModalActiveTab] = useState<'general' | 'banking'>('general');
+
+  // Bank Account Dialog State
+  const [isBankModalOpen, setIsBankModalOpen] = useState(false);
+  const [editingBankIndex, setEditingBankIndex] = useState<number | null>(null);
+  const [isCustomBank, setIsCustomBank] = useState(false);
+  const [bankFormData, setBankFormData] = useState<SupplierBankAccount>({
+    id: '',
+    bank_code: 'NBE',
+    bank_name: 'البنك الأهلي المصري',
+    account_number: '',
+    iban: '',
+    swift: 'NBEGEGCX',
+    branch: '',
+    is_active: true,
+    is_preferred: false,
+    attachments: []
+  });
 
   // ETA Linking Mode State
   const [linkingTargetSupplier, setLinkingTargetSupplier] = useState<Supplier | null>(null);
@@ -96,7 +118,9 @@ export const Suppliers: React.FC = () => {
     payment_terms: 'due_on_receipt',
     payment_terms_days: 0,
     advance_percentage: 0,
-    is_active: true
+    is_active: true,
+    attachments: [] as AttachmentItem[],
+    bank_accounts: [] as SupplierBankAccount[]
   });
 
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -247,7 +271,9 @@ export const Suppliers: React.FC = () => {
           { field: 'payment_terms', label: 'شروط السداد' },
           { field: 'payment_terms_days', label: 'أيام شروط السداد' },
           { field: 'advance_percentage', label: 'نسبة الدفعة المقدمة' },
-          { field: 'is_active', label: 'نشط' }
+          { field: 'is_active', label: 'نشط' },
+          { field: 'attachments', label: 'المرفقات' },
+          { field: 'bank_accounts', label: 'الحسابات البنكية' }
         ];
         await dbService.updateWithLog(
           'suppliers', 
@@ -431,7 +457,9 @@ export const Suppliers: React.FC = () => {
           payment_terms: fullData.payment_terms || 'due_on_receipt',
           payment_terms_days: fullData.payment_terms_days || 0,
           advance_percentage: fullData.advance_percentage || 0,
-          is_active: fullData.is_active !== false
+          is_active: fullData.is_active !== false,
+          attachments: Array.isArray(fullData.attachments) ? fullData.attachments : [],
+          bank_accounts: Array.isArray(fullData.bank_accounts) ? fullData.bank_accounts : []
         });
 
       } catch (error: any) {
@@ -444,11 +472,11 @@ export const Suppliers: React.FC = () => {
       const defaultCounterAccount = accounts.find(a => a.account_usage === 'opening_balance');
       setEditingSupplier(null);
       setFormData({
-        name: '',
+        name: pendingEtaSupplierForCreation ? pendingEtaSupplierForCreation.name : '',
         mobile: '',
         email: '',
-        tax_number: '',
-        address: '',
+        tax_number: pendingEtaSupplierForCreation ? pendingEtaSupplierForCreation.taxNumber : '',
+        address: pendingEtaSupplierForCreation?.address || '',
         opening_balance: 0,
         opening_balance_date: new Date().toISOString().slice(0, 10),
         account_id: defaultAccount?.id || '',
@@ -459,9 +487,13 @@ export const Suppliers: React.FC = () => {
         payment_terms: 'due_on_receipt',
         payment_terms_days: 0,
         advance_percentage: 0,
-        is_active: true
+        is_active: true,
+        attachments: [],
+        bank_accounts: []
       });
     }
+    setModalActiveTab('general');
+    setIsBankModalOpen(false);
     setIsModalOpen(true);
   };
 
@@ -469,9 +501,137 @@ export const Suppliers: React.FC = () => {
     setIsModalOpen(false);
     setEditingSupplier(null);
     setIsSaving(false);
+    setIsBankModalOpen(false);
+    setModalActiveTab('general');
     if (pendingEtaSupplierForCreation) {
       setPendingEtaSupplierForCreation(null);
     }
+  };
+
+  // Bank Account Handlers
+  const openAddBankAccountModal = () => {
+    setEditingBankIndex(null);
+    setIsCustomBank(false);
+    const defaultBank = EGYPTIAN_BANKS_DATA[0];
+    setBankFormData({
+      id: 'bank_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6),
+      bank_code: defaultBank?.code || 'NBE',
+      bank_name: defaultBank?.nameAr || 'البنك الأهلي المصري',
+      account_number: '',
+      iban: '',
+      swift: defaultBank?.swift || 'NBEGEGCX',
+      branch: '',
+      is_active: true,
+      is_preferred: formData.bank_accounts.length === 0, // Automatically default to true for the first account
+      attachments: []
+    });
+    setIsBankModalOpen(true);
+  };
+
+  const openEditBankAccountModal = (index: number) => {
+    const acc = formData.bank_accounts[index];
+    if (!acc) return;
+    setEditingBankIndex(index);
+    const isKnown = EGYPTIAN_BANKS_DATA.some(b => b.code === acc.bank_code || b.nameAr === acc.bank_name);
+    setIsCustomBank(!isKnown);
+    setBankFormData({
+      ...acc,
+      attachments: Array.isArray(acc.attachments) ? acc.attachments : []
+    });
+    setIsBankModalOpen(true);
+  };
+
+  const handleBankSelect = (code: string) => {
+    if (code === '__custom__') {
+      setIsCustomBank(true);
+      setBankFormData(prev => ({
+        ...prev,
+        bank_code: 'CUSTOM',
+        bank_name: '',
+        swift: ''
+      }));
+    } else {
+      setIsCustomBank(false);
+      const bank = EGYPTIAN_BANKS_DATA.find(b => b.code === code);
+      if (bank) {
+        setBankFormData(prev => ({
+          ...prev,
+          bank_code: bank.code,
+          bank_name: language === 'ar' ? bank.nameAr : bank.nameEn,
+          swift: bank.swift || prev.swift
+        }));
+      }
+    }
+  };
+
+  const handleSaveBankAccount = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bankFormData.bank_name.trim()) {
+      showNotification(language === 'ar' ? 'يرجى إدخال اسم البنك' : 'Please specify bank name', 'error');
+      return;
+    }
+    if (!bankFormData.account_number.trim()) {
+      showNotification(language === 'ar' ? 'يرجى إدخال رقم الحساب البنكي' : 'Please enter account number', 'error');
+      return;
+    }
+
+    let updatedAccounts = [...formData.bank_accounts];
+
+    // If marked as preferred, reset all others to false (Strict rule: only 1 preferred)
+    if (bankFormData.is_preferred) {
+      updatedAccounts = updatedAccounts.map(acc => ({ ...acc, is_preferred: false }));
+    }
+
+    if (editingBankIndex !== null) {
+      updatedAccounts[editingBankIndex] = bankFormData;
+    } else {
+      updatedAccounts.push(bankFormData);
+    }
+
+    // Double check: if no account is preferred, make the first one preferred
+    const hasPreferred = updatedAccounts.some(a => a.is_preferred);
+    if (!hasPreferred && updatedAccounts.length > 0) {
+      updatedAccounts[0].is_preferred = true;
+    }
+
+    setFormData(prev => ({ ...prev, bank_accounts: updatedAccounts }));
+    setIsBankModalOpen(false);
+    showNotification(language === 'ar' ? 'تم حفظ الحساب البنكي بنجاح' : 'Bank account saved', 'success');
+  };
+
+  const handleDeleteBankAccount = (index: number) => {
+    const accToDelete = formData.bank_accounts[index];
+    let updatedAccounts = formData.bank_accounts.filter((_, i) => i !== index);
+
+    // If the deleted account was preferred, make the first remaining one preferred
+    if (accToDelete?.is_preferred && updatedAccounts.length > 0) {
+      updatedAccounts[0].is_preferred = true;
+    }
+
+    setFormData(prev => ({ ...prev, bank_accounts: updatedAccounts }));
+    showNotification(language === 'ar' ? 'تم حذف الحساب البنكي' : 'Bank account removed', 'success');
+  };
+
+  const handleTogglePreferred = (id: string) => {
+    // Set only this account as preferred (Strict single preferred)
+    setFormData(prev => ({
+      ...prev,
+      bank_accounts: prev.bank_accounts.map(acc => ({
+        ...acc,
+        is_preferred: acc.id === id
+      }))
+    }));
+    showNotification(language === 'ar' ? 'تم تعيين هذا الحساب كحساب مفضل' : 'Account set as preferred', 'success');
+  };
+
+  const handleToggleBankActive = (index: number) => {
+    setFormData(prev => {
+      const updated = [...prev.bank_accounts];
+      if (updated[index]) {
+        updated[index] = { ...updated[index], is_active: !updated[index].is_active };
+      }
+      return { ...prev, bank_accounts: updated };
+    });
   };
 
   const getSupplierBalance = (supplierId: string) => {
@@ -716,7 +876,21 @@ export const Suppliers: React.FC = () => {
                           }`}
                         >
                           <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
-                            <span className="font-mono text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-bold border border-slate-200 group-hover:border-emerald-200 group-hover:text-emerald-700 transition-all">{supplier.code}</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-bold border border-slate-200 group-hover:border-emerald-200 group-hover:text-emerald-700 transition-all">{supplier.code}</span>
+                              {supplier.bank_accounts && supplier.bank_accounts.length > 0 && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-200" title={language === 'ar' ? `${supplier.bank_accounts.length} حسابات بنكية` : `${supplier.bank_accounts.length} bank accounts`}>
+                                  <Landmark size={10} />
+                                  <span>{supplier.bank_accounts.length}</span>
+                                </span>
+                              )}
+                              {supplier.attachments && supplier.attachments.length > 0 && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold border border-slate-200" title={language === 'ar' ? `${supplier.attachments.length} مرفق` : `${supplier.attachments.length} attachments`}>
+                                  <Paperclip size={10} className="text-emerald-600" />
+                                  <span>{supplier.attachments.length}</span>
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                             <span className={`font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors ${editingSupplier?.id === supplier.id ? 'text-emerald-700' : ''}`}>{supplier.name}</span>
@@ -831,7 +1005,21 @@ export const Suppliers: React.FC = () => {
                     >
                       <div className="flex justify-between items-start relative z-10">
                         <div className="flex flex-col gap-1">
-                          <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded text-slate-500 font-bold w-fit border border-slate-200">{supplier.code}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded text-slate-500 font-bold w-fit border border-slate-200">{supplier.code}</span>
+                            {supplier.bank_accounts && supplier.bank_accounts.length > 0 && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 text-[9px] font-bold border border-blue-200" title={language === 'ar' ? `${supplier.bank_accounts.length} حسابات بنكية` : `${supplier.bank_accounts.length} bank accounts`}>
+                                <Landmark size={9} />
+                                <span>{supplier.bank_accounts.length}</span>
+                              </span>
+                            )}
+                            {supplier.attachments && supplier.attachments.length > 0 && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200" title={language === 'ar' ? `${supplier.attachments.length} مرفق` : `${supplier.attachments.length} attachments`}>
+                                <Paperclip size={9} className="text-emerald-600" />
+                                <span>{supplier.attachments.length}</span>
+                              </span>
+                            )}
+                          </div>
                           <h4 className="font-bold text-slate-900 group-hover:text-emerald-700 transition-colors text-sm leading-tight">{supplier.name}</h4>
                           <span className="text-[10px] text-slate-400 font-bold">{supplier.mobile}</span>
                           <div className="flex flex-wrap gap-1 mt-0.5">
@@ -982,8 +1170,48 @@ export const Suppliers: React.FC = () => {
                   </div>
                 </div>
                 
+                {/* Modal Navigation Tabs */}
+                <div className="flex items-center gap-1 border-b border-slate-200 px-4 pt-1 bg-slate-50/70 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setModalActiveTab('general')}
+                    className={`py-2 px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all ${
+                      modalActiveTab === 'general'
+                        ? 'border-emerald-600 text-emerald-700 bg-white rounded-t-lg shadow-xs -mb-[1px]'
+                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <Truck size={14} />
+                    <span>{language === 'ar' ? 'البيانات الأساسية' : 'General Info'}</span>
+                    {formData.attachments && formData.attachments.length > 0 && (
+                      <span className="px-1.5 py-0.2 bg-slate-100 text-slate-700 text-[10px] font-bold rounded-full border border-slate-200">
+                        {formData.attachments.length}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalActiveTab('banking')}
+                    className={`py-2 px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition-all ${
+                      modalActiveTab === 'banking'
+                        ? 'border-emerald-600 text-emerald-700 bg-white rounded-t-lg shadow-xs -mb-[1px]'
+                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <Landmark size={14} />
+                    <span>{language === 'ar' ? 'البيانات البنكية' : 'Bank Accounts'}</span>
+                    {formData.bank_accounts && formData.bank_accounts.length > 0 && (
+                      <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full border border-emerald-200">
+                        {formData.bank_accounts.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+                
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                   <form id="supplier-form" onSubmit={handleSubmit} className="p-3 md:p-4 space-y-2.5">
+                    {modalActiveTab === 'general' && (
+                      <div className="space-y-2.5">
                     {/* ETA Linked Banner */}
                     {pendingEtaSupplierForCreation && (
                       <div className="p-2.5 bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent border border-emerald-500/30 rounded-xl flex items-center justify-between gap-2 shadow-xs">
@@ -1340,6 +1568,189 @@ export const Suppliers: React.FC = () => {
                       )}
                     </div>
 
+                    {/* Supplier General Attachments Section */}
+                    <div className="p-2.5 bg-slate-50/60 rounded-xl border border-slate-200/60 space-y-2">
+                      <AttachmentsManager
+                        title={language === 'ar' ? 'المستندات والمرفقات العامة للمورد' : 'General Documents & Attachments'}
+                        subtitle={language === 'ar' ? 'يمكن إرفاق صورة السجل التجاري، البطاقة الضريبية، العقود أو أي مستند' : 'Attach CR, Tax Card, contracts, or any documents'}
+                        attachments={formData.attachments}
+                        onChange={(attachments) => setFormData({ ...formData, attachments })}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Tab 2: Bank Accounts Management */}
+                {modalActiveTab === 'banking' && (
+                  <div className="space-y-3">
+                    {/* Header Banner */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-slate-50/80 border border-slate-200/80 rounded-xl">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 bg-emerald-600/10 text-emerald-700 rounded-lg flex items-center justify-center">
+                          <Landmark size={18} />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-slate-900">
+                            {language === 'ar' ? 'الحسابات البنكية للمورد' : 'Supplier Bank Accounts'}
+                          </h4>
+                          <p className="text-[10px] text-slate-500">
+                            {language === 'ar' ? 'إدارة كافة حسابات المورد البنكية مع تحديد حساب مفضل واحد للتحويلات وسداد المستحقات' : 'Manage accounts and select one preferred account'}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={openAddBankAccountModal}
+                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-xs transition-all active:scale-95 shrink-0"
+                      >
+                        <Plus size={14} />
+                        <span>{language === 'ar' ? 'إضافة حساب بنكي' : 'Add Bank Account'}</span>
+                      </button>
+                    </div>
+
+                    {/* Bank Accounts Table */}
+                    {formData.bank_accounts && formData.bank_accounts.length > 0 ? (
+                      <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-xs">
+                        <table className="w-full text-xs">
+                          <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 text-[10px] uppercase font-black tracking-wider whitespace-nowrap">
+                            <tr>
+                              <th className={`p-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'البنك والفرع' : 'Bank & Branch'}</th>
+                              <th className={`p-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'رقم الحساب' : 'Account No.'}</th>
+                              <th className={`p-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'السويفت' : 'SWIFT'}</th>
+                              <th className={`p-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الآيبان IBAN' : 'IBAN'}</th>
+                              <th className="p-2.5 text-center">{language === 'ar' ? 'الحالة' : 'Status'}</th>
+                              <th className="p-2.5 text-center">{language === 'ar' ? 'المفضل' : 'Preferred'}</th>
+                              <th className="p-2.5 text-center">{language === 'ar' ? 'المرفقات' : 'Attachments'}</th>
+                              <th className={`p-2.5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{language === 'ar' ? 'إجراءات' : 'Actions'}</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {formData.bank_accounts.map((acc, index) => {
+                              const matchedBank = EGYPTIAN_BANKS_DATA.find(b => b.code === acc.bank_code || b.nameAr === acc.bank_name);
+                              return (
+                                <tr key={acc.id || index} className="hover:bg-slate-50/60 transition-colors">
+                                  <td className="p-2.5 whitespace-nowrap">
+                                    <div className="flex items-center gap-2">
+                                      {matchedBank ? (
+                                        <BankLogoBadge bank={matchedBank} size="sm" />
+                                      ) : (
+                                        <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 shrink-0">
+                                          <Landmark size={15} />
+                                        </div>
+                                      )}
+                                      <div className="min-w-0">
+                                        <div className="font-bold text-slate-900">{acc.bank_name}</div>
+                                        {acc.branch ? (
+                                          <div className="text-[10px] text-slate-400">{acc.branch}</div>
+                                        ) : (
+                                          <div className="text-[10px] text-slate-300 font-mono">-</div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="p-2.5 font-mono font-bold text-slate-800 dir-ltr text-right sm:text-left whitespace-nowrap">
+                                    {acc.account_number}
+                                  </td>
+                                  <td className="p-2.5 font-mono text-xs text-slate-600 dir-ltr whitespace-nowrap">
+                                    {acc.swift || '-'}
+                                  </td>
+                                  <td className="p-2.5 font-mono text-[11px] text-slate-600 dir-ltr whitespace-nowrap">
+                                    {acc.iban || '-'}
+                                  </td>
+                                  <td className="p-2.5 text-center whitespace-nowrap">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleBankActive(index)}
+                                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors ${
+                                        acc.is_active !== false
+                                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                          : 'bg-slate-100 text-slate-500 border-slate-200'
+                                      }`}
+                                      title={language === 'ar' ? 'انقر لتغيير الحالة' : 'Click to toggle'}
+                                    >
+                                      {acc.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'معطل' : 'Inactive')}
+                                    </button>
+                                  </td>
+                                  <td className="p-2.5 text-center whitespace-nowrap">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleTogglePreferred(acc.id)}
+                                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all border ${
+                                        acc.is_preferred
+                                          ? 'bg-amber-50 text-amber-700 border-amber-300 shadow-xs'
+                                          : 'bg-white text-slate-400 border-slate-200 hover:text-amber-600 hover:border-amber-200'
+                                      }`}
+                                      title={language === 'ar' ? 'تعيين كحساب مفضل (حساب واحد فقط)' : 'Set as preferred (single account only)'}
+                                    >
+                                      <Star size={12} className={acc.is_preferred ? 'fill-amber-400 text-amber-500' : ''} />
+                                      <span>{acc.is_preferred ? (language === 'ar' ? 'المفضل' : 'Preferred') : (language === 'ar' ? 'تعيين' : 'Set')}</span>
+                                    </button>
+                                  </td>
+                                  <td className="p-2.5 text-center whitespace-nowrap">
+                                    {acc.attachments && acc.attachments.length > 0 ? (
+                                      <span 
+                                        onClick={() => openEditBankAccountModal(index)}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200 cursor-pointer hover:bg-emerald-100 transition-colors"
+                                        title={language === 'ar' ? `${acc.attachments.length} مرفقات - انقر للمعاينة والتعديل` : `${acc.attachments.length} attachments`}
+                                      >
+                                        <Paperclip size={10} />
+                                        <span>{acc.attachments.length}</span>
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] text-slate-300 font-mono">-</span>
+                                    )}
+                                  </td>
+                                  <td className="p-2.5 whitespace-nowrap">
+                                    <div className="flex items-center justify-end gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => openEditBankAccountModal(index)}
+                                        className="p-1 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                        title={language === 'ar' ? 'تعديل الحساب' : 'Edit'}
+                                      >
+                                        <Edit2 size={13} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteBankAccount(index)}
+                                        className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                        title={language === 'ar' ? 'حذف الحساب' : 'Delete'}
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="p-8 bg-slate-50/50 border-2 border-dashed border-slate-200 rounded-2xl text-center flex flex-col items-center justify-center gap-2.5">
+                        <div className="w-12 h-12 bg-white rounded-full shadow-xs border border-slate-200 flex items-center justify-center text-slate-400">
+                          <Landmark size={22} />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-800">
+                            {language === 'ar' ? 'لا توجد حسابات بنكية مسجلة للمورد بعد' : 'No bank accounts added yet'}
+                          </h4>
+                          <p className="text-[10px] text-slate-400 max-w-sm mx-auto mt-0.5">
+                            {language === 'ar' ? 'أضف الحسابات البنكية للمورد لتسهيل التحويلات وسندات الصرف والربط الآلي' : 'Add supplier bank accounts for payment processing'}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={openAddBankAccountModal}
+                          className="mt-1 flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-xs transition-all active:scale-95"
+                        >
+                          <Plus size={14} />
+                          <span>{language === 'ar' ? 'إضافة أول حساب بنكي' : 'Add First Bank Account'}</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                   </form>
                 </div>
@@ -1364,6 +1775,244 @@ export const Suppliers: React.FC = () => {
         )}
       </AnimatePresence>
     </div>
+
+      {/* Add / Edit Bank Account Modal */}
+      {isBankModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" dir={dir}>
+          <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className={`px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 bg-emerald-600 text-white rounded-lg flex items-center justify-center shadow-xs">
+                  <Landmark size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">
+                    {editingBankIndex !== null 
+                      ? (language === 'ar' ? 'تعديل بيانات الحساب البنكي' : 'Edit Bank Account')
+                      : (language === 'ar' ? 'إضافة حساب بنكي للمورد' : 'Add Bank Account')}
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-bold">
+                    {formData.name || (language === 'ar' ? 'بيانات الحساب البنكي' : 'Bank Account Details')}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBankModalOpen(false)}
+                className="w-7 h-7 flex items-center justify-center bg-slate-50 text-slate-400 rounded-lg hover:bg-rose-50 hover:text-rose-500 transition-all border border-slate-200/60"
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            {/* Form Body */}
+            <form onSubmit={handleSaveBankAccount} className="p-4 overflow-y-auto custom-scrollbar space-y-3.5 flex-1">
+              {/* Bank Selection */}
+              <div className="p-3 bg-slate-50/70 border border-slate-200/80 rounded-xl space-y-2.5">
+                <label className="block text-[11px] font-bold text-slate-700">
+                  {language === 'ar' ? 'اختيار البنك' : 'Select Bank'} <span className="text-rose-500">*</span>
+                </label>
+                <div className="flex items-center gap-3">
+                  {/* Bank Logo Preview */}
+                  {(() => {
+                    const selectedBankObj = EGYPTIAN_BANKS_DATA.find(b => b.code === bankFormData.bank_code);
+                    return selectedBankObj && !isCustomBank ? (
+                      <BankLogoBadge bank={selectedBankObj} size="md" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-center text-slate-400 shrink-0">
+                        <Building2 size={22} />
+                      </div>
+                    );
+                  })()}
+
+                  <div className="flex-1 space-y-1">
+                    <select
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                      value={isCustomBank ? '__custom__' : (bankFormData.bank_code || 'NBE')}
+                      onChange={(e) => handleBankSelect(e.target.value)}
+                    >
+                      <optgroup label={language === 'ar' ? 'البنوك العاملة في مصر' : 'Egyptian Operating Banks'}>
+                        {EGYPTIAN_BANKS_DATA.map((b) => (
+                          <option key={b.code} value={b.code}>
+                            {b.nameAr} ({b.code})
+                          </option>
+                        ))}
+                      </optgroup>
+                      <option value="__custom__">
+                        {language === 'ar' ? '➕ بنك آخر / غير مدرج في القائمة' : '➕ Other Bank'}
+                      </option>
+                    </select>
+
+                    {isCustomBank && (
+                      <input
+                        required
+                        type="text"
+                        placeholder={language === 'ar' ? 'اكتب اسم البنك...' : 'Enter bank name...'}
+                        className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 mt-1"
+                        value={bankFormData.bank_name}
+                        onChange={(e) => setBankFormData({ ...bankFormData, bank_name: e.target.value })}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Account Details Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Account Number */}
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-600">
+                    {language === 'ar' ? 'رقم الحساب البنكي' : 'Account Number'} <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    placeholder="مثال: 123456789012345"
+                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 font-mono dir-ltr focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                    value={bankFormData.account_number}
+                    onChange={(e) => setBankFormData({ ...bankFormData, account_number: e.target.value })}
+                  />
+                </div>
+
+                {/* SWIFT Code */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-600">
+                    {language === 'ar' ? 'كود السويفت (SWIFT)' : 'SWIFT Code'}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="مثال: NBEGEGCX"
+                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 font-mono dir-ltr uppercase focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                    value={bankFormData.swift || ''}
+                    onChange={(e) => setBankFormData({ ...bankFormData, swift: e.target.value.toUpperCase() })}
+                  />
+                </div>
+
+                {/* Branch */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-slate-600">
+                    {language === 'ar' ? 'الفرع' : 'Branch'}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={language === 'ar' ? 'مثال: فرع المهندسين' : 'Branch name'}
+                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                    value={bankFormData.branch || ''}
+                    onChange={(e) => setBankFormData({ ...bankFormData, branch: e.target.value })}
+                  />
+                </div>
+
+                {/* IBAN */}
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-600">
+                    {language === 'ar' ? 'رقم الآيبان الدولي (IBAN)' : 'IBAN'}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="EG000000000000000000000000000"
+                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 font-mono dir-ltr uppercase focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
+                    value={bankFormData.iban || ''}
+                    onChange={(e) => setBankFormData({ ...bankFormData, iban: e.target.value.toUpperCase() })}
+                  />
+                </div>
+              </div>
+
+              {/* Status & Preferred Account Toggles */}
+              <div className="p-3 bg-slate-50/70 border border-slate-200/80 rounded-xl space-y-2">
+                {/* Active switch */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-slate-800">
+                      {language === 'ar' ? 'حالة الحساب البنكي' : 'Account Status'}
+                    </span>
+                    <p className="text-[10px] text-slate-400">
+                      {bankFormData.is_active !== false 
+                        ? (language === 'ar' ? 'الحساب متاح للاستخدام والتحويلات' : 'Account is active') 
+                        : (language === 'ar' ? 'الحساب معطل مؤقتاً' : 'Account is inactive')}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setBankFormData({ ...bankFormData, is_active: !bankFormData.is_active })}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                      bankFormData.is_active !== false ? 'bg-emerald-600' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                        bankFormData.is_active !== false 
+                          ? (dir === 'rtl' ? '-translate-x-4.5' : 'translate-x-4.5') 
+                          : (dir === 'rtl' ? '-translate-x-0.5' : 'translate-x-0.5')
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="border-t border-slate-200/60 pt-2 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <Star size={13} className={bankFormData.is_preferred ? 'fill-amber-400 text-amber-500' : 'text-slate-400'} />
+                      <span className="text-xs font-bold text-slate-800">
+                        {language === 'ar' ? 'الحساب المفضل للمورد' : 'Preferred Bank Account'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">
+                      {language === 'ar' 
+                        ? 'يكون لحساب واحد فقط؛ تعيينه سيلغي تفضيل أي حساب آخر تلقائياً' 
+                        : 'Only one account can be preferred per supplier'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setBankFormData({ ...bankFormData, is_preferred: !bankFormData.is_preferred })}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                      bankFormData.is_preferred ? 'bg-amber-500' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                        bankFormData.is_preferred 
+                          ? (dir === 'rtl' ? '-translate-x-4.5' : 'translate-x-4.5') 
+                          : (dir === 'rtl' ? '-translate-x-0.5' : 'translate-x-0.5')
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Bank Account Attachments */}
+              <div className="p-3 bg-slate-50/70 border border-slate-200/80 rounded-xl">
+                <AttachmentsManager
+                  title={language === 'ar' ? 'مستندات الحساب البنكي' : 'Bank Account Documents'}
+                  subtitle={language === 'ar' ? 'إرفاق شهادة الحساب، شيك ملغى، أو خطاب رسمي' : 'Attach bank certificate, void cheque, etc.'}
+                  attachments={bankFormData.attachments || []}
+                  onChange={(att) => setBankFormData({ ...bankFormData, attachments: att })}
+                  compact={true}
+                />
+              </div>
+
+              {/* Modal Footer Buttons */}
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsBankModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors"
+                >
+                  {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95 flex items-center gap-1.5"
+                >
+                  <Check size={14} />
+                  <span>{language === 'ar' ? 'حفظ بيانات الحساب' : 'Save Account'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (

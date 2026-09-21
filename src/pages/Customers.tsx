@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Customer, Account, JournalEntry } from '../types';
+import { Customer, Account, JournalEntry, AttachmentItem } from '../types';
 import { 
   Search, Plus, Edit2, Trash2, X, History, FileText, User, 
   Hash, Box, Wallet, Calendar, Phone, Mail, MapPin, Lock,
-  LayoutGrid, List, ChevronRight, ChevronLeft, AlertCircle, CreditCard, FileUp
+  LayoutGrid, List, ChevronRight, ChevronLeft, AlertCircle, CreditCard, FileUp, Paperclip
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
@@ -22,6 +22,7 @@ import { formatNumber } from '../utils/formatUtils';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { FormattedNumberInput } from '../components/FormattedNumberInput';
 import { ExcelImportWizard } from '../components/ExcelImportWizard';
+import { AttachmentsManager } from '../components/common/AttachmentsManager';
 
 export const Customers: React.FC = () => {
   const { user } = useAuth();
@@ -80,7 +81,8 @@ export const Customers: React.FC = () => {
     payment_terms: 'due_on_receipt',
     payment_terms_days: 0,
     advance_percentage: 0,
-    is_active: true
+    is_active: true,
+    attachments: [] as AttachmentItem[]
   });
 
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -182,7 +184,8 @@ export const Customers: React.FC = () => {
           { field: 'payment_terms', label: 'شروط السداد' },
           { field: 'payment_terms_days', label: 'أيام شروط السداد' },
           { field: 'advance_percentage', label: 'نسبة الدفعة المقدمة' },
-          { field: 'is_active', label: 'نشط' }
+          { field: 'is_active', label: 'نشط' },
+          { field: 'attachments', label: 'المرفقات' }
         ];
         await dbService.updateWithLog(
           'customers', 
@@ -340,7 +343,8 @@ export const Customers: React.FC = () => {
           payment_terms: fullData.payment_terms || 'due_on_receipt',
           payment_terms_days: fullData.payment_terms_days || 0,
           advance_percentage: fullData.advance_percentage || 0,
-          is_active: fullData.is_active !== false
+          is_active: fullData.is_active !== false,
+          attachments: Array.isArray(fullData.attachments) ? fullData.attachments : []
         });
 
       } catch (error: any) {
@@ -368,7 +372,8 @@ export const Customers: React.FC = () => {
         payment_terms: 'due_on_receipt',
         payment_terms_days: 0,
         advance_percentage: 0,
-        is_active: true
+        is_active: true,
+        attachments: []
       });
     }
     setIsModalOpen(true);
@@ -523,7 +528,15 @@ export const Customers: React.FC = () => {
                           className={`hover:bg-emerald-50/40 transition-all group cursor-pointer border-transparent border-x-2 ${editingCustomer?.id === customer.id ? 'bg-emerald-50/80 border-emerald-500' : ''}`}
                         >
                           <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
-                            <span className="font-mono text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-bold border border-slate-200 group-hover:border-emerald-200 group-hover:text-emerald-700 transition-all">{customer.code}</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-bold border border-slate-200 group-hover:border-emerald-200 group-hover:text-emerald-700 transition-all">{customer.code}</span>
+                              {customer.attachments && customer.attachments.length > 0 && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold border border-slate-200" title={language === 'ar' ? `${customer.attachments.length} مرفق` : `${customer.attachments.length} attachments`}>
+                                  <Paperclip size={10} className="text-emerald-600" />
+                                  <span>{customer.attachments.length}</span>
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                             <span className={`font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors ${editingCustomer?.id === customer.id ? 'text-emerald-700' : ''}`}>{customer.name}</span>
@@ -614,7 +627,15 @@ export const Customers: React.FC = () => {
                     >
                       <div className="flex justify-between items-start relative z-10">
                         <div className="flex flex-col gap-0.5">
-                          <span className="font-mono text-[9px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold w-fit border border-slate-200">{customer.code}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-[9px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold w-fit border border-slate-200">{customer.code}</span>
+                            {customer.attachments && customer.attachments.length > 0 && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[9px] font-bold border border-slate-200" title={language === 'ar' ? `${customer.attachments.length} مرفق` : `${customer.attachments.length} attachments`}>
+                                <Paperclip size={9} className="text-emerald-600" />
+                                <span>{customer.attachments.length}</span>
+                              </span>
+                            )}
+                          </div>
                           <h4 className="font-bold text-slate-900 group-hover:text-emerald-700 transition-colors text-sm leading-tight">{customer.name}</h4>
                           <span className="text-[11px] text-slate-400 font-medium">{customer.mobile}</span>
                           <div className="flex flex-wrap gap-1 mt-0.5">
@@ -1065,6 +1086,16 @@ export const Customers: React.FC = () => {
                           </div>
                         );
                       })()}
+                    </div>
+
+                    {/* Attachments Section */}
+                    <div className="p-2.5 bg-slate-50/60 rounded-xl border border-slate-200/60 space-y-2">
+                      <AttachmentsManager
+                        title={language === 'ar' ? 'المستندات والمرفقات' : 'Documents & Attachments'}
+                        subtitle={language === 'ar' ? 'يمكن إرفاق صورة السجل التجاري، البطاقة الضريبية أو أية مستندات' : 'Attach tax card, CR, or any documents'}
+                        attachments={formData.attachments}
+                        onChange={(attachments) => setFormData({ ...formData, attachments })}
+                      />
                     </div>
 
                   </form>
