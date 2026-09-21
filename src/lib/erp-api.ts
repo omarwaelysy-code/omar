@@ -1916,6 +1916,52 @@ const getList = async (table: string, filters: any) => {
 };
 
 // --- Authentication & Users ---
+router.get('/auth/check-user-exists', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const email = String(req.query.email || '').trim().toLowerCase();
+    const companyId = String(req.query.company_id || req.user?.company_id || '').trim();
+
+    if (!email) {
+      return res.status(400).json({ error: 'البريد الإلكتروني مطلوب' });
+    }
+
+    // 1. Check if user already exists in THIS company
+    const { rows: sameCompanyRows } = await pool.query(
+      'SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND company_id = $2',
+      [email, companyId]
+    );
+
+    if (sameCompanyRows.length > 0) {
+      return res.json({
+        existsInCurrentCompany: true,
+        existsInSystem: true
+      });
+    }
+
+    // 2. Check if user exists in ANY company in the database
+    const { rows: systemUserRows } = await pool.query(
+      'SELECT id, username, name FROM users WHERE LOWER(email) = LOWER($1) ORDER BY created_at ASC LIMIT 1',
+      [email]
+    );
+
+    if (systemUserRows.length > 0) {
+      return res.json({
+        existsInCurrentCompany: false,
+        existsInSystem: true,
+        username: systemUserRows[0].username,
+        name: systemUserRows[0].name
+      });
+    }
+
+    return res.json({
+      existsInCurrentCompany: false,
+      existsInSystem: false
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: (error as any).message });
+  }
+});
+
 router.post('/auth/register', authenticateToken, authorizeRoles('admin', 'super_admin'), UsersLimitMiddleware, async (req: AuthRequest, res) => {
   try {
     const { username, name, email, password, company_id, role } = req.body;

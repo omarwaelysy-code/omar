@@ -6,7 +6,7 @@ import { User, UserPermissions, ModulePermissions } from '../types';
 import { 
   Search, Plus, Trash2, X, Shield, User as UserIcon, History, Lock, Check,
   AlertCircle, Edit2, ChevronDown, ChevronUp, Copy, HelpCircle, RefreshCw, Info,
-  ChevronLeft, ChevronRight, Save
+  ChevronLeft, ChevronRight, Save, CheckCircle2
 } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
@@ -111,6 +111,16 @@ export const Users: React.FC = () => {
   const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
 
   const [userFormData, setUserFormData] = useState({ email: '', password: '', role: 'user' as 'admin' | 'user' | 'manager' });
+  const [userCheckStatus, setUserCheckStatus] = useState<{
+    checking: boolean;
+    existsInCurrentCompany: boolean;
+    existsInSystem: boolean;
+    checkedEmail?: string;
+  }>({
+    checking: false,
+    existsInCurrentCompany: false,
+    existsInSystem: false
+  });
   
   // Role Modals state
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
@@ -177,6 +187,51 @@ export const Users: React.FC = () => {
         .catch(err => console.error("Error loading cost centers for permissions:", err));
     }
   }, [isPermissionsModalOpen, currentUser]);
+
+  // Check if user email already exists in this company or system
+  useEffect(() => {
+    const cleanEmail = userFormData.email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      setUserCheckStatus({ checking: false, existsInCurrentCompany: false, existsInSystem: false });
+      return;
+    }
+
+    if (users.some(u => u.email?.toLowerCase() === cleanEmail)) {
+      setUserCheckStatus({
+        checking: false,
+        existsInCurrentCompany: true,
+        existsInSystem: true,
+        checkedEmail: cleanEmail
+      });
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setUserCheckStatus(prev => ({ ...prev, checking: true }));
+      try {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`/api/erp/auth/check-user-exists?email=${encodeURIComponent(cleanEmail)}&company_id=${currentUser?.company_id || ''}`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setUserCheckStatus({
+            checking: false,
+            existsInCurrentCompany: !!data.existsInCurrentCompany,
+            existsInSystem: !!data.existsInSystem,
+            checkedEmail: cleanEmail
+          });
+        } else {
+          setUserCheckStatus(prev => ({ ...prev, checking: false }));
+        }
+      } catch (err) {
+        console.error("Error checking user existence:", err);
+        setUserCheckStatus(prev => ({ ...prev, checking: false }));
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [userFormData.email, users, currentUser]);
 
   // Section Toggle
   const toggleSection = (sectionId: string) => {
@@ -266,8 +321,13 @@ export const Users: React.FC = () => {
     if (!currentUser) return;
 
     const cleanEmail = userFormData.email.trim().toLowerCase();
-    if (users.some(u => u.email?.toLowerCase() === cleanEmail)) {
-      showNotification(t('users.user_exists') || 'المستخدم موجود بالفعل', 'error');
+    if (users.some(u => u.email?.toLowerCase() === cleanEmail) || userCheckStatus.existsInCurrentCompany) {
+      showNotification(t('users.user_exists') || (language === 'ar' ? 'المستخدم موجود بالفعل في هذه الشركة' : 'User already exists in this company'), 'error');
+      return;
+    }
+
+    if (!userCheckStatus.existsInSystem && (!userFormData.password || userFormData.password.length < 6)) {
+      showNotification(language === 'ar' ? 'يرجى إدخال كلمة مرور لا تقل عن 6 أحرف للمستخدم الجديد' : 'Please enter a password with at least 6 characters for the new user', 'error');
       return;
     }
 
@@ -284,7 +344,7 @@ export const Users: React.FC = () => {
         body: JSON.stringify({
           username: cleanEmail,
           email: cleanEmail,
-          password: userFormData.password,
+          password: userCheckStatus.existsInSystem ? '' : userFormData.password,
           company_id: currentUser.company_id,
           role: userFormData.role
         })
@@ -307,15 +367,18 @@ export const Users: React.FC = () => {
       
       if (newUser.existingUser) {
         showNotification(
-          `تنبيه: البريد الإلكتروني (${cleanEmail}) مستخدم من قبل في النظام. تم ربط المستخدم بشركتك مع الحفاظ على كلمة المرور الحالية بدون تغيير.`,
-          'info'
+          language === 'ar'
+            ? `تم ربط المستخدم (${cleanEmail}) بشركتك بنجاح، وسيتم استخدام نفس كلمة المرور المسجلة له مسبقاً في النظام.`
+            : `User (${cleanEmail}) linked successfully using their existing registered password.`,
+          'success'
         );
       } else {
-        showNotification(t('users.add_success') || 'تمت إضافة المستخدم بنجاح', 'success');
+        showNotification(t('users.add_success') || (language === 'ar' ? 'تمت إضافة المستخدم بنجاح' : 'User added successfully'), 'success');
       }
 
       setIsUserModalOpen(false);
       setUserFormData({ email: '', password: '', role: 'user' });
+      setUserCheckStatus({ checking: false, existsInCurrentCompany: false, existsInSystem: false });
     } catch (e: any) {
       console.error(e);
       showNotification(e.message || 'خطأ أثناء إضافة المستخدم', 'error');
@@ -1346,7 +1409,11 @@ export const Users: React.FC = () => {
           
           {activeTab === 'users' ? (
             <button 
-              onClick={() => setIsUserModalOpen(true)}
+              onClick={() => {
+                setUserFormData({ email: '', password: '', role: 'user' });
+                setUserCheckStatus({ checking: false, existsInCurrentCompany: false, existsInSystem: false });
+                setIsUserModalOpen(true);
+              }}
               className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95"
             >
               <Plus size={20} />
@@ -1530,33 +1597,90 @@ export const Users: React.FC = () => {
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col border border-slate-200">
             <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-white shrink-0">
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight">{language === 'ar' ? 'إنشاء حساب مستخدم جديد' : 'Create New User Account'}</h3>
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+                {userCheckStatus.existsInSystem && !userCheckStatus.existsInCurrentCompany
+                  ? (language === 'ar' ? 'ربط حساب مستخدم موجود' : 'Link Existing User Account')
+                  : (language === 'ar' ? 'إنشاء حساب مستخدم جديد' : 'Create New User Account')}
+              </h3>
               <button onClick={() => setIsUserModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-50 rounded-full transition-all"><X size={24} /></button>
             </div>
             <form onSubmit={handleCreateUser} className={`p-8 space-y-6 flex-1 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
               <div className="space-y-2">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'البريد الإلكتروني / اسم المستخدم' : 'Email / Username'}</label>
+                <div className="flex items-center justify-between px-1">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">{language === 'ar' ? 'البريد الإلكتروني / اسم المستخدم' : 'Email / Username'}</label>
+                  {userCheckStatus.checking && (
+                    <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1 animate-pulse">
+                      <RefreshCw size={10} className="animate-spin" />
+                      {language === 'ar' ? 'جاري التحقق...' : 'Checking...'}
+                    </span>
+                  )}
+                </div>
                 <input
                   required
                   type="email"
-                  className="premium-input font-bold w-full"
+                  className={`premium-input font-bold w-full transition-all ${
+                    userCheckStatus.existsInSystem && !userCheckStatus.existsInCurrentCompany 
+                      ? 'border-emerald-500 ring-2 ring-emerald-500/20' 
+                      : userCheckStatus.existsInCurrentCompany 
+                        ? 'border-rose-400 ring-2 ring-rose-400/20' 
+                        : ''
+                  }`}
                   value={userFormData.email}
                   onChange={(e) => setUserFormData({ ...userFormData, email: e.target.value })}
                   placeholder="name@company.com"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'كلمة المرور الافتراضية' : 'Default Password'}</label>
-                <input
-                  required
-                  type="password"
-                  minLength={6}
-                  className="premium-input font-mono font-bold w-full"
-                  value={userFormData.password}
-                  onChange={(e) => setUserFormData({ ...userFormData, password: e.target.value })}
-                  placeholder="••••••••"
-                />
-              </div>
+
+              {/* Case 1: User already in this company */}
+              {userCheckStatus.existsInCurrentCompany && (
+                <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-3 text-rose-800 animate-in fade-in">
+                  <AlertCircle size={20} className="shrink-0 text-rose-600 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-xs">{language === 'ar' ? 'المستخدم موجود بالفعل' : 'User Already Exists'}</p>
+                    <p className="text-[11px] text-rose-700 mt-0.5 leading-relaxed">
+                      {language === 'ar' 
+                        ? 'هذا البريد الإلكتروني مسجل بالفعل ضمن مستخدمي هذه الشركة ولا يمكن إضافته مجدداً.' 
+                        : 'This email is already registered within this company.'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Case 2: User exists in another company -> DO NOT ASK FOR PASSWORD, SHOW PROFESSIONAL MESSAGE */}
+              {userCheckStatus.existsInSystem && !userCheckStatus.existsInCurrentCompany ? (
+                <div className="p-4 bg-emerald-50/90 border border-emerald-200 rounded-2xl space-y-2.5 text-emerald-950 animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-center gap-2 font-black text-sm text-emerald-800">
+                    <CheckCircle2 size={20} className="shrink-0 text-emerald-600" />
+                    <span>{language === 'ar' ? 'المستخدم مسجل مسبقاً في النظام' : 'User Already Registered in System'}</span>
+                  </div>
+                  <p className="text-xs text-emerald-800/90 leading-relaxed font-medium">
+                    {language === 'ar'
+                      ? 'تم العثور على حساب نشط لهذا البريد الإلكتروني في النظام. سيتم ربط المستخدم بشركتك الحالية مباشرة، والاعتماد على كلمة المرور المسجلة له مسبقاً دون الحاجة لطلب أو إدخال كلمة سر جديدة.'
+                      : 'An active account was found for this email in the system. The user will be linked to your company directly using their existing registered password.'}
+                  </p>
+                  <div className="pt-1 flex items-center gap-2 text-[11px] font-bold text-emerald-700 bg-white/70 px-3 py-1.5 rounded-xl border border-emerald-100">
+                    <Lock size={13} className="shrink-0 text-emerald-600" />
+                    <span>{language === 'ar' ? 'تسجيل الدخول بنفس كلمة المرور الحالية للمستخدم' : 'Login using the user’s current password'}</span>
+                  </div>
+                </div>
+              ) : (
+                /* Case 3: Completely new user -> ask for password */
+                !userCheckStatus.existsInCurrentCompany && (
+                  <div className="space-y-2">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'كلمة المرور الافتراضية' : 'Default Password'}</label>
+                    <input
+                      required
+                      type="password"
+                      minLength={6}
+                      className="premium-input font-mono font-bold w-full"
+                      value={userFormData.password}
+                      onChange={(e) => setUserFormData({ ...userFormData, password: e.target.value })}
+                      placeholder="••••••••"
+                    />
+                  </div>
+                )
+              )}
+
               <div className="space-y-2">
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'الرتبة في النظام' : 'System Role'}</label>
                 <select 
@@ -1573,10 +1697,14 @@ export const Users: React.FC = () => {
               <div className="pt-4">
                 <button 
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || userCheckStatus.checking || userCheckStatus.existsInCurrentCompany}
                   className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold text-lg hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 disabled:opacity-50 active:scale-95"
                 >
-                  {loading ? (language === 'ar' ? 'جاري المعالجة...' : 'Processing...') : (language === 'ar' ? 'تأكيد إنشاء الحساب' : 'Confirm Account Creation')}
+                  {loading ? (language === 'ar' ? 'جاري المعالجة...' : 'Processing...') : (
+                    userCheckStatus.existsInSystem && !userCheckStatus.existsInCurrentCompany
+                      ? (language === 'ar' ? 'تأكيد ربط المستخدم بالشركة' : 'Confirm Linking User')
+                      : (language === 'ar' ? 'تأكيد إنشاء الحساب' : 'Confirm Account Creation')
+                  )}
                 </button>
               </div>
             </form>
