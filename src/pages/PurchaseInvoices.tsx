@@ -6726,6 +6726,8 @@ export const PurchaseInvoices: React.FC = () => {
                       ))}
                     </div>
                   </div>
+                )}
+
                 {/* Attachments Display */}
                 {viewInvoice.attachments && viewInvoice.attachments.length > 0 && (
                   <div className="pt-6 border-t border-slate-100">
