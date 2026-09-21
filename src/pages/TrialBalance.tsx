@@ -183,66 +183,84 @@ export const TrialBalance: React.FC = () => {
           <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'} border-collapse`}>
             <thead>
               <tr className="bg-zinc-100 border-b border-zinc-200">
-                <th rowSpan={2} className={`px-6 py-4 text-sm font-bold text-zinc-700 ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200`}>{t('accounts.column_code')}</th>
-                <th rowSpan={2} className={`px-6 py-4 text-sm font-bold text-zinc-700 ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200`}>{t('accounts.column_name')}</th>
-                <th colSpan={2} className={`px-6 py-2 text-sm font-bold text-zinc-700 text-center border-b border-zinc-200 ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200`}>{t('trial.opening_balance')}</th>
-                <th colSpan={2} className={`px-6 py-2 text-sm font-bold text-zinc-700 text-center border-b border-zinc-200 ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200`}>{t('trial.movement')}</th>
-                <th colSpan={2} className="px-6 py-2 text-sm font-bold text-zinc-700 text-center border-b border-zinc-200">{t('trial.closing_balance')}</th>
+                <th rowSpan={2} className={`px-3 py-2 text-xs md:text-sm font-bold text-zinc-700 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200`}>{t('accounts.column_code')}</th>
+                <th rowSpan={2} className={`px-4 py-2 text-xs md:text-sm font-bold text-zinc-700 ${dir === 'rtl' ? 'text-right border-l' : 'text-left border-r'} border-zinc-200`}>{t('accounts.column_name')}</th>
+                <th colSpan={2} className={`px-3 py-1.5 text-xs md:text-sm font-bold text-zinc-700 text-center border-b border-zinc-200 ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200`}>{t('trial.opening_balance')}</th>
+                <th colSpan={2} className={`px-3 py-1.5 text-xs md:text-sm font-bold text-zinc-700 text-center border-b border-zinc-200 ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200`}>{t('trial.movement')}</th>
+                <th colSpan={2} className="px-3 py-1.5 text-xs md:text-sm font-bold text-zinc-700 text-center border-b border-zinc-200">{t('trial.closing_balance')}</th>
               </tr>
               <tr className="bg-zinc-50 border-b border-zinc-200">
-                <th className={`px-4 py-2 text-xs font-bold text-zinc-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200`}>{t('journal.column_debit')}</th>
-                <th className={`px-4 py-2 text-xs font-bold text-zinc-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200`}>{t('journal.column_credit')}</th>
-                <th className={`px-4 py-2 text-xs font-bold text-zinc-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200`}>{t('journal.column_debit')}</th>
-                <th className={`px-4 py-2 text-xs font-bold text-zinc-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200`}>{t('journal.column_credit')}</th>
-                <th className={`px-4 py-2 text-xs font-bold text-zinc-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200`}>{t('journal.column_debit')}</th>
-                <th className="px-4 py-2 text-xs font-bold text-zinc-600 text-center">{t('journal.column_credit')}</th>
+                <th className={`px-2.5 py-1 text-xs font-bold text-zinc-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200`}>{t('journal.column_debit')}</th>
+                <th className={`px-2.5 py-1 text-xs font-bold text-zinc-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200`}>{t('journal.column_credit')}</th>
+                <th className={`px-2.5 py-1 text-xs font-bold text-zinc-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200`}>{t('journal.column_debit')}</th>
+                <th className={`px-2.5 py-1 text-xs font-bold text-zinc-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200`}>{t('journal.column_credit')}</th>
+                <th className={`px-2.5 py-1 text-xs font-bold text-zinc-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200`}>{t('journal.column_debit')}</th>
+                <th className="px-2.5 py-1 text-xs font-bold text-zinc-600 text-center">{t('journal.column_credit')}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {trialBalanceData.map((a) => (
-                <tr key={a.id} className="hover:bg-zinc-50/50 transition-colors">
-                  <td 
-                    onClick={() => {
-                      setPendingLedgerParams({
-                        accountId: a.id,
-                        startDate: dateRange.start,
-                        endDate: dateRange.end
-                      });
-                      setCurrentPage('general_ledger_report');
-                    }}
-                    className={`px-6 py-4 text-sm font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}
+            <tbody className="divide-y divide-zinc-200/70">
+              {trialBalanceData.map((a, index) => {
+                const isEven = index % 2 === 0;
+                return (
+                  <tr 
+                    key={a.id} 
+                    className={`${isEven ? 'bg-white' : 'bg-emerald-50/40'} hover:bg-emerald-100/60 transition-colors`}
                   >
-                    {a.code}
-                  </td>
-                  <td 
-                    onClick={() => {
-                      setPendingLedgerParams({
-                        accountId: a.id,
-                        startDate: dateRange.start,
-                        endDate: dateRange.end
-                      });
-                      setCurrentPage('general_ledger_report');
-                    }}
-                    className={`px-6 py-4 text-sm font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}
-                  >
-                    {a.name}
-                  </td>
-                  <td className={`px-4 py-4 text-sm font-black text-emerald-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.opening.debit > 0 ? formatNumber(a.opening.debit) : '-'}</td>
-                  <td className={`px-4 py-4 text-sm font-black text-emerald-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.opening.credit > 0 ? formatNumber(a.opening.credit) : '-'}</td>
-                  <td className={`px-4 py-4 text-sm font-black text-emerald-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.movement.debit > 0 ? formatNumber(a.movement.debit) : '-'}</td>
-                  <td className={`px-4 py-4 text-sm font-black text-emerald-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.movement.credit > 0 ? formatNumber(a.movement.credit) : '-'}</td>
-                  <td className={`px-4 py-4 text-sm font-black text-emerald-600 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-100`}>{a.closing.debit > 0 ? formatNumber(a.closing.debit) : '-'}</td>
-                  <td className="px-4 py-4 text-sm font-black text-emerald-600 text-center">{a.closing.credit > 0 ? formatNumber(a.closing.credit) : '-'}</td>
-                </tr>
-              ))}
+                    <td 
+                      onClick={() => {
+                        setPendingLedgerParams({
+                          accountId: a.id,
+                          startDate: dateRange.start,
+                          endDate: dateRange.end
+                        });
+                        setCurrentPage('general_ledger_report');
+                      }}
+                      className={`px-3 py-2 text-xs md:text-sm font-bold font-mono text-center text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200/70`}
+                    >
+                      {a.code}
+                    </td>
+                    <td 
+                      onClick={() => {
+                        setPendingLedgerParams({
+                          accountId: a.id,
+                          startDate: dateRange.start,
+                          endDate: dateRange.end
+                        });
+                        setCurrentPage('general_ledger_report');
+                      }}
+                      className={`px-4 py-2 text-xs md:text-sm font-bold text-zinc-800 hover:text-emerald-700 hover:underline cursor-pointer ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200/70`}
+                    >
+                      {a.name}
+                    </td>
+                    <td className={`px-2.5 py-2 text-xs md:text-sm font-bold font-mono text-emerald-700 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200/70`}>
+                      {a.opening.debit > 0 ? formatNumber(a.opening.debit) : <span className="text-zinc-400 font-normal">-</span>}
+                    </td>
+                    <td className={`px-2.5 py-2 text-xs md:text-sm font-bold font-mono text-emerald-700 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200/70`}>
+                      {a.opening.credit > 0 ? formatNumber(a.opening.credit) : <span className="text-zinc-400 font-normal">-</span>}
+                    </td>
+                    <td className={`px-2.5 py-2 text-xs md:text-sm font-bold font-mono text-emerald-700 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200/70`}>
+                      {a.movement.debit > 0 ? formatNumber(a.movement.debit) : <span className="text-zinc-400 font-normal">-</span>}
+                    </td>
+                    <td className={`px-2.5 py-2 text-xs md:text-sm font-bold font-mono text-emerald-700 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200/70`}>
+                      {a.movement.credit > 0 ? formatNumber(a.movement.credit) : <span className="text-zinc-400 font-normal">-</span>}
+                    </td>
+                    <td className={`px-2.5 py-2 text-xs md:text-sm font-bold font-mono text-emerald-700 text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-200/70`}>
+                      {a.closing.debit > 0 ? formatNumber(a.closing.debit) : <span className="text-zinc-400 font-normal">-</span>}
+                    </td>
+                    <td className="px-2.5 py-2 text-xs md:text-sm font-bold font-mono text-emerald-700 text-center">
+                      {a.closing.credit > 0 ? formatNumber(a.closing.credit) : <span className="text-zinc-400 font-normal">-</span>}
+                    </td>
+                  </tr>
+                );
+              })}
               <tr className="bg-zinc-900 text-white font-black">
-                <td colSpan={2} className="px-6 py-4 text-sm text-center">{t('trial.total')}</td>
-                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.openingDebit)}</td>
-                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.openingCredit)}</td>
-                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.movementDebit)}</td>
-                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.movementCredit)}</td>
-                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.closingDebit)}</td>
-                <td className="px-4 py-4 text-sm text-center">{formatNumber(totals.closingCredit)}</td>
+                <td colSpan={2} className={`px-4 py-2.5 text-xs md:text-sm text-center ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-700`}>{t('trial.total')}</td>
+                <td className={`px-2.5 py-2.5 text-xs md:text-sm text-center font-mono ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-700`}>{formatNumber(totals.openingDebit)}</td>
+                <td className={`px-2.5 py-2.5 text-xs md:text-sm text-center font-mono ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-700`}>{formatNumber(totals.openingCredit)}</td>
+                <td className={`px-2.5 py-2.5 text-xs md:text-sm text-center font-mono ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-700`}>{formatNumber(totals.movementDebit)}</td>
+                <td className={`px-2.5 py-2.5 text-xs md:text-sm text-center font-mono ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-700`}>{formatNumber(totals.movementCredit)}</td>
+                <td className={`px-2.5 py-2.5 text-xs md:text-sm text-center font-mono ${dir === 'rtl' ? 'border-l' : 'border-r'} border-zinc-700`}>{formatNumber(totals.closingDebit)}</td>
+                <td className="px-2.5 py-2.5 text-xs md:text-sm text-center font-mono">{formatNumber(totals.closingCredit)}</td>
               </tr>
             </tbody>
           </table>
