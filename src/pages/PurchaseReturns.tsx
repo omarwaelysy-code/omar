@@ -22,6 +22,7 @@ import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { ExportButtons } from '../components/ExportButtons';
+import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
 
 import { TransactionManager } from '../services/TransactionManager';
 import { ReturnSchema, JournalEntrySchema } from '../lib/schemas';
@@ -88,6 +89,7 @@ export const PurchaseReturns: React.FC = () => {
   const [showAiInput, setShowAiInput] = useState(false);
 
   const [editingReturn, setEditingReturn] = useState<any | null>(null);
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [returnToDelete, setReturnToDelete] = useState<string | null>(null);
   
@@ -1703,6 +1705,7 @@ export const PurchaseReturns: React.FC = () => {
         exchange_rate: Number(exchangeRate) || 1,
         description: description || null,
         notes: returnData.notes || null,
+        attachments,
         eta_uuid: etaLockData ? etaLockData.uuid : (editingReturn?.eta_uuid || null),
         eta_invoice_number: etaLockData ? (etaLockData.internalId || null) : (editingReturn?.eta_invoice_number || null),
         created_at: editingReturn ? editingReturn.created_at : new Date().toISOString(),
@@ -2072,6 +2075,7 @@ export const PurchaseReturns: React.FC = () => {
     setExchangeRateType('manual');
     setDescription('');
     setDiscount(0);
+    setAttachments([]);
     prevExchangeRateRef.current = 1;
     const num = await generateReturnNumber(newDate);
     setReturnNumber(num);
@@ -2122,6 +2126,7 @@ export const PurchaseReturns: React.FC = () => {
       prevExchangeRateRef.current = fullData.exchange_rate || 1;
       setDescription(fullData.description || '');
       setDiscount(fullData.discount_amount || fullData.discount || 0);
+      setAttachments(Array.isArray(fullData.attachments) ? fullData.attachments : []);
 
       setItems((fullData.items || []).map((item: any) => {
         const qty = Number(item.quantity) || 0;
@@ -4047,6 +4052,13 @@ export const PurchaseReturns: React.FC = () => {
                 </div>
               )}
 
+              <div className="mt-6">
+                <AttachmentsManager
+                  attachments={attachments}
+                  onChange={setAttachments}
+                />
+              </div>
+
               {/* Form Footer */}
               <div className="p-4 md:p-6 border-t border-slate-100 bg-white/80 backdrop-blur-md sticky bottom-0 z-[70] flex items-center justify-between gap-4 mt-auto">
                 <button 
@@ -4270,6 +4282,19 @@ export const PurchaseReturns: React.FC = () => {
                       })()}
                     </tfoot>
                   </table>
+                </div>
+
+                <div className="mt-6">
+                  <AttachmentsManager
+                    attachments={viewReturn.attachments || []}
+                    readOnly={true}
+                    onDownload={(item) => {
+                      const link = document.createElement('a');
+                      link.href = item.data;
+                      link.download = item.name;
+                      link.click();
+                    }}
+                  />
                 </div>
               </div>
             </div>

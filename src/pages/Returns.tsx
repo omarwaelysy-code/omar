@@ -16,6 +16,7 @@ import { PageActivityLog } from '../components/PageActivityLog';
 import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { InlineActivityLog } from '../components/InlineActivityLog';
+import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
 import { ExportButtons } from '../components/ExportButtons';
 import { printDocument } from '../utils/printEngine';
 import { ActivityLog, Company } from '../types';
@@ -315,6 +316,7 @@ export const Returns: React.FC = () => {
   const [previewActivityLog, setPreviewActivityLog] = useState<Partial<ActivityLog> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [editingReturn, setEditingReturn] = useState<Return | null>(null);
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [returnNumber, setReturnNumber] = useState('');
   const [company, setCompany] = useState<Company | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -1187,6 +1189,7 @@ export const Returns: React.FC = () => {
         customer_name: customer?.name || '',
         warehouse_id: selectedWarehouseId || null,
         date, 
+        attachments,
         items: sanitizedItems,
         subtotal,
         discount: Number(discount) || 0,
@@ -1749,6 +1752,7 @@ export const Returns: React.FC = () => {
           };
         });
         setItems(loadedItems);
+        setAttachments(Array.isArray(fullData.attachments) ? fullData.attachments : []);
         setReturnNumber(fullData.return_number);
         setDiscount(fullData.discount || 0);
         setDescription(fullData.description || '');
@@ -1766,6 +1770,7 @@ export const Returns: React.FC = () => {
       }
     } else {
       setEditingReturn(null);
+      setAttachments([]);
       const newDate = new Date().toISOString().slice(0, 10);
       setSelectedCustomerId('');
       setSelectedWarehouseId('');
@@ -3628,6 +3633,14 @@ export const Returns: React.FC = () => {
                   </div>
                 )}
 
+                {/* Attachments Section */}
+                <div className="mt-6 pt-4 border-t border-zinc-100">
+                  <AttachmentsManager
+                    attachments={attachments}
+                    onChange={setAttachments}
+                  />
+                </div>
+
                 {/* Action Footer */}
                 <div className="flex gap-4 pt-6 mt-6 border-t border-zinc-100">
                   <button 
@@ -3835,6 +3848,17 @@ export const Returns: React.FC = () => {
                       </tfoot>
                     </table>
                   </div>
+
+                  {/* Attachments Display */}
+                  {viewReturn.attachments && viewReturn.attachments.length > 0 && (
+                    <div className="pt-6 border-t border-slate-100">
+                      <AttachmentsManager
+                        attachments={viewReturn.attachments}
+                        readOnly={true}
+                        title={language === 'ar' ? 'المرفقات والمستندات المؤيدة' : 'Supporting Attachments & Documents'}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="hidden lg:block w-80 border-r border-slate-100 bg-slate-50/30">

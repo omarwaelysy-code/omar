@@ -22,6 +22,7 @@ import { exportToExcel } from '../utils/excelUtils';
 import { printDocument } from '../utils/printEngine';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { InlineActivityLog } from '../components/InlineActivityLog';
+import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
 
 export const SalesOrders: React.FC = () => {
   const { t, dir, language } = useLanguage();
@@ -124,6 +125,7 @@ export const SalesOrders: React.FC = () => {
   const [items, setItems] = useState<SalesOrderItem[]>([]);
   const [discount, setDiscount] = useState<number>(0);
   const [description, setDescription] = useState<string>('');
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [orderNumber, setOrderNumber] = useState('');
   const [isFullScreen, setIsFullScreen] = useState(false);
 
@@ -390,6 +392,7 @@ export const SalesOrders: React.FC = () => {
     setItems([]);
     setDiscount(0);
     setDescription('');
+    setAttachments([]);
     setShowSidePanel(false);
     setIsPanelExpanded(false);
     setIsModalOpen(true);
@@ -437,6 +440,7 @@ export const SalesOrders: React.FC = () => {
       setDeliveryDate(fullData.delivery_date || fullData.date);
       setOrderNumber(fullData.order_number);
       setItems(fullData.items || []);
+      setAttachments(Array.isArray(fullData.attachments) ? fullData.attachments : []);
       setDiscount(fullData.discount_amount || 0);
       setDescription(fullData.description || '');
       setShowSidePanel(false);
@@ -662,6 +666,7 @@ export const SalesOrders: React.FC = () => {
         delivery_date: deliveryDate,
         description,
         notes: description,
+        attachments,
         items: sanitizedItems,
         subtotal,
         tax_amount: vatTotal,
@@ -1973,6 +1978,14 @@ export const SalesOrders: React.FC = () => {
               </div>
             )}
 
+            {/* Attachments Section */}
+            <div className="mt-6 pt-4 border-t border-zinc-100">
+              <AttachmentsManager
+                attachments={attachments}
+                onChange={setAttachments}
+              />
+            </div>
+
             {/* Floating Autocomplete Popover */}
             {activeSearch && popoverRect && (
               <>
@@ -2412,6 +2425,17 @@ export const SalesOrders: React.FC = () => {
                       />
                       <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">{viewOrder.order_number}</span>
                     </div>
+
+                    {/* Attachments Display */}
+                    {viewOrder.attachments && viewOrder.attachments.length > 0 && (
+                      <div className="pt-6 border-t border-slate-100">
+                        <AttachmentsManager
+                          attachments={viewOrder.attachments}
+                          readOnly={true}
+                          title={language === 'ar' ? 'المرفقات والمستندات المؤيدة' : 'Supporting Attachments & Documents'}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 

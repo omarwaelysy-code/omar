@@ -22,6 +22,7 @@ import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { formatNumber, formatDate, formatMoney, parseNumber } from '../utils/formatUtils';
 import { ExportButtons } from '../components/ExportButtons';
 import { PaginationControls } from '../components/PaginationControls';
+import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -39,6 +40,7 @@ export const CashTransfers: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [transferToDelete, setTransferToDelete] = useState<string | null>(null);
   const [viewTransfer, setViewTransfer] = useState<CashTransfer | null>(null);
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [view, setView] = useState<'table' | 'card'>('table');
   const handleSort = (field: string) => {
     if (sortBy === field) {
@@ -67,6 +69,7 @@ export const CashTransfers: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingTransfer(null);
+    setAttachments([]);
     setFormData({
       date: new Date().toISOString().slice(0, 10),
       amount: 0,
@@ -83,6 +86,7 @@ export const CashTransfers: React.FC = () => {
     if (currentIndex > 0) {
       const prev = transfers[currentIndex - 1];
       setEditingTransfer(prev);
+      setAttachments(Array.isArray(prev.attachments) ? prev.attachments : []);
       setFormData({
         date: prev.date ? prev.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
         amount: Number(prev.amount) || 0,
@@ -100,6 +104,7 @@ export const CashTransfers: React.FC = () => {
     if (currentIndex < transfers.length - 1) {
       const next = transfers[currentIndex + 1];
       setEditingTransfer(next);
+      setAttachments(Array.isArray(next.attachments) ? next.attachments : []);
       setFormData({
         date: next.date ? next.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
         amount: Number(next.amount) || 0,
@@ -258,7 +263,8 @@ export const CashTransfers: React.FC = () => {
         company_id: user.company_id,
         created_at: editingTransfer ? editingTransfer.created_at : new Date().toISOString(),
         created_by: editingTransfer ? editingTransfer.created_by : user.id,
-        transfer_number: formData.transfer_number
+        transfer_number: formData.transfer_number,
+        attachments
       };
 
       const journalItems = [
@@ -484,6 +490,7 @@ export const CashTransfers: React.FC = () => {
           <button 
             onClick={() => {
               setEditingTransfer(null);
+              setAttachments([]);
               setFormData({
                 date: new Date().toISOString().slice(0, 10),
                 amount: 0,
@@ -589,6 +596,7 @@ export const CashTransfers: React.FC = () => {
                     className="hover:bg-zinc-50/50 transition-colors group cursor-pointer"
                     onClick={() => {
                       setEditingTransfer(transfer);
+                      setAttachments(Array.isArray(transfer.attachments) ? transfer.attachments : []);
                       setFormData({
                         date: transfer.date ? transfer.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
                         amount: Number(transfer.amount) || 0,
@@ -659,6 +667,7 @@ export const CashTransfers: React.FC = () => {
                           onClick={(e) => {
                             e.stopPropagation();
                             setEditingTransfer(transfer);
+                      setAttachments(Array.isArray(transfer.attachments) ? transfer.attachments : []);
                             setFormData({
                               date: transfer.date ? transfer.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
                               amount: Number(transfer.amount) || 0,
@@ -700,6 +709,7 @@ export const CashTransfers: React.FC = () => {
                 className="p-6 bg-zinc-50/50 rounded-3xl border border-zinc-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden cursor-pointer flex flex-col justify-between"
                 onClick={() => {
                   setEditingTransfer(transfer);
+                      setAttachments(Array.isArray(transfer.attachments) ? transfer.attachments : []);
                   setFormData({
                     date: transfer.date ? transfer.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
                     amount: Number(transfer.amount) || 0,
@@ -726,6 +736,7 @@ export const CashTransfers: React.FC = () => {
                     onClick={(e) => {
                       e.stopPropagation();
                       setEditingTransfer(transfer);
+                      setAttachments(Array.isArray(transfer.attachments) ? transfer.attachments : []);
                       setFormData({
                         date: transfer.date ? transfer.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
                         amount: Number(transfer.amount) || 0,
@@ -1082,6 +1093,14 @@ export const CashTransfers: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Attachments Section */}
+                  <div className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm max-w-4xl mx-auto w-full mt-6">
+                    <AttachmentsManager
+                      attachments={attachments}
+                      onChange={setAttachments}
+                    />
+                  </div>
+
                   {/* Action Footer */}
                   <div className="flex gap-4 p-6 bg-transparent border-t border-zinc-100 sticky bottom-4 z-[90] mt-auto max-w-4xl mx-auto w-full">
                     <button 
@@ -1386,6 +1405,19 @@ export const CashTransfers: React.FC = () => {
                       <p className="font-medium leading-relaxed">{viewTransfer.description}</p>
                     </div>
                   </div>
+                </div>
+
+                <div className="pt-6 border-t border-zinc-100">
+                  <AttachmentsManager
+                    attachments={viewTransfer.attachments || []}
+                    readOnly={true}
+                    onDownload={(item) => {
+                      const link = document.createElement('a');
+                      link.href = item.data;
+                      link.download = item.name;
+                      link.click();
+                    }}
+                  />
                 </div>
 
                 <div className="pt-6 border-t border-zinc-100">

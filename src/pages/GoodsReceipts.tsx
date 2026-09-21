@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
-import { Supplier, Product, Warehouse, Company, Currency } from '../types';
+import { Supplier, Product, Warehouse, Company, Currency, AttachmentItem } from '../types';
 import { 
   Search, Plus, Trash2, X, Eye, Sparkles, FileText, Pencil, Printer, Download, 
   ChevronLeft, ChevronRight, Hash, Calendar, Package, Tag, ArrowUpRight, 
-  Lock, LayoutGrid, List, ChevronDown, ChevronUp, History, Coins, CheckCheck, ExternalLink, RotateCcw, Save, Copy, Layers, Filter, FileSpreadsheet
+  Lock, LayoutGrid, List, ChevronDown, ChevronUp, History, Coins, CheckCheck, ExternalLink, RotateCcw, Save, Copy, Layers, Filter, FileSpreadsheet, Paperclip
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
@@ -20,6 +20,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { printElement, exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { printDocument } from '../utils/printEngine';
+import { AttachmentsManager } from '../components/common/AttachmentsManager';
 
 interface GoodsReceiptItem {
   id?: string;
@@ -59,6 +60,7 @@ interface GoodsReceipt {
   billing_status?: string;
   created_at?: string;
   items?: GoodsReceiptItem[];
+  attachments?: AttachmentItem[];
 }
 
 export const GoodsReceipts: React.FC = () => {
@@ -149,6 +151,7 @@ export const GoodsReceipts: React.FC = () => {
   const [status, setStatus] = useState<'draft' | 'posted'>('draft');
   const [items, setItems] = useState<GoodsReceiptItem[]>([]);
   const [selectedPOId, setSelectedPOId] = useState('');
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [view, setView] = useViewPreference('goods_receipts', 'table');
@@ -304,6 +307,7 @@ export const GoodsReceipts: React.FC = () => {
       setNotes(gr.notes || '');
       setStatus(gr.status);
       setSelectedPOId(gr.source_document_type === 'purchase_order' ? (gr.source_document_id || '') : '');
+      setAttachments(gr.attachments || []);
       
       const mapped = (gr.items || []).map(i => ({
         ...i,
@@ -319,6 +323,7 @@ export const GoodsReceipts: React.FC = () => {
       setNotes('');
       setStatus('draft');
       setSelectedPOId('');
+      setAttachments([]);
       setItems([]);
     }
     setIsModalOpen(true);
@@ -406,6 +411,7 @@ export const GoodsReceipts: React.FC = () => {
         source_document_number: po ? po.order_number : null,
         company_id: user.company_id,
         created_by: user.id,
+        attachments: attachments,
         items: validItems.map(i => ({
           product_id: i.product_id,
           unit: i.unit || 'default',
@@ -441,22 +447,27 @@ export const GoodsReceipts: React.FC = () => {
     try {
       await dbService.delete('goods_receipts', id);
       showNotification(gt('deleted_success'), 'success');
+      setReceipts(prev => prev.filter(r => r.id !== id));
+      if (viewReceipt?.id === id) setViewReceipt(null);
     } catch (err: any) {
       console.error(err);
       showNotification(err.message || 'Error deleting goods receipt', 'error');
     }
   };
 
-  const handleCopyReceipt = (gr: any) => {
+  const handleCopyDocument = (receipt: GoodsReceipt) => {
     setViewReceipt(null);
     setEditingReceipt(null);
+    setAttachments([]);
     const today = new Date().toISOString().slice(0, 10);
-    setSupplierId(gr.supplier_id || '');
-    setWarehouseId(gr.warehouse_id || '');
     setReceiptDate(today);
-    setNotes(gr.notes ? `${gr.notes} (${language === 'ar' ? 'نسخة' : 'Copy'})` : '');
-    setItems((gr.items || []).map((item: any) => ({
-      product_id: item.product_id || '',
+    setSupplierId(receipt.supplier_id || '');
+    setWarehouseId(receipt.warehouse_id || '');
+    setNotes(receipt.notes ? `${receipt.notes} (${language === 'ar' ? 'نسخة' : 'Copy'})` : '');
+    setStatus('draft');
+    setSelectedPOId('');
+    setItems((receipt.items || []).map((item: any) => ({
+      product_id: item.product_id,
       product_code: item.product_code || '',
       product_name: item.product_name || '',
       quantity: item.quantity || 1,
@@ -1037,6 +1048,18 @@ export const GoodsReceipts: React.FC = () => {
                     </div>
                   )}
 
+                  {/* Attachments */}
+                  {viewReceipt.attachments && viewReceipt.attachments.length > 0 && (
+                    <div className="pt-4 border-t border-slate-100">
+                      <AttachmentsManager
+                        attachments={viewReceipt.attachments}
+                        onChange={() => {}}
+                        readOnly={true}
+                        title={language === 'ar' ? 'المستندات والمرفقات' : 'Documents & Attachments'}
+                      />
+                    </div>
+                  )}
+
                   {/* Linked Invoices */}
                   {linkedInvoices.length > 0 && (
                     <div className="pt-4 border-t border-slate-100 text-xs text-slate-500 font-medium leading-relaxed">
@@ -1279,6 +1302,16 @@ export const GoodsReceipts: React.FC = () => {
                     className="w-full px-4 py-3 bg-slate-50 border-none rounded-2xl text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500/20 transition-all text-sm outline-none resize-none h-24"
                     value={notes}
                     onChange={e => setNotes(e.target.value)}
+                  />
+                </div>
+
+                {/* Attachments */}
+                <div className="pt-4 border-t border-slate-100">
+                  <AttachmentsManager
+                    attachments={attachments}
+                    onChange={setAttachments}
+                    title={language === 'ar' ? 'المستندات والمرفقات المؤيدة لإذن الاستلام' : 'Supporting Documents & Attachments'}
+                    subtitle={language === 'ar' ? 'صور البضاعة، فواتير المورد، أو مستندات PDF/أوفيس' : 'Delivery notes, photos, or PDF/Office docs'}
                   />
                 </div>
 

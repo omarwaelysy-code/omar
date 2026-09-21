@@ -28,6 +28,7 @@ import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { PaginationControls } from '../components/PaginationControls';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
+import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
 import { useNavigation } from '../contexts/NavigationContext';
 
 export const Receipts: React.FC = () => {
@@ -90,6 +91,7 @@ export const Receipts: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [receiptToDelete, setReceiptToDelete] = useState<string | null>(null);
   const [viewReceipt, setViewReceipt] = useState<ReceiptVoucher | null>(null);
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [showSidePanel, setShowSidePanel] = useState(false);
   const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
@@ -1067,7 +1069,8 @@ export const Receipts: React.FC = () => {
         created_at: editingReceipt?.created_at || new Date().toISOString(),
         created_by: editingReceipt?.created_by || user.id,
         voucher_type: 'multi',
-        items: mappedItems
+        items: mappedItems,
+        attachments
       };
 
       const journalItems: any[] = [];
@@ -1377,6 +1380,7 @@ export const Receipts: React.FC = () => {
 
   const openNewGeneralReceipt = async () => {
     setEditingReceipt(null);
+    setAttachments([]);
     setModalMode('general');
     const newRef = await generateInternalRef(new Date().toISOString().slice(0, 10));
     setInternalRef(newRef);
@@ -1401,6 +1405,7 @@ export const Receipts: React.FC = () => {
 
   const openNewCustomerReceipt = async () => {
     setEditingReceipt(null);
+    setAttachments([]);
     setModalMode('customer');
     const newRef = await generateInternalRef(new Date().toISOString().slice(0, 10));
     setInternalRef(newRef);
@@ -1504,6 +1509,7 @@ export const Receipts: React.FC = () => {
       fullData.items = mergedItems;
       setEditingReceipt(fullData);
 
+      setAttachments(Array.isArray(fullData.attachments) ? fullData.attachments : []);
       setVoucherData({
         internal_reference: fullData.internal_reference || fullData.voucher_number || '',
         manual_reference: fullData.manual_reference || '',
@@ -1954,6 +1960,7 @@ export const Receipts: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingReceipt(null);
+    setAttachments([]);
     setInternalRef('');
     setVoucherData({
       internal_reference: '',
@@ -3311,6 +3318,14 @@ export const Receipts: React.FC = () => {
                           {formatNumber(voucherData.items.reduce((sum, item) => sum + item.amount, 0))} ج.م
                         </span>
                       </div>
+
+                      {/* Attachments Section */}
+                      <div className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm mt-6">
+                        <AttachmentsManager
+                          attachments={attachments}
+                          onChange={setAttachments}
+                        />
+                      </div>
                     </div>
                   </section>
                 </div>
@@ -3560,6 +3575,19 @@ export const Receipts: React.FC = () => {
                         </button>
                       </div>
                     )}
+                  </div>
+
+                  <div className="mt-6 no-print">
+                    <AttachmentsManager
+                      attachments={viewReceipt.attachments || []}
+                      readOnly={true}
+                      onDownload={(item) => {
+                        const link = document.createElement('a');
+                        link.href = item.data;
+                        link.download = item.name;
+                        link.click();
+                      }}
+                    />
                   </div>
 
                   <div className="pt-12 flex justify-between items-end">
@@ -4168,6 +4196,19 @@ export const Receipts: React.FC = () => {
                     <span className="text-xs font-black text-teal-900 uppercase tracking-wider block">المدير المالي / الاعتماد</span>
                     <div className="border-b border-zinc-300 w-3/4 mx-auto pb-1 text-xs text-zinc-400">........................</div>
                   </div>
+                </div>
+
+                <div className="mt-6 no-print">
+                  <AttachmentsManager
+                    attachments={viewReceipt.attachments || []}
+                    readOnly={true}
+                    onDownload={(item) => {
+                      const link = document.createElement('a');
+                      link.href = item.data;
+                      link.download = item.name;
+                      link.click();
+                    }}
+                  />
                 </div>
 
                 {/* Company Footer Stamp / Information */}

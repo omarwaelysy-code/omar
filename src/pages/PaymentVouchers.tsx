@@ -28,6 +28,7 @@ import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { PaginationControls } from '../components/PaginationControls';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
+import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
 import { useNavigation } from '../contexts/NavigationContext';
 
 export interface PaymentVouchersProps {
@@ -94,6 +95,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
   const [internalRef, setInternalRef] = useState('');
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [viewVoucher, setViewVoucher] = useState<any | null>(null);
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
 
   const voucherRef = React.useRef<HTMLDivElement>(null);
   const tableRef = React.useRef<HTMLDivElement>(null);
@@ -1110,6 +1112,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
         created_at: editingVoucher?.created_at || new Date().toISOString(),
         created_by: editingVoucher?.created_by || user.id,
         voucher_type: voucherData.type, // 'supplier', 'expense', 'multi'
+        attachments,
         paid_to_type: voucherData.paid_to_type,
         paid_to_employee_id: voucherData.paid_to_employee_id,
         paid_to_external_name: voucherData.paid_to_external_name,
@@ -1888,6 +1891,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingVoucher(null);
+    setAttachments([]);
     setInternalRef('');
     setVoucherData({
       internal_reference: '',
@@ -1944,6 +1948,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
 
   const openNewGeneralVoucher = async () => {
     setEditingVoucher(null);
+    setAttachments([]);
     setModalMode('general');
     const newRef = await generateInternalRef(new Date().toISOString().slice(0, 10));
     setInternalRef(newRef);
@@ -1970,6 +1975,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
 
   const openNewSupplierVoucher = async () => {
     setEditingVoucher(null);
+    setAttachments([]);
     setModalMode('supplier');
     const newRef = await generateInternalRef(new Date().toISOString().slice(0, 10));
     setInternalRef(newRef);
@@ -2128,6 +2134,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
       fullData.items = mergedItems;
       setEditingVoucher(fullData);
 
+      setAttachments(Array.isArray(fullData.attachments) ? fullData.attachments : []);
       setVoucherData({
         internal_reference: fullData.internal_reference || fullData.voucher_number || fullData.number || '',
         manual_reference: fullData.manual_reference || '',
@@ -3549,6 +3556,14 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                     </div>
                   </section>
                 </div>
+
+                {/* Attachments Section */}
+                <div className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm mt-6">
+                  <AttachmentsManager
+                    attachments={attachments}
+                    onChange={setAttachments}
+                  />
+                </div>
               </div>
 
               {/* Action Footer */}
@@ -3807,6 +3822,19 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                         </button>
                       </div>
                     )}
+                  </div>
+
+                  <div className="mt-6 no-print">
+                    <AttachmentsManager
+                      attachments={viewVoucher.attachments || []}
+                      readOnly={true}
+                      onDownload={(item) => {
+                        const link = document.createElement('a');
+                        link.href = item.data;
+                        link.download = item.name;
+                        link.click();
+                      }}
+                    />
                   </div>
 
                   <div className="pt-12 flex justify-between items-end">
@@ -4475,6 +4503,19 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                     <span className="text-xs font-black text-teal-900 uppercase tracking-wider block">المدير المالي / الاعتماد</span>
                     <div className="border-b border-zinc-300 w-3/4 mx-auto pb-1 text-xs text-zinc-400">........................</div>
                   </div>
+                </div>
+
+                <div className="mt-6 no-print">
+                  <AttachmentsManager
+                    attachments={viewVoucher.attachments || []}
+                    readOnly={true}
+                    onDownload={(item) => {
+                      const link = document.createElement('a');
+                      link.href = item.data;
+                      link.download = item.name;
+                      link.click();
+                    }}
+                  />
                 </div>
 
                 {/* Company Footer Stamp / Information */}

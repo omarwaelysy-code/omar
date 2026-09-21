@@ -23,6 +23,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
 import { printDocument } from '../utils/printEngine';
 import { exportToExcel } from '../utils/excelUtils';
+import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
 
 interface ExtendedPurchaseOrderItem extends PurchaseOrderItem {
   operation_id?: string | null;
@@ -131,6 +132,7 @@ export const PurchaseOrders: React.FC = () => {
   const [items, setItems] = useState<ExtendedPurchaseOrderItem[]>([]);
   const [discount, setDiscount] = useState<number>(0);
   const [description, setDescription] = useState<string>('');
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [orderNumber, setOrderNumber] = useState('');
   const [isFullScreen, setIsFullScreen] = useState(false);
 
@@ -364,6 +366,7 @@ export const PurchaseOrders: React.FC = () => {
     setItems([]);
     setDiscount(0);
     setDescription('');
+    setAttachments([]);
     
     setSelectedCurrencyId('');
     setExchangeRate(1);
@@ -414,6 +417,7 @@ export const PurchaseOrders: React.FC = () => {
       setDate(fullData.date);
       setDeliveryDate(fullData.delivery_date || fullData.date);
       setOrderNumber(fullData.order_number);
+      setAttachments(Array.isArray(fullData.attachments) ? fullData.attachments : []);
       setItems((fullData.items || []).map((item: any) => ({
         ...item,
         operation_id: item.operation_id || null,
@@ -875,6 +879,7 @@ export const PurchaseOrders: React.FC = () => {
         delivery_date: deliveryDate,
         description,
         notes: description,
+        attachments,
         items: sanitizedItems,
         subtotal,
         tax_amount: vatTotal,
@@ -2072,6 +2077,14 @@ export const PurchaseOrders: React.FC = () => {
                 </div>
               )}
 
+            {/* Attachments Section */}
+            <div className="mt-6 pt-4 border-t border-zinc-100">
+              <AttachmentsManager
+                attachments={attachments}
+                onChange={setAttachments}
+              />
+            </div>
+
             </form>
           </div>
         </div>
@@ -2487,6 +2500,17 @@ export const PurchaseOrders: React.FC = () => {
                     />
                     <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">{viewOrder.order_number}</span>
                   </div>
+
+                  {/* Attachments Display */}
+                  {viewOrder.attachments && viewOrder.attachments.length > 0 && (
+                    <div className="pt-6 border-t border-slate-100">
+                      <AttachmentsManager
+                        attachments={viewOrder.attachments}
+                        readOnly={true}
+                        title={language === 'ar' ? 'المرفقات والمستندات المؤيدة' : 'Supporting Attachments & Documents'}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>

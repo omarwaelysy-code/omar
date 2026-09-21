@@ -17,6 +17,7 @@ import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils'
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { PaginationControls } from '../components/PaginationControls';
 import { ExportButtons } from '../components/ExportButtons';
+import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
 import { useRef } from 'react';
 
 
@@ -51,6 +52,7 @@ export const CustomerDiscounts: React.FC = () => {
   const [serverSummary, setServerSummary] = useState<any>({});
   const [discountNumber, setDiscountNumber] = useState('');
   const [editingDiscount, setEditingDiscount] = useState<any | null>(null);
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const tableRef = useRef<HTMLTableElement>(null);
 
   const handleExportExcel = () => {
@@ -82,6 +84,7 @@ export const CustomerDiscounts: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingDiscount(null);
+    setAttachments([]);
     setDiscountData({
       customer_id: '',
       amount: 0,
@@ -100,6 +103,7 @@ export const CustomerDiscounts: React.FC = () => {
       account_id: discount.account_id || '',
       notes: discount.notes || ''
     });
+    setAttachments(Array.isArray(discount.attachments) ? discount.attachments : []);
     setDiscountNumber(discount.number || '');
     setIsModalOpen(true);
   };
@@ -322,6 +326,7 @@ export const CustomerDiscounts: React.FC = () => {
         date: discountData.date,
         account_id: discountData.account_id,
         notes: discountData.notes,
+        attachments,
         number,
         type: 'customer',
         company_id: user.company_id,
@@ -875,6 +880,14 @@ export const CustomerDiscounts: React.FC = () => {
                       />
                     </div>
                   </section>
+
+                  {/* Attachments Section */}
+                  <div className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm">
+                    <AttachmentsManager
+                      attachments={attachments}
+                      onChange={setAttachments}
+                    />
+                  </div>
                 </div>
               </div>
 

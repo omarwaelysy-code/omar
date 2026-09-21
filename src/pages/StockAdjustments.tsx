@@ -8,6 +8,7 @@ import {
   ChevronRight, ChevronLeft, LayoutGrid, List
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
 import { dbService } from '../services/dbService';
 import { formatNumber, formatDate } from '../utils/formatUtils';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -85,6 +86,7 @@ export const StockAdjustments: React.FC = () => {
     description: ''
   });
   const [items, setItems] = useState<AdjItemInput[]>([]);
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
 
   // Subscriptions
   useEffect(() => {
@@ -135,6 +137,7 @@ export const StockAdjustments: React.FC = () => {
       description: ''
     });
     setItems([]);
+    setAttachments([]);
     setEditingAdj(null);
   };
 
@@ -161,6 +164,7 @@ export const StockAdjustments: React.FC = () => {
             unit_cost: Number(item.unit_cost)
           }))
         );
+        setAttachments(Array.isArray(fullAdj.attachments) ? fullAdj.attachments : []);
         setIsModalOpen(true);
       } else {
         showNotification(language === 'ar' ? 'عذراً، تعذر العثور على التفاصيل' : 'Failed to retrieve document details', 'error');
@@ -255,6 +259,7 @@ export const StockAdjustments: React.FC = () => {
     const payload = {
       ...formData,
       account_name: adjAcc?.name || '',
+      attachments,
       items: items.map(item => {
         const prod = products.find(p => p.id === item.product_id);
         const wh = warehouses.find(w => w.id === item.warehouse_id);
@@ -813,6 +818,14 @@ export const StockAdjustments: React.FC = () => {
                   )}
                 </div>
 
+                {/* Attachments Section */}
+                <div className="pt-2">
+                  <AttachmentsManager
+                    attachments={attachments}
+                    onChange={setAttachments}
+                  />
+                </div>
+
                 <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
                   <button
                     type="button"
@@ -991,6 +1004,17 @@ export const StockAdjustments: React.FC = () => {
                     }
                   </span>
                 </div>
+
+                {/* Attachments Display */}
+                {viewAdj.attachments && viewAdj.attachments.length > 0 && (
+                  <div className="pt-2">
+                    <AttachmentsManager
+                      attachments={viewAdj.attachments}
+                      readOnly={true}
+                      title={language === 'ar' ? 'المرفقات والمستندات المؤيدة' : 'Supporting Attachments & Documents'}
+                    />
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>

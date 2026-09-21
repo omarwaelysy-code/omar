@@ -347,6 +347,7 @@ export interface CashTransfer {
   created_by: string;
   entry_number?: string;
   transfer_number?: string;
+  attachments?: AttachmentItem[];
 }
 
 export interface Product {
@@ -452,6 +453,7 @@ export interface Invoice {
   eta_submission_uuid?: string;
   eta_submitted_at?: string;
   eta_error?: string;
+  attachments?: AttachmentItem[];
 }
 
 export interface PurchaseInvoice {
@@ -491,6 +493,7 @@ export interface PurchaseInvoice {
   cost_center_id?: string | null;
   eta_uuid?: string;
   eta_invoice_number?: string;
+  attachments?: AttachmentItem[];
 }
 
 export interface InvoiceItem {
@@ -549,6 +552,7 @@ export interface ReceiptVoucher {
   created_at?: string;
   created_by?: string;
   number?: string;
+  attachments?: AttachmentItem[];
 }
 
 export interface PaymentVoucherItem {
@@ -586,6 +590,7 @@ export interface PaymentVoucher {
   voucher_type?: string;
   created_at?: string;
   created_by?: string;
+  attachments?: AttachmentItem[];
 }
 
 export type IssuedChequeStatus = 'DRAFT' | 'ISSUED' | 'DUE' | 'PAID' | 'POSTPONED' | 'RETURNED' | 'CANCELLED';
@@ -777,6 +782,7 @@ export interface Return {
   eta_submission_uuid?: string;
   eta_submitted_at?: string;
   eta_error?: string;
+  attachments?: AttachmentItem[];
 }
 
 export interface PurchaseReturn {
@@ -800,6 +806,7 @@ export interface PurchaseReturn {
   items?: ReturnItem[];
   company_id: string;
   entry_number?: string;
+  attachments?: AttachmentItem[];
 }
 
 export interface ReturnItem {
@@ -832,6 +839,7 @@ export interface CustomerDiscount {
   date: string;
   amount: number;
   description: string;
+  attachments?: AttachmentItem[];
 }
 
 export interface SupplierDiscount {
@@ -841,6 +849,7 @@ export interface SupplierDiscount {
   date: string;
   amount: number;
   description: string;
+  attachments?: AttachmentItem[];
 }
 
 export interface ActivityLog {
@@ -1080,6 +1089,7 @@ export interface SalesOrder {
   operation_id?: string | null;
   cost_center_id?: string | null;
   department_id?: string | null;
+  attachments?: AttachmentItem[];
 }
 
 export interface SalesOrderItem {
@@ -1127,6 +1137,7 @@ export interface PurchaseOrder {
   operation_id?: string | null;
   cost_center_id?: string | null;
   department_id?: string | null;
+  attachments?: AttachmentItem[];
 }
 
 export interface PurchaseOrderItem {
@@ -1200,6 +1211,7 @@ export interface WarehouseTransfer {
   created_at?: string;
   items?: WarehouseTransferItem[];
   entry_number?: string;
+  attachments?: AttachmentItem[];
 }
 
 export interface OpeningStockItem {
@@ -1231,6 +1243,7 @@ export interface OpeningStockBalance {
   created_at?: string;
   items?: OpeningStockItem[];
   entry_number?: string;
+  attachments?: AttachmentItem[];
 }
 
 export interface StockAdjustmentItem {
@@ -1260,6 +1273,7 @@ export interface StockAdjustment {
   created_at?: string;
   items?: StockAdjustmentItem[];
   entry_number?: string;
+  attachments?: AttachmentItem[];
 }
 
 // ─── ExchangeRateService Types ────────────────────────────────────────────────

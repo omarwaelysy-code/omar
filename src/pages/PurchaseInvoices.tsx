@@ -28,6 +28,7 @@ import DocumentChatter from '../components/DocumentChatter';
 import { TransactionManager } from '../services/TransactionManager';
 import { InvoiceSchema, JournalEntrySchema } from '../lib/schemas';
 import { ExportButtons } from '../components/ExportButtons';
+import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
 import { ActivityLog } from '../types';
 import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { printDocument } from '../utils/printEngine';
@@ -202,6 +203,7 @@ export const PurchaseInvoices: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<any | null>(null);
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -3012,6 +3014,7 @@ export const PurchaseInvoices: React.FC = () => {
         currency_id: selectedCurrencyId || null,
         exchange_rate: Number(exchangeRate) || 1,
         description: description,
+        attachments,
         eta_uuid: etaLockData ? etaLockData.uuid : (editingInvoice?.eta_uuid || null),
         eta_invoice_number: etaLockData ? (etaLockData.internalId || null) : (editingInvoice?.eta_invoice_number || null)
       };
@@ -3540,6 +3543,7 @@ export const PurchaseInvoices: React.FC = () => {
         setAdvancePercentage(fullData.advance_percentage || 0);
         setDueDate(fullData.due_date ? fullData.due_date.slice(0, 10) : (fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10)));
         setInvoiceNumber(fullData.invoice_number);
+        setAttachments(Array.isArray(fullData.attachments) ? fullData.attachments : []);
         setFormSettlementNumber(fullData.settlement_number || '');
         setFormSettlementDate(fullData.settlement_date ? fullData.settlement_date.slice(0, 10) : (fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10)));
         setFormSettlements(fullData.settlements || []);
@@ -3561,6 +3565,7 @@ export const PurchaseInvoices: React.FC = () => {
       }
     } else {
       setEditingInvoice(null);
+      setAttachments([]);
       const newDate = new Date().toISOString().slice(0, 10);
       setFormSettlementNumber('');
       setFormSettlementDate(newDate);
@@ -6268,6 +6273,14 @@ export const PurchaseInvoices: React.FC = () => {
                       );
                     })()}
 
+                    {/* Attachments Section */}
+                    <div className="mt-6 pt-4 border-t border-zinc-100">
+                      <AttachmentsManager
+                        attachments={attachments}
+                        onChange={setAttachments}
+                      />
+                    </div>
+
                     </form>
 
                   {/* Journal Entry and Edit Log at the bottom */}
@@ -6712,6 +6725,15 @@ export const PurchaseInvoices: React.FC = () => {
                         </div>
                       ))}
                     </div>
+                  </div>
+                {/* Attachments Display */}
+                {viewInvoice.attachments && viewInvoice.attachments.length > 0 && (
+                  <div className="pt-6 border-t border-slate-100">
+                    <AttachmentsManager
+                      attachments={viewInvoice.attachments}
+                      readOnly={true}
+                      title={language === 'ar' ? 'المرفقات والمستندات المؤيدة' : 'Supporting Attachments & Documents'}
+                    />
                   </div>
                 )}
 

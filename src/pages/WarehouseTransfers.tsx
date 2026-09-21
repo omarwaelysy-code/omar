@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
-import { Warehouse, Product, WarehouseTransfer, WarehouseTransferItem } from '../types';
+import { Warehouse, Product, WarehouseTransfer, WarehouseTransferItem, AttachmentItem } from '../types';
 import { 
   Search, Plus, Trash2, X, ArrowLeftRight, Pencil, 
   Download, Eye, FileText, History, Printer, FileSpreadsheet, Copy,
-  Home, Calendar, Hash, Layers, Save,
+  Home, Calendar, Hash, Layers, Save, Paperclip,
   Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, User, LayoutGrid, List
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -16,6 +16,7 @@ import { PaginationControls } from '../components/PaginationControls';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { ExportButtons } from '../components/ExportButtons';
+import { AttachmentsManager } from '../components/common/AttachmentsManager';
 
 
 interface TransferItemInput {
@@ -86,6 +87,7 @@ export const WarehouseTransfers: React.FC = () => {
     description: ''
   });
   const [items, setItems] = useState<TransferItemInput[]>([]);
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
 
   // Subscriptions
   useEffect(() => {
@@ -133,6 +135,7 @@ export const WarehouseTransfers: React.FC = () => {
       description: ''
     });
     setItems([]);
+    setAttachments([]);
     setEditingTransfer(null);
   };
 
@@ -158,6 +161,7 @@ export const WarehouseTransfers: React.FC = () => {
             quantity: Number(item.quantity)
           }))
         );
+        setAttachments(fullTransfer.attachments || []);
         setIsModalOpen(true);
       } else {
         showNotification(language === 'ar' ? 'عذراً، تعذر العثور على تفاصيل عملية التحويل' : 'Failed to retrieve transfer details', 'error');
@@ -241,6 +245,7 @@ export const WarehouseTransfers: React.FC = () => {
       from_warehouse_id: formData.from_warehouse_id,
       to_warehouse_id: formData.to_warehouse_id,
       description: formData.description,
+      attachments: attachments,
       items: items
     };
 
@@ -320,6 +325,7 @@ export const WarehouseTransfers: React.FC = () => {
   const handleCopyTransfer = (transfer: WarehouseTransfer) => {
     setViewTransfer(null);
     setEditingTransfer(null);
+    setAttachments([]);
     const today = new Date().toISOString().slice(0, 10);
     setFormData({
       date: today,
@@ -735,6 +741,16 @@ export const WarehouseTransfers: React.FC = () => {
                   )}
                 </div>
 
+                {/* Attachments */}
+                <div className="pt-4 border-t border-slate-100">
+                  <AttachmentsManager
+                    attachments={attachments}
+                    onChange={setAttachments}
+                    title={language === 'ar' ? 'المستندات والمرفقات المؤيدة للتحويل المخزني' : 'Transfer Supporting Documents'}
+                    subtitle={language === 'ar' ? 'أذون الصرف/الاستلام، بوالص الشحن، أو ملفات PDF/أوفيس' : 'Waybills, delivery notes, or PDF/Office docs'}
+                  />
+                </div>
+
                 {/* Modal Footer Buttons */}
                 <div className="flex items-center justify-end gap-3 pt-6 border-t border-slate-100">
                   <button
@@ -885,6 +901,18 @@ export const WarehouseTransfers: React.FC = () => {
                     </table>
                   </div>
                 </div>
+
+                {/* Attachments */}
+                {viewTransfer.attachments && viewTransfer.attachments.length > 0 && (
+                  <div className="p-6 border-t border-slate-100">
+                    <AttachmentsManager
+                      attachments={viewTransfer.attachments}
+                      onChange={() => {}}
+                      readOnly={true}
+                      title={language === 'ar' ? 'المستندات والمرفقات' : 'Documents & Attachments'}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Footer */}

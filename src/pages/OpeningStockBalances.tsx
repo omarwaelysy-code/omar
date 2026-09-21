@@ -8,6 +8,7 @@ import {
   Calendar, Hash, Layers, Save, ChevronRight, ChevronLeft, LayoutGrid, List
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
 import { dbService } from '../services/dbService';
 import { formatNumber, formatDate } from '../utils/formatUtils';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -89,6 +90,7 @@ export const OpeningStockBalances: React.FC = () => {
     description: ''
   });
   const [items, setItems] = useState<ItemInput[]>([]);
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
 
   // Subscriptions
   useEffect(() => {
@@ -141,6 +143,7 @@ export const OpeningStockBalances: React.FC = () => {
       description: ''
     });
     setItems([]);
+    setAttachments([]);
     setEditingDoc(null);
   };
 
@@ -168,6 +171,7 @@ export const OpeningStockBalances: React.FC = () => {
             unit_cost: Number(item.unit_cost)
           }))
         );
+        setAttachments(Array.isArray(fullDoc.attachments) ? fullDoc.attachments : []);
         setIsModalOpen(true);
       } else {
         showNotification(language === 'ar' ? 'عذراً، تعذر العثور على التفاصيل' : 'Failed to retrieve document details', 'error');
@@ -392,6 +396,7 @@ export const OpeningStockBalances: React.FC = () => {
       ...formData,
       debit_account_name: debitAcc?.name || '',
       credit_account_name: creditAcc?.name || '',
+      attachments,
       items: items.map(item => {
         const prod = products.find(p => p.id === item.product_id);
         const wh = warehouses.find(w => w.id === item.warehouse_id);
@@ -1005,6 +1010,14 @@ export const OpeningStockBalances: React.FC = () => {
                   )}
                 </div>
 
+                {/* Attachments Section */}
+                <div className="pt-2">
+                  <AttachmentsManager
+                    attachments={attachments}
+                    onChange={setAttachments}
+                  />
+                </div>
+
                 <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
                   <button
                     type="button"
@@ -1170,6 +1183,17 @@ export const OpeningStockBalances: React.FC = () => {
                     )}
                   </span>
                 </div>
+
+                {/* Attachments Display */}
+                {viewDoc.attachments && viewDoc.attachments.length > 0 && (
+                  <div className="pt-2">
+                    <AttachmentsManager
+                      attachments={viewDoc.attachments}
+                      readOnly={true}
+                      title={language === 'ar' ? 'المرفقات والمستندات المؤيدة' : 'Supporting Attachments & Documents'}
+                    />
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>

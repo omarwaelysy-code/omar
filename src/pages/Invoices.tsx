@@ -23,6 +23,7 @@ import { InlineActivityLog } from '../components/InlineActivityLog';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import DocumentChatter from '../components/DocumentChatter';
+import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
 import { ExportButtons } from '../components/ExportButtons';
 import { PaginationControls } from '../components/PaginationControls';
 import { usePermissions } from '../hooks/usePermissions';
@@ -160,6 +161,7 @@ export const Invoices: React.FC = () => {
   const [selectedOperationId, setSelectedOperationId] = useState<string>('');
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
   const [selectedCostCenterId, setSelectedCostCenterId] = useState<string>('');
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   
   // Floating popover lookup search states
   const [activeSearch, setActiveSearch] = useState<{
@@ -2359,6 +2361,7 @@ export const Invoices: React.FC = () => {
         settlement_number: null,
         settlement_date: null,
         settlements: formSettlements,
+        attachments,
         invoice_number: invoiceNumber,
         customer_id: selectedCustomerId, 
         customer_name: customer?.name || '',
@@ -3343,6 +3346,7 @@ export const Invoices: React.FC = () => {
     setFormSettlementDate(newDate);
     setFormSettlements([]);
     setRowSettlementDates({});
+    setAttachments([]);
     
     setSelectedCurrencyId('');
     setExchangeRate(1);
@@ -3395,6 +3399,7 @@ export const Invoices: React.FC = () => {
       setDate(fullData.date.slice(0, 10));
       setInvoiceNumber(fullData.invoice_number);
       setItems(fullData.items || []);
+      setAttachments(Array.isArray(fullData.attachments) ? fullData.attachments : []);
       setDiscount(fullData.discount_amount || fullData.discount || 0);
       setDescription(fullData.description || '');
       setPaymentType(fullData.payment_type || 'credit');
@@ -6542,6 +6547,14 @@ export const Invoices: React.FC = () => {
                       </div>
                     )}
 
+                    {/* Attachments Section */}
+                    <div className="mt-6 pt-4 border-t border-zinc-100">
+                      <AttachmentsManager
+                        attachments={attachments}
+                        onChange={setAttachments}
+                      />
+                    </div>
+
                     {/* Actions removed from bottom of scrollable area as they are in the fixed footer */}
                   </form>
                 </div>
@@ -6873,6 +6886,17 @@ export const Invoices: React.FC = () => {
                     </div>
                   );
                 })()}
+
+                {/* Attachments Display */}
+                {viewInvoice.attachments && viewInvoice.attachments.length > 0 && (
+                  <div className="pt-6 border-t border-slate-100">
+                    <AttachmentsManager
+                      attachments={viewInvoice.attachments}
+                      readOnly={true}
+                      title={language === 'ar' ? 'المرفقات والمستندات المؤيدة' : 'Supporting Attachments & Documents'}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="hidden lg:block w-80 border-r border-slate-100 bg-slate-50/30">

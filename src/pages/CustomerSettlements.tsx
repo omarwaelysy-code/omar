@@ -11,6 +11,7 @@ import { formatNumber, formatDate, formatMoney, isCustomerAccount } from '../uti
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
 import { ExportButtons } from '../components/ExportButtons';
+import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
 import { useRef } from 'react';
 
 
@@ -74,6 +75,7 @@ export const CustomerSettlements: React.FC = () => {
   const [settlementDate, setSettlementDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [editingSettlementNum, setEditingSettlementNum] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
 
   // UI layout and search states
   const [layoutMode, setLayoutMode] = useState<'split' | 'unified'>('split');
@@ -323,11 +325,15 @@ export const CustomerSettlements: React.FC = () => {
                 total_amount: 0,
                 debitDocs: [],
                 creditDocs: [],
+                attachments: Array.isArray(s.attachments) ? s.attachments : [],
                 created_from: inferredOrigin
               };
               historyMap.set(num, entry);
             } else if (inferredOrigin && !entry.created_from) {
               entry.created_from = inferredOrigin;
+            }
+            if (Array.isArray(s.attachments) && s.attachments.length > 0 && (!entry.attachments || entry.attachments.length === 0)) {
+              entry.attachments = s.attachments;
             }
             if (!entry.debitDocs.some(d => d.number === inv.invoice_number)) {
               entry.debitDocs.push({
@@ -385,11 +391,15 @@ export const CustomerSettlements: React.FC = () => {
                     total_amount: 0,
                     debitDocs: [],
                     creditDocs: [],
+                    attachments: Array.isArray(s.attachments) ? s.attachments : [],
                     created_from: inferredOrigin
                   };
                   historyMap.set(num, entry);
                 } else if (inferredOrigin && !entry.created_from) {
                   entry.created_from = inferredOrigin;
+                }
+                if (Array.isArray(s.attachments) && s.attachments.length > 0 && (!entry.attachments || entry.attachments.length === 0)) {
+                  entry.attachments = s.attachments;
                 }
                 if (!entry.creditDocs.some(c => c.number === (v.voucher_number || v.number))) {
                   entry.creditDocs.push({
@@ -491,6 +501,7 @@ export const CustomerSettlements: React.FC = () => {
     setSelectedCustomerId(h.entity_id);
     setSettlementDate(h.date.slice(0, 10));
     setEditingSettlementNum(h.settlement_number);
+    setAttachments(Array.isArray(h.attachments) ? h.attachments : []);
   };
 
   // Build list of movements when customer selection changes
@@ -1060,6 +1071,7 @@ export const CustomerSettlements: React.FC = () => {
               original_amount: creditTx.original_amount,
               settlement_number: settlementNumber,
               settlement_date: settlementDate,
+              attachments,
               created_from: 'customer_settlements'
             });
           }
@@ -1096,6 +1108,7 @@ export const CustomerSettlements: React.FC = () => {
               original_amount: debitTx.original_amount,
               settlement_number: settlementNumber,
               settlement_date: settlementDate,
+              attachments,
               created_from: 'customer_settlements'
             });
           }
@@ -1110,6 +1123,7 @@ export const CustomerSettlements: React.FC = () => {
         await dbService.update('receipt_vouchers', id, v);
       }
 
+      setAttachments([]);
       showNotification(language === 'ar' ? 'تم حفظ التسوية بنجاح وتوزيع الأرصدة' : 'Settlement saved and balances distributed successfully', 'success');
 
       // Log activity
@@ -1752,6 +1766,14 @@ export const CustomerSettlements: React.FC = () => {
                 </div>
               )}
 
+              {/* Attachments Section */}
+              <div className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm">
+                <AttachmentsManager
+                  attachments={attachments}
+                  onChange={setAttachments}
+                />
+              </div>
+
               {/* Summary Bottom Actions Card */}
               <div className="bg-slate-900 p-6 rounded-3xl text-white flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl">
                 <div className="flex flex-wrap items-center gap-6">
@@ -1996,6 +2018,17 @@ export const CustomerSettlements: React.FC = () => {
                   <span className="text-zinc-400 text-xs">{language === 'ar' ? 'الإجمالي الكلي المسوى' : 'Total Settled Amount'}</span>
                   <span className="text-xl text-emerald-400">{formatMoney(selectedHistory.total_amount)} {t('common.currency')}</span>
                 </div>
+
+                {/* Attachments Display */}
+                {selectedHistory.attachments && selectedHistory.attachments.length > 0 && (
+                  <div className="pt-2">
+                    <AttachmentsManager
+                      attachments={selectedHistory.attachments}
+                      readOnly={true}
+                      title={language === 'ar' ? 'المرفقات والمستندات المؤيدة' : 'Supporting Attachments & Documents'}
+                    />
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>
