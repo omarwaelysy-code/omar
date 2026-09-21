@@ -3828,12 +3828,6 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                     <AttachmentsManager
                       attachments={viewVoucher.attachments || []}
                       readOnly={true}
-                      onDownload={(item) => {
-                        const link = document.createElement('a');
-                        link.href = item.data;
-                        link.download = item.name;
-                        link.click();
-                      }}
                     />
                   </div>
 
@@ -4509,12 +4503,6 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                   <AttachmentsManager
                     attachments={viewVoucher.attachments || []}
                     readOnly={true}
-                    onDownload={(item) => {
-                      const link = document.createElement('a');
-                      link.href = item.data;
-                      link.download = item.name;
-                      link.click();
-                    }}
                   />
                 </div>
 

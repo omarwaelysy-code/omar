@@ -471,7 +471,8 @@ export const GoodsReceipts: React.FC = () => {
       product_code: item.product_code || '',
       product_name: item.product_name || '',
       quantity: item.quantity || 1,
-      cost_price: item.cost_price || item.unit_price || 0,
+      unit_cost: item.unit_cost || item.cost_price || item.unit_price || 0,
+      cost_price: item.cost_price || item.unit_cost || item.unit_price || 0,
       total: item.total || (item.quantity * (item.cost_price || item.unit_price || 0)) || 0
     })));
     setIsModalOpen(true);
@@ -922,7 +923,7 @@ export const GoodsReceipts: React.FC = () => {
                     </button>
 
                     <button
-                      onClick={() => handleCopyReceipt(viewReceipt)}
+                      onClick={() => handleCopyDocument(viewReceipt)}
                       className="px-3 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-2xl transition-all font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95"
                       title={language === 'ar' ? 'نسخ المستند كمسودة جديدة' : 'Copy Document'}
                     >

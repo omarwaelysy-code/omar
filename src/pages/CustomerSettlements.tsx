@@ -297,6 +297,7 @@ export const CustomerSettlements: React.FC = () => {
       debitDocs: { number: string; type_label: string; amount: number; page_name: string; original_id: string; date: string; je_number: string }[];
       creditDocs: { number: string; type_label: string; amount: number; page_name: string; original_id: string; date: string; je_number: string }[];
       created_from?: string;
+      attachments?: AttachmentItem[];
     }>();
 
     // 1. Scan Invoices

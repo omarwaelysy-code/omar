@@ -184,6 +184,7 @@ export interface AttachmentItem {
   size?: number;
   type?: string;
   url: string;
+  data?: string;
   uploaded_at?: string;
 }
 

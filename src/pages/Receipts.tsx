@@ -3581,12 +3581,6 @@ export const Receipts: React.FC = () => {
                     <AttachmentsManager
                       attachments={viewReceipt.attachments || []}
                       readOnly={true}
-                      onDownload={(item) => {
-                        const link = document.createElement('a');
-                        link.href = item.data;
-                        link.download = item.name;
-                        link.click();
-                      }}
                     />
                   </div>
 
@@ -4202,12 +4196,6 @@ export const Receipts: React.FC = () => {
                   <AttachmentsManager
                     attachments={viewReceipt.attachments || []}
                     readOnly={true}
-                    onDownload={(item) => {
-                      const link = document.createElement('a');
-                      link.href = item.data;
-                      link.download = item.name;
-                      link.click();
-                    }}
                   />
                 </div>
 
