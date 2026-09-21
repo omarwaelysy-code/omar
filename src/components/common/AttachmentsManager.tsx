@@ -4,17 +4,19 @@ import {
   AlertCircle, Plus, FileSpreadsheet, Presentation, FileCode, File
 } from 'lucide-react';
 import { AttachmentItem } from '../../types';
+export type { AttachmentItem };
 import { AttachmentPreviewModal } from './AttachmentPreviewModal';
 import { useLanguage } from '../../contexts/LanguageContext';
 
-interface AttachmentsManagerProps {
+export interface AttachmentsManagerProps {
   attachments: AttachmentItem[];
-  onChange: (attachments: AttachmentItem[]) => void;
+  onChange?: (attachments: AttachmentItem[]) => void;
   title?: string;
   subtitle?: string;
   maxFileSizeMB?: number;
   readOnly?: boolean;
   compact?: boolean;
+  onDownload?: (item: AttachmentItem) => void;
 }
 
 export const AttachmentsManager: React.FC<AttachmentsManagerProps> = ({
