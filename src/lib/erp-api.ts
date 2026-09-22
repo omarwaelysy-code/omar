@@ -4993,7 +4993,14 @@ modules.forEach(moduleName => {
               queryFilters.company_id = requestedCompanyFilter;
             }
           } else if (isSuperAdmin) {
-            if (!queryFilters.company_id && req.user?.company_id) {
+            const isAllQuery = queryFilters.all === 'true' || queryFilters.all_companies === 'true' || queryFilters.company_id === 'all';
+            delete queryFilters.all;
+            delete queryFilters.all_companies;
+            if (isAllQuery) {
+              delete queryFilters.company_id;
+            } else if (!queryFilters.company_id && moduleName === 'users') {
+              // Super Admin listing users without a specific company filter retrieves all users across all companies
+            } else if (!queryFilters.company_id && req.user?.company_id) {
               queryFilters.company_id = req.user.company_id;
             }
           } else {

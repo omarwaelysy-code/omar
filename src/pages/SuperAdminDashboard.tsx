@@ -39,11 +39,45 @@ import {
   Activity,
   Settings,
   Clock,
-  Database
+  Database,
+  Copy,
+  Check,
+  Eye,
+  EyeOff,
+  Sparkles,
+  UserCheck,
+  UserX
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { useNotification } from '../contexts/NotificationContext';
+
+const PasswordRequirementsCard: React.FC = () => (
+  <div className="p-3.5 bg-amber-50/80 border border-amber-200/90 rounded-xl space-y-1.5 text-right" dir="rtl">
+    <div className="font-bold flex items-center gap-1.5 text-xs text-amber-800">
+      <Shield size={14} className="text-amber-600 shrink-0" />
+      <span>مواصفات كلمة المرور المقبولة:</span>
+    </div>
+    <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-900/80 font-medium">
+      <li>الطول: لا تقل عن 6 إلى 8 أحرف (يوصى بـ 8 أحرف فأكثر)</li>
+      <li>التكوين: يفضل أن تحتوي على مزيج من أحرف (كبيرة/صغيرة)، أرقام، ورموز خاصة</li>
+    </ul>
+    <div className="pt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-bold text-amber-950 border-t border-amber-200/60">
+      <span>شكل كلمة المرور (مثال):</span>
+      <code className="bg-white px-2 py-0.5 rounded border border-amber-200 font-mono text-emerald-700 tracking-wider font-bold">User@2026</code>
+      <span className="text-stone-400 font-normal">أو</span>
+      <code className="bg-white px-2 py-0.5 rounded border border-amber-200 font-mono text-emerald-700 tracking-wider font-bold">Admin#1234</code>
+    </div>
+  </div>
+);
+
+const generateStrongPassword = (): string => {
+  const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const smalls = 'abcdefghjkmnpqrstuvwxyz';
+  const nums = '23456789';
+  const pick = (chars: string) => chars[Math.floor(Math.random() * chars.length)];
+  return `User@${pick(letters)}${pick(smalls)}${pick(nums)}${Math.floor(100 + Math.random() * 900)}`;
+};
 
 interface SuperAdminDashboardProps {
   initialTab?: 'companies' | 'users' | 'logs' | 'system' | 'audit' | 'subscriptions' | 'feature-manager' | 'settings' | 'monitoring' | 'reports';
@@ -147,16 +181,170 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
   }, []);
 
   const [showTempPasswordModal, setShowTempPasswordModal] = useState(false);
-  const [tempPasswordData, setTempPasswordData] = useState<{ email: string, password: string } | null>(null);
+  const [tempPasswordData, setTempPasswordData] = useState<{ email: string, password: string, title?: string } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [companyToDelete, setCompanyToDelete] = useState<string | null>(null);
   const [sendEmailOnCreate, setSendEmailOnCreate] = useState(true);
 
+  // Manager Change Dialog State (When editing company manager email)
+  interface ManagerChangeState {
+    companyData: any;
+    newEmail: string;
+    oldEmail: string;
+    previousManager: User | null;
+    existsInSystem: boolean;
+    newPassword: string;
+    previousManagerAction: 'keep' | 'deactivate' | 'delete';
+  }
+  const [managerChangeState, setManagerChangeState] = useState<ManagerChangeState | null>(null);
+  const [showManagerChangeModal, setShowManagerChangeModal] = useState(false);
+  const [savingManagerChange, setSavingManagerChange] = useState(false);
+  const [showNewManagerPassword, setShowNewManagerPassword] = useState(false);
+
+  // Reset Password Dialog State
+  const [resetPasswordUser, setResetPasswordUser] = useState<User | null>(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState('');
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
+  const [savingResetPassword, setSavingResetPassword] = useState(false);
+  const [showResetPasswordInput, setShowResetPasswordInput] = useState(false);
+  const [copiedPassword, setCopiedPassword] = useState(false);
+
+  const handleOpenResetPasswordModal = (targetUser: User) => {
+    setResetPasswordUser(targetUser);
+    setResetPasswordValue(generateStrongPassword());
+    setShowResetPasswordModal(true);
+  };
+
+  const confirmResetPassword = async () => {
+    if (!resetPasswordUser || !resetPasswordValue) return;
+    setSavingResetPassword(true);
+    try {
+      await dbService.update('users', resetPasswordUser.id, {
+        temp_password: resetPasswordValue,
+        must_change_password: true
+      });
+
+      setTempPasswordData({
+        email: resetPasswordUser.email || '',
+        password: resetPasswordValue,
+        title: 'تمت إعادة تعيين كلمة المرور بنجاح'
+      });
+      setShowTempPasswordModal(true);
+      setShowResetPasswordModal(false);
+
+      if (user) {
+        await dbService.logActivity(
+          user.id,
+          user.username,
+          resetPasswordUser.company_id,
+          'إعادة تعيين كلمة المرور',
+          `إعادة تعيين كلمة المرور للمستخدم: ${resetPasswordUser.email}`,
+          'users',
+          resetPasswordUser.id
+        );
+      }
+
+      await fetchData();
+      showNotification('تمت إعادة تعيين كلمة المرور بنجاح', 'success');
+    } catch (error: any) {
+      console.error('Error resetting password:', error);
+      alert('حدث خطأ أثناء إعادة تعيين كلمة المرور: ' + (error.message || 'خطأ غير معروف'));
+    } finally {
+      setSavingResetPassword(false);
+    }
+  };
+
+  const confirmManagerChange = async () => {
+    if (!managerChangeState || !editingCompany) return;
+    setSavingManagerChange(true);
+    try {
+      const { companyData, newEmail, previousManager, existsInSystem, newPassword, previousManagerAction } = managerChangeState;
+      const token = localStorage.getItem('auth_token');
+
+      // 1. Update company details
+      await dbService.update('companies', editingCompany.id, companyData);
+
+      // 2. Apply action to previous manager if found
+      if (previousManager) {
+        if (previousManagerAction === 'deactivate') {
+          await dbService.update('users', previousManager.id, { status: 'inactive' });
+        } else if (previousManagerAction === 'delete') {
+          await dbService.delete('users', previousManager.id);
+        }
+      }
+
+      // 3. Register / link new manager in company
+      const regRes = await fetch('/api/erp/auth/register', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          'x-company-id': editingCompany.id
+        },
+        body: JSON.stringify({
+          username: newEmail,
+          email: newEmail,
+          password: existsInSystem ? '' : newPassword,
+          company_id: editingCompany.id,
+          role: 'admin'
+        })
+      });
+
+      const regData = await regRes.json();
+      if (!regRes.ok) {
+        throw new Error(regData.error || regData.message || 'فشل تسجيل المدير الجديد');
+      }
+
+      if (!existsInSystem) {
+        const allUsers = await dbService.listAll<User>('users');
+        const newUser = allUsers.find(u => u.email?.toLowerCase() === newEmail && u.company_id === editingCompany.id);
+        if (newUser) {
+          await dbService.update('users', newUser.id, {
+            temp_password: newPassword,
+            must_change_password: true
+          });
+        }
+        setTempPasswordData({
+          email: newEmail,
+          password: newPassword,
+          title: 'تم تحديث مدير الشركة بنجاح'
+        });
+        setShowTempPasswordModal(true);
+      } else {
+        showNotification(
+          `تم ربط المدير الجديد (${newEmail}) بالشركة بنجاح مع الاحتفاظ بكلمة مروره الحالية في النظام.`,
+          'info'
+        );
+      }
+
+      if (user) {
+        await dbService.logActivity(
+          user.id,
+          user.username,
+          editingCompany.id,
+          'تعديل مدير الشركة',
+          `تعديل مدير الشركة (${editingCompany.name}) إلى: ${newEmail} مع إجراء المدير السابق: ${previousManagerAction}`,
+          'companies',
+          editingCompany.id
+        );
+      }
+
+      await fetchData();
+      setShowManagerChangeModal(false);
+      setManagerChangeState(null);
+      setShowModal(false);
+      setEditingCompany(null);
+      showNotification('تم تحديث إعدادات الشركة ومدير الحساب بنجاح', 'success');
+    } catch (error: any) {
+      console.error('Error changing manager:', error);
+      alert('حدث خطأ أثناء تعديل مدير الشركة: ' + (error.message || 'خطأ غير معروف'));
+    } finally {
+      setSavingManagerChange(false);
+    }
+  };
+
   const handleResendEmail = async (user: User) => {
-    // Simulate sending email
     alert(`تم إرسال بيانات الدخول إلى ${user.email} بنجاح! \n\n (محاكاة: تم إرسال البريد الإلكتروني بنجاح)`);
-    
-    // Log the action
     await dbService.add('activity_logs', {
       user_id: 'system',
       username: 'Super Admin',
@@ -166,30 +354,6 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
       details: `تم إعادة إرسال بيانات الدخول للمستخدم ${user.email}`,
       entity: 'users'
     });
-  };
-
-  const handleResetPassword = async (user: User) => {
-    const newTempPassword = 'User@' + Math.floor(1000 + Math.random() * 9000);
-    await dbService.update('users', user.id, {
-      temp_password: newTempPassword,
-      must_change_password: true
-    });
-    
-    setTempPasswordData({ email: user.email || '', password: newTempPassword });
-    setShowTempPasswordModal(true);
-    
-    // Log the action
-    await dbService.add('activity_logs', {
-      user_id: 'system',
-      username: 'Super Admin',
-      company_id: user.company_id,
-      created_at: new Date().toISOString(),
-      action: 'إعادة تعيين كلمة المرور المؤقتة',
-      details: `تم إنشاء كلمة مرور مؤقتة جديدة للمستخدم ${user.email}`,
-      entity: 'users'
-    });
-    
-    fetchData();
   };
 
   const formatDateForInput = (val: any): string => {
@@ -287,6 +451,39 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
       };
 
       if (editingCompany) {
+        const oldEmail = (editingCompany.email || '').trim().toLowerCase();
+        const cleanEmail = (formData.email || '').trim().toLowerCase();
+
+        if (cleanEmail && cleanEmail !== oldEmail) {
+          const token = localStorage.getItem('auth_token');
+          let checkData: any = {};
+          try {
+            const checkRes = await fetch(`/api/erp/auth/check-user-exists?email=${encodeURIComponent(cleanEmail)}`, {
+              headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+            });
+            checkData = await checkRes.json();
+          } catch (e) {
+            console.error('Check user error:', e);
+          }
+
+          const prevManager = users.find(u => 
+            u.company_id === editingCompany.id && 
+            (u.email?.trim().toLowerCase() === oldEmail || u.role === 'admin')
+          ) || null;
+
+          setManagerChangeState({
+            companyData,
+            newEmail: cleanEmail,
+            oldEmail: oldEmail,
+            previousManager: prevManager,
+            existsInSystem: Boolean(checkData.existsInSystem),
+            newPassword: generateStrongPassword(),
+            previousManagerAction: 'deactivate'
+          });
+          setShowManagerChangeModal(true);
+          return;
+        }
+
         await dbService.update('companies', editingCompany.id, companyData);
         if (user) {
           await dbService.logActivity(
@@ -315,7 +512,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
         }
         
         // Create initial admin user for the company
-        const tempPassword = 'User@' + Math.floor(1000 + Math.random() * 9000);
+        const tempPassword = (formData as any).manager_password?.trim() || generateStrongPassword();
         const cleanEmail = formData.email!.trim().toLowerCase();
         
         const token = localStorage.getItem('auth_token');
@@ -337,8 +534,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
 
         const regData = await regRes.json();
 
-        const users = await dbService.query<User>('users', [{ field: 'email', operator: '==', value: cleanEmail }]);
-        const newUser = users.find(u => u.company_id === companyId);
+        const allUsersList = await dbService.listAll<User>('users');
+        const newUser = allUsersList.find(u => u.email?.toLowerCase() === cleanEmail && u.company_id === companyId);
 
         if (regData.existingUser) {
           showNotification(
@@ -352,7 +549,11 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
               must_change_password: true
             });
           }
-          setTempPasswordData({ email: formData.email || '', password: tempPassword });
+          setTempPasswordData({
+            email: formData.email || '',
+            password: tempPassword,
+            title: 'تم إضافة الشركة وحساب المدير بنجاح'
+          });
           setShowTempPasswordModal(true);
         }
 
@@ -1002,7 +1203,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                             </button>
                           )}
                           <button 
-                            onClick={() => handleResetPassword(u)}
+                            onClick={() => handleOpenResetPasswordModal(u)}
                             className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                             title="إعادة تعيين كلمة المرور"
                           >
@@ -1104,7 +1305,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                             </button>
                           )}
                           <button 
-                            onClick={() => handleResetPassword(u)}
+                            onClick={() => handleOpenResetPasswordModal(u)}
                             className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                             title="إعادة تعيين كلمة المرور"
                           >
@@ -1387,35 +1588,312 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
 
       {/* Temporary Password Modal */}
       {showTempPasswordModal && tempPasswordData && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-8 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200" dir="rtl">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-8 animate-in zoom-in-95 duration-200 text-right">
             <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-white">
+              <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-emerald-500/20">
                 <Lock size={24} />
               </div>
               <div>
-                <h3 className="text-xl font-black text-zinc-900">تم إضافة الشركة بنجاح</h3>
-                <p className="text-xs text-zinc-500 font-bold">يرجى تزويد المدير ببيانات الدخول التالية</p>
+                <h3 className="text-xl font-black text-zinc-900">{tempPasswordData.title || 'بيانات الدخول'}</h3>
+                <p className="text-xs text-zinc-500 font-bold">يرجى تزويد المستخدم ببيانات الدخول التالية</p>
               </div>
             </div>
 
-            <div className="space-y-4 mb-8">
-              <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
-                <p className="text-[10px] text-zinc-400 font-bold uppercase mb-1">البريد الإلكتروني</p>
-                <p className="font-mono font-bold text-zinc-900 select-all">{tempPasswordData.email}</p>
+            <div className="space-y-4 mb-6">
+              <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] text-zinc-400 font-bold uppercase mb-1">البريد الإلكتروني</p>
+                  <p className="font-mono font-bold text-zinc-900 select-all">{tempPasswordData.email}</p>
+                </div>
               </div>
-              <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
-                <p className="text-[10px] text-zinc-400 font-bold uppercase mb-1">كلمة المرور المؤقتة</p>
-                <p className="font-mono font-bold text-emerald-600 select-all">{tempPasswordData.password}</p>
+              <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] text-zinc-400 font-bold uppercase mb-1">كلمة المرور المؤقتة</p>
+                  <p className="font-mono font-bold text-emerald-600 select-all text-base">{tempPasswordData.password}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(tempPasswordData.password);
+                    setCopiedPassword(true);
+                    setTimeout(() => setCopiedPassword(false), 2000);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-stone-200 text-stone-700 hover:bg-stone-50 text-xs font-bold transition-all shadow-sm"
+                >
+                  {copiedPassword ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                  <span>{copiedPassword ? 'تم النسخ!' : 'نسخ'}</span>
+                </button>
               </div>
             </div>
 
-            <button 
-              onClick={() => setShowTempPasswordModal(false)}
-              className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all"
-            >
-              فهمت، إغلاق
-            </button>
+            <PasswordRequirementsCard />
+
+            <div className="mt-6">
+              <button 
+                onClick={() => setShowTempPasswordModal(false)}
+                className="w-full py-3.5 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-md"
+              >
+                فهمت، إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Modal */}
+      {showResetPasswordModal && resetPasswordUser && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200" dir="rtl">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-8 animate-in zoom-in-95 duration-200 text-right">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-amber-500/20">
+                <Key size={24} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-zinc-900">تعيين كلمة المرور</h3>
+                <p className="text-xs text-zinc-500 font-mono font-bold truncate max-w-[260px]">{resetPasswordUser.email}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-stone-700">كلمة المرور الجديدة</label>
+                  <button
+                    type="button"
+                    onClick={() => setResetPasswordValue(generateStrongPassword())}
+                    className="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1"
+                  >
+                    <Sparkles size={12} />
+                    <span>توليد كلمة سر عشوائية</span>
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showResetPasswordInput ? "text" : "password"}
+                    value={resetPasswordValue}
+                    onChange={(e) => setResetPasswordValue(e.target.value)}
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl font-mono font-bold text-stone-900 pl-10 focus:ring-2 focus:ring-amber-500/20 outline-none"
+                    placeholder="User@2026"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowResetPasswordInput(!showResetPasswordInput)}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+                  >
+                    {showResetPasswordInput ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <PasswordRequirementsCard />
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                type="button"
+                onClick={() => {
+                  setShowResetPasswordModal(false);
+                  setResetPasswordUser(null);
+                }}
+                disabled={savingResetPassword}
+                className="flex-1 py-3 bg-zinc-100 text-zinc-600 rounded-xl font-bold hover:bg-zinc-200 transition-all text-sm"
+              >
+                إلغاء
+              </button>
+              <button 
+                type="button"
+                onClick={confirmResetPassword}
+                disabled={savingResetPassword || !resetPasswordValue}
+                className="flex-1 py-3 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 transition-all shadow-md shadow-amber-600/20 text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {savingResetPassword ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    <span>جاري الحفظ...</span>
+                  </>
+                ) : (
+                  <span>حفظ كلمة المرور</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manager Change Modal (Edit Company Manager) */}
+      {showManagerChangeModal && managerChangeState && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-zinc-900/60 backdrop-blur-sm animate-in fade-in duration-200" dir="rtl">
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl p-7 animate-in zoom-in-95 duration-200 text-right space-y-5 border border-stone-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center gap-3.5 pb-4 border-b border-stone-100">
+              <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-emerald-500/20">
+                <UserCheck size={24} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-stone-900">تعديل مدير الشركة</h3>
+                <p className="text-xs text-stone-500 font-bold">{editingCompany?.name}</p>
+              </div>
+            </div>
+
+            {/* Email comparison card */}
+            <div className="grid grid-cols-2 gap-3 p-3.5 bg-stone-50 rounded-2xl border border-stone-200/80">
+              <div>
+                <p className="text-[10px] text-stone-400 font-bold uppercase mb-0.5">المدير الحالي</p>
+                <p className="text-xs font-mono font-bold text-stone-700 truncate" title={managerChangeState.oldEmail || 'لا يوجد'}>
+                  {managerChangeState.oldEmail || 'لا يوجد مدير سابق'}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-emerald-600 font-bold uppercase mb-0.5">المدير الجديد</p>
+                <p className="text-xs font-mono font-bold text-emerald-700 truncate" title={managerChangeState.newEmail}>
+                  {managerChangeState.newEmail}
+                </p>
+              </div>
+            </div>
+
+            {/* Case 1: New manager is already in system */}
+            {managerChangeState.existsInSystem ? (
+              <div className="p-4 bg-emerald-50/90 border border-emerald-200 rounded-2xl space-y-1.5 text-emerald-950">
+                <div className="flex items-center gap-2 font-bold text-xs text-emerald-800">
+                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                  <span>المستخدم مسجل مسبقاً في النظام</span>
+                </div>
+                <p className="text-[11px] text-emerald-800/90 leading-relaxed font-medium">
+                  تم العثور على حساب نشط لهذا البريد الإلكتروني في النظام. سيتم ربطه بهذه الشركة كمدير، مع الاعتماد على كلمة مروره الحالية بدون تغيير.
+                </p>
+              </div>
+            ) : (
+              /* Case 2: New manager is NOT registered -> ask for password */
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                    <Key size={14} className="text-amber-600" />
+                    <span>تعيين كلمة المرور للمدير الجديد:</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setManagerChangeState({ ...managerChangeState, newPassword: generateStrongPassword() })}
+                    className="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1"
+                  >
+                    <Sparkles size={12} />
+                    <span>توليد كلمة سر</span>
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showNewManagerPassword ? "text" : "password"}
+                    value={managerChangeState.newPassword}
+                    onChange={(e) => setManagerChangeState({ ...managerChangeState, newPassword: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-mono font-bold text-stone-900 pl-10 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                    placeholder="User@2026"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewManagerPassword(!showNewManagerPassword)}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+                  >
+                    {showNewManagerPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                <PasswordRequirementsCard />
+              </div>
+            )}
+
+            {/* Previous manager action choice */}
+            <div className="space-y-2.5 pt-2 border-t border-stone-100">
+              <label className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                <UserX size={14} className="text-amber-600" />
+                <span>ما هو الإجراء المطلوب اتخاذه بشأن المدير السابق{managerChangeState.previousManager ? ` (${managerChangeState.previousManager.email})` : ''}؟</span>
+              </label>
+
+              <div className="space-y-2">
+                <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                  managerChangeState.previousManagerAction === 'deactivate' 
+                    ? 'border-amber-500 bg-amber-50/70 shadow-sm' 
+                    : 'border-stone-200 hover:bg-stone-50'
+                }`}>
+                  <input
+                    type="radio"
+                    name="prevManagerAction"
+                    value="deactivate"
+                    checked={managerChangeState.previousManagerAction === 'deactivate'}
+                    onChange={() => setManagerChangeState({ ...managerChangeState, previousManagerAction: 'deactivate' })}
+                    className="mt-1 text-amber-600 focus:ring-amber-500"
+                  />
+                  <div>
+                    <p className="text-xs font-bold text-stone-900">جعله غير نشط (موصى به)</p>
+                    <p className="text-[11px] text-stone-500 mt-0.5">تعطيل حسابه لمنعه من الدخول مع الحفاظ على كافة العمليات والفواتير المنسوبة إليه.</p>
+                  </div>
+                </label>
+
+                <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                  managerChangeState.previousManagerAction === 'keep' 
+                    ? 'border-blue-500 bg-blue-50/70 shadow-sm' 
+                    : 'border-stone-200 hover:bg-stone-50'
+                }`}>
+                  <input
+                    type="radio"
+                    name="prevManagerAction"
+                    value="keep"
+                    checked={managerChangeState.previousManagerAction === 'keep'}
+                    onChange={() => setManagerChangeState({ ...managerChangeState, previousManagerAction: 'keep' })}
+                    className="mt-1 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div>
+                    <p className="text-xs font-bold text-stone-900">استمرار المدير السابق</p>
+                    <p className="text-[11px] text-stone-500 mt-0.5">إبقاء حسابه نشطاً داخل مستخدمي الشركة بصلاحية مسؤول.</p>
+                  </div>
+                </label>
+
+                <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                  managerChangeState.previousManagerAction === 'delete' 
+                    ? 'border-red-500 bg-red-50/70 shadow-sm' 
+                    : 'border-stone-200 hover:bg-stone-50'
+                }`}>
+                  <input
+                    type="radio"
+                    name="prevManagerAction"
+                    value="delete"
+                    checked={managerChangeState.previousManagerAction === 'delete'}
+                    onChange={() => setManagerChangeState({ ...managerChangeState, previousManagerAction: 'delete' })}
+                    className="mt-1 text-red-600 focus:ring-red-500"
+                  />
+                  <div>
+                    <p className="text-xs font-bold text-red-900">حذفه تماماً</p>
+                    <p className="text-[11px] text-red-600 mt-0.5">حذف حساب المدير السابق نهائياً من مستخدمي الشركة.</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-3 border-t border-stone-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowManagerChangeModal(false);
+                  setManagerChangeState(null);
+                }}
+                disabled={savingManagerChange}
+                className="flex-1 py-3 text-stone-600 hover:bg-stone-100 rounded-xl transition-colors font-bold text-sm"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={confirmManagerChange}
+                disabled={savingManagerChange}
+                className="flex-1 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors shadow-md shadow-emerald-600/20 font-bold text-sm flex items-center justify-center gap-2"
+              >
+                {savingManagerChange ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    <span>جاري التطبيق...</span>
+                  </>
+                ) : (
+                  <span>تأكيد وتطبيق التعديلات</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1688,6 +2166,32 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                     />
                   </div>
                 </div>
+
+                {!editingCompany && (
+                  <div className="space-y-3 p-4 bg-stone-50 rounded-2xl border border-stone-200/80">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
+                        <Key className="w-4 h-4 text-emerald-600" /> كلمة مرور المدير الافتراضية
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, manager_password: generateStrongPassword() } as any)}
+                        className="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1"
+                      >
+                        <Sparkles size={12} />
+                        <span>توليد كلمة سر</span>
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="User@2026 (اتركها فارغة للتوليد التلقائي)"
+                      value={(formData as any).manager_password || ''}
+                      onChange={(e) => setFormData({ ...formData, manager_password: e.target.value } as any)}
+                      className="w-full px-4 py-2 bg-white border border-stone-200 rounded-lg font-mono font-bold text-stone-900 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                    />
+                    <PasswordRequirementsCard />
+                  </div>
+                )}
 
                 {!editingCompany && (
                   <div className="flex items-center gap-2 pt-2">

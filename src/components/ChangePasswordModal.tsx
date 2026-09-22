@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, Eye, EyeOff, Check, AlertCircle } from 'lucide-react';
+import { X, Lock, Eye, EyeOff, Check, AlertCircle, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
@@ -7,7 +7,7 @@ import { dbService } from '../services/dbService';
 
 export const ChangePasswordModal: React.FC = () => {
   const { user, logout } = useAuth();
-  const { t, dir } = useLanguage();
+  const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -95,6 +95,23 @@ export const ChangePasswordModal: React.FC = () => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
               />
+            </div>
+          </div>
+
+          <div className="p-3.5 bg-amber-50/80 border border-amber-200/90 rounded-2xl space-y-1.5 text-xs text-right" dir="rtl">
+            <div className="font-bold flex items-center gap-1.5 text-amber-800">
+              <Shield size={14} className="text-amber-600 shrink-0" />
+              <span>{language === 'ar' ? 'مواصفات كلمة المرور:' : 'Password Requirements:'}</span>
+            </div>
+            <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-900/80 font-medium">
+              <li>{language === 'ar' ? 'الطول: 6 أحرف على الأقل (يوصى بـ 8 أحرف فأكثر)' : 'Length: At least 6 characters (8+ recommended)'}</li>
+              <li>{language === 'ar' ? 'التكوين: يفضل أن تشمل حروفاً وأرقاماً ورموزاً خاصة' : 'Composition: Include letters, numbers, and symbols'}</li>
+            </ul>
+            <div className="pt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-bold text-amber-950 border-t border-amber-200/60">
+              <span>{language === 'ar' ? 'شكل كلمة المرور (مثال):' : 'Password Example:'}</span>
+              <code className="bg-white px-2 py-0.5 rounded border border-amber-200 font-mono text-emerald-700 tracking-wider font-bold">User@2026</code>
+              <span className="text-stone-400 font-normal">{language === 'ar' ? 'أو' : 'or'}</span>
+              <code className="bg-white px-2 py-0.5 rounded border border-amber-200 font-mono text-emerald-700 tracking-wider font-bold">Admin#1234</code>
             </div>
           </div>
 

@@ -6,7 +6,7 @@ import { User, UserPermissions, ModulePermissions } from '../types';
 import { 
   Search, Plus, Trash2, X, Shield, User as UserIcon, History, Lock, Check,
   AlertCircle, Edit2, ChevronDown, ChevronUp, Copy, HelpCircle, RefreshCw, Info,
-  ChevronLeft, ChevronRight, Save, CheckCircle2
+  ChevronLeft, ChevronRight, Save, CheckCircle2, Sparkles
 } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
@@ -1666,17 +1666,48 @@ export const Users: React.FC = () => {
               ) : (
                 /* Case 3: Completely new user -> ask for password */
                 !userCheckStatus.existsInCurrentCompany && (
-                  <div className="space-y-2">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">{language === 'ar' ? 'كلمة المرور الافتراضية' : 'Default Password'}</label>
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between px-1">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">{language === 'ar' ? 'كلمة المرور الافتراضية' : 'Default Password'}</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+                          const nums = '23456789';
+                          const pick = (chars: string) => chars[Math.floor(Math.random() * chars.length)];
+                          setUserFormData({ ...userFormData, password: `User@${pick(letters)}${pick(nums)}${Math.floor(100 + Math.random() * 900)}` });
+                        }}
+                        className="text-[11px] text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1 hover:underline"
+                      >
+                        <Sparkles size={11} />
+                        <span>{language === 'ar' ? 'توليد كلمة سر' : 'Generate'}</span>
+                      </button>
+                    </div>
                     <input
                       required
-                      type="password"
+                      type="text"
                       minLength={6}
                       className="premium-input font-mono font-bold w-full"
                       value={userFormData.password}
                       onChange={(e) => setUserFormData({ ...userFormData, password: e.target.value })}
-                      placeholder="••••••••"
+                      placeholder="User@2026"
                     />
+                    <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-1 text-amber-900 text-xs text-right" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+                      <div className="font-bold flex items-center gap-1.5 text-amber-800">
+                        <Shield size={14} className="text-amber-600 shrink-0" />
+                        <span>{language === 'ar' ? 'مواصفات كلمة المرور المقبولة:' : 'Password Requirements:'}</span>
+                      </div>
+                      <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-800/90 font-medium">
+                        <li>{language === 'ar' ? 'الطول: لا تقل عن 6 أحرف (يوصى بـ 8 أحرف فأكثر)' : 'Length: At least 6 characters (8+ recommended)'}</li>
+                        <li>{language === 'ar' ? 'التكوين: يفضل أن تتضمن مزيجاً من أحرف، أرقام، ورموز خاصة' : 'Composition: Letters, numbers, and symbols'}</li>
+                      </ul>
+                      <div className="pt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-bold text-amber-950 border-t border-amber-200/60">
+                        <span>{language === 'ar' ? 'شكل كلمة المرور (مثال):' : 'Password Example:'}</span>
+                        <code className="bg-white px-2 py-0.5 rounded border border-amber-200 font-mono text-emerald-700 tracking-wider font-bold">User@2026</code>
+                        <span className="text-stone-400 font-normal">{language === 'ar' ? 'أو' : 'or'}</span>
+                        <code className="bg-white px-2 py-0.5 rounded border border-amber-200 font-mono text-emerald-700 tracking-wider font-bold">Pass#1234</code>
+                      </div>
+                    </div>
                   </div>
                 )
               )}
