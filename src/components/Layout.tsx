@@ -443,60 +443,77 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
     }
   };
 
-  // Periodic checks for notifications
+  // Periodic checks for notifications (runs once per company/user, then every 30 minutes)
+  const notifActionsRef = React.useRef({ addPersistentNotification, dismissNotification, t });
+  notifActionsRef.current = { addPersistentNotification, dismissNotification, t };
+
   React.useEffect(() => {
     if (!user || isSuperAdmin) return;
 
-    const runChecks = async () => {
-      // Check low stock (services excluded)
-      const lowStockProducts = await notificationService.checkLowStock(user.company_id);
+    let isCancelled = false;
 
-      // Auto-cleanup any stale or invalid low-stock notifications (e.g. for services or items with normal stock)
+    const runChecks = async () => {
       try {
-        const allProducts = await dbService.list<Product>('products', user.company_id);
-        const lowStockIds = new Set(lowStockProducts.map(p => p.id));
-        allProducts.forEach(p => {
-          if (p.type === 'service' || (p as any).is_service === true || !lowStockIds.has(p.id)) {
-            dismissNotification(`low-stock-${p.id}`);
-          }
+        const { addPersistentNotification: addNotif, dismissNotification: dismissNotif, t: translate } = notifActionsRef.current;
+
+        // Check low stock (services excluded)
+        const lowStockProducts = await notificationService.checkLowStock(user.company_id);
+        if (isCancelled) return;
+
+        // Auto-cleanup any stale or invalid low-stock notifications (e.g. for services or items with normal stock)
+        try {
+          const allProducts = await dbService.list<Product>('products', user.company_id);
+          if (isCancelled) return;
+          const lowStockIds = new Set(lowStockProducts.map(p => p.id));
+          allProducts.forEach(p => {
+            if (p.type === 'service' || (p as any).is_service === true || !lowStockIds.has(p.id)) {
+              dismissNotif(`low-stock-${p.id}`);
+            }
+          });
+        } catch (err) {
+          console.error('Error cleaning stale low-stock notifications:', err);
+        }
+
+        lowStockProducts.forEach(p => {
+          addNotif({
+            id: `low-stock-${p.id}`,
+            title: translate('common.low_stock'),
+            message: translate('common.low_stock_msg')
+              .replace('{name}', p.name)
+              .replace('{stock}', p.stock.toString()),
+            type: 'warning',
+            category: 'stock',
+            path: 'products'
+          });
+        });
+
+        // Check overdue invoices
+        const overdueInvoices = await notificationService.checkOverdueInvoices(user.company_id);
+        if (isCancelled) return;
+        overdueInvoices.forEach(inv => {
+          addNotif({
+            id: `overdue-${inv.id}`,
+            title: translate('common.overdue_invoice'),
+            message: translate('common.overdue_invoice_msg')
+              .replace('{number}', inv.invoice_number)
+              .replace('{customer}', inv.customer_name),
+            type: 'error',
+            category: 'invoice',
+            path: 'invoices'
+          });
         });
       } catch (err) {
-        console.error('Error cleaning stale low-stock notifications:', err);
+        console.error('Error running notification checks:', err);
       }
-
-      lowStockProducts.forEach(p => {
-        addPersistentNotification({
-          id: `low-stock-${p.id}`,
-          title: t('common.low_stock'),
-          message: t('common.low_stock_msg')
-            .replace('{name}', p.name)
-            .replace('{stock}', p.stock.toString()),
-          type: 'warning',
-          category: 'stock',
-          path: 'products'
-        });
-      });
-
-      // Check overdue invoices
-      const overdueInvoices = await notificationService.checkOverdueInvoices(user.company_id);
-      overdueInvoices.forEach(inv => {
-        addPersistentNotification({
-          id: `overdue-${inv.id}`,
-          title: t('common.overdue_invoice'),
-          message: t('common.overdue_invoice_msg')
-            .replace('{number}', inv.invoice_number)
-            .replace('{customer}', inv.customer_name),
-          type: 'error',
-          category: 'invoice',
-          path: 'invoices'
-        });
-      });
     };
 
     runChecks();
     const interval = setInterval(runChecks, 1000 * 60 * 30); // Every 30 minutes
-    return () => clearInterval(interval);
-  }, [user, isSuperAdmin, addPersistentNotification, dismissNotification]);
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
+  }, [user?.id, user?.company_id, isSuperAdmin]);
 
   React.useEffect(() => {
     const handleResize = () => {

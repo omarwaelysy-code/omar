@@ -2122,7 +2122,7 @@ export const Invoices: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || isSubmitting) return;
-    setIsSubmitting(true);
+
     if (!selectedCustomerId) {
       showNotification('يرجى اختيار العميل', 'error');
       return;
@@ -2131,7 +2131,6 @@ export const Invoices: React.FC = () => {
     const validItems = items.filter(item => item.product_id);
     if (validItems.length === 0) {
       showNotification('يرجى إضافة أصناف مكتملة للفاتورة', 'error');
-      setIsSubmitting(false);
       return;
     }
 
@@ -2142,7 +2141,6 @@ export const Invoices: React.FC = () => {
 
     if (invoiceType === 'items' && hasPhysicalProduct && !selectedWarehouseId) {
       showNotification('يرجى اختيار المخزن', 'error');
-      setIsSubmitting(false);
       return;
     }
 
@@ -2151,6 +2149,7 @@ export const Invoices: React.FC = () => {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       const subtotal = Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)), 0)) || 0;
       const discount_amount = Number(discount) || 0;
@@ -4942,7 +4941,6 @@ export const Invoices: React.FC = () => {
               <button 
                 type="submit"
                 form="invoice-form"
-                onClick={handleSubmit}
                 disabled={isSubmitting}
                 className="px-3.5 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1.5 justify-center active:scale-95 shadow-sm text-[11px] whitespace-nowrap font-sans"
               >

@@ -102,23 +102,27 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [showNotification]);
 
-  const markAsRead = (id: string) => {
-    setPersistentNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
-  };
+  const markAsRead = useCallback((id: string) => {
+    setPersistentNotifications((prev) => {
+      if (!prev.some((n) => n.id === id && !n.read)) return prev;
+      return prev.map((n) => (n.id === id ? { ...n, read: true } : n));
+    });
+  }, []);
 
-  const handleNotificationClick = (n: AppNotification) => {
+  const handleNotificationClick = useCallback((n: AppNotification) => {
     markAsRead(n.id);
     if (n.path) {
       setCurrentPage(n.path);
       setIsCenterOpen(false);
     }
-  };
+  }, [markAsRead]);
 
-  const dismissNotification = (id: string) => {
-    setPersistentNotifications((prev) => prev.filter((n) => n.id !== id));
-  };
+  const dismissNotification = useCallback((id: string) => {
+    setPersistentNotifications((prev) => {
+      if (!prev.some((n) => n.id === id)) return prev;
+      return prev.filter((n) => n.id !== id);
+    });
+  }, []);
 
   const showSuccess = useCallback((message: string) => {
     showNotification(message, 'success');
@@ -128,13 +132,16 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     showNotification(message, 'error');
   }, [showNotification]);
 
-  const markAllAsRead = () => {
-    setPersistentNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  };
+  const markAllAsRead = useCallback(() => {
+    setPersistentNotifications((prev) => {
+      if (!prev.some((n) => !n.read)) return prev;
+      return prev.map((n) => ({ ...n, read: true }));
+    });
+  }, []);
 
-  const clearAll = () => {
-    setPersistentNotifications([]);
-  };
+  const clearAll = useCallback(() => {
+    setPersistentNotifications((prev) => (prev.length === 0 ? prev : []));
+  }, []);
 
   const unreadCount = persistentNotifications.filter((n) => !n.read).length;
 
