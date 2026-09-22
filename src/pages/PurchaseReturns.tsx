@@ -138,6 +138,14 @@ export const PurchaseReturns: React.FC = () => {
 
   const [selectedOperationId, setSelectedOperationId] = useState<string>('');
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
+
+  const isAllServicesPurchaseReturn = useMemo(() => {
+    const validItems = items.filter(item => item.product_id);
+    return validItems.length > 0 && validItems.every(item => {
+      const prod = products.find(p => p.id === item.product_id);
+      return prod && (prod.type === 'service' || (prod as any).is_service);
+    });
+  }, [items, products]);
   const [selectedCostCenterId, setSelectedCostCenterId] = useState<string>('');
 
   const [focusedPriceIndex, setFocusedPriceIndex] = useState<number | null>(null);
@@ -1396,13 +1404,14 @@ export const PurchaseReturns: React.FC = () => {
       return;
     }
 
-    const hasPhysicalProduct = items.some(item => {
+    const hasPhysicalProduct = validItems.some(item => {
       const prod = products.find(p => p.id === item.product_id);
-      return prod && prod.type !== 'service';
+      return prod && prod.type !== 'service' && !(prod as any).is_service;
     });
 
     if (hasPhysicalProduct && !returnData.warehouse_id) {
       showNotification(language === 'ar' ? 'يرجى اختيار المخزن' : 'Please select warehouse', 'error');
+      setIsSubmitting(false);
       return;
     }
 
@@ -2984,14 +2993,16 @@ export const PurchaseReturns: React.FC = () => {
 
                     {/* Warehouse */}
                     <div>
-                      <label className="block text-[10px] font-bold text-zinc-400 mb-1 px-1 uppercase">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
+                      <label className="block text-[10px] font-bold text-zinc-400 mb-1 px-1 uppercase">
+                        {language === 'ar' ? (isAllServicesPurchaseReturn ? 'المخزن (اختياري - خدمات)' : 'المخزن') : (isAllServicesPurchaseReturn ? 'Warehouse (Optional)' : 'Warehouse')}
+                      </label>
                       <select 
-                        required
+                        required={!isAllServicesPurchaseReturn}
                         className="w-full px-3 py-1.5 rounded-xl bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 outline-none font-bold text-zinc-800 text-xs cursor-pointer"
                         value={returnData.warehouse_id}
                         onChange={(e) => setReturnData({...returnData, warehouse_id: e.target.value})}
                       >
-                        <option value="">{language === 'ar' ? 'اختر المخزن' : 'Select Warehouse'}</option>
+                        <option value="">{language === 'ar' ? (isAllServicesPurchaseReturn ? 'بدون مخزن (خدمات)' : 'اختر المخزن') : (isAllServicesPurchaseReturn ? 'No Warehouse (Services)' : 'Select Warehouse')}</option>
                         {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                       </select>
                     </div>

@@ -539,6 +539,14 @@ export const Returns: React.FC = () => {
   const [selectedCostCenterId, setSelectedCostCenterId] = useState<string>('');
   const [settings, setSettings] = useState<any>(null);
 
+  const isAllServicesReturn = useMemo(() => {
+    const validItems = items.filter(item => item.product_id);
+    return validItems.length > 0 && validItems.every(item => {
+      const prod = products.find(p => p.id === item.product_id);
+      return prod && (prod.type === 'service' || (prod as any).is_service);
+    });
+  }, [items, products]);
+
   useEffect(() => {
     if (user) {
       const unsubItems = dbService.subscribePaginated('returns', {
@@ -1133,19 +1141,19 @@ export const Returns: React.FC = () => {
       return;
     }
 
-    const hasPhysicalProduct = items.some(item => {
+    const validItems = items.filter(item => item.product_id);
+    if (validItems.length === 0) {
+      showNotification('يرجى إضافة أصناف مكتملة للمرتجع', 'error');
+      return;
+    }
+
+    const hasPhysicalProduct = validItems.some(item => {
       const prod = products.find(p => p.id === item.product_id);
-      return prod && prod.type !== 'service';
+      return prod && prod.type !== 'service' && !(prod as any).is_service;
     });
 
     if (hasPhysicalProduct && !selectedWarehouseId) {
       showNotification('يرجى اختيار المخزن', 'error');
-      return;
-    }
-    
-    const validItems = items.filter(item => item.product_id);
-    if (validItems.length === 0) {
-      showNotification('يرجى إضافة أصناف مكتملة للمرتجع', 'error');
       return;
     }
 
@@ -2611,14 +2619,16 @@ export const Returns: React.FC = () => {
 
                       {/* 3. Warehouse */}
                       <div>
-                        <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
+                        <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">
+                          {language === 'ar' ? (isAllServicesReturn ? 'المخزن (اختياري - خدمات)' : 'المخزن') : (isAllServicesReturn ? 'Warehouse (Optional)' : 'Warehouse')}
+                        </label>
                         <select 
-                          required
+                          required={!isAllServicesReturn}
                           className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer"
                           value={selectedWarehouseId}
                           onChange={(e) => setSelectedWarehouseId(e.target.value)}
                         >
-                          <option value="">{language === 'ar' ? 'اختر المخزن' : 'Select Warehouse'}</option>
+                          <option value="">{language === 'ar' ? (isAllServicesReturn ? 'بدون مخزن (خدمات)' : 'اختر المخزن') : (isAllServicesReturn ? 'No Warehouse (Services)' : 'Select Warehouse')}</option>
                           {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                         </select>
                       </div>

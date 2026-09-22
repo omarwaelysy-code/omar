@@ -398,6 +398,15 @@ export const PurchaseInvoices: React.FC = () => {
   const [isMatchingModalOpen, setIsMatchingModalOpen] = useState(false);
   const [matchingReceipts, setMatchingReceipts] = useState<any[]>([]);
 
+  const isAllServicesPurchase = useMemo(() => {
+    if (invoiceData.purchase_type === 'expenses') return true;
+    const validItems = items.filter(item => item.product_id);
+    return validItems.length > 0 && validItems.every(item => {
+      const prod = products.find(p => p.id === item.product_id);
+      return prod && (prod.type === 'service' || (prod as any).is_service);
+    });
+  }, [items, products, invoiceData.purchase_type]);
+
   useEffect(() => {
     if (user) {
       Promise.all([
@@ -2634,7 +2643,12 @@ export const PurchaseInvoices: React.FC = () => {
       return;
     }
 
-    if (invoiceData.purchase_type === 'items' && !invoiceData.warehouse_id) {
+    const hasPhysicalProduct = validItems.some(item => {
+      const prod = products.find(p => p.id === item.product_id);
+      return prod && prod.type !== 'service' && !(prod as any).is_service;
+    });
+
+    if (invoiceData.purchase_type === 'items' && hasPhysicalProduct && !invoiceData.warehouse_id) {
       showNotification('يرجى اختيار المخزن', 'error');
       setIsSubmitting(false);
       return;
@@ -5174,14 +5188,16 @@ export const PurchaseInvoices: React.FC = () => {
                           {/* 3. Warehouse */}
                           {invoiceData.purchase_type === 'items' && (
                             <div>
-                              <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
+                              <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">
+                                {language === 'ar' ? (isAllServicesPurchase ? 'المخزن (اختياري - خدمات)' : 'المخزن') : (isAllServicesPurchase ? 'Warehouse (Optional)' : 'Warehouse')}
+                              </label>
                               <select 
-                                required
+                                required={!isAllServicesPurchase}
                                 className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer"
                                 value={invoiceData.warehouse_id}
                                 onChange={(e) => setInvoiceData({...invoiceData, warehouse_id: e.target.value})}
                               >
-                                <option value="">{language === 'ar' ? 'اختر المخزن' : 'Select Warehouse'}</option>
+                                <option value="">{language === 'ar' ? (isAllServicesPurchase ? 'بدون مخزن (خدمات)' : 'اختر المخزن') : (isAllServicesPurchase ? 'No Warehouse (Services)' : 'Select Warehouse')}</option>
                                 {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                               </select>
                             </div>

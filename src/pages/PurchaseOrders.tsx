@@ -140,6 +140,14 @@ export const PurchaseOrders: React.FC = () => {
   const [exchangeRate, setExchangeRate] = useState<number>(1);
   const [exchangeRateType, setExchangeRateType] = useState<'manual' | 'auto'>('manual');
 
+  const isAllServicesPurchaseOrder = useMemo(() => {
+    const validItems = items.filter(item => item.product_id);
+    return validItems.length > 0 && validItems.every(item => {
+      const prod = products.find(p => p.id === item.product_id);
+      return prod && (prod.type === 'service' || (prod as any).is_service);
+    });
+  }, [items, products]);
+
   // Floating popover lookup search states
   const [activeSearch, setActiveSearch] = useState<{
     index: number;
@@ -1380,13 +1388,15 @@ export const PurchaseOrders: React.FC = () => {
 
                     {/* Warehouse */}
                     <div>
-                      <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{ot('form_warehouse')}</label>
+                      <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">
+                        {language === 'ar' ? (isAllServicesPurchaseOrder ? 'المخزن (اختياري - خدمات)' : ot('form_warehouse')) : (isAllServicesPurchaseOrder ? 'Warehouse (Optional)' : ot('form_warehouse'))}
+                      </label>
                       <select 
                         className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer"
                         value={selectedWarehouseId}
                         onChange={(e) => setSelectedWarehouseId(e.target.value)}
                       >
-                        <option value="">{language === 'ar' ? 'المخزن الرئيسي (تلقائي)' : 'Main Warehouse (Default)'}</option>
+                        <option value="">{language === 'ar' ? (isAllServicesPurchaseOrder ? 'بدون مخزن (خدمات)' : 'المخزن الرئيسي (تلقائي)') : (isAllServicesPurchaseOrder ? 'No Warehouse (Services)' : 'Main Warehouse (Default)')}</option>
                         {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                       </select>
                     </div>

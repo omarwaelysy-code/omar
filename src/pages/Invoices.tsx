@@ -195,6 +195,15 @@ export const Invoices: React.FC = () => {
   const [exchangeRateType, setExchangeRateType] = useState<'manual' | 'auto'>('manual');
   const [view, setView] = useViewPreference('invoices', 'table');
   const [invoiceType, setInvoiceType] = useState<'items' | 'services'>('items');
+  
+  const isAllServicesInvoice = useMemo(() => {
+    const validItems = items.filter(item => item.product_id);
+    return validItems.length > 0 && validItems.every(item => {
+      const prod = products.find(p => p.id === item.product_id);
+      return prod && (prod.type === 'service' || (prod as any).is_service);
+    });
+  }, [items, products]);
+
   const [isColumnSelectorOpen, setIsColumnSelectorOpen] = useState(false);
   const columnSelectorRef = useRef<HTMLDivElement>(null);
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
@@ -2119,14 +2128,21 @@ export const Invoices: React.FC = () => {
       return;
     }
 
-    if (invoiceType === 'items' && !selectedWarehouseId) {
-      showNotification('يرجى اختيار المخزن', 'error');
-      return;
-    }
-    
     const validItems = items.filter(item => item.product_id);
     if (validItems.length === 0) {
       showNotification('يرجى إضافة أصناف مكتملة للفاتورة', 'error');
+      setIsSubmitting(false);
+      return;
+    }
+
+    const hasPhysicalProduct = validItems.some(item => {
+      const prod = products.find(p => p.id === item.product_id);
+      return prod && prod.type !== 'service' && !(prod as any).is_service;
+    });
+
+    if (invoiceType === 'items' && hasPhysicalProduct && !selectedWarehouseId) {
+      showNotification('يرجى اختيار المخزن', 'error');
+      setIsSubmitting(false);
       return;
     }
 
@@ -5045,15 +5061,17 @@ export const Invoices: React.FC = () => {
                           {/* 3. Warehouse */}
                           {invoiceType === 'items' && (
                             <div>
-                              <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">{language === 'ar' ? 'المخزن' : 'Warehouse'}</label>
+                              <label className="block text-[9px] font-bold text-zinc-400 mb-0 px-0.5">
+                                {language === 'ar' ? (isAllServicesInvoice ? 'المخزن (اختياري - خدمات)' : 'المخزن') : (isAllServicesInvoice ? 'Warehouse (Optional)' : 'Warehouse')}
+                              </label>
                               <select 
-                                required
+                                required={!isAllServicesInvoice}
                                 disabled={!hasBusinessPermission("change_warehouse")}
                                 className="w-full px-1.5 py-0.5 rounded-md bg-zinc-50 border border-zinc-200 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none font-bold text-zinc-800 text-[11px] cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed"
                                 value={selectedWarehouseId}
                                 onChange={(e) => setSelectedWarehouseId(e.target.value)}
                               >
-                                <option value="">{language === 'ar' ? 'اختر المخزن' : 'Select Warehouse'}</option>
+                                <option value="">{language === 'ar' ? (isAllServicesInvoice ? 'بدون مخزن (خدمات)' : 'اختر المخزن') : (isAllServicesInvoice ? 'No Warehouse (Services)' : 'Select Warehouse')}</option>
                                 {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                               </select>
                             </div>
