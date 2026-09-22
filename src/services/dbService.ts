@@ -304,7 +304,7 @@ export const dbService = {
   },
 
   async listAll<T>(collectionName: string): Promise<T[]> {
-    return apiRequest<T[]>(`/${collectionName}?all_companies=true`);
+    return apiRequest<T[]>(`/${collectionName}`);
   },
 
   async list<T>(collectionName: string, options?: string | any[] | { company_id?: string; [key: string]: any }): Promise<T[]> {

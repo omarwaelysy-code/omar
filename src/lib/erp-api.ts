@@ -1864,10 +1864,10 @@ const getList = async (table: string, filters: any) => {
   
   let paramIndex = 1;
   Object.keys(filters).forEach((key) => {
-    // ── Skip meta-params (_limit, _sort, _order, _page, _search, etc.)
+    // ── Skip meta-params (_limit, _sort, _order, _page, _search, all_companies, etc.)
     //    They are NOT column names. The paginated branch already guards these;
     //    this guard was missing here, causing HTTP 500 on exchange_rates queries.
-    if (key.startsWith('_')) return;
+    if (key.startsWith('_') || key === 'all_companies' || key === 'all') return;
 
     const value = filters[key];
     
@@ -4977,6 +4977,10 @@ modules.forEach(moduleName => {
         // For other tables, we apply company_id filter by default if present in schema
         const queryFilters = { ...req.query } as any;
         const isSuperAdmin = isSuperAdminUser;
+        const isAllQuery = queryFilters.all === 'true' || queryFilters.all_companies === 'true' || queryFilters.company_id === 'all';
+        delete queryFilters.all;
+        delete queryFilters.all_companies;
+
         const isOwnEmailQuery = moduleName === 'users' && (
           queryFilters.email === req.user?.email || 
           (typeof queryFilters.email === 'string' && typeof req.user?.email === 'string' && queryFilters.email.toLowerCase() === req.user.email.toLowerCase())
@@ -4993,9 +4997,6 @@ modules.forEach(moduleName => {
               queryFilters.company_id = requestedCompanyFilter;
             }
           } else if (isSuperAdmin) {
-            const isAllQuery = queryFilters.all === 'true' || queryFilters.all_companies === 'true' || queryFilters.company_id === 'all';
-            delete queryFilters.all;
-            delete queryFilters.all_companies;
             if (isAllQuery) {
               delete queryFilters.company_id;
             } else if (!queryFilters.company_id && moduleName === 'users') {
