@@ -81,7 +81,7 @@ export const ACCOUNT_USAGE_OPTIONS: AccountUsageOption[] = [
 ];
 
 export const getAccountUsageLabel = (key: string | undefined, lang: 'ar' | 'en'): string => {
-  if (!key || key === 'other' || key === 'none') return lang === 'ar' ? 'عام' : 'General';
+  if (!key || key === 'other' || key === 'none') return lang === 'ar' ? 'غير محدد' : 'Unspecified';
   if (key === 'post_dated_cheque' || key === 'cheque') {
     return lang === 'ar' ? 'أوراق قبض' : 'Notes Receivable';
   }
@@ -107,7 +107,7 @@ export const getAccountUsageLabel = (key: string | undefined, lang: 'ar' | 'en')
     return lang === 'ar' ? 'رواتب مستحقة' : 'Accrued Salaries';
   }
   const opt = ACCOUNT_USAGE_OPTIONS.find(o => o.key === key);
-  if (!opt) return lang === 'ar' ? 'عام' : 'General';
+  if (!opt) return lang === 'ar' ? 'غير محدد' : 'Unspecified';
   return lang === 'ar' ? opt.ar : opt.en;
 };
 
@@ -209,4 +209,88 @@ export const ACCOUNT_USAGE_GROUPS: AccountUsageGroup[] = [
   }
 ];
 
+export const getAllMacroCategories = (): { macroAr: string; macroEn: string }[] => {
+  const seen = new Set<string>();
+  const list: { macroAr: string; macroEn: string }[] = [];
+  ACCOUNT_USAGE_GROUPS.forEach(g => {
+    if (!seen.has(g.macroAr)) {
+      seen.add(g.macroAr);
+      list.push({ macroAr: g.macroAr, macroEn: g.macroEn });
+    }
+  });
+  return list;
+};
 
+export const getMacroCategoryForUsage = (usageKey: string): string => {
+  for (const group of ACCOUNT_USAGE_GROUPS) {
+    if (group.keys.includes(usageKey)) {
+      return group.macroAr;
+    }
+  }
+  return '';
+};
+
+export const getUsagesForMacro = (macroAr: string): AccountUsageOption[] => {
+  const groups = ACCOUNT_USAGE_GROUPS.filter(g => g.macroAr === macroAr);
+  const keys = new Set<string>();
+  groups.forEach(g => g.keys.forEach(k => keys.add(k)));
+  return ACCOUNT_USAGE_OPTIONS.filter(o => keys.has(o.key));
+};
+
+export const findUsageOptionByText = (text: string): AccountUsageOption | undefined => {
+  if (!text) return undefined;
+  const clean = text.trim().toLowerCase();
+  
+  // Direct key match
+  const byKey = ACCOUNT_USAGE_OPTIONS.find(o => o.key.toLowerCase() === clean);
+  if (byKey) return byKey;
+
+  // Exact Arabic match
+  const byAr = ACCOUNT_USAGE_OPTIONS.find(o => o.ar.trim().toLowerCase() === clean);
+  if (byAr) return byAr;
+
+  // Exact English match
+  const byEn = ACCOUNT_USAGE_OPTIONS.find(o => o.en.trim().toLowerCase() === clean);
+  if (byEn) return byEn;
+
+  // Synonyms and aliases
+  if (clean.includes('خزينة') || clean.includes('نقدية') || clean.includes('صندوق') || clean === 'cash') {
+    return ACCOUNT_USAGE_OPTIONS.find(o => o.key === 'cash');
+  }
+  if (clean.includes('بنك') || clean === 'bank') {
+    return ACCOUNT_USAGE_OPTIONS.find(o => o.key === 'bank');
+  }
+  if (clean.includes('عميل') || clean.includes('عملاء') || clean === 'customer' || clean === 'customers') {
+    return ACCOUNT_USAGE_OPTIONS.find(o => o.key === 'customer');
+  }
+  if (clean.includes('مورد') || clean.includes('موردين') || clean === 'supplier' || clean === 'suppliers') {
+    return ACCOUNT_USAGE_OPTIONS.find(o => o.key === 'supplier');
+  }
+  if (clean.includes('مخزون') || clean === 'inventory' || clean === 'stock') {
+    return ACCOUNT_USAGE_OPTIONS.find(o => o.key === 'inventory');
+  }
+  if (clean.includes('مبيعات') || clean === 'sales' || clean.includes('ايراد')) {
+    return ACCOUNT_USAGE_OPTIONS.find(o => o.key === 'sales_revenue');
+  }
+  if (clean.includes('تكلفة المبيعات') || clean.includes('تكلفة البضاعة') || clean === 'cogs') {
+    return ACCOUNT_USAGE_OPTIONS.find(o => o.key === 'cost_of_sales');
+  }
+  if (clean.includes('مشتريات') || clean === 'purchases') {
+    return ACCOUNT_USAGE_OPTIONS.find(o => o.key === 'purchases');
+  }
+  if (clean.includes('رأس المال') || clean === 'capital') {
+    return ACCOUNT_USAGE_OPTIONS.find(o => o.key === 'capital');
+  }
+  if (clean.includes('أصل ثابت') || clean.includes('أصول ثابتة') || clean === 'fixed_asset') {
+    return ACCOUNT_USAGE_OPTIONS.find(o => o.key === 'fixed_asset');
+  }
+  if (clean.includes('مصروف إداري') || clean.includes('مصروفات عمومية') || clean.includes('إدارية')) {
+    return ACCOUNT_USAGE_OPTIONS.find(o => o.key === 'administrative_expense');
+  }
+  if (clean.includes('مصروف تشغيل') || clean.includes('تشغيلية')) {
+    return ACCOUNT_USAGE_OPTIONS.find(o => o.key === 'operating_expense');
+  }
+
+  // Partial match fallback
+  return ACCOUNT_USAGE_OPTIONS.find(o => o.ar.includes(clean) || clean.includes(o.ar));
+};

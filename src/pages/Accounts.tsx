@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Account, AccountType } from '../types';
-import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, BookOpen, User, Layers, AlertCircle, LayoutGrid, List, ChevronRight, ChevronLeft, Save, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, BookOpen, User, Layers, AlertCircle, LayoutGrid, List, ChevronRight, ChevronLeft, Save, ChevronDown, CheckCircle2, Upload } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
@@ -18,6 +18,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { FormattedNumberInput } from '../components/FormattedNumberInput';
 import { ACCOUNT_USAGE_OPTIONS, getAccountUsageLabel, ACCOUNT_USAGE_GROUPS } from '../utils/accountUsageUtils';
 import { generateDefaultCOA } from '../services/coaService';
+import { AccountExcelImportModal } from '../components/AccountExcelImportModal';
 
 export const Accounts: React.FC = () => {
   const { user } = useAuth();
@@ -44,8 +45,30 @@ export const Accounts: React.FC = () => {
   const [coaLanguage, setCoaLanguage] = useState<'ar' | 'en'>(language || 'ar');
   const [isGeneratingCoa, setIsGeneratingCoa] = useState(false);
   const [coaProgress, setCoaProgress] = useState('');
+  const [isExcelImportModalOpen, setIsExcelImportModalOpen] = useState(false);
   const tableRef = useRef<HTMLTableElement>(null);
   const usageDropdownRef = useRef<HTMLDivElement>(null);
+
+  const getClassificationLabel = (classification?: string) => {
+    if (!classification) return '';
+    switch (classification) {
+      case 'asset': return language === 'ar' ? 'أصل' : 'Asset';
+      case 'liability': return language === 'ar' ? 'التزام' : 'Liability';
+      case 'equity': return language === 'ar' ? 'حقوق ملكية' : 'Equity';
+      case 'liability_equity': return language === 'ar' ? 'التزام/حقوق ملكية' : 'Liability/Equity';
+      case 'cash_and_equivalents': return language === 'ar' ? 'نقدية وما في حكمها' : 'Cash & Cash Equivalents';
+      case 'receivables': return language === 'ar' ? 'عملاء' : 'Customers / Receivables';
+      case 'payables': return language === 'ar' ? 'موردين' : 'Suppliers / Payables';
+      case 'revenue': return language === 'ar' ? 'إيراد' : 'Revenue';
+      case 'cost': return language === 'ar' ? 'تكلفة' : 'Cost';
+      case 'expense': return language === 'ar' ? 'مصروف' : 'Expense';
+      case 'interest_expense': return language === 'ar' ? 'فوائد مدينة' : 'Debit Interest';
+      case 'depreciation': return language === 'ar' ? 'إهلاكات' : 'Depreciation';
+      case 'other_revenue': return language === 'ar' ? 'إيرادات أخرى' : 'Other Revenues';
+      case 'other_expense': return language === 'ar' ? 'مصروفات أخرى' : 'Other Expenses';
+      default: return classification;
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -123,7 +146,7 @@ export const Accounts: React.FC = () => {
     required_sub_account: false,
     parent_id: '',
     is_active: true,
-    account_usage: 'other'
+    account_usage: ''
   });
 
   useEffect(() => {
@@ -153,7 +176,7 @@ export const Accounts: React.FC = () => {
           required_sub_account: result.name?.toLowerCase().includes('عملاء') || result.name?.toLowerCase().includes('موردين') || false,
           parent_id: '',
           is_active: true,
-          account_usage: 'other'
+          account_usage: ''
         });
         showNotification(t('common.ai_parse_success'), 'success');
         setAiText('');
@@ -185,6 +208,11 @@ export const Accounts: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    if (!formData.account_usage || formData.account_usage === 'other' || formData.account_usage === 'none') {
+      showNotification(language === 'ar' ? 'يرجى اختيار استخدام الحساب من القائمة (إلزامي)' : 'Please select account usage from the list (required)', 'error');
+      return;
+    }
 
     const selectedType = types.find(t => t.id === formData.type_id);
     const accountData = {
@@ -262,7 +290,7 @@ export const Accounts: React.FC = () => {
         required_sub_account: requiredSubAccount,
         parent_id: account.parent_id || '',
         is_active: account.is_active !== false,
-        account_usage: account.account_usage || 'other'
+        account_usage: account.account_usage || ''
       };
 
       setFormData(newFormData);
@@ -276,7 +304,7 @@ export const Accounts: React.FC = () => {
         required_sub_account: false,
         parent_id: '',
         is_active: true,
-        account_usage: 'other'
+        account_usage: ''
       });
     }
     setIsModalOpen(true);
@@ -326,6 +354,14 @@ export const Accounts: React.FC = () => {
             onExportExcel={handleExportExcel} 
             onExportPDF={handleExportPDF} 
           />
+          <button 
+            onClick={() => setIsExcelImportModalOpen(true)}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-2xl font-bold hover:bg-emerald-100 transition-all active:scale-95 shadow-sm"
+            title={language === 'ar' ? 'استيراد دليل الحسابات والأنواع من إكسيل' : 'Import Accounts from Excel'}
+          >
+            <Upload size={20} className="text-emerald-600" />
+            <span className="hidden md:inline">{language === 'ar' ? 'استيراد إكسيل' : 'Import Excel'}</span>
+          </button>
           {accounts.length === 0 && (
             <button 
               onClick={() => setIsCoaWizardOpen(true)}
@@ -574,18 +610,18 @@ export const Accounts: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8 bg-slate-50/50">
-            <div className="max-w-5xl mx-auto space-y-8">
-              <div className="bg-white p-6 rounded-[2rem] border border-emerald-100 shadow-sm">
-                <div className="flex items-center gap-2 mb-4 text-emerald-700 font-bold text-sm">
-                  <Sparkles size={18} />
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-5 bg-slate-50/50">
+            <div className="w-full max-w-6xl mx-auto space-y-4">
+              <div className="bg-white p-3.5 md:p-4 rounded-2xl border border-emerald-100 shadow-xs">
+                <div className="flex items-center gap-2 mb-2 text-emerald-700 font-bold text-xs">
+                  <Sparkles size={16} />
                   <span>{t('accounts.ai_input')}</span>
                 </div>
-                <div className="flex flex-col md:flex-row gap-3">
+                <div className="flex flex-col md:flex-row gap-2.5">
                   <input 
                     type="text"
                     placeholder={t('accounts.ai_placeholder')}
-                    className="flex-1 px-6 py-4 bg-zinc-50 border border-emerald-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 outline-none text-sm transition-all"
+                    className="flex-1 px-4 py-2 bg-zinc-50 border border-emerald-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none text-xs font-bold transition-all"
                     value={aiText}
                     onChange={(e) => setAiText(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleAiParse()}
@@ -593,25 +629,25 @@ export const Accounts: React.FC = () => {
                   <button 
                     onClick={handleAiParse}
                     disabled={isAiParsing || !aiText.trim()}
-                    className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-bold text-sm hover:bg-emerald-700 disabled:opacity-50 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 whitespace-nowrap flex gap-2 items-center justify-center"
+                    className="px-5 py-2 bg-emerald-600 text-white rounded-xl font-bold text-xs hover:bg-emerald-700 disabled:opacity-50 transition-all shadow-xs active:scale-95 whitespace-nowrap flex gap-1.5 items-center justify-center"
                   >
-                    {isAiParsing ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Sparkles size={16} />}
+                    {isAiParsing ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Sparkles size={14} />}
                     {isAiParsing ? t('accounts.ai_analyzing') : t('accounts.ai_analyze')}
                   </button>
                 </div>
               </div>
 
-              <form id="account-form" onSubmit={handleSubmit} className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-100 shadow-sm space-y-8">
+              <form id="account-form" onSubmit={handleSubmit} className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
                 <button type="submit" id="hidden-account-submit" className="hidden" />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
-                    <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">{t('accounts.form_name')}</label>
+                    <label className="block text-[11px] font-black text-slate-500 mb-1.5 uppercase tracking-widest">{t('accounts.form_name')}</label>
                     <div className="relative group">
-                      <FileText className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                      <FileText className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={16} />
                       <input 
                         required
                         type="text" 
-                        className={`w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all font-bold ${dir === 'rtl' ? 'pr-12' : 'pl-12'}`}
+                        className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all font-bold text-sm`}
                         placeholder={language === 'ar' ? 'مثال: البنك الأهلي، الموردين، المبيعات' : 'e.g., National Bank, Suppliers, Sales'}
                         value={formData.name}
                         onChange={(e) => setFormData({...formData, name: e.target.value})}
@@ -619,13 +655,13 @@ export const Accounts: React.FC = () => {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">{t('accounts.form_code')}</label>
+                    <label className="block text-[11px] font-black text-slate-500 mb-1.5 uppercase tracking-widest">{t('accounts.form_code')}</label>
                     <div className="relative group">
-                      <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+                      <Hash className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={16} />
                       <input 
                         required
                         type="text" 
-                        className={`w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all font-mono font-bold ${dir === 'rtl' ? 'pr-12' : 'pl-12'}`}
+                        className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all font-mono font-bold text-sm`}
                         placeholder="1101"
                         value={formData.code}
                         onChange={(e) => setFormData({...formData, code: e.target.value})}
@@ -633,30 +669,69 @@ export const Accounts: React.FC = () => {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">{t('accounts.form_type')}</label>
+                    <label className="block text-[11px] font-black text-slate-500 mb-1.5 uppercase tracking-widest">{t('accounts.form_type') || (language === 'ar' ? 'نوع الحساب' : 'Account Type')}</label>
                     <select 
                       required
-                      className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all appearance-none font-bold"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all appearance-none font-bold text-sm"
                       value={formData.type_id}
                       onChange={(e) => setFormData({...formData, type_id: e.target.value})}
                     >
-                      <option value="">{t('accounts.select_type')}</option>
+                      <option value="">{language === 'ar' ? 'اختر نوع الحساب...' : 'Select Account Type...'}</option>
                       {types.map(type => (
-                        <option key={type.id} value={type.id}>{type.name}</option>
+                        <option key={type.id} value={type.id}>{type.name} ({type.code})</option>
                       ))}
                     </select>
+
+                    {/* Account Type Details Card */}
+                    {(() => {
+                      const selectedType = types.find(t => t.id === formData.type_id);
+                      if (!selectedType) return null;
+                      return (
+                        <div className="mt-2.5 p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs animate-in fade-in duration-200">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                            <div>
+                              <span className="text-[10px] font-bold text-slate-400 block">اسم النوع:</span>
+                              <span className="font-black text-slate-800 text-xs">{selectedType.name}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] font-bold text-slate-400 block">كود النوع:</span>
+                              <span className="font-mono font-black text-emerald-700 text-xs">{selectedType.code}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] font-bold text-slate-400 block">تابع لـ:</span>
+                              <span className="font-black text-indigo-700 text-xs">
+                                {selectedType.statement_type === 'balance_sheet' 
+                                  ? (language === 'ar' ? 'الميزانية العمومية' : 'Balance Sheet') 
+                                  : (language === 'ar' ? 'قائمة الدخل' : 'Income Statement')}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] font-bold text-slate-400 block">التصنيف:</span>
+                              <span className="font-black text-emerald-800 text-xs">
+                                {getClassificationLabel(selectedType.classification)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
+
                   <div className="relative" ref={usageDropdownRef}>
-                    <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">{t('accounts.form_usage')}</label>
+                    <label className="block text-[11px] font-black text-slate-500 mb-1.5 uppercase tracking-widest">
+                      {language === 'ar' ? 'استخدام الحساب (إلزامي)' : 'Account Usage (Required)'}
+                    </label>
                     <button
                       type="button"
                       onClick={() => setIsUsageDropdownOpen(!isUsageDropdownOpen)}
-                      className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all flex items-center justify-between font-bold"
+                      className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all flex items-center justify-between font-bold text-sm ${
+                        !formData.account_usage ? 'border-amber-300 text-amber-800' : 'border-slate-200 text-slate-900'
+                      }`}
                     >
                       <span>
-                        {formData.account_usage ? getAccountUsageLabel(formData.account_usage, language) : t('accounts.usage_general')}
+                        {formData.account_usage ? getAccountUsageLabel(formData.account_usage, language) : (language === 'ar' ? 'اختر استخدام الحساب من القائمة (إلزامي)...' : 'Select Account Usage (Required)...')}
                       </span>
-                      <ChevronDown size={20} className="text-slate-400" />
+                      <ChevronDown size={18} className="text-slate-400" />
                     </button>
                     
                     <AnimatePresence>
@@ -916,6 +991,16 @@ export const Accounts: React.FC = () => {
           </div>
         </div>
       )}
+
+      <AccountExcelImportModal
+        isOpen={isExcelImportModalOpen}
+        onClose={() => setIsExcelImportModalOpen(false)}
+        onSuccess={() => {
+          // Real-time subscription will automatically reflect the changes
+        }}
+        existingAccounts={accounts}
+        existingTypes={types}
+      />
 
       <PageActivityLog 
         isOpen={isActivityLogOpen} 
