@@ -2226,6 +2226,341 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
           </div>
         )}
       </AnimatePresence>
+
+      {/* 1. Manager Change Confirmation Modal */}
+      <AnimatePresence>
+        {showManagerChangeModal && managerChangeState && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-sm animate-in fade-in duration-200" dir="rtl">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-7 space-y-6 border border-stone-200 text-right overflow-hidden max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between border-b border-stone-100 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-amber-100 text-amber-800 rounded-2xl flex items-center justify-center font-black">
+                    <ArrowLeftRight size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-stone-900">تغيير مدير الشركة</h3>
+                    <p className="text-xs text-stone-500 font-bold mt-0.5">تحديث بريد المدير وإدارة صلاحيات المدير السابق</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowManagerChangeModal(false)}
+                  className="p-2 text-stone-400 hover:text-stone-600 rounded-xl hover:bg-stone-100 transition-colors"
+                >
+                  <XCircle size={22} />
+                </button>
+              </div>
+
+              {/* Previous Manager Action */}
+              <div className="space-y-3">
+                <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200/80">
+                  <div className="text-xs font-bold text-stone-500">المدير السابق الحالي:</div>
+                  <div className="font-mono text-sm font-black text-stone-800 mt-1 flex items-center gap-2">
+                    <Mail size={15} className="text-stone-400" />
+                    <span>{managerChangeState.oldEmail}</span>
+                  </div>
+                </div>
+
+                <label className="block text-xs font-bold text-stone-700">ما الإجراء المطلوب للمدير السابق؟</label>
+                <div className="space-y-2">
+                  <label className={`flex items-center justify-between p-3 rounded-2xl border-2 cursor-pointer transition-all ${
+                    managerChangeState.previousManagerAction === 'deactivate' 
+                      ? 'border-amber-500 bg-amber-50/60' 
+                      : 'border-stone-200 hover:bg-stone-50'
+                  }`}>
+                    <div className="flex items-center gap-2.5">
+                      <UserX size={18} className="text-amber-600 shrink-0" />
+                      <div>
+                        <div className="text-xs font-black text-stone-900">تعطيل حساب المدير السابق (غير نشط)</div>
+                        <div className="text-[11px] text-stone-500">يظل حسابه مسجلاً ولكن يتم تعطيل دخوله لحين الحاجة.</div>
+                      </div>
+                    </div>
+                    <input 
+                      type="radio" 
+                      name="prevManagerAction" 
+                      value="deactivate"
+                      checked={managerChangeState.previousManagerAction === 'deactivate'}
+                      onChange={() => setManagerChangeState({ ...managerChangeState, previousManagerAction: 'deactivate' })}
+                      className="text-amber-600 focus:ring-amber-500"
+                    />
+                  </label>
+
+                  <label className={`flex items-center justify-between p-3 rounded-2xl border-2 cursor-pointer transition-all ${
+                    managerChangeState.previousManagerAction === 'keep' 
+                      ? 'border-emerald-500 bg-emerald-50/60' 
+                      : 'border-stone-200 hover:bg-stone-50'
+                  }`}>
+                    <div className="flex items-center gap-2.5">
+                      <UserCheck size={18} className="text-emerald-600 shrink-0" />
+                      <div>
+                        <div className="text-xs font-black text-stone-900">إبقاء المدير السابق نشطاً</div>
+                        <div className="text-[11px] text-stone-500">يظل حسابه نشطاً ومتاحاً ضمن مستخدمي الشركة.</div>
+                      </div>
+                    </div>
+                    <input 
+                      type="radio" 
+                      name="prevManagerAction" 
+                      value="keep"
+                      checked={managerChangeState.previousManagerAction === 'keep'}
+                      onChange={() => setManagerChangeState({ ...managerChangeState, previousManagerAction: 'keep' })}
+                      className="text-emerald-600 focus:ring-emerald-500"
+                    />
+                  </label>
+
+                  <label className={`flex items-center justify-between p-3 rounded-2xl border-2 cursor-pointer transition-all ${
+                    managerChangeState.previousManagerAction === 'delete' 
+                      ? 'border-red-500 bg-red-50/60' 
+                      : 'border-stone-200 hover:bg-stone-50'
+                  }`}>
+                    <div className="flex items-center gap-2.5">
+                      <Trash2 size={18} className="text-red-600 shrink-0" />
+                      <div>
+                        <div className="text-xs font-black text-stone-900">حذف المدير السابق نهائياً من الشركة</div>
+                        <div className="text-[11px] text-stone-500">حذف الحساب بشكل دائم من مستخدمي الشركة.</div>
+                      </div>
+                    </div>
+                    <input 
+                      type="radio" 
+                      name="prevManagerAction" 
+                      value="delete"
+                      checked={managerChangeState.previousManagerAction === 'delete'}
+                      onChange={() => setManagerChangeState({ ...managerChangeState, previousManagerAction: 'delete' })}
+                      className="text-red-600 focus:ring-red-500"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* New Manager Details */}
+              <div className="space-y-3 pt-2 border-t border-stone-100">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-stone-500">المدير الجديد:</span>
+                  <span className="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                    {managerChangeState.newEmail}
+                  </span>
+                </div>
+
+                {managerChangeState.existsInSystem ? (
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-2xl space-y-1.5 text-blue-900">
+                    <div className="font-bold text-xs flex items-center gap-2 text-blue-800">
+                      <CheckCircle2 size={16} className="text-blue-600" />
+                      <span>المستخدم مسجل مسبقاً في النظام</span>
+                    </div>
+                    <p className="text-xs text-blue-700 leading-relaxed font-medium">
+                      هذا البريد مسجل بالفعل في النظام. سيتم ربطه بالشركة مباشرة كمدير عام مع الاحتفاظ بكلمة مروره الحالية دون تعديل.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
+                        <Key size={14} className="text-emerald-600" />
+                        <span>تعيين كلمة المرور للمدير الجديد:</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setManagerChangeState({ ...managerChangeState, newPassword: generateStrongPassword() })}
+                        className="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1 hover:underline"
+                      >
+                        <Sparkles size={12} />
+                        <span>توليد تلقائي</span>
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <input 
+                        type={showNewManagerPassword ? "text" : "password"}
+                        value={managerChangeState.newPassword}
+                        onChange={(e) => setManagerChangeState({ ...managerChangeState, newPassword: e.target.value })}
+                        className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-mono font-bold text-stone-800 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none pr-10"
+                        placeholder="User@2026"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewManagerPassword(!showNewManagerPassword)}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+                      >
+                        {showNewManagerPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    <PasswordRequirementsCard />
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4 border-t border-stone-100">
+                <button
+                  type="button"
+                  onClick={() => setShowManagerChangeModal(false)}
+                  className="flex-1 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-2xl font-bold transition-all text-sm"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="button"
+                  disabled={savingManagerChange || (!managerChangeState.existsInSystem && (!managerChangeState.newPassword || managerChangeState.newPassword.length < 6))}
+                  onClick={confirmManagerChange}
+                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-emerald-600/20 text-sm disabled:opacity-50"
+                >
+                  {savingManagerChange ? 'جاري الحفظ...' : 'تأكيد وتطبيق التغييرات'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 2. Reset Password Modal */}
+      <AnimatePresence>
+        {showResetPasswordModal && resetPasswordUser && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-sm animate-in fade-in duration-200" dir="rtl">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-7 space-y-6 border border-stone-200 text-right overflow-hidden"
+            >
+              <div className="flex items-center justify-between border-b border-stone-100 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-amber-100 text-amber-800 rounded-2xl flex items-center justify-center font-black">
+                    <Key size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-stone-900">إعادة تعيين كلمة المرور</h3>
+                    <p className="text-xs text-stone-500 font-bold mt-0.5">{resetPasswordUser.email || resetPasswordUser.username}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowResetPasswordModal(false)}
+                  className="p-2 text-stone-400 hover:text-stone-600 rounded-xl hover:bg-stone-100 transition-colors"
+                >
+                  <XCircle size={22} />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-stone-700">كلمة المرور الجديدة:</label>
+                  <button
+                    type="button"
+                    onClick={() => setResetPasswordValue(generateStrongPassword())}
+                    className="text-xs text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1 hover:underline"
+                  >
+                    <Sparkles size={12} />
+                    <span>توليد تلقائي</span>
+                  </button>
+                </div>
+                <div className="relative">
+                  <input 
+                    type={showResetPasswordInput ? "text" : "password"}
+                    value={resetPasswordValue}
+                    onChange={(e) => setResetPasswordValue(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl font-mono font-bold text-stone-800 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none pr-10"
+                    placeholder="User@2026"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowResetPasswordInput(!showResetPasswordInput)}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+                  >
+                    {showResetPasswordInput ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                <PasswordRequirementsCard />
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t border-stone-100">
+                <button
+                  type="button"
+                  onClick={() => setShowResetPasswordModal(false)}
+                  className="flex-1 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-2xl font-bold transition-all text-sm"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="button"
+                  disabled={savingResetPassword || !resetPasswordValue || resetPasswordValue.length < 6}
+                  onClick={confirmResetPassword}
+                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-emerald-600/20 text-sm disabled:opacity-50"
+                >
+                  {savingResetPassword ? 'جاري الحفظ...' : 'حفظ وتعيين كلمة المرور'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 3. Temp Password / Success Modal */}
+      <AnimatePresence>
+        {showTempPasswordModal && tempPasswordData && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-sm animate-in fade-in duration-200" dir="rtl">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-7 space-y-6 border border-stone-200 text-right overflow-hidden"
+            >
+              <div className="flex items-center gap-3 border-b border-stone-100 pb-4">
+                <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center font-black">
+                  <CheckCircle2 size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-stone-900">{tempPasswordData.title || 'بيانات الحساب الجديد'}</h3>
+                  <p className="text-xs text-stone-500 font-bold mt-0.5">يرجى نسخ وحفظ بيانات الدخول أدناه</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200 space-y-1">
+                  <span className="text-xs font-bold text-stone-400">البريد الإلكتروني:</span>
+                  <div className="font-mono text-sm font-bold text-stone-800 break-all">{tempPasswordData.email}</div>
+                </div>
+
+                <div className="p-3.5 bg-amber-50/80 rounded-2xl border border-amber-200 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-800">كلمة المرور المؤقتة:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(tempPasswordData.password);
+                        setCopiedPassword(true);
+                        setTimeout(() => setCopiedPassword(false), 2000);
+                      }}
+                      className="text-xs text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-amber-200 shadow-sm"
+                    >
+                      {copiedPassword ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                      <span>{copiedPassword ? 'تم النسخ!' : 'نسخ'}</span>
+                    </button>
+                  </div>
+                  <div className="font-mono text-base font-black text-amber-950 tracking-wider break-all bg-white/80 p-2.5 rounded-xl border border-amber-200/60">
+                    {tempPasswordData.password}
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-stone-500 font-medium leading-relaxed bg-stone-50 p-3 rounded-xl border border-stone-200/60">
+                  * سيُطلب من المستخدم تغيير كلمة المرور عند أول تسجيل دخول للنظام للحفاظ على أمان الحساب.
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTempPasswordModal(false);
+                  setTempPasswordData(null);
+                }}
+                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-emerald-600/20 text-sm"
+              >
+                تم الحفظ / إغلاق
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -3,11 +3,7 @@ import pool from '../../../postgres';
 import { AuthRequest } from '../../../auth-middleware';
 
 export const UsersLimitMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  let companyId = req.user?.company_id;
-  
-  if (!companyId && req.body && req.body.company_id) {
-    companyId = req.body.company_id;
-  }
+  let companyId = req.body?.company_id || (req.headers['x-company-id'] as string) || req.user?.company_id;
 
   if (!companyId) {
     return next();
