@@ -3139,7 +3139,10 @@ router.get('/document_import_batches/:id/full', authenticateToken, async (req: a
           withholding_tax_amount: whtAmount,
           total,
           is_service: it.is_service || false,
-          description: it.description || it.notes || ''
+          description: it.description || it.notes || '',
+          operation_id: it.operation_id || null,
+          department_id: it.department_id || null,
+          cost_center_id: it.cost_center_id || null
         };
       });
 

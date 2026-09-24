@@ -7,12 +7,12 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { dbService, apiRequest } from '../services/dbService';
 import { PostingService } from '../services/PostingService';
 import { formatNumber, formatMoney } from '../utils/formatUtils';
-import { Customer, Supplier, Product, Warehouse, PaymentMethod, Account } from '../types';
+import { Customer, Supplier, Product, Warehouse, PaymentMethod, Account, Operation, Department, CostCenter } from '../types';
 import { 
   FileSpreadsheet, UploadCloud, Download, CheckCircle2, AlertTriangle, 
   Trash2, Edit3, ChevronDown, ChevronUp, FileText, ArrowUpFromLine, 
   ArrowDownToLine, RotateCcw, Hash, Calendar, Layers, ShieldCheck, 
-  X, Check, RefreshCw, Eye, Sparkles, ExternalLink
+  X, Check, RefreshCw, Eye, Sparkles, ExternalLink, Plus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -104,6 +104,12 @@ interface ParsedItem {
   stock_warning?: string;
   account_error?: boolean;
   account_warning?: string;
+  operation_id?: string | null;
+  operation_number?: string;
+  department_id?: string | null;
+  department_name?: string;
+  cost_center_id?: string | null;
+  cost_center_name?: string;
 }
 
 interface ParsedDocument {
@@ -168,6 +174,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [operations, setOperations] = useState<Operation[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
   const [companySettings, setCompanySettings] = useState<any>(null);
   const [isLoadingMasterData, setIsLoadingMasterData] = useState(true);
 
@@ -186,6 +195,32 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
   // Edit item modal state
   const [editingItem, setEditingItem] = useState<{ docRef: string; item: ParsedItem } | null>(null);
+
+  // Add item modal state
+  const [addingItemDocRef, setAddingItemDocRef] = useState<string | null>(null);
+  const [newItemForm, setNewItemForm] = useState<{
+    product_id: string;
+    quantity: number;
+    unit_price: number;
+    discount_amount: number;
+    vat_rate: number;
+    withholding_tax_rate: number;
+    operation_id: string;
+    department_id: string;
+    cost_center_id: string;
+    description: string;
+  }>({
+    product_id: '',
+    quantity: 1,
+    unit_price: 0,
+    discount_amount: 0,
+    vat_rate: 14,
+    withholding_tax_rate: 0,
+    operation_id: '',
+    department_id: '',
+    cost_center_id: '',
+    description: ''
+  });
 
   // Save / Post state
   const [isSavingBatch, setIsSavingBatch] = useState(false);
@@ -226,7 +261,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           whs,
           pms,
           accs,
-          compRes
+          compRes,
+          ops,
+          depts,
+          ccs
         ] = await Promise.all([
           dbService.list<Customer>('customers', { company_id: user.company_id }),
           dbService.list<Supplier>('suppliers', { company_id: user.company_id }),
@@ -234,7 +272,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           dbService.list<Warehouse>('warehouses', { company_id: user.company_id }),
           dbService.list<PaymentMethod>('payment_methods', { company_id: user.company_id }),
           dbService.list<Account>('accounts', { company_id: user.company_id }),
-          dbService.get<any>('companies', user.company_id).catch(() => null)
+          dbService.get<any>('companies', user.company_id).catch(() => null),
+          dbService.list<Operation>('operations', user.company_id).catch(() => []),
+          dbService.list<Department>('departments', user.company_id).catch(() => []),
+          dbService.list<CostCenter>('cost_centers', user.company_id).catch(() => [])
         ]);
 
         setCustomers(custs || []);
@@ -244,6 +285,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         setPaymentMethods(pms || []);
         setAccounts(accs || []);
         setCompanySettings(compRes?.settings || {});
+        setOperations(ops || []);
+        setDepartments(depts || []);
+        setCostCenters(ccs || []);
       } catch (err: any) {
         console.error('Failed to load master data:', err);
         showNotification('فشل تحميل البيانات الأساسية للمطابقة: ' + err.message, 'error');
@@ -670,6 +714,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       ['10. ضريبة الخصم والإضافة %:', isWhtEnabled ? 'النسبة المئوية لضريبة الخصم والإضافة مثل 1 أو 0 (النظام مفعل له ض.خ.أ).' : 'ضريبة الخصم والإضافة معطلة في إعدادات الشركة الحالية (تكون 0%).'],
       ['11. طريقة الدفع:', 'إما (آجل) أو (نقدي). إذا كانت نقدي، يمكن تحديد اسم الخزينة / طريقة الدفع.'],
       ['12. تكرار بيانات المستند:', 'يجب تكرار بيانات الفاتورة (رقم المرجع، النوع، التاريخ، ' + entityLabel + ') في كل سطر يحتوي على صنف لنفس الفاتورة.'],
+      ['13. رقم العملية / الإدارة / مركز التكلفة:', 'حقول اختيارية تماماً (غير إلزامية). يمكن إدخال رقم العملية، واسم أو كود الإدارة، واسم أو كود مركز التكلفة لربط البند تلقائياً.'],
       ['']
     ];
 
@@ -686,6 +731,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     const sampleProd2 = products[1]?.code || 'PRD-002';
     const sampleProdName2 = products[1]?.name || 'صنف تجريبي رقم 2';
     const sampleWarehouse = warehouses[0]?.name || warehouses[0]?.code || 'المخزن الرئيسي';
+    const sampleOp = operations[0]?.operation_number || '';
+    const sampleDept = departments[0]?.name || '';
+    const sampleCC = costCenters[0]?.name || '';
 
     const headers = [
       'Ref',
@@ -701,19 +749,22 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       'نسبة ضريبة القيمة المضافة %',
       'نسبة ضريبة الخصم والاضافة %',
       'طريقة الدفع',
-      'ملاحظات'
+      'ملاحظات',
+      'رقم العملية',
+      'الإدارة',
+      'مركز التكلفة'
     ];
 
     const exampleRows = isSales ? [
-      ['Ref-000001', 'فاتورة بيع', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 10, 150, 0, sampleVatRate, sampleWhtRate, 'آجل', 'فاتورة مبيعات بضاعة - صنف أول'],
-      ['Ref-000001', 'فاتورة بيع', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 5, 200, 20, sampleVatRate, sampleWhtRate, 'آجل', 'فاتورة مبيعات بضاعة - صنف ثانٍ لنفس الفاتورة'],
-      ['Ref-000002', 'أمر بيع', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 25, 145, 50, sampleVatRate, 0, 'آجل', 'أمر بيع معتمد للعميل'],
-      ['Ref-000003', 'مرتجع بيع', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 2, 200, 0, sampleVatRate, sampleWhtRate, 'نقدي', 'مرتجع مبيعات نقدي تالف']
+      ['Ref-000001', 'فاتورة بيع', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 10, 150, 0, sampleVatRate, sampleWhtRate, 'آجل', 'فاتورة مبيعات بضاعة - صنف أول', sampleOp, sampleDept, sampleCC],
+      ['Ref-000001', 'فاتورة بيع', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 5, 200, 20, sampleVatRate, sampleWhtRate, 'آجل', 'فاتورة مبيعات بضاعة - صنف ثانٍ لنفس الفاتورة', sampleOp, sampleDept, sampleCC],
+      ['Ref-000002', 'أمر بيع', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 25, 145, 50, sampleVatRate, 0, 'آجل', 'أمر بيع معتمد للعميل', '', '', sampleCC],
+      ['Ref-000003', 'مرتجع بيع', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 2, 200, 0, sampleVatRate, sampleWhtRate, 'نقدي', 'مرتجع مبيعات نقدي تالف', '', sampleDept, '']
     ] : [
-      ['Ref-000001', 'فاتورة شراء', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 50, 120, 100, sampleVatRate, sampleWhtRate, 'آجل', 'فاتورة توريد خامات - بند أول'],
-      ['Ref-000001', 'فاتورة شراء', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 30, 180, 0, sampleVatRate, sampleWhtRate, 'آجل', 'فاتورة توريد خامات - بند ثانٍ'],
-      ['Ref-000002', 'أمر شراء', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 100, 115, 0, sampleVatRate, 0, 'آجل', 'أمر شراء معتمد للمورد'],
-      ['Ref-000003', 'مرتجع شراء', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 5, 180, 0, sampleVatRate, sampleWhtRate, 'آجل', 'مرتجع مشتريات لعدم مطابقة المواصفات']
+      ['Ref-000001', 'فاتورة شراء', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 50, 120, 100, sampleVatRate, sampleWhtRate, 'آجل', 'فاتورة توريد خامات - بند أول', sampleOp, sampleDept, sampleCC],
+      ['Ref-000001', 'فاتورة شراء', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 30, 180, 0, sampleVatRate, sampleWhtRate, 'آجل', 'فاتورة توريد خامات - بند ثانٍ', sampleOp, sampleDept, sampleCC],
+      ['Ref-000002', 'أمر شراء', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 100, 115, 0, sampleVatRate, 0, 'آجل', 'أمر شراء معتمد للمورد', '', '', sampleCC],
+      ['Ref-000003', 'مرتجع شراء', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 5, 180, 0, sampleVatRate, sampleWhtRate, 'آجل', 'مرتجع مشتريات لعدم مطابقة المواصفات', '', sampleDept, '']
     ];
 
     const dataWs = XLSX.utils.aoa_to_sheet([headers, ...exampleRows]);
@@ -731,7 +782,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       { wch: 16 }, // VAT %
       { wch: 16 }, // WHT %
       { wch: 14 }, // Payment Type
-      { wch: 30 }  // Notes
+      { wch: 30 }, // Notes
+      { wch: 18 }, // Operation Number
+      { wch: 20 }, // Department
+      { wch: 20 }  // Cost Center
     ];
 
     XLSX.utils.book_append_sheet(wb, dataWs, 'بيانات المستندات');
@@ -1083,6 +1137,31 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
       const defaultWh = warehouses[0];
 
+      // Dynamic header index discovery
+      const headerRow: string[] = (rawRows[0] || []).map((h: any) => String(h || '').trim().toLowerCase());
+      const findColIdx = (keywords: string[], fallback: number): number => {
+        const found = headerRow.findIndex(h => keywords.some(k => h.includes(k.toLowerCase())));
+        return found !== -1 ? found : fallback;
+      };
+
+      const refCol = findColIdx(['ref', 'مرجع'], 0);
+      const docTypeCol = findColIdx(['نوع المستند', 'نوع'], 1);
+      const dateCol = findColIdx(['تاريخ', 'التاريخ'], 2);
+      const partyCol = findColIdx(['عميل', 'مورد', 'الطرف', 'طرف'], 3);
+      const prodCodeCol = findColIdx(['كود الصنف', 'باركود', 'كود'], 4);
+      const prodNameCol = findColIdx(['اسم الصنف', 'صنف'], 5);
+      const whCol = findColIdx(['المخزن', 'مخزن', 'مستودع'], 6);
+      const qtyCol = findColIdx(['كمية', 'الكمية'], 7);
+      const priceCol = findColIdx(['سعر', 'السعر'], 8);
+      const discCol = findColIdx(['خصم', 'الخصم'], 9);
+      const vatCol = findColIdx(['قيمة مضافة', 'ض.ق.م', 'vat'], 10);
+      const whtCol = findColIdx(['خصم والاضافة', 'ض.خ', 'wht'], 11);
+      const payTypeCol = findColIdx(['طريقة الدفع', 'دفع'], 12);
+      const notesCol = findColIdx(['ملاحظات', 'بيان', 'notes'], 13);
+      const opCol = findColIdx(['رقم العملية', 'رقم عملية', 'العملية', 'operation'], 14);
+      const deptCol = findColIdx(['الإدارة', 'الادارة', 'إدارة', 'ادارة', 'department'], 15);
+      const ccCol = findColIdx(['مركز التكلفة', 'مركز تكلفة', 'التكلفة', 'cost_center'], 16);
+
       // Parse data rows (row index 0 is header)
       for (let i = 1; i < rawRows.length; i++) {
         const row = rawRows[i];
@@ -1093,20 +1172,23 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           continue;
         }
 
-        const rawRef = String(row[0] || '').trim();
-        const rawDocType = String(row[1] || '').trim();
-        const rawDate = row[2];
-        const rawParty = String(row[3] || '').trim();
-        const rawProdCode = String(row[4] || '').trim();
-        const rawProdName = String(row[5] || '').trim();
-        const rawWarehouse = String(row[6] || '').trim();
-        const rawQty = row[7];
-        const rawPrice = row[8];
-        const rawDiscount = row[9];
-        const rawVatRate = row[10];
-        const rawWhtRate = row[11];
-        const rawPaymentType = String(row[12] || '').trim();
-        const rawNotes = String(row[13] || '').trim();
+        const rawRef = String(row[refCol] || '').trim();
+        const rawDocType = String(row[docTypeCol] || '').trim();
+        const rawDate = row[dateCol];
+        const rawParty = String(row[partyCol] || '').trim();
+        const rawProdCode = String(row[prodCodeCol] || '').trim();
+        const rawProdName = String(row[prodNameCol] || '').trim();
+        const rawWarehouse = String(row[whCol] || '').trim();
+        const rawQty = row[qtyCol];
+        const rawPrice = row[priceCol];
+        const rawDiscount = row[discCol];
+        const rawVatRate = row[vatCol];
+        const rawWhtRate = row[whtCol];
+        const rawPaymentType = String(row[payTypeCol] || '').trim();
+        const rawNotes = String(row[notesCol] || '').trim();
+        const rawOperation = String(row[opCol] || '').trim();
+        const rawDepartment = String(row[deptCol] || '').trim();
+        const rawCostCenter = String(row[ccCol] || '').trim();
 
         // 1. Validate Ref
         if (!rawRef) {
@@ -1450,6 +1532,36 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           }
 
           if (matchedProduct && qtyNum > 0) {
+            // Optional Operation matching
+            let matchedOp: Operation | undefined = undefined;
+            if (rawOperation) {
+              matchedOp = operations.find(o => 
+                (o.operation_number && o.operation_number.toLowerCase() === rawOperation.toLowerCase()) ||
+                o.id === rawOperation ||
+                (o.description && o.description.toLowerCase().includes(rawOperation.toLowerCase()))
+              );
+            }
+
+            // Optional Department matching
+            let matchedDept: Department | undefined = undefined;
+            if (rawDepartment) {
+              matchedDept = departments.find(d => 
+                (d.name && d.name.trim().toLowerCase() === rawDepartment.toLowerCase()) ||
+                (d.code && d.code.toLowerCase() === rawDepartment.toLowerCase()) ||
+                d.id === rawDepartment
+              );
+            }
+
+            // Optional Cost Center matching
+            let matchedCostCenter: CostCenter | undefined = undefined;
+            if (rawCostCenter) {
+              matchedCostCenter = costCenters.find(c => 
+                (c.name && c.name.trim().toLowerCase() === rawCostCenter.toLowerCase()) ||
+                (c.code && c.code.toLowerCase() === rawCostCenter.toLowerCase()) ||
+                c.id === rawCostCenter
+              );
+            }
+
             groupedDocs[rawRef].items.push({
               id: 'temp-' + rowNumber + '-' + Math.random().toString(36).substr(2, 9),
               rowIndex: rowNumber,
@@ -1467,7 +1579,13 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               withholding_tax_amount: lineWht,
               total: lineTotal,
               description: rawNotes,
-              is_service: isServiceItem
+              is_service: isServiceItem,
+              operation_id: matchedOp?.id || null,
+              operation_number: matchedOp?.operation_number || (rawOperation ? rawOperation : undefined),
+              department_id: matchedDept?.id || null,
+              department_name: matchedDept?.name || (rawDepartment ? rawDepartment : undefined),
+              cost_center_id: matchedCostCenter?.id || null,
+              cost_center_name: matchedCostCenter?.name || (rawCostCenter ? rawCostCenter : undefined)
             });
           }
         }
@@ -1611,6 +1729,134 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     showNotification('تم تحديث بيانات الصنف وإعادة فحص رصيد المخزون بنجاح', 'success');
   };
 
+  // Open Add Item Modal
+  const handleOpenAddItemModal = (docRef: string) => {
+    const defaultProd = products[0];
+    const defaultPrice = isSales 
+      ? (defaultProd?.sale_price || defaultProd?.cost_price || 0) 
+      : (defaultProd?.cost_price || defaultProd?.sale_price || 0);
+    const defaultVat = isVatEnabled 
+      ? (parseFloat(String(isSales ? defaultProd?.vat_rate : defaultProd?.purchase_vat_rate)) || 14) 
+      : 0;
+    const defaultWht = isWhtEnabled 
+      ? (parseFloat(String(isSales ? defaultProd?.sales_withholding_tax_rate : defaultProd?.purchase_withholding_tax_rate)) || 0) 
+      : 0;
+
+    setNewItemForm({
+      product_id: defaultProd?.id || '',
+      quantity: 1,
+      unit_price: Number(defaultPrice) || 0,
+      discount_amount: 0,
+      vat_rate: defaultVat,
+      withholding_tax_rate: defaultWht,
+      operation_id: '',
+      department_id: '',
+      cost_center_id: '',
+      description: ''
+    });
+    setAddingItemDocRef(docRef);
+  };
+
+  // Change product in Add Item Modal
+  const handleProductChangeInNewItem = (prodId: string) => {
+    const prod = products.find(p => p.id === prodId);
+    if (!prod) return;
+    const price = isSales 
+      ? (prod.sale_price || prod.cost_price || 0) 
+      : (prod.cost_price || prod.sale_price || 0);
+    const vat = isVatEnabled 
+      ? (parseFloat(String(isSales ? prod.vat_rate : prod.purchase_vat_rate)) || 14) 
+      : 0;
+    const wht = isWhtEnabled 
+      ? (parseFloat(String(isSales ? prod.sales_withholding_tax_rate : prod.purchase_withholding_tax_rate)) || 0) 
+      : 0;
+
+    setNewItemForm(prev => ({
+      ...prev,
+      product_id: prodId,
+      unit_price: Number(price) || 0,
+      vat_rate: vat,
+      withholding_tax_rate: wht
+    }));
+  };
+
+  // Save newly added item into document
+  const handleSaveNewItem = () => {
+    if (!addingItemDocRef) return;
+    const targetDoc = documents.find(d => d.ref === addingItemDocRef);
+    if (!targetDoc) return;
+
+    const matchedProduct = products.find(p => p.id === newItemForm.product_id);
+    if (!matchedProduct) {
+      showNotification('يرجى اختيار صنف صحيح من القائمة', 'error');
+      return;
+    }
+    if (!newItemForm.quantity || newItemForm.quantity <= 0) {
+      showNotification('يجب أن تكون الكمية أكبر من صفر', 'error');
+      return;
+    }
+
+    const isServiceItem = matchedProduct.type === 'service' || matchedProduct.is_service === true;
+    const lineGross = (newItemForm.quantity || 0) * (newItemForm.unit_price || 0);
+    const lineSubtotal = Math.max(0, lineGross - (newItemForm.discount_amount || 0));
+    const effectiveVat = isVatEnabled ? (newItemForm.vat_rate || 0) : 0;
+    const effectiveWht = isWhtEnabled ? (newItemForm.withholding_tax_rate || 0) : 0;
+    const lineVat = Number(((lineSubtotal * effectiveVat) / 100).toFixed(2));
+    const lineWht = Number(((lineSubtotal * effectiveWht) / 100).toFixed(2));
+    const lineTotal = Number((lineSubtotal + lineVat - lineWht).toFixed(2));
+
+    const matchedOp = operations.find(o => o.id === newItemForm.operation_id);
+    const matchedDept = departments.find(d => d.id === newItemForm.department_id);
+    const matchedCc = costCenters.find(c => c.id === newItemForm.cost_center_id);
+
+    const newItem: ParsedItem = {
+      id: 'item-added-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6),
+      rowIndex: targetDoc.items.length + 1,
+      product_id: matchedProduct.id,
+      product_code: matchedProduct.code || '',
+      product_name: matchedProduct.name || '',
+      unit: matchedProduct.unit || 'قطعة',
+      quantity: newItemForm.quantity,
+      unit_price: newItemForm.unit_price,
+      discount_amount: newItemForm.discount_amount,
+      subtotal: lineSubtotal,
+      vat_rate: effectiveVat,
+      vat_amount: lineVat,
+      withholding_tax_rate: effectiveWht,
+      withholding_tax_amount: lineWht,
+      total: lineTotal,
+      description: newItemForm.description || '',
+      is_service: isServiceItem,
+      operation_id: matchedOp?.id || null,
+      operation_number: matchedOp?.operation_number,
+      department_id: matchedDept?.id || null,
+      department_name: matchedDept?.name,
+      cost_center_id: matchedCc?.id || null,
+      cost_center_name: matchedCc?.name
+    };
+
+    const updatedDocs = documents.map(d => {
+      if (d.ref !== addingItemDocRef) return d;
+      const newItems = [...d.items, newItem];
+      const newTotals = recalculateDocTotals(newItems);
+      const allServices = newItems.every(it => it.is_service === true);
+      return {
+        ...d,
+        items: newItems,
+        is_all_services: allServices,
+        ...newTotals,
+        status: (d.status === 'saved' ? 'pending' : d.status) as any
+      };
+    });
+
+    const { updatedDocs: revalidated, allErrors } = revalidateBatch(updatedDocs, products, companySettings, validationErrors);
+    setDocuments(revalidated);
+    setValidationErrors(allErrors);
+    setExpandedRefs(prev => ({ ...prev, [addingItemDocRef]: true }));
+    setAddingItemDocRef(null);
+    showNotification(`تمت إضافة الصنف "${matchedProduct.name}" إلى المستند ${addingItemDocRef} بنجاح`, 'success');
+  };
+
   // Save & Post batch
   const handleSaveAndPostBatch = async () => {
     if (documents.length === 0) {
@@ -1674,7 +1920,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           withholding_tax_amount: item.withholding_tax_amount,
           total: item.total,
           unit: item.unit,
-          description: item.description || ''
+          description: item.description || '',
+          operation_id: item.operation_id || null,
+          department_id: item.department_id || null,
+          cost_center_id: item.cost_center_id || null
         }));
 
         // Clean return items payload (no vat_rate/vat_amount as returns tables lack them in DB)
@@ -1688,7 +1937,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           withholding_tax_amount: item.withholding_tax_amount,
           total: item.total,
           unit: item.unit,
-          description: item.description || ''
+          description: item.description || '',
+          operation_id: item.operation_id || null,
+          department_id: item.department_id || null,
+          cost_center_id: item.cost_center_id || null
         }));
 
         if (doc.doc_type === 'فاتورة بيع') {
@@ -2883,8 +3135,18 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                           </span>
                         </div>
 
-                        {/* Left: Net Total Badge & Delete Action */}
+                        {/* Left: Add Item Action & Net Total Badge & Delete Action */}
                         <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenAddItemModal(doc.ref)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-xs transition-all cursor-pointer"
+                            title="إضافة صنف جديد لهذا المستند"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>+ إضافة صنف</span>
+                          </button>
+
                           <div className="flex items-center gap-1 text-xs font-mono bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-lg">
                             <span className="text-emerald-700 dark:text-emerald-300 font-medium">الصافي:</span>
                             <span className="text-emerald-900 dark:text-emerald-100 font-bold">{formatMoney(doc.total_amount)}</span>
@@ -2916,6 +3178,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                                   <th className="py-1 px-2 w-8 text-center text-[11px]">#</th>
                                   <th className="py-1 px-2 text-[11px]">كود الصنف</th>
                                   <th className="py-1 px-2 text-[11px]">اسم الصنف</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">رقم عملية</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">الإدارة</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">مركز التكلفة</th>
                                   <th className="py-1 px-2 text-center text-[11px]">الكمية</th>
                                   <th className="py-1 px-2 text-center text-[11px]">السعر</th>
                                   <th className="py-1 px-2 text-center text-[11px]">الخصم</th>
@@ -2958,6 +3223,15 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                                           <span>عجز مخزون (المتاح: {item.available_stock})</span>
                                         </span>
                                       )}
+                                    </td>
+                                    <td className="py-1 px-2 text-center text-[11px] font-sans text-slate-600 dark:text-slate-400">
+                                      {item.operation_number || operations.find(o => o.id === item.operation_id)?.operation_number || '-'}
+                                    </td>
+                                    <td className="py-1 px-2 text-center text-[11px] font-sans text-slate-600 dark:text-slate-400">
+                                      {item.department_name || departments.find(d => d.id === item.department_id)?.name || '-'}
+                                    </td>
+                                    <td className="py-1 px-2 text-center text-[11px] font-sans text-slate-600 dark:text-slate-400">
+                                      {item.cost_center_name || costCenters.find(c => c.id === item.cost_center_id)?.name || '-'}
                                     </td>
                                     <td className={`py-1 px-2 text-center font-bold ${
                                       item.stock_error 
@@ -3111,6 +3385,87 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">رقم العملية (اختياري):</label>
+                  <select
+                    value={editingItem.item.operation_id || ''}
+                    onChange={(e) => {
+                      const opId = e.target.value;
+                      const op = operations.find(o => o.id === opId);
+                      setEditingItem({
+                        ...editingItem,
+                        item: {
+                          ...editingItem.item,
+                          operation_id: opId || null,
+                          operation_number: op ? (op.operation_number || op.id) : undefined
+                        }
+                      });
+                    }}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 text-xs"
+                  >
+                    <option value="">— بدون عملية —</option>
+                    {operations.map(op => (
+                      <option key={op.id} value={op.id}>
+                        {op.operation_number || op.id} {op.customer_name ? `(${op.customer_name})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">الإدارة (اختياري):</label>
+                  <select
+                    value={editingItem.item.department_id || ''}
+                    onChange={(e) => {
+                      const deptId = e.target.value;
+                      const dept = departments.find(d => d.id === deptId);
+                      setEditingItem({
+                        ...editingItem,
+                        item: {
+                          ...editingItem.item,
+                          department_id: deptId || null,
+                          department_name: dept ? dept.name : undefined
+                        }
+                      });
+                    }}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 text-xs"
+                  >
+                    <option value="">— بدون إدارة —</option>
+                    {departments.map(dept => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name} {dept.code ? `(${dept.code})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">مركز التكلفة (اختياري):</label>
+                  <select
+                    value={editingItem.item.cost_center_id || ''}
+                    onChange={(e) => {
+                      const ccId = e.target.value;
+                      const cc = costCenters.find(c => c.id === ccId);
+                      setEditingItem({
+                        ...editingItem,
+                        item: {
+                          ...editingItem.item,
+                          cost_center_id: ccId || null,
+                          cost_center_name: cc ? cc.name : undefined
+                        }
+                      });
+                    }}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 text-xs"
+                  >
+                    <option value="">— بدون مركز تكلفة —</option>
+                    {costCenters.map(cc => (
+                      <option key={cc.id} value={cc.id}>
+                        {cc.name} {cc.code ? `(${cc.code})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">ملاحظات البند:</label>
                 <input 
@@ -3137,6 +3492,225 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 className="px-3.5 py-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs cursor-pointer"
               >
                 حفظ التعديلات
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 1.5: Add Item to Document Modal */}
+      {addingItemDocRef && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-xl w-full p-4 shadow-xl space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Plus className="w-4 h-4 text-emerald-600" />
+                <span>إضافة صنف جديد للمستند ({addingItemDocRef})</span>
+              </h3>
+              <button 
+                onClick={() => setAddingItemDocRef(null)}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2.5 text-xs">
+              {/* Product selector */}
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">الصنف المطلوب إضافته:</label>
+                <select
+                  value={newItemForm.product_id}
+                  onChange={(e) => handleProductChangeInNewItem(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-medium"
+                >
+                  <option value="">— اختر الصنف —</option>
+                  {products.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.code ? `[${p.code}] ` : ''}{p.name} {p.type === 'service' ? '(خدمة)' : `(رصيد: ${p.stock ?? 0})`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Quantity & Unit Price */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">الكمية:</label>
+                  <input 
+                    type="number"
+                    min="0.001"
+                    step="any"
+                    value={newItemForm.quantity}
+                    onChange={(e) => setNewItemForm(prev => ({
+                      ...prev,
+                      quantity: parseFloat(e.target.value) || 0
+                    }))}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">السعر (سعر الوحدة):</label>
+                  <input 
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={newItemForm.unit_price}
+                    onChange={(e) => setNewItemForm(prev => ({
+                      ...prev,
+                      unit_price: parseFloat(e.target.value) || 0
+                    }))}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Discount, VAT, WHT */}
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">قيمة الخصم:</label>
+                  <input 
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={newItemForm.discount_amount}
+                    onChange={(e) => setNewItemForm(prev => ({
+                      ...prev,
+                      discount_amount: parseFloat(e.target.value) || 0
+                    }))}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">ض.ق.م (%):</label>
+                  <input 
+                    type="number"
+                    min="0"
+                    step="any"
+                    disabled={!isVatEnabled}
+                    value={isVatEnabled ? newItemForm.vat_rate : 0}
+                    onChange={(e) => setNewItemForm(prev => ({
+                      ...prev,
+                      vat_rate: parseFloat(e.target.value) || 0
+                    }))}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 font-mono disabled:opacity-50"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">ض.خ.إ (%):</label>
+                  <input 
+                    type="number"
+                    min="0"
+                    step="any"
+                    disabled={!isWhtEnabled}
+                    value={isWhtEnabled ? newItemForm.withholding_tax_rate : 0}
+                    onChange={(e) => setNewItemForm(prev => ({
+                      ...prev,
+                      withholding_tax_rate: parseFloat(e.target.value) || 0
+                    }))}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 font-mono disabled:opacity-50"
+                  />
+                </div>
+              </div>
+
+              {/* Optional: Operation, Department, Cost Center */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">رقم العملية (اختياري):</label>
+                  <select
+                    value={newItemForm.operation_id}
+                    onChange={(e) => setNewItemForm(prev => ({ ...prev, operation_id: e.target.value }))}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 text-xs"
+                  >
+                    <option value="">— بدون عملية —</option>
+                    {operations.map(op => (
+                      <option key={op.id} value={op.id}>
+                        {op.operation_number || op.id} {op.customer_name ? `(${op.customer_name})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">الإدارة (اختياري):</label>
+                  <select
+                    value={newItemForm.department_id}
+                    onChange={(e) => setNewItemForm(prev => ({ ...prev, department_id: e.target.value }))}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 text-xs"
+                  >
+                    <option value="">— بدون إدارة —</option>
+                    {departments.map(dept => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name} {dept.code ? `(${dept.code})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">مركز التكلفة (اختياري):</label>
+                  <select
+                    value={newItemForm.cost_center_id}
+                    onChange={(e) => setNewItemForm(prev => ({ ...prev, cost_center_id: e.target.value }))}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 text-xs"
+                  >
+                    <option value="">— بدون مركز تكلفة —</option>
+                    {costCenters.map(cc => (
+                      <option key={cc.id} value={cc.id}>
+                        {cc.name} {cc.code ? `(${cc.code})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">ملاحظات / بيان البند:</label>
+                <input 
+                  type="text"
+                  placeholder="وصف اختياري للبند..."
+                  value={newItemForm.description}
+                  onChange={(e) => setNewItemForm(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5"
+                />
+              </div>
+
+              {/* Live line summary */}
+              {(() => {
+                const gross = (newItemForm.quantity || 0) * (newItemForm.unit_price || 0);
+                const sub = Math.max(0, gross - (newItemForm.discount_amount || 0));
+                const vat = isVatEnabled ? Number(((sub * (newItemForm.vat_rate || 0)) / 100).toFixed(2)) : 0;
+                const wht = isWhtEnabled ? Number(((sub * (newItemForm.withholding_tax_rate || 0)) / 100).toFixed(2)) : 0;
+                const tot = Number((sub + vat - wht).toFixed(2));
+
+                return (
+                  <div className="p-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between text-xs font-mono">
+                    <div className="flex items-center gap-3">
+                      <span>الإجمالي: <strong className="text-slate-800 dark:text-slate-200">{formatMoney(gross)}</strong></span>
+                      <span>الصافي قبل الضريبة: <strong className="text-blue-600">{formatMoney(sub)}</strong></span>
+                      {isVatEnabled && <span>ض.ق.م: <strong className="text-emerald-600">+{formatMoney(vat)}</strong></span>}
+                      {isWhtEnabled && wht > 0 && <span>ض.خ.إ: <strong className="text-purple-600">-{formatMoney(wht)}</strong></span>}
+                    </div>
+                    <div className="font-bold text-sm text-emerald-600">
+                      الصافي النهائي: {formatMoney(tot)}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <button
+                onClick={() => setAddingItemDocRef(null)}
+                className="px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={handleSaveNewItem}
+                className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs cursor-pointer flex items-center gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>إضافة الصنف للمستند</span>
               </button>
             </div>
           </div>

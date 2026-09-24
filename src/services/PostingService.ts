@@ -130,7 +130,10 @@ export class PostingService {
         currency: currencyCode,
         exchange_rate: rate,
         foreign_amount: itemTotalFC,
-        description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoice.invoice_number}`
+        description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoice.invoice_number}`,
+        operation_id: (item as any).operation_id || (invoice as any).operation_id || null,
+        department_id: (item as any).department_id || (invoice as any).department_id || null,
+        cost_center_id: (item as any).cost_center_id || (invoice as any).cost_center_id || null
       });
     });
 
@@ -320,7 +323,10 @@ export class PostingService {
         account_name: salesReturnAccountName,
         debit: Number(item.total) || 0,
         credit: 0,
-        description: `مردودات مبيعات: ${item.product_name} - مرتجع ${doc.return_number || doc.id.slice(-6)}`
+        description: `مردودات مبيعات: ${item.product_name} - مرتجع ${doc.return_number || doc.id.slice(-6)}`,
+        operation_id: (item as any).operation_id || (doc as any).operation_id || null,
+        department_id: (item as any).department_id || (doc as any).department_id || null,
+        cost_center_id: (item as any).cost_center_id || (doc as any).cost_center_id || null
       });
     });
 
@@ -490,7 +496,10 @@ export class PostingService {
         account_name: purchaseAccountName,
         debit: Number(item.total) || 0,
         credit: 0,
-        description: `مشتريات: ${item.product_name} - فاتورة ${doc.invoice_number}`
+        description: `مشتريات: ${item.product_name} - فاتورة ${doc.invoice_number}`,
+        operation_id: (item as any).operation_id || (doc as any).operation_id || null,
+        department_id: (item as any).department_id || (doc as any).department_id || null,
+        cost_center_id: (item as any).cost_center_id || (doc as any).cost_center_id || null
       });
     });
 
@@ -707,7 +716,10 @@ export class PostingService {
         account_name: purchaseReturnAccountName,
         debit: 0,
         credit: Number(item.total) || 0,
-        description: `مرتجع مشتريات: ${item.product_name} - رقم ${doc.return_number}`
+        description: `مرتجع مشتريات: ${item.product_name} - رقم ${doc.return_number}`,
+        operation_id: (item as any).operation_id || (doc as any).operation_id || null,
+        department_id: (item as any).department_id || (doc as any).department_id || null,
+        cost_center_id: (item as any).cost_center_id || (doc as any).cost_center_id || null
       });
     });
 
