@@ -292,43 +292,104 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
   };
 
   // Handler to load an entire batch into the workspace table for re-processing / inspection
-  const handleLoadBatchIntoWorkspace = (batch: any) => {
+  const handleLoadBatchIntoWorkspace = async (batch: any) => {
     if (!batch) return;
     setBatchNumber(batch.batch_number);
     if (batch.batch_date) {
       setBatchDate(String(batch.batch_date).slice(0, 10));
     }
-    if (Array.isArray(batch.details) && batch.details.length > 0) {
-      const docs: ParsedDocument[] = batch.details.map((d: any, idx: number) => ({
-        ref: d.ref || `Ref-${idx + 1}`,
-        doc_type: d.doc_type || (isSales ? 'فاتورة بيع' : 'فاتورة شراء'),
-        date: d.date || batch.batch_date || batchDate,
-        party_name: d.party_name || '',
-        payment_type: 'آجل',
-        items: [],
-        gross_total: Number(d.total_amount) || 0,
-        discount_total: 0,
-        net_before_tax: Number(d.total_amount) || 0,
-        tax_total: 0,
-        withholding_tax_total: 0,
-        total_amount: Number(d.total_amount) || 0,
-        created_document_id: d.created_document_id,
-        created_document_number: d.created_document_number,
-        created_journal_id: d.created_journal_id,
-        created_journal_number: d.created_journal_number,
-        status: d.status || 'saved',
-        error_message: d.error_message
-      }));
-      setDocuments(docs);
-      setIsBatchSaved(batch.status === 'posted');
+
+    try {
+      // Fetch full batch details with populated items from server
+      let fullBatch = batch;
+      try {
+        const res: any = await apiRequest(`/document_import_batches/${batch.id}/full`);
+        if (res && Array.isArray(res.details)) {
+          fullBatch = res;
+        }
+      } catch (fErr) {
+        console.warn('Could not fetch full batch, falling back to cached details:', fErr);
+      }
+
+      if (Array.isArray(fullBatch.details) && fullBatch.details.length > 0) {
+        const docs: ParsedDocument[] = fullBatch.details.map((d: any, idx: number) => {
+          const items: ParsedItem[] = Array.isArray(d.items) ? d.items : [];
+          
+          let gross = 0;
+          let disc = 0;
+          let netBefore = 0;
+          let vat = 0;
+          let wht = 0;
+          let total = 0;
+
+          items.forEach(it => {
+            const qty = Number(it.quantity) || 1;
+            const price = Number(it.unit_price) || 0;
+            const itGross = qty * price;
+            const itDisc = Number(it.discount_amount) || 0;
+            const itSub = Number(it.subtotal) || Math.max(0, itGross - itDisc);
+            const itVat = Number(it.vat_amount) || 0;
+            const itWht = Number(it.withholding_tax_amount) || 0;
+            const itTot = Number(it.total) || (itSub + itVat - itWht);
+
+            gross += itGross;
+            disc += itDisc;
+            netBefore += itSub;
+            vat += itVat;
+            wht += itWht;
+            total += itTot;
+          });
+
+          return {
+            ref: d.ref || `Ref-${idx + 1}`,
+            doc_type: d.doc_type || (isSales ? 'فاتورة بيع' : 'فاتورة شراء'),
+            date: d.date || fullBatch.batch_date || batchDate,
+            party_name: d.party_name || '',
+            payment_type: d.payment_type || 'آجل',
+            warehouse_name: d.warehouse_name || '',
+            items,
+            gross_total: items.length > 0 ? Number(gross.toFixed(2)) : (Number(d.gross_total) || Number(d.total_amount) || 0),
+            discount_amount: Number(disc.toFixed(2)),
+            discount_total: Number(disc.toFixed(2)),
+            subtotal: items.length > 0 ? Number(netBefore.toFixed(2)) : (Number(d.subtotal) || Number(d.total_amount) || 0),
+            net_before_tax: items.length > 0 ? Number(netBefore.toFixed(2)) : (Number(d.net_before_tax) || Number(d.total_amount) || 0),
+            tax_amount: Number(vat.toFixed(2)),
+            tax_total: Number(vat.toFixed(2)),
+            withholding_tax_amount: Number(wht.toFixed(2)),
+            withholding_tax_total: Number(wht.toFixed(2)),
+            total_amount: items.length > 0 ? Number(total.toFixed(2)) : (Number(d.total_amount) || 0),
+            created_document_id: d.created_document_id,
+            created_document_number: d.created_document_number,
+            created_journal_id: d.created_journal_id,
+            created_journal_number: d.created_journal_number,
+            status: d.status || 'saved',
+            error_message: d.error_message
+          };
+        });
+
+        // Expand all refs by default so items are immediately visible
+        const newExpanded: Record<string, boolean> = {};
+        docs.forEach(d => {
+          newExpanded[d.ref] = true;
+        });
+        setExpandedRefs(newExpanded);
+
+        const { updatedDocs, allErrors } = revalidateBatch(docs, products, companySettings, []);
+        setDocuments(updatedDocs);
+        setValidationErrors(allErrors);
+        setIsBatchSaved(fullBatch.status === 'posted');
+      }
+    } catch (err: any) {
+      console.error('Failed to load batch into workspace:', err);
     }
+
     setEditingBatch(null);
     setSelectedBatchDetails(null);
     setActiveMainTab('import');
     showNotification(
       isAr 
-        ? `تم تحميل التشغيلة ${batch.batch_number} في شاشة الاستيراد للمراجعة والتعديل` 
-        : `Loaded batch ${batch.batch_number} into workspace`, 
+        ? `تم تحميل التشغيلة ${batch.batch_number} مع كافة بنودها وأصنافها بنجاح` 
+        : `Loaded batch ${batch.batch_number} with all items`, 
       'info'
     );
   };
@@ -1886,13 +1947,25 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           doc_type: d.doc_type,
           party_name: d.party_name,
           date: d.date,
+          gross_total: d.gross_total,
+          discount_amount: d.discount_amount,
+          discount_total: d.discount_amount,
+          subtotal: d.subtotal,
+          net_before_tax: d.subtotal,
+          tax_amount: d.tax_amount,
+          tax_total: d.tax_amount,
+          withholding_tax_amount: d.withholding_tax_amount,
+          withholding_tax_total: d.withholding_tax_amount,
           total_amount: d.total_amount,
+          payment_type: d.payment_type,
+          warehouse_name: d.warehouse_name,
           created_document_id: d.created_document_id,
           created_document_number: d.created_document_number,
           created_journal_id: d.created_journal_id,
           created_journal_number: d.created_journal_number,
           status: d.status,
-          error_message: d.error_message
+          error_message: d.error_message,
+          items: d.items || []
         })),
         status: totalRemaining === 0 ? 'posted' : 'partial',
         created_by: user?.id || user?.email
@@ -2817,15 +2890,13 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                             <span className="text-emerald-900 dark:text-emerald-100 font-bold">{formatMoney(doc.total_amount)}</span>
                           </div>
 
-                          {doc.status !== 'saved' && (
-                            <button
-                              onClick={() => handleDeleteDocument(doc.ref)}
-                              className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
-                              title="حذف المستند بالكامل"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleDeleteDocument(doc.ref)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                            title={doc.status === 'saved' ? 'إزالة المستند من مساحة العمل' : 'حذف المستند بالكامل'}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
 
                       </div>
@@ -2854,7 +2925,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                                   <th className="py-1 px-2 text-center text-[11px]">ض.خ.أ (%)</th>
                                   <th className="py-1 px-2 text-center text-[11px]">قيمة ض.خ.أ</th>
                                   <th className="py-1 px-2 text-center font-extrabold text-slate-900 dark:text-white text-[11px]">الإجمالي</th>
-                                  {doc.status !== 'saved' && <th className="py-1 px-2 text-center w-16 text-[11px]">إجراءات</th>}
+                                  <th className="py-1 px-2 text-center w-16 text-[11px]">إجراءات</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono text-xs">
@@ -2903,26 +2974,24 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                                     <td className="py-1 px-2 text-center text-slate-500 font-sans">{item.withholding_tax_rate}%</td>
                                     <td className="py-1 px-2 text-center text-purple-600 font-bold">{formatMoney(item.withholding_tax_amount)}</td>
                                     <td className="py-1 px-2 text-center font-extrabold text-emerald-700 dark:text-emerald-300">{formatMoney(item.total)}</td>
-                                    {doc.status !== 'saved' && (
-                                      <td className="py-1 px-2 text-center">
-                                        <div className="flex items-center justify-center gap-1 font-sans">
-                                          <button
-                                            onClick={() => setEditingItem({ docRef: doc.ref, item })}
-                                            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-emerald-600 cursor-pointer"
-                                            title="تعديل هذا البند"
-                                          >
-                                            <Edit3 className="w-3 h-3" />
-                                          </button>
-                                          <button
-                                            onClick={() => handleDeleteItem(doc.ref, item.id)}
-                                            className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-slate-400 hover:text-red-600 cursor-pointer"
-                                            title="حذف هذا البند"
-                                          >
-                                            <Trash2 className="w-3 h-3" />
-                                          </button>
-                                        </div>
-                                      </td>
-                                    )}
+                                    <td className="py-1 px-2 text-center">
+                                      <div className="flex items-center justify-center gap-1 font-sans">
+                                        <button
+                                          onClick={() => setEditingItem({ docRef: doc.ref, item })}
+                                          className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-emerald-600 cursor-pointer"
+                                          title="تعديل هذا البند"
+                                        >
+                                          <Edit3 className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteItem(doc.ref, item.id)}
+                                          className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-slate-400 hover:text-red-600 cursor-pointer"
+                                          title="حذف هذا البند"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    </td>
                                   </tr>
                                 ))}
                               </tbody>

@@ -3037,6 +3037,128 @@ router.put('/document_import_batches/:id', authenticateToken, async (req: any, r
   }
 });
 
+router.get('/document_import_batches/:id/full', authenticateToken, async (req: any, res) => {
+  try {
+    const companyId = req.user?.company_id || req.headers['x-company-id'];
+    if (!companyId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { id } = req.params;
+    const batchRes = await pool.query(
+      'SELECT * FROM document_import_batches WHERE company_id = $1 AND id = $2',
+      [companyId, id]
+    );
+
+    if (batchRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Batch not found' });
+    }
+
+    const batch = batchRes.rows[0];
+    const details = Array.isArray(batch.details) ? batch.details : [];
+
+    // For each document in details, ensure items are fully populated
+    const fullDetails = await Promise.all(details.map(async (doc: any, docIdx: number) => {
+      if (Array.isArray(doc.items) && doc.items.length > 0) {
+        return doc;
+      }
+
+      // If items not stored in details, fetch from the database
+      let items: any[] = [];
+      const docType = String(doc.doc_type || '');
+      const docId = doc.created_document_id;
+      const docNum = doc.created_document_number;
+
+      try {
+        if (docType.includes('بيع') && docType.includes('فاتورة')) {
+          const itemsRes = await pool.query(
+            'SELECT ii.*, p.name as p_name, p.code as p_code FROM invoice_items ii LEFT JOIN products p ON p.id = ii.product_id WHERE ii.invoice_id = $1 OR (ii.invoice_id IN (SELECT id FROM invoices WHERE company_id = $2 AND invoice_number = $3))',
+            [docId || uuidv4(), companyId, docNum || '']
+          );
+          items = itemsRes.rows;
+        } else if (docType.includes('مرتجع') && docType.includes('بيع')) {
+          const itemsRes = await pool.query(
+            'SELECT ri.*, p.name as p_name, p.code as p_code FROM return_items ri LEFT JOIN products p ON p.id = ri.product_id WHERE ri.return_id = $1 OR (ri.return_id IN (SELECT id FROM returns WHERE company_id = $2 AND return_number = $3))',
+            [docId || uuidv4(), companyId, docNum || '']
+          );
+          items = itemsRes.rows;
+        } else if (docType.includes('أمر') && docType.includes('بيع')) {
+          const itemsRes = await pool.query(
+            'SELECT soi.*, p.name as p_name, p.code as p_code FROM sales_order_items soi LEFT JOIN products p ON p.id = soi.product_id WHERE soi.order_id = $1 OR (soi.order_id IN (SELECT id FROM sales_orders WHERE company_id = $2 AND order_number = $3))',
+            [docId || uuidv4(), companyId, docNum || '']
+          );
+          items = itemsRes.rows;
+        } else if (docType.includes('شراء') && docType.includes('فاتورة')) {
+          const itemsRes = await pool.query(
+            'SELECT pii.*, p.name as p_name, p.code as p_code FROM purchase_invoice_items pii LEFT JOIN products p ON p.id = pii.product_id WHERE pii.purchase_invoice_id = $1 OR (pii.purchase_invoice_id IN (SELECT id FROM purchase_invoices WHERE company_id = $2 AND invoice_number = $3))',
+            [docId || uuidv4(), companyId, docNum || '']
+          );
+          items = itemsRes.rows;
+        } else if (docType.includes('مرتجع') && docType.includes('شراء')) {
+          const itemsRes = await pool.query(
+            'SELECT pri.*, p.name as p_name, p.code as p_code FROM purchase_return_items pri LEFT JOIN products p ON p.id = pri.product_id WHERE pri.return_id = $1 OR (pri.return_id IN (SELECT id FROM purchase_returns WHERE company_id = $2 AND return_number = $3))',
+            [docId || uuidv4(), companyId, docNum || '']
+          );
+          items = itemsRes.rows;
+        } else if (docType.includes('أمر') && docType.includes('شراء')) {
+          const itemsRes = await pool.query(
+            'SELECT poi.*, p.name as p_name, p.code as p_code FROM purchase_order_items poi LEFT JOIN products p ON p.id = poi.product_id WHERE poi.order_id = $1 OR (poi.order_id IN (SELECT id FROM purchase_orders WHERE company_id = $2 AND order_number = $3))',
+            [docId || uuidv4(), companyId, docNum || '']
+          );
+          items = itemsRes.rows;
+        }
+      } catch (e) {
+        console.warn('Error fetching items for doc:', doc.ref, e);
+      }
+
+      const mappedItems = items.map((it: any, iIdx: number) => {
+        const qty = Number(it.quantity) || 1;
+        const price = Number(it.unit_price) || 0;
+        const discount = Number(it.discount || it.discount_amount) || 0;
+        const gross = qty * price;
+        const subtotal = Number(it.subtotal) || Math.max(0, gross - discount);
+        const vatRate = Number(it.tax_rate !== undefined ? it.tax_rate : it.vat_rate) || 0;
+        const vatAmount = Number(it.tax_amount !== undefined ? it.tax_amount : it.vat_amount) || 0;
+        const whtRate = Number(it.withholding_tax_rate) || 0;
+        const whtAmount = Number(it.withholding_tax_amount) || 0;
+        const total = Number(it.total || it.total_amount) || (subtotal + vatAmount - whtAmount);
+
+        return {
+          id: it.id || `${doc.ref}-${iIdx + 1}`,
+          rowIndex: iIdx + 1,
+          product_id: it.product_id || '',
+          product_code: it.product_code || it.p_code || '',
+          product_name: it.product_name || it.p_name || 'صنف',
+          warehouse_id: it.warehouse_id || null,
+          warehouse_name: it.warehouse_name || '',
+          quantity: qty,
+          unit_price: price,
+          discount_amount: discount,
+          subtotal,
+          vat_rate: vatRate,
+          vat_amount: vatAmount,
+          withholding_tax_rate: whtRate,
+          withholding_tax_amount: whtAmount,
+          total,
+          is_service: it.is_service || false,
+          description: it.description || it.notes || ''
+        };
+      });
+
+      return {
+        ...doc,
+        items: mappedItems
+      };
+    }));
+
+    res.json({
+      ...batch,
+      details: fullDetails
+    });
+  } catch (error: any) {
+    console.error('Error fetching full batch details:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.post('/utils/fix-duplicate-pinv', authenticateToken, async (req: any, res) => {
   const client = await pool.connect();
   try {
