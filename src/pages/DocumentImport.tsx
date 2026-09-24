@@ -99,6 +99,9 @@ interface ParsedItem {
   total: number;
   description?: string;
   is_service?: boolean;
+  stock_error?: boolean;
+  available_stock?: number;
+  stock_warning?: string;
 }
 
 interface ParsedDocument {
@@ -129,6 +132,8 @@ interface ParsedDocument {
   created_journal_number?: string;
   error_message?: string;
   is_all_services?: boolean;
+  has_stock_error?: boolean;
+  stock_error_message?: string;
 }
 
 interface ValidationError {
@@ -582,6 +587,123 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     showNotification('تم تنزيل نموذج الإكسيل التجريبي بنجاح', 'success');
   };
 
+  // Stock pre-validation helper: checks availability for physical items in outflow documents
+  const revalidateBatch = (
+    docs: ParsedDocument[],
+    currentProducts: Product[],
+    settings: any,
+    baseErrors: ValidationError[]
+  ): { updatedDocs: ParsedDocument[]; allErrors: ValidationError[] } => {
+    const allowNegativeStock = settings?.allow_negative_stock === true || settings?.allow_negative_stock === 'true';
+
+    // Remove old stock errors to avoid duplicates
+    const nonStockErrors = baseErrors.filter(e => e.field !== 'رصيد المخزون');
+    const newStockErrors: ValidationError[] = [];
+
+    // Track running stock per product across the batch
+    const stockMap: Record<string, number> = {};
+    currentProducts.forEach(p => {
+      stockMap[p.id] = Number(p.stock ?? p.current_stock ?? 0);
+    });
+
+    const updatedDocs = docs.map(doc => {
+      // If already saved, don't modify its status/error
+      if (doc.status === 'saved') {
+        return doc;
+      }
+
+      const isSalesOutflow = isSales && doc.doc_type === 'فاتورة بيع';
+      const isPurchaseOutflow = !isSales && doc.doc_type === 'مرتجع شراء';
+      const isOutflow = isSalesOutflow || isPurchaseOutflow;
+
+      const isSalesInflow = isSales && doc.doc_type === 'مرتجع بيع';
+      const isPurchaseInflow = !isSales && doc.doc_type === 'فاتورة شراء';
+      const isInflow = isSalesInflow || isPurchaseInflow;
+
+      let docHasStockError = false;
+      let firstStockErrorMsg = '';
+
+      const updatedItems = doc.items.map(item => {
+        const prod = currentProducts.find(p => p.id === item.product_id || (p.code && p.code.toLowerCase() === item.product_code.toLowerCase()));
+        const isService = item.is_service || prod?.type === 'service' || prod?.is_service === true;
+
+        if (isService) {
+          return {
+            ...item,
+            stock_error: false,
+            available_stock: undefined,
+            stock_warning: undefined
+          };
+        }
+
+        const available = stockMap[item.product_id] !== undefined
+          ? stockMap[item.product_id]
+          : Number(prod?.stock ?? prod?.current_stock ?? 0);
+
+        if (isInflow) {
+          // Document brings inventory into warehouse
+          stockMap[item.product_id] = available + item.quantity;
+          return {
+            ...item,
+            stock_error: false,
+            available_stock: available,
+            stock_warning: undefined
+          };
+        }
+
+        if (isOutflow) {
+          if (!allowNegativeStock && item.quantity > available) {
+            docHasStockError = true;
+            if (!firstStockErrorMsg) {
+              firstStockErrorMsg = `عجز في رصيد الصنف "${item.product_name}" (المتاح: ${formatNumber(Math.max(0, available))}، المطلوب: ${formatNumber(item.quantity)})`;
+            }
+            newStockErrors.push({
+              rowNumber: item.rowIndex,
+              ref: doc.ref,
+              field: 'رصيد المخزون',
+              message: `الكمية المطلوبة (${formatNumber(item.quantity)}) من الصنف "${item.product_name} (${item.product_code})" غير متوفرة في المخزن (الرصيد المتاح: ${formatNumber(Math.max(0, available))}). سياسة الشركة تمنع الصرف بالسالب.`
+            });
+            stockMap[item.product_id] = available - item.quantity;
+            return {
+              ...item,
+              stock_error: true,
+              available_stock: Math.max(0, available),
+              stock_warning: `الرصيد المتاح: ${formatNumber(Math.max(0, available))} (عجز: ${formatNumber(item.quantity - available)})`
+            };
+          } else {
+            stockMap[item.product_id] = available - item.quantity;
+            return {
+              ...item,
+              stock_error: false,
+              available_stock: available,
+              stock_warning: undefined
+            };
+          }
+        }
+
+        // Draft orders (sales order / purchase order)
+        return {
+          ...item,
+          stock_error: false,
+          available_stock: available,
+          stock_warning: undefined
+        };
+      });
+
+      return {
+        ...doc,
+        items: updatedItems,
+        has_stock_error: docHasStockError,
+        stock_error_message: firstStockErrorMsg || undefined
+      };
+    });
+
+    return {
+      updatedDocs,
+      allErrors: [...nonStockErrors, ...newStockErrors]
+    };
+  };
+
   // Parse uploaded file
   const handleFileUpload = async (file: File) => {
     if (!file) return;
@@ -592,6 +714,28 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     setIsBatchSaved(false);
 
     try {
+      // Refresh products and companySettings to ensure 100% accurate up-to-date stock balances
+      let currentProducts = products;
+      let currentSettings = companySettings;
+      try {
+        if (user?.company_id) {
+          const [freshProds, freshComp] = await Promise.all([
+            dbService.list<Product>('products', { company_id: user.company_id }),
+            dbService.get<any>('companies', user.company_id).catch(() => null)
+          ]);
+          if (freshProds && freshProds.length > 0) {
+            setProducts(freshProds);
+            currentProducts = freshProds;
+          }
+          if (freshComp?.settings) {
+            setCompanySettings(freshComp.settings);
+            currentSettings = freshComp.settings;
+          }
+        }
+      } catch (e) {
+        console.warn('Master data quick-refresh fallback:', e);
+      }
+
       const buffer = await file.arrayBuffer();
       const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
       
@@ -734,7 +878,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             message: 'كود الصنف أو الباركود أو اسم الصنف إلزامي'
           });
         } else {
-          matchedProduct = products.find(p => 
+          matchedProduct = currentProducts.find(p => 
             (rawProdCode && p.code && p.code.toLowerCase() === rawProdCode.toLowerCase()) ||
             (rawProdCode && p.barcode && p.barcode.toLowerCase() === rawProdCode.toLowerCase()) ||
             (rawProdName && p.name && p.name.trim().toLowerCase() === rawProdName.toLowerCase()) ||
@@ -911,8 +1055,6 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         }
       }
 
-      setValidationErrors(errors);
-
       // Convert grouped documents to list and calculate totals
       const docsList: ParsedDocument[] = Object.values(groupedDocs).map(g => {
         const totals = recalculateDocTotals(g.items);
@@ -937,17 +1079,26 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         };
       });
 
-      setDocuments(docsList);
+      // Pre-validate stock across batch documents before allowing saving
+      const { updatedDocs, allErrors } = revalidateBatch(docsList, currentProducts, currentSettings, errors);
+
+      setDocuments(updatedDocs);
+      setValidationErrors(allErrors);
 
       // Expand all by default
       const initialExp: Record<string, boolean> = {};
-      docsList.forEach(d => { initialExp[d.ref] = true; });
+      updatedDocs.forEach(d => { initialExp[d.ref] = true; });
       setExpandedRefs(initialExp);
 
-      if (errors.length > 0) {
-        showNotification(`تم فحص الملف: تم العثور على ${errors.length} خطأ بحاجة لمراجعة`, 'error');
+      const stockErrorsCount = allErrors.filter(e => e.field === 'رصيد المخزون').length;
+      if (allErrors.length > 0) {
+        if (stockErrorsCount > 0) {
+          showNotification(`تم فحص الملف: تم العثور على ${allErrors.length} ملاحظة (منها ${stockErrorsCount} عجز مخزون يمنع الحفظ)`, 'error');
+        } else {
+          showNotification(`تم فحص الملف: تم العثور على ${allErrors.length} خطأ بحاجة لمراجعة`, 'error');
+        }
       } else {
-        showNotification(`تم فحص ومطابقة الملف بنجاح! تم استخراج ${docsList.length} مستند صالح`, 'success');
+        showNotification(`تم فحص ومطابقة الملف بنجاح! تم استخراج ${updatedDocs.length} مستند صالح وجاهز للحفظ`, 'success');
       }
 
     } catch (err: any) {
@@ -969,26 +1120,35 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
   // Delete single document
   const handleDeleteDocument = (ref: string) => {
-    setDocuments(prev => prev.filter(d => d.ref !== ref));
-    setValidationErrors(prev => prev.filter(e => e.ref !== ref));
-    showNotification(`تم حذف المستند ${ref} من الدفعة`, 'info');
+    const remaining = documents.filter(d => d.ref !== ref);
+    const { updatedDocs, allErrors } = revalidateBatch(
+      remaining, 
+      products, 
+      companySettings, 
+      validationErrors.filter(e => e.ref !== ref)
+    );
+    setDocuments(updatedDocs);
+    setValidationErrors(allErrors);
+    showNotification(`تم حذف المستند ${ref} من الدفعة وإعادة فحص المخزون`, 'info');
   };
 
   // Delete item from document
   const handleDeleteItem = (docRef: string, itemId: string) => {
-    setDocuments(prev => {
-      return prev.map(doc => {
-        if (doc.ref !== docRef) return doc;
-        const newItems = doc.items.filter(it => it.id !== itemId);
-        const newTotals = recalculateDocTotals(newItems);
-        return {
-          ...doc,
-          items: newItems,
-          ...newTotals
-        };
-      }).filter(doc => doc.items.length > 0);
-    });
-    showNotification('تم حذف البند وإعادة احتساب الإجماليات', 'info');
+    const updated = documents.map(doc => {
+      if (doc.ref !== docRef) return doc;
+      const newItems = doc.items.filter(it => it.id !== itemId);
+      const newTotals = recalculateDocTotals(newItems);
+      return {
+        ...doc,
+        items: newItems,
+        ...newTotals
+      };
+    }).filter(doc => doc.items.length > 0);
+
+    const { updatedDocs, allErrors } = revalidateBatch(updated, products, companySettings, validationErrors);
+    setDocuments(updatedDocs);
+    setValidationErrors(allErrors);
+    showNotification('تم حذف البند وإعادة فحص رصيد المخزون', 'info');
   };
 
   // Update item in document
@@ -1014,21 +1174,23 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       total: lineTotal
     };
 
-    setDocuments(prev => {
-      return prev.map(doc => {
-        if (doc.ref !== docRef) return doc;
-        const newItems = doc.items.map(it => it.id === finalItem.id ? finalItem : it);
-        const newTotals = recalculateDocTotals(newItems);
-        return {
-          ...doc,
-          items: newItems,
-          ...newTotals
-        };
-      });
+    const updated = documents.map(doc => {
+      if (doc.ref !== docRef) return doc;
+      const newItems = doc.items.map(it => it.id === finalItem.id ? finalItem : it);
+      const newTotals = recalculateDocTotals(newItems);
+      return {
+        ...doc,
+        items: newItems,
+        ...newTotals
+      };
     });
 
+    const { updatedDocs, allErrors } = revalidateBatch(updated, products, companySettings, validationErrors);
+    setDocuments(updatedDocs);
+    setValidationErrors(allErrors);
+
     setEditingItem(null);
-    showNotification('تم تحديث بيانات الصنف وإعادة احتساب الإجماليات بنجاح', 'success');
+    showNotification('تم تحديث بيانات الصنف وإعادة فحص رصيد المخزون بنجاح', 'success');
   };
 
   // Save & Post batch
@@ -1829,14 +1991,19 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-amber-100 dark:divide-slate-800">
-                      {validationErrors.map((err, i) => (
-                        <tr key={i} className="hover:bg-amber-50/50 dark:hover:bg-slate-800/50">
-                          <td className="p-2 font-mono font-bold text-amber-700 dark:text-amber-400">الصف {err.rowNumber}</td>
-                          <td className="p-2 font-mono">{err.ref}</td>
-                          <td className="p-2 font-semibold">{err.field}</td>
-                          <td className="p-2 text-red-600 dark:text-red-400">{err.message}</td>
-                        </tr>
-                      ))}
+                      {validationErrors.map((err, i) => {
+                        const isStockErr = err.field === 'رصيد المخزون';
+                        return (
+                          <tr key={i} className={`hover:bg-amber-50/50 dark:hover:bg-slate-800/50 ${isStockErr ? 'bg-red-50/80 dark:bg-red-950/40 font-medium' : ''}`}>
+                            <td className="p-2 font-mono font-bold text-amber-700 dark:text-amber-400">الصف {err.rowNumber}</td>
+                            <td className="p-2 font-mono font-bold">{err.ref}</td>
+                            <td className={`p-2 font-semibold ${isStockErr ? 'text-red-700 dark:text-red-300 font-bold' : ''}`}>
+                              {isStockErr ? '⚠️ ' + err.field : err.field}
+                            </td>
+                            <td className="p-2 text-red-600 dark:text-red-400">{err.message}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -2203,7 +2370,18 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                             </button>
                           )}
 
-                          {/* 3. Error Badge if document failed */}
+                          {/* 3. Pre-validation Stock Shortage Warning */}
+                          {doc.has_stock_error && doc.status !== 'saved' && doc.status !== 'failed' && (
+                            <div 
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-red-50 dark:bg-red-950/70 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 text-[11px] font-semibold"
+                              title={doc.stock_error_message}
+                            >
+                              <AlertTriangle className="w-3 h-3 text-red-600 shrink-0" />
+                              <span className="truncate max-w-[340px]">عجز مخزون: {doc.stock_error_message}</span>
+                            </div>
+                          )}
+
+                          {/* 3.1 Error Badge if document failed during save */}
                           {doc.status === 'failed' && (
                             <div 
                               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-red-50 dark:bg-red-950/70 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 text-[11px] font-semibold"
@@ -2303,15 +2481,30 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                                   <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
                                     <td className="py-1 px-2 text-center text-slate-400 font-sans">{itemIdx + 1}</td>
                                     <td className="py-1 px-2 font-semibold text-slate-700 dark:text-slate-300">{item.product_code}</td>
-                                    <td className="py-1 px-2 font-sans font-medium text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                    <td className="py-1 px-2 font-sans font-medium text-slate-900 dark:text-slate-100 flex items-center gap-1.5 flex-wrap">
                                       <span>{item.product_name}</span>
                                       {item.is_service && (
                                         <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300 font-semibold border border-purple-200 dark:border-purple-800">
                                           خدمة
                                         </span>
                                       )}
+                                      {item.stock_error && (
+                                        <span 
+                                          className="text-[10px] px-1.5 py-0.2 rounded bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200 font-bold border border-red-300 dark:border-red-800 flex items-center gap-1"
+                                          title={item.stock_warning}
+                                        >
+                                          <AlertTriangle className="w-2.5 h-2.5 text-red-600" />
+                                          <span>عجز مخزون (المتاح: {item.available_stock})</span>
+                                        </span>
+                                      )}
                                     </td>
-                                    <td className="py-1 px-2 text-center font-bold text-slate-900 dark:text-white">{item.quantity}</td>
+                                    <td className={`py-1 px-2 text-center font-bold ${
+                                      item.stock_error 
+                                        ? 'text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/60 rounded border border-red-200 dark:border-red-800' 
+                                        : 'text-slate-900 dark:text-white'
+                                    }`}>
+                                      {item.quantity}
+                                    </td>
                                     <td className="py-1 px-2 text-center">{formatMoney(item.unit_price)}</td>
                                     <td className="py-1 px-2 text-center text-amber-600 font-bold">{formatMoney(item.discount_amount)}</td>
                                     <td className="py-1 px-2 text-center text-blue-600 font-bold">{formatMoney(item.subtotal)}</td>
@@ -2376,7 +2569,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             <div className="space-y-2.5 text-xs">
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">الكمية:</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-slate-700 dark:text-slate-300">الكمية:</label>
+                    {editingItem.item.available_stock !== undefined && (
+                      <span className="text-[11px] text-slate-500 font-mono">
+                        (المتاح: {editingItem.item.available_stock})
+                      </span>
+                    )}
+                  </div>
                   <input 
                     type="number"
                     min="0.001"
