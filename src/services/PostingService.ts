@@ -38,16 +38,7 @@ export class PostingService {
     let customerAccountId = customer?.account_id || '';
     let customerAccountName = customer?.account_name || 'حساب العملاء';
     if (!customerAccountId) {
-      const defaultCustAcc = accounts.find(a => 
-        a.account_usage === 'customer' ||
-        a.code === '1102' ||
-        a.name.includes('العملاء') ||
-        a.name.includes('الذمم المدينة')
-      );
-      if (defaultCustAcc) {
-        customerAccountId = defaultCustAcc.id;
-        customerAccountName = defaultCustAcc.name;
-      }
+      throw new Error(`لا يمكن إنشاء القيد المحاسبي: حساب العميل غير محدد للعميل "${customer?.name || invoice.customer_id}". يمنع النظام توقع الحسابات تلقائياً.`);
     }
 
     // Main Sales Invoice Debit Line (Customer Account)
@@ -126,16 +117,7 @@ export class PostingService {
       let salesAccountName = product?.revenue_account_name || 'حساب المبيعات';
 
       if (!salesAccountId) {
-        const defaultSalesAcc = accounts.find(a => 
-          a.account_usage === 'sales_revenue' ||
-          a.code === '4101' ||
-          a.name.includes('المبيعات') ||
-          a.name.includes('إيرادات مبيعات')
-        );
-        if (defaultSalesAcc) {
-          salesAccountId = defaultSalesAcc.id;
-          salesAccountName = defaultSalesAcc.name;
-        }
+        throw new Error(`لا يمكن إنشاء القيد المحاسبي: حساب الإيرادات غير محدد في بطاقة الصنف "${item.product_name || product?.name}". يمنع النظام توقع الحسابات تلقائياً.`);
       }
       const itemTotalFC = Number(item.total) || 0;
       const itemTotalLocal = Number((itemTotalFC * rate).toFixed(2));
@@ -163,32 +145,18 @@ export class PostingService {
       const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
       
       if (itemVat > 0) {
-        let finalVatAccountId = vatAccountId;
-        let finalVatAccountName = vatAccountName;
-        
-        if (!finalVatAccountId) {
-          const globalVatAccount = accounts.find(a => 
-            a.account_usage === 'vat' ||
-            a.account_usage === 'vat_sales' ||
-            a.name.includes('ضريبة القيمة المضافة') || 
-            a.name.includes('قيمة مضافة') || 
-            a.name.includes('ضريبة مبيعات') ||
-            a.code === '2221'
-          );
-          finalVatAccountId = globalVatAccount?.id || '';
-          finalVatAccountName = globalVatAccount?.name || finalVatAccountName;
+        if (!vatAccountId) {
+          throw new Error(`لا يمكن إنشاء القيد المحاسبي: حساب ضريبة القيمة المضافة (مبيعات) غير محدد في بطاقة الصنف "${item.product_name || prod?.name}". يمنع النظام توقع الحسابات تلقائياً.`);
         }
         
-        if (finalVatAccountId) {
-          if (!vatGroup[finalVatAccountId]) {
-            vatGroup[finalVatAccountId] = {
-              account_id: finalVatAccountId,
-              account_name: finalVatAccountName,
-              amount: 0
-            };
-          }
-          vatGroup[finalVatAccountId].amount += itemVat;
+        if (!vatGroup[vatAccountId]) {
+          vatGroup[vatAccountId] = {
+            account_id: vatAccountId,
+            account_name: vatAccountName,
+            amount: 0
+          };
         }
+        vatGroup[vatAccountId].amount += itemVat;
       }
     });
 
@@ -208,27 +176,7 @@ export class PostingService {
         });
       });
     } else if (taxAmount > 0) {
-      const vatAccount = accounts.find(a => 
-        a.account_usage === 'vat' ||
-        a.account_usage === 'vat_sales' ||
-        a.name.includes('ضريبة القيمة المضافة') || 
-        a.name.includes('قيمة مضافة') || 
-        a.name.includes('ضريبة مبيعات') ||
-        a.code === '2221'
-      );
-      const vatAccountId = vatAccount?.id || '';
-      const vatAccountName = vatAccount?.name || 'حساب ضريبة القيمة المضافة';
-      const taxLocal = Number((taxAmount * rate).toFixed(2));
-      journalItems.push({
-        account_id: vatAccountId,
-        account_name: vatAccountName,
-        debit: 0,
-        credit: taxLocal,
-        currency: currencyCode,
-        exchange_rate: rate,
-        foreign_amount: taxAmount,
-        description: `ضريبة القيمة المضافة - فاتورة مبيعات رقم ${invoice.invoice_number}`
-      });
+      throw new Error(`لا يمكن إنشاء القيد المحاسبي: الفاتورة رقم ${invoice.invoice_number} تحتوي على ضريبة قيمة مضافة (${taxAmount}) لكن لم يتم تحديد حساب ضريبة القيمة المضافة في بطاقة أي صنف.`);
     }
 
     // Withholding Tax (Debit side for sales: Current Asset - Tax Withheld by Customers)
@@ -242,32 +190,18 @@ export class PostingService {
       const itemWht = Number(item.withholding_tax_amount !== undefined ? item.withholding_tax_amount : (itemTotal * (rateVal / 100)).toFixed(2));
 
       if (itemWht > 0) {
-        let finalWhtAccountId = whtAccountId;
-        let finalWhtAccountName = whtAccountName;
-
-        if (!finalWhtAccountId) {
-          const globalWhtAccount = accounts.find(a => 
-            a.account_usage === 'withholding_tax_customers' || 
-            a.name.includes('تحت حساب الضريبة') ||
-            a.name.includes('خصم من العملاء') ||
-            a.name.includes('خصم عملاء') ||
-            a.code === '112' ||
-            a.code?.startsWith('118')
-          );
-          finalWhtAccountId = globalWhtAccount?.id || '';
-          finalWhtAccountName = globalWhtAccount?.name || finalWhtAccountName;
+        if (!whtAccountId) {
+          throw new Error(`لا يمكن إنشاء القيد المحاسبي: حساب ضرائب خصم من العملاء غير محدد في بطاقة الصنف "${item.product_name || prod?.name}". يمنع النظام توقع الحسابات تلقائياً.`);
         }
 
-        if (finalWhtAccountId) {
-          if (!whtSalesGroup[finalWhtAccountId]) {
-            whtSalesGroup[finalWhtAccountId] = {
-              account_id: finalWhtAccountId,
-              account_name: finalWhtAccountName,
-              amount: 0
-            };
-          }
-          whtSalesGroup[finalWhtAccountId].amount += itemWht;
+        if (!whtSalesGroup[whtAccountId]) {
+          whtSalesGroup[whtAccountId] = {
+            account_id: whtAccountId,
+            account_name: whtAccountName,
+            amount: 0
+          };
         }
+        whtSalesGroup[whtAccountId].amount += itemWht;
       }
     });
 
@@ -287,25 +221,7 @@ export class PostingService {
         });
       });
     } else if (invoiceWhtTotal > 0) {
-      const globalWhtAccount = accounts.find(a => 
-        a.account_usage === 'withholding_tax_customers' || 
-        a.name.includes('تحت حساب الضريبة') ||
-        a.name.includes('خصم من العملاء') ||
-        a.name.includes('خصم عملاء') ||
-        a.code === '112' ||
-        a.code?.startsWith('118')
-      );
-      const whtLocal = Number((invoiceWhtTotal * rate).toFixed(2));
-      journalItems.push({
-        account_id: globalWhtAccount?.id || '',
-        account_name: globalWhtAccount?.name || 'ضرائب خصم من العملاء',
-        debit: whtLocal,
-        credit: 0,
-        currency: currencyCode,
-        exchange_rate: rate,
-        foreign_amount: invoiceWhtTotal,
-        description: `ضريبة خصم وإضافة مبيعات (خصم من العملاء) - فاتورة رقم ${invoice.invoice_number}`
-      });
+      throw new Error(`لا يمكن إنشاء القيد المحاسبي: الفاتورة رقم ${invoice.invoice_number} تحتوي على ضريبة خصم (${invoiceWhtTotal}) دون تحديد حساب ضرائب الخصم في بطاقة الصنف.`);
     }
 
     let total_debit = Number(journalItems.reduce((sum, i) => sum + (Number(i.debit) || 0), 0).toFixed(2));
@@ -395,6 +311,10 @@ export class PostingService {
       let salesReturnAccountId = product?.revenue_account_id || ''; 
       let salesReturnAccountName = product?.revenue_account_name || 'حساب مردودات المبيعات';
 
+      if (!salesReturnAccountId) {
+        throw new Error(`لا يمكن إنشاء القيد المحاسبي: حساب مردودات/إيرادات المبيعات غير محدد في بطاقة الصنف "${item.product_name || product?.name}".`);
+      }
+
       journalItems.push({
         account_id: salesReturnAccountId,
         account_name: salesReturnAccountName,
@@ -415,29 +335,18 @@ export class PostingService {
       const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
       
       if (itemVat > 0) {
-        let finalVatAccountId = vatAccountId;
-        let finalVatAccountName = vatAccountName;
-        
-        if (!finalVatAccountId) {
-          const globalVatAccount = accounts.find(a => 
-            a.name.includes('ضريبة القيمة المضافة') || 
-            a.name.includes('قيمة مضافة') || 
-            a.name.includes('ضريبة مبيعات')
-          );
-          finalVatAccountId = globalVatAccount?.id || '';
-          finalVatAccountName = globalVatAccount?.name || finalVatAccountName;
+        if (!vatAccountId) {
+          throw new Error(`لا يمكن إنشاء القيد المحاسبي: حساب ضريبة القيمة المضافة (مبيعات) غير محدد في بطاقة الصنف "${item.product_name || prod?.name}".`);
         }
         
-        if (finalVatAccountId) {
-          if (!vatGroup[finalVatAccountId]) {
-            vatGroup[finalVatAccountId] = {
-              account_id: finalVatAccountId,
-              account_name: finalVatAccountName,
-              amount: 0
-            };
-          }
-          vatGroup[finalVatAccountId].amount += itemVat;
+        if (!vatGroup[vatAccountId]) {
+          vatGroup[vatAccountId] = {
+            account_id: vatAccountId,
+            account_name: vatAccountName,
+            amount: 0
+          };
         }
+        vatGroup[vatAccountId].amount += itemVat;
       }
     });
 
@@ -453,25 +362,15 @@ export class PostingService {
         });
       });
     } else if (taxAmountReturn > 0) {
-      const vatAccount = accounts.find(a => 
-        a.name.includes('ضريبة القيمة المضافة') || 
-        a.name.includes('قيمة مضافة') || 
-        a.name.includes('ضريبة مبيعات')
-      );
-      const vatAccountId = vatAccount?.id || '';
-      const vatAccountName = vatAccount?.name || 'حساب ضريبة القيمة المضافة';
-      journalItems.push({
-        account_id: vatAccountId,
-        account_name: vatAccountName,
-        debit: taxAmountReturn,
-        credit: 0,
-        description: `ضريبة القيمة المضافة - مرتجع مبيعات رقم ${doc.return_number || doc.id.slice(-6)}`
-      });
+      throw new Error(`لا يمكن إنشاء القيد المحاسبي: مرتجع المبيعات رقم ${doc.return_number} يحتوي على ضريبة (${taxAmountReturn}) دون تحديد حساب ضريبة القيمة المضافة في بطاقة الصنف.`);
     }
 
     // Debit Customer Account (Clear customer balance on return)
     let customerAccountId = customer?.account_id || '';
     let customerAccountName = customer?.account_name || 'حساب العملاء';
+    if (!customerAccountId) {
+      throw new Error(`لا يمكن إنشاء القيد المحاسبي: حساب العميل غير محدد للعميل "${customer?.name || doc.customer_id}".`);
+    }
 
     journalItems.push({
       account_id: customerAccountId,
@@ -525,30 +424,18 @@ export class PostingService {
       const itemWht = Number(item.withholding_tax_amount !== undefined ? item.withholding_tax_amount : (itemTotal * (rateVal / 100)).toFixed(2));
 
       if (itemWht > 0) {
-        let finalWhtAccountId = whtAccountId;
-        let finalWhtAccountName = whtAccountName;
-
-        if (!finalWhtAccountId) {
-          const globalWhtAccount = accounts.find(a => 
-            a.account_usage === 'withholding_tax_customers' || 
-            a.name.includes('خصم من العملاء') ||
-            a.name.includes('خصم عملاء') ||
-            a.code?.startsWith('118')
-          );
-          finalWhtAccountId = globalWhtAccount?.id || '';
-          finalWhtAccountName = globalWhtAccount?.name || finalWhtAccountName;
+        if (!whtAccountId) {
+          throw new Error(`لا يمكن إنشاء القيد المحاسبي: حساب ضرائب خصم من العملاء غير محدد في بطاقة الصنف "${item.product_name || prod?.name}".`);
         }
 
-        if (finalWhtAccountId) {
-          if (!whtReturnGroup[finalWhtAccountId]) {
-            whtReturnGroup[finalWhtAccountId] = {
-              account_id: finalWhtAccountId,
-              account_name: finalWhtAccountName,
-              amount: 0
-            };
-          }
-          whtReturnGroup[finalWhtAccountId].amount += itemWht;
+        if (!whtReturnGroup[whtAccountId]) {
+          whtReturnGroup[whtAccountId] = {
+            account_id: whtAccountId,
+            account_name: whtAccountName,
+            amount: 0
+          };
         }
+        whtReturnGroup[whtAccountId].amount += itemWht;
       }
     });
 
@@ -564,19 +451,7 @@ export class PostingService {
         });
       });
     } else if (returnWhtTotal > 0) {
-      const globalWhtAccount = accounts.find(a => 
-        a.account_usage === 'withholding_tax_customers' || 
-        a.name.includes('خصم من العملاء') ||
-        a.name.includes('خصم عملاء') ||
-        a.code?.startsWith('118')
-      );
-      journalItems.push({
-        account_id: globalWhtAccount?.id || '',
-        account_name: globalWhtAccount?.name || 'ضرائب خصم من العملاء',
-        debit: 0,
-        credit: returnWhtTotal,
-        description: `تسوية ضريبة خصم وإضافة - مرتجع مبيعات رقم ${doc.return_number || doc.id.slice(-6)}`
-      });
+      throw new Error(`لا يمكن إنشاء القيد المحاسبي: مرتجع المبيعات رقم ${doc.return_number} يحتوي على ضريبة خصم (${returnWhtTotal}) دون تحديد حساب ضرائب الخصم في بطاقة الصنف.`);
     }
 
     return {
@@ -603,22 +478,11 @@ export class PostingService {
     // Debit side: Purchases / Inventory
     doc.items?.forEach(item => {
       const product = products.find(p => p.id === item.product_id);
-      let purchaseAccountId = product?.cost_account_id || '';
-      let purchaseAccountName = product?.cost_account_name || 'حساب المشتريات';
+      let purchaseAccountId = product?.cost_account_id || product?.inventory_account_id || '';
+      let purchaseAccountName = product?.cost_account_name || product?.inventory_account_name || 'حساب المشتريات / التكلفة';
 
       if (!purchaseAccountId) {
-        const defaultPurchaseAcc = accounts.find(a => 
-          a.account_usage === 'cost_of_sales' ||
-          a.account_usage === 'inventory' ||
-          a.code === '5101' ||
-          a.code?.startsWith('51') ||
-          a.name.includes('المشتريات') ||
-          a.name.includes('تكلفة المبيعات')
-        );
-        if (defaultPurchaseAcc) {
-          purchaseAccountId = defaultPurchaseAcc.id;
-          purchaseAccountName = defaultPurchaseAcc.name;
-        }
+        throw new Error(`لا يمكن حفظ القيد: حساب التكلفة أو المخزون غير محدد في بطاقة الصنف "${item.product_name || product?.name || 'غير معروف'}". يمنع النظام توقع الحسابات تلقائياً.`);
       }
 
       journalItems.push({
@@ -641,29 +505,18 @@ export class PostingService {
       const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
       
       if (itemVat > 0) {
-        let finalVatAccountId = vatAccountId;
-        let finalVatAccountName = vatAccountName;
-        
-        if (!finalVatAccountId) {
-          const globalVatAccount = accounts.find(a => 
-            a.name.includes('ضريبة القيمة المضافة') || 
-            a.name.includes('قيمة مضافة') || 
-            a.name.includes('ضريبة مدخلات')
-          );
-          finalVatAccountId = globalVatAccount?.id || '';
-          finalVatAccountName = globalVatAccount?.name || finalVatAccountName;
+        if (!vatAccountId) {
+          throw new Error(`لا يمكن حفظ القيد: حساب ضريبة القيمة المضافة (مشتريات) غير محدد في بطاقة الصنف "${item.product_name || prod?.name || 'غير معروف'}". يمنع النظام توقع الحسابات تلقائياً.`);
         }
         
-        if (finalVatAccountId) {
-          if (!vatGroup[finalVatAccountId]) {
-            vatGroup[finalVatAccountId] = {
-              account_id: finalVatAccountId,
-              account_name: finalVatAccountName,
-              amount: 0
-            };
-          }
-          vatGroup[finalVatAccountId].amount += itemVat;
+        if (!vatGroup[vatAccountId]) {
+          vatGroup[vatAccountId] = {
+            account_id: vatAccountId,
+            account_name: vatAccountName,
+            amount: 0
+          };
         }
+        vatGroup[vatAccountId].amount += itemVat;
       }
     });
 
@@ -679,36 +532,14 @@ export class PostingService {
         });
       });
     } else if (taxAmountPurchase > 0) {
-      const vatAccount = accounts.find(a => 
-        a.name.includes('ضريبة القيمة المضافة') || 
-        a.name.includes('قيمة مضافة') || 
-        a.name.includes('ضريبة مدخلات')
-      );
-      const vatAccountId = vatAccount?.id || '';
-      const vatAccountName = vatAccount?.name || 'حساب ضريبة القيمة المضافة';
-      journalItems.push({
-        account_id: vatAccountId,
-        account_name: vatAccountName,
-        debit: taxAmountPurchase,
-        credit: 0,
-        description: `ضريبة القيمة المضافة - فاتورة مشتريات رقم ${doc.invoice_number}`
-      });
+      throw new Error(`لا يمكن حفظ القيد: فاتورة المشتريات رقم ${doc.invoice_number} تحتوي على ضريبة (${taxAmountPurchase}) دون تحديد حساب ضريبة القيمة المضافة في بطاقة الصنف.`);
     }
 
     // Credit Supplier Account (Account Payable)
     let supplierAccountId = supplier?.account_id || '';
     let supplierAccountName = supplier?.account_name || 'حساب الموردين';
     if (!supplierAccountId) {
-      const defaultSuppAcc = accounts.find(a => 
-        a.account_usage === 'supplier' ||
-        a.code === '211' ||
-        a.name.includes('الموردين') ||
-        a.name.includes('الذمم الدائنة')
-      );
-      if (defaultSuppAcc) {
-        supplierAccountId = defaultSuppAcc.id;
-        supplierAccountName = defaultSuppAcc.name;
-      }
+      throw new Error(`لا يمكن حفظ القيد: حساب المورد غير محدد في بطاقة المورد "${supplier?.name || doc.supplier_id}". يمنع النظام توقع الحسابات تلقائياً.`);
     }
 
     journalItems.push({
@@ -763,31 +594,18 @@ export class PostingService {
       const itemWht = Number(item.withholding_tax_amount !== undefined ? item.withholding_tax_amount : (itemTotal * (rateVal / 100)).toFixed(2));
 
       if (itemWht > 0) {
-        let finalWhtAccountId = whtAccountId;
-        let finalWhtAccountName = whtAccountName;
-
-        if (!finalWhtAccountId) {
-          const globalWhtAccount = accounts.find(a => 
-            a.account_usage === 'withholding_tax_suppliers' || 
-            a.name.includes('خصم على الموردين') ||
-            a.name.includes('خصم من الموردين') ||
-            a.name.includes('خصم موردين') ||
-            a.code?.startsWith('222')
-          );
-          finalWhtAccountId = globalWhtAccount?.id || '';
-          finalWhtAccountName = globalWhtAccount?.name || finalWhtAccountName;
+        if (!whtAccountId) {
+          throw new Error(`لا يمكن حفظ القيد: حساب ضرائب الخصم على الموردين غير محدد في بطاقة الصنف "${item.product_name || prod?.name || 'غير معروف'}". يمنع النظام توقع الحسابات تلقائياً.`);
         }
 
-        if (finalWhtAccountId) {
-          if (!whtPurchaseGroup[finalWhtAccountId]) {
-            whtPurchaseGroup[finalWhtAccountId] = {
-              account_id: finalWhtAccountId,
-              account_name: finalWhtAccountName,
-              amount: 0
-            };
-          }
-          whtPurchaseGroup[finalWhtAccountId].amount += itemWht;
+        if (!whtPurchaseGroup[whtAccountId]) {
+          whtPurchaseGroup[whtAccountId] = {
+            account_id: whtAccountId,
+            account_name: whtAccountName,
+            amount: 0
+          };
         }
+        whtPurchaseGroup[whtAccountId].amount += itemWht;
       }
     });
 
@@ -803,20 +621,7 @@ export class PostingService {
         });
       });
     } else if (docWhtTotal > 0) {
-      const globalWhtAccount = accounts.find(a => 
-        a.account_usage === 'withholding_tax_suppliers' || 
-        a.name.includes('خصم على الموردين') ||
-        a.name.includes('خصم من الموردين') ||
-        a.name.includes('خصم موردين') ||
-        a.code?.startsWith('222')
-      );
-      journalItems.push({
-        account_id: globalWhtAccount?.id || '',
-        account_name: globalWhtAccount?.name || 'ضرائب خصم على الموردين',
-        debit: 0,
-        credit: docWhtTotal,
-        description: `ضريبة خصم وإضافة مشتريات (خصم على الموردين) - فاتورة مشتريات رقم ${doc.invoice_number}`
-      });
+      throw new Error(`لا يمكن حفظ القيد: فاتورة المشتريات رقم ${doc.invoice_number} تحتوي على ضريبة خصم (${docWhtTotal}) دون تحديد حساب ضرائب الخصم في بطاقة الصنف.`);
     }
 
     return {
@@ -843,6 +648,9 @@ export class PostingService {
     // Supplier account ID
     let supplierAccountId = supplier?.account_id || '';
     let supplierAccountName = supplier?.account_name || 'حساب الموردين';
+    if (!supplierAccountId) {
+      throw new Error(`لا يمكن حفظ القيد: حساب المورد غير محدد في بطاقة المورد "${supplier?.name || doc.supplier_id}". يمنع النظام توقع الحسابات تلقائياً.`);
+    }
 
     journalItems.push({
       account_id: supplierAccountId,
@@ -887,8 +695,12 @@ export class PostingService {
     // Credit side: Purchase Returns / Inventory reduction
     doc.items?.forEach(item => {
       const product = products.find(p => p.id === item.product_id);
-      let purchaseReturnAccountId = product?.cost_account_id || '';
-      let purchaseReturnAccountName = product?.cost_account_name || 'حساب مردودات المشتريات';
+      let purchaseReturnAccountId = product?.cost_account_id || product?.inventory_account_id || '';
+      let purchaseReturnAccountName = product?.cost_account_name || product?.inventory_account_name || 'حساب مردودات المشتريات / المخزون';
+
+      if (!purchaseReturnAccountId) {
+        throw new Error(`لا يمكن حفظ القيد: حساب التكلفة أو المخزون غير محدد في بطاقة الصنف "${item.product_name || product?.name || 'غير معروف'}". يمنع النظام توقع الحسابات تلقائياً.`);
+      }
 
       journalItems.push({
         account_id: purchaseReturnAccountId,
@@ -910,29 +722,18 @@ export class PostingService {
       const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
       
       if (itemVat > 0) {
-        let finalVatAccountId = vatAccountId;
-        let finalVatAccountName = vatAccountName;
-        
-        if (!finalVatAccountId) {
-          const globalVatAccount = accounts.find(a => 
-            a.name.includes('ضريبة القيمة المضافة') || 
-            a.name.includes('قيمة مضافة') || 
-            a.name.includes('ضريبة مدخلات')
-          );
-          finalVatAccountId = globalVatAccount?.id || '';
-          finalVatAccountName = globalVatAccount?.name || finalVatAccountName;
+        if (!vatAccountId) {
+          throw new Error(`لا يمكن حفظ القيد: حساب ضريبة القيمة المضافة (مشتريات) غير محدد في بطاقة الصنف "${item.product_name || prod?.name || 'غير معروف'}". يمنع النظام توقع الحسابات تلقائياً.`);
         }
         
-        if (finalVatAccountId) {
-          if (!vatGroup[finalVatAccountId]) {
-            vatGroup[finalVatAccountId] = {
-              account_id: finalVatAccountId,
-              account_name: finalVatAccountName,
-              amount: 0
-            };
-          }
-          vatGroup[finalVatAccountId].amount += itemVat;
+        if (!vatGroup[vatAccountId]) {
+          vatGroup[vatAccountId] = {
+            account_id: vatAccountId,
+            account_name: vatAccountName,
+            amount: 0
+          };
         }
+        vatGroup[vatAccountId].amount += itemVat;
       }
     });
 
@@ -948,20 +749,7 @@ export class PostingService {
         });
       });
     } else if (taxAmountPurchaseReturn > 0) {
-      const vatAccount = accounts.find(a => 
-        a.name.includes('ضريبة القيمة المضافة') || 
-        a.name.includes('قيمة مضافة') || 
-        a.name.includes('ضريبة مدخلات')
-      );
-      const vatAccountId = vatAccount?.id || '';
-      const vatAccountName = vatAccount?.name || 'حساب ضريبة القيمة المضافة';
-      journalItems.push({
-        account_id: vatAccountId,
-        account_name: vatAccountName,
-        debit: 0,
-        credit: taxAmountPurchaseReturn,
-        description: `ضريبة القيمة المضافة - مرتجع مشتريات رقم ${doc.return_number || doc.id.slice(-6)}`
-      });
+      throw new Error(`لا يمكن حفظ القيد: مرتجع المشتريات رقم ${doc.return_number} يحتوي على ضريبة (${taxAmountPurchaseReturn}) دون تحديد حساب ضريبة القيمة المضافة في بطاقة الصنف.`);
     }
 
     
@@ -976,31 +764,18 @@ export class PostingService {
       const itemWht = Number(item.withholding_tax_amount !== undefined ? item.withholding_tax_amount : (itemTotal * (rateVal / 100)).toFixed(2));
 
       if (itemWht > 0) {
-        let finalWhtAccountId = whtAccountId;
-        let finalWhtAccountName = whtAccountName;
-
-        if (!finalWhtAccountId) {
-          const globalWhtAccount = accounts.find(a => 
-            a.account_usage === 'withholding_tax_suppliers' || 
-            a.name.includes('خصم على الموردين') ||
-            a.name.includes('خصم من الموردين') ||
-            a.name.includes('خصم موردين') ||
-            a.code?.startsWith('222')
-          );
-          finalWhtAccountId = globalWhtAccount?.id || '';
-          finalWhtAccountName = globalWhtAccount?.name || finalWhtAccountName;
+        if (!whtAccountId) {
+          throw new Error(`لا يمكن حفظ القيد: حساب ضرائب الخصم على الموردين غير محدد في بطاقة الصنف "${item.product_name || prod?.name || 'غير معروف'}". يمنع النظام توقع الحسابات تلقائياً.`);
         }
 
-        if (finalWhtAccountId) {
-          if (!whtPurchReturnGroup[finalWhtAccountId]) {
-            whtPurchReturnGroup[finalWhtAccountId] = {
-              account_id: finalWhtAccountId,
-              account_name: finalWhtAccountName,
-              amount: 0
-            };
-          }
-          whtPurchReturnGroup[finalWhtAccountId].amount += itemWht;
+        if (!whtPurchReturnGroup[whtAccountId]) {
+          whtPurchReturnGroup[whtAccountId] = {
+            account_id: whtAccountId,
+            account_name: whtAccountName,
+            amount: 0
+          };
         }
+        whtPurchReturnGroup[whtAccountId].amount += itemWht;
       }
     });
 
@@ -1016,20 +791,7 @@ export class PostingService {
         });
       });
     } else if (purchReturnWhtTotal > 0) {
-      const globalWhtAccount = accounts.find(a => 
-        a.account_usage === 'withholding_tax_suppliers' || 
-        a.name.includes('خصم على الموردين') ||
-        a.name.includes('خصم من الموردين') ||
-        a.name.includes('خصم موردين') ||
-        a.code?.startsWith('222')
-      );
-      journalItems.push({
-        account_id: globalWhtAccount?.id || '',
-        account_name: globalWhtAccount?.name || 'ضرائب خصم على الموردين',
-        debit: purchReturnWhtTotal,
-        credit: 0,
-        description: `تسوية ضريبة خصم وإضافة - مرتجع مشتريات رقم ${doc.return_number || doc.id.slice(-6)}`
-      });
+      throw new Error(`لا يمكن حفظ القيد: مرتجع المشتريات رقم ${doc.return_number} يحتوي على ضريبة خصم (${purchReturnWhtTotal}) دون تحديد حساب ضرائب الخصم في بطاقة الصنف.`);
     }
 
     return {

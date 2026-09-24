@@ -102,6 +102,8 @@ interface ParsedItem {
   stock_error?: boolean;
   available_stock?: number;
   stock_warning?: string;
+  account_error?: boolean;
+  account_warning?: string;
 }
 
 interface ParsedDocument {
@@ -134,6 +136,8 @@ interface ParsedDocument {
   is_all_services?: boolean;
   has_stock_error?: boolean;
   stock_error_message?: string;
+  has_account_error?: boolean;
+  account_error_message?: string;
 }
 
 interface ValidationError {
@@ -351,7 +355,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     };
   };
 
-  // Audit items accounts for journal entries (sales, cost, inventory, vat, wht)
+  // Audit items accounts for journal entries (sales, cost, inventory, vat, wht) - ZERO GUESSING POLICY
   const itemsAccountAudit = useMemo(() => {
     if (documents.length === 0) return [];
     
@@ -364,90 +368,112 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       });
     });
 
-    const defaultSalesAcc = accounts.find(a => 
-      a.account_usage === 'sales_revenue' ||
-      a.code === '4101' ||
-      a.name.includes('المبيعات') ||
-      a.name.includes('إيرادات مبيعات')
-    );
-
-    const defaultCostAcc = accounts.find(a => 
-      a.account_usage === 'cost_of_sales' ||
-      a.code === '5101' ||
-      a.name.includes('تكلفة المبيعات')
-    );
-
-    const defaultInvAcc = accounts.find(a => 
-      a.account_usage === 'inventory' ||
-      a.code === '1201' ||
-      a.name.includes('المخزون')
-    );
-
-    const defaultVatAcc = accounts.find(a => 
-      a.account_usage === 'vat' ||
-      a.account_usage === 'vat_sales' ||
-      a.code === '2221' ||
-      a.name.includes('قيمة مضافة')
-    );
-
-    const defaultWhtAcc = accounts.find(a => 
-      a.account_usage === 'withholding_tax_customers' ||
-      a.code === '112' ||
-      a.name.includes('خصم من العملاء') ||
-      a.name.includes('تحت حساب الضريبة')
-    );
-
     return Array.from(uniqueMap.values()).map(item => {
       const prod = products.find(p => p.id === item.product_id || (p.code && p.code.toLowerCase() === item.product_code.toLowerCase()));
-      const isService = item.is_service || prod?.type === 'service';
+      const isService = item.is_service || prod?.type === 'service' || prod?.is_service === true;
 
-      // 1. Sales Account
-      const salesAccId = prod?.revenue_account_id;
-      const salesAccName = prod?.revenue_account_name || accounts.find(a => a.id === salesAccId)?.name;
-      const hasDirectSales = !!salesAccId;
-      const finalSalesName = salesAccName || defaultSalesAcc?.name || 'حساب المبيعات الافتراضي';
-      const salesStatus = hasDirectSales ? 'linked' : (defaultSalesAcc ? 'fallback' : 'missing');
+      // 1. Sales / Revenue Account (or Purchases for purchase imports)
+      let salesName = '';
+      let salesStatus: 'linked' | 'missing' | 'exempt' = 'missing';
+      if (isSales) {
+        if (prod?.revenue_account_id) {
+          salesStatus = 'linked';
+          salesName = prod.revenue_account_name || accounts.find(a => a.id === prod.revenue_account_id)?.name || 'حساب الإيراد';
+        } else {
+          salesStatus = 'missing';
+          salesName = 'غير مسجل في بطاقة الصنف';
+        }
+      } else {
+        const purAccId = prod?.cost_account_id || prod?.inventory_account_id;
+        if (purAccId) {
+          salesStatus = 'linked';
+          salesName = prod?.cost_account_name || prod?.inventory_account_name || accounts.find(a => a.id === purAccId)?.name || 'حساب التكلفة/المخزون';
+        } else {
+          salesStatus = 'missing';
+          salesName = 'غير مسجل في بطاقة الصنف';
+        }
+      }
 
       // 2. Cost Account
-      const costAccId = prod?.cost_account_id;
-      const costAccName = prod?.cost_account_name || accounts.find(a => a.id === costAccId)?.name;
-      const hasDirectCost = !!costAccId;
-      const finalCostName = costAccName || defaultCostAcc?.name || 'حساب تكلفة المبيعات الافتراضي';
-      const costStatus = isService ? 'exempt' : (hasDirectCost ? 'linked' : (defaultCostAcc ? 'fallback' : 'missing'));
+      let costName = '';
+      let costStatus: 'linked' | 'missing' | 'exempt' = 'missing';
+      if (isService) {
+        costStatus = 'exempt';
+        costName = 'خدمي (معفى)';
+      } else {
+        if (prod?.cost_account_id) {
+          costStatus = 'linked';
+          costName = prod.cost_account_name || accounts.find(a => a.id === prod.cost_account_id)?.name || 'حساب تكلفة المبيعات';
+        } else {
+          costStatus = 'missing';
+          costName = 'غير مسجل في بطاقة الصنف';
+        }
+      }
 
       // 3. Inventory Account
-      const invAccId = prod?.inventory_account_id;
-      const invAccName = prod?.inventory_account_name || accounts.find(a => a.id === invAccId)?.name;
-      const hasDirectInv = !!invAccId;
-      const finalInvName = invAccName || defaultInvAcc?.name || 'حساب المخزون الافتراضي';
-      const invStatus = isService ? 'exempt' : (hasDirectInv ? 'linked' : (defaultInvAcc ? 'fallback' : 'missing'));
+      let invName = '';
+      let invStatus: 'linked' | 'missing' | 'exempt' = 'missing';
+      if (isService) {
+        invStatus = 'exempt';
+        invName = 'خدمي (معفى)';
+      } else {
+        if (prod?.inventory_account_id) {
+          invStatus = 'linked';
+          invName = prod.inventory_account_name || accounts.find(a => a.id === prod.inventory_account_id)?.name || 'حساب المخزون';
+        } else {
+          invStatus = 'missing';
+          invName = 'غير مسجل في بطاقة الصنف';
+        }
+      }
 
       // 4. VAT Account
-      const vatAccId = prod?.sales_vat_account_id || prod?.vat_account_id;
-      const vatAccName = prod?.sales_vat_account_name || prod?.vat_account_name || accounts.find(a => a.id === vatAccId)?.name;
-      const hasDirectVat = !!vatAccId;
-      const finalVatName = vatAccName || defaultVatAcc?.name || 'حساب القيمة المضافة الافتراضي';
-      const vatStatus = hasDirectVat ? 'linked' : (defaultVatAcc ? 'fallback' : 'missing');
+      let vatName = '';
+      let vatStatus: 'linked' | 'missing' | 'exempt' = 'missing';
+      const hasVatRate = isVatEnabled && (item.vat_rate > 0 || (isSales ? (prod?.vat_rate || 0) > 0 : (prod?.purchase_vat_rate || 0) > 0));
+      if (!isVatEnabled || !hasVatRate) {
+        vatStatus = 'exempt';
+        vatName = !isVatEnabled ? 'معطلة بالشركة' : 'معفى (0%)';
+      } else {
+        const vatAccId = isSales ? (prod?.sales_vat_account_id || prod?.vat_account_id) : (prod?.purchase_vat_account_id || prod?.vat_account_id);
+        if (vatAccId) {
+          vatStatus = 'linked';
+          vatName = (isSales ? (prod?.sales_vat_account_name || prod?.vat_account_name) : (prod?.purchase_vat_account_name || prod?.vat_account_name)) || accounts.find(a => a.id === vatAccId)?.name || 'حساب ضريبة القيمة المضافة';
+        } else {
+          vatStatus = 'missing';
+          vatName = 'غير مسجل في بطاقة الصنف';
+        }
+      }
 
       // 5. WHT Account
-      const whtAccId = prod?.sales_withholding_tax_account_id;
-      const whtAccName = prod?.sales_withholding_tax_account_name || accounts.find(a => a.id === whtAccId)?.name;
-      const hasDirectWht = !!whtAccId;
-      const finalWhtName = whtAccName || defaultWhtAcc?.name || 'حساب الخصم والإضافة الافتراضي';
-      const whtStatus = hasDirectWht ? 'linked' : (defaultWhtAcc ? 'fallback' : 'missing');
+      let whtName = '';
+      let whtStatus: 'linked' | 'missing' | 'exempt' = 'missing';
+      const hasWhtRate = isWhtEnabled && (item.withholding_tax_rate > 0 || (isSales ? (prod?.sales_withholding_tax_rate || 0) > 0 : (prod?.purchase_withholding_tax_rate || 0) > 0));
+      if (!isWhtEnabled || !hasWhtRate) {
+        whtStatus = 'exempt';
+        whtName = !isWhtEnabled ? 'معطلة بالشركة' : 'معفى (0%)';
+      } else {
+        const whtAccId = isSales ? prod?.sales_withholding_tax_account_id : prod?.purchase_withholding_tax_account_id;
+        if (whtAccId) {
+          whtStatus = 'linked';
+          whtName = (isSales ? prod?.sales_withholding_tax_account_name : prod?.purchase_withholding_tax_account_name) || accounts.find(a => a.id === whtAccId)?.name || 'حساب ضريبة الخصم';
+        } else {
+          whtStatus = 'missing';
+          whtName = 'غير مسجل في بطاقة الصنف';
+        }
+      }
 
       return {
         product_code: item.product_code,
         product_name: item.product_name,
         is_service: isService,
-        sales: { name: finalSalesName, status: salesStatus },
-        cost: { name: finalCostName, status: costStatus },
-        inventory: { name: finalInvName, status: invStatus },
-        vat: { name: finalVatName, status: vatStatus },
-        wht: { name: finalWhtName, status: whtStatus }
+        sales: { name: salesName, status: salesStatus },
+        cost: { name: costName, status: costStatus },
+        inventory: { name: invName, status: invStatus },
+        vat: { name: vatName, status: vatStatus },
+        wht: { name: whtName, status: whtStatus }
       };
     });
-  }, [documents, products, accounts]);
+  }, [documents, products, accounts, isSales, isVatEnabled, isWhtEnabled]);
 
   // Summaries for Invoices, Orders, and Returns
   const computeSummaryForType = (typeKeywords: string[]) => {
@@ -587,7 +613,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     showNotification('تم تنزيل نموذج الإكسيل التجريبي بنجاح', 'success');
   };
 
-  // Stock pre-validation helper: checks availability for physical items in outflow documents
+  // Pre-validation helper: checks stock availability and mandatory GL accounts completeness (zero guessing policy)
   const revalidateBatch = (
     docs: ParsedDocument[],
     currentProducts: Product[],
@@ -596,9 +622,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
   ): { updatedDocs: ParsedDocument[]; allErrors: ValidationError[] } => {
     const allowNegativeStock = settings?.allow_negative_stock === true || settings?.allow_negative_stock === 'true';
 
-    // Remove old stock errors to avoid duplicates
-    const nonStockErrors = baseErrors.filter(e => e.field !== 'رصيد المخزون');
+    // Remove old stock errors AND dynamic account errors to avoid stale duplicates
+    const nonDynamicErrors = baseErrors.filter(e => 
+      e.field !== 'رصيد المخزون' && 
+      !e.field.startsWith('حساب') && 
+      !e.field.includes('ضريبة')
+    );
     const newStockErrors: ValidationError[] = [];
+    const newAccountErrors: ValidationError[] = [];
 
     // Track running stock per product across the batch
     const stockMap: Record<string, number> = {};
@@ -623,70 +654,210 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       let docHasStockError = false;
       let firstStockErrorMsg = '';
 
+      let docHasAccountError = false;
+      let firstAccountErrorMsg = '';
+
+      // 1. Validate Party Account (for accounting documents: invoices and returns)
+      if (doc.doc_type !== 'أمر بيع' && doc.doc_type !== 'أمر شراء') {
+        let partyAccId = '';
+        if (isSales) {
+          const c = customers.find(x => x.id === doc.party_id || (x.code && x.code.toLowerCase() === (doc.party_code || '').toLowerCase()) || x.name === doc.party_name);
+          partyAccId = c?.account_id || '';
+        } else {
+          const s = suppliers.find(x => x.id === doc.party_id || (x.code && x.code.toLowerCase() === (doc.party_code || '').toLowerCase()) || x.name === doc.party_name);
+          partyAccId = s?.account_id || '';
+        }
+
+        if (!partyAccId) {
+          docHasAccountError = true;
+          firstAccountErrorMsg = `حساب ${entityLabel} غير مربوط في بطاقة "${doc.party_name}"`;
+          newAccountErrors.push({
+            rowNumber: doc.items[0]?.rowIndex || 1,
+            ref: doc.ref,
+            field: `حساب ${entityLabel}`,
+            message: `حساب ${entityLabel} غير محدد في بطاقة "${doc.party_name}". يرجى ربط حساب ${entityLabel} في شجرة الحسابات أولاً لاستكمال الترحيل المحاسبي.`
+          });
+        }
+      }
+
+      // 2. Validate Items Stock & GL Accounts
       const updatedItems = doc.items.map(item => {
         const prod = currentProducts.find(p => p.id === item.product_id || (p.code && p.code.toLowerCase() === item.product_code.toLowerCase()));
         const isService = item.is_service || prod?.type === 'service' || prod?.is_service === true;
 
-        if (isService) {
-          return {
-            ...item,
-            stock_error: false,
-            available_stock: undefined,
-            stock_warning: undefined
-          };
-        }
+        let itemStockError = false;
+        let itemStockWarning: string | undefined = undefined;
+        let itemAvailable: number | undefined = undefined;
 
-        const available = stockMap[item.product_id] !== undefined
-          ? stockMap[item.product_id]
-          : Number(prod?.stock ?? prod?.current_stock ?? 0);
+        let itemAccountError = false;
+        let itemAccountWarning: string | undefined = undefined;
 
-        if (isInflow) {
-          // Document brings inventory into warehouse
-          stockMap[item.product_id] = available + item.quantity;
-          return {
-            ...item,
-            stock_error: false,
-            available_stock: available,
-            stock_warning: undefined
-          };
-        }
+        // Stock verification (physical items only)
+        if (!isService) {
+          const available = stockMap[item.product_id] !== undefined
+            ? stockMap[item.product_id]
+            : Number(prod?.stock ?? prod?.current_stock ?? 0);
 
-        if (isOutflow) {
-          if (!allowNegativeStock && item.quantity > available) {
-            docHasStockError = true;
-            if (!firstStockErrorMsg) {
-              firstStockErrorMsg = `عجز في رصيد الصنف "${item.product_name}" (المتاح: ${formatNumber(Math.max(0, available))}، المطلوب: ${formatNumber(item.quantity)})`;
+          if (isInflow) {
+            stockMap[item.product_id] = available + item.quantity;
+            itemAvailable = available;
+          } else if (isOutflow) {
+            if (!allowNegativeStock && item.quantity > available) {
+              docHasStockError = true;
+              if (!firstStockErrorMsg) {
+                firstStockErrorMsg = `عجز في رصيد الصنف "${item.product_name}" (المتاح: ${formatNumber(Math.max(0, available))}، المطلوب: ${formatNumber(item.quantity)})`;
+              }
+              newStockErrors.push({
+                rowNumber: item.rowIndex,
+                ref: doc.ref,
+                field: 'رصيد المخزون',
+                message: `الكمية المطلوبة (${formatNumber(item.quantity)}) من الصنف "${item.product_name} (${item.product_code})" غير متوفرة في المخزن (الرصيد المتاح: ${formatNumber(Math.max(0, available))}). سياسة الشركة تمنع الصرف بالسالب.`
+              });
+              stockMap[item.product_id] = available - item.quantity;
+              itemStockError = true;
+              itemAvailable = Math.max(0, available);
+              itemStockWarning = `الرصيد المتاح: ${formatNumber(Math.max(0, available))} (عجز: ${formatNumber(item.quantity - available)})`;
+            } else {
+              stockMap[item.product_id] = available - item.quantity;
+              itemAvailable = available;
             }
-            newStockErrors.push({
-              rowNumber: item.rowIndex,
-              ref: doc.ref,
-              field: 'رصيد المخزون',
-              message: `الكمية المطلوبة (${formatNumber(item.quantity)}) من الصنف "${item.product_name} (${item.product_code})" غير متوفرة في المخزن (الرصيد المتاح: ${formatNumber(Math.max(0, available))}). سياسة الشركة تمنع الصرف بالسالب.`
-            });
-            stockMap[item.product_id] = available - item.quantity;
-            return {
-              ...item,
-              stock_error: true,
-              available_stock: Math.max(0, available),
-              stock_warning: `الرصيد المتاح: ${formatNumber(Math.max(0, available))} (عجز: ${formatNumber(item.quantity - available)})`
-            };
-          } else {
-            stockMap[item.product_id] = available - item.quantity;
-            return {
-              ...item,
-              stock_error: false,
-              available_stock: available,
-              stock_warning: undefined
-            };
           }
         }
 
-        // Draft orders (sales order / purchase order)
+        // Mandatory GL Accounts verification on Product Card (for financial documents: invoices & returns)
+        if (doc.doc_type !== 'أمر بيع' && doc.doc_type !== 'أمر شراء' && prod) {
+          const missingFields: string[] = [];
+
+          if (isSales) {
+            // Revenue / Sales Account
+            if (!prod.revenue_account_id) {
+              missingFields.push('حساب الإيراد/المبيعات');
+              newAccountErrors.push({
+                rowNumber: item.rowIndex,
+                ref: doc.ref,
+                field: 'حساب الإيراد',
+                message: `حساب الإيراد/المبيعات غير محدد في بطاقة الصنف "${prod.name}" (${prod.code}). يمنع النظام توقع الحسابات تلقائياً.`
+              });
+            }
+
+            // Sales VAT Account
+            if (isVatEnabled && item.vat_rate > 0) {
+              const vatAcc = prod.sales_vat_account_id || prod.vat_account_id;
+              if (!vatAcc) {
+                missingFields.push('حساب ضريبة المبيعات');
+                newAccountErrors.push({
+                  rowNumber: item.rowIndex,
+                  ref: doc.ref,
+                  field: 'حساب ضريبة المبيعات',
+                  message: `حساب ضريبة القيمة المضافة (مبيعات) غير محدد في بطاقة الصنف "${prod.name}" (${prod.code}) بالرغم من خضوعه لضريبة ${item.vat_rate}%. يمنع النظام توقع الحسابات تلقائياً.`
+                });
+              }
+            }
+
+            // Sales WHT Account
+            if (isWhtEnabled && item.withholding_tax_rate > 0) {
+              const whtAcc = prod.sales_withholding_tax_account_id;
+              if (!whtAcc) {
+                missingFields.push('حساب خصم من العملاء');
+                newAccountErrors.push({
+                  rowNumber: item.rowIndex,
+                  ref: doc.ref,
+                  field: 'حساب خصم من العملاء',
+                  message: `حساب ضرائب الخصم من العملاء (أ.ت.ص) غير محدد في بطاقة الصنف "${prod.name}" (${prod.code}) بالرغم من وجود خصم ${item.withholding_tax_rate}%. يمنع النظام توقع الحسابات تلقائياً.`
+                });
+              }
+            }
+
+            // Physical Sales Item: Cost & Inventory Accounts
+            if (!isService) {
+              if (!prod.cost_account_id) {
+                missingFields.push('حساب تكلفة المبيعات');
+                newAccountErrors.push({
+                  rowNumber: item.rowIndex,
+                  ref: doc.ref,
+                  field: 'حساب تكلفة المبيعات',
+                  message: `حساب تكلفة المبيعات غير محدد في بطاقة الصنف المخزني "${prod.name}" (${prod.code}).`
+                });
+              }
+              if (!prod.inventory_account_id) {
+                missingFields.push('حساب المخزون');
+                newAccountErrors.push({
+                  rowNumber: item.rowIndex,
+                  ref: doc.ref,
+                  field: 'حساب المخزون',
+                  message: `حساب المخزون غير محدد في بطاقة الصنف المخزني "${prod.name}" (${prod.code}).`
+                });
+              }
+            }
+          } else {
+            // Purchases
+            if (!prod.cost_account_id && !prod.inventory_account_id) {
+              missingFields.push('حساب التكلفة/المخزون');
+              newAccountErrors.push({
+                rowNumber: item.rowIndex,
+                ref: doc.ref,
+                field: 'حساب المشتريات/المخزون',
+                message: `حساب التكلفة أو المخزون غير محدد في بطاقة الصنف "${prod.name}" (${prod.code}). يمنع النظام توقع الحسابات تلقائياً.`
+              });
+            }
+
+            // Purchase VAT Account
+            if (isVatEnabled && item.vat_rate > 0) {
+              const vatAcc = prod.purchase_vat_account_id || prod.vat_account_id;
+              if (!vatAcc) {
+                missingFields.push('حساب ضريبة المشتريات');
+                newAccountErrors.push({
+                  rowNumber: item.rowIndex,
+                  ref: doc.ref,
+                  field: 'حساب ضريبة المشتريات',
+                  message: `حساب ضريبة القيمة المضافة (مشتريات) غير محدد في بطاقة الصنف "${prod.name}" (${prod.code}) بالرغم من خضوعه لضريبة ${item.vat_rate}%. يمنع النظام توقع الحسابات تلقائياً.`
+                });
+              }
+            }
+
+            // Purchase WHT Account
+            if (isWhtEnabled && item.withholding_tax_rate > 0) {
+              const whtAcc = prod.purchase_withholding_tax_account_id;
+              if (!whtAcc) {
+                missingFields.push('حساب خصم على الموردين');
+                newAccountErrors.push({
+                  rowNumber: item.rowIndex,
+                  ref: doc.ref,
+                  field: 'حساب خصم على الموردين',
+                  message: `حساب ضرائب الخصم على الموردين غير محدد في بطاقة الصنف "${prod.name}" (${prod.code}) بالرغم من وجود خصم ${item.withholding_tax_rate}%. يمنع النظام توقع الحسابات تلقائياً.`
+                });
+              }
+            }
+
+            // Physical Purchase Item: Inventory Account
+            if (!isService && !prod.inventory_account_id) {
+              missingFields.push('حساب المخزون');
+              newAccountErrors.push({
+                rowNumber: item.rowIndex,
+                ref: doc.ref,
+                field: 'حساب المخزون',
+                message: `حساب المخزون غير محدد في بطاقة الصنف المخزني "${prod.name}" (${prod.code}).`
+              });
+            }
+          }
+
+          if (missingFields.length > 0) {
+            itemAccountError = true;
+            itemAccountWarning = `حسابات غير مكتملة في بطاقة الصنف: (${missingFields.join('، ')})`;
+            docHasAccountError = true;
+            if (!firstAccountErrorMsg) {
+              firstAccountErrorMsg = `نقص حسابات في الصنف "${prod.name}": (${missingFields.join('، ')})`;
+            }
+          }
+        }
+
         return {
           ...item,
-          stock_error: false,
-          available_stock: available,
-          stock_warning: undefined
+          stock_error: itemStockError,
+          available_stock: itemAvailable,
+          stock_warning: itemStockWarning,
+          account_error: itemAccountError,
+          account_warning: itemAccountWarning
         };
       });
 
@@ -694,13 +865,15 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         ...doc,
         items: updatedItems,
         has_stock_error: docHasStockError,
-        stock_error_message: firstStockErrorMsg || undefined
+        stock_error_message: firstStockErrorMsg || undefined,
+        has_account_error: docHasAccountError,
+        account_error_message: firstAccountErrorMsg || undefined
       };
     });
 
     return {
       updatedDocs,
-      allErrors: [...nonStockErrors, ...newStockErrors]
+      allErrors: [...nonDynamicErrors, ...newStockErrors, ...newAccountErrors]
     };
   };
 
@@ -865,6 +1038,13 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               field: entityLabel,
               message: `${entityLabel} "${rawParty}" غير مسجل في دليل ${entityLabel}ين للنظام`
             });
+          } else if (!matchedParty.account_id && rawDocType !== 'أمر بيع' && rawDocType !== 'أمر شراء') {
+            errors.push({
+              rowNumber,
+              ref: rawRef,
+              field: `حساب ${entityLabel}`,
+              message: `حساب ${entityLabel} غير محدد في بطاقة "${matchedParty.name}". يرجى ربط حساب ${entityLabel} في شجرة الحسابات أولاً لاستكمال الترحيل المحاسبي.`
+            });
           }
         }
 
@@ -973,6 +1153,113 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           whtRateNum = rawWhtRate !== '' && rawWhtRate !== undefined
             ? (parseFloat(String(rawWhtRate)) || 0)
             : (parseFloat(String(isSales ? matchedProduct?.sales_withholding_tax_rate : matchedProduct?.purchase_withholding_tax_rate)) || 0);
+        }
+
+        // 8.1 Mandatory GL Accounts verification on Product Card (zero guessing policy)
+        if (matchedProduct && rawDocType !== 'أمر بيع' && rawDocType !== 'أمر شراء') {
+          if (isSales) {
+            // Revenue account
+            if (!matchedProduct.revenue_account_id) {
+              errors.push({
+                rowNumber,
+                ref: rawRef,
+                field: 'حساب الإيراد',
+                message: `حساب الإيراد/المبيعات غير محدد في بطاقة الصنف "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}). يمنع النظام توقع الحسابات تلقائياً.`
+              });
+            }
+
+            // Sales VAT account
+            if (isVatEnabled && vatRateNum > 0) {
+              const vatAcc = matchedProduct.sales_vat_account_id || matchedProduct.vat_account_id;
+              if (!vatAcc) {
+                errors.push({
+                  rowNumber,
+                  ref: rawRef,
+                  field: 'حساب ضريبة المبيعات',
+                  message: `حساب ضريبة القيمة المضافة (مبيعات) غير محدد في بطاقة الصنف "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}) بالرغم من خضوعه لضريبة ${vatRateNum}%. يمنع النظام توقع الحسابات تلقائياً.`
+                });
+              }
+            }
+
+            // Sales WHT account
+            if (isWhtEnabled && whtRateNum > 0) {
+              const whtAcc = matchedProduct.sales_withholding_tax_account_id;
+              if (!whtAcc) {
+                errors.push({
+                  rowNumber,
+                  ref: rawRef,
+                  field: 'حساب خصم من العملاء',
+                  message: `حساب ضرائب الخصم من العملاء (أ.ت.ص) غير محدد في بطاقة الصنف "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}) بالرغم من وجود خصم ${whtRateNum}%. يمنع النظام توقع الحسابات تلقائياً.`
+                });
+              }
+            }
+
+            // Physical item: Cost and Inventory accounts
+            if (!isServiceItem) {
+              if (!matchedProduct.cost_account_id) {
+                errors.push({
+                  rowNumber,
+                  ref: rawRef,
+                  field: 'حساب تكلفة المبيعات',
+                  message: `حساب تكلفة المبيعات غير محدد في بطاقة الصنف المخزني "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}).`
+                });
+              }
+              if (!matchedProduct.inventory_account_id) {
+                errors.push({
+                  rowNumber,
+                  ref: rawRef,
+                  field: 'حساب المخزون',
+                  message: `حساب المخزون غير محدد في بطاقة الصنف المخزني "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}).`
+                });
+              }
+            }
+          } else {
+            // Purchases
+            if (!matchedProduct.cost_account_id && !matchedProduct.inventory_account_id) {
+              errors.push({
+                rowNumber,
+                ref: rawRef,
+                field: 'حساب المشتريات/المخزون',
+                message: `حساب التكلفة أو المخزون غير محدد في بطاقة الصنف "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}). يمنع النظام توقع الحسابات تلقائياً.`
+              });
+            }
+
+            // Purchase VAT account
+            if (isVatEnabled && vatRateNum > 0) {
+              const vatAcc = matchedProduct.purchase_vat_account_id || matchedProduct.vat_account_id;
+              if (!vatAcc) {
+                errors.push({
+                  rowNumber,
+                  ref: rawRef,
+                  field: 'حساب ضريبة المشتريات',
+                  message: `حساب ضريبة القيمة المضافة (مشتريات) غير محدد في بطاقة الصنف "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}) بالرغم من خضوعه لضريبة ${vatRateNum}%. يمنع النظام توقع الحسابات تلقائياً.`
+                });
+              }
+            }
+
+            // Purchase WHT account
+            if (isWhtEnabled && whtRateNum > 0) {
+              const whtAcc = matchedProduct.purchase_withholding_tax_account_id;
+              if (!whtAcc) {
+                errors.push({
+                  rowNumber,
+                  ref: rawRef,
+                  field: 'حساب خصم على الموردين',
+                  message: `حساب ضرائب الخصم على الموردين غير محدد في بطاقة الصنف "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}) بالرغم من وجود خصم ${whtRateNum}%. يمنع النظام توقع الحسابات تلقائياً.`
+                });
+              }
+            }
+
+            // Physical item: Inventory account
+            if (!isServiceItem && !matchedProduct.inventory_account_id) {
+              errors.push({
+                rowNumber,
+                ref: rawRef,
+                field: 'حساب المخزون',
+                message: `حساب المخزون غير محدد في بطاقة الصنف المخزني "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}).`
+              });
+            }
+          }
         }
 
         // Payment type parsing
@@ -1296,28 +1583,24 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           createdDocId = invRes.id;
           createdDocNumber = invRes.invoice_number || `INV-${createdDocId.slice(-6)}`;
 
-          // Generate Journal Entry via PostingService
-          try {
-            const fullInv = { ...invPayload, id: createdDocId, invoice_number: createdDocNumber };
-            const journalData = PostingService.generateInvoiceJournal(
-              fullInv as any,
-              customers,
-              products,
-              accounts,
-              paymentMethods,
-              companySettings
-            );
+          // Generate Journal Entry via PostingService (strictly required for financial posting)
+          const fullInv = { ...invPayload, id: createdDocId, invoice_number: createdDocNumber };
+          const journalData = PostingService.generateInvoiceJournal(
+            fullInv as any,
+            customers,
+            products,
+            accounts,
+            paymentMethods,
+            companySettings
+          );
 
-            const jeRes: any = await apiRequest('/journal_entries', 'POST', {
-              ...journalData,
-              reference_id: createdDocId,
-              company_id: user?.company_id
-            });
-            createdJournalId = jeRes.id;
-            createdJournalNumber = jeRes.entry_number || '';
-          } catch (jeErr: any) {
-            console.warn('Journal generation for invoice warning:', jeErr);
-          }
+          const jeRes: any = await apiRequest('/journal_entries', 'POST', {
+            ...journalData,
+            reference_id: createdDocId,
+            company_id: user?.company_id
+          });
+          createdJournalId = jeRes.id;
+          createdJournalNumber = jeRes.entry_number || '';
 
         } else if (doc.doc_type === 'أمر بيع') {
           const soPayload = {
@@ -1362,26 +1645,22 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           createdDocNumber = retRes.return_number || `RET-${createdDocId.slice(-6)}`;
 
           // Generate Journal Entry for Return
-          try {
-            const fullRet = { ...retPayload, id: createdDocId, return_number: createdDocNumber };
-            const journalData = PostingService.generateReturnJournal(
-              fullRet as any,
-              customers,
-              products,
-              accounts,
-              paymentMethods
-            );
+          const fullRet = { ...retPayload, id: createdDocId, return_number: createdDocNumber };
+          const journalData = PostingService.generateReturnJournal(
+            fullRet as any,
+            customers,
+            products,
+            accounts,
+            paymentMethods
+          );
 
-            const jeRes: any = await apiRequest('/journal_entries', 'POST', {
-              ...journalData,
-              reference_id: createdDocId,
-              company_id: user?.company_id
-            });
-            createdJournalId = jeRes.id;
-            createdJournalNumber = jeRes.entry_number || '';
-          } catch (jeErr: any) {
-            console.warn('Journal generation for return warning:', jeErr);
-          }
+          const jeRes: any = await apiRequest('/journal_entries', 'POST', {
+            ...journalData,
+            reference_id: createdDocId,
+            company_id: user?.company_id
+          });
+          createdJournalId = jeRes.id;
+          createdJournalNumber = jeRes.entry_number || '';
 
         } else if (doc.doc_type === 'فاتورة شراء') {
           const pinvPayload = {
@@ -1407,27 +1686,23 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           createdDocNumber = pinvRes.invoice_number || `PINV-${createdDocId.slice(-6)}`;
 
           // Generate Journal Entry for Purchase Invoice
-          try {
-            const fullPinv = { ...pinvPayload, id: createdDocId, invoice_number: createdDocNumber };
-            const journalData = PostingService.generatePurchaseInvoiceJournal(
-              fullPinv as any,
-              suppliers,
-              products,
-              accounts,
-              paymentMethods,
-              companySettings
-            );
+          const fullPinv = { ...pinvPayload, id: createdDocId, invoice_number: createdDocNumber };
+          const journalData = PostingService.generatePurchaseInvoiceJournal(
+            fullPinv as any,
+            suppliers,
+            products,
+            accounts,
+            paymentMethods,
+            companySettings
+          );
 
-            const jeRes: any = await apiRequest('/journal_entries', 'POST', {
-              ...journalData,
-              reference_id: createdDocId,
-              company_id: user?.company_id
-            });
-            createdJournalId = jeRes.id;
-            createdJournalNumber = jeRes.entry_number || '';
-          } catch (jeErr: any) {
-            console.warn('Journal generation for purchase invoice warning:', jeErr);
-          }
+          const jeRes: any = await apiRequest('/journal_entries', 'POST', {
+            ...journalData,
+            reference_id: createdDocId,
+            company_id: user?.company_id
+          });
+          createdJournalId = jeRes.id;
+          createdJournalNumber = jeRes.entry_number || '';
 
         } else if (doc.doc_type === 'أمر شراء') {
           const poPayload = {
@@ -1472,26 +1747,22 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           createdDocNumber = pretRes.return_number || `PRET-${createdDocId.slice(-6)}`;
 
           // Generate Journal Entry for Purchase Return
-          try {
-            const fullPret = { ...pretPayload, id: createdDocId, return_number: createdDocNumber };
-            const journalData = PostingService.generatePurchaseReturnJournal(
-              fullPret as any,
-              suppliers,
-              products,
-              accounts,
-              paymentMethods
-            );
+          const fullPret = { ...pretPayload, id: createdDocId, return_number: createdDocNumber };
+          const journalData = PostingService.generatePurchaseReturnJournal(
+            fullPret as any,
+            suppliers,
+            products,
+            accounts,
+            paymentMethods
+          );
 
-            const jeRes: any = await apiRequest('/journal_entries', 'POST', {
-              ...journalData,
-              reference_id: createdDocId,
-              company_id: user?.company_id
-            });
-            createdJournalId = jeRes.id;
-            createdJournalNumber = jeRes.entry_number || '';
-          } catch (jeErr: any) {
-            console.warn('Journal generation for purchase return warning:', jeErr);
-          }
+          const jeRes: any = await apiRequest('/journal_entries', 'POST', {
+            ...journalData,
+            reference_id: createdDocId,
+            company_id: user?.company_id
+          });
+          createdJournalId = jeRes.id;
+          createdJournalNumber = jeRes.entry_number || '';
         }
 
         updatedDocuments[idx] = {
@@ -2114,8 +2385,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
                     فحص ومطابقة ربط الحسابات للقيود المحاسبية ({itemsAccountAudit.length} صنف مسجل بالإكسيل):
                   </span>
-                  <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-full font-semibold">
-                    {itemsAccountAudit.every(a => a.sales.status !== 'missing' && a.cost.status !== 'missing' && a.inventory.status !== 'missing') ? '✓ جميع الأصناف مرتبطة بحسابات صحيحة' : '⚠️ توجد أصناف تحتاج مراجعة الحسابات'}
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                    itemsAccountAudit.every(a => a.sales.status !== 'missing' && a.cost.status !== 'missing' && a.inventory.status !== 'missing' && a.vat.status !== 'missing' && a.wht.status !== 'missing')
+                      ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                      : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-200 border border-rose-300 dark:border-rose-800 font-bold'
+                  }`}>
+                    {itemsAccountAudit.every(a => a.sales.status !== 'missing' && a.cost.status !== 'missing' && a.inventory.status !== 'missing' && a.vat.status !== 'missing' && a.wht.status !== 'missing')
+                      ? '✓ جميع الأصناف مكتملة الحسابات ومطابقة'
+                      : '⚠️ توجد أصناف تفتقد لحسابات لازمة للقيود (تمنع الحفظ)'}
                   </span>
                 </div>
 
@@ -2135,7 +2412,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                       <tr>
                         <th className="py-1.5 px-2.5">كود الصنف</th>
                         <th className="py-1.5 px-2.5">اسم الصنف</th>
-                        <th className="py-1.5 px-2.5 text-center">حساب المبيعات / الإيراد</th>
+                        <th className="py-1.5 px-2.5 text-center">{isSales ? 'حساب المبيعات / الإيراد' : 'حساب المشتريات / التكلفة'}</th>
                         <th className="py-1.5 px-2.5 text-center">حساب تكلفة المبيعات</th>
                         <th className="py-1.5 px-2.5 text-center">حساب المخزون</th>
                         <th className="py-1.5 px-2.5 text-center">ضريبة القيمة المضافة (ق م)</th>
@@ -2148,44 +2425,58 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                           <td className="py-1.5 px-2.5 font-bold text-slate-800 dark:text-slate-200">{aud.product_code}</td>
                           <td className="py-1.5 px-2.5 font-sans font-medium text-slate-900 dark:text-slate-100">{aud.product_name}</td>
                           <td className="py-1.5 px-2.5 text-center">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold ${
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold border ${
                               aud.sales.status === 'linked' 
-                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' 
-                                : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800' 
+                                : aud.sales.status === 'exempt'
+                                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border-purple-200'
+                                  : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200 border-rose-300 dark:border-rose-800'
                             }`}>
-                              {aud.sales.status === 'linked' ? '✓ ' : '⚠️ '}{aud.sales.name}
+                              {aud.sales.status === 'linked' ? '✓ ' : aud.sales.status === 'missing' ? '✕ ' : ''}{aud.sales.name}
                             </span>
                           </td>
                           <td className="py-1.5 px-2.5 text-center">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold ${
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold border ${
                               aud.cost.status === 'exempt'
-                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
+                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border-purple-200'
                                 : aud.cost.status === 'linked'
-                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                                  : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                                  : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200 border-rose-300 dark:border-rose-800'
                             }`}>
-                              {aud.cost.status === 'exempt' ? 'خدمي (معفى)' : (aud.cost.status === 'linked' ? '✓ ' : '⚠️ ') + aud.cost.name}
+                              {aud.cost.status === 'exempt' ? 'خدمي (معفى)' : (aud.cost.status === 'linked' ? '✓ ' : '✕ ') + aud.cost.name}
                             </span>
                           </td>
                           <td className="py-1.5 px-2.5 text-center">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold ${
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold border ${
                               aud.inventory.status === 'exempt'
-                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
+                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border-purple-200'
                                 : aud.inventory.status === 'linked'
-                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                                  : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                                  : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200 border-rose-300 dark:border-rose-800'
                             }`}>
-                              {aud.inventory.status === 'exempt' ? 'خدمي (معفى)' : (aud.inventory.status === 'linked' ? '✓ ' : '⚠️ ') + aud.inventory.name}
+                              {aud.inventory.status === 'exempt' ? 'خدمي (معفى)' : (aud.inventory.status === 'linked' ? '✓ ' : '✕ ') + aud.inventory.name}
                             </span>
                           </td>
                           <td className="py-1.5 px-2.5 text-center">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-sans font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                              ✓ {aud.vat.name}
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold border ${
+                              aud.vat.status === 'exempt'
+                                ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-300'
+                                : aud.vat.status === 'linked'
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                                  : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200 border-rose-300 dark:border-rose-800'
+                            }`}>
+                              {aud.vat.status === 'linked' ? '✓ ' : aud.vat.status === 'missing' ? '✕ ' : ''}{aud.vat.name}
                             </span>
                           </td>
                           <td className="py-1.5 px-2.5 text-center">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-sans font-bold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
-                              ✓ {aud.wht.name}
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold border ${
+                              aud.wht.status === 'exempt'
+                                ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-300'
+                                : aud.wht.status === 'linked'
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                                  : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200 border-rose-300 dark:border-rose-800'
+                            }`}>
+                              {aud.wht.status === 'linked' ? '✓ ' : aud.wht.status === 'missing' ? '✕ ' : ''}{aud.wht.name}
                             </span>
                           </td>
                         </tr>
@@ -2381,6 +2672,17 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                             </div>
                           )}
 
+                          {/* 3.1 Pre-validation Missing Accounts Warning */}
+                          {doc.has_account_error && doc.status !== 'saved' && doc.status !== 'failed' && (
+                            <div 
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-50 dark:bg-rose-950/70 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-[11px] font-semibold"
+                              title={doc.account_error_message}
+                            >
+                              <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />
+                              <span className="truncate max-w-[340px]">{doc.account_error_message || 'حسابات غير مكتملة في بطاقات الأصناف أو الأطراف'}</span>
+                            </div>
+                          )}
+
                           {/* 3.1 Error Badge if document failed during save */}
                           {doc.status === 'failed' && (
                             <div 
@@ -2483,6 +2785,15 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                                     <td className="py-1 px-2 font-semibold text-slate-700 dark:text-slate-300">{item.product_code}</td>
                                     <td className="py-1 px-2 font-sans font-medium text-slate-900 dark:text-slate-100 flex items-center gap-1.5 flex-wrap">
                                       <span>{item.product_name}</span>
+                                      {item.account_error && (
+                                        <span 
+                                          className="text-[10px] px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200 font-bold border border-rose-300 dark:border-rose-800 flex items-center gap-1"
+                                          title={item.account_warning}
+                                        >
+                                          <AlertTriangle className="w-2.5 h-2.5 text-rose-600" />
+                                          <span>{item.account_warning || 'حسابات غير مكتملة بالصنف'}</span>
+                                        </span>
+                                      )}
                                       {item.is_service && (
                                         <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300 font-semibold border border-purple-200 dark:border-purple-800">
                                           خدمة
