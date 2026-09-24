@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useNavigation } from '../contexts/NavigationContext';
 import { dbService, apiRequest } from '../services/dbService';
 import { PostingService } from '../services/PostingService';
 import { formatNumber, formatMoney } from '../utils/formatUtils';
@@ -11,7 +12,7 @@ import {
   FileSpreadsheet, UploadCloud, Download, CheckCircle2, AlertTriangle, 
   Trash2, Edit3, ChevronDown, ChevronUp, FileText, ArrowUpFromLine, 
   ArrowDownToLine, RotateCcw, Hash, Calendar, Layers, ShieldCheck, 
-  X, Check, RefreshCw, Eye, Sparkles
+  X, Check, RefreshCw, Eye, Sparkles, ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -36,6 +37,7 @@ interface ParsedItem {
   withholding_tax_amount: number;
   total: number;
   description?: string;
+  is_service?: boolean;
 }
 
 interface ParsedDocument {
@@ -45,7 +47,7 @@ interface ParsedDocument {
   party_id: string;
   party_name: string;
   party_code?: string;
-  warehouse_id?: string;
+  warehouse_id?: string | null;
   warehouse_name?: string;
   payment_type: 'cash' | 'credit';
   payment_method_id?: string;
@@ -58,13 +60,14 @@ interface ParsedDocument {
   tax_amount: number;
   withholding_tax_amount: number;
   total_amount: number;
-  // Post-save data
+  // Execution status
+  status?: 'pending' | 'saved' | 'failed';
   created_document_id?: string;
   created_document_number?: string;
   created_journal_id?: string;
   created_journal_number?: string;
-  status?: 'pending' | 'saved' | 'failed';
   error_message?: string;
+  is_all_services?: boolean;
 }
 
 interface ValidationError {
@@ -78,13 +81,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
   const { user } = useAuth();
   const { showNotification } = useNotification();
   const { language, dir } = useLanguage();
+  const { openTab, setPendingViewDoc } = useNavigation();
 
   const isSales = type === 'sales';
-  const pageTitle = isSales ? 'استيراد مستندات بيع من إكسيل' : 'استيراد مستندات شراء من إكسيل';
   const entityLabel = isSales ? 'العميل' : 'المورد';
+  const pageTitle = isSales ? 'استيراد مستندات بيع من إكسيل' : 'استيراد مستندات شراء من إكسيل';
   const sequenceModuleName = isSales ? 'sales_import_batches' : 'purchases_import_batches';
 
-  // System master data
+  // Master data
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -116,6 +120,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
   const [isBatchSaved, setIsBatchSaved] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Company Tax Settings
+  const isVatEnabled = companySettings?.vat_enabled !== false;
+  const isWhtEnabled = companySettings?.wht_enabled !== false && (isSales ? companySettings?.sales_wht_enabled !== false : companySettings?.purchase_wht_enabled !== false);
 
   // Load master data on mount
   useEffect(() => {
@@ -188,6 +196,41 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     };
   }, [user?.company_id, sequenceModuleName]);
 
+  // Navigation to created document
+  const handleNavigateToDocument = (doc: ParsedDocument) => {
+    const docIdOrNum = doc.created_document_number || doc.created_document_id;
+    if (!docIdOrNum) return;
+
+    if (doc.doc_type === 'فاتورة بيع') {
+      setPendingViewDoc({ type: 'invoice', idOrNumber: docIdOrNum });
+      openTab('invoices', 'فواتير المبيعات');
+    } else if (doc.doc_type === 'أمر بيع') {
+      setPendingViewDoc({ type: 'sales_order', idOrNumber: docIdOrNum });
+      openTab('sales_orders', 'أوامر البيع');
+    } else if (doc.doc_type === 'مرتجع بيع') {
+      setPendingViewDoc({ type: 'return', idOrNumber: docIdOrNum });
+      openTab('returns', 'مرتجعات المبيعات');
+    } else if (doc.doc_type === 'فاتورة شراء') {
+      setPendingViewDoc({ type: 'purchase_invoice', idOrNumber: docIdOrNum });
+      openTab('purchase_invoices', 'فواتير المشتريات');
+    } else if (doc.doc_type === 'أمر شراء') {
+      setPendingViewDoc({ type: 'purchase_order', idOrNumber: docIdOrNum });
+      openTab('purchase_orders', 'أوامر الشراء');
+    } else if (doc.doc_type === 'مرتجع شراء') {
+      setPendingViewDoc({ type: 'purchase_return', idOrNumber: docIdOrNum });
+      openTab('purchase_returns', 'مرتجعات المشتريات');
+    }
+  };
+
+  // Navigation to created journal entry
+  const handleNavigateToJournal = (doc: ParsedDocument) => {
+    const journalIdOrNum = doc.created_journal_number || doc.created_journal_id;
+    if (!journalIdOrNum) return;
+
+    setPendingViewDoc({ type: 'journal', idOrNumber: journalIdOrNum });
+    openTab('journal_entries', 'قيود اليومية');
+  };
+
   // Recalculate document totals
   const recalculateDocTotals = (items: ParsedItem[]) => {
     let gross_total = 0;
@@ -216,8 +259,12 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     };
   };
 
-  // Grand summary for top KPI cards
-  const batchSummary = useMemo(() => {
+  // Three separate summaries for Invoices, Orders, and Returns
+  const computeSummaryForType = (typeKeywords: string[]) => {
+    const filteredDocs = documents.filter(d => 
+      typeKeywords.some(kw => d.doc_type.includes(kw))
+    );
+
     let gross = 0;
     let discount = 0;
     let subtotal = 0;
@@ -226,31 +273,38 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     let net = 0;
     let totalItems = 0;
 
-    documents.forEach(doc => {
-      gross += doc.gross_total;
-      discount += doc.discount_amount;
-      subtotal += doc.subtotal;
-      vat += doc.tax_amount;
-      wht += doc.withholding_tax_amount;
-      net += doc.total_amount;
-      totalItems += doc.items.length;
+    filteredDocs.forEach(d => {
+      gross += d.gross_total;
+      discount += d.discount_amount;
+      subtotal += d.subtotal;
+      vat += d.tax_amount;
+      wht += d.withholding_tax_amount;
+      net += d.total_amount;
+      totalItems += d.items.length;
     });
 
     return {
+      count: filteredDocs.length,
+      totalItems,
       gross: Number(gross.toFixed(2)),
       discount: Number(discount.toFixed(2)),
       subtotal: Number(subtotal.toFixed(2)),
       vat: Number(vat.toFixed(2)),
       wht: Number(wht.toFixed(2)),
-      net: Number(net.toFixed(2)),
-      docCount: documents.length,
-      totalItems
+      net: Number(net.toFixed(2))
     };
-  }, [documents]);
+  };
+
+  const invoicesSummary = useMemo(() => computeSummaryForType(['فاتورة']), [documents]);
+  const ordersSummary = useMemo(() => computeSummaryForType(['أمر']), [documents]);
+  const returnsSummary = useMemo(() => computeSummaryForType(['مرتجع']), [documents]);
 
   // Download comprehensive explanation template with realistic examples
   const handleDownloadTemplate = () => {
     const wb = XLSX.utils.book_new();
+
+    const sampleVatRate = isVatEnabled ? 14 : 0;
+    const sampleWhtRate = isWhtEnabled ? 1 : 0;
 
     // Sheet 1: Explanation & Guidelines
     const guideRows = [
@@ -263,10 +317,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       ['4. كود أو اسم ' + entityLabel + ':', 'يجب إدخال كود ' + entityLabel + ' أو اسمه المسجل في النظام بدقة للمطابقة التلقائية.'],
       ['5. كود الصنف أو الباركود:', 'يجب إدخال كود الصنف أو الباركود أو اسم الصنف المسجل بالنظام.'],
       ['6. اسم الصنف:', 'حقل اختياري للاسترشاد، يقوم النظام بجلب بيانات الصنف الأساسية تلقائياً من الكود.'],
-      ['7. كود المخزن أو اسم المخزن:', 'المخزن المراد الصرف منه أو الإضافة إليه. في حالة تركه فارغاً، يتم استخدام المخزن الافتراضي للشركة.'],
+      ['7. المخزن والأصناف الخدمية:', 'المخزن إلزامي للأصناف المخزنية فقط. في حال كان الصنف خدمة (Service) فلا يلزم تحديد مخزن ولا يؤثر ذلك على حركة الأرصدة.'],
       ['8. الكمية والسعر والخصم:', 'الكمية يجب أن تكون رقماً موجباً أكبر من صفر. السعر هو سعر الوحدة قبل الضريبة والخصم. الخصم قيمة نقدية على مستوى البند (أو 0).'],
-      ['9. نسبة ضريبة القيمة المضافة %:', 'النسبة المئوية لضريبة القيمة المضافة مثل 14 أو 0 (بدون علامة %).'],
-      ['10. نسبة ضريبة الخصم والإضافة %:', 'النسبة المئوية لضريبة الخصم والإضافة (ض.خ.أ) مثل 1 أو 0.'],
+      ['9. ضريبة القيمة المضافة %:', isVatEnabled ? 'النسبة المئوية لضريبة القيمة المضافة مثل 14 أو 0 (النظام مفعل له ض.ق.م).' : 'ضريبة القيمة المضافة معطلة في إعدادات الشركة الحالية (تكون 0%).'],
+      ['10. ضريبة الخصم والإضافة %:', isWhtEnabled ? 'النسبة المئوية لضريبة الخصم والإضافة مثل 1 أو 0 (النظام مفعل له ض.خ.أ).' : 'ضريبة الخصم والإضافة معطلة في إعدادات الشركة الحالية (تكون 0%).'],
       ['11. طريقة الدفع:', 'إما (آجل) أو (نقدي). إذا كانت نقدي، يمكن تحديد اسم الخزينة / طريقة الدفع.'],
       ['12. تكرار بيانات المستند:', 'يجب تكرار بيانات الفاتورة (رقم المرجع، النوع، التاريخ، ' + entityLabel + ') في كل سطر يحتوي على صنف لنفس الفاتورة.'],
       ['']
@@ -304,15 +358,15 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     ];
 
     const exampleRows = isSales ? [
-      ['Ref-000001', 'فاتورة بيع', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 10, 150, 0, 14, 1, 'آجل', 'فاتورة مبيعات بضاعة - صنف أول'],
-      ['Ref-000001', 'فاتورة بيع', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 5, 200, 20, 14, 1, 'آجل', 'فاتورة مبيعات بضاعة - صنف ثانٍ لنفس الفاتورة'],
-      ['Ref-000002', 'أمر بيع', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 25, 145, 50, 14, 0, 'آجل', 'أمر بيع معتمد للعميل'],
-      ['Ref-000003', 'مرتجع بيع', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 2, 200, 0, 14, 1, 'نقدي', 'مرتجع مبيعات نقدي تالف']
+      ['Ref-000001', 'فاتورة بيع', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 10, 150, 0, sampleVatRate, sampleWhtRate, 'آجل', 'فاتورة مبيعات بضاعة - صنف أول'],
+      ['Ref-000001', 'فاتورة بيع', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 5, 200, 20, sampleVatRate, sampleWhtRate, 'آجل', 'فاتورة مبيعات بضاعة - صنف ثانٍ لنفس الفاتورة'],
+      ['Ref-000002', 'أمر بيع', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 25, 145, 50, sampleVatRate, 0, 'آجل', 'أمر بيع معتمد للعميل'],
+      ['Ref-000003', 'مرتجع بيع', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 2, 200, 0, sampleVatRate, sampleWhtRate, 'نقدي', 'مرتجع مبيعات نقدي تالف']
     ] : [
-      ['Ref-000001', 'فاتورة شراء', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 50, 120, 100, 14, 1, 'آجل', 'فاتورة توريد خامات - بند أول'],
-      ['Ref-000001', 'فاتورة شراء', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 30, 180, 0, 14, 1, 'آجل', 'فاتورة توريد خامات - بند ثانٍ'],
-      ['Ref-000002', 'أمر شراء', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 100, 115, 0, 14, 0, 'آجل', 'أمر شراء معتمد للمورد'],
-      ['Ref-000003', 'مرتجع شراء', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 5, 180, 0, 14, 1, 'آجل', 'مرتجع مشتريات لعدم مطابقة المواصفات']
+      ['Ref-000001', 'فاتورة شراء', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 50, 120, 100, sampleVatRate, sampleWhtRate, 'آجل', 'فاتورة توريد خامات - بند أول'],
+      ['Ref-000001', 'فاتورة شراء', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 30, 180, 0, sampleVatRate, sampleWhtRate, 'آجل', 'فاتورة توريد خامات - بند ثانٍ'],
+      ['Ref-000002', 'أمر شراء', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 100, 115, 0, sampleVatRate, 0, 'آجل', 'أمر شراء معتمد للمورد'],
+      ['Ref-000003', 'مرتجع شراء', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 5, 180, 0, sampleVatRate, sampleWhtRate, 'آجل', 'مرتجع مشتريات لعدم مطابقة المواصفات']
     ];
 
     const dataWs = XLSX.utils.aoa_to_sheet([headers, ...exampleRows]);
@@ -381,7 +435,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           party_id: string;
           party_name: string;
           party_code?: string;
-          warehouse_id?: string;
+          warehouse_id?: string | null;
           warehouse_name?: string;
           payment_type: 'cash' | 'credit';
           payment_method_id?: string;
@@ -392,18 +446,17 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
       const validSalesTypes = ['فاتورة بيع', 'أمر بيع', 'مرتجع بيع'];
       const validPurchaseTypes = ['فاتورة شراء', 'أمر شراء', 'مرتجع شراء'];
-      const allowedDocTypes = isSales ? validSalesTypes : validPurchaseTypes;
+      const expectedDocTypes = isSales ? validSalesTypes : validPurchaseTypes;
 
-      // Default warehouse fallback
-      const defaultWh = warehouses.find(w => (w as any).is_default) || warehouses[0];
+      const defaultWh = warehouses[0];
 
-      // Process rows (row 0 is header, rows 1+ are data)
+      // Parse data rows (row index 0 is header)
       for (let i = 1; i < rawRows.length; i++) {
         const row = rawRows[i];
-        const rowNumber = i + 1; // 1-indexed Excel row
+        const rowNumber = i + 1; // 1-based index in Excel
 
-        // Skip completely empty rows
-        if (!row || row.every((c: any) => c === '' || c === null || c === undefined)) {
+        // Ignore empty lines
+        if (!row || row.every(cell => cell === '' || cell === null || cell === undefined)) {
           continue;
         }
 
@@ -427,12 +480,12 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           errors.push({
             rowNumber,
             ref: rawRef || 'غير محدد',
-            field: 'Ref',
-            message: 'رقم المرجع (العمود الأول) إلزامي ولا يمكن تركه فارغاً'
+            field: 'رقم المرجع (Ref)',
+            message: 'رقم المرجع (Ref) إلزامي لربط بنود المستند'
           });
         }
 
-        // 2. Validate Doc Type
+        // 2. Validate Document Type
         if (!rawDocType) {
           errors.push({
             rowNumber,
@@ -440,62 +493,61 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             field: 'نوع المستند',
             message: 'نوع المستند إلزامي'
           });
-        } else if (!allowedDocTypes.includes(rawDocType)) {
+        } else if (!expectedDocTypes.includes(rawDocType)) {
           errors.push({
             rowNumber,
             ref: rawRef,
             field: 'نوع المستند',
-            message: `نوع المستند "${rawDocType}" غير صالح لشاشة ${isSales ? 'المبيعات' : 'المشتريات'}. الأنواع المسموحة: ${allowedDocTypes.join(' أو ')}`
+            message: `نوع المستند "${rawDocType}" غير صالح. الأنواع المقبولة هي: (${expectedDocTypes.join(' - ')})`
           });
         }
 
         // 3. Validate Date
         let parsedDate = batchDate;
         if (rawDate) {
-          if (typeof rawDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
-            parsedDate = rawDate;
-          } else if (typeof rawDate === 'number') {
-            // Excel serial date number
-            const d = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
-            parsedDate = d.toISOString().slice(0, 10);
+          const d = new Date(rawDate);
+          if (isNaN(d.getTime())) {
+            errors.push({
+              rowNumber,
+              ref: rawRef,
+              field: 'التاريخ',
+              message: `تاريخ المستند "${rawDate}" غير صالح. يرجى استخدام صيغة YYYY-MM-DD`
+            });
           } else {
-            const d = new Date(rawDate);
-            if (!isNaN(d.getTime())) {
-              parsedDate = d.toISOString().slice(0, 10);
-            } else {
-              errors.push({
-                rowNumber,
-                ref: rawRef,
-                field: 'التاريخ',
-                message: `تنسيق التاريخ غير صحيح "${rawDate}". يرجى كتابته بتنسيق YYYY-MM-DD`
-              });
-            }
+            parsedDate = rawDate.slice(0, 10);
           }
         }
 
-        // 4. Validate Customer / Supplier
-        let matchedParty: Customer | Supplier | undefined;
+        // 4. Validate Party (Customer / Supplier)
+        let matchedParty: any = null;
         if (!rawParty) {
           errors.push({
             rowNumber,
             ref: rawRef,
             field: entityLabel,
-            message: `اسم أو كود ${entityLabel} إلزامي`
+            message: `كود أو اسم ${entityLabel} إلزامي`
           });
         } else {
-          const list = isSales ? customers : suppliers;
-          matchedParty = list.find(p => 
-            p.id === rawParty || 
-            (p.code && p.code.toLowerCase() === rawParty.toLowerCase()) || 
-            (p.name && p.name.trim().toLowerCase() === rawParty.toLowerCase())
-          );
+          if (isSales) {
+            matchedParty = customers.find(c => 
+              (c.code && c.code.toLowerCase() === rawParty.toLowerCase()) ||
+              (c.name && c.name.trim().toLowerCase() === rawParty.toLowerCase()) ||
+              (c.tax_number && c.tax_number === rawParty)
+            );
+          } else {
+            matchedParty = suppliers.find(s => 
+              (s.code && s.code.toLowerCase() === rawParty.toLowerCase()) ||
+              (s.name && s.name.trim().toLowerCase() === rawParty.toLowerCase()) ||
+              (s.tax_number && s.tax_number === rawParty)
+            );
+          }
 
           if (!matchedParty) {
             errors.push({
               rowNumber,
               ref: rawRef,
               field: entityLabel,
-              message: `لم يتم العثور على ${entityLabel} "${rawParty}" في دليل ${isSales ? 'العملاء' : 'الموردين'}`
+              message: `${entityLabel} "${rawParty}" غير مسجل في دليل ${entityLabel}ين للنظام`
             });
           }
         }
@@ -527,8 +579,11 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           }
         }
 
-        // 6. Validate Warehouse
-        let matchedWarehouse: Warehouse | undefined = defaultWh;
+        // Service check: Services do NOT require warehouse and never fail on inventory
+        const isServiceItem = matchedProduct?.type === 'service' || matchedProduct?.is_service === true;
+
+        // 6. Validate Warehouse (Only for physical products)
+        let matchedWarehouse: Warehouse | undefined = undefined;
         if (rawWarehouse) {
           const foundWh = warehouses.find(w => 
             w.id === rawWarehouse ||
@@ -543,6 +598,17 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               ref: rawRef,
               field: 'المخزن',
               message: `المخزن "${rawWarehouse}" غير مسجل في دليل المستودعات`
+            });
+          }
+        } else if (!isServiceItem) {
+          // Physical product: default warehouse fallback
+          matchedWarehouse = defaultWh;
+          if (!matchedWarehouse) {
+            errors.push({
+              rowNumber,
+              ref: rawRef,
+              field: 'المخزن',
+              message: `المخزن إلزامي للصنف المخزني "${rawProdName || rawProdCode}"`
             });
           }
         }
@@ -578,14 +644,20 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           });
         }
 
-        // 8. Tax rates
-        const vatRateNum = rawVatRate !== '' && rawVatRate !== undefined 
-          ? (parseFloat(String(rawVatRate)) || 0)
-          : (parseFloat(String(isSales ? matchedProduct?.vat_rate : matchedProduct?.purchase_vat_rate)) || 14);
+        // 8. Tax rates respecting company settings
+        let vatRateNum = 0;
+        if (isVatEnabled) {
+          vatRateNum = rawVatRate !== '' && rawVatRate !== undefined 
+            ? (parseFloat(String(rawVatRate)) || 0)
+            : (parseFloat(String(isSales ? matchedProduct?.vat_rate : matchedProduct?.purchase_vat_rate)) || 14);
+        }
 
-        const whtRateNum = rawWhtRate !== '' && rawWhtRate !== undefined
-          ? (parseFloat(String(rawWhtRate)) || 0)
-          : (parseFloat(String(isSales ? matchedProduct?.sales_withholding_tax_rate : matchedProduct?.purchase_withholding_tax_rate)) || 0);
+        let whtRateNum = 0;
+        if (isWhtEnabled) {
+          whtRateNum = rawWhtRate !== '' && rawWhtRate !== undefined
+            ? (parseFloat(String(rawWhtRate)) || 0)
+            : (parseFloat(String(isSales ? matchedProduct?.sales_withholding_tax_rate : matchedProduct?.purchase_withholding_tax_rate)) || 0);
+        }
 
         // Payment type parsing
         const paymentType: 'cash' | 'credit' = (rawPaymentType === 'نقدي' || rawPaymentType.toLowerCase() === 'cash') ? 'cash' : 'credit';
@@ -608,7 +680,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 party_id: matchedParty?.id || '',
                 party_name: matchedParty?.name || rawParty,
                 party_code: matchedParty?.code,
-                warehouse_id: matchedWarehouse?.id || '',
+                warehouse_id: matchedWarehouse?.id || null,
                 warehouse_name: matchedWarehouse?.name || '',
                 payment_type: paymentType,
                 payment_method_id: paymentMethods[0]?.id || '',
@@ -617,6 +689,12 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               items: []
             };
           } else {
+            // Keep warehouse from any row if not yet set
+            if (matchedWarehouse && !groupedDocs[rawRef].header.warehouse_id) {
+              groupedDocs[rawRef].header.warehouse_id = matchedWarehouse.id;
+              groupedDocs[rawRef].header.warehouse_name = matchedWarehouse.name;
+            }
+
             // Check cross-row consistency for the same Ref
             const existingHeader = groupedDocs[rawRef].header;
             if (rawDocType && existingHeader.doc_type !== rawDocType) {
@@ -654,7 +732,8 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               withholding_tax_rate: whtRateNum,
               withholding_tax_amount: lineWht,
               total: lineTotal,
-              description: rawNotes
+              description: rawNotes,
+              is_service: isServiceItem
             });
           }
         }
@@ -665,6 +744,8 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       // Convert grouped documents to list and calculate totals
       const docsList: ParsedDocument[] = Object.values(groupedDocs).map(g => {
         const totals = recalculateDocTotals(g.items);
+        const allServices = g.items.length > 0 && g.items.every(it => it.is_service === true);
+
         return {
           ref: g.header.ref,
           doc_type: g.header.doc_type,
@@ -672,12 +753,13 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           party_id: g.header.party_id,
           party_name: g.header.party_name,
           party_code: g.header.party_code,
-          warehouse_id: g.header.warehouse_id,
-          warehouse_name: g.header.warehouse_name,
+          warehouse_id: allServices ? null : (g.header.warehouse_id || defaultWh?.id || null),
+          warehouse_name: allServices ? 'خدمات (بدون مخزن)' : (g.header.warehouse_name || defaultWh?.name || ''),
           payment_type: g.header.payment_type,
           payment_method_id: g.header.payment_method_id,
           notes: g.header.notes,
           items: g.items,
+          is_all_services: allServices,
           ...totals,
           status: 'pending'
         };
@@ -698,57 +780,62 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
     } catch (err: any) {
       console.error('File parsing error:', err);
-      showNotification('خطأ أثناء قراءة ملف الإكسيل: ' + err.message, 'error');
+      showNotification('فشل تحليل ملف الإكسيل: ' + err.message, 'error');
     } finally {
       setIsParsing(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  // Toggle accordion expand
+  // Toggle expand
   const toggleDocExpand = (ref: string) => {
-    setExpandedRefs(prev => ({ ...prev, [ref]: !prev[ref] }));
+    setExpandedRefs(prev => ({
+      ...prev,
+      [ref]: !prev[ref]
+    }));
   };
 
-  // Delete entire document
+  // Delete single document
   const handleDeleteDocument = (ref: string) => {
-    if (confirm(`هل أنت متأكد من حذف المستند بالكامل رقم المرجع ${ref}؟`)) {
-      setDocuments(prev => prev.filter(d => d.ref !== ref));
-      showNotification(`تم حذف المستند ${ref}`, 'info');
-    }
+    setDocuments(prev => prev.filter(d => d.ref !== ref));
+    setValidationErrors(prev => prev.filter(e => e.ref !== ref));
+    showNotification(`تم حذف المستند ${ref} من الدفعة`, 'info');
   };
 
-  // Delete single item in a document
+  // Delete item from document
   const handleDeleteItem = (docRef: string, itemId: string) => {
     setDocuments(prev => {
       return prev.map(doc => {
         if (doc.ref !== docRef) return doc;
-        const newItems = doc.items.filter(item => item.id !== itemId);
+        const newItems = doc.items.filter(it => it.id !== itemId);
         const newTotals = recalculateDocTotals(newItems);
         return {
           ...doc,
           items: newItems,
           ...newTotals
         };
-      }).filter(doc => doc.items.length > 0); // Remove document if it has no items left
+      }).filter(doc => doc.items.length > 0);
     });
-    showNotification('تم حذف الصنف وإعادة احتساب الإجماليات', 'info');
+    showNotification('تم حذف البند وإعادة احتساب الإجماليات', 'info');
   };
 
-  // Save edited item
+  // Update item in document
   const handleSaveItemEdit = (updatedItem: ParsedItem) => {
     if (!editingItem) return;
-    const docRef = editingItem.docRef;
+    const { docRef } = editingItem;
 
-    // Recalculate item line
-    const lineGross = updatedItem.quantity * updatedItem.unit_price;
-    const lineSubtotal = Math.max(0, lineGross - updatedItem.discount_amount);
-    const lineVat = Number(((lineSubtotal * updatedItem.vat_rate) / 100).toFixed(2));
-    const lineWht = Number(((lineSubtotal * updatedItem.withholding_tax_rate) / 100).toFixed(2));
+    const lineGross = (updatedItem.quantity || 0) * (updatedItem.unit_price || 0);
+    const lineSubtotal = Math.max(0, lineGross - (updatedItem.discount_amount || 0));
+    const effectiveVatRate = isVatEnabled ? updatedItem.vat_rate : 0;
+    const effectiveWhtRate = isWhtEnabled ? updatedItem.withholding_tax_rate : 0;
+    const lineVat = Number(((lineSubtotal * effectiveVatRate) / 100).toFixed(2));
+    const lineWht = Number(((lineSubtotal * effectiveWhtRate) / 100).toFixed(2));
     const lineTotal = Number((lineSubtotal + lineVat - lineWht).toFixed(2));
 
     const finalItem: ParsedItem = {
       ...updatedItem,
+      vat_rate: effectiveVatRate,
+      withholding_tax_rate: effectiveWhtRate,
       subtotal: lineSubtotal,
       vat_amount: lineVat,
       withholding_tax_amount: lineWht,
@@ -894,14 +981,12 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           createdDocNumber = soRes.order_number || `SO-${createdDocId.slice(-6)}`;
 
         } else if (doc.doc_type === 'مرتجع بيع') {
+          // Note: returns table only stores total_amount and withholding_tax_amount
           const retPayload = {
             customer_id: doc.party_id,
             customer_name: doc.party_name,
             warehouse_id: doc.warehouse_id || null,
             date: doc.date,
-            subtotal: doc.subtotal,
-            discount: doc.discount_amount,
-            tax: doc.tax_amount,
             withholding_tax_amount: doc.withholding_tax_amount,
             total_amount: doc.total_amount,
             payment_type: doc.payment_type,
@@ -1006,14 +1091,12 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           createdDocNumber = poRes.order_number || `PO-${createdDocId.slice(-6)}`;
 
         } else if (doc.doc_type === 'مرتجع شراء') {
+          // Note: purchase_returns table only stores total_amount and withholding_tax_amount
           const pretPayload = {
             supplier_id: doc.party_id,
             supplier_name: doc.party_name,
             warehouse_id: doc.warehouse_id || null,
             date: doc.date,
-            subtotal: doc.subtotal,
-            discount: doc.discount_amount,
-            tax: doc.tax_amount,
             withholding_tax_amount: doc.withholding_tax_amount,
             total_amount: doc.total_amount,
             payment_type: doc.payment_type,
@@ -1057,16 +1140,18 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           created_document_number: createdDocNumber,
           created_journal_id: createdJournalId,
           created_journal_number: createdJournalNumber,
-          status: 'saved'
+          status: 'saved',
+          error_message: undefined
         };
         successCount++;
 
       } catch (err: any) {
         console.error(`Error saving document ${doc.ref}:`, err);
+        const errMsg = err.message || err.detail || 'خطأ أثناء الحفظ والترحيل';
         updatedDocuments[idx] = {
           ...doc,
           status: 'failed',
-          error_message: err.message
+          error_message: errMsg
         };
         failedCount++;
       }
@@ -1092,15 +1177,16 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           created_document_id: d.created_document_id,
           created_document_number: d.created_document_number,
           created_journal_number: d.created_journal_number,
-          status: d.status
+          status: d.status,
+          error_message: d.error_message
         })),
         status: failedCount === 0 ? 'posted' : 'partial',
         created_by: user?.id || user?.email
       };
 
-      await dbService.add('document_import_batches', batchRecord);
+      await apiRequest('/document_import_batches', 'POST', batchRecord);
     } catch (bErr: any) {
-      console.warn('Could not record document_import_batches entry:', bErr);
+      console.warn('Failed to record batch audit history:', bErr);
     }
 
     setIsSavingBatch(false);
@@ -1108,13 +1194,13 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     setIsBatchSaved(true);
 
     if (failedCount === 0) {
-      showNotification(`تم حفظ وترحيل جميع المستندات (${successCount}) بنجاح تام!`, 'success');
+      showNotification(`تم حفظ وترحيل كامل الدفعة بنجاح! تم إنشاء ${successCount} مستند والقيود التلقائية`, 'success');
     } else {
-      showNotification(`تم حفظ ${successCount} مستند وفشل ${failedCount} مستند`, 'warning');
+      showNotification(`تم ترحيل ${successCount} مستند بنجاح، وتعذر حفظ ${failedCount} مستند (راجع الأسباب بالجدول)`, 'warning');
     }
   };
 
-  // Export after save with Batch Number, Invoice Numbers, Journal Numbers
+  // Export processed data to Excel after save
   const handleExportAfterSave = () => {
     if (documents.length === 0) return;
 
@@ -1142,6 +1228,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       'قيمة ض.خ.أ',
       'الإجمالي النهائي للسطر',
       'طريقة الدفع',
+      'حالة الحفظ والترحيل',
       'ملاحظات'
     ];
 
@@ -1152,7 +1239,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         exportRows.push([
           batchDate,
           batchNumber,
-          doc.created_document_number || 'لم يتم الحفظ',
+          doc.created_document_number || (doc.status === 'failed' ? `لم يتم الحفظ: ${doc.error_message || 'خطأ'}` : 'لم يتم الحفظ'),
           doc.created_journal_number || (doc.doc_type.includes('أمر') ? 'بدون قيد (أمر)' : '-'),
           doc.ref,
           doc.doc_type,
@@ -1171,6 +1258,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           item.withholding_tax_amount,
           item.total,
           doc.payment_type === 'cash' ? 'نقدي' : 'آجل',
+          doc.status === 'saved' ? 'تم الحفظ والترحيل' : `فشل: ${doc.error_message || 'لم يحفظ'}`,
           item.description || doc.notes || ''
         ]);
       });
@@ -1186,114 +1274,116 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto" dir={dir}>
-      {/* Header Bar */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className={`p-3 rounded-xl ${isSales ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600' : 'bg-blue-50 dark:bg-blue-950/40 text-blue-600'}`}>
-              <FileSpreadsheet className="w-7 h-7" />
+    <div className="w-full px-2 sm:px-4 py-3 space-y-3.5" dir={dir}>
+      
+      {/* Merged Compact Header & Upload Bar */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 md:p-3.5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          
+          {/* Right: Title & Info */}
+          <div className="flex items-center gap-2.5">
+            <div className={`p-2 rounded-xl ${isSales ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600' : 'bg-blue-50 dark:bg-blue-950/40 text-blue-600'}`}>
+              <FileSpreadsheet className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                {pageTitle}
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
+              <div className="flex items-center gap-2">
+                <h1 className="text-sm md:text-base font-bold text-slate-900 dark:text-white">
+                  {pageTitle}
+                </h1>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                   {isSales ? 'مبيعات' : 'مشتريات'}
                 </span>
-              </h1>
-              <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                استيراد الفواتير والأوامر والمرتجعات دفعة واحدة من ملف إكسيل مع توليد الأرقام والقيود المحاسبية التلقائية
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                استيراد الفواتير والأوامر والمرتجعات مع توليد أرقام القيود التلقائية
               </p>
             </div>
           </div>
 
-          {/* Batch Date & Number Display */}
-          <div className="flex flex-wrap items-center gap-3 bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700/60">
-            {/* Batch Date */}
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-slate-400" />
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">تاريخ التشغيلة:</span>
+          {/* Center: Merged Upload Dropzone / Button */}
+          <div 
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragging(false);
+              if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                handleFileUpload(e.dataTransfer.files[0]);
+              }
+            }}
+            onClick={() => fileInputRef.current?.click()}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border border-dashed cursor-pointer transition-all duration-150 select-none ${
+              isDragging 
+                ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700' 
+                : fileName
+                  ? 'border-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-200 hover:border-emerald-400'
+                  : 'border-slate-300 dark:border-slate-700 hover:border-emerald-400 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300'
+            }`}
+            title="اضغط لاختيار ملف الإكسيل أو اسحبه وأفلته هنا"
+          >
+            <input 
+              type="file" 
+              ref={fileInputRef}
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  handleFileUpload(e.target.files[0]);
+                }
+              }}
+              accept=".xlsx, .xls, .csv"
+              className="hidden" 
+            />
+            <UploadCloud className={`w-4 h-4 shrink-0 ${fileName ? 'text-emerald-600' : 'text-slate-500'}`} />
+            {isParsing ? (
+              <span className="text-xs font-semibold flex items-center gap-1">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                جاري الفحص...
+              </span>
+            ) : fileName ? (
+              <span className="text-xs font-semibold truncate max-w-[220px]" dir="ltr">
+                {fileName}
+              </span>
+            ) : (
+              <span className="text-xs font-semibold">
+                اضغط لاختيار ملف الإكسيل أو اسحبه هنا
+              </span>
+            )}
+          </div>
+
+          {/* Left: Tight inputs for Date, Batch # and Download Template */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Date */}
+            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/60 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+              <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">التاريخ:</span>
               <input 
                 type="date"
                 value={batchDate}
-                disabled={documents.length > 0 || isSavingBatch}
+                disabled={isBatchSaved}
                 onChange={(e) => setBatchDate(e.target.value)}
-                className="text-xs font-medium bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60"
+                className="text-xs font-mono font-medium bg-transparent focus:outline-none disabled:opacity-60 cursor-pointer"
               />
             </div>
 
-            <div className="h-5 w-px bg-slate-300 dark:bg-slate-700 hidden sm:block" />
-
             {/* Batch Number */}
-            <div className="flex items-center gap-2">
-              <Hash className="w-4 h-4 text-emerald-500" />
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">رقم التشغيلة:</span>
-              <div className="text-xs font-mono font-bold px-2.5 py-1.5 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 rounded-lg select-all">
+            <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/60">
+              <Hash className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">التشغيلة:</span>
+              <span className="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-300 select-all">
                 {isGeneratingBatchNumber ? 'جاري التوليد...' : batchNumber}
-              </div>
+              </span>
             </div>
 
             {/* Download Template Button */}
             <button
               onClick={handleDownloadTemplate}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800/70 hover:bg-emerald-50/50 px-3 py-1.5 rounded-lg transition-colors shadow-sm"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1 rounded-lg transition-colors shadow-sm"
               title="تحميل نموذج الإكسيل النموذجي المشروح مع أمثلة عملية جاهزة"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>تحميل النموذج المشروح</span>
+              <span>تحميل النموذج</span>
             </button>
           </div>
-        </div>
-      </div>
 
-      {/* Upload Zone */}
-      <div 
-        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-        onDragLeave={() => setIsDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setIsDragging(false);
-          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            handleFileUpload(e.dataTransfer.files[0]);
-          }
-        }}
-        onClick={() => fileInputRef.current?.click()}
-        className={`border-2 border-dashed rounded-2xl p-6 md:p-8 text-center cursor-pointer transition-all duration-200 ${
-          isDragging 
-            ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 scale-[0.99]' 
-            : 'border-slate-300 dark:border-slate-700 hover:border-emerald-400 dark:hover:border-emerald-600 bg-white dark:bg-slate-900'
-        }`}
-      >
-        <input 
-          type="file" 
-          ref={fileInputRef}
-          onChange={(e) => {
-            if (e.target.files && e.target.files[0]) {
-              handleFileUpload(e.target.files[0]);
-            }
-          }}
-          accept=".xlsx, .xls, .csv"
-          className="hidden" 
-        />
-        
-        <div className="flex flex-col items-center justify-center gap-3">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 flex items-center justify-center shadow-inner">
-            <UploadCloud className="w-7 h-7" />
-          </div>
-          <div>
-            <p className="text-base font-bold text-slate-800 dark:text-slate-200">
-              اضغط لاختيار ملف الإكسيل أو اسحبه وأفلته هنا
-            </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              يدعم ملفات (.xlsx, .xls) مع التحقق الفوري من صحة الأكواد والأسعار والعملاء والأصناف
-            </p>
-          </div>
-          {fileName && (
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 mt-1">
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-              <span>{fileName}</span>
-            </div>
-          )}
         </div>
       </div>
 
@@ -1301,38 +1391,38 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       <AnimatePresence>
         {validationErrors.length > 0 && (
           <motion.div 
-            initial={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl p-5 shadow-sm space-y-3"
+            exit={{ opacity: 0, y: -8 }}
+            className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 shadow-sm space-y-2.5"
           >
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold text-sm">
-                <AlertTriangle className="w-5 h-5 text-amber-600" />
+              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold text-xs md:text-sm">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
                 <span>تنبيهات وأخطاء الفحص التفصيلي ({validationErrors.length} ملاحظة):</span>
               </div>
-              <span className="text-xs bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full font-semibold">
+              <span className="text-[11px] bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full font-semibold">
                 يرجى تصحيح الأخطاء في الإكسيل أو التعديل بالجدول أدناه
               </span>
             </div>
 
-            <div className="max-h-60 overflow-y-auto rounded-xl border border-amber-200/80 dark:border-amber-800/80 bg-white dark:bg-slate-900">
+            <div className="max-h-52 overflow-y-auto rounded-xl border border-amber-200/80 dark:border-amber-800/80 bg-white dark:bg-slate-900">
               <table className="w-full text-right text-xs">
                 <thead className="bg-amber-100/60 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border-b border-amber-200 dark:border-amber-800 sticky top-0">
                   <tr>
-                    <th className="p-2.5 font-bold">رقم الصف بالإكسيل</th>
-                    <th className="p-2.5 font-bold">رقم المرجع (Ref)</th>
-                    <th className="p-2.5 font-bold">الحقل</th>
-                    <th className="p-2.5 font-bold">سبب الخطأ بالتفصيل</th>
+                    <th className="p-2 font-bold">رقم الصف بالإكسيل</th>
+                    <th className="p-2 font-bold">رقم المرجع (Ref)</th>
+                    <th className="p-2 font-bold">الحقل</th>
+                    <th className="p-2 font-bold">سبب الخطأ بالتفصيل</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-amber-100 dark:divide-slate-800">
                   {validationErrors.map((err, i) => (
                     <tr key={i} className="hover:bg-amber-50/50 dark:hover:bg-slate-800/50">
-                      <td className="p-2.5 font-mono font-bold text-amber-700 dark:text-amber-400">الصف {err.rowNumber}</td>
-                      <td className="p-2.5 font-mono">{err.ref}</td>
-                      <td className="p-2.5 font-semibold text-slate-700 dark:text-slate-300">{err.field}</td>
-                      <td className="p-2.5 text-red-600 dark:text-red-400">{err.message}</td>
+                      <td className="p-2 font-mono font-bold text-amber-700 dark:text-amber-400">الصف {err.rowNumber}</td>
+                      <td className="p-2 font-mono">{err.ref}</td>
+                      <td className="p-2 font-semibold text-slate-700 dark:text-slate-300">{err.field}</td>
+                      <td className="p-2 text-red-600 dark:text-red-400">{err.message}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1342,78 +1432,41 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         )}
       </AnimatePresence>
 
-      {/* Top Summary Cards (KPIs) */}
+      {/* 3 Distinct Totals Rows: Invoices / Orders / Returns */}
       {documents.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-          {/* Gross */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-sm text-center">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">الإجمالي</span>
-            <span className="text-sm md:text-base font-bold text-slate-900 dark:text-white block font-mono">
-              {formatMoney(batchSummary.gross)}
-            </span>
-          </div>
+        <div className="space-y-2">
+          {/* Row 1: Invoices */}
+          <SummaryRowCard 
+            title={isSales ? 'فواتير بيع' : 'فواتير شراء'}
+            badgeColor="bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-800"
+            summary={invoicesSummary}
+            isVatEnabled={isVatEnabled}
+            isWhtEnabled={isWhtEnabled}
+          />
 
-          {/* Discount */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-sm text-center">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">إجمالي الخصم</span>
-            <span className="text-sm md:text-base font-bold text-amber-600 dark:text-amber-400 block font-mono">
-              {formatMoney(batchSummary.discount)}
-            </span>
-          </div>
+          {/* Row 2: Orders */}
+          <SummaryRowCard 
+            title={isSales ? 'أوامر بيع' : 'أوامر شراء'}
+            badgeColor="bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-800"
+            summary={ordersSummary}
+            isVatEnabled={isVatEnabled}
+            isWhtEnabled={false}
+          />
 
-          {/* Subtotal */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-sm text-center">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">الصافي قبل الضريبة</span>
-            <span className="text-sm md:text-base font-bold text-blue-600 dark:text-blue-400 block font-mono">
-              {formatMoney(batchSummary.subtotal)}
-            </span>
-          </div>
-
-          {/* VAT */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-sm text-center">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">ض.ق.م (14%)</span>
-            <span className="text-sm md:text-base font-bold text-emerald-600 dark:text-emerald-400 block font-mono">
-              {formatMoney(batchSummary.vat)}
-            </span>
-          </div>
-
-          {/* WHT */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-sm text-center">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">ض.خ.أ</span>
-            <span className="text-sm md:text-base font-bold text-purple-600 dark:text-purple-400 block font-mono">
-              {formatMoney(batchSummary.wht)}
-            </span>
-          </div>
-
-          {/* Net Total */}
-          <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3.5 shadow-sm text-center col-span-2 sm:col-span-1">
-            <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 block mb-1">الصافي النهائي</span>
-            <span className="text-sm md:text-base font-bold text-emerald-800 dark:text-emerald-200 block font-mono">
-              {formatMoney(batchSummary.net)}
-            </span>
-          </div>
-
-          {/* Doc count */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-sm text-center">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">المستندات</span>
-            <span className="text-sm md:text-base font-bold text-slate-900 dark:text-white block font-mono">
-              {batchSummary.docCount}
-            </span>
-          </div>
-
-          {/* Items count */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-sm text-center">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">إجمالي البنود</span>
-            <span className="text-sm md:text-base font-bold text-slate-900 dark:text-white block font-mono">
-              {batchSummary.totalItems}
-            </span>
-          </div>
+          {/* Row 3: Returns */}
+          <SummaryRowCard 
+            title={isSales ? 'مرتجعات بيع' : 'مرتجعات شراء'}
+            badgeColor="bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-800"
+            summary={returnsSummary}
+            isVatEnabled={isVatEnabled}
+            isWhtEnabled={isWhtEnabled}
+          />
         </div>
       )}
 
       {/* Actions Bar: Save & Post / Export After Save */}
       {documents.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 shadow-sm">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
               إجمالي المستندات الجاهزة:
@@ -1429,13 +1482,13 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {/* Save & Post Button */}
             {!isBatchSaved && (
               <button
                 onClick={handleSaveAndPostBatch}
                 disabled={isSavingBatch || validationErrors.length > 0}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs md:text-sm font-bold rounded-xl shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSavingBatch ? (
                   <>
@@ -1455,7 +1508,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             {isBatchSaved && (
               <button
                 onClick={handleExportAfterSave}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl shadow-md transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-bold rounded-xl shadow-md transition-colors"
               >
                 <Download className="w-4 h-4" />
                 <span>تصدير إكسيل بعد الحفظ (مع أرقام الفواتير والقيود)</span>
@@ -1467,12 +1520,12 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
       {/* Save Progress Bar */}
       {saveProgress && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm space-y-2">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 shadow-sm space-y-1.5">
           <div className="flex justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
             <span>{saveProgress.statusText}</span>
             <span className="font-mono">{Math.round((saveProgress.current / saveProgress.total) * 100)}%</span>
           </div>
-          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
+          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
             <div 
               className="bg-emerald-500 h-full transition-all duration-300"
               style={{ width: `${(saveProgress.current / saveProgress.total) * 100}%` }}
@@ -1483,10 +1536,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
       {/* Interactive Table of Valid Documents (Accordion) */}
       {documents.length > 0 && (
-        <div className="space-y-4">
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Layers className="w-5 h-5 text-emerald-600" />
+            <h2 className="text-sm md:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <Layers className="w-4 h-4 text-emerald-600" />
               <span>جدول المستندات الصحيحة ومطابقتها ({documents.length}):</span>
             </h2>
             <div className="flex items-center gap-2">
@@ -1510,7 +1563,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {documents.map((doc, docIdx) => {
               const isExpanded = !!expandedRefs[doc.ref];
               const docTypeBadgeColor = 
@@ -1518,89 +1571,120 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 doc.doc_type.includes('أمر') ? 'bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-800' :
                 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-800';
 
+              const allServices = doc.items.length > 0 && doc.items.every(i => i.is_service === true);
+
               return (
                 <div 
                   key={doc.ref}
-                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden"
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden"
                 >
                   {/* Document Header Row (Parent) */}
-                  <div className="p-4 bg-slate-50/70 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
+                  <div className="p-2.5 md:p-3 bg-slate-50/70 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2.5">
+                    
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Chevron toggle */}
                       <button
                         onClick={() => toggleDocExpand(doc.ref)}
-                        className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors"
+                        className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors"
                         title={isExpanded ? 'طي الأصناف' : 'عرض الأصناف'}
                       >
-                        {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </button>
 
-                      <span className="font-mono font-bold text-xs px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-sm text-slate-800 dark:text-slate-200">
+                      {/* 1. Document Number Link / Badge (BEFORE Ref as requested) */}
+                      {doc.created_document_number && (
+                        <button
+                          type="button"
+                          onClick={() => handleNavigateToDocument(doc)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-mono font-bold shadow-sm transition-all transform hover:scale-105 cursor-pointer"
+                          title="انقر للانتقال مباشرة إلى المستند في تبويب جديد"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>{doc.created_document_number}</span>
+                          <ExternalLink className="w-3 h-3 opacity-80" />
+                        </button>
+                      )}
+
+                      {/* 2. Journal Entry Number Link / Badge (BEFORE Ref as requested) */}
+                      {doc.created_journal_number && (
+                        <button
+                          type="button"
+                          onClick={() => handleNavigateToJournal(doc)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-mono font-bold shadow-sm transition-all transform hover:scale-105 cursor-pointer"
+                          title="انقر للانتقال مباشرة إلى القيد المحاسبي في تبويب جديد"
+                        >
+                          <Hash className="w-3.5 h-3.5" />
+                          <span>قيد: {doc.created_journal_number}</span>
+                          <ExternalLink className="w-3 h-3 opacity-80" />
+                        </button>
+                      )}
+
+                      {/* 3. Error Badge if document failed */}
+                      {doc.status === 'failed' && (
+                        <div 
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-100 dark:bg-red-950/70 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 text-xs font-semibold"
+                          title={doc.error_message}
+                        >
+                          <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                          <span className="truncate max-w-[280px]">فشل الحفظ: {doc.error_message || 'خطأ في الحفظ'}</span>
+                        </div>
+                      )}
+
+                      {/* 4. Ref Badge */}
+                      <span className="font-mono font-bold text-xs px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xs text-slate-800 dark:text-slate-200">
                         {doc.ref}
                       </span>
 
-                      <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${docTypeBadgeColor}`}>
+                      {/* 5. Document Type Badge */}
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold border ${docTypeBadgeColor}`}>
                         {doc.doc_type}
                       </span>
 
-                      <span className="font-bold text-sm text-slate-900 dark:text-white">
+                      {/* 6. Party Name */}
+                      <span className="font-bold text-xs md:text-sm text-slate-900 dark:text-white">
                         {doc.party_name}
                       </span>
 
+                      {/* 7. Date */}
                       <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                         {doc.date}
                       </span>
 
-                      {doc.warehouse_name && (
+                      {/* 8. Warehouse or Service Badge */}
+                      {allServices ? (
+                        <span className="text-[11px] px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-semibold border border-purple-200 dark:border-purple-800">
+                          خدمات (لا يلزم مخزن)
+                        </span>
+                      ) : doc.warehouse_name ? (
                         <span className="text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                           {doc.warehouse_name}
                         </span>
-                      )}
+                      ) : null}
 
+                      {/* 9. Payment Type */}
                       <span className="text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                         {doc.payment_type === 'cash' ? 'نقدي' : 'آجل'}
                       </span>
                     </div>
 
-                    {/* Totals & Generated Numbers */}
-                    <div className="flex flex-wrap items-center gap-3">
-                      {/* Generated Numbers (shown after save) */}
-                      {doc.created_document_number && (
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs font-mono font-bold">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>رقم الفاتورة: {doc.created_document_number}</span>
-                        </div>
-                      )}
-
-                      {doc.created_journal_number && (
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-300 dark:border-blue-800 text-blue-800 dark:text-blue-200 text-xs font-mono font-bold">
-                          <FileText className="w-3.5 h-3.5 text-blue-600" />
-                          <span>رقم القيد: {doc.created_journal_number}</span>
-                        </div>
-                      )}
-
-                      {/* Totals Pill */}
-                      <div className="flex items-center gap-2 text-xs font-mono font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg">
-                        <span className="text-slate-500">الإجمالي:</span>
-                        <span className="font-bold text-slate-800 dark:text-slate-100">{formatMoney(doc.subtotal)}</span>
-                        <span className="text-slate-400">|</span>
-                        <span className="text-slate-500">الضريبة:</span>
-                        <span className="text-emerald-600 font-bold">{formatMoney(doc.tax_amount)}</span>
-                        <span className="text-slate-400">|</span>
-                        <span className="text-slate-500">الصافي:</span>
-                        <span className="text-emerald-700 dark:text-emerald-400 font-extrabold">{formatMoney(doc.total_amount)}</span>
+                    {/* Left: Net Total Badge & Delete Action (Redundant duplicate values removed as requested) */}
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex items-center gap-1.5 text-xs font-mono bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 px-3 py-1 rounded-lg">
+                        <span className="text-emerald-700 dark:text-emerald-300 font-medium">الصافي:</span>
+                        <span className="text-emerald-900 dark:text-emerald-100 font-extrabold text-sm">{formatMoney(doc.total_amount)}</span>
                       </div>
 
-                      {/* Delete Document Button */}
                       {!isBatchSaved && (
                         <button
                           onClick={() => handleDeleteDocument(doc.ref)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                          className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                           title="حذف المستند بالكامل"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       )}
                     </div>
+
                   </div>
 
                   {/* Collapsible Items Sub-Table */}
@@ -1615,38 +1699,45 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                         <table className="w-full text-right text-xs">
                           <thead className="bg-slate-100/70 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 font-bold">
                             <tr>
-                              <th className="p-3 w-10 text-center">#</th>
-                              <th className="p-3">كود الصنف</th>
-                              <th className="p-3">اسم الصنف</th>
-                              <th className="p-3 text-center">الكمية</th>
-                              <th className="p-3 text-center">السعر</th>
-                              <th className="p-3 text-center">الخصم</th>
-                              <th className="p-3 text-center">الصافي قبل الضريبة</th>
-                              <th className="p-3 text-center">ض.ق.م (%)</th>
-                              <th className="p-3 text-center">قيمة ض.ق.م</th>
-                              <th className="p-3 text-center">ض.خ.أ (%)</th>
-                              <th className="p-3 text-center">قيمة ض.خ.أ</th>
-                              <th className="p-3 text-center font-extrabold text-slate-900 dark:text-white">الإجمالي</th>
-                              {!isBatchSaved && <th className="p-3 text-center w-24">إجراءات</th>}
+                              <th className="p-2.5 w-10 text-center">#</th>
+                              <th className="p-2.5">كود الصنف</th>
+                              <th className="p-2.5">اسم الصنف</th>
+                              <th className="p-2.5 text-center">الكمية</th>
+                              <th className="p-2.5 text-center">السعر</th>
+                              <th className="p-2.5 text-center">الخصم</th>
+                              <th className="p-2.5 text-center">الصافي قبل الضريبة</th>
+                              <th className="p-2.5 text-center">ض.ق.م (%)</th>
+                              <th className="p-2.5 text-center">قيمة ض.ق.م</th>
+                              <th className="p-2.5 text-center">ض.خ.أ (%)</th>
+                              <th className="p-2.5 text-center">قيمة ض.خ.أ</th>
+                              <th className="p-2.5 text-center font-extrabold text-slate-900 dark:text-white">الإجمالي</th>
+                              {!isBatchSaved && <th className="p-2.5 text-center w-20">إجراءات</th>}
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
                             {doc.items.map((item, itemIdx) => (
                               <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                                <td className="p-3 text-center text-slate-400 font-sans">{itemIdx + 1}</td>
-                                <td className="p-3 font-semibold text-slate-700 dark:text-slate-300">{item.product_code}</td>
-                                <td className="p-3 font-sans font-medium text-slate-900 dark:text-slate-100">{item.product_name}</td>
-                                <td className="p-3 text-center font-bold text-slate-900 dark:text-white">{item.quantity}</td>
-                                <td className="p-3 text-center">{formatMoney(item.unit_price)}</td>
-                                <td className="p-3 text-center text-amber-600 font-bold">{formatMoney(item.discount_amount)}</td>
-                                <td className="p-3 text-center text-blue-600 font-bold">{formatMoney(item.subtotal)}</td>
-                                <td className="p-3 text-center text-slate-500 font-sans">{item.vat_rate}%</td>
-                                <td className="p-3 text-center text-emerald-600 font-bold">{formatMoney(item.vat_amount)}</td>
-                                <td className="p-3 text-center text-slate-500 font-sans">{item.withholding_tax_rate}%</td>
-                                <td className="p-3 text-center text-purple-600 font-bold">{formatMoney(item.withholding_tax_amount)}</td>
-                                <td className="p-3 text-center font-extrabold text-emerald-700 dark:text-emerald-300">{formatMoney(item.total)}</td>
+                                <td className="p-2.5 text-center text-slate-400 font-sans">{itemIdx + 1}</td>
+                                <td className="p-2.5 font-semibold text-slate-700 dark:text-slate-300">{item.product_code}</td>
+                                <td className="p-2.5 font-sans font-medium text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                  <span>{item.product_name}</span>
+                                  {item.is_service && (
+                                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300 font-semibold border border-purple-200 dark:border-purple-800">
+                                      خدمة
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="p-2.5 text-center font-bold text-slate-900 dark:text-white">{item.quantity}</td>
+                                <td className="p-2.5 text-center">{formatMoney(item.unit_price)}</td>
+                                <td className="p-2.5 text-center text-amber-600 font-bold">{formatMoney(item.discount_amount)}</td>
+                                <td className="p-2.5 text-center text-blue-600 font-bold">{formatMoney(item.subtotal)}</td>
+                                <td className="p-2.5 text-center text-slate-500 font-sans">{item.vat_rate}%</td>
+                                <td className="p-2.5 text-center text-emerald-600 font-bold">{formatMoney(item.vat_amount)}</td>
+                                <td className="p-2.5 text-center text-slate-500 font-sans">{item.withholding_tax_rate}%</td>
+                                <td className="p-2.5 text-center text-purple-600 font-bold">{formatMoney(item.withholding_tax_amount)}</td>
+                                <td className="p-2.5 text-center font-extrabold text-emerald-700 dark:text-emerald-300">{formatMoney(item.total)}</td>
                                 {!isBatchSaved && (
-                                  <td className="p-3 text-center">
+                                  <td className="p-2.5 text-center">
                                     <div className="flex items-center justify-center gap-1 font-sans">
                                       <button
                                         onClick={() => setEditingItem({ docRef: doc.ref, item })}
@@ -1682,21 +1773,21 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       {/* Edit Item Modal */}
       {editingItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-5 shadow-2xl space-y-3.5">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Edit3 className="w-5 h-5 text-emerald-600" />
+              <h3 className="text-sm md:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Edit3 className="w-4 h-4 text-emerald-600" />
                 <span>تعديل بند الصنف ({editingItem.item.product_name})</span>
               </h3>
               <button 
                 onClick={() => setEditingItem(null)}
                 className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 text-xs">
+            <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">الكمية:</label>
                 <input 
@@ -1743,32 +1834,38 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">نسبة ض.ق.م (%):</label>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  نسبة ض.ق.م (%) {isVatEnabled ? '' : '(معطلة بالشركة)'}:
+                </label>
                 <input 
                   type="number"
                   min="0"
                   step="any"
-                  value={editingItem.item.vat_rate}
+                  disabled={!isVatEnabled}
+                  value={isVatEnabled ? editingItem.item.vat_rate : 0}
                   onChange={(e) => setEditingItem({
                     ...editingItem,
                     item: { ...editingItem.item, vat_rate: parseFloat(e.target.value) || 0 }
                   })}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-mono"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-mono disabled:opacity-50"
                 />
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">نسبة ض.خ.أ (%):</label>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  نسبة ض.خ.أ (%) {isWhtEnabled ? '' : '(معطلة بالشركة)'}:
+                </label>
                 <input 
                   type="number"
                   min="0"
                   step="any"
-                  value={editingItem.item.withholding_tax_rate}
+                  disabled={!isWhtEnabled}
+                  value={isWhtEnabled ? editingItem.item.withholding_tax_rate : 0}
                   onChange={(e) => setEditingItem({
                     ...editingItem,
                     item: { ...editingItem.item, withholding_tax_rate: parseFloat(e.target.value) || 0 }
                   })}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-mono"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-mono disabled:opacity-50"
                 />
               </div>
 
@@ -1789,13 +1886,13 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
               <button
                 onClick={() => setEditingItem(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
+                className="px-4 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
               >
                 إلغاء
               </button>
               <button
                 onClick={() => handleSaveItemEdit(editingItem.item)}
-                className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm"
+                className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm"
               >
                 حفظ التعديلات
               </button>
@@ -1806,5 +1903,91 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     </div>
   );
 };
+
+// Sleek unified row card for category totals (Invoices, Orders, Returns)
+const SummaryRowCard: React.FC<{
+  title: string;
+  badgeColor: string;
+  summary: {
+    count: number;
+    totalItems: number;
+    gross: number;
+    discount: number;
+    subtotal: number;
+    vat: number;
+    wht: number;
+    net: number;
+  };
+  isVatEnabled: boolean;
+  isWhtEnabled: boolean;
+}> = ({ title, badgeColor, summary, isVatEnabled, isWhtEnabled }) => (
+  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2 md:p-2.5 shadow-xs grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 items-center">
+    
+    {/* Category & Count */}
+    <div className="col-span-2 sm:col-span-4 lg:col-span-1 flex items-center justify-between lg:justify-start gap-2 border-b lg:border-b-0 lg:border-l border-slate-100 dark:border-slate-800 pb-1.5 lg:pb-0 lg:pl-2">
+      <span className={`text-xs px-2.5 py-0.5 rounded-lg font-bold border ${badgeColor} whitespace-nowrap`}>
+        {title}
+      </span>
+      <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 font-mono">
+        <span>{summary.count} مستند</span>
+        <span className="mx-1 text-slate-300">/</span>
+        <span>{summary.totalItems} بند</span>
+      </div>
+    </div>
+
+    {/* Gross */}
+    <div className="text-center">
+      <span className="text-[10px] text-slate-400 dark:text-slate-500 block">الإجمالي</span>
+      <span className="text-xs md:text-sm font-bold text-slate-800 dark:text-slate-200 font-mono">
+        {formatMoney(summary.gross)}
+      </span>
+    </div>
+
+    {/* Discount */}
+    <div className="text-center">
+      <span className="text-[10px] text-slate-400 dark:text-slate-500 block">إجمالي الخصم</span>
+      <span className="text-xs md:text-sm font-bold text-amber-600 dark:text-amber-400 font-mono">
+        {formatMoney(summary.discount)}
+      </span>
+    </div>
+
+    {/* Subtotal */}
+    <div className="text-center">
+      <span className="text-[10px] text-slate-400 dark:text-slate-500 block">الصافي قبل الضريبة</span>
+      <span className="text-xs md:text-sm font-bold text-blue-600 dark:text-blue-400 font-mono">
+        {formatMoney(summary.subtotal)}
+      </span>
+    </div>
+
+    {/* VAT */}
+    <div className="text-center">
+      <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
+        ض.ق.م {isVatEnabled ? '(14%)' : '(معطلة)'}
+      </span>
+      <span className="text-xs md:text-sm font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+        {isVatEnabled ? formatMoney(summary.vat) : '-'}
+      </span>
+    </div>
+
+    {/* WHT */}
+    <div className="text-center">
+      <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
+        ض.خ.إ {isWhtEnabled ? '(1%)' : '(معطلة)'}
+      </span>
+      <span className="text-xs md:text-sm font-bold text-purple-600 dark:text-purple-400 font-mono">
+        {isWhtEnabled ? formatMoney(summary.wht) : '-'}
+      </span>
+    </div>
+
+    {/* Net Total */}
+    <div className="text-center bg-emerald-50/70 dark:bg-emerald-950/40 rounded-lg py-1 px-1.5 border border-emerald-200/80 dark:border-emerald-800/80">
+      <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 block">الصافي النهائي</span>
+      <span className="text-xs md:text-sm font-extrabold text-emerald-900 dark:text-emerald-100 font-mono">
+        {formatMoney(summary.net)}
+      </span>
+    </div>
+
+  </div>
+);
 
 export default DocumentImport;

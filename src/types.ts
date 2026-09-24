@@ -356,6 +356,7 @@ export interface Product {
   code: string;
   name: string;
   type: 'service' | 'finished_good' | 'raw_material' | 'commodity' | 'consumable' | 'packaging';
+  is_service?: boolean;
   sale_price: number;
   cost_price: number;
   description?: string;

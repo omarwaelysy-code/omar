@@ -907,14 +907,15 @@ export async function logAudit(params: {
   const recordName = metadata?.name || metadata?.code || metadata?.invoice_number || metadata?.number || metadata?.username || metadata?.title || null;
 
   // Non-blocking fire-and-forget query
+  const auditId = uuidv4();
   pool.query(
     `INSERT INTO audit_logs (
-      company_id, user_id, username, user_email, action, module, details, 
+      id, company_id, user_id, username, user_email, action, module, details, 
       entity_type, entity_id, ip_address, metadata, browser, operating_system, 
       device, branch, record_name, record_id, old_values, new_values, success, execution_time
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`,
     [
-      company_id, user_id, username, user_email, action, module, details, 
+      auditId, company_id, user_id, username, user_email, action, module, details, 
       entity_type, entity_id, ip_address || 'unknown', JSON.stringify(cleanMetadata || {}),
       reqBrowser, reqOS, reqDevice, reqBranch, recordName, entity_id, 
       JSON.stringify(oldValues), JSON.stringify(newValues), reqSuccess, reqExecutionTime
