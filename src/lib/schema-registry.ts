@@ -51,7 +51,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'payment_terms', 'payment_terms_days', 'advance_percentage',
     'settlements', 'settlement_number', 'settlement_date',
     'operation_id', 'department_id', 'cost_center_id', 'currency_id', 'exchange_rate', 'updated_at',
-    'eta_uuid', 'eta_invoice_number', 'attachments'
+    'eta_uuid', 'eta_invoice_number', 'attachments', 'batch_number'
   ],
   invoice_items: [
     'id', 'invoice_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
@@ -63,7 +63,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   sales_orders: [
     'id', 'company_id', 'customer_id', 'customer_name', 'warehouse_id', 'order_number', 'date', 'delivery_date', 'subtotal',
     'tax_amount', 'discount_amount', 'total_amount', 'status', 'invoice_id', 'invoice_number', 'description', 'notes', 'created_by', 'created_at',
-    'currency_id', 'exchange_rate', 'attachments'
+    'currency_id', 'exchange_rate', 'attachments', 'batch_number'
   ],
   sales_order_items: [
     'id', 'order_id', 'product_id', 'company_id', 'description', 'quantity', 'unit_price', 'total',
@@ -73,7 +73,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   purchase_orders: [
     'id', 'company_id', 'supplier_id', 'supplier_name', 'warehouse_id', 'order_number', 'date', 'delivery_date', 'subtotal',
     'tax_amount', 'discount_amount', 'total_amount', 'status', 'invoice_id', 'invoice_number', 'description', 'notes', 'created_by', 'created_at',
-    'currency_id', 'exchange_rate', 'attachments'
+    'currency_id', 'exchange_rate', 'attachments', 'batch_number'
   ],
   purchase_order_items: [
     'id', 'order_id', 'product_id', 'company_id', 'description', 'quantity', 'unit_price', 'total',
@@ -83,7 +83,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   returns: [
     'id', 'company_id', 'customer_id', 'customer_name', 'warehouse_id', 'return_number', 'date', 'subtotal', 'tax', 'discount', 'shipping', 'withholding_tax_amount', 'total_amount', 
     'payment_type', 'payment_method_id', 'payment_method_name', 'description', 'notes', 'created_at',
-    'currency_id', 'exchange_rate', 'eta_uuid', 'eta_invoice_number', 'attachments'
+    'currency_id', 'exchange_rate', 'eta_uuid', 'eta_invoice_number', 'attachments', 'batch_number'
   ],
   return_items: [
     'id', 'return_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
@@ -97,7 +97,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'payment_method_id', 'payment_method_name', 'description', 'notes', 'source_orders', 'created_at',
     'payment_terms', 'payment_terms_days', 'advance_percentage',
     'settlements', 'settlement_number', 'settlement_date',
-    'operation_id', 'department_id', 'cost_center_id', 'currency_id', 'exchange_rate', 'eta_uuid', 'eta_invoice_number', 'attachments'
+    'operation_id', 'department_id', 'cost_center_id', 'currency_id', 'exchange_rate', 'eta_uuid', 'eta_invoice_number', 'attachments', 'batch_number'
   ],
   purchase_invoice_items: [
     'id', 'invoice_id', 'product_id', 'expense_category_id', 'description', 'quantity', 'unit_price', 'total',
@@ -108,7 +108,10 @@ export const EXPECTED_SCHEMA: TableSchema = {
   purchase_returns: [
     'id', 'company_id', 'supplier_id', 'supplier_name', 'warehouse_id', 'return_number', 'date', 'subtotal', 'tax', 'discount', 'shipping', 'withholding_tax_amount', 'total_amount', 
     'payment_type', 'payment_method_id', 'payment_method_name', 'description', 'notes', 'created_at',
-    'currency_id', 'exchange_rate', 'eta_uuid', 'eta_invoice_number', 'attachments'
+    'currency_id', 'exchange_rate', 'eta_uuid', 'eta_invoice_number', 'attachments', 'batch_number'
+  ],
+  document_import_batches: [
+    'id', 'company_id', 'batch_number', 'batch_type', 'batch_date', 'total_documents', 'total_amount', 'details', 'status', 'created_by', 'created_at', 'updated_at'
   ],
   purchase_return_items: [
     'id', 'return_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',

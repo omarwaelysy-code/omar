@@ -22,13 +22,13 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     id: 'sales',
     nameAr: 'المبيعات',
     nameEn: 'Sales',
-    modules: ['quotations', 'sales_orders', 'invoices', 'returns', 'customer_discounts', 'customer_settlements']
+    modules: ['quotations', 'sales_orders', 'invoices', 'returns', 'sales_import', 'customer_discounts', 'customer_settlements']
   },
   {
     id: 'purchases',
     nameAr: 'المشتريات',
     nameEn: 'Purchases',
-    modules: ['purchase_orders', 'purchase_invoices', 'purchase_returns', 'supplier_discounts', 'supplier_settlements']
+    modules: ['purchase_orders', 'purchase_invoices', 'purchase_returns', 'purchases_import', 'supplier_discounts', 'supplier_settlements']
   },
   {
     id: 'warehouses',
@@ -307,12 +307,14 @@ export const MODULE_PERMISSIONS_META: { [moduleId: string]: { labelAr: string; l
   sales_orders: { labelAr: 'أوامر البيع', labelEn: 'Sales Orders', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved'] },
   invoices: { labelAr: 'فواتير المبيعات', labelEn: 'Sales Invoices', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved', 'view_cost', 'view_profit_margin', 'change_prices', 'allow_negative'] },
   returns: { labelAr: 'مرتجع المبيعات', labelEn: 'Sales Returns', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved', 'view_cost'] },
+  sales_import: { labelAr: 'استيراد مستندات بيع', labelEn: 'Import Sales Documents', hasCrud: true, special: ['import_excel', 'export_excel', 'post_batch'] },
   customer_discounts: { labelAr: 'خصم العملاء', labelEn: 'Customer Discounts', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel'] },
   customer_settlements: { labelAr: 'تسويات العملاء', labelEn: 'Customer Settlements', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'edit_approved', 'delete_approved'] },
   // Purchases
   purchase_orders: { labelAr: 'أوامر الشراء', labelEn: 'Purchase Orders', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved'] },
   purchase_invoices: { labelAr: 'فواتير المشتريات', labelEn: 'Purchase Invoices', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved', 'view_cost', 'edit_cost_price'] },
   purchase_returns: { labelAr: 'مرتجع المشتريات', labelEn: 'Purchase Returns', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'copy', 'edit_approved', 'delete_approved', 'view_cost'] },
+  purchases_import: { labelAr: 'استيراد مستندات شراء', labelEn: 'Import Purchase Documents', hasCrud: true, special: ['import_excel', 'export_excel', 'post_batch'] },
   supplier_discounts: { labelAr: 'خصم الموردين', labelEn: 'Supplier Discounts', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel'] },
   supplier_settlements: { labelAr: 'تسويات الموردين', labelEn: 'Supplier Settlements', hasCrud: true, special: ['approve', 'cancel_approval', 'print', 'export_pdf', 'export_excel', 'edit_approved', 'delete_approved'] },
   // Warehouses

@@ -85,6 +85,8 @@ export const pageLabels: { [key: string]: string } = {
   'egyptian_banks': 'دليل البنوك المصرية',
   'returns': 'مرتجع مبيعات',
   'purchase_returns': 'مرتجع مشتريات',
+  'sales_import': 'استيراد مستندات بيع',
+  'purchases_import': 'استيراد مستندات شراء',
   'customer_discounts': 'خصم عملاء',
   'supplier_discounts': 'خصم موردين',
   'users': 'إدارة المستخدمين',

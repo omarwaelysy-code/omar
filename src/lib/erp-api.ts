@@ -2632,7 +2632,9 @@ export const SEQUENCE_MODULE_CONFIG: Record<string, { table: string; field: stri
   'cash_transfers': { table: 'cash_transfers', field: 'transfer_number', prefix: 'CT', padLength: 6, periodType: 'month' },
   'issued_cheques': { table: 'issued_cheques', field: 'serial_number', prefix: 'CHQ', padLength: 6, periodType: 'month' },
   'received_cheques': { table: 'received_cheques', field: 'serial_number', prefix: 'RCV', padLength: 6, periodType: 'month' },
-  'fixed_assets': { table: 'fixed_assets', field: 'asset_number', prefix: 'AST', padLength: 6, periodType: 'month' }
+  'fixed_assets': { table: 'fixed_assets', field: 'asset_number', prefix: 'AST', padLength: 6, periodType: 'month' },
+  'sales_import_batches': { table: 'document_import_batches', field: 'batch_number', prefix: 'Batch-sal', padLength: 5, periodType: 'month' },
+  'purchases_import_batches': { table: 'document_import_batches', field: 'batch_number', prefix: 'Batch-pur', padLength: 5, periodType: 'month' }
 };
 
 export async function getNextAtomicSequence(
@@ -2670,7 +2672,9 @@ export async function getNextAtomicSequence(
     'goods_receipts': { table: 'goods_receipts', field: 'receipt_number', prefix: 'GR' },
     'employees': { table: 'employees', field: 'employee_code', prefix: 'EMP' },
     'cash_transfers': { table: 'cash_transfers', field: 'transfer_number', prefix: 'CT' },
-    'fixed_assets': { table: 'fixed_assets', field: 'asset_number', prefix: 'AST' }
+    'fixed_assets': { table: 'fixed_assets', field: 'asset_number', prefix: 'AST' },
+    'sales_import_batches': { table: 'document_import_batches', field: 'batch_number', prefix: 'Batch-sal' },
+    'purchases_import_batches': { table: 'document_import_batches', field: 'batch_number', prefix: 'Batch-pur' }
   };
 
   const target = tableNames[module];
@@ -2813,6 +2817,8 @@ export async function generateNextSequence(client: any, companyId: string, modul
     case 'goods_receipts': prefix = 'GR'; break;
     case 'issued_cheques': prefix = 'CHQ'; break;
     case 'received_cheques': prefix = 'RCV'; break;
+    case 'sales_import_batches': prefix = 'Batch-sal'; padLength = 5; break;
+    case 'purchases_import_batches': prefix = 'Batch-pur'; padLength = 5; break;
     default: prefix = 'DOC';
   }
 
@@ -2853,7 +2859,9 @@ export async function generateNextSequence(client: any, companyId: string, modul
       'purchase_orders': { table: 'purchase_orders', field: 'order_number', prefix: 'PO' },
       'goods_receipts': { table: 'goods_receipts', field: 'receipt_number', prefix: 'GR' },
       'employees': { table: 'employees', field: 'employee_code', prefix: 'EMP' },
-      'cash_transfers': { table: 'cash_transfers', field: 'transfer_number', prefix: 'CT' }
+      'cash_transfers': { table: 'cash_transfers', field: 'transfer_number', prefix: 'CT' },
+      'sales_import_batches': { table: 'document_import_batches', field: 'batch_number', prefix: 'Batch-sal' },
+      'purchases_import_batches': { table: 'document_import_batches', field: 'batch_number', prefix: 'Batch-pur' }
     };
 
     const target = tableNames[moduleName];
@@ -6902,7 +6910,7 @@ router.post('/invoices', authenticateToken, TransactionsLimitMiddleware, async (
       metadata: { invoiceData, itemCount: (items || []).length }
     });
 
-    res.status(201).json({ id: invoiceId });
+    res.status(201).json({ id: invoiceId, invoice_number: invoiceData.invoice_number });
   } catch (error: any) {
     if (client) await client.query('ROLLBACK');
     console.error('[DATABASE] Invoice creation full failure:', error);
@@ -7332,7 +7340,7 @@ router.post('/returns', authenticateToken, async (req: AuthRequest, res) => {
     }
 
     await client.query('COMMIT');
-    res.status(201).json({ id: returnId });
+    res.status(201).json({ id: returnId, return_number: returnData.return_number });
   } catch (error: any) {
     if (client) await client.query('ROLLBACK');
     console.error('[CRASH PREVENTED] Return creation error:', error);
@@ -8058,7 +8066,7 @@ await client.query(
     }
 
     await client.query('COMMIT');
-    res.status(201).json({ id: invoiceId });
+    res.status(201).json({ id: invoiceId, invoice_number: invoiceData.invoice_number });
   } catch (error: any) {
     if (client) await client.query('ROLLBACK');
     console.error('[CRASH PREVENTED] Purchase invoice creation error:', error);
@@ -8565,7 +8573,7 @@ router.post('/purchase_returns', authenticateToken, async (req: AuthRequest, res
     }
 
     await client.query('COMMIT');
-    res.status(201).json({ id: returnId });
+    res.status(201).json({ id: returnId, return_number: returnData.return_number });
   } catch (error: any) {
     if (client) await client.query('ROLLBACK');
     latestServerError = {
@@ -8800,7 +8808,7 @@ router.post('/journal_entries', authenticateToken, TransactionsLimitMiddleware, 
       metadata: { entryData: finalEntryData, itemCount: (items || []).length }
     });
 
-    res.status(201).json({ id: entryId });
+    res.status(201).json({ id: entryId, entry_number: finalEntryData.entry_number });
   } catch (error: any) {
     if (client) await client.query('ROLLBACK');
     console.error('[CRASH PREVENTED] Journal entry creation error:', error);

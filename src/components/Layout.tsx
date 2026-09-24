@@ -124,6 +124,9 @@ const getTabIcon = (id: string) => {
     case 'customer_discounts':
     case 'supplier_discounts':
       return <Tags {...iconProps} />;
+    case 'sales_import':
+    case 'purchases_import':
+      return <FileSpreadsheet {...iconProps} />;
     case 'customer_settlements':
     case 'supplier_settlements':
     case 'flexible_operations':
@@ -571,6 +574,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'invoices', label: t('nav.invoices'), icon: ArrowUpFromLine },
           { id: 'sales_orders', label: t('nav.sales_orders'), icon: FileText },
           { id: 'returns', label: t('nav.returns'), icon: RotateCcw },
+          { id: 'sales_import', label: t('nav.sales_import') || (language === 'ar' ? 'استيراد مستندات بيع' : 'Import Sales Documents'), icon: FileSpreadsheet },
           { id: 'customer_discounts', label: t('nav.customer_discounts'), icon: Tags },
           { id: 'customer_settlements', label: t('nav.customer_settlements') || 'تسويات العملاء', icon: Layers }
         ]
@@ -586,6 +590,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           ] : []),
           { id: 'purchase_orders', label: t('nav.purchase_orders'), icon: FileText },
           { id: 'purchase_returns', label: t('nav.purchase_returns'), icon: RotateCcw },
+          { id: 'purchases_import', label: t('nav.purchases_import') || (language === 'ar' ? 'استيراد مستندات شراء' : 'Import Purchase Documents'), icon: FileSpreadsheet },
           { id: 'supplier_discounts', label: t('nav.supplier_discounts'), icon: Tags },
           { id: 'supplier_settlements', label: t('nav.supplier_settlements') || 'تسويات الموردين', icon: Layers }
         ]

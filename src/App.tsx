@@ -82,6 +82,7 @@ const EtaSentItemMapping = React.lazy(() => import('./pages/EtaSentItemMapping')
 const EtaTaxTypesGuide = React.lazy(() => import('./pages/EtaTaxTypesGuide').then(m => ({ default: m.EtaTaxTypesGuide })));
 const IfrsGuide = React.lazy(() => import('./pages/IfrsGuide'));
 const FixedAssets = React.lazy(() => import('./pages/FixedAssets').then(m => ({ default: m.FixedAssets })));
+const DocumentImport = React.lazy(() => import('./pages/DocumentImport').then(m => ({ default: m.DocumentImport })));
 
 import { useNavigation } from './contexts/NavigationContext';
 import { useLanguage } from './contexts/LanguageContext';
@@ -252,6 +253,8 @@ export default function App() {
       case 'egyptian_banks': return <EgyptianBanks />;
       case 'returns': return <Returns />;
       case 'purchase_returns': return <PurchaseReturns />;
+      case 'sales_import': return <DocumentImport type="sales" />;
+      case 'purchases_import': return <DocumentImport type="purchases" />;
       case 'customer_discounts': return <CustomerDiscounts />;
       case 'supplier_discounts': return <SupplierDiscounts />;
       case 'customer_settlements': return <CustomerSettlements />;

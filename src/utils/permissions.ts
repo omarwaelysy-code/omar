@@ -109,7 +109,7 @@ export function getDefaultRolePermissions(roleName: string): any {
     Object.keys(perms).forEach(modId => {
       const isPur = [
         'suppliers', 'products', 'item_groups', 'purchase_orders', 
-        'purchase_invoices', 'purchase_returns', 'supplier_discounts', 'supplier_settlements'
+        'purchase_invoices', 'purchase_returns', 'purchases_import', 'supplier_discounts', 'supplier_settlements'
       ].includes(modId);
       
       if (isPur) {
@@ -125,7 +125,7 @@ export function getDefaultRolePermissions(roleName: string): any {
     Object.keys(perms).forEach(modId => {
       const isSal = [
         'customers', 'products', 'item_groups', 'quotations', 
-        'sales_orders', 'invoices', 'returns', 'customer_discounts', 'customer_settlements'
+        'sales_orders', 'invoices', 'returns', 'sales_import', 'customer_discounts', 'customer_settlements'
       ].includes(modId);
       
       if (isSal) {
