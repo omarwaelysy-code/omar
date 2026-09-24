@@ -2428,11 +2428,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                             <span className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold border ${
                               aud.sales.status === 'linked' 
                                 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800' 
-                                : aud.sales.status === 'exempt'
-                                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border-purple-200'
-                                  : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200 border-rose-300 dark:border-rose-800'
+                                : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200 border-rose-300 dark:border-rose-800'
                             }`}>
-                              {aud.sales.status === 'linked' ? '✓ ' : aud.sales.status === 'missing' ? '✕ ' : ''}{aud.sales.name}
+                              {aud.sales.status === 'linked' ? '✓ ' : '✕ '}{aud.sales.name}
                             </span>
                           </td>
                           <td className="py-1.5 px-2.5 text-center">
