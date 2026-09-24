@@ -2922,6 +2922,82 @@ router.get('/utils/next-sequence/:moduleName', authenticateToken, async (req: an
   }
 });
 
+router.get('/document_import_batches', authenticateToken, async (req: any, res) => {
+  try {
+    const companyId = req.user?.company_id || req.headers['x-company-id'];
+    if (!companyId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { batch_type } = req.query;
+    let query = 'SELECT * FROM document_import_batches WHERE company_id = $1';
+    const params: any[] = [companyId];
+    if (batch_type) {
+      query += ' AND batch_type = $2';
+      params.push(batch_type);
+    }
+    query += ' ORDER BY created_at DESC';
+
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (error: any) {
+    console.error('Error fetching document import batches:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/document_import_batches', authenticateToken, async (req: any, res) => {
+  try {
+    const companyId = req.user?.company_id || req.headers['x-company-id'];
+    if (!companyId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { batch_number, batch_type, batch_date, total_documents, total_amount, details, status } = req.body;
+    
+    const existing = await pool.query(
+      'SELECT id FROM document_import_batches WHERE company_id = $1 AND batch_number = $2',
+      [companyId, batch_number]
+    );
+
+    let result;
+    if (existing.rows.length > 0) {
+      result = await pool.query(`
+        UPDATE document_import_batches
+        SET batch_date = $1, total_documents = $2, total_amount = $3, details = $4, status = $5, updated_at = CURRENT_TIMESTAMP
+        WHERE id = $6
+        RETURNING *
+      `, [
+        batch_date,
+        Number(total_documents) || 0,
+        Number(total_amount) || 0,
+        JSON.stringify(details || []),
+        status || 'posted',
+        existing.rows[0].id
+      ]);
+    } else {
+      const id = req.body.id || uuidv4();
+      result = await pool.query(`
+        INSERT INTO document_import_batches (id, company_id, batch_number, batch_type, batch_date, total_documents, total_amount, details, status, created_by)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING *
+      `, [
+        id,
+        companyId,
+        batch_number,
+        batch_type || 'sales',
+        batch_date,
+        Number(total_documents) || 0,
+        Number(total_amount) || 0,
+        JSON.stringify(details || []),
+        status || 'posted',
+        req.user?.id || req.user?.email || null
+      ]);
+    }
+
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Error saving document import batch:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.post('/utils/fix-duplicate-pinv', authenticateToken, async (req: any, res) => {
   const client = await pool.connect();
   try {

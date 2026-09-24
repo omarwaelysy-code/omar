@@ -16,6 +16,67 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+/**
+ * Safely parses Excel dates including serial numbers (e.g. 46288), Date objects, and string formats (YYYY-MM-DD or DD/MM/YYYY)
+ */
+function formatExcelDate(val: any, fallbackDate: string): string {
+  if (val === null || val === undefined || val === '') return fallbackDate;
+  
+  if (val instanceof Date) {
+    if (!isNaN(val.getTime())) {
+      const y = val.getFullYear();
+      const m = String(val.getMonth() + 1).padStart(2, '0');
+      const d = String(val.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    return fallbackDate;
+  }
+
+  const str = String(val).trim();
+  if (!str) return fallbackDate;
+
+  // Check if numeric serial (Excel serial date e.g. 25000 to 90000)
+  const num = Number(str);
+  if (!isNaN(num) && num > 25000 && num < 90000) {
+    const d = new Date(Math.round((num - 25569) * 86400 * 1000));
+    if (!isNaN(d.getTime())) {
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const dt = String(d.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${dt}`;
+    }
+  }
+
+  // Check DD/MM/YYYY or DD-MM-YYYY
+  const dmy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmy) {
+    const day = dmy[1].padStart(2, '0');
+    const month = dmy[2].padStart(2, '0');
+    const year = dmy[3];
+    return `${year}-${month}-${day}`;
+  }
+
+  // Check YYYY-MM-DD or YYYY/MM/DD
+  const ymd = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (ymd) {
+    const year = ymd[1];
+    const month = ymd[2].padStart(2, '0');
+    const day = ymd[3].padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  // Fallback try standard JS Date
+  const d = new Date(str);
+  if (!isNaN(d.getTime()) && d.getFullYear() >= 2000 && d.getFullYear() <= 2100) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dt = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dt}`;
+  }
+
+  return fallbackDate;
+}
+
 export interface DocumentImportProps {
   type: 'sales' | 'purchases';
 }
@@ -119,6 +180,15 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
   const [saveProgress, setSaveProgress] = useState<{ current: number; total: number; statusText: string } | null>(null);
   const [isBatchSaved, setIsBatchSaved] = useState(false);
 
+  // Tabs: 'import' or 'history'
+  const [activeMainTab, setActiveMainTab] = useState<'import' | 'history'>('import');
+  const [batchesHistory, setBatchesHistory] = useState<any[]>([]);
+  const [isLoadingBatches, setIsLoadingBatches] = useState(false);
+  const [selectedBatchDetails, setSelectedBatchDetails] = useState<any | null>(null);
+
+  // Accounts audit toggle
+  const [showAccountsAudit, setShowAccountsAudit] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Company Tax Settings
@@ -166,6 +236,23 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
     loadData();
   }, [user?.company_id]);
+
+  const fetchBatchesHistory = async () => {
+    if (!user?.company_id) return;
+    setIsLoadingBatches(true);
+    try {
+      const res: any = await apiRequest(`/document_import_batches?batch_type=${isSales ? 'sales' : 'purchases'}`);
+      setBatchesHistory(Array.isArray(res) ? res : []);
+    } catch (err: any) {
+      console.error('Failed to load batches history:', err);
+    } finally {
+      setIsLoadingBatches(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBatchesHistory();
+  }, [user?.company_id, isSales]);
 
   // Generate permanent Batch Number on initial mount
   useEffect(() => {
@@ -258,6 +345,104 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       total_amount: Number(total_amount.toFixed(2))
     };
   };
+
+  // Audit items accounts for journal entries (sales, cost, inventory, vat, wht)
+  const itemsAccountAudit = useMemo(() => {
+    if (documents.length === 0) return [];
+    
+    const uniqueMap = new Map<string, ParsedItem>();
+    documents.forEach(doc => {
+      doc.items.forEach(item => {
+        if (!uniqueMap.has(item.product_code)) {
+          uniqueMap.set(item.product_code, item);
+        }
+      });
+    });
+
+    const defaultSalesAcc = accounts.find(a => 
+      a.account_usage === 'sales_revenue' ||
+      a.code === '4101' ||
+      a.name.includes('المبيعات') ||
+      a.name.includes('إيرادات مبيعات')
+    );
+
+    const defaultCostAcc = accounts.find(a => 
+      a.account_usage === 'cost_of_sales' ||
+      a.code === '5101' ||
+      a.name.includes('تكلفة المبيعات')
+    );
+
+    const defaultInvAcc = accounts.find(a => 
+      a.account_usage === 'inventory' ||
+      a.code === '1201' ||
+      a.name.includes('المخزون')
+    );
+
+    const defaultVatAcc = accounts.find(a => 
+      a.account_usage === 'vat' ||
+      a.account_usage === 'vat_sales' ||
+      a.code === '2221' ||
+      a.name.includes('قيمة مضافة')
+    );
+
+    const defaultWhtAcc = accounts.find(a => 
+      a.account_usage === 'withholding_tax_customers' ||
+      a.code === '112' ||
+      a.name.includes('خصم من العملاء') ||
+      a.name.includes('تحت حساب الضريبة')
+    );
+
+    return Array.from(uniqueMap.values()).map(item => {
+      const prod = products.find(p => p.id === item.product_id || (p.code && p.code.toLowerCase() === item.product_code.toLowerCase()));
+      const isService = item.is_service || prod?.type === 'service';
+
+      // 1. Sales Account
+      const salesAccId = prod?.revenue_account_id;
+      const salesAccName = prod?.revenue_account_name || accounts.find(a => a.id === salesAccId)?.name;
+      const hasDirectSales = !!salesAccId;
+      const finalSalesName = salesAccName || defaultSalesAcc?.name || 'حساب المبيعات الافتراضي';
+      const salesStatus = hasDirectSales ? 'linked' : (defaultSalesAcc ? 'fallback' : 'missing');
+
+      // 2. Cost Account
+      const costAccId = prod?.cost_account_id;
+      const costAccName = prod?.cost_account_name || accounts.find(a => a.id === costAccId)?.name;
+      const hasDirectCost = !!costAccId;
+      const finalCostName = costAccName || defaultCostAcc?.name || 'حساب تكلفة المبيعات الافتراضي';
+      const costStatus = isService ? 'exempt' : (hasDirectCost ? 'linked' : (defaultCostAcc ? 'fallback' : 'missing'));
+
+      // 3. Inventory Account
+      const invAccId = prod?.inventory_account_id;
+      const invAccName = prod?.inventory_account_name || accounts.find(a => a.id === invAccId)?.name;
+      const hasDirectInv = !!invAccId;
+      const finalInvName = invAccName || defaultInvAcc?.name || 'حساب المخزون الافتراضي';
+      const invStatus = isService ? 'exempt' : (hasDirectInv ? 'linked' : (defaultInvAcc ? 'fallback' : 'missing'));
+
+      // 4. VAT Account
+      const vatAccId = prod?.sales_vat_account_id || prod?.vat_account_id;
+      const vatAccName = prod?.sales_vat_account_name || prod?.vat_account_name || accounts.find(a => a.id === vatAccId)?.name;
+      const hasDirectVat = !!vatAccId;
+      const finalVatName = vatAccName || defaultVatAcc?.name || 'حساب القيمة المضافة الافتراضي';
+      const vatStatus = hasDirectVat ? 'linked' : (defaultVatAcc ? 'fallback' : 'missing');
+
+      // 5. WHT Account
+      const whtAccId = prod?.sales_withholding_tax_account_id;
+      const whtAccName = prod?.sales_withholding_tax_account_name || accounts.find(a => a.id === whtAccId)?.name;
+      const hasDirectWht = !!whtAccId;
+      const finalWhtName = whtAccName || defaultWhtAcc?.name || 'حساب الخصم والإضافة الافتراضي';
+      const whtStatus = hasDirectWht ? 'linked' : (defaultWhtAcc ? 'fallback' : 'missing');
+
+      return {
+        product_code: item.product_code,
+        product_name: item.product_name,
+        is_service: isService,
+        sales: { name: finalSalesName, status: salesStatus },
+        cost: { name: finalCostName, status: costStatus },
+        inventory: { name: finalInvName, status: invStatus },
+        vat: { name: finalVatName, status: vatStatus },
+        wht: { name: finalWhtName, status: whtStatus }
+      };
+    });
+  }, [documents, products, accounts]);
 
   // Summaries for Invoices, Orders, and Returns
   const computeSummaryForType = (typeKeywords: string[]) => {
@@ -408,7 +593,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
     try {
       const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: 'array' });
+      const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
       
       // Look for data sheet
       let targetSheetName = wb.SheetNames[0];
@@ -462,7 +647,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
         const rawRef = String(row[0] || '').trim();
         const rawDocType = String(row[1] || '').trim();
-        const rawDate = String(row[2] || '').trim();
+        const rawDate = row[2];
         const rawParty = String(row[3] || '').trim();
         const rawProdCode = String(row[4] || '').trim();
         const rawProdName = String(row[5] || '').trim();
@@ -502,21 +687,8 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           });
         }
 
-        // 3. Validate Date
-        let parsedDate = batchDate;
-        if (rawDate) {
-          const d = new Date(rawDate);
-          if (isNaN(d.getTime())) {
-            errors.push({
-              rowNumber,
-              ref: rawRef,
-              field: 'التاريخ',
-              message: `تاريخ المستند "${rawDate}" غير صالح. يرجى استخدام صيغة YYYY-MM-DD`
-            });
-          } else {
-            parsedDate = rawDate.slice(0, 10);
-          }
-        }
+        // 3. Validate Date (Supports Excel serial dates like 46288, Date objects, DD/MM/YYYY and YYYY-MM-DD)
+        const parsedDate = formatExcelDate(rawDate, batchDate);
 
         // 4. Validate Party (Customer / Supplier)
         let matchedParty: any = null;
@@ -1177,8 +1349,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         // Clean up common technical prefixes for clean UI
         errMsg = errMsg.replace(/^Failed to create (invoice|return|sales_order|purchase_invoice|purchase_order):\s*/i, '');
         errMsg = errMsg.replace(/^Error:\s*/i, '');
-        if (errMsg.includes('Negative stock is not allowed')) {
-          errMsg = errMsg.split('(Negative stock')[0].trim();
+        if (errMsg.includes('Negative stock is not allowed') || errMsg.includes('الكمية المطلوبة غير متوفرة')) {
+          errMsg = 'الكمية المطلوبة غير متوفرة في المخزن (رصيد الصنف لا يكفي وسياسة الشركة تمنع الصرف بالسالب)';
+        } else if (errMsg.includes('invalid input syntax for type date')) {
+          errMsg = 'صيغة تاريخ المستند غير متوافقة';
         }
 
         updatedDocuments[idx] = {
@@ -1212,6 +1386,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           total_amount: d.total_amount,
           created_document_id: d.created_document_id,
           created_document_number: d.created_document_number,
+          created_journal_id: d.created_journal_id,
           created_journal_number: d.created_journal_number,
           status: d.status,
           error_message: d.error_message
@@ -1221,6 +1396,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       };
 
       await apiRequest('/document_import_batches', 'POST', batchRecord);
+      fetchBatchesHistory();
     } catch (bErr: any) {
       console.warn('Failed to record batch audit history:', bErr);
     }
@@ -1311,679 +1487,969 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     showNotification('تم تصدير ملف الإكسيل بنجاح', 'success');
   };
 
+  const handleExportPastBatch = (batch: any) => {
+    if (!batch || !batch.details || batch.details.length === 0) return;
+    const wb = XLSX.utils.book_new();
+    const headers = [
+      'تاريخ التشغيلة',
+      'رقم التشغيلة (Batch)',
+      'رقم الفاتورة / المستند بالنظام',
+      'رقم القيد المحاسبي',
+      'رقم المرجع (Ref)',
+      'نوع المستند',
+      'الطرف (العميل / المورد)',
+      'تاريخ المستند',
+      'الصافي النهائي',
+      'حالة الحفظ والترحيل',
+      'ملاحظات / أسباب الفشل'
+    ];
+    const dataRows = (batch.details || []).map((d: any) => [
+      batch.batch_date,
+      batch.batch_number,
+      d.created_document_number || '-',
+      d.created_journal_number ? `قيد ${d.created_journal_number}` : '-',
+      d.ref,
+      d.doc_type,
+      d.party_name,
+      d.date,
+      d.total_amount,
+      d.status === 'saved' ? 'تم الحفظ والترحيل' : 'تعذر الحفظ',
+      d.error_message || '-'
+    ]);
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
+    ws['!cols'] = headers.map(() => ({ wch: 20 }));
+    XLSX.utils.book_append_sheet(wb, ws, 'تقرير التشغيلة');
+    XLSX.writeFile(wb, `تقرير_تشغيلة_${batch.batch_number}.xlsx`);
+    showNotification(`تم تصدير إكسيل التشغيلة ${batch.batch_number} بنجاح`, 'success');
+  };
+
   return (
-    <div className="w-full px-2 sm:px-4 py-3 space-y-3.5" dir={dir}>
+    <div className="w-full px-2 sm:px-4 py-2.5 space-y-2.5" dir={dir}>
       
-      {/* Merged Compact Header & Upload Bar */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 md:p-3.5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          
-          {/* Right: Title & Info */}
-          <div className="flex items-center gap-2.5">
-            <div className={`p-2 rounded-xl ${isSales ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600' : 'bg-blue-50 dark:bg-blue-950/40 text-blue-600'}`}>
-              <FileSpreadsheet className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-sm md:text-base font-bold text-slate-900 dark:text-white">
-                  {pageTitle}
-                </h1>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                  {isSales ? 'مبيعات' : 'مشتريات'}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                استيراد الفواتير والأوامر والمرتجعات مع توليد أرقام القيود التلقائية
-              </p>
-            </div>
-          </div>
-
-          {/* Center: Merged Upload Dropzone / Button */}
-          <div 
-            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setIsDragging(false);
-              if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                handleFileUpload(e.dataTransfer.files[0]);
-              }
-            }}
-            onClick={() => fileInputRef.current?.click()}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border border-dashed cursor-pointer transition-all duration-150 select-none ${
-              isDragging 
-                ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700' 
-                : fileName
-                  ? 'border-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-200 hover:border-emerald-400'
-                  : 'border-slate-300 dark:border-slate-700 hover:border-emerald-400 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300'
+      {/* Top Tab Switcher: Import vs Batches History */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveMainTab('import')}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeMainTab === 'import'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
             }`}
-            title="اضغط لاختيار ملف الإكسيل أو اسحبه وأفلته هنا"
           >
-            <input 
-              type="file" 
-              ref={fileInputRef}
-              onChange={(e) => {
-                if (e.target.files && e.target.files[0]) {
-                  handleFileUpload(e.target.files[0]);
-                }
-              }}
-              accept=".xlsx, .xls, .csv"
-              className="hidden" 
-            />
-            <UploadCloud className={`w-4 h-4 shrink-0 ${fileName ? 'text-emerald-600' : 'text-slate-500'}`} />
-            {isParsing ? (
-              <span className="text-xs font-semibold flex items-center gap-1">
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                جاري الفحص...
-              </span>
-            ) : fileName ? (
-              <span className="text-xs font-semibold truncate max-w-[220px]" dir="ltr">
-                {fileName}
-              </span>
-            ) : (
-              <span className="text-xs font-semibold">
-                اضغط لاختيار ملف الإكسيل أو اسحبه هنا
-              </span>
-            )}
-          </div>
+            <UploadCloud className="w-3.5 h-3.5" />
+            <span>استيراد تشغيلة جديدة</span>
+          </button>
 
-          {/* Left: Tight inputs for Date, Batch # and Download Template */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Date */}
-            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/60 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
-              <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">التاريخ:</span>
-              <input 
-                type="date"
-                value={batchDate}
-                disabled={isBatchSaved}
-                onChange={(e) => setBatchDate(e.target.value)}
-                className="text-xs font-mono font-medium bg-transparent focus:outline-none disabled:opacity-60 cursor-pointer"
-              />
-            </div>
-
-            {/* Batch Number */}
-            <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/60">
-              <Hash className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">التشغيلة:</span>
-              <span className="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-300 select-all">
-                {isGeneratingBatchNumber ? 'جاري التوليد...' : batchNumber}
-              </span>
-            </div>
-
-            {/* Download Template Button */}
-            <button
-              onClick={handleDownloadTemplate}
-              className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1 rounded-lg transition-colors shadow-sm"
-              title="تحميل نموذج الإكسيل النموذجي المشروح مع أمثلة عملية جاهزة"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>تحميل النموذج</span>
-            </button>
-          </div>
-
+          <button
+            onClick={() => {
+              setActiveMainTab('history');
+              fetchBatchesHistory();
+            }}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeMainTab === 'history'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>سجل التشغيلات السابقة ({batchesHistory.length})</span>
+          </button>
         </div>
+
+        {activeMainTab === 'history' && (
+          <button
+            onClick={fetchBatchesHistory}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-emerald-600 transition-colors cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoadingBatches ? 'animate-spin' : ''}`} />
+            <span>تحديث السجل</span>
+          </button>
+        )}
       </div>
 
-      {/* Validation Errors Box (if any) */}
-      <AnimatePresence>
-        {validationErrors.length > 0 && (
-          <motion.div 
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 shadow-sm space-y-2.5"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold text-xs md:text-sm">
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
-                <span>تنبيهات وأخطاء الفحص التفصيلي ({validationErrors.length} ملاحظة):</span>
-              </div>
-              <span className="text-[11px] bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full font-semibold">
-                يرجى تصحيح الأخطاء في الإكسيل أو التعديل بالجدول أدناه
-              </span>
-            </div>
-
-            <div className="max-h-52 overflow-y-auto rounded-xl border border-amber-200/80 dark:border-amber-800/80 bg-white dark:bg-slate-900">
-              <table className="w-full text-right text-xs">
-                <thead className="bg-amber-100/60 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border-b border-amber-200 dark:border-amber-800 sticky top-0">
-                  <tr>
-                    <th className="p-2 font-bold">رقم الصف بالإكسيل</th>
-                    <th className="p-2 font-bold">رقم المرجع (Ref)</th>
-                    <th className="p-2 font-bold">الحقل</th>
-                    <th className="p-2 font-bold">سبب الخطأ بالتفصيل</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-amber-100 dark:divide-slate-800">
-                  {validationErrors.map((err, i) => (
-                    <tr key={i} className="hover:bg-amber-50/50 dark:hover:bg-slate-800/50">
-                      <td className="p-2 font-mono font-bold text-amber-700 dark:text-amber-400">الصف {err.rowNumber}</td>
-                      <td className="p-2 font-mono">{err.ref}</td>
-                      <td className="p-2 font-semibold text-slate-700 dark:text-slate-300">{err.field}</td>
-                      <td className="p-2 text-red-600 dark:text-red-400">{err.message}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Unified Compact Totals Table (Single header, no duplicate titles, dedicated doc/item columns) */}
-      {documents.length > 0 && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-bold">
-                <tr>
-                  <th className="py-2.5 px-3 whitespace-nowrap">نوع المستند</th>
-                  <th className="py-2.5 px-2 text-center whitespace-nowrap">عدد المستندات</th>
-                  <th className="py-2.5 px-2 text-center whitespace-nowrap">عدد البنود</th>
-                  <th className="py-2.5 px-2 text-center whitespace-nowrap">الإجمالي</th>
-                  <th className="py-2.5 px-2 text-center whitespace-nowrap">إجمالي الخصم</th>
-                  <th className="py-2.5 px-2 text-center whitespace-nowrap">الصافي قبل الضريبة</th>
-                  <th className="py-2.5 px-2 text-center whitespace-nowrap">
-                    ض.ق.م {isVatEnabled ? '(14%)' : '(معطلة)'}
-                  </th>
-                  <th className="py-2.5 px-2 text-center whitespace-nowrap">
-                    ض.خ.إ {isWhtEnabled ? '(1%)' : '(معطلة)'}
-                  </th>
-                  <th className="py-2.5 px-3 text-center whitespace-nowrap font-extrabold text-emerald-700 dark:text-emerald-300">
-                    الصافي النهائي
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
-                {/* Row 1: Invoices */}
-                <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
-                  <td className="py-2 px-3 font-sans font-bold whitespace-nowrap">
-                    <span className="text-xs px-2.5 py-0.5 rounded-full border bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-800">
-                      {isSales ? 'فواتير بيع' : 'فواتير شراء'}
-                    </span>
-                  </td>
-                  <td className="py-2 px-2 text-center font-bold text-slate-800 dark:text-slate-200">{invoicesSummary.count}</td>
-                  <td className="py-2 px-2 text-center text-slate-600 dark:text-slate-400">{invoicesSummary.totalItems}</td>
-                  <td className="py-2 px-2 text-center">{formatMoney(invoicesSummary.gross)}</td>
-                  <td className="py-2 px-2 text-center text-amber-600 font-bold">{formatMoney(invoicesSummary.discount)}</td>
-                  <td className="py-2 px-2 text-center text-blue-600 font-bold">{formatMoney(invoicesSummary.subtotal)}</td>
-                  <td className="py-2 px-2 text-center text-emerald-600 font-bold">{isVatEnabled ? formatMoney(invoicesSummary.vat) : '-'}</td>
-                  <td className="py-2 px-2 text-center text-purple-600 font-bold">{isWhtEnabled ? formatMoney(invoicesSummary.wht) : '-'}</td>
-                  <td className="py-2 px-3 text-center font-extrabold text-emerald-700 dark:text-emerald-300">{formatMoney(invoicesSummary.net)}</td>
-                </tr>
-
-                {/* Row 2: Orders */}
-                <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
-                  <td className="py-2 px-3 font-sans font-bold whitespace-nowrap">
-                    <span className="text-xs px-2.5 py-0.5 rounded-full border bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-800">
-                      {isSales ? 'أوامر بيع' : 'أوامر شراء'}
-                    </span>
-                  </td>
-                  <td className="py-2 px-2 text-center font-bold text-slate-800 dark:text-slate-200">{ordersSummary.count}</td>
-                  <td className="py-2 px-2 text-center text-slate-600 dark:text-slate-400">{ordersSummary.totalItems}</td>
-                  <td className="py-2 px-2 text-center">{formatMoney(ordersSummary.gross)}</td>
-                  <td className="py-2 px-2 text-center text-amber-600 font-bold">{formatMoney(ordersSummary.discount)}</td>
-                  <td className="py-2 px-2 text-center text-blue-600 font-bold">{formatMoney(ordersSummary.subtotal)}</td>
-                  <td className="py-2 px-2 text-center text-emerald-600 font-bold">{isVatEnabled ? formatMoney(ordersSummary.vat) : '-'}</td>
-                  <td className="py-2 px-2 text-center text-slate-400 font-bold">-</td>
-                  <td className="py-2 px-3 text-center font-extrabold text-blue-700 dark:text-blue-300">{formatMoney(ordersSummary.net)}</td>
-                </tr>
-
-                {/* Row 3: Returns */}
-                <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
-                  <td className="py-2 px-3 font-sans font-bold whitespace-nowrap">
-                    <span className="text-xs px-2.5 py-0.5 rounded-full border bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-800">
-                      {isSales ? 'مرتجعات بيع' : 'مرتجعات شراء'}
-                    </span>
-                  </td>
-                  <td className="py-2 px-2 text-center font-bold text-slate-800 dark:text-slate-200">{returnsSummary.count}</td>
-                  <td className="py-2 px-2 text-center text-slate-600 dark:text-slate-400">{returnsSummary.totalItems}</td>
-                  <td className="py-2 px-2 text-center">{formatMoney(returnsSummary.gross)}</td>
-                  <td className="py-2 px-2 text-center text-amber-600 font-bold">{formatMoney(returnsSummary.discount)}</td>
-                  <td className="py-2 px-2 text-center text-blue-600 font-bold">{formatMoney(returnsSummary.subtotal)}</td>
-                  <td className="py-2 px-2 text-center text-emerald-600 font-bold">{isVatEnabled ? formatMoney(returnsSummary.vat) : '-'}</td>
-                  <td className="py-2 px-2 text-center text-purple-600 font-bold">{isWhtEnabled ? formatMoney(returnsSummary.wht) : '-'}</td>
-                  <td className="py-2 px-3 text-center font-extrabold text-amber-700 dark:text-amber-300">{formatMoney(returnsSummary.net)}</td>
-                </tr>
-              </tbody>
-              <tfoot className="bg-slate-100/70 dark:bg-slate-800/70 border-t-2 border-slate-200 dark:border-slate-700 font-mono font-bold text-slate-800 dark:text-slate-200">
-                <tr>
-                  <td className="py-2 px-3 font-sans font-extrabold whitespace-nowrap">الإجمالي العام</td>
-                  <td className="py-2 px-2 text-center">{documents.length}</td>
-                  <td className="py-2 px-2 text-center">{documents.reduce((sum, d) => sum + d.items.length, 0)}</td>
-                  <td className="py-2 px-2 text-center">{formatMoney(documents.reduce((sum, d) => sum + d.gross_total, 0))}</td>
-                  <td className="py-2 px-2 text-center text-amber-600">{formatMoney(documents.reduce((sum, d) => sum + d.discount_amount, 0))}</td>
-                  <td className="py-2 px-2 text-center text-blue-600">{formatMoney(documents.reduce((sum, d) => sum + d.subtotal, 0))}</td>
-                  <td className="py-2 px-2 text-center text-emerald-600">{isVatEnabled ? formatMoney(documents.reduce((sum, d) => sum + d.tax_amount, 0)) : '-'}</td>
-                  <td className="py-2 px-2 text-center text-purple-600">{isWhtEnabled ? formatMoney(documents.reduce((sum, d) => sum + d.withholding_tax_amount, 0)) : '-'}</td>
-                  <td className="py-2 px-3 text-center font-extrabold text-emerald-700 dark:text-emerald-300">{formatMoney(documents.reduce((sum, d) => sum + d.total_amount, 0))}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Actions Bar: Save & Post / Export After Save */}
-      {documents.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 shadow-xs">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-              إجمالي المستندات:
-            </span>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-mono">
-              {documents.length} مستند
-            </span>
-
-            {/* If all saved */}
-            {isBatchSaved && (
-              <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                <span>تم الحفظ والترحيل بالكامل ({documents.filter(d => d.status === 'saved').length} مستند)</span>
-              </span>
-            )}
-
-            {/* If partially saved with failures */}
-            {!isBatchSaved && documents.some(d => d.status === 'saved') && (
-              <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-100 dark:bg-amber-950/80 px-2.5 py-0.5 rounded-full border border-amber-300 dark:border-amber-800">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                <span>
-                  تم حفظ {documents.filter(d => d.status === 'saved').length} مستند، وتعذر حفظ {documents.filter(d => d.status === 'failed').length} مستند
-                </span>
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Save & Post Button (Available whenever there are unsaved documents) */}
-            {!isBatchSaved && (
-              <button
-                onClick={handleSaveAndPostBatch}
-                disabled={isSavingBatch || validationErrors.length > 0}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs md:text-sm font-bold rounded-xl shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              >
-                {isSavingBatch ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>جاري الحفظ والترحيل...</span>
-                  </>
-                ) : documents.some(d => d.status === 'saved') ? (
-                  <>
-                    <RotateCcw className="w-4 h-4" />
-                    <span>إعادة محاولة حفظ المستندات المتبقية ({documents.filter(d => d.status !== 'saved').length})</span>
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4" />
-                    <span>حفظ وترحيل المستندات</span>
-                  </>
-                )}
-              </button>
-            )}
-
-            {/* Export After Save Button */}
-            {(isBatchSaved || documents.some(d => d.status === 'saved' || d.status === 'failed')) && (
-              <button
-                onClick={handleExportAfterSave}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-bold rounded-xl shadow-md transition-colors cursor-pointer"
-              >
-                <Download className="w-4 h-4" />
-                <span>تصدير إكسيل النتائج (مع أرقام الفواتير والقيود)</span>
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Save Progress Bar */}
-      {saveProgress && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 shadow-sm space-y-1.5">
-          <div className="flex justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
-            <span>{saveProgress.statusText}</span>
-            <span className="font-mono">{Math.round((saveProgress.current / saveProgress.total) * 100)}%</span>
-          </div>
-          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-            <div 
-              className="bg-emerald-500 h-full transition-all duration-300"
-              style={{ width: `${(saveProgress.current / saveProgress.total) * 100}%` }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Interactive Table of Valid Documents (Accordion) */}
-      {documents.length > 0 && (
+      {/* VIEW 1: Batches History Screen */}
+      {activeMainTab === 'history' ? (
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm md:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Layers className="w-4 h-4 text-emerald-600" />
-              <span>جدول المستندات ومطابقتها ({documents.length}):</span>
-            </h2>
-            <div className="flex items-center gap-2">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-emerald-600" />
+                  <span>سجل تشغيلات الاستيراد السابقة ({batchesHistory.length})</span>
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  عرض جميع الدفعات التي تم استيرادها وترحيلها للنظام، مع إمكانية استعراض المستندات والقيود المرتبطة بكل تشغيلة
+                </p>
+              </div>
+
               <button
-                onClick={() => {
-                  const allOpen: Record<string, boolean> = {};
-                  documents.forEach(d => { allOpen[d.ref] = true; });
-                  setExpandedRefs(allOpen);
+                onClick={() => setActiveMainTab('import')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 cursor-pointer"
+              >
+                <UploadCloud className="w-3.5 h-3.5" />
+                <span>استيراد تشغيلة جديدة</span>
+              </button>
+            </div>
+
+            {isLoadingBatches ? (
+              <div className="py-12 text-center text-slate-500">
+                <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-600" />
+                <span className="text-xs">جاري تحميل سجل التشغيلات...</span>
+              </div>
+            ) : batchesHistory.length === 0 ? (
+              <div className="py-12 text-center text-slate-500 space-y-3">
+                <Layers className="w-10 h-10 text-slate-300 mx-auto" />
+                <p className="text-xs font-semibold">لا توجد تشغيلات استيراد مسجلة حتى الآن</p>
+                <button
+                  onClick={() => setActiveMainTab('import')}
+                  className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-sm cursor-pointer"
+                >
+                  بدء أول استيراد الآن
+                </button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                <table className="w-full text-right text-xs">
+                  <thead className="bg-slate-50 dark:bg-slate-800/70 border-b border-slate-200 dark:border-slate-800 font-bold text-slate-700 dark:text-slate-300">
+                    <tr>
+                      <th className="py-2.5 px-3">رقم التشغيلة</th>
+                      <th className="py-2.5 px-3 text-center">التاريخ</th>
+                      <th className="py-2.5 px-3 text-center">نوع التشغيلة</th>
+                      <th className="py-2.5 px-3 text-center">عدد المستندات</th>
+                      <th className="py-2.5 px-3 text-center">إجمالي القيمة</th>
+                      <th className="py-2.5 px-3 text-center">الحالة</th>
+                      <th className="py-2.5 px-3 text-center">تاريخ وتوقيت الحفظ</th>
+                      <th className="py-2.5 px-3 text-center">إجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {batchesHistory.map((batch: any) => {
+                      const isComplete = batch.status === 'posted' || batch.status === 'completed';
+                      return (
+                        <tr key={batch.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
+                          <td className="py-2.5 px-3 font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                            {batch.batch_number}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono">
+                            {batch.batch_date ? String(batch.batch_date).slice(0, 10) : '-'}
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800">
+                              {batch.batch_type === 'sales' ? 'مبيعات' : 'مشتريات'}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-bold">
+                            {batch.total_documents || 0} مستند
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-900 dark:text-white">
+                            {formatMoney(Number(batch.total_amount) || 0)}
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                              isComplete 
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}>
+                              {isComplete ? 'مكتملة بالكامل' : 'حفظ جزئي'}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center text-slate-500 font-mono text-[11px]" dir="ltr">
+                            {batch.created_at ? new Date(batch.created_at).toLocaleString('ar-EG') : '-'}
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => setSelectedBatchDetails(batch)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs border border-emerald-200 transition-colors cursor-pointer"
+                                title="استعراض تفاصيل المستندات والقيود لهذه التشغيلة"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>المستندات والقيود</span>
+                              </button>
+                              <button
+                                onClick={() => handleExportPastBatch(batch)}
+                                className="p-1 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 cursor-pointer"
+                                title="تصدير إكسيل التشغيلة"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* VIEW 2: Import & Processing View */
+        <div className="space-y-2.5">
+          {/* Merged Compact Header & Upload Bar */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-2.5 md:p-3 shadow-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2.5">
+              
+              {/* Right: Title & Info */}
+              <div className="flex items-center gap-2">
+                <div className={`p-1.5 rounded-xl ${isSales ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600' : 'bg-blue-50 dark:bg-blue-950/40 text-blue-600'}`}>
+                  <FileSpreadsheet className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <h1 className="text-xs md:text-sm font-bold text-slate-900 dark:text-white">
+                      {pageTitle}
+                    </h1>
+                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                      {isSales ? 'مبيعات' : 'مشتريات'}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                    استيراد الفواتير والأوامر والمرتجعات مع توليد أرقام القيود التلقائية
+                  </p>
+                </div>
+              </div>
+
+              {/* Center: Merged Upload Dropzone / Button */}
+              <div 
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    handleFileUpload(e.dataTransfer.files[0]);
+                  }
                 }}
-                className="text-xs text-slate-600 dark:text-slate-400 hover:underline"
+                onClick={() => fileInputRef.current?.click()}
+                className={`flex items-center gap-2 px-3 py-1 rounded-xl border border-dashed cursor-pointer transition-all duration-150 select-none ${
+                  isDragging 
+                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700' 
+                    : fileName
+                      ? 'border-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-200 hover:border-emerald-400'
+                      : 'border-slate-300 dark:border-slate-700 hover:border-emerald-400 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300'
+                }`}
+                title="اضغط لاختيار ملف الإكسيل أو اسحبه وأفلته هنا"
               >
-                فتح الكل
-              </button>
-              <span className="text-slate-300">|</span>
-              <button
-                onClick={() => setExpandedRefs({})}
-                className="text-xs text-slate-600 dark:text-slate-400 hover:underline"
-              >
-                طي الكل
-              </button>
+                <input 
+                  type="file" 
+                  ref={fileInputRef}
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleFileUpload(e.target.files[0]);
+                    }
+                  }}
+                  accept=".xlsx, .xls, .csv"
+                  className="hidden" 
+                />
+                <UploadCloud className={`w-3.5 h-3.5 shrink-0 ${fileName ? 'text-emerald-600' : 'text-slate-500'}`} />
+                {isParsing ? (
+                  <span className="text-[11px] font-semibold flex items-center gap-1">
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    جاري الفحص...
+                  </span>
+                ) : fileName ? (
+                  <span className="text-[11px] font-semibold truncate max-w-[200px]" dir="ltr">
+                    {fileName}
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-semibold">
+                    اضغط لاختيار ملف الإكسيل أو اسحبه هنا
+                  </span>
+                )}
+              </div>
+
+              {/* Left: Tight inputs for Date, Batch # and Download Template */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {/* Date */}
+                <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800/60 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">التاريخ:</span>
+                  <input 
+                    type="date"
+                    value={batchDate}
+                    disabled={isBatchSaved}
+                    onChange={(e) => setBatchDate(e.target.value)}
+                    className="text-xs font-mono font-medium bg-transparent focus:outline-none disabled:opacity-60 cursor-pointer"
+                  />
+                </div>
+
+                {/* Batch Number */}
+                <div className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-800/60">
+                  <Hash className="w-3 h-3 text-emerald-600 shrink-0" />
+                  <span className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-300">التشغيلة:</span>
+                  <span className="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-300 select-all">
+                    {isGeneratingBatchNumber ? 'جاري التوليد...' : batchNumber}
+                  </span>
+                </div>
+
+                {/* Download Template Button */}
+                <button
+                  onClick={handleDownloadTemplate}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-lg transition-colors shadow-xs cursor-pointer"
+                  title="تحميل نموذج الإكسيل النموذجي المشروح مع أمثلة عملية جاهزة"
+                >
+                  <Download className="w-3 h-3" />
+                  <span>تحميل النموذج</span>
+                </button>
+              </div>
+
             </div>
           </div>
 
-          <div className="space-y-2.5">
-            {documents.map((doc, docIdx) => {
-              const isExpanded = !!expandedRefs[doc.ref];
-              const docTypeBadgeColor = 
-                doc.doc_type.includes('فاتورة') ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-800' :
-                doc.doc_type.includes('أمر') ? 'bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-800' :
-                'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-800';
+          {/* Validation Errors Box (if any) */}
+          <AnimatePresence>
+            {validationErrors.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl p-3 shadow-xs space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold text-xs">
+                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    <span>تنبيهات وأخطاء الفحص التفصيلي ({validationErrors.length} ملاحظة):</span>
+                  </div>
+                  <span className="text-[10px] bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full font-semibold">
+                    يرجى تصحيح الأخطاء في الإكسيل أو التعديل بالجدول أدناه
+                  </span>
+                </div>
 
-              const allServices = doc.items.length > 0 && doc.items.every(i => i.is_service === true);
+                <div className="max-h-48 overflow-y-auto rounded-xl border border-amber-200/80 dark:border-amber-800/80 bg-white dark:bg-slate-900">
+                  <table className="w-full text-right text-xs">
+                    <thead className="bg-amber-100/60 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border-b border-amber-200 dark:border-amber-800 sticky top-0">
+                      <tr>
+                        <th className="p-2 font-bold">رقم الصف بالإكسيل</th>
+                        <th className="p-2 font-bold">رقم المرجع (Ref)</th>
+                        <th className="p-2 font-bold">الحقل</th>
+                        <th className="p-2 font-bold">سبب الخطأ بالتفصيل</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-amber-100 dark:divide-slate-800">
+                      {validationErrors.map((err, i) => (
+                        <tr key={i} className="hover:bg-amber-50/50 dark:hover:bg-slate-800/50">
+                          <td className="p-2 font-mono font-bold text-amber-700 dark:text-amber-400">الصف {err.rowNumber}</td>
+                          <td className="p-2 font-mono">{err.ref}</td>
+                          <td className="p-2 font-semibold">{err.field}</td>
+                          <td className="p-2 text-red-600 dark:text-red-400">{err.message}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-              return (
-                <div 
-                  key={doc.ref}
-                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden"
+          {/* Unified Compact Totals Table */}
+          {documents.length > 0 && (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-right text-xs">
+                  <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-bold">
+                    <tr>
+                      <th className="py-2 px-3 whitespace-nowrap">نوع المستند</th>
+                      <th className="py-2 px-2 text-center whitespace-nowrap">عدد المستندات</th>
+                      <th className="py-2 px-2 text-center whitespace-nowrap">عدد البنود</th>
+                      <th className="py-2 px-2 text-center whitespace-nowrap">الإجمالي</th>
+                      <th className="py-2 px-2 text-center whitespace-nowrap">إجمالي الخصم</th>
+                      <th className="py-2 px-2 text-center whitespace-nowrap">الصافي قبل الضريبة</th>
+                      <th className="py-2 px-2 text-center whitespace-nowrap">
+                        ض.ق.م {isVatEnabled ? '(14%)' : '(معطلة)'}
+                      </th>
+                      <th className="py-2 px-2 text-center whitespace-nowrap">
+                        ض.خ.إ {isWhtEnabled ? '(1%)' : '(معطلة)'}
+                      </th>
+                      <th className="py-2 px-3 text-center whitespace-nowrap font-extrabold text-emerald-700 dark:text-emerald-300">
+                        الصافي النهائي
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
+                    {/* Row 1: Invoices */}
+                    <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                      <td className="py-1.5 px-3 font-sans font-bold whitespace-nowrap">
+                        <span className="text-xs px-2.5 py-0.5 rounded-full border bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-800">
+                          {isSales ? 'فواتير بيع' : 'فواتير شراء'}
+                        </span>
+                      </td>
+                      <td className="py-1.5 px-2 text-center font-bold text-slate-800 dark:text-slate-200">{invoicesSummary.count}</td>
+                      <td className="py-1.5 px-2 text-center text-slate-600 dark:text-slate-400">{invoicesSummary.totalItems}</td>
+                      <td className="py-1.5 px-2 text-center">{formatMoney(invoicesSummary.gross)}</td>
+                      <td className="py-1.5 px-2 text-center text-amber-600 font-bold">{formatMoney(invoicesSummary.discount)}</td>
+                      <td className="py-1.5 px-2 text-center text-blue-600 font-bold">{formatMoney(invoicesSummary.subtotal)}</td>
+                      <td className="py-1.5 px-2 text-center text-emerald-600 font-bold">{isVatEnabled ? formatMoney(invoicesSummary.vat) : '-'}</td>
+                      <td className="py-1.5 px-2 text-center text-purple-600 font-bold">{isWhtEnabled ? formatMoney(invoicesSummary.wht) : '-'}</td>
+                      <td className="py-1.5 px-3 text-center font-extrabold text-emerald-700 dark:text-emerald-300">{formatMoney(invoicesSummary.net)}</td>
+                    </tr>
+
+                    {/* Row 2: Orders */}
+                    <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                      <td className="py-1.5 px-3 font-sans font-bold whitespace-nowrap">
+                        <span className="text-xs px-2.5 py-0.5 rounded-full border bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-800">
+                          {isSales ? 'أوامر بيع' : 'أوامر شراء'}
+                        </span>
+                      </td>
+                      <td className="py-1.5 px-2 text-center font-bold text-slate-800 dark:text-slate-200">{ordersSummary.count}</td>
+                      <td className="py-1.5 px-2 text-center text-slate-600 dark:text-slate-400">{ordersSummary.totalItems}</td>
+                      <td className="py-1.5 px-2 text-center">{formatMoney(ordersSummary.gross)}</td>
+                      <td className="py-1.5 px-2 text-center text-amber-600 font-bold">{formatMoney(ordersSummary.discount)}</td>
+                      <td className="py-1.5 px-2 text-center text-blue-600 font-bold">{formatMoney(ordersSummary.subtotal)}</td>
+                      <td className="py-1.5 px-2 text-center text-emerald-600 font-bold">{isVatEnabled ? formatMoney(ordersSummary.vat) : '-'}</td>
+                      <td className="py-1.5 px-2 text-center text-slate-400 font-bold">-</td>
+                      <td className="py-1.5 px-3 text-center font-extrabold text-blue-700 dark:text-blue-300">{formatMoney(ordersSummary.net)}</td>
+                    </tr>
+
+                    {/* Row 3: Returns */}
+                    <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                      <td className="py-1.5 px-3 font-sans font-bold whitespace-nowrap">
+                        <span className="text-xs px-2.5 py-0.5 rounded-full border bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-800">
+                          {isSales ? 'مرتجعات بيع' : 'مرتجعات شراء'}
+                        </span>
+                      </td>
+                      <td className="py-1.5 px-2 text-center font-bold text-slate-800 dark:text-slate-200">{returnsSummary.count}</td>
+                      <td className="py-1.5 px-2 text-center text-slate-600 dark:text-slate-400">{returnsSummary.totalItems}</td>
+                      <td className="py-1.5 px-2 text-center">{formatMoney(returnsSummary.gross)}</td>
+                      <td className="py-1.5 px-2 text-center text-amber-600 font-bold">{formatMoney(returnsSummary.discount)}</td>
+                      <td className="py-1.5 px-2 text-center text-blue-600 font-bold">{formatMoney(returnsSummary.subtotal)}</td>
+                      <td className="py-1.5 px-2 text-center text-emerald-600 font-bold">{isVatEnabled ? formatMoney(returnsSummary.vat) : '-'}</td>
+                      <td className="py-1.5 px-2 text-center text-purple-600 font-bold">{isWhtEnabled ? formatMoney(returnsSummary.wht) : '-'}</td>
+                      <td className="py-1.5 px-3 text-center font-extrabold text-amber-700 dark:text-amber-300">{formatMoney(returnsSummary.net)}</td>
+                    </tr>
+                  </tbody>
+                  <tfoot className="bg-slate-100/70 dark:bg-slate-800/70 border-t-2 border-slate-200 dark:border-slate-700 font-mono font-bold text-slate-800 dark:text-slate-200">
+                    <tr>
+                      <td className="py-1.5 px-3 font-sans font-extrabold whitespace-nowrap">الإجمالي العام</td>
+                      <td className="py-1.5 px-2 text-center">{documents.length}</td>
+                      <td className="py-1.5 px-2 text-center">{documents.reduce((sum, d) => sum + d.items.length, 0)}</td>
+                      <td className="py-1.5 px-2 text-center">{formatMoney(documents.reduce((sum, d) => sum + d.gross_total, 0))}</td>
+                      <td className="py-1.5 px-2 text-center text-amber-600">{formatMoney(documents.reduce((sum, d) => sum + d.discount_amount, 0))}</td>
+                      <td className="py-1.5 px-2 text-center text-blue-600">{formatMoney(documents.reduce((sum, d) => sum + d.subtotal, 0))}</td>
+                      <td className="py-1.5 px-2 text-center text-emerald-600">{isVatEnabled ? formatMoney(documents.reduce((sum, d) => sum + d.tax_amount, 0)) : '-'}</td>
+                      <td className="py-1.5 px-2 text-center text-purple-600">{isWhtEnabled ? formatMoney(documents.reduce((sum, d) => sum + d.withholding_tax_amount, 0)) : '-'}</td>
+                      <td className="py-1.5 px-3 text-center font-extrabold text-emerald-700 dark:text-emerald-300">{formatMoney(documents.reduce((sum, d) => sum + d.total_amount, 0))}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Items Accounts Audit Section */}
+          {documents.length > 0 && itemsAccountAudit.length > 0 && (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 shadow-xs space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    فحص ومطابقة ربط الحسابات للقيود المحاسبية ({itemsAccountAudit.length} صنف مسجل بالإكسيل):
+                  </span>
+                  <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-full font-semibold">
+                    {itemsAccountAudit.every(a => a.sales.status !== 'missing' && a.cost.status !== 'missing' && a.inventory.status !== 'missing') ? '✓ جميع الأصناف مرتبطة بحسابات صحيحة' : '⚠️ توجد أصناف تحتاج مراجعة الحسابات'}
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => setShowAccountsAudit(!showAccountsAudit)}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
                 >
-                  {/* Document Header Row (Parent) */}
-                  <div className="p-2.5 md:p-3 bg-slate-50/70 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2.5">
-                    
-                    <div className="flex flex-wrap items-center gap-2">
-                      {/* Chevron toggle */}
-                      <button
-                        onClick={() => toggleDocExpand(doc.ref)}
-                        className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors"
-                        title={isExpanded ? 'طي الأصناف' : 'عرض الأصناف'}
-                      >
-                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      </button>
+                  <span>{showAccountsAudit ? 'إخفاء تفاصيل ربط الحسابات' : 'عرض تفاصيل ربط الحسابات (البيع / التكلفة / المخزون / الضرائب)'}</span>
+                  {showAccountsAudit ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+              </div>
 
-                      {/* 1. Document Number Link / Badge (BEFORE Ref as requested) */}
-                      {doc.created_document_number && (
-                        <button
-                          type="button"
-                          onClick={() => handleNavigateToDocument(doc)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-mono font-bold shadow-sm transition-all transform hover:scale-105 cursor-pointer"
-                          title="انقر للانتقال مباشرة إلى المستند في تبويب جديد"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                          <span>{doc.created_document_number}</span>
-                          <ExternalLink className="w-3 h-3 opacity-80" />
-                        </button>
-                      )}
+              {showAccountsAudit && (
+                <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700 mt-2">
+                  <table className="w-full text-right text-xs">
+                    <thead className="bg-slate-50 dark:bg-slate-800/80 font-bold text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">
+                      <tr>
+                        <th className="py-1.5 px-2.5">كود الصنف</th>
+                        <th className="py-1.5 px-2.5">اسم الصنف</th>
+                        <th className="py-1.5 px-2.5 text-center">حساب المبيعات / الإيراد</th>
+                        <th className="py-1.5 px-2.5 text-center">حساب تكلفة المبيعات</th>
+                        <th className="py-1.5 px-2.5 text-center">حساب المخزون</th>
+                        <th className="py-1.5 px-2.5 text-center">ضريبة القيمة المضافة (ق م)</th>
+                        <th className="py-1.5 px-2.5 text-center">ضريبة أ.ت.ص (خ إ)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono text-[11px]">
+                      {itemsAccountAudit.map((aud, i) => (
+                        <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                          <td className="py-1.5 px-2.5 font-bold text-slate-800 dark:text-slate-200">{aud.product_code}</td>
+                          <td className="py-1.5 px-2.5 font-sans font-medium text-slate-900 dark:text-slate-100">{aud.product_name}</td>
+                          <td className="py-1.5 px-2.5 text-center">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold ${
+                              aud.sales.status === 'linked' 
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' 
+                                : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                            }`}>
+                              {aud.sales.status === 'linked' ? '✓ ' : '⚠️ '}{aud.sales.name}
+                            </span>
+                          </td>
+                          <td className="py-1.5 px-2.5 text-center">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold ${
+                              aud.cost.status === 'exempt'
+                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
+                                : aud.cost.status === 'linked'
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                  : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                            }`}>
+                              {aud.cost.status === 'exempt' ? 'خدمي (معفى)' : (aud.cost.status === 'linked' ? '✓ ' : '⚠️ ') + aud.cost.name}
+                            </span>
+                          </td>
+                          <td className="py-1.5 px-2.5 text-center">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold ${
+                              aud.inventory.status === 'exempt'
+                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
+                                : aud.inventory.status === 'linked'
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                  : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                            }`}>
+                              {aud.inventory.status === 'exempt' ? 'خدمي (معفى)' : (aud.inventory.status === 'linked' ? '✓ ' : '⚠️ ') + aud.inventory.name}
+                            </span>
+                          </td>
+                          <td className="py-1.5 px-2.5 text-center">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-sans font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                              ✓ {aud.vat.name}
+                            </span>
+                          </td>
+                          <td className="py-1.5 px-2.5 text-center">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-sans font-bold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                              ✓ {aud.wht.name}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
 
-                      {/* 2. Journal Entry Number Link / Badge (BEFORE Ref as requested) */}
-                      {doc.created_journal_number && (
-                        <button
-                          type="button"
-                          onClick={() => handleNavigateToJournal(doc)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-mono font-bold shadow-sm transition-all transform hover:scale-105 cursor-pointer"
-                          title="انقر للانتقال مباشرة إلى القيد المحاسبي في تبويب جديد"
-                        >
-                          <Hash className="w-3.5 h-3.5" />
-                          <span>قيد: {doc.created_journal_number}</span>
-                          <ExternalLink className="w-3 h-3 opacity-80" />
-                        </button>
-                      )}
+          {/* Actions Bar: Save & Post / Export After Save */}
+          {documents.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 shadow-xs">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  إجمالي المستندات:
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-mono">
+                  {documents.length} مستند
+                </span>
 
-                      {/* 3. Error Badge if document failed */}
-                      {doc.status === 'failed' && (
-                        <div 
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-100 dark:bg-red-950/70 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 text-xs font-semibold"
-                          title={doc.error_message}
-                        >
-                          <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0" />
-                          <span className="truncate max-w-[320px]">فشل الحفظ: {doc.error_message || 'خطأ في الحفظ'}</span>
+                {/* If all saved */}
+                {isBatchSaved && (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>تم الحفظ والترحيل بالكامل ({documents.filter(d => d.status === 'saved').length} مستند)</span>
+                  </span>
+                )}
+
+                {/* If partially saved with failures */}
+                {!isBatchSaved && documents.some(d => d.status === 'saved') && (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-100 dark:bg-amber-950/80 px-2.5 py-0.5 rounded-full border border-amber-300 dark:border-amber-800">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                    <span>
+                      تم حفظ {documents.filter(d => d.status === 'saved').length} مستند، وتعذر حفظ {documents.filter(d => d.status === 'failed').length} مستند
+                    </span>
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Save & Post Button */}
+                {!isBatchSaved && (
+                  <button
+                    onClick={handleSaveAndPostBatch}
+                    disabled={isSavingBatch || validationErrors.length > 0}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    {isSavingBatch ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>جاري الحفظ والترحيل...</span>
+                      </>
+                    ) : documents.some(d => d.status === 'saved') ? (
+                      <>
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>إعادة محاولة حفظ المستندات المتبقية ({documents.filter(d => d.status !== 'saved').length})</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>حفظ وترحيل المستندات</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {/* Export After Save Button */}
+                {(isBatchSaved || documents.some(d => d.status === 'saved' || d.status === 'failed')) && (
+                  <button
+                    onClick={handleExportAfterSave}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>تصدير إكسيل النتائج (مع أرقام الفواتير والقيود)</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Save Progress Bar */}
+          {saveProgress && (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 shadow-xs space-y-1">
+              <div className="flex justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <span>{saveProgress.statusText}</span>
+                <span className="font-mono">{Math.round((saveProgress.current / saveProgress.total) * 100)}%</span>
+              </div>
+              <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                <div 
+                  className="bg-emerald-500 h-full transition-all duration-300"
+                  style={{ width: `${(saveProgress.current / saveProgress.total) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Interactive Table of Valid Documents (Accordion) - COMPACT ROW SPACING */}
+          {documents.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs md:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>جدول المستندات ومطابقتها ({documents.length}):</span>
+                </h2>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const allOpen: Record<string, boolean> = {};
+                      documents.forEach(d => { allOpen[d.ref] = true; });
+                      setExpandedRefs(allOpen);
+                    }}
+                    className="text-[11px] text-slate-600 dark:text-slate-400 hover:underline cursor-pointer"
+                  >
+                    فتح الكل
+                  </button>
+                  <span className="text-slate-300">|</span>
+                  <button
+                    onClick={() => setExpandedRefs({})}
+                    className="text-[11px] text-slate-600 dark:text-slate-400 hover:underline cursor-pointer"
+                  >
+                    طي الكل
+                  </button>
+                </div>
+              </div>
+
+              {/* Tight Spacing Between Rows */}
+              <div className="space-y-1">
+                {documents.map((doc) => {
+                  const isExpanded = !!expandedRefs[doc.ref];
+                  const docTypeBadgeColor = 
+                    doc.doc_type.includes('فاتورة') ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-800' :
+                    doc.doc_type.includes('أمر') ? 'bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-800' :
+                    'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-800';
+
+                  const allServices = doc.items.length > 0 && doc.items.every(i => i.is_service === true);
+
+                  return (
+                    <div 
+                      key={doc.ref}
+                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden"
+                    >
+                      {/* Document Header Row (Parent) - COMPACT */}
+                      <div className="py-1 px-2.5 bg-slate-50/70 dark:bg-slate-800/40 border-b border-slate-200/80 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-1.5">
+                        
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {/* Chevron toggle */}
+                          <button
+                            onClick={() => toggleDocExpand(doc.ref)}
+                            className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors cursor-pointer"
+                            title={isExpanded ? 'طي الأصناف' : 'عرض الأصناف'}
+                          >
+                            {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                          </button>
+
+                          {/* 1. Document Number Link / Badge */}
+                          {doc.created_document_number && (
+                            <button
+                              type="button"
+                              onClick={() => handleNavigateToDocument(doc)}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-mono font-bold shadow-xs transition-all cursor-pointer"
+                              title="انقر للانتقال مباشرة إلى المستند في تبويب جديد"
+                            >
+                              <FileText className="w-3 h-3" />
+                              <span>{doc.created_document_number}</span>
+                              <ExternalLink className="w-2.5 h-2.5 opacity-80" />
+                            </button>
+                          )}
+
+                          {/* 2. Journal Entry Number Link / Badge */}
+                          {doc.created_journal_number && (
+                            <button
+                              type="button"
+                              onClick={() => handleNavigateToJournal(doc)}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-mono font-bold shadow-xs transition-all cursor-pointer"
+                              title="انقر للانتقال مباشرة إلى القيد المحاسبي في تبويب جديد"
+                            >
+                              <Hash className="w-3 h-3" />
+                              <span>قيد: {doc.created_journal_number}</span>
+                              <ExternalLink className="w-2.5 h-2.5 opacity-80" />
+                            </button>
+                          )}
+
+                          {/* 3. Error Badge if document failed */}
+                          {doc.status === 'failed' && (
+                            <div 
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-red-50 dark:bg-red-950/70 border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 text-[11px] font-semibold"
+                              title={doc.error_message}
+                            >
+                              <AlertTriangle className="w-3 h-3 text-red-600 shrink-0" />
+                              <span className="truncate max-w-[340px]">فشل الحفظ: {doc.error_message || 'خطأ في الحفظ'}</span>
+                            </div>
+                          )}
+
+                          {/* 4. Ref Badge */}
+                          <span className="font-mono font-bold text-[11px] px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xs text-slate-800 dark:text-slate-200">
+                            {doc.ref}
+                          </span>
+
+                          {/* 5. Document Type Badge */}
+                          <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold border ${docTypeBadgeColor}`}>
+                            {doc.doc_type}
+                          </span>
+
+                          {/* 6. Party Name */}
+                          <span className="font-bold text-xs text-slate-900 dark:text-white">
+                            {doc.party_name}
+                          </span>
+
+                          {/* 7. Date */}
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                            {doc.date}
+                          </span>
+
+                          {/* 8. Warehouse or Service Badge */}
+                          {allServices ? (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-semibold border border-purple-200 dark:border-purple-800">
+                              خدمات (لا يلزم مخزن)
+                            </span>
+                          ) : doc.warehouse_name ? (
+                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                              {doc.warehouse_name}
+                            </span>
+                          ) : null}
+
+                          {/* 9. Payment Type */}
+                          <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                            {doc.payment_type === 'cash' ? 'نقدي' : 'آجل'}
+                          </span>
                         </div>
-                      )}
 
-                      {/* 4. Ref Badge */}
-                      <span className="font-mono font-bold text-xs px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xs text-slate-800 dark:text-slate-200">
-                        {doc.ref}
-                      </span>
+                        {/* Left: Net Total Badge & Delete Action */}
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1 text-xs font-mono bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-lg">
+                            <span className="text-emerald-700 dark:text-emerald-300 font-medium">الصافي:</span>
+                            <span className="text-emerald-900 dark:text-emerald-100 font-bold">{formatMoney(doc.total_amount)}</span>
+                          </div>
 
-                      {/* 5. Document Type Badge */}
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold border ${docTypeBadgeColor}`}>
-                        {doc.doc_type}
-                      </span>
+                          {doc.status !== 'saved' && (
+                            <button
+                              onClick={() => handleDeleteDocument(doc.ref)}
+                              className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                              title="حذف المستند بالكامل"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
 
-                      {/* 6. Party Name */}
-                      <span className="font-bold text-xs md:text-sm text-slate-900 dark:text-white">
-                        {doc.party_name}
-                      </span>
-
-                      {/* 7. Date */}
-                      <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                        {doc.date}
-                      </span>
-
-                      {/* 8. Warehouse or Service Badge */}
-                      {allServices ? (
-                        <span className="text-[11px] px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-semibold border border-purple-200 dark:border-purple-800">
-                          خدمات (لا يلزم مخزن)
-                        </span>
-                      ) : doc.warehouse_name ? (
-                        <span className="text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                          {doc.warehouse_name}
-                        </span>
-                      ) : null}
-
-                      {/* 9. Payment Type */}
-                      <span className="text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                        {doc.payment_type === 'cash' ? 'نقدي' : 'آجل'}
-                      </span>
-                    </div>
-
-                    {/* Left: Net Total Badge & Delete Action */}
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex items-center gap-1.5 text-xs font-mono bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 px-3 py-1 rounded-lg">
-                        <span className="text-emerald-700 dark:text-emerald-300 font-medium">الصافي:</span>
-                        <span className="text-emerald-900 dark:text-emerald-100 font-extrabold text-sm">{formatMoney(doc.total_amount)}</span>
                       </div>
 
-                      {doc.status !== 'saved' && (
-                        <button
-                          onClick={() => handleDeleteDocument(doc.ref)}
-                          className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
-                          title="حذف المستند بالكامل"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
+                      {/* Collapsible Items Sub-Table - COMPACT */}
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-x-auto"
+                          >
+                            <table className="w-full text-right text-xs">
+                              <thead className="bg-slate-100/70 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 font-bold">
+                                <tr>
+                                  <th className="py-1 px-2 w-8 text-center text-[11px]">#</th>
+                                  <th className="py-1 px-2 text-[11px]">كود الصنف</th>
+                                  <th className="py-1 px-2 text-[11px]">اسم الصنف</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">الكمية</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">السعر</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">الخصم</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">الصافي قبل الضريبة</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">ض.ق.م (%)</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">قيمة ض.ق.م</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">ض.خ.أ (%)</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">قيمة ض.خ.أ</th>
+                                  <th className="py-1 px-2 text-center font-extrabold text-slate-900 dark:text-white text-[11px]">الإجمالي</th>
+                                  {doc.status !== 'saved' && <th className="py-1 px-2 text-center w-16 text-[11px]">إجراءات</th>}
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono text-xs">
+                                {doc.items.map((item, itemIdx) => (
+                                  <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                                    <td className="py-1 px-2 text-center text-slate-400 font-sans">{itemIdx + 1}</td>
+                                    <td className="py-1 px-2 font-semibold text-slate-700 dark:text-slate-300">{item.product_code}</td>
+                                    <td className="py-1 px-2 font-sans font-medium text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                      <span>{item.product_name}</span>
+                                      {item.is_service && (
+                                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300 font-semibold border border-purple-200 dark:border-purple-800">
+                                          خدمة
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="py-1 px-2 text-center font-bold text-slate-900 dark:text-white">{item.quantity}</td>
+                                    <td className="py-1 px-2 text-center">{formatMoney(item.unit_price)}</td>
+                                    <td className="py-1 px-2 text-center text-amber-600 font-bold">{formatMoney(item.discount_amount)}</td>
+                                    <td className="py-1 px-2 text-center text-blue-600 font-bold">{formatMoney(item.subtotal)}</td>
+                                    <td className="py-1 px-2 text-center text-slate-500 font-sans">{item.vat_rate}%</td>
+                                    <td className="py-1 px-2 text-center text-emerald-600 font-bold">{formatMoney(item.vat_amount)}</td>
+                                    <td className="py-1 px-2 text-center text-slate-500 font-sans">{item.withholding_tax_rate}%</td>
+                                    <td className="py-1 px-2 text-center text-purple-600 font-bold">{formatMoney(item.withholding_tax_amount)}</td>
+                                    <td className="py-1 px-2 text-center font-extrabold text-emerald-700 dark:text-emerald-300">{formatMoney(item.total)}</td>
+                                    {doc.status !== 'saved' && (
+                                      <td className="py-1 px-2 text-center">
+                                        <div className="flex items-center justify-center gap-1 font-sans">
+                                          <button
+                                            onClick={() => setEditingItem({ docRef: doc.ref, item })}
+                                            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-emerald-600 cursor-pointer"
+                                            title="تعديل هذا البند"
+                                          >
+                                            <Edit3 className="w-3 h-3" />
+                                          </button>
+                                          <button
+                                            onClick={() => handleDeleteItem(doc.ref, item.id)}
+                                            className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-slate-400 hover:text-red-600 cursor-pointer"
+                                            title="حذف هذا البند"
+                                          >
+                                            <Trash2 className="w-3 h-3" />
+                                          </button>
+                                        </div>
+                                      </td>
+                                    )}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
-
-                  </div>
-
-                  {/* Collapsible Items Sub-Table */}
-                  <AnimatePresence>
-                    {isExpanded && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="overflow-x-auto"
-                      >
-                        <table className="w-full text-right text-xs">
-                          <thead className="bg-slate-100/70 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 font-bold">
-                            <tr>
-                              <th className="p-2.5 w-10 text-center">#</th>
-                              <th className="p-2.5">كود الصنف</th>
-                              <th className="p-2.5">اسم الصنف</th>
-                              <th className="p-2.5 text-center">الكمية</th>
-                              <th className="p-2.5 text-center">السعر</th>
-                              <th className="p-2.5 text-center">الخصم</th>
-                              <th className="p-2.5 text-center">الصافي قبل الضريبة</th>
-                              <th className="p-2.5 text-center">ض.ق.م (%)</th>
-                              <th className="p-2.5 text-center">قيمة ض.ق.م</th>
-                              <th className="p-2.5 text-center">ض.خ.أ (%)</th>
-                              <th className="p-2.5 text-center">قيمة ض.خ.أ</th>
-                              <th className="p-2.5 text-center font-extrabold text-slate-900 dark:text-white">الإجمالي</th>
-                              {doc.status !== 'saved' && <th className="p-2.5 text-center w-20">إجراءات</th>}
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
-                            {doc.items.map((item, itemIdx) => (
-                              <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                                <td className="p-2.5 text-center text-slate-400 font-sans">{itemIdx + 1}</td>
-                                <td className="p-2.5 font-semibold text-slate-700 dark:text-slate-300">{item.product_code}</td>
-                                <td className="p-2.5 font-sans font-medium text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                                  <span>{item.product_name}</span>
-                                  {item.is_service && (
-                                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300 font-semibold border border-purple-200 dark:border-purple-800">
-                                      خدمة
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="p-2.5 text-center font-bold text-slate-900 dark:text-white">{item.quantity}</td>
-                                <td className="p-2.5 text-center">{formatMoney(item.unit_price)}</td>
-                                <td className="p-2.5 text-center text-amber-600 font-bold">{formatMoney(item.discount_amount)}</td>
-                                <td className="p-2.5 text-center text-blue-600 font-bold">{formatMoney(item.subtotal)}</td>
-                                <td className="p-2.5 text-center text-slate-500 font-sans">{item.vat_rate}%</td>
-                                <td className="p-2.5 text-center text-emerald-600 font-bold">{formatMoney(item.vat_amount)}</td>
-                                <td className="p-2.5 text-center text-slate-500 font-sans">{item.withholding_tax_rate}%</td>
-                                <td className="p-2.5 text-center text-purple-600 font-bold">{formatMoney(item.withholding_tax_amount)}</td>
-                                <td className="p-2.5 text-center font-extrabold text-emerald-700 dark:text-emerald-300">{formatMoney(item.total)}</td>
-                                {doc.status !== 'saved' && (
-                                  <td className="p-2.5 text-center">
-                                    <div className="flex items-center justify-center gap-1 font-sans">
-                                      <button
-                                        onClick={() => setEditingItem({ docRef: doc.ref, item })}
-                                        className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-emerald-600"
-                                        title="تعديل هذا البند"
-                                      >
-                                        <Edit3 className="w-3.5 h-3.5" />
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeleteItem(doc.ref, item.id)}
-                                        className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-slate-400 hover:text-red-600"
-                                        title="حذف هذا البند"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
-                                    </div>
-                                  </td>
-                                )}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Edit Item Modal */}
+      {/* Modal 1: Edit Item Modal */}
       {editingItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-5 shadow-2xl space-y-3.5">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-              <h3 className="text-sm md:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-4 shadow-xl space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                 <Edit3 className="w-4 h-4 text-emerald-600" />
-                <span>تعديل بند الصنف ({editingItem.item.product_name})</span>
+                <span>تعديل بيانات البند ({editingItem.item.product_name})</span>
               </h3>
               <button 
                 onClick={() => setEditingItem(null)}
-                className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
+                className="p-1 rounded-md text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">الكمية:</label>
-                <input 
-                  type="number"
-                  min="0.001"
-                  step="any"
-                  value={editingItem.item.quantity}
-                  onChange={(e) => setEditingItem({
-                    ...editingItem,
-                    item: { ...editingItem.item, quantity: parseFloat(e.target.value) || 0 }
-                  })}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-mono"
-                />
+            <div className="space-y-2.5 text-xs">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">الكمية:</label>
+                  <input 
+                    type="number"
+                    min="0.001"
+                    step="any"
+                    value={editingItem.item.quantity}
+                    onChange={(e) => setEditingItem({
+                      ...editingItem,
+                      item: { ...editingItem.item, quantity: parseFloat(e.target.value) || 0 }
+                    })}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">السعر:</label>
+                  <input 
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={editingItem.item.unit_price}
+                    onChange={(e) => setEditingItem({
+                      ...editingItem,
+                      item: { ...editingItem.item, unit_price: parseFloat(e.target.value) || 0 }
+                    })}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 font-mono"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">السعر (قبل الضريبة):</label>
-                <input 
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={editingItem.item.unit_price}
-                  onChange={(e) => setEditingItem({
-                    ...editingItem,
-                    item: { ...editingItem.item, unit_price: parseFloat(e.target.value) || 0 }
-                  })}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">الخصم:</label>
-                <input 
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={editingItem.item.discount_amount}
-                  onChange={(e) => setEditingItem({
-                    ...editingItem,
-                    item: { ...editingItem.item, discount_amount: parseFloat(e.target.value) || 0 }
-                  })}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  نسبة ض.ق.م (%) {isVatEnabled ? '' : '(معطلة بالشركة)'}:
-                </label>
-                <input 
-                  type="number"
-                  min="0"
-                  step="any"
-                  disabled={!isVatEnabled}
-                  value={isVatEnabled ? editingItem.item.vat_rate : 0}
-                  onChange={(e) => setEditingItem({
-                    ...editingItem,
-                    item: { ...editingItem.item, vat_rate: parseFloat(e.target.value) || 0 }
-                  })}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-mono disabled:opacity-50"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  نسبة ض.خ.أ (%) {isWhtEnabled ? '' : '(معطلة بالشركة)'}:
-                </label>
-                <input 
-                  type="number"
-                  min="0"
-                  step="any"
-                  disabled={!isWhtEnabled}
-                  value={isWhtEnabled ? editingItem.item.withholding_tax_rate : 0}
-                  onChange={(e) => setEditingItem({
-                    ...editingItem,
-                    item: { ...editingItem.item, withholding_tax_rate: parseFloat(e.target.value) || 0 }
-                  })}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-mono disabled:opacity-50"
-                />
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">قيمة الخصم:</label>
+                  <input 
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={editingItem.item.discount_amount}
+                    onChange={(e) => setEditingItem({
+                      ...editingItem,
+                      item: { ...editingItem.item, discount_amount: parseFloat(e.target.value) || 0 }
+                    })}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">ض.ق.م (%):</label>
+                  <input 
+                    type="number"
+                    min="0"
+                    step="any"
+                    disabled={!isVatEnabled}
+                    value={isVatEnabled ? editingItem.item.vat_rate : 0}
+                    onChange={(e) => setEditingItem({
+                      ...editingItem,
+                      item: { ...editingItem.item, vat_rate: parseFloat(e.target.value) || 0 }
+                    })}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 font-mono disabled:opacity-50"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">ض.خ.إ (%):</label>
+                  <input 
+                    type="number"
+                    min="0"
+                    step="any"
+                    disabled={!isWhtEnabled}
+                    value={isWhtEnabled ? editingItem.item.withholding_tax_rate : 0}
+                    onChange={(e) => setEditingItem({
+                      ...editingItem,
+                      item: { ...editingItem.item, withholding_tax_rate: parseFloat(e.target.value) || 0 }
+                    })}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 font-mono disabled:opacity-50"
+                  />
+                </div>
               </div>
 
               <div>
@@ -1995,21 +2461,21 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                     ...editingItem,
                     item: { ...editingItem.item, description: e.target.value }
                   })}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
               <button
                 onClick={() => setEditingItem(null)}
-                className="px-4 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
+                className="px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
               >
                 إلغاء
               </button>
               <button
                 onClick={() => handleSaveItemEdit(editingItem.item)}
-                className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm"
+                className="px-3.5 py-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs cursor-pointer"
               >
                 حفظ التعديلات
               </button>
@@ -2017,6 +2483,161 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           </div>
         </div>
       )}
+
+      {/* Modal 2: Past Batch Details Modal */}
+      {selectedBatchDetails && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-4xl w-full p-4 shadow-2xl space-y-3 max-h-[90vh] flex flex-col">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white font-mono">
+                      تفاصيل تشغيلة: {selectedBatchDetails.batch_number}
+                    </h3>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                      selectedBatchDetails.status === 'posted' || selectedBatchDetails.status === 'completed'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                    }`}>
+                      {selectedBatchDetails.status === 'posted' || selectedBatchDetails.status === 'completed' ? 'مكتملة بالكامل' : 'حفظ جزئي'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                    تاريخ التشغيلة: {selectedBatchDetails.batch_date ? String(selectedBatchDetails.batch_date).slice(0, 10) : '-'} | الإجمالي: {formatMoney(Number(selectedBatchDetails.total_amount) || 0)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleExportPastBatch(selectedBatchDetails)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>تصدير إكسيل التشغيلة</span>
+                </button>
+                <button
+                  onClick={() => setSelectedBatchDetails(null)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body: Documents Table */}
+            <div className="overflow-y-auto flex-1 rounded-xl border border-slate-200 dark:border-slate-800">
+              <table className="w-full text-right text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-800/80 font-bold text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-800 sticky top-0">
+                  <tr>
+                    <th className="py-2 px-3">رقم المرجع (Ref)</th>
+                    <th className="py-2 px-3">نوع المستند</th>
+                    <th className="py-2 px-3">الطرف</th>
+                    <th className="py-2 px-3 text-center">التاريخ</th>
+                    <th className="py-2 px-3 text-center">رقم المستند المنشأ</th>
+                    <th className="py-2 px-3 text-center">رقم القيد المنشأ</th>
+                    <th className="py-2 px-3 text-center font-bold">الصافي</th>
+                    <th className="py-2 px-3 text-center">الحالة</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {(selectedBatchDetails.details || []).map((doc: any, docIdx: number) => {
+                    const isDocSaved = doc.status === 'saved';
+                    return (
+                      <tr key={docIdx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                        <td className="py-2 px-3 font-mono font-bold text-slate-800 dark:text-slate-200">
+                          {doc.ref}
+                        </td>
+                        <td className="py-2 px-3">
+                          <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-slate-100 dark:bg-slate-800">
+                            {doc.doc_type}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 font-bold text-slate-900 dark:text-white">
+                          {doc.party_name}
+                        </td>
+                        <td className="py-2 px-3 text-center font-mono text-[11px] text-slate-500">
+                          {doc.date}
+                        </td>
+                        <td className="py-2 px-3 text-center font-mono font-bold">
+                          {doc.created_document_number ? (
+                            <button
+                              onClick={() => {
+                                handleNavigateToDocument(doc);
+                                setSelectedBatchDetails(null);
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 cursor-pointer"
+                              title="فتح المستند في النظام"
+                            >
+                              <span>{doc.created_document_number}</span>
+                              <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+                            </button>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-center font-mono font-bold">
+                          {doc.created_journal_number ? (
+                            <button
+                              onClick={() => {
+                                handleNavigateToJournal(doc);
+                                setSelectedBatchDetails(null);
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 cursor-pointer"
+                              title="فتح القيد المحاسبي في النظام"
+                            >
+                              <span>قيد: {doc.created_journal_number}</span>
+                              <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+                            </button>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-center font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                          {formatMoney(Number(doc.total_amount) || 0)}
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          {isDocSaved ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>تم الحفظ</span>
+                            </span>
+                          ) : (
+                            <span 
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded-full border border-red-200"
+                              title={doc.error_message}
+                            >
+                              <AlertTriangle className="w-3 h-3 text-red-600" />
+                              <span className="truncate max-w-[140px]">{doc.error_message || 'تعذر الحفظ'}</span>
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end pt-2 border-t border-slate-200 dark:border-slate-800">
+              <button
+                onClick={() => setSelectedBatchDetails(null)}
+                className="px-4 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer"
+              >
+                إغلاق النافذة
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

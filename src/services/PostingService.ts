@@ -37,6 +37,18 @@ export class PostingService {
     // Get Customer Account ID
     let customerAccountId = customer?.account_id || '';
     let customerAccountName = customer?.account_name || 'حساب العملاء';
+    if (!customerAccountId) {
+      const defaultCustAcc = accounts.find(a => 
+        a.account_usage === 'customer' ||
+        a.code === '1102' ||
+        a.name.includes('العملاء') ||
+        a.name.includes('الذمم المدينة')
+      );
+      if (defaultCustAcc) {
+        customerAccountId = defaultCustAcc.id;
+        customerAccountName = defaultCustAcc.name;
+      }
+    }
 
     // Main Sales Invoice Debit Line (Customer Account)
     journalItems.push({
@@ -112,6 +124,19 @@ export class PostingService {
       const product = products.find(p => p.id === item.product_id);
       let salesAccountId = product?.revenue_account_id || '';
       let salesAccountName = product?.revenue_account_name || 'حساب المبيعات';
+
+      if (!salesAccountId) {
+        const defaultSalesAcc = accounts.find(a => 
+          a.account_usage === 'sales_revenue' ||
+          a.code === '4101' ||
+          a.name.includes('المبيعات') ||
+          a.name.includes('إيرادات مبيعات')
+        );
+        if (defaultSalesAcc) {
+          salesAccountId = defaultSalesAcc.id;
+          salesAccountName = defaultSalesAcc.name;
+        }
+      }
       const itemTotalFC = Number(item.total) || 0;
       const itemTotalLocal = Number((itemTotalFC * rate).toFixed(2));
 
@@ -581,6 +606,21 @@ export class PostingService {
       let purchaseAccountId = product?.cost_account_id || '';
       let purchaseAccountName = product?.cost_account_name || 'حساب المشتريات';
 
+      if (!purchaseAccountId) {
+        const defaultPurchaseAcc = accounts.find(a => 
+          a.account_usage === 'cost_of_sales' ||
+          a.account_usage === 'inventory' ||
+          a.code === '5101' ||
+          a.code?.startsWith('51') ||
+          a.name.includes('المشتريات') ||
+          a.name.includes('تكلفة المبيعات')
+        );
+        if (defaultPurchaseAcc) {
+          purchaseAccountId = defaultPurchaseAcc.id;
+          purchaseAccountName = defaultPurchaseAcc.name;
+        }
+      }
+
       journalItems.push({
         account_id: purchaseAccountId,
         account_name: purchaseAccountName,
@@ -658,6 +698,18 @@ export class PostingService {
     // Credit Supplier Account (Account Payable)
     let supplierAccountId = supplier?.account_id || '';
     let supplierAccountName = supplier?.account_name || 'حساب الموردين';
+    if (!supplierAccountId) {
+      const defaultSuppAcc = accounts.find(a => 
+        a.account_usage === 'supplier' ||
+        a.code === '211' ||
+        a.name.includes('الموردين') ||
+        a.name.includes('الذمم الدائنة')
+      );
+      if (defaultSuppAcc) {
+        supplierAccountId = defaultSuppAcc.id;
+        supplierAccountName = defaultSuppAcc.name;
+      }
+    }
 
     journalItems.push({
       account_id: supplierAccountId,
