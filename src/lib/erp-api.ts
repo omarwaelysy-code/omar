@@ -2998,6 +2998,45 @@ router.post('/document_import_batches', authenticateToken, async (req: any, res)
   }
 });
 
+router.put('/document_import_batches/:id', authenticateToken, async (req: any, res) => {
+  try {
+    const companyId = req.user?.company_id || req.headers['x-company-id'];
+    if (!companyId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { id } = req.params;
+    const { batch_date, status, batch_number, details, total_documents, total_amount } = req.body;
+
+    const existing = await pool.query(
+      'SELECT * FROM document_import_batches WHERE company_id = $1 AND id = $2',
+      [companyId, id]
+    );
+
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: 'Batch not found' });
+    }
+
+    const current = existing.rows[0];
+    const newBatchDate = batch_date || current.batch_date;
+    const newStatus = status || current.status;
+    const newBatchNumber = batch_number || current.batch_number;
+    const newDetails = details !== undefined ? JSON.stringify(details) : JSON.stringify(current.details);
+    const newTotalDocs = total_documents !== undefined ? Number(total_documents) : current.total_documents;
+    const newTotalAmount = total_amount !== undefined ? Number(total_amount) : current.total_amount;
+
+    const result = await pool.query(`
+      UPDATE document_import_batches
+      SET batch_date = $1, status = $2, batch_number = $3, details = $4, total_documents = $5, total_amount = $6, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $7 AND company_id = $8
+      RETURNING *
+    `, [newBatchDate, newStatus, newBatchNumber, newDetails, newTotalDocs, newTotalAmount, id, companyId]);
+
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Error updating document import batch:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.post('/utils/fix-duplicate-pinv', authenticateToken, async (req: any, res) => {
   const client = await pool.connect();
   try {

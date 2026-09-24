@@ -80,7 +80,7 @@ interface LayoutProps {
   currentPage: string;
 }
 
-import { useNavigation } from '../contexts/NavigationContext';
+import { useNavigation, pageLabels } from '../contexts/NavigationContext';
 
 const getTabIcon = (id: string) => {
   const iconProps = { size: 16 };
@@ -1176,15 +1176,32 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
 
         <div className={`flex items-center gap-1 xl:gap-1.5 ${dir === 'rtl' ? 'mr-auto' : 'ml-auto'} shrink-0`}>
           {/* Desktop Language Switcher */}
-          <button
-            type="button"
-            onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
-            className="flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-slate-700 hover:text-emerald-700 bg-slate-100/80 hover:bg-emerald-50 rounded-lg border border-slate-200 hover:border-emerald-300 transition-all cursor-pointer shadow-2xs active:scale-95"
-            title={language === 'ar' ? 'التغيير إلى الإنجليزية (Switch to English)' : 'التبديل إلى العربية (Switch to Arabic)'}
-          >
-            <Languages size={13} className="text-emerald-600 shrink-0" />
-            <span>{language === 'ar' ? 'English' : 'العربية'}</span>
-          </button>
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700 text-[11px] font-bold">
+            <button
+              type="button"
+              onClick={() => setLanguage('ar')}
+              className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                language === 'ar'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+              }`}
+              title="التبديل إلى الواجهة العربية"
+            >
+              العربية
+            </button>
+            <button
+              type="button"
+              onClick={() => setLanguage('en')}
+              className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                language === 'en'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+              }`}
+              title="Switch to English interface"
+            >
+              EN
+            </button>
+          </div>
 
           <button 
             type="button"
@@ -1384,7 +1401,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           <div className="hidden md:flex items-center justify-between px-6 py-2 bg-white/90 backdrop-blur-md border-b border-slate-100 sticky top-0 z-20 gap-3">
             <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar py-0.5 max-w-[calc(100%-150px)]">
               {openTabs.map((tab) => {
-                const displayLabel = t('nav.' + tab.id) !== 'nav.' + tab.id ? t('nav.' + tab.id) : tab.label;
+                const navKey = 'nav.' + tab.id;
+                const translated = t(navKey);
+                const displayLabel = language === 'ar'
+                  ? (pageLabels[tab.id] || (translated !== navKey ? translated : tab.label))
+                  : (translated !== navKey ? translated : tab.label);
                 const isActive = activeTabId === tab.id;
                 return (
                   <button
@@ -1436,7 +1457,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           {/* Mobile Tabs Bar */}
           <div className="md:hidden flex overflow-x-auto bg-white border-b border-slate-100 p-2 gap-2 custom-scrollbar">
             {openTabs.map((tab) => {
-              const displayLabel = t('nav.' + tab.id) !== 'nav.' + tab.id ? t('nav.' + tab.id) : tab.label;
+              const navKey = 'nav.' + tab.id;
+              const translated = t(navKey);
+              const displayLabel = language === 'ar'
+                ? (pageLabels[tab.id] || (translated !== navKey ? translated : tab.label))
+                : (translated !== navKey ? translated : tab.label);
               return (
                 <button
                   key={tab.id}

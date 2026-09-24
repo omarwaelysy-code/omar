@@ -153,9 +153,12 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
   const { language, dir } = useLanguage();
   const { openTab, setPendingViewDoc } = useNavigation();
 
+  const isAr = language === 'ar';
   const isSales = type === 'sales';
-  const entityLabel = isSales ? 'العميل' : 'المورد';
-  const pageTitle = isSales ? 'استيراد مستندات بيع من إكسيل' : 'استيراد مستندات شراء من إكسيل';
+  const entityLabel = isSales ? (isAr ? 'العميل' : 'Customer') : (isAr ? 'المورد' : 'Supplier');
+  const pageTitle = isSales 
+    ? (isAr ? 'استيراد مستندات بيع من إكسيل' : 'Import Sales Documents from Excel')
+    : (isAr ? 'استيراد مستندات شراء من إكسيل' : 'Import Purchase Documents from Excel');
   const sequenceModuleName = isSales ? 'sales_import_batches' : 'purchases_import_batches';
 
   // Master data
@@ -194,6 +197,12 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
   const [batchesHistory, setBatchesHistory] = useState<any[]>([]);
   const [isLoadingBatches, setIsLoadingBatches] = useState(false);
   const [selectedBatchDetails, setSelectedBatchDetails] = useState<any | null>(null);
+
+  // Edit batch state
+  const [editingBatch, setEditingBatch] = useState<any | null>(null);
+  const [editBatchDate, setEditBatchDate] = useState<string>('');
+  const [editBatchStatus, setEditBatchStatus] = useState<string>('posted');
+  const [isUpdatingBatch, setIsUpdatingBatch] = useState(false);
 
   // Accounts audit toggle
   const [showAccountsAudit, setShowAccountsAudit] = useState(false);
@@ -262,6 +271,67 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
   useEffect(() => {
     fetchBatchesHistory();
   }, [user?.company_id, isSales]);
+
+  // Handler to save batch metadata edits
+  const handleSaveBatchEdit = async () => {
+    if (!editingBatch) return;
+    setIsUpdatingBatch(true);
+    try {
+      await apiRequest(`/document_import_batches/${editingBatch.id}`, 'PUT', {
+        batch_date: editBatchDate,
+        status: editBatchStatus
+      });
+      showNotification(isAr ? 'تم حفظ تعديلات التشغيلة بنجاح' : 'Batch updated successfully', 'success');
+      setEditingBatch(null);
+      fetchBatchesHistory();
+    } catch (err: any) {
+      showNotification(err.message || (isAr ? 'فشل حفظ التعديلات' : 'Failed to update batch'), 'error');
+    } finally {
+      setIsUpdatingBatch(false);
+    }
+  };
+
+  // Handler to load an entire batch into the workspace table for re-processing / inspection
+  const handleLoadBatchIntoWorkspace = (batch: any) => {
+    if (!batch) return;
+    setBatchNumber(batch.batch_number);
+    if (batch.batch_date) {
+      setBatchDate(String(batch.batch_date).slice(0, 10));
+    }
+    if (Array.isArray(batch.details) && batch.details.length > 0) {
+      const docs: ParsedDocument[] = batch.details.map((d: any, idx: number) => ({
+        ref: d.ref || `Ref-${idx + 1}`,
+        doc_type: d.doc_type || (isSales ? 'فاتورة بيع' : 'فاتورة شراء'),
+        date: d.date || batch.batch_date || batchDate,
+        party_name: d.party_name || '',
+        payment_type: 'آجل',
+        items: [],
+        gross_total: Number(d.total_amount) || 0,
+        discount_total: 0,
+        net_before_tax: Number(d.total_amount) || 0,
+        tax_total: 0,
+        withholding_tax_total: 0,
+        total_amount: Number(d.total_amount) || 0,
+        created_document_id: d.created_document_id,
+        created_document_number: d.created_document_number,
+        created_journal_id: d.created_journal_id,
+        created_journal_number: d.created_journal_number,
+        status: d.status || 'saved',
+        error_message: d.error_message
+      }));
+      setDocuments(docs);
+      setIsBatchSaved(batch.status === 'posted');
+    }
+    setEditingBatch(null);
+    setSelectedBatchDetails(null);
+    setActiveMainTab('import');
+    showNotification(
+      isAr 
+        ? `تم تحميل التشغيلة ${batch.batch_number} في شاشة الاستيراد للمراجعة والتعديل` 
+        : `Loaded batch ${batch.batch_number} into workspace`, 
+      'info'
+    );
+  };
 
   // Generate permanent Batch Number on initial mount
   useEffect(() => {
@@ -2093,17 +2163,28 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                           <td className="py-2.5 px-3 text-center">
                             <div className="flex items-center justify-center gap-1.5">
                               <button
+                                onClick={() => {
+                                  setEditingBatch(batch);
+                                  setEditBatchDate(batch.batch_date ? String(batch.batch_date).slice(0, 10) : '');
+                                  setEditBatchStatus(batch.status || 'posted');
+                                }}
+                                className="p-1.5 rounded-lg text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors cursor-pointer"
+                                title={isAr ? "تعديل بيانات التشغيلة" : "Edit Batch"}
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
                                 onClick={() => setSelectedBatchDetails(batch)}
                                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs border border-emerald-200 transition-colors cursor-pointer"
-                                title="استعراض تفاصيل المستندات والقيود لهذه التشغيلة"
+                                title={isAr ? "استعراض تفاصيل المستندات والقيود لهذه التشغيلة" : "View Documents & Journals"}
                               >
                                 <Eye className="w-3.5 h-3.5" />
-                                <span>المستندات والقيود</span>
+                                <span>{isAr ? "المستندات والقيود" : "Docs & Journals"}</span>
                               </button>
                               <button
                                 onClick={() => handleExportPastBatch(batch)}
                                 className="p-1 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 cursor-pointer"
-                                title="تصدير إكسيل التشغيلة"
+                                title={isAr ? "تصدير إكسيل التشغيلة" : "Export Batch Excel"}
                               >
                                 <Download className="w-3.5 h-3.5" />
                               </button>
@@ -3025,11 +3106,22 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
               <div className="flex items-center gap-2">
                 <button
+                  onClick={() => {
+                    setEditingBatch(selectedBatchDetails);
+                    setEditBatchDate(selectedBatchDetails.batch_date ? String(selectedBatchDetails.batch_date).slice(0, 10) : '');
+                    setEditBatchStatus(selectedBatchDetails.status || 'posted');
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors cursor-pointer"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>{isAr ? 'تعديل التشغيلة' : 'Edit Batch'}</span>
+                </button>
+                <button
                   onClick={() => handleExportPastBatch(selectedBatchDetails)}
                   className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>تصدير إكسيل التشغيلة</span>
+                  <span>{isAr ? 'تصدير إكسيل التشغيلة' : 'Export Batch Excel'}</span>
                 </button>
                 <button
                   onClick={() => setSelectedBatchDetails(null)}
@@ -3143,6 +3235,136 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 إغلاق النافذة
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 3: Edit Batch Modal (تعديل بيانات التشغيلة) */}
+      {editingBatch && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-4 shadow-2xl space-y-4">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white font-mono">
+                    {isAr ? 'تعديل بيانات التشغيلة' : 'Edit Batch'}: {editingBatch.batch_number}
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    {isAr ? 'تعديل تاريخ وحالة التشغيلة أو إعادة فتحها للمراجعة والتعديل' : 'Modify batch date, status, or re-open for editing'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingBatch(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form Fields */}
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  {isAr ? 'رقم التشغيلة' : 'Batch Number'}
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={editingBatch.batch_number}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono text-xs border border-slate-200 dark:border-slate-700 cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  {isAr ? 'تاريخ التشغيلة' : 'Batch Date'}
+                </label>
+                <input
+                  type="date"
+                  value={editBatchDate}
+                  onChange={(e) => setEditBatchDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono text-xs border border-slate-200 dark:border-slate-700 focus:outline-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  {isAr ? 'حالة التشغيلة' : 'Batch Status'}
+                </label>
+                <select
+                  value={editBatchStatus}
+                  onChange={(e) => setEditBatchStatus(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs border border-slate-200 dark:border-slate-700 focus:outline-emerald-500 cursor-pointer"
+                >
+                  <option value="posted">{isAr ? 'مكتملة بالكامل (Posted)' : 'Completed (Posted)'}</option>
+                  <option value="partial">{isAr ? 'حفظ جزئي (Partial)' : 'Partial'}</option>
+                  <option value="pending">{isAr ? 'معلقة (Pending)' : 'Pending'}</option>
+                  <option value="draft">{isAr ? 'مسودة (Draft)' : 'Draft'}</option>
+                </select>
+              </div>
+
+              {/* Statistics info box */}
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-slate-500">{isAr ? 'عدد المستندات' : 'Docs'}: </span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200 font-mono">{editingBatch.total_documents || 0}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500">{isAr ? 'إجمالي القيمة' : 'Total'}: </span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">{formatMoney(Number(editingBatch.total_amount) || 0)}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500">{isAr ? 'النوع' : 'Type'}: </span>
+                  <span className="font-bold text-slate-700 dark:text-slate-300">{editingBatch.batch_type === 'sales' ? (isAr ? 'مبيعات' : 'Sales') : (isAr ? 'مشتريات' : 'Purchases')}</span>
+                </div>
+              </div>
+
+              {/* Load into workspace button */}
+              <button
+                type="button"
+                onClick={() => handleLoadBatchIntoWorkspace(editingBatch)}
+                className="w-full py-2 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>{isAr ? 'تحميل بيانات التشغيلة في جدول الاستيراد لإعادة المعالجة' : 'Load Batch into Workspace to Re-process / Edit'}</span>
+              </button>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex items-center justify-end gap-2 border-t border-slate-200 dark:border-slate-800 pt-3">
+              <button
+                type="button"
+                onClick={() => setEditingBatch(null)}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                {isAr ? 'إلغاء' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                disabled={isUpdatingBatch}
+                onClick={handleSaveBatchEdit}
+                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 cursor-pointer shadow-xs transition-all"
+              >
+                {isUpdatingBatch ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>{isAr ? 'جاري الحفظ...' : 'Saving...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>{isAr ? 'حفظ التعديلات' : 'Save Changes'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+
           </div>
         </div>
       )}
