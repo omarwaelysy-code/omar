@@ -259,7 +259,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     };
   };
 
-  // Three separate summaries for Invoices, Orders, and Returns
+  // Summaries for Invoices, Orders, and Returns
   const computeSummaryForType = (typeKeywords: string[]) => {
     const filteredDocs = documents.filter(d => 
       typeKeywords.some(kw => d.doc_type.includes(kw))
@@ -870,23 +870,35 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       return;
     }
 
-    if (!confirm(`هل أنت متأكد من حفظ وترحيل عدد ${documents.length} مستند بتشغيلة رقم ${batchNumber} إلى النظام المحاسبي؟`)) {
+    const unsavedDocs = documents.filter(d => d.status !== 'saved');
+    if (unsavedDocs.length === 0) {
+      showNotification('جميع المستندات في هذه الدفعة محفوظة ومرحلة بالفعل', 'info');
+      return;
+    }
+
+    if (!confirm(`هل أنت متأكد من حفظ وترحيل عدد ${unsavedDocs.length} مستند بتشغيلة رقم ${batchNumber} إلى النظام المحاسبي؟`)) {
       return;
     }
 
     setIsSavingBatch(true);
-    setSaveProgress({ current: 0, total: documents.length, statusText: 'بدء الترحيل المحاسبي للدفعة...' });
+    setSaveProgress({ current: 0, total: unsavedDocs.length, statusText: 'بدء الترحيل المحاسبي للدفعة...' });
 
     const updatedDocuments = [...documents];
-    let successCount = 0;
+    let newlySavedCount = 0;
     let failedCount = 0;
 
     for (let idx = 0; idx < updatedDocuments.length; idx++) {
       const doc = updatedDocuments[idx];
+      
+      // Skip already saved documents
+      if (doc.status === 'saved') {
+        continue;
+      }
+
       setSaveProgress({ 
-        current: idx + 1, 
-        total: updatedDocuments.length, 
-        statusText: `جاري حفظ المستند (${doc.ref}) - ${doc.doc_type} [${idx + 1} من ${updatedDocuments.length}]...` 
+        current: newlySavedCount + failedCount + 1, 
+        total: unsavedDocs.length, 
+        statusText: `جاري حفظ المستند (${doc.ref}) - ${doc.doc_type}...` 
       });
 
       try {
@@ -895,7 +907,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         let createdJournalId = '';
         let createdJournalNumber = '';
 
-        // Prepare items payload
+        // Standard items payload for invoices & orders
         const itemsPayload = doc.items.map(item => ({
           product_id: item.product_id,
           product_name: item.product_name,
@@ -906,6 +918,20 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           discount_amount: item.discount_amount,
           vat_rate: item.vat_rate,
           vat_amount: item.vat_amount,
+          withholding_tax_rate: item.withholding_tax_rate,
+          withholding_tax_amount: item.withholding_tax_amount,
+          total: item.total,
+          unit: item.unit,
+          description: item.description || ''
+        }));
+
+        // Clean return items payload (no vat_rate/vat_amount as returns tables lack them in DB)
+        const returnItemsPayload = doc.items.map(item => ({
+          product_id: item.product_id,
+          product_name: item.product_name,
+          product_code: item.product_code,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
           withholding_tax_rate: item.withholding_tax_rate,
           withholding_tax_amount: item.withholding_tax_amount,
           total: item.total,
@@ -994,7 +1020,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             notes: doc.notes || '',
             description: `استيراد مرتجع بيع تشغيلة: ${batchNumber} - مرجع: ${doc.ref}`,
             batch_number: batchNumber,
-            items: itemsPayload
+            items: returnItemsPayload
           };
 
           const retRes: any = await apiRequest('/returns', 'POST', retPayload);
@@ -1104,7 +1130,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             notes: doc.notes || '',
             description: `استيراد مرتجع شراء تشغيلة: ${batchNumber} - مرجع: ${doc.ref}`,
             batch_number: batchNumber,
-            items: itemsPayload
+            items: returnItemsPayload
           };
 
           const pretRes: any = await apiRequest('/purchase_returns', 'POST', pretPayload);
@@ -1143,11 +1169,18 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           status: 'saved',
           error_message: undefined
         };
-        successCount++;
+        newlySavedCount++;
 
       } catch (err: any) {
         console.error(`Error saving document ${doc.ref}:`, err);
-        const errMsg = err.message || err.detail || 'خطأ أثناء الحفظ والترحيل';
+        let errMsg = err.message || err.detail || 'خطأ أثناء الحفظ والترحيل';
+        // Clean up common technical prefixes for clean UI
+        errMsg = errMsg.replace(/^Failed to create (invoice|return|sales_order|purchase_invoice|purchase_order):\s*/i, '');
+        errMsg = errMsg.replace(/^Error:\s*/i, '');
+        if (errMsg.includes('Negative stock is not allowed')) {
+          errMsg = errMsg.split('(Negative stock')[0].trim();
+        }
+
         updatedDocuments[idx] = {
           ...doc,
           status: 'failed',
@@ -1159,6 +1192,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
     setDocuments(updatedDocuments);
 
+    const totalSaved = updatedDocuments.filter(d => d.status === 'saved').length;
+    const totalRemaining = updatedDocuments.filter(d => d.status !== 'saved').length;
+
     // Save batch record in document_import_batches
     try {
       const batchRecord = {
@@ -1166,7 +1202,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         batch_number: batchNumber,
         batch_type: isSales ? 'sales' : 'purchases',
         batch_date: batchDate,
-        total_documents: updatedDocuments.filter(d => d.status === 'saved').length,
+        total_documents: totalSaved,
         total_amount: updatedDocuments.filter(d => d.status === 'saved').reduce((sum, d) => sum + d.total_amount, 0),
         details: updatedDocuments.map(d => ({
           ref: d.ref,
@@ -1180,7 +1216,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           status: d.status,
           error_message: d.error_message
         })),
-        status: failedCount === 0 ? 'posted' : 'partial',
+        status: totalRemaining === 0 ? 'posted' : 'partial',
         created_by: user?.id || user?.email
       };
 
@@ -1191,12 +1227,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
     setIsSavingBatch(false);
     setSaveProgress(null);
-    setIsBatchSaved(true);
 
-    if (failedCount === 0) {
-      showNotification(`تم حفظ وترحيل كامل الدفعة بنجاح! تم إنشاء ${successCount} مستند والقيود التلقائية`, 'success');
+    // Only mark batch as completely saved if ALL documents succeeded!
+    if (totalRemaining === 0) {
+      setIsBatchSaved(true);
+      showNotification(`تم حفظ وترحيل كامل الدفعة بنجاح! تم إنشاء ${totalSaved} مستند والقيود التلقائية`, 'success');
     } else {
-      showNotification(`تم ترحيل ${successCount} مستند بنجاح، وتعذر حفظ ${failedCount} مستند (راجع الأسباب بالجدول)`, 'warning');
+      setIsBatchSaved(false);
+      showNotification(`تم حفظ ${newlySavedCount} مستند، وتعذر حفظ ${failedCount} مستند (راجع الأسباب بالجدول ثم أعد المحاولة)`, 'warning');
     }
   };
 
@@ -1270,7 +1308,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
     const outFileName = `${batchNumber}_${isSales ? 'مبيعات' : 'مشتريات'}_المرحلة.xlsx`;
     XLSX.writeFile(wb, outFileName);
-    showNotification('تم تصدير ملف الإكسيل المحفوظ بنجاح', 'success');
+    showNotification('تم تصدير ملف الإكسيل بنجاح', 'success');
   };
 
   return (
@@ -1432,68 +1470,147 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         )}
       </AnimatePresence>
 
-      {/* 3 Distinct Totals Rows: Invoices / Orders / Returns */}
+      {/* Unified Compact Totals Table (Single header, no duplicate titles, dedicated doc/item columns) */}
       {documents.length > 0 && (
-        <div className="space-y-2">
-          {/* Row 1: Invoices */}
-          <SummaryRowCard 
-            title={isSales ? 'فواتير بيع' : 'فواتير شراء'}
-            badgeColor="bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-800"
-            summary={invoicesSummary}
-            isVatEnabled={isVatEnabled}
-            isWhtEnabled={isWhtEnabled}
-          />
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-xs">
+              <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-bold">
+                <tr>
+                  <th className="py-2.5 px-3 whitespace-nowrap">نوع المستند</th>
+                  <th className="py-2.5 px-2 text-center whitespace-nowrap">عدد المستندات</th>
+                  <th className="py-2.5 px-2 text-center whitespace-nowrap">عدد البنود</th>
+                  <th className="py-2.5 px-2 text-center whitespace-nowrap">الإجمالي</th>
+                  <th className="py-2.5 px-2 text-center whitespace-nowrap">إجمالي الخصم</th>
+                  <th className="py-2.5 px-2 text-center whitespace-nowrap">الصافي قبل الضريبة</th>
+                  <th className="py-2.5 px-2 text-center whitespace-nowrap">
+                    ض.ق.م {isVatEnabled ? '(14%)' : '(معطلة)'}
+                  </th>
+                  <th className="py-2.5 px-2 text-center whitespace-nowrap">
+                    ض.خ.إ {isWhtEnabled ? '(1%)' : '(معطلة)'}
+                  </th>
+                  <th className="py-2.5 px-3 text-center whitespace-nowrap font-extrabold text-emerald-700 dark:text-emerald-300">
+                    الصافي النهائي
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
+                {/* Row 1: Invoices */}
+                <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                  <td className="py-2 px-3 font-sans font-bold whitespace-nowrap">
+                    <span className="text-xs px-2.5 py-0.5 rounded-full border bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-800">
+                      {isSales ? 'فواتير بيع' : 'فواتير شراء'}
+                    </span>
+                  </td>
+                  <td className="py-2 px-2 text-center font-bold text-slate-800 dark:text-slate-200">{invoicesSummary.count}</td>
+                  <td className="py-2 px-2 text-center text-slate-600 dark:text-slate-400">{invoicesSummary.totalItems}</td>
+                  <td className="py-2 px-2 text-center">{formatMoney(invoicesSummary.gross)}</td>
+                  <td className="py-2 px-2 text-center text-amber-600 font-bold">{formatMoney(invoicesSummary.discount)}</td>
+                  <td className="py-2 px-2 text-center text-blue-600 font-bold">{formatMoney(invoicesSummary.subtotal)}</td>
+                  <td className="py-2 px-2 text-center text-emerald-600 font-bold">{isVatEnabled ? formatMoney(invoicesSummary.vat) : '-'}</td>
+                  <td className="py-2 px-2 text-center text-purple-600 font-bold">{isWhtEnabled ? formatMoney(invoicesSummary.wht) : '-'}</td>
+                  <td className="py-2 px-3 text-center font-extrabold text-emerald-700 dark:text-emerald-300">{formatMoney(invoicesSummary.net)}</td>
+                </tr>
 
-          {/* Row 2: Orders */}
-          <SummaryRowCard 
-            title={isSales ? 'أوامر بيع' : 'أوامر شراء'}
-            badgeColor="bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-800"
-            summary={ordersSummary}
-            isVatEnabled={isVatEnabled}
-            isWhtEnabled={false}
-          />
+                {/* Row 2: Orders */}
+                <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                  <td className="py-2 px-3 font-sans font-bold whitespace-nowrap">
+                    <span className="text-xs px-2.5 py-0.5 rounded-full border bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-800">
+                      {isSales ? 'أوامر بيع' : 'أوامر شراء'}
+                    </span>
+                  </td>
+                  <td className="py-2 px-2 text-center font-bold text-slate-800 dark:text-slate-200">{ordersSummary.count}</td>
+                  <td className="py-2 px-2 text-center text-slate-600 dark:text-slate-400">{ordersSummary.totalItems}</td>
+                  <td className="py-2 px-2 text-center">{formatMoney(ordersSummary.gross)}</td>
+                  <td className="py-2 px-2 text-center text-amber-600 font-bold">{formatMoney(ordersSummary.discount)}</td>
+                  <td className="py-2 px-2 text-center text-blue-600 font-bold">{formatMoney(ordersSummary.subtotal)}</td>
+                  <td className="py-2 px-2 text-center text-emerald-600 font-bold">{isVatEnabled ? formatMoney(ordersSummary.vat) : '-'}</td>
+                  <td className="py-2 px-2 text-center text-slate-400 font-bold">-</td>
+                  <td className="py-2 px-3 text-center font-extrabold text-blue-700 dark:text-blue-300">{formatMoney(ordersSummary.net)}</td>
+                </tr>
 
-          {/* Row 3: Returns */}
-          <SummaryRowCard 
-            title={isSales ? 'مرتجعات بيع' : 'مرتجعات شراء'}
-            badgeColor="bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-800"
-            summary={returnsSummary}
-            isVatEnabled={isVatEnabled}
-            isWhtEnabled={isWhtEnabled}
-          />
+                {/* Row 3: Returns */}
+                <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                  <td className="py-2 px-3 font-sans font-bold whitespace-nowrap">
+                    <span className="text-xs px-2.5 py-0.5 rounded-full border bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-800">
+                      {isSales ? 'مرتجعات بيع' : 'مرتجعات شراء'}
+                    </span>
+                  </td>
+                  <td className="py-2 px-2 text-center font-bold text-slate-800 dark:text-slate-200">{returnsSummary.count}</td>
+                  <td className="py-2 px-2 text-center text-slate-600 dark:text-slate-400">{returnsSummary.totalItems}</td>
+                  <td className="py-2 px-2 text-center">{formatMoney(returnsSummary.gross)}</td>
+                  <td className="py-2 px-2 text-center text-amber-600 font-bold">{formatMoney(returnsSummary.discount)}</td>
+                  <td className="py-2 px-2 text-center text-blue-600 font-bold">{formatMoney(returnsSummary.subtotal)}</td>
+                  <td className="py-2 px-2 text-center text-emerald-600 font-bold">{isVatEnabled ? formatMoney(returnsSummary.vat) : '-'}</td>
+                  <td className="py-2 px-2 text-center text-purple-600 font-bold">{isWhtEnabled ? formatMoney(returnsSummary.wht) : '-'}</td>
+                  <td className="py-2 px-3 text-center font-extrabold text-amber-700 dark:text-amber-300">{formatMoney(returnsSummary.net)}</td>
+                </tr>
+              </tbody>
+              <tfoot className="bg-slate-100/70 dark:bg-slate-800/70 border-t-2 border-slate-200 dark:border-slate-700 font-mono font-bold text-slate-800 dark:text-slate-200">
+                <tr>
+                  <td className="py-2 px-3 font-sans font-extrabold whitespace-nowrap">الإجمالي العام</td>
+                  <td className="py-2 px-2 text-center">{documents.length}</td>
+                  <td className="py-2 px-2 text-center">{documents.reduce((sum, d) => sum + d.items.length, 0)}</td>
+                  <td className="py-2 px-2 text-center">{formatMoney(documents.reduce((sum, d) => sum + d.gross_total, 0))}</td>
+                  <td className="py-2 px-2 text-center text-amber-600">{formatMoney(documents.reduce((sum, d) => sum + d.discount_amount, 0))}</td>
+                  <td className="py-2 px-2 text-center text-blue-600">{formatMoney(documents.reduce((sum, d) => sum + d.subtotal, 0))}</td>
+                  <td className="py-2 px-2 text-center text-emerald-600">{isVatEnabled ? formatMoney(documents.reduce((sum, d) => sum + d.tax_amount, 0)) : '-'}</td>
+                  <td className="py-2 px-2 text-center text-purple-600">{isWhtEnabled ? formatMoney(documents.reduce((sum, d) => sum + d.withholding_tax_amount, 0)) : '-'}</td>
+                  <td className="py-2 px-3 text-center font-extrabold text-emerald-700 dark:text-emerald-300">{formatMoney(documents.reduce((sum, d) => sum + d.total_amount, 0))}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
       )}
 
       {/* Actions Bar: Save & Post / Export After Save */}
       {documents.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 shadow-sm">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 shadow-xs">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-              إجمالي المستندات الجاهزة:
+              إجمالي المستندات:
             </span>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 font-mono">
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-mono">
               {documents.length} مستند
             </span>
+
+            {/* If all saved */}
             {isBatchSaved && (
-              <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>تم الحفظ والترحيل للدفعة</span>
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>تم الحفظ والترحيل بالكامل ({documents.filter(d => d.status === 'saved').length} مستند)</span>
+              </span>
+            )}
+
+            {/* If partially saved with failures */}
+            {!isBatchSaved && documents.some(d => d.status === 'saved') && (
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-100 dark:bg-amber-950/80 px-2.5 py-0.5 rounded-full border border-amber-300 dark:border-amber-800">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                <span>
+                  تم حفظ {documents.filter(d => d.status === 'saved').length} مستند، وتعذر حفظ {documents.filter(d => d.status === 'failed').length} مستند
+                </span>
               </span>
             )}
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Save & Post Button */}
+            {/* Save & Post Button (Available whenever there are unsaved documents) */}
             {!isBatchSaved && (
               <button
                 onClick={handleSaveAndPostBatch}
                 disabled={isSavingBatch || validationErrors.length > 0}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs md:text-sm font-bold rounded-xl shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs md:text-sm font-bold rounded-xl shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {isSavingBatch ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
                     <span>جاري الحفظ والترحيل...</span>
+                  </>
+                ) : documents.some(d => d.status === 'saved') ? (
+                  <>
+                    <RotateCcw className="w-4 h-4" />
+                    <span>إعادة محاولة حفظ المستندات المتبقية ({documents.filter(d => d.status !== 'saved').length})</span>
                   </>
                 ) : (
                   <>
@@ -1505,13 +1622,13 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             )}
 
             {/* Export After Save Button */}
-            {isBatchSaved && (
+            {(isBatchSaved || documents.some(d => d.status === 'saved' || d.status === 'failed')) && (
               <button
                 onClick={handleExportAfterSave}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-bold rounded-xl shadow-md transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-bold rounded-xl shadow-md transition-colors cursor-pointer"
               >
                 <Download className="w-4 h-4" />
-                <span>تصدير إكسيل بعد الحفظ (مع أرقام الفواتير والقيود)</span>
+                <span>تصدير إكسيل النتائج (مع أرقام الفواتير والقيود)</span>
               </button>
             )}
           </div>
@@ -1540,7 +1657,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           <div className="flex items-center justify-between">
             <h2 className="text-sm md:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Layers className="w-4 h-4 text-emerald-600" />
-              <span>جدول المستندات الصحيحة ومطابقتها ({documents.length}):</span>
+              <span>جدول المستندات ومطابقتها ({documents.length}):</span>
             </h2>
             <div className="flex items-center gap-2">
               <button
@@ -1626,7 +1743,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                           title={doc.error_message}
                         >
                           <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0" />
-                          <span className="truncate max-w-[280px]">فشل الحفظ: {doc.error_message || 'خطأ في الحفظ'}</span>
+                          <span className="truncate max-w-[320px]">فشل الحفظ: {doc.error_message || 'خطأ في الحفظ'}</span>
                         </div>
                       )}
 
@@ -1667,14 +1784,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                       </span>
                     </div>
 
-                    {/* Left: Net Total Badge & Delete Action (Redundant duplicate values removed as requested) */}
+                    {/* Left: Net Total Badge & Delete Action */}
                     <div className="flex items-center gap-2.5">
                       <div className="flex items-center gap-1.5 text-xs font-mono bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 px-3 py-1 rounded-lg">
                         <span className="text-emerald-700 dark:text-emerald-300 font-medium">الصافي:</span>
                         <span className="text-emerald-900 dark:text-emerald-100 font-extrabold text-sm">{formatMoney(doc.total_amount)}</span>
                       </div>
 
-                      {!isBatchSaved && (
+                      {doc.status !== 'saved' && (
                         <button
                           onClick={() => handleDeleteDocument(doc.ref)}
                           className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
@@ -1711,7 +1828,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                               <th className="p-2.5 text-center">ض.خ.أ (%)</th>
                               <th className="p-2.5 text-center">قيمة ض.خ.أ</th>
                               <th className="p-2.5 text-center font-extrabold text-slate-900 dark:text-white">الإجمالي</th>
-                              {!isBatchSaved && <th className="p-2.5 text-center w-20">إجراءات</th>}
+                              {doc.status !== 'saved' && <th className="p-2.5 text-center w-20">إجراءات</th>}
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
@@ -1736,7 +1853,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                                 <td className="p-2.5 text-center text-slate-500 font-sans">{item.withholding_tax_rate}%</td>
                                 <td className="p-2.5 text-center text-purple-600 font-bold">{formatMoney(item.withholding_tax_amount)}</td>
                                 <td className="p-2.5 text-center font-extrabold text-emerald-700 dark:text-emerald-300">{formatMoney(item.total)}</td>
-                                {!isBatchSaved && (
+                                {doc.status !== 'saved' && (
                                   <td className="p-2.5 text-center">
                                     <div className="flex items-center justify-center gap-1 font-sans">
                                       <button
@@ -1903,91 +2020,5 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     </div>
   );
 };
-
-// Sleek unified row card for category totals (Invoices, Orders, Returns)
-const SummaryRowCard: React.FC<{
-  title: string;
-  badgeColor: string;
-  summary: {
-    count: number;
-    totalItems: number;
-    gross: number;
-    discount: number;
-    subtotal: number;
-    vat: number;
-    wht: number;
-    net: number;
-  };
-  isVatEnabled: boolean;
-  isWhtEnabled: boolean;
-}> = ({ title, badgeColor, summary, isVatEnabled, isWhtEnabled }) => (
-  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2 md:p-2.5 shadow-xs grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 items-center">
-    
-    {/* Category & Count */}
-    <div className="col-span-2 sm:col-span-4 lg:col-span-1 flex items-center justify-between lg:justify-start gap-2 border-b lg:border-b-0 lg:border-l border-slate-100 dark:border-slate-800 pb-1.5 lg:pb-0 lg:pl-2">
-      <span className={`text-xs px-2.5 py-0.5 rounded-lg font-bold border ${badgeColor} whitespace-nowrap`}>
-        {title}
-      </span>
-      <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 font-mono">
-        <span>{summary.count} مستند</span>
-        <span className="mx-1 text-slate-300">/</span>
-        <span>{summary.totalItems} بند</span>
-      </div>
-    </div>
-
-    {/* Gross */}
-    <div className="text-center">
-      <span className="text-[10px] text-slate-400 dark:text-slate-500 block">الإجمالي</span>
-      <span className="text-xs md:text-sm font-bold text-slate-800 dark:text-slate-200 font-mono">
-        {formatMoney(summary.gross)}
-      </span>
-    </div>
-
-    {/* Discount */}
-    <div className="text-center">
-      <span className="text-[10px] text-slate-400 dark:text-slate-500 block">إجمالي الخصم</span>
-      <span className="text-xs md:text-sm font-bold text-amber-600 dark:text-amber-400 font-mono">
-        {formatMoney(summary.discount)}
-      </span>
-    </div>
-
-    {/* Subtotal */}
-    <div className="text-center">
-      <span className="text-[10px] text-slate-400 dark:text-slate-500 block">الصافي قبل الضريبة</span>
-      <span className="text-xs md:text-sm font-bold text-blue-600 dark:text-blue-400 font-mono">
-        {formatMoney(summary.subtotal)}
-      </span>
-    </div>
-
-    {/* VAT */}
-    <div className="text-center">
-      <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
-        ض.ق.م {isVatEnabled ? '(14%)' : '(معطلة)'}
-      </span>
-      <span className="text-xs md:text-sm font-bold text-emerald-600 dark:text-emerald-400 font-mono">
-        {isVatEnabled ? formatMoney(summary.vat) : '-'}
-      </span>
-    </div>
-
-    {/* WHT */}
-    <div className="text-center">
-      <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
-        ض.خ.إ {isWhtEnabled ? '(1%)' : '(معطلة)'}
-      </span>
-      <span className="text-xs md:text-sm font-bold text-purple-600 dark:text-purple-400 font-mono">
-        {isWhtEnabled ? formatMoney(summary.wht) : '-'}
-      </span>
-    </div>
-
-    {/* Net Total */}
-    <div className="text-center bg-emerald-50/70 dark:bg-emerald-950/40 rounded-lg py-1 px-1.5 border border-emerald-200/80 dark:border-emerald-800/80">
-      <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 block">الصافي النهائي</span>
-      <span className="text-xs md:text-sm font-extrabold text-emerald-900 dark:text-emerald-100 font-mono">
-        {formatMoney(summary.net)}
-      </span>
-    </div>
-
-  </div>
-);
 
 export default DocumentImport;

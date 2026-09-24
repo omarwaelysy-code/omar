@@ -88,7 +88,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   return_items: [
     'id', 'return_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
     'product_name', 'product_code', 'product_image_url', 'unit_cost',
-    'operation_id', 'department_id', 'cost_center_id', 'vat_rate', 'vat_amount',
+    'operation_id', 'department_id', 'cost_center_id',
     'withholding_tax_rate', 'withholding_tax_amount'
   ],
   purchase_invoices: [
@@ -116,7 +116,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   purchase_return_items: [
     'id', 'return_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
     'product_name', 'product_code', 'product_image_url', 'unit_cost',
-    'operation_id', 'department_id', 'cost_center_id', 'vat_rate', 'vat_amount',
+    'operation_id', 'department_id', 'cost_center_id',
     'withholding_tax_rate', 'withholding_tax_amount'
   ],
   receipt_vouchers: [
