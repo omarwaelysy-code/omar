@@ -332,12 +332,13 @@ export async function backfillMissingJournalEntries(pool: any) {
             break;
           }
 
+          const itemSubtotal = parseFloat(item.quantity || '1') * parseFloat(item.unit_price || '0');
           journalItems.push({
             id: crypto.randomUUID(),
             account_id: creditAccountId,
             account_name: creditAccountName,
             debit: 0,
-            credit: parseFloat(item.total || '0'),
+            credit: itemSubtotal,
             description: `مبيعات صنف: ${item.product_name || ''} - فاتورة ${invoiceNumber}`
           });
         }
@@ -374,6 +375,26 @@ export async function backfillMissingJournalEntries(pool: any) {
           });
         }
 
+        // 4b. Withholding Tax Line (if any)
+        const whtTotal = items.reduce((sum, item) => sum + parseFloat(item.withholding_tax_amount || '0'), 0);
+        if (whtTotal > 0) {
+          const whtAccount = accounts.find((a: any) => 
+            (a.name && (a.name.includes('خصم') && (a.name.includes('إضافة') || a.name.includes('ارباح') || a.name.includes('عملاء')))) ||
+            a.code === '1205' || a.code === '120501' ||
+            (a.name && a.name.toLowerCase().includes('withholding'))
+          );
+          if (whtAccount?.id) {
+            journalItems.push({
+              id: crypto.randomUUID(),
+              account_id: whtAccount.id,
+              account_name: whtAccount.name || 'حساب ضرائب الخصم والإضافة',
+              debit: whtTotal,
+              credit: 0,
+              description: `ضريبة خصم وإضافة - فاتورة رقم ${invoiceNumber}`
+            });
+          }
+        }
+
         // 5. Cash Payment Lines (if cash sale)
         if (paymentType === 'cash') {
           const pm = paymentMethods.find((p: any) => p.id === paymentMethodId);
@@ -407,8 +428,21 @@ export async function backfillMissingJournalEntries(pool: any) {
           });
         }
 
-        const totalDebit = journalItems.reduce((sum, item) => sum + item.debit, 0);
-        const totalCredit = journalItems.reduce((sum, item) => sum + item.credit, 0);
+        let totalDebit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0).toFixed(2));
+        let totalCredit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0).toFixed(2));
+        
+        const diff = Number((totalDebit - totalCredit).toFixed(2));
+        if (diff !== 0 && journalItems.length > 0) {
+          if (diff > 0) {
+            const creditItem = journalItems.find(item => (Number(item.credit) || 0) > 0);
+            if (creditItem) creditItem.credit = Number((Number(creditItem.credit) + diff).toFixed(2));
+          } else {
+            const debitItem = journalItems.find(item => (Number(item.debit) || 0) > 0);
+            if (debitItem) debitItem.debit = Number((Number(debitItem.debit) + Math.abs(diff)).toFixed(2));
+          }
+          totalDebit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0).toFixed(2));
+          totalCredit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0).toFixed(2));
+        }
         
         const entryId = crypto.randomUUID();
         
