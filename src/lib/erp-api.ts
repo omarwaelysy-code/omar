@@ -1919,6 +1919,7 @@ router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 
       for (const table of [...TABLES_TO_BACKUP].reverse()) {
         try {
           if (table === 'companies') continue; // Never delete company entity itself!
+          if (table === 'users' && isCrossCompany) continue; // Never delete existing users of the target company during cross-company restore!
           if (table === 'inventory_movement_lines') {
             await client.query(`DELETE FROM inventory_movement_lines WHERE movement_id IN (SELECT id FROM inventory_movements WHERE company_id = $1 UNION SELECT id FROM inventory_movements_v2 WHERE company_id = $1)`, [targetCompanyId]);
           } else if (table === 'asset_components') {
@@ -2052,7 +2053,37 @@ router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 
       }
     }
 
-    // 4. Restore normal replication role
+    // 4. Ensure restoring user has access to the target company
+    if (isCrossCompany && req.user?.email) {
+      try {
+        const checkUser = await client.query(
+          'SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND company_id = $2',
+          [req.user.email, targetCompanyId]
+        );
+        if (checkUser.rows.length === 0) {
+          const uRow = await client.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]).catch(() => ({ rows: [] }));
+          const passHash = uRow.rows[0]?.password_hash || '$2a$10$e7wzJkZ71D6K.x74U6/yXe3J6p01.8.847528374958673829102';
+          await client.query(
+            `INSERT INTO users (id, username, email, password_hash, role, company_id, permissions)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             ON CONFLICT (email, company_id) DO NOTHING`,
+            [
+              uuidv4(),
+              req.user.username || req.user.email,
+              req.user.email,
+              passHash,
+              req.user.role || 'super_admin',
+              targetCompanyId,
+              JSON.stringify({})
+            ]
+          );
+        }
+      } catch (ensureErr: any) {
+        console.warn('Failed to ensure restoring user membership in target company:', ensureErr?.message);
+      }
+    }
+
+    // 5. Restore normal replication role
     await client.query("SET session_replication_role = 'origin'");
 
     await client.query('COMMIT');

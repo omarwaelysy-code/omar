@@ -185,7 +185,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           company_name: companyName
         });
       }
-      
+
+      if (hasSuperAdminRole) {
+        try {
+          const allCompanies = await dbService.listAll<any>('companies');
+          const baseUser = membershipsData[0] || {};
+          for (const comp of allCompanies) {
+            if (!comp.id || comp.id === 'system' || comp.id === 'SYSTEM' || comp.code === 'SYS-ROOT') continue;
+            if (!memberships.some(m => m.company_id === comp.id)) {
+              memberships.push({
+                ...baseUser,
+                id: baseUser.id || userId,
+                email: email,
+                company_id: comp.id,
+                company_name: comp.name || 'شركة',
+                role: 'super_admin',
+                permissions: {}
+              });
+            }
+          }
+        } catch (compErr) {
+          console.error('Error fetching all companies for super_admin:', compErr);
+        }
+      }
+
       setUserMemberships(memberships);
 
       if (memberships.length > 0) {
