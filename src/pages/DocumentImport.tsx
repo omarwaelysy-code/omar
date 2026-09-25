@@ -1404,30 +1404,68 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
       const defaultWh = warehouses[0];
 
-      // Dynamic header index discovery
+      // Dynamic header index discovery with collision prevention
       const headerRow: string[] = (rawRows[0] || []).map((h: any) => String(h || '').trim().toLowerCase());
-      const findColIdx = (keywords: string[], fallback: number): number => {
-        const found = headerRow.findIndex(h => keywords.some(k => h.includes(k.toLowerCase())));
-        return found !== -1 ? found : fallback;
+      const usedCols = new Set<number>();
+
+      const findColIdx = (exactMatches: string[], partialMatches: string[], fallback: number): number => {
+        // 1. Check exact matches first across unused columns
+        let found = headerRow.findIndex((h, idx) => !usedCols.has(idx) && exactMatches.some(e => h === e.toLowerCase()));
+        if (found !== -1) {
+          usedCols.add(found);
+          return found;
+        }
+        // 2. Check partial matches across unused columns
+        found = headerRow.findIndex((h, idx) => !usedCols.has(idx) && partialMatches.some(p => h.includes(p.toLowerCase())));
+        if (found !== -1) {
+          usedCols.add(found);
+          return found;
+        }
+        // 3. Fallback if unused
+        if (!usedCols.has(fallback) && fallback < headerRow.length) {
+          usedCols.add(fallback);
+          return fallback;
+        }
+        return fallback;
       };
 
-      const refCol = findColIdx(['ref', 'مرجع'], 0);
-      const docTypeCol = findColIdx(['نوع المستند', 'نوع'], 1);
-      const dateCol = findColIdx(['تاريخ', 'التاريخ'], 2);
-      const partyCol = findColIdx(['عميل', 'مورد', 'الطرف', 'طرف'], 3);
-      const prodCodeCol = findColIdx(['كود الصنف', 'باركود', 'كود'], 4);
-      const prodNameCol = findColIdx(['اسم الصنف', 'صنف'], 5);
-      const whCol = findColIdx(['المخزن', 'مخزن', 'مستودع'], 6);
-      const qtyCol = findColIdx(['كمية', 'الكمية'], 7);
-      const priceCol = findColIdx(['سعر', 'السعر'], 8);
-      const discCol = findColIdx(['خصم', 'الخصم'], 9);
-      const vatCol = findColIdx(['قيمة مضافة', 'ض.ق.م', 'vat'], 10);
-      const whtCol = findColIdx(['خصم والاضافة', 'ض.خ', 'wht'], 11);
-      const payTypeCol = findColIdx(['طريقة الدفع', 'دفع'], 12);
-      const notesCol = findColIdx(['ملاحظات', 'بيان', 'notes'], 13);
-      const opCol = findColIdx(['رقم العملية', 'رقم عملية', 'العملية', 'operation'], 14);
-      const deptCol = findColIdx(['الإدارة', 'الادارة', 'إدارة', 'ادارة', 'department'], 15);
-      const ccCol = findColIdx(['مركز التكلفة', 'مركز تكلفة', 'التكلفة', 'cost_center'], 16);
+      const refCol = findColIdx(['ref', 'رقم المرجع', 'مرجع', 'reference'], ['ref', 'مرجع'], 0);
+      const docTypeCol = findColIdx(['نوع المستند', 'نوع مستند', 'نوع الفاتورة', 'نوع الحركة'], ['نوع المستند', 'نوع مستند', 'نوع الفاتورة', 'doc type'], 1);
+      const dateCol = findColIdx(['التاريخ', 'تاريخ', 'تاريخ المستند', 'تاريخ الفاتورة'], ['تاريخ', 'التاريخ', 'date'], 2);
+      const partyCol = findColIdx(
+        ['كود العميل / المورد', 'كود العميل/المورد', 'كود العميل', 'اسم العميل', 'العميل', 'كود المورد', 'اسم المورد', 'المورد', 'الطرف', 'طرف'],
+        ['عميل', 'مورد', 'الطرف', 'طرف', 'customer', 'supplier', 'party', 'client', 'vendor'],
+        3
+      );
+      const prodCodeCol = findColIdx(
+        ['كود الصنف / الباركود', 'كود الصنف/الباركود', 'كود الصنف', 'كود صنف', 'كود المنتج', 'كود منتج', 'باركود', 'barcode', 'item code', 'product code', 'sku'],
+        ['كود الصنف', 'كود المنتج', 'باركود', 'barcode', 'item code', 'product code'],
+        4
+      );
+      const prodNameCol = findColIdx(
+        ['اسم الصنف', 'اسم صنف', 'اسم المنتج', 'اسم منتج', 'بيان الصنف', 'وصف الصنف', 'item name', 'product name', 'item_name', 'product_name'],
+        ['اسم الصنف', 'اسم صنف', 'اسم المنتج', 'اسم منتج', 'بيان الصنف', 'وصف الصنف', 'item name', 'product name'],
+        5
+      );
+      const whCol = findColIdx(['المخزن', 'المستودع', 'مخزن', 'مستودع'], ['المخزن', 'المستودع', 'مخزن', 'مستودع', 'warehouse', 'store'], 6);
+      const qtyCol = findColIdx(['الكمية', 'كمية', 'qty', 'quantity'], ['الكمية', 'كمية', 'qty', 'quantity'], 7);
+      const priceCol = findColIdx(['السعر', 'سعر', 'سعر الوحدة', 'price', 'unit price'], ['السعر', 'سعر', 'price'], 8);
+      const discCol = findColIdx(['الخصم', 'خصم', 'discount'], ['الخصم', 'خصم', 'discount'], 9);
+      const vatCol = findColIdx(
+        ['نسبة ضريبة القيمة المضافة %', 'ضريبة القيمة المضافة', 'قيمة مضافة', 'ض.ق.م', 'vat', 'vat rate'],
+        ['قيمة مضافة', 'ض.ق.م', 'vat'],
+        10
+      );
+      const whtCol = findColIdx(
+        ['نسبة ضريبة الخصم والاضافة %', 'ضريبة الخصم والاضافة', 'ضريبة الخصم والإضافة', 'خصم والاضافة', 'خصم وإضافة', 'ض.خ.أ', 'ض.خ', 'wht'],
+        ['خصم والاضافة', 'خصم وإضافة', 'ض.خ', 'wht'],
+        11
+      );
+      const payTypeCol = findColIdx(['طريقة الدفع', 'طريقة السداد', 'طريقة دفع', 'طريقة سداد'], ['طريقة الدفع', 'طريقة السداد', 'دفع', 'سداد'], 12);
+      const notesCol = findColIdx(['ملاحظات', 'ملاحظة', 'بيان', 'notes', 'remarks'], ['ملاحظات', 'ملاحظة', 'notes'], 13);
+      const opCol = findColIdx(['رقم العملية', 'العملية', 'operation'], ['رقم العملية', 'العملية', 'operation'], 14);
+      const deptCol = findColIdx(['الإدارة', 'الادارة', 'إدارة', 'ادارة', 'department'], ['الإدارة', 'الادارة', 'إدارة', 'ادارة', 'department'], 15);
+      const ccCol = findColIdx(['مركز التكلفة', 'مركز تكلفة', 'cost center', 'cost_center'], ['مركز التكلفة', 'مركز تكلفة', 'cost center'], 16);
 
       // Parse data rows (row index 0 is header)
       for (let i = 1; i < rawRows.length; i++) {
@@ -1538,12 +1576,22 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             message: 'كود الصنف أو الباركود أو اسم الصنف إلزامي'
           });
         } else {
-          matchedProduct = currentProducts.find(p => 
-            (rawProdCode && p.code && p.code.toLowerCase() === rawProdCode.toLowerCase()) ||
-            (rawProdCode && p.barcode && p.barcode.toLowerCase() === rawProdCode.toLowerCase()) ||
-            (rawProdName && p.name && p.name.trim().toLowerCase() === rawProdName.toLowerCase()) ||
-            (rawProdCode && p.name && p.name.trim().toLowerCase() === rawProdCode.toLowerCase())
-          );
+          const rawCodeClean = rawProdCode.trim().toLowerCase();
+          const rawNameClean = rawProdName.trim().toLowerCase();
+
+          matchedProduct = currentProducts.find(p => {
+            const pCode = String(p.code || '').trim().toLowerCase();
+            const pBarcode = String(p.barcode || '').trim().toLowerCase();
+            const pName = String(p.name || '').trim().toLowerCase();
+
+            return (
+              (rawCodeClean && pCode === rawCodeClean) ||
+              (rawCodeClean && pBarcode === rawCodeClean) ||
+              (rawNameClean && pName === rawNameClean) ||
+              (rawCodeClean && pName === rawCodeClean) ||
+              (rawNameClean && pCode === rawNameClean)
+            );
+          });
 
           if (!matchedProduct) {
             errors.push({
