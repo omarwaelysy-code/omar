@@ -156,6 +156,61 @@ interface ValidationError {
   message: string;
 }
 
+/**
+ * Resiliently updates an existing journal entry or creates a new one if not found or invalid
+ */
+async function saveOrUpdateJournalEntry(
+  journalData: any,
+  referenceId: string,
+  preferredJournalId?: string,
+  preferredJournalNumber?: string,
+  companyId?: string
+): Promise<{ id: string; entry_number: string }> {
+  // 1. If preferredJournalId is provided, try updating it
+  if (preferredJournalId) {
+    try {
+      await apiRequest(`/journal_entries/${preferredJournalId}`, 'PUT', {
+        ...journalData,
+        reference_id: referenceId,
+        company_id: companyId
+      });
+      return { id: preferredJournalId, entry_number: preferredJournalNumber || '' };
+    } catch (e: any) {
+      console.warn(`[DocumentImport] Preferred journal entry ${preferredJournalId} PUT failed, falling back:`, e);
+    }
+  }
+
+  // 2. Check if a journal entry already exists for this document reference in the database
+  if (companyId && referenceId) {
+    try {
+      const existing = await dbService.getJournalEntryByReference(referenceId, companyId);
+      if (existing?.id) {
+        try {
+          await apiRequest(`/journal_entries/${existing.id}`, 'PUT', {
+            ...journalData,
+            reference_id: referenceId,
+            company_id: companyId
+          });
+          return { id: existing.id, entry_number: existing.entry_number || preferredJournalNumber || '' };
+        } catch (updateErr) {
+          console.warn(`[DocumentImport] Existing journal entry ${existing.id} PUT failed, deleting before recreating:`, updateErr);
+          await dbService.deleteJournalEntryByReference(referenceId, companyId);
+        }
+      }
+    } catch (lookupErr) {
+      console.warn(`[DocumentImport] Journal entry lookup by reference failed:`, lookupErr);
+    }
+  }
+
+  // 3. Create fresh journal entry
+  const jeRes: any = await apiRequest('/journal_entries', 'POST', {
+    ...journalData,
+    reference_id: referenceId,
+    company_id: companyId
+  });
+  return { id: jeRes.id, entry_number: jeRes.entry_number || '' };
+}
+
 export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
   const { user } = useAuth();
   const { showNotification } = useNotification();
@@ -2272,63 +2327,39 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             items: itemsPayload
           };
 
+          let fullInv: any;
           if (doc.created_document_id) {
             // Update existing invoice
             await apiRequest(`/invoices/${doc.created_document_id}`, 'PUT', invPayload);
             createdDocId = doc.created_document_id;
             createdDocNumber = doc.created_document_number || `INV-${createdDocId.slice(-6)}`;
-
-            const fullInv = { ...invPayload, id: createdDocId, invoice_number: createdDocNumber };
-            const journalData = PostingService.generateInvoiceJournal(
-              fullInv as any,
-              customers,
-              products,
-              accounts,
-              paymentMethods,
-              companySettings
-            );
-
-            if (doc.created_journal_id) {
-              await apiRequest(`/journal_entries/${doc.created_journal_id}`, 'PUT', {
-                ...journalData,
-                reference_id: createdDocId,
-                company_id: user?.company_id
-              });
-              createdJournalId = doc.created_journal_id;
-              createdJournalNumber = doc.created_journal_number || '';
-            } else {
-              const jeRes: any = await apiRequest('/journal_entries', 'POST', {
-                ...journalData,
-                reference_id: createdDocId,
-                company_id: user?.company_id
-              });
-              createdJournalId = jeRes.id;
-              createdJournalNumber = jeRes.entry_number || '';
-            }
+            fullInv = { ...invPayload, id: createdDocId, invoice_number: createdDocNumber };
           } else {
             // Create new invoice
             const invRes: any = await apiRequest('/invoices', 'POST', invPayload);
             createdDocId = invRes.id;
             createdDocNumber = invRes.invoice_number || `INV-${createdDocId.slice(-6)}`;
-
-            const fullInv = { ...invPayload, id: createdDocId, invoice_number: createdDocNumber };
-            const journalData = PostingService.generateInvoiceJournal(
-              fullInv as any,
-              customers,
-              products,
-              accounts,
-              paymentMethods,
-              companySettings
-            );
-
-            const jeRes: any = await apiRequest('/journal_entries', 'POST', {
-              ...journalData,
-              reference_id: createdDocId,
-              company_id: user?.company_id
-            });
-            createdJournalId = jeRes.id;
-            createdJournalNumber = jeRes.entry_number || '';
+            fullInv = { ...invPayload, id: createdDocId, invoice_number: createdDocNumber };
           }
+
+          const journalData = PostingService.generateInvoiceJournal(
+            fullInv as any,
+            customers,
+            products,
+            accounts,
+            paymentMethods,
+            companySettings
+          );
+
+          const je = await saveOrUpdateJournalEntry(
+            journalData,
+            createdDocId,
+            doc.created_journal_id,
+            doc.created_journal_number,
+            user?.company_id
+          );
+          createdJournalId = je.id;
+          createdJournalNumber = je.entry_number;
 
         } else if (doc.doc_type === 'أمر بيع') {
           const soPayload = {
@@ -2347,9 +2378,15 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             items: itemsPayload
           };
 
-          const soRes: any = await apiRequest('/sales_orders', 'POST', soPayload);
-          createdDocId = soRes.id;
-          createdDocNumber = soRes.order_number || `SO-${createdDocId.slice(-6)}`;
+          if (doc.created_document_id) {
+            await apiRequest(`/sales_orders/${doc.created_document_id}`, 'PUT', soPayload);
+            createdDocId = doc.created_document_id;
+            createdDocNumber = doc.created_document_number || `SO-${createdDocId.slice(-6)}`;
+          } else {
+            const soRes: any = await apiRequest('/sales_orders', 'POST', soPayload);
+            createdDocId = soRes.id;
+            createdDocNumber = soRes.order_number || `SO-${createdDocId.slice(-6)}`;
+          }
 
         } else if (doc.doc_type === 'مرتجع بيع') {
           // Note: returns table only stores total_amount and withholding_tax_amount
@@ -2368,12 +2405,20 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             items: returnItemsPayload
           };
 
-          const retRes: any = await apiRequest('/returns', 'POST', retPayload);
-          createdDocId = retRes.id;
-          createdDocNumber = retRes.return_number || `RET-${createdDocId.slice(-6)}`;
+          let fullRet: any;
+          if (doc.created_document_id) {
+            await apiRequest(`/returns/${doc.created_document_id}`, 'PUT', retPayload);
+            createdDocId = doc.created_document_id;
+            createdDocNumber = doc.created_document_number || `RET-${createdDocId.slice(-6)}`;
+            fullRet = { ...retPayload, id: createdDocId, return_number: createdDocNumber };
+          } else {
+            const retRes: any = await apiRequest('/returns', 'POST', retPayload);
+            createdDocId = retRes.id;
+            createdDocNumber = retRes.return_number || `RET-${createdDocId.slice(-6)}`;
+            fullRet = { ...retPayload, id: createdDocId, return_number: createdDocNumber };
+          }
 
           // Generate Journal Entry for Return
-          const fullRet = { ...retPayload, id: createdDocId, return_number: createdDocNumber };
           const journalData = PostingService.generateReturnJournal(
             fullRet as any,
             customers,
@@ -2382,13 +2427,15 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             paymentMethods
           );
 
-          const jeRes: any = await apiRequest('/journal_entries', 'POST', {
-            ...journalData,
-            reference_id: createdDocId,
-            company_id: user?.company_id
-          });
-          createdJournalId = jeRes.id;
-          createdJournalNumber = jeRes.entry_number || '';
+          const je = await saveOrUpdateJournalEntry(
+            journalData,
+            createdDocId,
+            doc.created_journal_id,
+            doc.created_journal_number,
+            user?.company_id
+          );
+          createdJournalId = je.id;
+          createdJournalNumber = je.entry_number;
 
         } else if (doc.doc_type === 'فاتورة شراء') {
           const pinvPayload = {
@@ -2409,12 +2456,20 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             items: itemsPayload
           };
 
-          const pinvRes: any = await apiRequest('/purchase_invoices', 'POST', pinvPayload);
-          createdDocId = pinvRes.id;
-          createdDocNumber = pinvRes.invoice_number || `PINV-${createdDocId.slice(-6)}`;
+          let fullPinv: any;
+          if (doc.created_document_id) {
+            await apiRequest(`/purchase_invoices/${doc.created_document_id}`, 'PUT', pinvPayload);
+            createdDocId = doc.created_document_id;
+            createdDocNumber = doc.created_document_number || `PINV-${createdDocId.slice(-6)}`;
+            fullPinv = { ...pinvPayload, id: createdDocId, invoice_number: createdDocNumber };
+          } else {
+            const pinvRes: any = await apiRequest('/purchase_invoices', 'POST', pinvPayload);
+            createdDocId = pinvRes.id;
+            createdDocNumber = pinvRes.invoice_number || `PINV-${createdDocId.slice(-6)}`;
+            fullPinv = { ...pinvPayload, id: createdDocId, invoice_number: createdDocNumber };
+          }
 
           // Generate Journal Entry for Purchase Invoice
-          const fullPinv = { ...pinvPayload, id: createdDocId, invoice_number: createdDocNumber };
           const journalData = PostingService.generatePurchaseInvoiceJournal(
             fullPinv as any,
             suppliers,
@@ -2424,13 +2479,15 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             companySettings
           );
 
-          const jeRes: any = await apiRequest('/journal_entries', 'POST', {
-            ...journalData,
-            reference_id: createdDocId,
-            company_id: user?.company_id
-          });
-          createdJournalId = jeRes.id;
-          createdJournalNumber = jeRes.entry_number || '';
+          const je = await saveOrUpdateJournalEntry(
+            journalData,
+            createdDocId,
+            doc.created_journal_id,
+            doc.created_journal_number,
+            user?.company_id
+          );
+          createdJournalId = je.id;
+          createdJournalNumber = je.entry_number;
 
         } else if (doc.doc_type === 'أمر شراء') {
           const poPayload = {
@@ -2449,9 +2506,15 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             items: itemsPayload
           };
 
-          const poRes: any = await apiRequest('/purchase_orders', 'POST', poPayload);
-          createdDocId = poRes.id;
-          createdDocNumber = poRes.order_number || `PO-${createdDocId.slice(-6)}`;
+          if (doc.created_document_id) {
+            await apiRequest(`/purchase_orders/${doc.created_document_id}`, 'PUT', poPayload);
+            createdDocId = doc.created_document_id;
+            createdDocNumber = doc.created_document_number || `PO-${createdDocId.slice(-6)}`;
+          } else {
+            const poRes: any = await apiRequest('/purchase_orders', 'POST', poPayload);
+            createdDocId = poRes.id;
+            createdDocNumber = poRes.order_number || `PO-${createdDocId.slice(-6)}`;
+          }
 
         } else if (doc.doc_type === 'مرتجع شراء') {
           // Note: purchase_returns table only stores total_amount and withholding_tax_amount
@@ -2470,12 +2533,20 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             items: returnItemsPayload
           };
 
-          const pretRes: any = await apiRequest('/purchase_returns', 'POST', pretPayload);
-          createdDocId = pretRes.id;
-          createdDocNumber = pretRes.return_number || `PRET-${createdDocId.slice(-6)}`;
+          let fullPret: any;
+          if (doc.created_document_id) {
+            await apiRequest(`/purchase_returns/${doc.created_document_id}`, 'PUT', pretPayload);
+            createdDocId = doc.created_document_id;
+            createdDocNumber = doc.created_document_number || `PRET-${createdDocId.slice(-6)}`;
+            fullPret = { ...pretPayload, id: createdDocId, return_number: createdDocNumber };
+          } else {
+            const pretRes: any = await apiRequest('/purchase_returns', 'POST', pretPayload);
+            createdDocId = pretRes.id;
+            createdDocNumber = pretRes.return_number || `PRET-${createdDocId.slice(-6)}`;
+            fullPret = { ...pretPayload, id: createdDocId, return_number: createdDocNumber };
+          }
 
           // Generate Journal Entry for Purchase Return
-          const fullPret = { ...pretPayload, id: createdDocId, return_number: createdDocNumber };
           const journalData = PostingService.generatePurchaseReturnJournal(
             fullPret as any,
             suppliers,
@@ -2484,13 +2555,15 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             paymentMethods
           );
 
-          const jeRes: any = await apiRequest('/journal_entries', 'POST', {
-            ...journalData,
-            reference_id: createdDocId,
-            company_id: user?.company_id
-          });
-          createdJournalId = jeRes.id;
-          createdJournalNumber = jeRes.entry_number || '';
+          const je = await saveOrUpdateJournalEntry(
+            journalData,
+            createdDocId,
+            doc.created_journal_id,
+            doc.created_journal_number,
+            user?.company_id
+          );
+          createdJournalId = je.id;
+          createdJournalNumber = je.entry_number;
         }
 
         updatedDocuments[idx] = {
