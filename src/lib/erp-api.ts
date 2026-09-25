@@ -292,7 +292,7 @@ export async function syncProductsCostAndJEs(client: any, companyId: string, pro
   if (refIds.length === 0) return;
 
   // 2. Fetch all related Journal Entries
-  const jeRes = await client.query(`
+  const jeRes: any = await client.query(`
     SELECT id, reference_id, reference_type 
     FROM journal_entries 
     WHERE reference_id = ANY($1) AND company_id = $2
@@ -2442,7 +2442,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         let totalValue = 0;
 
         if (cfg.isManualJE) {
-          const manualRes = await client.query(
+          const manualRes: any = await client.query(
             `SELECT COUNT(*)::int as count, COALESCE(SUM(total_debit), 0)::numeric as total_val 
              FROM journal_entries 
              WHERE company_id = $1 AND (reference_type IN ('manual', 'journal_entry') OR reference_type IS NULL)`,
@@ -2451,12 +2451,12 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
           count = manualRes.rows[0]?.count || 0;
           totalValue = parseFloat(manualRes.rows[0]?.total_val || 0);
         } else if (cfg.customCountSql) {
-          const customRes = await client.query(cfg.customCountSql, [companyId]);
+          const customRes: any = await client.query(cfg.customCountSql, [companyId]);
           count = customRes.rows[0]?.count || 0;
           totalValue = parseFloat(customRes.rows[0]?.total_val || 0);
         } else {
           const whereClause = cfg.customWhere ? `company_id = $1 AND (${cfg.customWhere})` : `company_id = $1`;
-          const baseRes = await client.query(
+          const baseRes: any = await client.query(
             `SELECT COUNT(*)::int as count, COALESCE(SUM(${cfg.amountCol}), 0)::numeric as total_val FROM "${cfg.table}" WHERE ${whereClause}`,
             [companyId]
           );
@@ -2474,7 +2474,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         if (cfg.isManualJE) {
           journalValue = totalValue;
           // Check unbalanced journal entries
-          const unbalRes = await client.query(
+          const unbalRes: any = await client.query(
             `SELECT id, entry_number, date, total_debit, total_credit, ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) as diff
              FROM journal_entries
              WHERE company_id = $1 AND (reference_type IN ('manual', 'journal_entry') OR reference_type IS NULL)
@@ -2494,7 +2494,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
           }
 
           // Check lines with null account_id
-          const nullAccRes = await client.query(
+          const nullAccRes: any = await client.query(
             `SELECT COUNT(*)::int as count 
              FROM journal_entry_lines jel
              JOIN journal_entries je ON je.id = jel.journal_entry_id
@@ -2508,7 +2508,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
 
           if (cfg.jeFilter) {
             // Opening balance or custom filtered journal queries
-            const jeRes = await client.query(
+            const jeRes: any = await client.query(
               `SELECT COUNT(*)::int as posted_cnt, COALESCE(SUM(total_debit), 0)::numeric as posted_val,
                       COUNT(CASE WHEN ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) > 0.01 THEN 1 END)::int as unbal_cnt
                FROM journal_entries
@@ -2522,7 +2522,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
             unpostedValue = parseFloat(Math.max(0, totalValue - journalValue).toFixed(2));
           } else if (cfg.customCountSql) {
             // Document with subquery items (opening stock or stock adjustment)
-            const jeRes = await client.query(
+            const jeRes: any = await client.query(
               `SELECT COUNT(*)::int as posted_cnt, COALESCE(SUM(total_debit), 0)::numeric as posted_val,
                       COUNT(CASE WHEN ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) > 0.01 THEN 1 END)::int as unbal_cnt
                FROM journal_entries
@@ -2536,7 +2536,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
           } else {
             // Standard posted documents and value
             const whereClause = cfg.customWhere ? `d.company_id = $1 AND (${cfg.customWhere})` : `d.company_id = $1`;
-            const postedDocsRes = await client.query(
+            const postedDocsRes: any = await client.query(
               `SELECT COUNT(*)::int as posted_cnt, COALESCE(SUM(d."${cfg.amountCol}"), 0)::numeric as posted_val
                FROM "${cfg.table}" d
                WHERE ${whereClause}
@@ -2550,7 +2550,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
             journalValue = parseFloat(postedDocsRes.rows[0]?.posted_val || 0);
 
             // Check unbalanced journal entries linked to this table
-            const unbalRes = await client.query(
+            const unbalRes: any = await client.query(
               `SELECT COUNT(*)::int as unbal_count
                FROM journal_entries
                WHERE company_id = $1 AND reference_type IN (${placeholders}) AND ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) > 0.01`,
@@ -2559,7 +2559,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
             unbalancedCount = unbalRes.rows[0]?.unbal_count || 0;
 
             // Check unposted documents
-            const unpostedRes = await client.query(
+            const unpostedRes: any = await client.query(
               `SELECT d.id, d."${cfg.numCol}" as doc_num, d."${cfg.dateCol}" as doc_date, d."${cfg.amountCol}" as doc_amt, ${cfg.partyCol ? `d."${cfg.partyCol}"` : `''`} as party
                FROM "${cfg.table}" d
                WHERE ${whereClause}
@@ -2588,7 +2588,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
 
             // Check missing party accounts only when party ID is present
             if (cfg.partyTable && cfg.partyIdCol && cfg.partyAccCol) {
-              const missingPartyRes = await client.query(
+              const missingPartyRes: any = await client.query(
                 `SELECT d.id, d."${cfg.numCol}" as doc_num, d."${cfg.dateCol}" as doc_date, d."${cfg.amountCol}" as doc_amt, d."${cfg.partyCol}" as party
                  FROM "${cfg.table}" d
                  LEFT JOIN "${cfg.partyTable}" p ON d."${cfg.partyIdCol}" = p.id
@@ -2613,7 +2613,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
 
             // Check products missing revenue accounts for invoice tables
             if (cfg.key === 'invoices') {
-              const prodMissingAccRes = await client.query(
+              const prodMissingAccRes: any = await client.query(
                 `SELECT ii.id, i.invoice_number, i.date, ii.product_name, p.name as prod_name, p.id as prod_id
                  FROM invoice_items ii
                  JOIN invoices i ON ii.invoice_id = i.id
@@ -7794,7 +7794,7 @@ modules.forEach(moduleName => {
           const voucherRes = await client.query(`SELECT voucher_number FROM "${moduleName}" WHERE id = $1`, [id]);
           const vNum = voucherRes.rows[0]?.voucher_number;
 
-          const jeRes = await client.query(
+          const jeRes: any = await client.query(
             `SELECT id FROM journal_entries WHERE reference_id = $1 OR (reference_number = $2 AND reference_type IN ('payment', 'receipt'))`,
             [id, vNum || '___NONE___']
           );
@@ -10668,7 +10668,7 @@ router.post('/inventory/recalculate_all', async (req: any, res) => {
     // Sync COGS journal entries with latest inventory movement costs
 
     // 1. Fetch all related Journal Entries
-    const jeRes = await client.query(`
+    const jeRes: any = await client.query(`
       SELECT id, reference_id, reference_type 
       FROM journal_entries 
       WHERE reference_type IN ('invoice', 'return', 'sales_return') AND company_id = $1
