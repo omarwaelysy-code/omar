@@ -1854,6 +1854,27 @@ router.get('/system/export-excel', authenticateToken, authorizeRoles('super_admi
   }
 });
 
+function remapObjectIds(obj: any, idMap: Map<string, string>, oldCompanyId: string, newCompanyId: string): any {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === 'string') {
+    if (obj === oldCompanyId) return newCompanyId;
+    if (idMap.has(obj)) return idMap.get(obj)!;
+    if (obj.includes(oldCompanyId)) return obj.replaceAll(oldCompanyId, newCompanyId);
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => remapObjectIds(item, idMap, oldCompanyId, newCompanyId));
+  }
+  if (typeof obj === 'object' && !(obj instanceof Date)) {
+    const newObj: any = {};
+    for (const [k, v] of Object.entries(obj)) {
+      newObj[k] = remapObjectIds(v, idMap, oldCompanyId, newCompanyId);
+    }
+    return newObj;
+  }
+  return obj;
+}
+
 // Import JSON
 router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 'admin'), upload.single('file') as any, async (req: AuthRequest, res) => {
   const client = await pool.connect();
@@ -1861,25 +1882,43 @@ router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     
     const backupData = JSON.parse(req.file.buffer.toString());
-    const companyId = req.user?.company_id;
+    const userCompanyId = req.user?.company_id;
     const mode = req.query.mode || 'merge'; // 'merge' or 'replace'
 
     if (!backupData.data || !backupData.company_id) {
       return res.status(400).json({ error: 'Invalid backup file format' });
     }
 
-    // Safety check: if not super_admin, can only restore to own company
-    if (req.user?.role !== 'super_admin' && backupData.company_id !== companyId) {
-      return res.status(403).json({ error: 'Permission denied: backup belongs to another company' });
+    // Determine target company: explicitly passed company_id (or query param) or current logged in company
+    const requestedCompanyId = req.query.company_id || req.body?.company_id;
+    let targetCompanyId = userCompanyId;
+
+    if (req.user?.role === 'super_admin' && requestedCompanyId) {
+      targetCompanyId = String(requestedCompanyId);
+    } else if (requestedCompanyId && requestedCompanyId === userCompanyId) {
+      targetCompanyId = userCompanyId;
+    } else if (!targetCompanyId) {
+      targetCompanyId = backupData.company_id;
     }
 
-    const targetCompanyId = backupData.company_id;
+    if (!targetCompanyId) {
+      return res.status(400).json({ error: 'Target company could not be determined' });
+    }
+
+    const isCrossCompany = targetCompanyId !== backupData.company_id;
+    const oldCompanyId = backupData.company_id;
+
+    // Safety check: non-super_admin cannot restore to another company they do not belong to
+    if (req.user?.role !== 'super_admin' && userCompanyId && targetCompanyId !== userCompanyId) {
+      return res.status(403).json({ error: 'Permission denied: cannot restore to another company' });
+    }
 
     await client.query('BEGIN');
 
     if (mode === 'replace') {
       for (const table of [...TABLES_TO_BACKUP].reverse()) {
         try {
+          if (table === 'companies') continue; // Never delete company entity itself!
           if (table === 'inventory_movement_lines') {
             await client.query(`DELETE FROM inventory_movement_lines WHERE movement_id IN (SELECT id FROM inventory_movements WHERE company_id = $1 UNION SELECT id FROM inventory_movements_v2 WHERE company_id = $1)`, [targetCompanyId]);
           } else if (table === 'asset_components') {
@@ -1890,10 +1929,8 @@ router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 
             await client.query(`DELETE FROM purchase_invoice_goods_receipts WHERE purchase_invoice_id IN (SELECT id FROM purchase_invoices WHERE company_id = $1)`, [targetCompanyId]);
           } else if (table === 'widgets') {
             await client.query(`DELETE FROM widgets WHERE dashboard_id IN (SELECT id FROM dashboards WHERE company_id = $1)`, [targetCompanyId]);
-          } else if (table === 'system_config') {
-            await client.query(`DELETE FROM system_config WHERE company_id = $1`, [targetCompanyId]);
-          } else if (table === 'currency_rates') {
-            // Keep system-wide rates
+          } else if (table === 'system_config' || table === 'currency_rates') {
+            // Keep system-wide configurations
           } else {
             await client.query(`DELETE FROM "${table}" WHERE company_id = $1`, [targetCompanyId]);
           }
@@ -1903,21 +1940,89 @@ router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 
       }
     }
 
+    // 1. Build ID mapping if cross-company to prevent UUID primary key collisions across tenants
+    const idMap = new Map<string, string>();
+    if (isCrossCompany) {
+      for (const table of TABLES_TO_BACKUP) {
+        if (table === 'companies') continue;
+        const rows = backupData.data[table];
+        if (!rows || !Array.isArray(rows)) continue;
+        for (const row of rows) {
+          if (row && row.id && typeof row.id === 'string') {
+            if (table === 'document_sequences') {
+              idMap.set(row.id, row.id.replaceAll(oldCompanyId, targetCompanyId));
+            } else {
+              idMap.set(row.id, uuidv4());
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Set session replication role to suppress FK order conflicts during bulk import
+    await client.query("SET session_replication_role = 'replica'");
+
+    // 3. Insert/Restore records table by table
     for (const table of TABLES_TO_BACKUP) {
+      if (table === 'companies') {
+        if (isCrossCompany) {
+          const cRows = backupData.data['companies'];
+          if (cRows && cRows[0]) {
+            const c = cRows[0];
+            await client.query(
+              `UPDATE companies SET 
+                 currency = COALESCE($1, currency),
+                 tax_number = COALESCE($2, tax_number),
+                 commercial_register = COALESCE($3, commercial_register),
+                 phone = COALESCE($4, phone),
+                 address = COALESCE($5, address),
+                 settings = COALESCE($6, settings)
+               WHERE id = $7`,
+              [c.currency, c.tax_number, c.commercial_register, c.phone, c.address, typeof c.settings === 'object' ? JSON.stringify(c.settings) : c.settings, targetCompanyId]
+            ).catch(() => {});
+          }
+        }
+        continue;
+      }
+
       const rows = backupData.data[table];
       if (!rows || !Array.isArray(rows)) continue;
 
-      for (const row of rows) {
-        if (!row || typeof row !== 'object') continue;
+      for (const originalRow of rows) {
+        if (!originalRow || typeof originalRow !== 'object') continue;
+
+        let row = originalRow;
+        if (isCrossCompany) {
+          row = remapObjectIds(originalRow, idMap, oldCompanyId, targetCompanyId);
+          if (originalRow.id && idMap.has(originalRow.id)) {
+            row.id = idMap.get(originalRow.id);
+          }
+        }
+
+        if (row.company_id !== undefined || !['currency_rates', 'system_config'].includes(table)) {
+          row.company_id = targetCompanyId;
+        }
+
+        // Avoid unique email constraint failure on users table when cloning to a new company
+        if (table === 'users' && isCrossCompany && row.email) {
+          const existingUser = await client.query(
+            'SELECT id FROM users WHERE email = $1 AND company_id = $2',
+            [row.email, targetCompanyId]
+          );
+          if (existingUser.rows.length > 0) {
+            idMap.set(originalRow.id, existingUser.rows[0].id);
+            continue;
+          }
+        }
+
         const keys = Object.keys(row);
         if (keys.length === 0) continue;
-        const values = Object.values(row);
-        
-        // Ensure company_id matches target if table has company_id
-        const companyIdIndex = keys.indexOf('company_id');
-        if (companyIdIndex !== -1) {
-          values[companyIdIndex] = targetCompanyId;
-        }
+        const values = Object.values(row).map(v => {
+          if (v !== null && typeof v === 'object' && !(v instanceof Date)) {
+            return JSON.stringify(v);
+          }
+          return v;
+        });
 
         const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
         const updateClause = keys.filter(k => k !== 'id').map(k => `"${k}" = EXCLUDED."${k}"`).join(', ');
@@ -1936,10 +2041,16 @@ router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 
       }
     }
 
+    // 4. Restore normal replication role
+    await client.query("SET session_replication_role = 'origin'");
+
     await client.query('COMMIT');
-    res.json({ message: 'Restore successful', mode });
+    res.json({ message: 'Restore successful', mode, target_company_id: targetCompanyId });
   } catch (error: any) {
-    if (client) await client.query('ROLLBACK');
+    if (client) {
+      await client.query("SET session_replication_role = 'origin'").catch(() => {});
+      await client.query('ROLLBACK').catch(() => {});
+    }
     console.error('JSON Restore failed:', error);
     res.status(500).json({ error: error.message });
   } finally {
@@ -1954,30 +2065,38 @@ router.post('/system/import-excel', authenticateToken, authorizeRoles('super_adm
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     
     const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-    const companyId = req.user?.company_id;
+    const userCompanyId = req.user?.company_id;
+    const requestedCompanyId = req.query.company_id || req.body?.company_id;
+    const targetCompanyId = (req.user?.role === 'super_admin' && requestedCompanyId)
+      ? String(requestedCompanyId)
+      : userCompanyId;
+
+    if (!targetCompanyId) {
+      return res.status(400).json({ error: 'Target company could not be determined' });
+    }
+
     const mode = req.query.mode || 'merge';
 
     await client.query('BEGIN');
 
-    if (mode === 'replace' && companyId) {
+    if (mode === 'replace') {
       for (const table of [...TABLES_TO_BACKUP].reverse()) {
         try {
+          if (table === 'companies') continue;
           if (table === 'inventory_movement_lines') {
-            await client.query(`DELETE FROM inventory_movement_lines WHERE movement_id IN (SELECT id FROM inventory_movements WHERE company_id = $1 UNION SELECT id FROM inventory_movements_v2 WHERE company_id = $1)`, [companyId]);
+            await client.query(`DELETE FROM inventory_movement_lines WHERE movement_id IN (SELECT id FROM inventory_movements WHERE company_id = $1 UNION SELECT id FROM inventory_movements_v2 WHERE company_id = $1)`, [targetCompanyId]);
           } else if (table === 'asset_components') {
-            await client.query(`DELETE FROM asset_components WHERE asset_id IN (SELECT id FROM fixed_assets WHERE company_id = $1 UNION SELECT id FROM assets WHERE company_id = $1)`, [companyId]);
+            await client.query(`DELETE FROM asset_components WHERE asset_id IN (SELECT id FROM fixed_assets WHERE company_id = $1 UNION SELECT id FROM assets WHERE company_id = $1)`, [targetCompanyId]);
           } else if (table === 'asset_depreciation_items') {
-            await client.query(`DELETE FROM asset_depreciation_items WHERE run_id IN (SELECT id FROM asset_depreciation_runs WHERE company_id = $1)`, [companyId]);
+            await client.query(`DELETE FROM asset_depreciation_items WHERE run_id IN (SELECT id FROM asset_depreciation_runs WHERE company_id = $1)`, [targetCompanyId]);
           } else if (table === 'purchase_invoice_goods_receipts') {
-            await client.query(`DELETE FROM purchase_invoice_goods_receipts WHERE purchase_invoice_id IN (SELECT id FROM purchase_invoices WHERE company_id = $1)`, [companyId]);
+            await client.query(`DELETE FROM purchase_invoice_goods_receipts WHERE purchase_invoice_id IN (SELECT id FROM purchase_invoices WHERE company_id = $1)`, [targetCompanyId]);
           } else if (table === 'widgets') {
-            await client.query(`DELETE FROM widgets WHERE dashboard_id IN (SELECT id FROM dashboards WHERE company_id = $1)`, [companyId]);
-          } else if (table === 'system_config') {
-            await client.query(`DELETE FROM system_config WHERE company_id = $1`, [companyId]);
-          } else if (table === 'currency_rates') {
+            await client.query(`DELETE FROM widgets WHERE dashboard_id IN (SELECT id FROM dashboards WHERE company_id = $1)`, [targetCompanyId]);
+          } else if (table === 'system_config' || table === 'currency_rates') {
             // Keep system-wide rates
           } else {
-            await client.query(`DELETE FROM "${table}" WHERE company_id = $1`, [companyId]);
+            await client.query(`DELETE FROM "${table}" WHERE company_id = $1`, [targetCompanyId]);
           }
         } catch (e) {
           console.warn(`Failed to clear table ${table}:`, e);
@@ -1985,21 +2104,36 @@ router.post('/system/import-excel', authenticateToken, authorizeRoles('super_adm
       }
     }
 
+    await client.query("SET session_replication_role = 'replica'");
+
     for (const sheetName of workbook.SheetNames) {
       const table = sheetName;
-      if (!TABLES_TO_BACKUP.includes(table)) continue;
+      if (!TABLES_TO_BACKUP.includes(table) || table === 'companies') continue;
 
       const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]) as any[];
       for (const row of rows) {
         if (!row || typeof row !== 'object' || !row.id) continue;
         
         // Match user's company
-        if (row.company_id !== undefined || !['currency_rates', 'companies'].includes(table)) {
-          row.company_id = companyId;
+        if (row.company_id !== undefined || !['currency_rates', 'companies', 'system_config'].includes(table)) {
+          row.company_id = targetCompanyId;
         }
 
         const keys = Object.keys(row);
-        const values = Object.values(row);
+        const values = Object.values(row).map(v => {
+          if (typeof v === 'string') {
+            // Try to parse JSON strings back to objects if valid JSON
+            if ((v.startsWith('{') && v.endsWith('}')) || (v.startsWith('[') && v.endsWith(']'))) {
+              try {
+                return JSON.parse(v);
+              } catch (e) {
+                return v;
+              }
+            }
+          }
+          return v;
+        });
+
         const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
         const updateClause = keys.filter(k => k !== 'id').map(k => `"${k}" = EXCLUDED."${k}"`).join(', ');
 
@@ -2017,10 +2151,15 @@ router.post('/system/import-excel', authenticateToken, authorizeRoles('super_adm
       }
     }
 
+    await client.query("SET session_replication_role = 'origin'");
+
     await client.query('COMMIT');
-    res.json({ message: 'Excel import successful', mode });
+    res.json({ message: 'Excel import successful', mode, target_company_id: targetCompanyId });
   } catch (error: any) {
-    if (client) await client.query('ROLLBACK');
+    if (client) {
+      await client.query("SET session_replication_role = 'origin'").catch(() => {});
+      await client.query('ROLLBACK').catch(() => {});
+    }
     console.error('Excel Import failed:', error);
     res.status(500).json({ error: error.message });
   } finally {

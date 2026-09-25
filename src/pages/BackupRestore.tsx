@@ -166,7 +166,7 @@ export const BackupRestore: React.FC = () => {
       formData.append('file', file);
       
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`/api/erp/system/restore?mode=${mode}`, {
+      const response = await fetch(`/api/erp/system/restore?mode=${mode}&company_id=${user.company_id}`, {
         method: 'POST',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
@@ -224,7 +224,7 @@ export const BackupRestore: React.FC = () => {
       formData.append('file', file);
       
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`/api/erp/system/import-excel?mode=${mode}`, {
+      const response = await fetch(`/api/erp/system/import-excel?mode=${mode}&company_id=${user.company_id}`, {
         method: 'POST',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
@@ -622,7 +622,10 @@ export const BackupRestore: React.FC = () => {
                 {successModal.message}
               </p>
               <button
-                onClick={() => setSuccessModal({ show: false, message: '' })}
+                onClick={() => {
+                  setSuccessModal({ show: false, message: '' });
+                  window.location.reload();
+                }}
                 className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
               >
                 {language === 'ar' ? 'حسناً' : 'OK'}
