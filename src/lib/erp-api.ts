@@ -2532,10 +2532,14 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         // 3. Check for any unposted documents in the primary table (if applicable)
         if (cfg.table && cfg.numCol && cfg.table !== 'journal_entries') {
           try {
+            const amountFilter = (cfg.amountCol && cfg.amountCol !== '0')
+              ? `AND ABS(COALESCE(d."${cfg.amountCol}"::numeric, 0)) > 0.001`
+              : '';
             const unpostedRes: any = await client.query(
               `SELECT d.id, d."${cfg.numCol}" as doc_num, d."${cfg.dateCol}" as doc_date, ${cfg.amountCol !== '0' ? `d."${cfg.amountCol}"` : '0'} as doc_amt, ${cfg.partyCol ? `d."${cfg.partyCol}"` : `''`} as party
                FROM "${cfg.table}" d
                WHERE d.company_id = $1
+                 ${amountFilter}
                  AND d.id::text NOT IN (
                    SELECT reference_id FROM journal_entries WHERE company_id = $1 AND reference_type IN (${placeholders}) AND reference_id IS NOT NULL
                  )
