@@ -111,14 +111,11 @@ export async function balanceAndValidateJournalEntry(client: any, journalEntryId
     totalCredit += parseFloat(line.credit || 0);
   }
 
-  // Round to 2 decimal places to avoid floating point issues
-  totalDebit = Math.round(totalDebit * 100) / 100;
-  totalCredit = Math.round(totalCredit * 100) / 100;
+  // Exact difference down to fractional precision
+  const diff = Number((totalDebit - totalCredit).toFixed(4));
 
-  const diff = Math.round((totalDebit - totalCredit) * 100) / 100;
-
-  if (Math.abs(diff) > 0) {
-    if (Math.abs(diff) < 1.0) {
+  if (Math.abs(diff) > 0.0001) {
+    if (Math.abs(diff) <= 1.0) {
       // Auto-adjust minor discrepancy on the largest line
       if (diff > 0) {
         // More debits than credits: add diff to the largest credit line
@@ -157,23 +154,23 @@ export async function balanceAndValidateJournalEntry(client: any, journalEntryId
           );
         }
       }
-
-      // Re-read totals after adjustment
-      const { rows: adjustedLines } = await client.query(
-        'SELECT SUM(debit) as d, SUM(credit) as c FROM journal_entry_lines WHERE journal_entry_id = $1',
-        [journalEntryId]
-      );
-      totalDebit = Math.round(parseFloat(adjustedLines[0].d || 0) * 100) / 100;
-      totalCredit = Math.round(parseFloat(adjustedLines[0].c || 0) * 100) / 100;
     } else {
       // Significant difference: throw error to trigger rollback
       throw new Error(`القيد غير متزن بمقدار ${Math.abs(diff).toFixed(2)} (مجموع المدين: ${totalDebit.toFixed(2)}، مجموع الدائن: ${totalCredit.toFixed(2)})`);
     }
   }
 
-  // Update header totals
+  // Update header totals cleanly rounded to 2 decimal places to guarantee perfect balance
   await client.query(
-    'UPDATE journal_entries SET total_debit = $1, total_credit = $2 WHERE id = $3',
-    [totalDebit, totalCredit, journalEntryId]
+    `UPDATE journal_entries 
+     SET total_debit = ROUND(sub.d, 2), 
+         total_credit = ROUND(sub.c, 2)
+     FROM (
+       SELECT COALESCE(SUM(debit), 0) as d, COALESCE(SUM(credit), 0) as c 
+       FROM journal_entry_lines 
+       WHERE journal_entry_id = $1
+     ) sub 
+     WHERE journal_entries.id = $1`,
+    [journalEntryId]
   );
 }

@@ -2275,7 +2275,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         numCol: 'voucher_number',
         dateCol: 'date',
         amountCol: 'amount',
-        refTypes: ['payment_voucher', 'voucher'],
+        refTypes: ['payment_voucher', 'payment', 'voucher'],
         partyCol: 'supplier_name',
         partyIdCol: 'supplier_id',
         partyTable: 'suppliers',
@@ -2370,9 +2370,9 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
           journalValue = totalValue;
           // Check unbalanced journal entries
           const unbalRes = await client.query(
-            `SELECT id, entry_number, date, total_debit, total_credit, ABS(total_debit - total_credit) as diff
+            `SELECT id, entry_number, date, total_debit, total_credit, ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) as diff
              FROM journal_entries
-             WHERE company_id = $1 AND ABS(total_debit - total_credit) > 0.001`,
+             WHERE company_id = $1 AND ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) > 0.01`,
             [companyId]
           );
           unbalancedCount = unbalRes.rows.length;
@@ -2394,25 +2394,40 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
           );
           missingAccountsCount = nullAccRes.rows[0]?.count || 0;
         } else {
-          // Check journal value linked to this table
+          // Check posted documents and value
           const placeholders = cfg.refTypes.map((_, i) => `$${i + 2}`).join(',');
-          const jvRes = await client.query(
-            `SELECT COALESCE(SUM(total_debit), 0)::numeric as total_jv,
-                    COUNT(CASE WHEN ABS(total_debit - total_credit) > 0.001 THEN 1 END)::int as unbal_count
-             FROM journal_entries
-             WHERE company_id = $1 AND reference_type IN (${placeholders})`,
+          const postedDocsRes = await client.query(
+            `SELECT COUNT(*)::int as posted_cnt, COALESCE(SUM(d."${cfg.amountCol}"), 0)::numeric as posted_val
+             FROM "${cfg.table}" d
+             WHERE d.company_id = $1
+               AND (
+                 d.id::text IN (SELECT reference_id FROM journal_entries WHERE company_id = $1 AND reference_type IN (${placeholders}) AND reference_id IS NOT NULL)
+                 OR d."${cfg.numCol}" IN (SELECT reference_number FROM journal_entries WHERE company_id = $1 AND reference_type IN (${placeholders}) AND reference_number IS NOT NULL)
+               )`,
             [companyId, ...cfg.refTypes]
           );
-          journalValue = parseFloat(jvRes.rows[0]?.total_jv || 0);
-          unbalancedCount = jvRes.rows[0]?.unbal_count || 0;
+          const postedCnt = postedDocsRes.rows[0]?.posted_cnt || 0;
+          journalValue = parseFloat(postedDocsRes.rows[0]?.posted_val || 0);
+
+          // Check unbalanced journal entries linked to this table
+          const unbalRes = await client.query(
+            `SELECT COUNT(*)::int as unbal_count
+             FROM journal_entries
+             WHERE company_id = $1 AND reference_type IN (${placeholders}) AND ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) > 0.01`,
+            [companyId, ...cfg.refTypes]
+          );
+          unbalancedCount = unbalRes.rows[0]?.unbal_count || 0;
 
           // Check unposted documents
           const unpostedRes = await client.query(
             `SELECT d.id, d."${cfg.numCol}" as doc_num, d."${cfg.dateCol}" as doc_date, d."${cfg.amountCol}" as doc_amt, ${cfg.partyCol ? `d."${cfg.partyCol}"` : `''`} as party
              FROM "${cfg.table}" d
              WHERE d.company_id = $1
-               AND d.id NOT IN (
+               AND d.id::text NOT IN (
                  SELECT reference_id FROM journal_entries WHERE company_id = $1 AND reference_type IN (${placeholders}) AND reference_id IS NOT NULL
+               )
+               AND d."${cfg.numCol}" NOT IN (
+                 SELECT reference_number FROM journal_entries WHERE company_id = $1 AND reference_type IN (${placeholders}) AND reference_number IS NOT NULL
                )`,
             [companyId, ...cfg.refTypes]
           );
@@ -2431,13 +2446,15 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
             });
           }
 
-          // Check missing party accounts (e.g. customer/supplier without account_id)
+          // Check missing party accounts only when party ID is present (exclude capital injections or general expenses)
           if (cfg.partyTable && cfg.partyIdCol && cfg.partyAccCol) {
             const missingPartyRes = await client.query(
               `SELECT d.id, d."${cfg.numCol}" as doc_num, d."${cfg.dateCol}" as doc_date, d."${cfg.amountCol}" as doc_amt, d."${cfg.partyCol}" as party
                FROM "${cfg.table}" d
                LEFT JOIN "${cfg.partyTable}" p ON d."${cfg.partyIdCol}" = p.id
-               WHERE d.company_id = $1 AND (p.id IS NULL OR p."${cfg.partyAccCol}" IS NULL)`,
+               WHERE d.company_id = $1 
+                 AND d."${cfg.partyIdCol}" IS NOT NULL 
+                 AND (p.id IS NULL OR p."${cfg.partyAccCol}" IS NULL)`,
               [companyId]
             );
             missingAccountsCount += missingPartyRes.rows.length;
@@ -2590,12 +2607,73 @@ router.post('/system/auto-fix-missing-accounts', authenticateToken, authorizeRol
       fixedSuppliers = suppRes.rowCount || 0;
     }
 
+    // Fix unbalanced journal entries with minor rounding discrepancies (<= 1.00)
+    let fixedEntries = 0;
+    const unbalJes = await client.query(
+      `SELECT id FROM journal_entries 
+       WHERE company_id = $1 AND ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) > 0.001 
+         AND ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) <= 1.0`,
+      [companyId]
+    );
+    for (const je of unbalJes.rows) {
+      await balanceAndValidateJournalEntry(client, je.id);
+      fixedEntries++;
+    }
+
+    // Auto-post unposted returns if products and customers now have accounts
+    let postedReturnsCount = 0;
+    const unpostedReturns = await client.query(`
+      SELECT r.* FROM returns r
+      WHERE r.company_id = $1
+        AND r.id::text NOT IN (SELECT reference_id FROM journal_entries WHERE company_id = $1 AND reference_type IN ('return', 'sales_return') AND reference_id IS NOT NULL)
+        AND r.return_number NOT IN (SELECT reference_number FROM journal_entries WHERE company_id = $1 AND reference_type IN ('return', 'sales_return') AND reference_number IS NOT NULL)
+    `, [companyId]);
+
+    for (const ret of unpostedReturns.rows) {
+      const custRes = await client.query('SELECT account_id, name FROM customers WHERE id = $1', [ret.customer_id]);
+      const custAccId = custRes.rows[0]?.account_id || defCustomerAcc?.id;
+      const custAccName = custRes.rows[0]?.name || 'حساب العملاء';
+      const retAmt = parseFloat(ret.total_amount || 0);
+
+      if (custAccId && retAmt > 0) {
+        const retDate = ret.date ? new Date(ret.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+        const jeNumber = await ensureUniqueSequenceNumber(pool, companyId, 'journal_entries', retDate);
+        const jeId = uuidv4();
+
+        // Header
+        await client.query(`
+          INSERT INTO journal_entries (id, company_id, entry_number, date, description, reference_id, reference_type, reference_number, total_debit, total_credit, status, created_by, created_at)
+          VALUES ($1, $2, $3, $4, $5, $6, 'return', $7, $8, $8, 'posted', 'system', CURRENT_TIMESTAMP)
+        `, [jeId, companyId, jeNumber, retDate, `قيد مردود مبيعات رقم ${ret.return_number}`, ret.id, ret.return_number, retAmt]);
+
+        // Lines: Debit Sales/Returns Revenue, Credit Customer
+        const revAccId = defRevenueAcc?.id;
+        const revAccName = defRevenueAcc?.name || 'مردودات ومبيعات';
+
+        await client.query(`
+          INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, company_id)
+          VALUES ($1, $2, $3, $4, $5, $6, 0, $7)
+        `, [uuidv4(), jeId, revAccId, revAccName, `مردود مبيعات رقم ${ret.return_number}`, retAmt, companyId]);
+
+        await client.query(`
+          INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, company_id, sub_account_id, sub_account_type)
+          VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, 'customer')
+        `, [uuidv4(), jeId, custAccId, custAccName, `مردود مبيعات رقم ${ret.return_number} - ${ret.customer_name || ''}`, retAmt, companyId, ret.customer_id]);
+
+        await syncCOGSForJournalEntry(client, companyId, jeId, ret.id, 'return');
+        await balanceAndValidateJournalEntry(client, jeId);
+        postedReturnsCount++;
+      }
+    }
+
     await client.query('COMMIT');
     res.json({
-      message: 'تم ربط الحسابات الناقصة بالحسابات الافتراضية بنجاح',
+      message: 'تم ربط الحسابات الناقصة بالحسابات الافتراضية وتحديث القيود بنجاح',
       fixed_products: fixedProducts,
       fixed_customers: fixedCustomers,
       fixed_suppliers: fixedSuppliers,
+      fixed_entries: fixedEntries,
+      posted_returns: postedReturnsCount,
       default_accounts: {
         customer_account: defCustomerAcc?.name,
         supplier_account: defSupplierAcc?.name,
