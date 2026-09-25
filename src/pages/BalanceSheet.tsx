@@ -478,8 +478,9 @@ export const BalanceSheet: React.FC = () => {
         </div>
 
         {viewMode === 'single' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-            {/* RIGHT COLUMN: ASSETS (الأصول) */}
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+              {/* RIGHT COLUMN: ASSETS (الأصول) */}
             <div className="space-y-6">
               <div className="bg-white border border-stone-200 rounded-[2.5rem] overflow-hidden shadow-sm">
                 {/* Assets Header */}
@@ -728,9 +729,8 @@ export const BalanceSheet: React.FC = () => {
               </div>
             </div>
           </div>
-        ) : null}
 
-        {/* IAS 1 Balance Verification Banner */}
+          {/* IAS 1 Balance Verification Banner */}
         <div className={`p-6 rounded-[2rem] border-2 flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg ${
           totalData.isBalanced 
             ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 border-emerald-400 text-white shadow-emerald-600/20' 
@@ -842,7 +842,6 @@ export const BalanceSheet: React.FC = () => {
                 </motion.div>
               )}
             </div>
-          </div>
         ) : (
           <div className="bg-white border border-zinc-200 rounded-[2.5rem] shadow-sm overflow-hidden">
             <div className={`px-8 py-6 border-b border-zinc-100 bg-zinc-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4`}>
