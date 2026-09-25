@@ -508,6 +508,11 @@ export interface InvoiceItem {
   quantity: number;
   unit_price: number;
   total: number;
+  subtotal?: number;
+  discount?: number;
+  discount_amount?: number;
+  unit?: string;
+  description?: string;
   barcode?: string;
   image_url?: string;
   operation_id?: string | null;
@@ -822,6 +827,10 @@ export interface ReturnItem {
   unit_price: number;
   price?: number; // Keep price for backward compatibility if needed
   total: number;
+  subtotal?: number;
+  discount?: number;
+  discount_amount?: number;
+  unit?: string;
   barcode?: string;
   image_url?: string;
   operation_id?: string | null;

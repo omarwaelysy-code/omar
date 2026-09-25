@@ -123,17 +123,17 @@ export class PostingService {
       if (!salesAccountId) {
         throw new Error(`لا يمكن إنشاء القيد المحاسبي: حساب الإيرادات غير محدد في بطاقة الصنف "${item.product_name || product?.name}". يمنع النظام توقع الحسابات تلقائياً.`);
       }
-      const itemTotalFC = Number(item.total) || 0;
-      const itemTotalLocal = Number((itemTotalFC * rate).toFixed(2));
+      const itemSubtotalFC = Number(item.subtotal !== undefined ? item.subtotal : (Number(item.quantity || 1) * Number(item.unit_price || 0) - Number(item.discount_amount || item.discount || 0))) || 0;
+      const itemSubtotalLocal = Number((itemSubtotalFC * rate).toFixed(2));
 
       journalItems.push({
         account_id: salesAccountId,
         account_name: salesAccountName,
         debit: 0,
-        credit: itemTotalLocal,
+        credit: itemSubtotalLocal,
         currency: currencyCode,
         exchange_rate: rate,
-        foreign_amount: itemTotalFC,
+        foreign_amount: itemSubtotalFC,
         description: `مبيعات صنف: ${item.product_name} - فاتورة ${invoice.invoice_number}`,
         operation_id: (item as any).operation_id || (invoice as any).operation_id || null,
         department_id: (item as any).department_id || (invoice as any).department_id || null,
@@ -148,8 +148,8 @@ export class PostingService {
       const vatAccountId = prod?.sales_vat_account_id || prod?.vat_account_id || '';
       const vatAccountName = prod?.sales_vat_account_name || prod?.vat_account_name || 'حساب ضريبة القيمة المضافة (مبيعات)';
       const rateVal = item.vat_rate !== undefined ? item.vat_rate : (prod?.vat_rate || 0);
-      const itemTotal = Number(item.total) || 0;
-      const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
+      const itemSubtotal = Number(item.subtotal !== undefined ? item.subtotal : (Number(item.quantity || 1) * Number(item.unit_price || 0) - Number(item.discount_amount || item.discount || 0))) || 0;
+      const itemVat = Number(item.vat_amount !== undefined ? item.vat_amount : (itemSubtotal * (rateVal / 100)).toFixed(2));
       
       if (itemVat > 0) {
         if (!vatAccountId) {
@@ -193,8 +193,8 @@ export class PostingService {
       const whtAccountId = prod?.sales_withholding_tax_account_id || '';
       const whtAccountName = prod?.sales_withholding_tax_account_name || 'ضرائب خصم من العملاء';
       const rateVal = item.withholding_tax_rate !== undefined ? item.withholding_tax_rate : (prod?.sales_withholding_tax_rate || 0);
-      const itemTotal = Number(item.total) || 0;
-      const itemWht = Number(item.withholding_tax_amount !== undefined ? item.withholding_tax_amount : (itemTotal * (rateVal / 100)).toFixed(2));
+      const itemSubtotal = Number(item.subtotal !== undefined ? item.subtotal : (Number(item.quantity || 1) * Number(item.unit_price || 0) - Number(item.discount_amount || item.discount || 0))) || 0;
+      const itemWht = Number(item.withholding_tax_amount !== undefined ? item.withholding_tax_amount : (itemSubtotal * (rateVal / 100)).toFixed(2));
 
       if (itemWht > 0) {
         if (!whtAccountId) {
@@ -326,10 +326,11 @@ export class PostingService {
         throw new Error(`لا يمكن إنشاء القيد المحاسبي: حساب مردودات/إيرادات المبيعات غير محدد في بطاقة الصنف "${item.product_name || product?.name}".`);
       }
 
+      const itemSubtotal = Number(item.subtotal !== undefined ? item.subtotal : (Number(item.quantity || 1) * Number(item.unit_price || 0) - Number(item.discount_amount || item.discount || 0))) || 0;
       journalItems.push({
         account_id: salesReturnAccountId,
         account_name: salesReturnAccountName,
-        debit: Number(item.total) || 0,
+        debit: itemSubtotal,
         credit: 0,
         description: `مردودات مبيعات: ${item.product_name} - مرتجع ${doc.return_number || doc.id.slice(-6)}`,
         operation_id: (item as any).operation_id || (doc as any).operation_id || null,
@@ -345,8 +346,8 @@ export class PostingService {
       const vatAccountId = prod?.sales_vat_account_id || prod?.vat_account_id || '';
       const vatAccountName = prod?.sales_vat_account_name || prod?.vat_account_name || 'حساب ضريبة القيمة المضافة (مبيعات)';
       const rateVal = prod?.vat_rate || 0;
-      const itemTotal = Number(item.total) || 0;
-      const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
+      const itemSubtotal = Number(item.subtotal !== undefined ? item.subtotal : (Number(item.quantity || 1) * Number(item.unit_price || 0) - Number(item.discount_amount || item.discount || 0))) || 0;
+      const itemVat = Number(item.vat_amount !== undefined ? item.vat_amount : (itemSubtotal * (rateVal / 100)).toFixed(2));
       
       if (itemVat > 0) {
         if (!vatAccountId) {
@@ -434,8 +435,8 @@ export class PostingService {
       const whtAccountId = prod?.sales_withholding_tax_account_id || '';
       const whtAccountName = prod?.sales_withholding_tax_account_name || 'ضرائب خصم من العملاء';
       const rateVal = item.withholding_tax_rate !== undefined ? item.withholding_tax_rate : (prod?.sales_withholding_tax_rate || 0);
-      const itemTotal = Number(item.total) || 0;
-      const itemWht = Number(item.withholding_tax_amount !== undefined ? item.withholding_tax_amount : (itemTotal * (rateVal / 100)).toFixed(2));
+      const itemSubtotal = Number(item.subtotal !== undefined ? item.subtotal : (Number(item.quantity || 1) * Number(item.unit_price || 0) - Number(item.discount_amount || item.discount || 0))) || 0;
+      const itemWht = Number(item.withholding_tax_amount !== undefined ? item.withholding_tax_amount : (itemSubtotal * (rateVal / 100)).toFixed(2));
 
       if (itemWht > 0) {
         if (!whtAccountId) {
@@ -503,10 +504,11 @@ export class PostingService {
         throw new Error(`لا يمكن حفظ القيد: حساب التكلفة أو المخزون غير محدد في بطاقة الصنف "${item.product_name || product?.name || 'غير معروف'}". يمنع النظام توقع الحسابات تلقائياً.`);
       }
 
+      const itemSubtotal = Number(item.subtotal !== undefined ? item.subtotal : (Number(item.quantity || 1) * Number(item.unit_price || 0) - Number(item.discount_amount || item.discount || 0))) || 0;
       journalItems.push({
         account_id: purchaseAccountId,
         account_name: purchaseAccountName,
-        debit: Number(item.total) || 0,
+        debit: itemSubtotal,
         credit: 0,
         description: `مشتريات: ${item.product_name} - فاتورة ${doc.invoice_number}`,
         operation_id: (item as any).operation_id || (doc as any).operation_id || null,
@@ -522,8 +524,8 @@ export class PostingService {
       const vatAccountId = prod?.purchase_vat_account_id || prod?.vat_account_id || '';
       const vatAccountName = prod?.purchase_vat_account_name || prod?.vat_account_name || 'حساب ضريبة القيمة المضافة (مشتريات)';
       const rateVal = item.vat_rate !== undefined ? item.vat_rate : (prod?.vat_rate || 0);
-      const itemTotal = Number(item.total) || 0;
-      const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
+      const itemSubtotal = Number(item.subtotal !== undefined ? item.subtotal : (Number(item.quantity || 1) * Number(item.unit_price || 0) - Number(item.discount_amount || item.discount || 0))) || 0;
+      const itemVat = Number(item.vat_amount !== undefined ? item.vat_amount : (itemSubtotal * (rateVal / 100)).toFixed(2));
       
       if (itemVat > 0) {
         if (!vatAccountId) {
@@ -611,8 +613,8 @@ export class PostingService {
       const whtAccountId = prod?.purchase_withholding_tax_account_id || '';
       const whtAccountName = prod?.purchase_withholding_tax_account_name || 'ضرائب خصم على الموردين';
       const rateVal = item.withholding_tax_rate !== undefined ? item.withholding_tax_rate : (prod?.purchase_withholding_tax_rate || 0);
-      const itemTotal = Number(item.total) || 0;
-      const itemWht = Number(item.withholding_tax_amount !== undefined ? item.withholding_tax_amount : (itemTotal * (rateVal / 100)).toFixed(2));
+      const itemSubtotal = Number(item.subtotal !== undefined ? item.subtotal : (Number(item.quantity || 1) * Number(item.unit_price || 0) - Number(item.discount_amount || item.discount || 0))) || 0;
+      const itemWht = Number(item.withholding_tax_amount !== undefined ? item.withholding_tax_amount : (itemSubtotal * (rateVal / 100)).toFixed(2));
 
       if (itemWht > 0) {
         if (!whtAccountId) {
@@ -727,11 +729,12 @@ export class PostingService {
         throw new Error(`لا يمكن حفظ القيد: حساب التكلفة أو المخزون غير محدد في بطاقة الصنف "${item.product_name || product?.name || 'غير معروف'}". يمنع النظام توقع الحسابات تلقائياً.`);
       }
 
+      const itemSubtotal = Number(item.subtotal !== undefined ? item.subtotal : (Number(item.quantity || 1) * Number(item.unit_price || 0) - Number(item.discount_amount || item.discount || 0))) || 0;
       journalItems.push({
         account_id: purchaseReturnAccountId,
         account_name: purchaseReturnAccountName,
         debit: 0,
-        credit: Number(item.total) || 0,
+        credit: itemSubtotal,
         description: `مرتجع مشتريات: ${item.product_name} - رقم ${doc.return_number}`,
         operation_id: (item as any).operation_id || (doc as any).operation_id || null,
         department_id: (item as any).department_id || (doc as any).department_id || null,
@@ -746,8 +749,8 @@ export class PostingService {
       const vatAccountId = prod?.purchase_vat_account_id || prod?.vat_account_id || '';
       const vatAccountName = prod?.purchase_vat_account_name || prod?.vat_account_name || 'حساب ضريبة القيمة المضافة (مشتريات)';
       const rateVal = prod?.vat_rate || 0;
-      const itemTotal = Number(item.total) || 0;
-      const itemVat = Number((itemTotal * (rateVal / 100)).toFixed(2));
+      const itemSubtotal = Number(item.subtotal !== undefined ? item.subtotal : (Number(item.quantity || 1) * Number(item.unit_price || 0) - Number(item.discount_amount || item.discount || 0))) || 0;
+      const itemVat = Number(item.vat_amount !== undefined ? item.vat_amount : (itemSubtotal * (rateVal / 100)).toFixed(2));
       
       if (itemVat > 0) {
         if (!vatAccountId) {
@@ -788,8 +791,8 @@ export class PostingService {
       const whtAccountId = prod?.purchase_withholding_tax_account_id || '';
       const whtAccountName = prod?.purchase_withholding_tax_account_name || 'ضرائب خصم على الموردين';
       const rateVal = item.withholding_tax_rate !== undefined ? item.withholding_tax_rate : (prod?.purchase_withholding_tax_rate || 0);
-      const itemTotal = Number(item.total) || 0;
-      const itemWht = Number(item.withholding_tax_amount !== undefined ? item.withholding_tax_amount : (itemTotal * (rateVal / 100)).toFixed(2));
+      const itemSubtotal = Number(item.subtotal !== undefined ? item.subtotal : (Number(item.quantity || 1) * Number(item.unit_price || 0) - Number(item.discount_amount || item.discount || 0))) || 0;
+      const itemWht = Number(item.withholding_tax_amount !== undefined ? item.withholding_tax_amount : (itemSubtotal * (rateVal / 100)).toFixed(2));
 
       if (itemWht > 0) {
         if (!whtAccountId) {
