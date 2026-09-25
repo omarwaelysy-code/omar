@@ -31,6 +31,7 @@ services:
       DB_NAME: ${DB_NAME:-cloud_erp_system}
       JWT_SECRET: ${JWT_SECRET}
       NODE_ENV: production
+      NODE_OPTIONS: "--max-old-space-size=4096"
     depends_on:
       erp-db:
         condition: service_healthy

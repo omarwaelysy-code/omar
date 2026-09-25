@@ -76,7 +76,12 @@ export const BackupRestore: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error(language === 'ar' ? 'فشل تصدير النسخة الاحتياطية من الخادم' : 'Failed to export backup from server');
+        let errMessage = '';
+        try {
+          const errData = await response.json();
+          errMessage = errData.error || errData.message;
+        } catch (e) {}
+        throw new Error(errMessage || (language === 'ar' ? 'فشل تصدير النسخة الاحتياطية من الخادم' : 'Failed to export backup from server'));
       }
 
       setProgress(80);
@@ -120,7 +125,12 @@ export const BackupRestore: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error(language === 'ar' ? 'فشل تصدير ملف Excel من الخادم' : 'Failed to export Excel file from server');
+        let errMessage = '';
+        try {
+          const errData = await response.json();
+          errMessage = errData.error || errData.message;
+        } catch (e) {}
+        throw new Error(errMessage || (language === 'ar' ? 'فشل تصدير ملف Excel من الخادم' : 'Failed to export Excel file from server'));
       }
 
       setProgress(70);

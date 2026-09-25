@@ -170,43 +170,47 @@ async function saveOrUpdateJournalEntry(
   // Determine preserved journal entry number
   const preservedNumber = preferredJournalNumber || journalData?.entry_number || (dbService as any)._recentDeletedJEs?.[referenceId]?.entry_number;
 
-  // 1. If preferredJournalId is provided, try updating it
-  if (preferredJournalId) {
-    try {
-      await apiRequest(`/journal_entries/${preferredJournalId}`, 'PUT', {
-        ...journalData,
-        entry_number: preservedNumber || undefined,
-        reference_id: referenceId,
-        company_id: companyId
-      });
-      return { id: preferredJournalId, entry_number: preservedNumber || '' };
-    } catch (e: any) {
-      console.warn(`[DocumentImport] Preferred journal entry ${preferredJournalId} PUT failed, falling back:`, e);
-    }
-  }
-
-  // 2. Check if a journal entry already exists for this document reference in the database
+  // 1. Check if a journal entry already exists for this document reference in the database
+  let targetEntryId = preferredJournalId;
   let existingNumber = preservedNumber;
+
   if (companyId && referenceId) {
     try {
       const existing = await dbService.getJournalEntryByReference(referenceId, companyId);
       if (existing?.id) {
+        targetEntryId = existing.id;
         existingNumber = existing.entry_number || existingNumber;
-        try {
-          await apiRequest(`/journal_entries/${existing.id}`, 'PUT', {
-            ...journalData,
-            entry_number: existingNumber || undefined,
-            reference_id: referenceId,
-            company_id: companyId
-          });
-          return { id: existing.id, entry_number: existingNumber || '' };
-        } catch (updateErr) {
-          console.warn(`[DocumentImport] Existing journal entry ${existing.id} PUT failed, deleting before recreating:`, updateErr);
-          await dbService.deleteJournalEntryByReference(referenceId, companyId);
-        }
       }
     } catch (lookupErr) {
       console.warn(`[DocumentImport] Journal entry lookup by reference failed:`, lookupErr);
+    }
+  }
+
+  // 2. If targetEntryId is known (either existing in DB or preferred), try updating it
+  if (targetEntryId) {
+    try {
+      await apiRequest(`/journal_entries/${targetEntryId}`, 'PUT', {
+        ...journalData,
+        entry_number: existingNumber || preservedNumber || undefined,
+        reference_id: referenceId,
+        company_id: companyId
+      });
+      return { id: targetEntryId, entry_number: existingNumber || preservedNumber || '' };
+    } catch (e: any) {
+      console.warn(`[DocumentImport] Target journal entry ${targetEntryId} PUT failed, falling back:`, e);
+      if (targetEntryId !== preferredJournalId && preferredJournalId) {
+        try {
+          await apiRequest(`/journal_entries/${preferredJournalId}`, 'PUT', {
+            ...journalData,
+            entry_number: preservedNumber || undefined,
+            reference_id: referenceId,
+            company_id: companyId
+          });
+          return { id: preferredJournalId, entry_number: preservedNumber || '' };
+        } catch (fallbackErr) {
+          console.warn(`[DocumentImport] Preferred journal entry ${preferredJournalId} PUT also failed:`, fallbackErr);
+        }
+      }
     }
   }
 

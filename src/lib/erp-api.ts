@@ -628,7 +628,7 @@ router.use(async (req: any, res: any, next: any) => {
   const path = req.path || '';
   const isPolling = req.query._polling === 'true' || req.headers['x-polling'] === 'true';
   const isLogRetrieval = path.includes('/activity_logs') || path.includes('/audit_logs');
-  const isHealthOrMe = path.includes('/health') || path.includes('/auth/me') || path.includes('/auth/refresh') || path.includes('/auth/ping');
+  const isHealthOrMe = path.includes('/health') || path.includes('/auth/me') || path.includes('/auth/refresh') || path.includes('/auth/ping') || path.includes('/heartbeat') || path.includes('/auth/heartbeat');
 
   if (isPolling || isLogRetrieval || isHealthOrMe) {
     return next();
@@ -971,38 +971,126 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 } // 50MB
 });
 
-// List of all tables available for backup/restore
+// List of all tables available for backup/restore (in foreign key dependency order)
 const TABLES_TO_BACKUP = [
+  // 1. Company, Roles & Security
   'companies',
+  'roles',
+  'users',
   'account_types',
   'accounts',
-  'users',
-  'customers',
-  'suppliers',
-  'products',
+  'settings',
+  'system_config',
+  'currencies',
+  'exchange_rates',
+  'currency_rates',
+  'exchange_rate_history',
+
+  // 2. Cost Centers, Departments & Operational Coding
+  'cost_centers',
+  'departments',
+  'operation_categories',
+  'operations',
+  'operation_fields',
+  'operation_field_values',
+  'field_operation_categories',
+
+  // 3. Master Data
   'item_groups',
   'warehouses',
+  'products',
+  'customers',
+  'suppliers',
   'payment_methods',
   'expense_categories',
-  'settings',
+  'customer_discounts',
+  'supplier_discounts',
+
+  // 4. Sales Cycle
+  'sales_orders',
+  'sales_order_items',
   'invoices',
   'invoice_items',
   'returns',
   'return_items',
+
+  // 5. Purchases & Goods Receipts Cycle
+  'purchase_orders',
+  'purchase_order_items',
+  'goods_receipts',
+  'goods_receipt_items',
   'purchase_invoices',
+  'purchase_invoice_items',
+  'purchase_invoice_goods_receipts',
   'purchase_returns',
-  'customer_discounts',
-  'supplier_discounts',
+  'purchase_return_items',
+
+  // 6. Treasury, Cheques & Cash
   'receipt_vouchers',
   'payment_vouchers',
   'cash_transfers',
   'issued_cheques',
   'received_cheques',
+
+  // 7. Inventory, Stock Balances & Movements
+  'opening_stock_balances',
+  'opening_stock_items',
+  'stock_adjustments',
+  'stock_adjustment_items',
+  'warehouse_transfers',
+  'warehouse_transfer_items',
+  'inventory_movements',
+  'inventory_movements_v2',
+  'inventory_movement_lines',
+  'inventory_layers',
+  'stock_card',
+  'inventory_transaction_journal',
+
+  // 8. General Ledger & Financial Periods
   'journal_entries',
   'journal_entry_lines',
+  'period_closings',
+
+  // 9. Sequences & Document Import Batches
+  'document_sequences',
+  'document_import_batches',
+
+  // 10. Electronic Invoicing (ETA)
+  'eta_settings',
+  'eta_documents',
+  'eta_item_mappings',
+  'eta_supplier_mappings',
+  'eta_registered_codes',
+
+  // 11. Fixed Assets
+  'asset_categories',
+  'fixed_assets',
+  'assets',
+  'asset_components',
+  'asset_depreciation_runs',
+  'asset_depreciation_items',
+  'asset_maintenance',
+  'asset_disposals',
+  'asset_revaluations',
+  'asset_transfers',
+
+  // 12. HR & Payroll
+  'employees',
+  'attendance',
+  'payroll',
+
+  // 13. UI, Dashboards, Templates & System Configurations
+  'dashboards',
+  'widgets',
+  'templates',
+  'template_versions',
+  'print_profiles',
+  'paper_sizes',
+  'pos_branch_linking_codes',
+
+  // 14. Logs (Scoped/Limited)
   'activity_logs',
-  'currencies',
-  'exchange_rates'
+  'audit_logs'
 ];
 
 // --- Period Closing Helpers and Middleware ---
@@ -1600,6 +1688,65 @@ router.post('/system/fix', authenticateToken, authorizeRoles('super_admin'), asy
 
 // --- Backup & Restore ---
 
+function getBackupQueryForTable(table: string, companyId: string, isExcel: boolean = false): { sql: string; params: any[] } {
+  if (table === 'companies') {
+    return { sql: 'SELECT * FROM companies WHERE id = $1', params: [companyId] };
+  }
+  if (table === 'activity_logs' || table === 'audit_logs') {
+    const limit = isExcel ? 1000 : 5000;
+    return { 
+      sql: `SELECT * FROM ${table} WHERE company_id = $1 ORDER BY id DESC LIMIT ${limit}`, 
+      params: [companyId] 
+    };
+  }
+  if (table === 'inventory_movement_lines') {
+    return { 
+      sql: `SELECT * FROM inventory_movement_lines WHERE movement_id IN (SELECT id FROM inventory_movements WHERE company_id = $1 UNION SELECT id FROM inventory_movements_v2 WHERE company_id = $1)`, 
+      params: [companyId] 
+    };
+  }
+  if (table === 'asset_components') {
+    return { 
+      sql: `SELECT * FROM asset_components WHERE asset_id IN (SELECT id FROM fixed_assets WHERE company_id = $1 UNION SELECT id FROM assets WHERE company_id = $1)`, 
+      params: [companyId] 
+    };
+  }
+  if (table === 'asset_depreciation_items') {
+    return { 
+      sql: `SELECT * FROM asset_depreciation_items WHERE run_id IN (SELECT id FROM asset_depreciation_runs WHERE company_id = $1)`, 
+      params: [companyId] 
+    };
+  }
+  if (table === 'purchase_invoice_goods_receipts') {
+    return { 
+      sql: `SELECT * FROM purchase_invoice_goods_receipts WHERE invoice_id IN (SELECT id FROM purchase_invoices WHERE company_id = $1)`, 
+      params: [companyId] 
+    };
+  }
+  if (table === 'widgets') {
+    return { 
+      sql: `SELECT * FROM widgets WHERE dashboard_id IN (SELECT id FROM dashboards WHERE company_id = $1)`, 
+      params: [companyId] 
+    };
+  }
+  if (table === 'system_config') {
+    return { 
+      sql: `SELECT * FROM system_config WHERE company_id = $1 OR company_id IS NULL`, 
+      params: [companyId] 
+    };
+  }
+  if (table === 'currency_rates') {
+    return { 
+      sql: `SELECT * FROM currency_rates`, 
+      params: [] 
+    };
+  }
+  return { 
+    sql: `SELECT * FROM ${table} WHERE company_id = $1`, 
+    params: [companyId] 
+  };
+}
+
 // Export JSON
 router.get('/system/backup', authenticateToken, authorizeRoles('super_admin', 'admin'), async (req: AuthRequest, res) => {
   try {
@@ -1609,19 +1756,15 @@ router.get('/system/backup', authenticateToken, authorizeRoles('super_admin', 'a
     const backupData: any = {
       company_id: companyId,
       exported_at: new Date().toISOString(),
-      version: '1.0',
+      version: '2.0',
       data: {}
     };
 
     for (const table of TABLES_TO_BACKUP) {
       try {
-        let query = `SELECT * FROM ${table} WHERE company_id = $1`;
-        if (table === 'companies') {
-          query = `SELECT * FROM companies WHERE id = $1`;
-        }
-        
-        const { rows } = await pool.query(query, [companyId]).catch(() => ({ rows: [] }));
-        if (table === 'users') {
+        const { sql, params } = getBackupQueryForTable(table, companyId, false);
+        const { rows } = await pool.query(sql, params).catch(() => ({ rows: [] }));
+        if (table === 'users' && rows.length > 0) {
           rows.forEach((r: any) => {
             delete r.password_hash;
             delete r.temp_password;
@@ -1663,19 +1806,29 @@ router.get('/system/export-excel', authenticateToken, authorizeRoles('super_admi
 
     for (const table of TABLES_TO_BACKUP) {
       try {
-        let query = `SELECT * FROM ${table} WHERE company_id = $1`;
-        if (table === 'companies') {
-          query = `SELECT * FROM companies WHERE id = $1`;
-        }
-        const { rows } = await pool.query(query, [companyId]).catch(() => ({ rows: [] }));
-        if (rows.length > 0) {
+        const { sql, params } = getBackupQueryForTable(table, companyId, true);
+        const { rows } = await pool.query(sql, params).catch(() => ({ rows: [] }));
+        if (rows && rows.length > 0) {
           if (table === 'users') {
             rows.forEach((r: any) => {
               delete r.password_hash;
               delete r.temp_password;
             });
           }
-          const ws = XLSX.utils.json_to_sheet(rows);
+          // Format complex objects/arrays for readable Excel cell strings
+          const formattedRows = rows.map((r: any) => {
+            const rowCopy: any = { ...r };
+            for (const key of Object.keys(rowCopy)) {
+              if (rowCopy[key] !== null && typeof rowCopy[key] === 'object' && !(rowCopy[key] instanceof Date)) {
+                try {
+                  rowCopy[key] = JSON.stringify(rowCopy[key]);
+                } catch (e) {}
+              }
+            }
+            return rowCopy;
+          });
+
+          const ws = XLSX.utils.json_to_sheet(formattedRows);
           applyNumberFormat(ws);
           XLSX.utils.book_append_sheet(wb, ws, table.substring(0, 31)); // sheet names limited to 31 chars
         }
@@ -1718,11 +1871,25 @@ router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 
     await client.query('BEGIN');
 
     if (mode === 'replace') {
-      // Tables should be deleted in reverse order of dependencies if FKs exist
-      // For simplicity, we'll try to delete all company data
       for (const table of [...TABLES_TO_BACKUP].reverse()) {
         try {
-          await client.query(`DELETE FROM ${table} WHERE company_id = $1`, [targetCompanyId]);
+          if (table === 'inventory_movement_lines') {
+            await client.query(`DELETE FROM inventory_movement_lines WHERE movement_id IN (SELECT id FROM inventory_movements WHERE company_id = $1 UNION SELECT id FROM inventory_movements_v2 WHERE company_id = $1)`, [targetCompanyId]);
+          } else if (table === 'asset_components') {
+            await client.query(`DELETE FROM asset_components WHERE asset_id IN (SELECT id FROM fixed_assets WHERE company_id = $1 UNION SELECT id FROM assets WHERE company_id = $1)`, [targetCompanyId]);
+          } else if (table === 'asset_depreciation_items') {
+            await client.query(`DELETE FROM asset_depreciation_items WHERE run_id IN (SELECT id FROM asset_depreciation_runs WHERE company_id = $1)`, [targetCompanyId]);
+          } else if (table === 'purchase_invoice_goods_receipts') {
+            await client.query(`DELETE FROM purchase_invoice_goods_receipts WHERE invoice_id IN (SELECT id FROM purchase_invoices WHERE company_id = $1)`, [targetCompanyId]);
+          } else if (table === 'widgets') {
+            await client.query(`DELETE FROM widgets WHERE dashboard_id IN (SELECT id FROM dashboards WHERE company_id = $1)`, [targetCompanyId]);
+          } else if (table === 'system_config') {
+            await client.query(`DELETE FROM system_config WHERE company_id = $1`, [targetCompanyId]);
+          } else if (table === 'currency_rates') {
+            // Keep system-wide rates
+          } else {
+            await client.query(`DELETE FROM "${table}" WHERE company_id = $1`, [targetCompanyId]);
+          }
         } catch (e) {
           console.warn(`Failed to clear table ${table}:`, e);
         }
@@ -1734,23 +1901,31 @@ router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 
       if (!rows || !Array.isArray(rows)) continue;
 
       for (const row of rows) {
+        if (!row || typeof row !== 'object') continue;
         const keys = Object.keys(row);
+        if (keys.length === 0) continue;
         const values = Object.values(row);
         
-        // Ensure company_id matches target
+        // Ensure company_id matches target if table has company_id
         const companyIdIndex = keys.indexOf('company_id');
         if (companyIdIndex !== -1) {
           values[companyIdIndex] = targetCompanyId;
         }
 
         const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
-        const updateClause = keys.map((k, i) => `${k} = EXCLUDED.${k}`).join(', ');
+        const updateClause = keys.filter(k => k !== 'id').map(k => `"${k}" = EXCLUDED."${k}"`).join(', ');
+
+        const conflictClause = row.id && updateClause.length > 0 
+          ? `ON CONFLICT (id) DO UPDATE SET ${updateClause}`
+          : (row.id ? `ON CONFLICT (id) DO NOTHING` : `ON CONFLICT DO NOTHING`);
 
         await client.query(
-          `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})
-           ON CONFLICT (id) DO UPDATE SET ${updateClause}`,
+          `INSERT INTO "${table}" (${keys.map(k => `"${k}"`).join(', ')}) VALUES (${placeholders})
+           ${conflictClause}`,
           values
-        );
+        ).catch(err => {
+          console.warn(`Restore row insert skipped for ${table}:`, err.message);
+        });
       }
     }
 
@@ -1780,7 +1955,23 @@ router.post('/system/import-excel', authenticateToken, authorizeRoles('super_adm
     if (mode === 'replace' && companyId) {
       for (const table of [...TABLES_TO_BACKUP].reverse()) {
         try {
-          await client.query(`DELETE FROM ${table} WHERE company_id = $1`, [companyId]);
+          if (table === 'inventory_movement_lines') {
+            await client.query(`DELETE FROM inventory_movement_lines WHERE movement_id IN (SELECT id FROM inventory_movements WHERE company_id = $1 UNION SELECT id FROM inventory_movements_v2 WHERE company_id = $1)`, [companyId]);
+          } else if (table === 'asset_components') {
+            await client.query(`DELETE FROM asset_components WHERE asset_id IN (SELECT id FROM fixed_assets WHERE company_id = $1 UNION SELECT id FROM assets WHERE company_id = $1)`, [companyId]);
+          } else if (table === 'asset_depreciation_items') {
+            await client.query(`DELETE FROM asset_depreciation_items WHERE run_id IN (SELECT id FROM asset_depreciation_runs WHERE company_id = $1)`, [companyId]);
+          } else if (table === 'purchase_invoice_goods_receipts') {
+            await client.query(`DELETE FROM purchase_invoice_goods_receipts WHERE invoice_id IN (SELECT id FROM purchase_invoices WHERE company_id = $1)`, [companyId]);
+          } else if (table === 'widgets') {
+            await client.query(`DELETE FROM widgets WHERE dashboard_id IN (SELECT id FROM dashboards WHERE company_id = $1)`, [companyId]);
+          } else if (table === 'system_config') {
+            await client.query(`DELETE FROM system_config WHERE company_id = $1`, [companyId]);
+          } else if (table === 'currency_rates') {
+            // Keep system-wide rates
+          } else {
+            await client.query(`DELETE FROM "${table}" WHERE company_id = $1`, [companyId]);
+          }
         } catch (e) {
           console.warn(`Failed to clear table ${table}:`, e);
         }
@@ -1793,21 +1984,29 @@ router.post('/system/import-excel', authenticateToken, authorizeRoles('super_adm
 
       const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]) as any[];
       for (const row of rows) {
-        if (!row.id) continue;
+        if (!row || typeof row !== 'object' || !row.id) continue;
         
         // Match user's company
-        row.company_id = companyId;
+        if (row.company_id !== undefined || !['currency_rates', 'companies'].includes(table)) {
+          row.company_id = companyId;
+        }
 
         const keys = Object.keys(row);
         const values = Object.values(row);
         const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
-        const updateClause = keys.map((k, i) => `${k} = EXCLUDED.${k}`).join(', ');
+        const updateClause = keys.filter(k => k !== 'id').map(k => `"${k}" = EXCLUDED."${k}"`).join(', ');
+
+        const conflictClause = row.id && updateClause.length > 0 
+          ? `ON CONFLICT (id) DO UPDATE SET ${updateClause}`
+          : (row.id ? `ON CONFLICT (id) DO NOTHING` : `ON CONFLICT DO NOTHING`);
 
         await client.query(
-          `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})
-           ON CONFLICT (id) DO UPDATE SET ${updateClause}`,
+          `INSERT INTO "${table}" (${keys.map(k => `"${k}"`).join(', ')}) VALUES (${placeholders})
+           ${conflictClause}`,
           values
-        );
+        ).catch(err => {
+          console.warn(`Excel import row insert skipped for ${table}:`, err.message);
+        });
       }
     }
 
