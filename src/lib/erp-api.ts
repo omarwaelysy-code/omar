@@ -1985,6 +1985,13 @@ router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 
         continue;
       }
 
+      if (table === 'users') {
+        if (isCrossCompany) {
+          // Target company already has its own administrative users. Do not clone users across companies
+          continue;
+        }
+      }
+
       const rows = backupData.data[table];
       if (!rows || !Array.isArray(rows)) continue;
 
@@ -2003,15 +2010,14 @@ router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 
           row.company_id = targetCompanyId;
         }
 
-        // Avoid unique email constraint failure on users table when cloning to a new company
-        if (table === 'users' && isCrossCompany && row.email) {
-          const existingUser = await client.query(
-            'SELECT id FROM users WHERE email = $1 AND company_id = $2',
-            [row.email, targetCompanyId]
-          );
-          if (existingUser.rows.length > 0) {
-            idMap.set(originalRow.id, existingUser.rows[0].id);
-            continue;
+        if (table === 'users') {
+          if (!row.password_hash) {
+            const existingUser = await client.query('SELECT password_hash FROM users WHERE id = $1', [row.id]).catch(() => ({ rows: [] }));
+            if (existingUser.rows[0]?.password_hash) {
+              row.password_hash = existingUser.rows[0].password_hash;
+            } else {
+              row.password_hash = '$2a$10$e7wzJkZ71D6K.x74U6/yXe3J6p01.8.847528374958673829102';
+            }
           }
         }
 
@@ -2031,13 +2037,18 @@ router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 
           ? `ON CONFLICT (id) DO UPDATE SET ${updateClause}`
           : (row.id ? `ON CONFLICT (id) DO NOTHING` : `ON CONFLICT DO NOTHING`);
 
-        await client.query(
-          `INSERT INTO "${table}" (${keys.map(k => `"${k}"`).join(', ')}) VALUES (${placeholders})
-           ${conflictClause}`,
-          values
-        ).catch(err => {
+        try {
+          await client.query('SAVEPOINT sp_row');
+          await client.query(
+            `INSERT INTO "${table}" (${keys.map(k => `"${k}"`).join(', ')}) VALUES (${placeholders})
+             ${conflictClause}`,
+            values
+          );
+          await client.query('RELEASE SAVEPOINT sp_row');
+        } catch (err: any) {
+          await client.query('ROLLBACK TO SAVEPOINT sp_row').catch(() => {});
           console.warn(`Restore row insert skipped for ${table}:`, err.message);
-        });
+        }
       }
     }
 
