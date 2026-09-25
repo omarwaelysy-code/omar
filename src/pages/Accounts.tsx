@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Account, AccountType } from '../types';
-import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, BookOpen, User, Layers, AlertCircle, LayoutGrid, List, ChevronRight, ChevronLeft, Save, ChevronDown, CheckCircle2, Upload } from 'lucide-react';
+import { Account, AccountType, JournalEntry } from '../types';
+import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, BookOpen, User, Layers, AlertCircle, LayoutGrid, List, ChevronRight, ChevronLeft, Save, ChevronDown, CheckCircle2, Upload, Wallet, Calendar } from 'lucide-react';
+import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
@@ -28,6 +29,7 @@ export const Accounts: React.FC = () => {
   const [view, setView] = useViewPreference('accounts', 'card');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [types, setTypes] = useState<AccountType[]>([]);
+  const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -143,6 +145,8 @@ export const Accounts: React.FC = () => {
     name: '',
     type_id: '',
     opening_balance: 0,
+    opening_balance_date: new Date().toISOString().slice(0, 10),
+    counter_account_id: '',
     required_sub_account: false,
     parent_id: '',
     is_active: true,
@@ -153,10 +157,12 @@ export const Accounts: React.FC = () => {
     if (user?.company_id) {
       const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
       const unsubTypes = dbService.subscribe<AccountType>('account_types', user.company_id, setTypes);
+      const unsubJournals = dbService.subscribe<JournalEntry>('journal_entries', user.company_id, setEntries);
       setLoading(false);
       return () => {
         unsubAccounts();
         unsubTypes();
+        unsubJournals();
       };
     }
   }, [user?.company_id]);
@@ -222,6 +228,7 @@ export const Accounts: React.FC = () => {
     };
 
     try {
+      let id = '';
       if (editingAccount) {
         const fieldsToTrack = [
           { field: 'code', label: 'الكود' },
@@ -240,12 +247,55 @@ export const Accounts: React.FC = () => {
           'accounts',
           fieldsToTrack
         );
+        id = editingAccount.id;
         showNotification('تم تحديث بيانات الحساب بنجاح', 'success');
       } else {
-        const id = await dbService.add('accounts', accountData);
+        id = await dbService.add('accounts', accountData);
         await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة حساب', `إضافة حساب جديد: ${formData.name}`, 'accounts', id);
         showNotification('تم إضافة الحساب بنجاح', 'success');
       }
+
+      // Handle automatic opening balance journal entry
+      if (formData.opening_balance !== 0) {
+        await dbService.deleteJournalEntryByReference(id, user.company_id);
+        const absBalance = Math.abs(formData.opening_balance);
+        const isNegative = formData.opening_balance < 0;
+        const counterAcc = accounts.find(a => a.id === formData.counter_account_id) || 
+                           accounts.find(a => ['opening_balance', 'capital', 'equity', 'retained_earnings'].includes(a.account_usage || ''));
+
+        if (counterAcc) {
+          await dbService.add('journal_entries', {
+            company_id: user.company_id,
+            date: formData.opening_balance_date || new Date().toISOString().slice(0, 10),
+            description: `رصيد افتتاحي لحساب: ${formData.name}`,
+            reference_id: id,
+            reference_type: 'opening_balance',
+            items: [
+              {
+                account_id: id,
+                account_name: formData.name,
+                debit: isNegative ? 0 : absBalance,
+                credit: isNegative ? absBalance : 0,
+                description: `رصيد افتتاحي: ${formData.name}`
+              },
+              {
+                account_id: counterAcc.id,
+                account_name: counterAcc.name,
+                debit: isNegative ? absBalance : 0,
+                credit: isNegative ? 0 : absBalance,
+                description: `الطرف المقابل للرصيد الافتتاحي: ${formData.name}`
+              }
+            ],
+            total_debit: absBalance,
+            total_credit: absBalance,
+            created_at: new Date().toISOString(),
+            created_by: user.id
+          });
+        }
+      } else if (editingAccount) {
+        await dbService.deleteJournalEntryByReference(editingAccount.id, user.company_id);
+      }
+
       closeModal();
     } catch (e) {
       console.error(e);
@@ -282,11 +332,19 @@ export const Accounts: React.FC = () => {
       const requiredSubAccount = rawVal === true || rawVal === 'true' || rawVal === 1 || rawVal === 't' || rawVal === '1';
 
       setEditingAccount(account);
+      const linkedJe = entries.find(e => 
+        (e.reference_id === account.id || e.reference_number === account.code || e.description?.includes(account.name)) && 
+        e.reference_type === 'opening_balance'
+      );
+      const counterLine = linkedJe?.items?.find((it: any) => it.account_id !== account.id);
+
       const newFormData = {
         code: account.code,
         name: account.name,
         type_id: account.type_id,
         opening_balance: account.opening_balance || 0,
+        opening_balance_date: linkedJe?.date ? new Date(linkedJe.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+        counter_account_id: counterLine?.account_id || '',
         required_sub_account: requiredSubAccount,
         parent_id: account.parent_id || '',
         is_active: account.is_active !== false,
@@ -301,6 +359,8 @@ export const Accounts: React.FC = () => {
         name: '',
         type_id: '',
         opening_balance: 0,
+        opening_balance_date: new Date().toISOString().slice(0, 10),
+        counter_account_id: '',
         required_sub_account: false,
         parent_id: '',
         is_active: true,
@@ -815,6 +875,125 @@ export const Accounts: React.FC = () => {
                         </motion.div>
                       )}
                     </AnimatePresence>
+                  </div>
+                </div>
+
+                {/* Opening Balance Section */}
+                <div className="p-3 bg-slate-50/70 rounded-2xl border border-slate-200/70 space-y-3">
+                  {(() => {
+                    const linkedJe = entries.find(e => 
+                      (e.reference_id === editingAccount?.id || e.reference_number === editingAccount?.code || e.description?.includes(formData.name)) && 
+                      e.reference_type === 'opening_balance'
+                    );
+                    return (
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 bg-amber-500 text-white rounded-md flex items-center justify-center shadow-xs">
+                            <Wallet size={13} />
+                          </div>
+                          <h4 className="text-xs font-black text-slate-900">
+                            {language === 'ar' ? 'الرصيد الافتتاحي للحساب' : 'Account Opening Balance'}
+                          </h4>
+                        </div>
+                        {linkedJe?.entry_number && (
+                          <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 border border-indigo-200 rounded-lg text-indigo-700 font-mono text-xs font-black shadow-xs">
+                            <FileText size={13} className="text-indigo-600" />
+                            <span>{language === 'ar' ? `رقم القيد: ${linkedJe.entry_number}` : `JE #: ${linkedJe.entry_number}`}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-right">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">
+                        {language === 'ar' ? 'الرصيد الافتتاحي (مدين بالموجب / دائن بالسالب)' : 'Opening Balance'}
+                      </label>
+                      <div className="relative group">
+                        <Wallet className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-emerald-500 pointer-events-none`} size={13} />
+                        <FormattedNumberInput
+                          className="w-full px-2.5 py-1.5 bg-white border border-emerald-200 rounded-lg text-xs font-black text-emerald-700 outline-none focus:ring-1 focus:ring-emerald-500 ps-7"
+                          value={formData.opening_balance}
+                          onChange={(val) => setFormData({ ...formData, opening_balance: val })}
+                          dir={dir === 'rtl' ? 'rtl' : 'ltr'}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">
+                        {language === 'ar' ? 'تاريخ الرصيد' : 'As of Date'}
+                      </label>
+                      <div className="relative group">
+                        <Calendar className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={13} />
+                        <input
+                          type="date"
+                          className="w-full pr-7 pl-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs"
+                          value={formData.opening_balance_date}
+                          onChange={(e) => setFormData({ ...formData, opening_balance_date: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    {formData.opening_balance !== 0 && (
+                      <div className="sm:col-span-2 p-2.5 bg-white rounded-xl border border-slate-200 space-y-2 shadow-xs">
+                        <h5 className="text-xs font-black text-slate-900 leading-none">
+                          {language === 'ar' ? 'إعدادات قيد الموازنة الافتتاحية' : 'Opening Journal Settings'}
+                        </h5>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">
+                            {language === 'ar' ? 'حساب الطرف الآخر للقيد (الرصيد الافتتاحي / حقوق الملكية)' : 'Counter Account'}
+                          </label>
+                          <select
+                            required
+                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                            value={formData.counter_account_id}
+                            onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}
+                          >
+                            <option value="">{language === 'ar' ? 'اختر حساب الطرف الآخر...' : 'Select counter account...'}</option>
+                            {accounts
+                              .filter(acc => acc.id !== editingAccount?.id && ['opening_balance', 'capital', 'equity', 'retained_earnings', 'other'].includes(acc.account_usage || ''))
+                              .map(acc => (
+                                <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
+                              ))}
+                          </select>
+                        </div>
+
+                        {formData.counter_account_id && (() => {
+                          const accCounter = accounts.find(a => a.id === formData.counter_account_id);
+                          const linkedJe = entries.find(e => 
+                            (e.reference_id === editingAccount?.id || e.reference_number === editingAccount?.code || e.description?.includes(formData.name)) && 
+                            e.reference_type === 'opening_balance'
+                          );
+
+                          return (
+                            <div className="rounded-lg overflow-hidden border border-slate-100 shadow-xs">
+                              <JournalEntryPreview
+                                title={language === 'ar' ? 'معاينة قيد الرصيد الافتتاحي' : 'Opening Entry Preview'}
+                                entry_number={linkedJe?.entry_number}
+                                items={[
+                                  {
+                                    account_code: formData.code,
+                                    account_name: formData.name || 'هذا الحساب',
+                                    debit: formData.opening_balance > 0 ? formData.opening_balance : 0,
+                                    credit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
+                                    description: `رصيد افتتاحي: ${formData.name}`
+                                  },
+                                  {
+                                    account_code: accCounter?.code || '',
+                                    account_name: accCounter?.name || '',
+                                    debit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
+                                    credit: formData.opening_balance > 0 ? formData.opening_balance : 0,
+                                    description: `الطرف المقابل: ${formData.name}`
+                                  }
+                                ]}
+                              />
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
                 </div>
 

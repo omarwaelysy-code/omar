@@ -62,6 +62,7 @@ interface PostingTransactionItem {
   name: string;
   count: number;
   total_value: number;
+  counter_value?: number;
   journal_value: number;
   variance: number;
   unposted_count: number;
@@ -167,8 +168,9 @@ export const DataCountsValues: React.FC = () => {
         'القسم': 'حركات تلزم قيود',
         'نوع الحركة': pt.name,
         'العدد': pt.count,
-        'إجمالي القيم (ج.م)': pt.total_value,
-        'قيم القيود (ج.م)': pt.journal_value,
+        'صافي الحركة (المستندات)': pt.total_value,
+        'باقي أطراف القيد': pt.counter_value || pt.journal_value,
+        'قيم القيود المرحلة (ج.م)': pt.journal_value,
         'فرق القيمة': pt.variance,
         'غير مرحل (عدد)': pt.unposted_count,
         'غير مرحل (قيمة)': pt.unposted_value,
@@ -499,7 +501,8 @@ export const DataCountsValues: React.FC = () => {
                 <tr className="bg-stone-50/80 text-stone-600 border-b border-stone-200 font-black">
                   <th className="py-2 px-3 whitespace-nowrap">{language === 'ar' ? 'نوع الحركة / المستند' : 'Type'}</th>
                   <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'العدد' : 'Count'}</th>
-                  <th className="py-2 px-3 whitespace-nowrap text-left">{language === 'ar' ? 'إجمالي القيم' : 'Total Value'}</th>
+                  <th className="py-2 px-3 whitespace-nowrap text-left">{language === 'ar' ? 'صافي الحركة (المستندات)' : 'Net Movement'}</th>
+                  <th className="py-2 px-3 whitespace-nowrap text-left">{language === 'ar' ? 'باقي أطراف القيد' : 'Counter Sides'}</th>
                   <th className="py-2 px-3 whitespace-nowrap text-left">{language === 'ar' ? 'قيم القيود المرحلة' : 'Journal Value'}</th>
                   <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'فرق القيمة' : 'Variance'}</th>
                   <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'حركات غير مرحلة' : 'Unposted'}</th>
@@ -530,6 +533,10 @@ export const DataCountsValues: React.FC = () => {
 
                       <td className="py-1.5 px-3 text-left font-mono font-black text-stone-900 text-xs">
                         {formatNumber(row.total_value)} EGP
+                      </td>
+
+                      <td className="py-1.5 px-3 text-left font-mono font-black text-indigo-700 text-xs">
+                        {formatNumber(row.counter_value || row.journal_value)} EGP
                       </td>
 
                       <td className="py-1.5 px-3 text-left font-mono font-black text-emerald-700 text-xs">
@@ -607,6 +614,102 @@ export const DataCountsValues: React.FC = () => {
                   );
                 })}
               </tbody>
+              <tfoot>
+                <tr className="bg-stone-100/90 border-t-2 border-stone-300 font-black text-stone-900">
+                  <td className="py-2.5 px-3 flex items-center gap-2">
+                    <span className="text-xs font-black text-emerald-950">{language === 'ar' ? 'الإجمالي العام لكافة الحركات' : 'Grand Total'}</span>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black">
+                      {filteredPosting.length} {language === 'ar' ? 'نوع مستند' : 'Types'}
+                    </span>
+                  </td>
+
+                  <td className="py-2.5 px-3 text-center">
+                    <span className="px-2 py-0.5 rounded-md bg-stone-200/90 font-mono font-black text-stone-900 text-xs">
+                      {formatNumber(filteredPosting.reduce((s, r) => s + (r.count || 0), 0))}
+                    </span>
+                  </td>
+
+                  <td className="py-2.5 px-3 text-left font-mono font-black text-stone-900 text-xs">
+                    {formatNumber(filteredPosting.reduce((s, r) => s + (r.total_value || 0), 0))} EGP
+                  </td>
+
+                  <td className="py-2.5 px-3 text-left font-mono font-black text-indigo-700 text-xs">
+                    {formatNumber(filteredPosting.reduce((s, r) => s + (r.counter_value || r.journal_value || 0), 0))} EGP
+                  </td>
+
+                  <td className="py-2.5 px-3 text-left font-mono font-black text-emerald-700 text-xs">
+                    {formatNumber(filteredPosting.reduce((s, r) => s + (r.journal_value || 0), 0))} EGP
+                  </td>
+
+                  <td className="py-2.5 px-3 text-center font-mono text-xs">
+                    {(() => {
+                      const totalVar = filteredPosting.reduce((s, r) => s + (r.variance || 0), 0);
+                      return Math.abs(totalVar) < 0.05 ? (
+                        <span className="text-emerald-700 font-black">0.00</span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 font-black">
+                          {formatNumber(totalVar)}
+                        </span>
+                      );
+                    })()}
+                  </td>
+
+                  <td className="py-2.5 px-3 text-center">
+                    {(() => {
+                      const unposted = filteredPosting.reduce((s, r) => s + (r.unposted_count || 0), 0);
+                      return unposted === 0 ? (
+                        <span className="text-emerald-700 font-black text-xs">0</span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-black text-xs">
+                          {unposted}
+                        </span>
+                      );
+                    })()}
+                  </td>
+
+                  <td className="py-2.5 px-3 text-center">
+                    {(() => {
+                      const unbal = filteredPosting.reduce((s, r) => s + (r.unbalanced_entries_count || 0), 0);
+                      return unbal === 0 ? (
+                        <span className="text-emerald-700 font-black text-xs">0</span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-900 font-black text-xs">
+                          {unbal}
+                        </span>
+                      );
+                    })()}
+                  </td>
+
+                  <td className="py-2.5 px-3 text-center">
+                    {(() => {
+                      const missing = filteredPosting.reduce((s, r) => s + (r.missing_accounts_count || 0), 0);
+                      return missing === 0 ? (
+                        <span className="text-emerald-700 font-black text-xs">0</span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-900 font-black text-xs">
+                          {missing}
+                        </span>
+                      );
+                    })()}
+                  </td>
+
+                  <td className="py-2.5 px-3 text-center">
+                    {filteredPosting.every(r => r.unposted_count === 0 && r.unbalanced_entries_count === 0 && r.missing_accounts_count === 0 && Math.abs(r.variance) < 1) ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-black text-[11px] border border-emerald-300">
+                        <CheckCircle2 size={12} />
+                        {language === 'ar' ? 'متطابق 100%' : '100% Balanced'}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-black text-[11px] border border-amber-300">
+                        <AlertTriangle size={12} />
+                        {language === 'ar' ? 'فروقات قائمة' : 'Variances'}
+                      </span>
+                    )}
+                  </td>
+
+                  <td className="py-2.5 px-3 text-center text-stone-400 font-bold text-[11px]">—</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
@@ -670,6 +773,30 @@ export const DataCountsValues: React.FC = () => {
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="bg-blue-50/70 border-t-2 border-blue-200 font-black text-slate-900">
+                  <td className="py-2.5 px-3 flex items-center gap-2">
+                    <span className="text-xs font-black text-blue-950">{language === 'ar' ? 'إجمالي العمليات غير المقيدة' : 'Total Operational'}</span>
+                    <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-black">
+                      {filteredOperational.length} {language === 'ar' ? 'نوع مستند' : 'Types'}
+                    </span>
+                  </td>
+                  <td className="py-2.5 px-3 text-center">
+                    <span className="px-2 py-0.5 rounded-md bg-stone-200/90 font-mono font-black text-stone-900 text-xs">
+                      {formatNumber(filteredOperational.reduce((s, r) => s + (r.count || 0), 0))}
+                    </span>
+                  </td>
+                  <td className="py-2.5 px-3 text-left font-mono font-black text-blue-900 text-xs">
+                    {formatNumber(filteredOperational.reduce((s, r) => s + (r.total_value || 0), 0))} EGP
+                  </td>
+                  <td className="py-2.5 px-3 text-stone-500 text-xs">—</td>
+                  <td className="py-2.5 px-3 text-center">
+                    <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold text-[11px]">
+                      {language === 'ar' ? 'إجمالي مسجل' : 'Total Recorded'}
+                    </span>
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>

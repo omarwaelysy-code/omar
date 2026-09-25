@@ -49,6 +49,14 @@ export const PaymentMethods: React.FC = () => {
   const [copiedSwift, setCopiedSwift] = useState(false);
   const bankPickerRef = useRef<HTMLDivElement>(null);
   
+  const linkedEntry = useMemo(() => {
+    if (!editingMethod) return null;
+    return journalEntries.find(je => 
+      (je.reference_id === editingMethod.id || je.reference_number === editingMethod.code || je.description?.includes(editingMethod.name)) && 
+      je.reference_type === 'opening_balance'
+    );
+  }, [editingMethod, journalEntries]);
+
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -1487,13 +1495,21 @@ export const PaymentMethods: React.FC = () => {
 
                      {/* Opening Balance Section */}
                      <div className="p-2.5 bg-slate-50/60 rounded-xl border border-slate-200/60 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 bg-amber-500 text-white rounded-md flex items-center justify-center shadow-xs">
-                            <Wallet size={13} />
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 bg-amber-500 text-white rounded-md flex items-center justify-center shadow-xs">
+                              <Wallet size={13} />
+                            </div>
+                            <h4 className="text-xs font-black text-slate-900">
+                              {language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Setup'}
+                            </h4>
                           </div>
-                          <h4 className="text-xs font-black text-slate-900">
-                            {language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Setup'}
-                          </h4>
+                          {linkedEntry?.entry_number && (
+                            <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-100/90 border border-amber-300 rounded-lg text-amber-900 font-mono font-black text-xs shadow-xs">
+                              <Hash size={13} className="text-amber-700" />
+                              <span>{language === 'ar' ? `رقم القيد: ${linkedEntry.entry_number}` : `JE #: ${linkedEntry.entry_number}`}</span>
+                            </div>
+                          )}
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-right">
                            <div>
@@ -1545,14 +1561,17 @@ export const PaymentMethods: React.FC = () => {
                                     <div className="rounded-lg overflow-hidden border border-slate-100 shadow-xs">
                                        <JournalEntryPreview 
                                          title="معاينة قيد الافتتاح"
+                                         entry_number={linkedEntry?.entry_number}
                                          items={[
                                             {
+                                               account_code: accounts.find(a => a.id === formData.account_id)?.code,
                                                account_name: accounts.find(a => a.id === formData.account_id)?.name || 'حساب المصرف',
                                                debit: formData.opening_balance > 0 ? formData.opening_balance : 0,
                                                credit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
                                                description: 'رصيد افتتاحي'
                                             },
                                             {
+                                               account_code: accounts.find(a => a.id === formData.counter_account_id)?.code,
                                                account_name: accounts.find(a => a.id === formData.counter_account_id)?.name || 'حساب الموازنة',
                                                debit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
                                                credit: formData.opening_balance > 0 ? formData.opening_balance : 0,

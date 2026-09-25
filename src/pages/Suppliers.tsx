@@ -1503,12 +1503,28 @@ export const Suppliers: React.FC = () => {
 
                       {formData.opening_balance !== 0 && (
                         <div className="sm:col-span-2 lg:col-span-4 p-2.5 bg-slate-50/60 rounded-xl border border-slate-200/60 space-y-2 animate-in slide-in-from-bottom-2 duration-300">
-                           <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 bg-emerald-600 text-white rounded-md flex items-center justify-center shadow-xs">
-                                 <Wallet size={13} />
-                              </div>
-                              <h4 className="text-xs font-black text-slate-900">{language === 'ar' ? 'إعدادات الرصيد الافتتاحي' : 'Opening Balance Settings'}</h4>
-                           </div>
+                           {(() => {
+                             const linkedJe = entries.find(e => 
+                               (e.reference_id === editingSupplier?.id || e.reference_number === editingSupplier?.code || e.description?.includes(formData.name)) && 
+                               e.reference_type === 'opening_balance'
+                             );
+                             return (
+                               <div className="flex items-center justify-between flex-wrap gap-2">
+                                 <div className="flex items-center gap-2">
+                                   <div className="w-6 h-6 bg-emerald-600 text-white rounded-md flex items-center justify-center shadow-xs">
+                                      <Wallet size={13} />
+                                   </div>
+                                   <h4 className="text-xs font-black text-slate-900">{language === 'ar' ? 'إعدادات الرصيد الافتتاحي' : 'Opening Balance Settings'}</h4>
+                                 </div>
+                                 {linkedJe?.entry_number && (
+                                   <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 border border-indigo-200 rounded-lg text-indigo-700 font-mono text-xs font-black shadow-xs">
+                                     <FileText size={13} className="text-indigo-600" />
+                                     <span>{language === 'ar' ? `رقم القيد: ${linkedJe.entry_number}` : `JE #: ${linkedJe.entry_number}`}</span>
+                                   </div>
+                                 )}
+                               </div>
+                             );
+                           })()}
 
                            <div className="space-y-2">
                               <div>
@@ -1543,27 +1559,35 @@ export const Suppliers: React.FC = () => {
                                  const supplierAccount = accounts.find(a => a.id === finalAccountId);
                                  const counterAccount = accounts.find(a => a.id === finalCounterAccountId);
 
-                                 return (
-                                   <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-xs">
-                                      <JournalEntryPreview 
-                                        title={language === 'ar' ? 'معاينة قيد الرصيد' : 'Entry Preview'}
-                                        items={[
-                                          {
-                                            account_name: supplierAccount?.name || '',
-                                            debit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
-                                            credit: formData.opening_balance > 0 ? formData.opening_balance : 0,
-                                            description: language === 'ar' ? `رصيد أول: ${formData.name}` : `Opening: ${formData.name}`
-                                          },
-                                          {
-                                            account_name: counterAccount?.name || '',
-                                            debit: formData.opening_balance > 0 ? formData.opening_balance : 0,
-                                            credit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
-                                            description: language === 'ar' ? `الطرف المقابل: ${formData.name}` : `Counter: ${formData.name}`
-                                          }
-                                        ]}
-                                      />
-                                   </div>
-                                 );
+                                  const linkedJe = entries.find(e => 
+                                    (e.reference_id === editingSupplier?.id || e.reference_number === editingSupplier?.code || e.description?.includes(formData.name)) && 
+                                    e.reference_type === 'opening_balance'
+                                  );
+
+                                  return (
+                                    <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-xs">
+                                       <JournalEntryPreview 
+                                         title={language === 'ar' ? 'معاينة قيد الرصيد' : 'Entry Preview'}
+                                         entry_number={linkedJe?.entry_number}
+                                         items={[
+                                           {
+                                             account_code: supplierAccount?.code || '',
+                                             account_name: supplierAccount?.name || '',
+                                             debit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
+                                             credit: formData.opening_balance > 0 ? formData.opening_balance : 0,
+                                             description: language === 'ar' ? `رصيد أول: ${formData.name}` : `Opening: ${formData.name}`
+                                           },
+                                           {
+                                             account_code: counterAccount?.code || '',
+                                             account_name: counterAccount?.name || '',
+                                             debit: formData.opening_balance > 0 ? formData.opening_balance : 0,
+                                             credit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
+                                             description: language === 'ar' ? `الطرف المقابل: ${formData.name}` : `Counter: ${formData.name}`
+                                           }
+                                         ]}
+                                       />
+                                    </div>
+                                  );
                               })()}
                            </div>
                         </div>

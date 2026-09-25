@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
+import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { dbService } from '../services/dbService';
 import { formatNumber, formatDate } from '../utils/formatUtils';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -1017,6 +1018,38 @@ export const OpeningStockBalances: React.FC = () => {
                     onChange={setAttachments}
                   />
                 </div>
+
+                                {/* Journal Entry Preview */}
+                {formData.debit_account_id && formData.credit_account_id && (() => {
+                  const totalCost = items.reduce((sum, it) => sum + (Number(it.quantity || 0) * Number(it.unit_cost || 0)), 0);
+                  if (totalCost <= 0) return null;
+                  const debitAcc = accounts.find(a => a.id === formData.debit_account_id);
+                  const creditAcc = accounts.find(a => a.id === formData.credit_account_id);
+                  return (
+                    <div className="pt-2">
+                      <JournalEntryPreview
+                        title={language === 'ar' ? 'معاينة القيد المحاسبي المتولد آلياً لرصيد أول المدة' : 'Opening Stock Journal Entry Preview'}
+                        entry_number={editingDoc?.entry_number}
+                        items={[
+                          {
+                            account_code: debitAcc?.code,
+                            account_name: debitAcc?.name || 'حساب المخزون',
+                            debit: totalCost,
+                            credit: 0,
+                            description: language === 'ar' ? `رصيد أول المدة للمخزون - ${formData.description || ''}` : 'Opening Stock'
+                          },
+                          {
+                            account_code: creditAcc?.code,
+                            account_name: creditAcc?.name || 'حساب الطرف المقابل',
+                            debit: 0,
+                            credit: totalCost,
+                            description: language === 'ar' ? 'الطرف الدائن المقابل لرصيد أول المدة' : 'Counter Account'
+                          }
+                        ]}
+                      />
+                    </div>
+                  );
+                })()}
 
                 <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
                   <button
