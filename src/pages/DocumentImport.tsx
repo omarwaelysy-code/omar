@@ -157,7 +157,8 @@ interface ValidationError {
 }
 
 /**
- * Resiliently updates an existing journal entry or creates a new one if not found or invalid
+ * Resiliently updates an existing journal entry or creates a new one if not found or invalid.
+ * Strictly preserves the existing journal entry number (entry_number) during document updates/edits.
  */
 async function saveOrUpdateJournalEntry(
   journalData: any,
@@ -166,32 +167,39 @@ async function saveOrUpdateJournalEntry(
   preferredJournalNumber?: string,
   companyId?: string
 ): Promise<{ id: string; entry_number: string }> {
+  // Determine preserved journal entry number
+  const preservedNumber = preferredJournalNumber || journalData?.entry_number || (dbService as any)._recentDeletedJEs?.[referenceId]?.entry_number;
+
   // 1. If preferredJournalId is provided, try updating it
   if (preferredJournalId) {
     try {
       await apiRequest(`/journal_entries/${preferredJournalId}`, 'PUT', {
         ...journalData,
+        entry_number: preservedNumber || undefined,
         reference_id: referenceId,
         company_id: companyId
       });
-      return { id: preferredJournalId, entry_number: preferredJournalNumber || '' };
+      return { id: preferredJournalId, entry_number: preservedNumber || '' };
     } catch (e: any) {
       console.warn(`[DocumentImport] Preferred journal entry ${preferredJournalId} PUT failed, falling back:`, e);
     }
   }
 
   // 2. Check if a journal entry already exists for this document reference in the database
+  let existingNumber = preservedNumber;
   if (companyId && referenceId) {
     try {
       const existing = await dbService.getJournalEntryByReference(referenceId, companyId);
       if (existing?.id) {
+        existingNumber = existing.entry_number || existingNumber;
         try {
           await apiRequest(`/journal_entries/${existing.id}`, 'PUT', {
             ...journalData,
+            entry_number: existingNumber || undefined,
             reference_id: referenceId,
             company_id: companyId
           });
-          return { id: existing.id, entry_number: existing.entry_number || preferredJournalNumber || '' };
+          return { id: existing.id, entry_number: existingNumber || '' };
         } catch (updateErr) {
           console.warn(`[DocumentImport] Existing journal entry ${existing.id} PUT failed, deleting before recreating:`, updateErr);
           await dbService.deleteJournalEntryByReference(referenceId, companyId);
@@ -202,13 +210,15 @@ async function saveOrUpdateJournalEntry(
     }
   }
 
-  // 3. Create fresh journal entry
+  // 3. Create fresh journal entry, strictly preserving the existing entry_number!
+  const finalEntryNumber = existingNumber || preferredJournalNumber || journalData?.entry_number || (dbService as any)._recentDeletedJEs?.[referenceId]?.entry_number;
   const jeRes: any = await apiRequest('/journal_entries', 'POST', {
     ...journalData,
+    entry_number: finalEntryNumber || undefined,
     reference_id: referenceId,
     company_id: companyId
   });
-  return { id: jeRes.id, entry_number: jeRes.entry_number || '' };
+  return { id: jeRes.id, entry_number: jeRes.entry_number || finalEntryNumber || '' };
 }
 
 export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {

@@ -248,6 +248,7 @@ export class PostingService {
     }
 
     return {
+      entry_number: (invoice as any).entry_number || (invoice as any).created_journal_number || undefined,
       date: invoice.date,
       reference_number: invoice.invoice_number,
       reference_id: invoice.id,
@@ -470,6 +471,7 @@ export class PostingService {
     }
 
     return {
+      entry_number: (doc as any).entry_number || (doc as any).created_journal_number || undefined,
       date: doc.date,
       reference_number: doc.return_number || doc.id.slice(-6),
       reference_id: doc.id,
@@ -648,6 +650,7 @@ export class PostingService {
     }
 
     return {
+      entry_number: (doc as any).entry_number || (doc as any).created_journal_number || undefined,
       date: doc.date,
       reference_number: doc.invoice_number,
       reference_id: doc.id,
@@ -826,6 +829,7 @@ export class PostingService {
     }
 
     return {
+      entry_number: (doc as any).entry_number || (doc as any).created_journal_number || undefined,
       date: doc.date,
       reference_number: doc.return_number || doc.id.slice(-6),
       reference_id: doc.id,

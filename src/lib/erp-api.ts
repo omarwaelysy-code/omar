@@ -8994,6 +8994,24 @@ router.post('/journal_entries', authenticateToken, TransactionsLimitMiddleware, 
 
     // Duplicate skip removed
 
+    // If a journal entry already exists for this reference_id in the same company, preserve its number and clean it up safely
+    let existingEntryId: string | null = null;
+    let existingEntryNumber: string | null = null;
+    if (entryData.reference_id && companyId) {
+      const existingRes = await client.query(
+        'SELECT id, entry_number FROM journal_entries WHERE company_id = $1 AND reference_id = $2 LIMIT 1',
+        [companyId, entryData.reference_id]
+      );
+      if (existingRes.rows.length > 0) {
+        existingEntryId = existingRes.rows[0].id;
+        existingEntryNumber = existingRes.rows[0].entry_number;
+      }
+    }
+
+    if (!entryData.entry_number && existingEntryNumber) {
+      entryData.entry_number = existingEntryNumber;
+    }
+
     const entryId = entryData.id || uuidv4();
     if (!isUUID(entryId)) return sendError(res, 400, 'Invalid Entry ID format');
 
@@ -9002,8 +9020,14 @@ router.post('/journal_entries', authenticateToken, TransactionsLimitMiddleware, 
       companyId,
       'journal_entries',
       entryData.date as string,
-      entryData.entry_number
+      entryData.entry_number,
+      existingEntryId || undefined
     );
+
+    if (existingEntryId) {
+      await client.query('DELETE FROM journal_entries WHERE id = $1', [existingEntryId]);
+    }
+
     const finalEntryData = { ...entryData, id: entryId };
     const keys = Object.keys(finalEntryData);
     const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
@@ -9085,6 +9109,17 @@ router.put('/journal_entries/:id', authenticateToken, async (req: AuthRequest, r
     const entryData = sanitizeData('journal_entries', rawEntryData);
     entryData.total_debit = roundedDebit;
     entryData.total_credit = roundedCredit;
+
+    if (entryData.entry_number) {
+      entryData.entry_number = await ensureUniqueSequenceNumber(
+        client,
+        companyId || '',
+        'journal_entries',
+        entryData.date as string,
+        entryData.entry_number,
+        entryId
+      );
+    }
     
     const keys = Object.keys(entryData);
     const setClause = keys.map((key, i) => `"${key}" = $${i + 1}`).join(', ');
@@ -9118,9 +9153,30 @@ router.put('/journal_entries/:id', authenticateToken, async (req: AuthRequest, r
       );
     }
 
+    const finalRefType = (entryData.reference_type || req.body.reference_type) as string;
+    const finalRefId = (entryData.reference_id || req.body.reference_id) as string;
+    if (finalRefType && finalRefId && ['invoice', 'return', 'sales_return'].includes(finalRefType)) {
+      await syncCOGSForJournalEntry(client, companyId || '', entryId, finalRefId, finalRefType);
+    }
+
     await balanceAndValidateJournalEntry(client, entryId);
     await client.query('COMMIT');
-    res.json({ success: true });
+
+    logAudit({
+      company_id: req.user?.company_id,
+      user_id: req.user?.id,
+      username: (req.user as any)?.username || req.user?.email,
+      user_email: req.user?.email,
+      action: 'UPDATE',
+      module: 'JOURNAL_ENTRIES',
+      details: `Updated journal entry: ${entryData.reference_number || entryData.entry_number || entryId}`,
+      entity_type: 'journal_entries',
+      entity_id: entryId,
+      ip_address: getIp(req),
+      metadata: { entryData, itemCount: (items || []).length }
+    });
+
+    res.json({ success: true, entry_number: entryData.entry_number });
   } catch (error: any) {
     if (client) await client.query('ROLLBACK');
     console.error('[CRASH PREVENTED] Journal entry update error:', error);
