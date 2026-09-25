@@ -2208,6 +2208,8 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         numCol: 'invoice_number',
         dateCol: 'date',
         amountCol: 'total_amount',
+        netCol: 'COALESCE(subtotal, total_amount - COALESCE(tax_amount, 0))',
+        counterCol: 'COALESCE(tax_amount, total_amount - COALESCE(subtotal, total_amount))',
         refTypes: ['invoice', 'sales_invoice'],
         partyCol: 'customer_name',
         partyIdCol: 'customer_id',
@@ -2221,6 +2223,8 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         numCol: 'invoice_number',
         dateCol: 'date',
         amountCol: 'total_amount',
+        netCol: 'COALESCE(subtotal, total_amount - COALESCE(tax_amount, 0))',
+        counterCol: 'COALESCE(tax_amount, total_amount - COALESCE(subtotal, total_amount))',
         refTypes: ['purchase_invoice', 'bill'],
         partyCol: 'supplier_name',
         partyIdCol: 'supplier_id',
@@ -2234,6 +2238,8 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         numCol: 'return_number',
         dateCol: 'date',
         amountCol: 'total_amount',
+        netCol: 'total_amount - COALESCE(withholding_tax_amount, 0)',
+        counterCol: 'COALESCE(withholding_tax_amount, 0)',
         refTypes: ['return', 'sales_return'],
         partyCol: 'customer_name',
         partyIdCol: 'customer_id',
@@ -2247,6 +2253,8 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         numCol: 'return_number',
         dateCol: 'date',
         amountCol: 'total_amount',
+        netCol: 'total_amount - COALESCE(withholding_tax_amount, 0)',
+        counterCol: 'COALESCE(withholding_tax_amount, 0)',
         refTypes: ['purchase_return'],
         partyCol: 'supplier_name',
         partyIdCol: 'supplier_id',
@@ -2440,6 +2448,8 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
       try {
         let count = 0;
         let totalValue = 0;
+        let netValue = 0;
+        let counterValue = 0;
 
         if (cfg.isManualJE) {
           const manualRes: any = await client.query(
@@ -2450,18 +2460,35 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
           );
           count = manualRes.rows[0]?.count || 0;
           totalValue = parseFloat(manualRes.rows[0]?.total_val || 0);
+          netValue = totalValue;
+          counterValue = 0;
         } else if (cfg.customCountSql) {
           const customRes: any = await client.query(cfg.customCountSql, [companyId]);
           count = customRes.rows[0]?.count || 0;
           totalValue = parseFloat(customRes.rows[0]?.total_val || 0);
+          netValue = totalValue;
+          counterValue = 0;
         } else {
           const whereClause = cfg.customWhere ? `company_id = $1 AND (${cfg.customWhere})` : `company_id = $1`;
+          const netExpr = cfg.netCol || cfg.amountCol;
+          const counterExpr = cfg.counterCol || '0';
           const baseRes: any = await client.query(
-            `SELECT COUNT(*)::int as count, COALESCE(SUM(${cfg.amountCol}), 0)::numeric as total_val FROM "${cfg.table}" WHERE ${whereClause}`,
+            `SELECT 
+               COUNT(*)::int as count, 
+               COALESCE(SUM(${cfg.amountCol}), 0)::numeric as total_val,
+               COALESCE(SUM(${netExpr}), 0)::numeric as net_val,
+               COALESCE(SUM(${counterExpr}), 0)::numeric as counter_val
+             FROM "${cfg.table}" 
+             WHERE ${whereClause}`,
             [companyId]
           );
           count = baseRes.rows[0]?.count || 0;
           totalValue = parseFloat(baseRes.rows[0]?.total_val || 0);
+          netValue = parseFloat(baseRes.rows[0]?.net_val || 0);
+          counterValue = parseFloat(baseRes.rows[0]?.counter_val || 0);
+          if (counterValue === 0 && Math.abs(totalValue - netValue) > 0.01) {
+            counterValue = parseFloat((totalValue - netValue).toFixed(2));
+          }
         }
 
         let journalValue = 0;
@@ -2644,6 +2671,8 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
           name: cfg.name,
           count,
           total_value: totalValue,
+          net_value: netValue,
+          counter_value: counterValue,
           journal_value: journalValue,
           variance: parseFloat((totalValue - journalValue).toFixed(2)),
           unposted_count: unpostedCount,

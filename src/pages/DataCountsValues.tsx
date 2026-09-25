@@ -62,6 +62,7 @@ interface PostingTransactionItem {
   name: string;
   count: number;
   total_value: number;
+  net_value?: number;
   counter_value?: number;
   journal_value: number;
   variance: number;
@@ -501,9 +502,18 @@ export const DataCountsValues: React.FC = () => {
                 <tr className="bg-stone-50/80 text-stone-600 border-b border-stone-200 font-black">
                   <th className="py-2 px-3 whitespace-nowrap">{language === 'ar' ? 'نوع الحركة / المستند' : 'Type'}</th>
                   <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'العدد' : 'Count'}</th>
-                  <th className="py-2 px-3 whitespace-nowrap text-left">{language === 'ar' ? 'صافي الحركة (المستندات)' : 'Net Movement'}</th>
-                  <th className="py-2 px-3 whitespace-nowrap text-left">{language === 'ar' ? 'باقي أطراف القيد' : 'Counter Sides'}</th>
-                  <th className="py-2 px-3 whitespace-nowrap text-left">{language === 'ar' ? 'قيم القيود المرحلة' : 'Journal Value'}</th>
+                  <th className="py-2 px-3 whitespace-nowrap text-left">
+                    <div>{language === 'ar' ? 'صافي الحركة (المستندات)' : 'Net Movement'}</div>
+                    <div className="text-[10px] text-stone-400 font-normal">{language === 'ar' ? 'طرف أساسي (+)' : 'Base (+)'}</div>
+                  </th>
+                  <th className="py-2 px-3 whitespace-nowrap text-left">
+                    <div>{language === 'ar' ? 'باقي أطراف القيد' : 'Counter Sides'}</div>
+                    <div className="text-[10px] text-indigo-400 font-normal">{language === 'ar' ? 'ضرائب ومتمم (+)' : 'Tax/Sides (+)'}</div>
+                  </th>
+                  <th className="py-2 px-3 whitespace-nowrap text-left">
+                    <div>{language === 'ar' ? 'الطرف الآخر للقيد' : 'Journal Total'}</div>
+                    <div className="text-[10px] text-emerald-600 font-normal">{language === 'ar' ? 'المساوي للقيد (=)' : 'Total (=)'}</div>
+                  </th>
                   <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'فرق القيمة' : 'Variance'}</th>
                   <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'حركات غير مرحلة' : 'Unposted'}</th>
                   <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'قيود غير متزنة' : 'Unbalanced'}</th>
@@ -532,11 +542,11 @@ export const DataCountsValues: React.FC = () => {
                       </td>
 
                       <td className="py-1.5 px-3 text-left font-mono font-black text-stone-900 text-xs">
-                        {formatNumber(row.total_value)} EGP
+                        {formatNumber(row.net_value ?? (row.total_value - (row.counter_value || 0)))} EGP
                       </td>
 
                       <td className="py-1.5 px-3 text-left font-mono font-black text-indigo-700 text-xs">
-                        {formatNumber(row.counter_value || row.journal_value)} EGP
+                        {formatNumber(row.counter_value || 0)} EGP
                       </td>
 
                       <td className="py-1.5 px-3 text-left font-mono font-black text-emerald-700 text-xs">
@@ -630,11 +640,11 @@ export const DataCountsValues: React.FC = () => {
                   </td>
 
                   <td className="py-2.5 px-3 text-left font-mono font-black text-stone-900 text-xs">
-                    {formatNumber(filteredPosting.reduce((s, r) => s + (r.total_value || 0), 0))} EGP
+                    {formatNumber(filteredPosting.reduce((s, r) => s + (r.net_value ?? (r.total_value - (r.counter_value || 0))), 0))} EGP
                   </td>
 
                   <td className="py-2.5 px-3 text-left font-mono font-black text-indigo-700 text-xs">
-                    {formatNumber(filteredPosting.reduce((s, r) => s + (r.counter_value || r.journal_value || 0), 0))} EGP
+                    {formatNumber(filteredPosting.reduce((s, r) => s + (r.counter_value || 0), 0))} EGP
                   </td>
 
                   <td className="py-2.5 px-3 text-left font-mono font-black text-emerald-700 text-xs">
