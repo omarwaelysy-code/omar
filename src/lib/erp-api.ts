@@ -1719,7 +1719,7 @@ function getBackupQueryForTable(table: string, companyId: string, isExcel: boole
   }
   if (table === 'purchase_invoice_goods_receipts') {
     return { 
-      sql: `SELECT * FROM purchase_invoice_goods_receipts WHERE invoice_id IN (SELECT id FROM purchase_invoices WHERE company_id = $1)`, 
+      sql: `SELECT * FROM purchase_invoice_goods_receipts WHERE purchase_invoice_id IN (SELECT id FROM purchase_invoices WHERE company_id = $1)`, 
       params: [companyId] 
     };
   }
@@ -1731,8 +1731,8 @@ function getBackupQueryForTable(table: string, companyId: string, isExcel: boole
   }
   if (table === 'system_config') {
     return { 
-      sql: `SELECT * FROM system_config WHERE company_id = $1 OR company_id IS NULL`, 
-      params: [companyId] 
+      sql: `SELECT * FROM system_config`, 
+      params: [] 
     };
   }
   if (table === 'currency_rates') {
@@ -1815,15 +1815,22 @@ router.get('/system/export-excel', authenticateToken, authorizeRoles('super_admi
               delete r.temp_password;
             });
           }
-          // Format complex objects/arrays for readable Excel cell strings
+          // Format complex objects/arrays and enforce Excel 32767 char cell limit
           const formattedRows = rows.map((r: any) => {
             const rowCopy: any = { ...r };
             for (const key of Object.keys(rowCopy)) {
-              if (rowCopy[key] !== null && typeof rowCopy[key] === 'object' && !(rowCopy[key] instanceof Date)) {
+              let val = rowCopy[key];
+              if (val !== null && typeof val === 'object' && !(val instanceof Date)) {
                 try {
-                  rowCopy[key] = JSON.stringify(rowCopy[key]);
-                } catch (e) {}
+                  val = JSON.stringify(val);
+                } catch (e) {
+                  val = String(val);
+                }
               }
+              if (typeof val === 'string' && val.length > 32000) {
+                val = val.substring(0, 32000) + '...[truncated for Excel cell limit]';
+              }
+              rowCopy[key] = val;
             }
             return rowCopy;
           });
@@ -1880,7 +1887,7 @@ router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 
           } else if (table === 'asset_depreciation_items') {
             await client.query(`DELETE FROM asset_depreciation_items WHERE run_id IN (SELECT id FROM asset_depreciation_runs WHERE company_id = $1)`, [targetCompanyId]);
           } else if (table === 'purchase_invoice_goods_receipts') {
-            await client.query(`DELETE FROM purchase_invoice_goods_receipts WHERE invoice_id IN (SELECT id FROM purchase_invoices WHERE company_id = $1)`, [targetCompanyId]);
+            await client.query(`DELETE FROM purchase_invoice_goods_receipts WHERE purchase_invoice_id IN (SELECT id FROM purchase_invoices WHERE company_id = $1)`, [targetCompanyId]);
           } else if (table === 'widgets') {
             await client.query(`DELETE FROM widgets WHERE dashboard_id IN (SELECT id FROM dashboards WHERE company_id = $1)`, [targetCompanyId]);
           } else if (table === 'system_config') {
@@ -1962,7 +1969,7 @@ router.post('/system/import-excel', authenticateToken, authorizeRoles('super_adm
           } else if (table === 'asset_depreciation_items') {
             await client.query(`DELETE FROM asset_depreciation_items WHERE run_id IN (SELECT id FROM asset_depreciation_runs WHERE company_id = $1)`, [companyId]);
           } else if (table === 'purchase_invoice_goods_receipts') {
-            await client.query(`DELETE FROM purchase_invoice_goods_receipts WHERE invoice_id IN (SELECT id FROM purchase_invoices WHERE company_id = $1)`, [companyId]);
+            await client.query(`DELETE FROM purchase_invoice_goods_receipts WHERE purchase_invoice_id IN (SELECT id FROM purchase_invoices WHERE company_id = $1)`, [companyId]);
           } else if (table === 'widgets') {
             await client.query(`DELETE FROM widgets WHERE dashboard_id IN (SELECT id FROM dashboards WHERE company_id = $1)`, [companyId]);
           } else if (table === 'system_config') {
