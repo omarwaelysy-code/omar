@@ -144,6 +144,9 @@ interface ParsedDocument {
   stock_error_message?: string;
   has_account_error?: boolean;
   account_error_message?: string;
+  has_warehouse_error?: boolean;
+  warehouse_error_message?: string;
+  is_modified?: boolean;
 }
 
 interface ValidationError {
@@ -193,11 +196,34 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
   const [documents, setDocuments] = useState<ParsedDocument[]>([]);
   const [expandedRefs, setExpandedRefs] = useState<Record<string, boolean>>({});
 
+  // Edit doc header modal state
+  const [editingDoc, setEditingDoc] = useState<ParsedDocument | null>(null);
+  const [editDocForm, setEditDocForm] = useState<{
+    doc_type: string;
+    date: string;
+    party_id: string;
+    warehouse_id: string;
+    payment_type: 'cash' | 'credit';
+    payment_method_id: string;
+    notes: string;
+    ref: string;
+  }>({
+    doc_type: '',
+    date: '',
+    party_id: '',
+    warehouse_id: '',
+    payment_type: 'credit',
+    payment_method_id: '',
+    notes: '',
+    ref: ''
+  });
+
   // Edit item modal state
   const [editingItem, setEditingItem] = useState<{ docRef: string; item: ParsedItem } | null>(null);
 
   // Add item modal state
   const [addingItemDocRef, setAddingItemDocRef] = useState<string | null>(null);
+  const [addingItemWarehouseId, setAddingItemWarehouseId] = useState<string>('');
   const [newItemForm, setNewItemForm] = useState<{
     product_id: string;
     quantity: number;
@@ -798,6 +824,119 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     showNotification('تم تنزيل نموذج الإكسيل التجريبي بنجاح', 'success');
   };
 
+  // Helper to inspect accounts and warehouse requirements for any product (Zero Guessing Policy)
+  const getProductAccountsCheck = (prod: Product | undefined, targetVatRate: number, targetWhtRate: number) => {
+    if (!prod) return null;
+    const isService = prod.type === 'service' || prod.is_service === true;
+
+    // 1. Sales / Purchases Account
+    let salesAccName = '';
+    let salesAccOk = false;
+    if (isSales) {
+      if (prod.revenue_account_id) {
+        salesAccOk = true;
+        salesAccName = prod.revenue_account_name || accounts.find(a => a.id === prod.revenue_account_id)?.name || 'حساب الإيراد';
+      } else {
+        salesAccName = 'غير مسجل بكارت الصنف';
+      }
+    } else {
+      const purAccId = prod.cost_account_id || prod.inventory_account_id;
+      if (purAccId) {
+        salesAccOk = true;
+        salesAccName = prod.cost_account_name || prod.inventory_account_name || accounts.find(a => a.id === purAccId)?.name || 'حساب التكلفة/المخزون';
+      } else {
+        salesAccName = 'غير مسجل بكارت الصنف';
+      }
+    }
+
+    // 2. Cost Account
+    let costAccName = '';
+    let costAccOk = false;
+    let costExempt = false;
+    if (isService) {
+      costExempt = true;
+      costAccName = 'معفى (صنف خدمي)';
+    } else {
+      if (prod.cost_account_id) {
+        costAccOk = true;
+        costAccName = prod.cost_account_name || accounts.find(a => a.id === prod.cost_account_id)?.name || 'حساب تكلفة المبيعات';
+      } else {
+        costAccName = 'غير مسجل بكارت الصنف';
+      }
+    }
+
+    // 3. Inventory Account
+    let invAccName = '';
+    let invAccOk = false;
+    let invExempt = false;
+    if (isService) {
+      invExempt = true;
+      invAccName = 'معفى (صنف خدمي)';
+    } else {
+      if (prod.inventory_account_id) {
+        invAccOk = true;
+        invAccName = prod.inventory_account_name || accounts.find(a => a.id === prod.inventory_account_id)?.name || 'حساب المخزون';
+      } else {
+        invAccName = 'غير مسجل بكارت الصنف';
+      }
+    }
+
+    // 4. VAT Account
+    let vatAccName = '';
+    let vatAccOk = false;
+    let vatExempt = false;
+    if (!isVatEnabled || targetVatRate === 0) {
+      vatExempt = true;
+      vatAccName = !isVatEnabled ? 'الضريبة معطلة' : 'معفى (0%)';
+    } else {
+      const vatAccId = isSales 
+        ? (prod.sales_vat_account_id || prod.vat_account_id || companySettings?.sales_vat_account_id || companySettings?.vat_account_id)
+        : (prod.purchase_vat_account_id || prod.vat_account_id || companySettings?.purchase_vat_account_id || companySettings?.vat_account_id);
+      if (vatAccId) {
+        vatAccOk = true;
+        vatAccName = (isSales ? (prod.sales_vat_account_name || prod.vat_account_name) : (prod.purchase_vat_account_name || prod.vat_account_name)) || accounts.find(a => a.id === vatAccId)?.name || 'حساب ض.ق.م';
+      } else {
+        vatAccName = 'غير مربوط بكارت الصنف أو الإعدادات';
+      }
+    }
+
+    // 5. WHT Account
+    let whtAccName = '';
+    let whtAccOk = false;
+    let whtExempt = false;
+    if (!isWhtEnabled || targetWhtRate === 0) {
+      whtExempt = true;
+      whtAccName = !isWhtEnabled ? 'الخصم معطل' : 'معفى (0%)';
+    } else {
+      const whtAccId = isSales
+        ? (prod.sales_withholding_tax_account_id || companySettings?.sales_withholding_tax_account_id)
+        : (prod.purchase_withholding_tax_account_id || companySettings?.purchase_withholding_tax_account_id);
+      if (whtAccId) {
+        whtAccOk = true;
+        whtAccName = (isSales ? prod.sales_withholding_tax_account_name : prod.purchase_withholding_tax_account_name) || accounts.find(a => a.id === whtAccId)?.name || 'حساب ض.خ.أ';
+      } else {
+        whtAccName = 'غير مربوط بكارت الصنف أو الإعدادات';
+      }
+    }
+
+    const missingNames: string[] = [];
+    if (!salesAccOk) missingNames.push(isSales ? 'حساب الإيراد' : 'حساب التكلفة');
+    if (!costExempt && !costAccOk) missingNames.push('حساب تكلفة المبيعات');
+    if (!invExempt && !invAccOk) missingNames.push('حساب المخزون');
+    if (!vatExempt && !vatAccOk) missingNames.push('حساب ضريبة القيمة المضافة');
+    if (!whtExempt && !whtAccOk) missingNames.push('حساب ضريبة الخصم');
+
+    return {
+      isService,
+      sales: { ok: salesAccOk, name: salesAccName },
+      cost: { ok: costAccOk || costExempt, exempt: costExempt, name: costAccName },
+      inventory: { ok: invAccOk || invExempt, exempt: invExempt, name: invAccName },
+      vat: { ok: vatAccOk || vatExempt, exempt: vatExempt, name: vatAccName },
+      wht: { ok: whtAccOk || whtExempt, exempt: whtExempt, name: whtAccName },
+      missingNames
+    };
+  };
+
   // Pre-validation helper: checks stock availability and mandatory GL accounts completeness (zero guessing policy)
   const revalidateBatch = (
     docs: ParsedDocument[],
@@ -807,14 +946,16 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
   ): { updatedDocs: ParsedDocument[]; allErrors: ValidationError[] } => {
     const allowNegativeStock = settings?.allow_negative_stock === true || settings?.allow_negative_stock === 'true';
 
-    // Remove old stock errors AND dynamic account errors to avoid stale duplicates
+    // Remove old stock errors, warehouse errors, AND dynamic account errors to avoid stale duplicates
     const nonDynamicErrors = baseErrors.filter(e => 
       e.field !== 'رصيد المخزون' && 
+      e.field !== 'المخزن' &&
       !e.field.startsWith('حساب') && 
       !e.field.includes('ضريبة')
     );
     const newStockErrors: ValidationError[] = [];
     const newAccountErrors: ValidationError[] = [];
+    const newWarehouseErrors: ValidationError[] = [];
 
     // Track running stock per product across the batch
     const stockMap: Record<string, number> = {};
@@ -823,11 +964,6 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     });
 
     const updatedDocs = docs.map(doc => {
-      // If already saved, don't modify its status/error
-      if (doc.status === 'saved') {
-        return doc;
-      }
-
       const isSalesOutflow = isSales && doc.doc_type === 'فاتورة بيع';
       const isPurchaseOutflow = !isSales && doc.doc_type === 'مرتجع شراء';
       const isOutflow = isSalesOutflow || isPurchaseOutflow;
@@ -841,6 +977,25 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
       let docHasAccountError = false;
       let firstAccountErrorMsg = '';
+
+      // Check if document contains physical items (which strictly require a warehouse in the system)
+      const hasPhysicalItems = doc.items.some(it => {
+        const prod = currentProducts.find(p => p.id === it.product_id || (p.code && p.code.toLowerCase() === it.product_code.toLowerCase()));
+        return !it.is_service && prod?.type !== 'service' && !prod?.is_service;
+      });
+
+      let docHasWarehouseError = false;
+      let firstWarehouseErrorMsg = '';
+      if (hasPhysicalItems && !doc.warehouse_id) {
+        docHasWarehouseError = true;
+        firstWarehouseErrorMsg = `المستند (${doc.ref}) يحتوي على أصناف مخزنية ولكن لم يتم تحديد مخزن للمستند`;
+        newWarehouseErrors.push({
+          rowNumber: doc.items[0]?.rowIndex || 1,
+          ref: doc.ref,
+          field: 'المخزن',
+          message: `المستند "${doc.ref}" يحتوي على أصناف مخزنية ولكن لم يتم تحديد المخزن. يرجى تعديل بيانات المستند الأساسية وتحديد المخزن لحفظ الحركات المحاسبية والمخزنية.`
+        });
+      }
 
       // 1. Validate Party Account (for accounting documents: invoices and returns)
       if (doc.doc_type !== 'أمر بيع' && doc.doc_type !== 'أمر شراء') {
@@ -1052,13 +1207,15 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         has_stock_error: docHasStockError,
         stock_error_message: firstStockErrorMsg || undefined,
         has_account_error: docHasAccountError,
-        account_error_message: firstAccountErrorMsg || undefined
+        account_error_message: firstAccountErrorMsg || undefined,
+        has_warehouse_error: docHasWarehouseError,
+        warehouse_error_message: firstWarehouseErrorMsg || undefined
       };
     });
 
     return {
       updatedDocs,
-      allErrors: [...nonDynamicErrors, ...newStockErrors, ...newAccountErrors]
+      allErrors: [...nonDynamicErrors, ...newWarehouseErrors, ...newStockErrors, ...newAccountErrors]
     };
   };
 
@@ -1668,6 +1825,56 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     showNotification(`تم حذف المستند ${ref} من الدفعة وإعادة فحص المخزون`, 'info');
   };
 
+  // Open Edit Document Header Modal (Requirement 2)
+  const handleOpenEditDocModal = (doc: ParsedDocument) => {
+    setEditingDoc(doc);
+    setEditDocForm({
+      doc_type: doc.doc_type,
+      date: doc.date,
+      party_id: doc.party_id || '',
+      warehouse_id: doc.warehouse_id || '',
+      payment_type: doc.payment_type || 'credit',
+      payment_method_id: doc.payment_method_id || '',
+      notes: doc.notes || '',
+      ref: doc.ref
+    });
+  };
+
+  // Save Document Header Edit (Requirement 2)
+  const handleSaveDocEdit = () => {
+    if (!editingDoc) return;
+    const matchedParty = isSales 
+      ? customers.find(c => c.id === editDocForm.party_id)
+      : suppliers.find(s => s.id === editDocForm.party_id);
+    const matchedWh = warehouses.find(w => w.id === editDocForm.warehouse_id);
+
+    const updated = documents.map(doc => {
+      if (doc.ref !== editingDoc.ref) return doc;
+      return {
+        ...doc,
+        doc_type: editDocForm.doc_type,
+        date: editDocForm.date,
+        party_id: editDocForm.party_id,
+        party_name: matchedParty?.name || doc.party_name,
+        party_code: matchedParty?.code || doc.party_code,
+        warehouse_id: editDocForm.warehouse_id || null,
+        warehouse_name: matchedWh?.name || (editDocForm.warehouse_id ? doc.warehouse_name : undefined),
+        payment_type: editDocForm.payment_type,
+        payment_method_id: editDocForm.payment_type === 'cash' ? editDocForm.payment_method_id : undefined,
+        notes: editDocForm.notes,
+        is_modified: true,
+        status: (doc.status === 'saved' ? 'pending' : doc.status) as any
+      };
+    });
+
+    const { updatedDocs, allErrors } = revalidateBatch(updated, products, companySettings, validationErrors);
+    setDocuments(updatedDocs);
+    setValidationErrors(allErrors);
+    setIsBatchSaved(false);
+    setEditingDoc(null);
+    showNotification('تم تحديث بيانات المستند الأساسية وإعادة الفحص بنجاح', 'success');
+  };
+
   // Delete item from document
   const handleDeleteItem = (docRef: string, itemId: string) => {
     const updated = documents.map(doc => {
@@ -1677,13 +1884,16 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       return {
         ...doc,
         items: newItems,
-        ...newTotals
+        ...newTotals,
+        is_modified: true,
+        status: (doc.status === 'saved' ? 'pending' : doc.status) as any
       };
     }).filter(doc => doc.items.length > 0);
 
     const { updatedDocs, allErrors } = revalidateBatch(updated, products, companySettings, validationErrors);
     setDocuments(updatedDocs);
     setValidationErrors(allErrors);
+    setIsBatchSaved(false);
     showNotification('تم حذف البند وإعادة فحص رصيد المخزون', 'info');
   };
 
@@ -1717,20 +1927,26 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       return {
         ...doc,
         items: newItems,
-        ...newTotals
+        ...newTotals,
+        is_modified: true,
+        status: (doc.status === 'saved' ? 'pending' : doc.status) as any
       };
     });
 
     const { updatedDocs, allErrors } = revalidateBatch(updated, products, companySettings, validationErrors);
     setDocuments(updatedDocs);
     setValidationErrors(allErrors);
+    setIsBatchSaved(false);
 
     setEditingItem(null);
     showNotification('تم تحديث بيانات الصنف وإعادة فحص رصيد المخزون بنجاح', 'success');
   };
 
-  // Open Add Item Modal
+  // Open Add Item Modal (Requirement 3: Check warehouse & accounts)
   const handleOpenAddItemModal = (docRef: string) => {
+    const targetDoc = documents.find(d => d.ref === docRef);
+    setAddingItemWarehouseId(targetDoc?.warehouse_id || '');
+
     const defaultProd = products[0];
     const defaultPrice = isSales 
       ? (defaultProd?.sale_price || defaultProd?.cost_price || 0) 
@@ -1780,7 +1996,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     }));
   };
 
-  // Save newly added item into document
+  // Save newly added item into document (Requirement 3)
   const handleSaveNewItem = () => {
     if (!addingItemDocRef) return;
     const targetDoc = documents.find(d => d.ref === addingItemDocRef);
@@ -1797,6 +2013,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     }
 
     const isServiceItem = matchedProduct.type === 'service' || matchedProduct.is_service === true;
+    const isPhysicalItem = !isServiceItem;
+
+    // Check if item is physical and document lacks a warehouse
+    if (isPhysicalItem && !targetDoc.warehouse_id && !addingItemWarehouseId) {
+      showNotification('يرجى اختيار مخزن للمستند، فالصنف المختار صنف مخزني يتطلب وجود مخزن محدد في المستند', 'error');
+      return;
+    }
+
     const lineGross = (newItemForm.quantity || 0) * (newItemForm.unit_price || 0);
     const lineSubtotal = Math.max(0, lineGross - (newItemForm.discount_amount || 0));
     const effectiveVat = isVatEnabled ? (newItemForm.vat_rate || 0) : 0;
@@ -1835,6 +2059,11 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       cost_center_name: matchedCc?.name
     };
 
+    const chosenWarehouseId = addingItemWarehouseId || targetDoc.warehouse_id || null;
+    const chosenWarehouseName = chosenWarehouseId 
+      ? (warehouses.find(w => w.id === chosenWarehouseId)?.name || targetDoc.warehouse_name) 
+      : targetDoc.warehouse_name;
+
     const updatedDocs = documents.map(d => {
       if (d.ref !== addingItemDocRef) return d;
       const newItems = [...d.items, newItem];
@@ -1842,9 +2071,12 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       const allServices = newItems.every(it => it.is_service === true);
       return {
         ...d,
+        warehouse_id: chosenWarehouseId,
+        warehouse_name: chosenWarehouseName,
         items: newItems,
         is_all_services: allServices,
         ...newTotals,
+        is_modified: true,
         status: (d.status === 'saved' ? 'pending' : d.status) as any
       };
     });
@@ -1852,6 +2084,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     const { updatedDocs: revalidated, allErrors } = revalidateBatch(updatedDocs, products, companySettings, validationErrors);
     setDocuments(revalidated);
     setValidationErrors(allErrors);
+    setIsBatchSaved(false);
     setExpandedRefs(prev => ({ ...prev, [addingItemDocRef]: true }));
     setAddingItemDocRef(null);
     showNotification(`تمت إضافة الصنف "${matchedProduct.name}" إلى المستند ${addingItemDocRef} بنجاح`, 'success');
@@ -1868,9 +2101,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       return;
     }
 
-    const unsavedDocs = documents.filter(d => d.status !== 'saved');
+    const unsavedDocs = documents.filter(d => d.status !== 'saved' || d.is_modified);
     if (unsavedDocs.length === 0) {
-      showNotification('جميع المستندات في هذه الدفعة محفوظة ومرحلة بالفعل', 'info');
+      showNotification('جميع المستندات في هذه الدفعة محفوظة ومرحلة بالكامل بدون أي تعديلات معلقة', 'info');
       return;
     }
 
@@ -1888,8 +2121,8 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     for (let idx = 0; idx < updatedDocuments.length; idx++) {
       const doc = updatedDocuments[idx];
       
-      // Skip already saved documents
-      if (doc.status === 'saved') {
+      // Skip already saved documents that have no pending edits
+      if (doc.status === 'saved' && !doc.is_modified) {
         continue;
       }
 
@@ -1962,28 +2195,63 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             items: itemsPayload
           };
 
-          const invRes: any = await apiRequest('/invoices', 'POST', invPayload);
-          createdDocId = invRes.id;
-          createdDocNumber = invRes.invoice_number || `INV-${createdDocId.slice(-6)}`;
+          if (doc.created_document_id) {
+            // Update existing invoice
+            await apiRequest(`/invoices/${doc.created_document_id}`, 'PUT', invPayload);
+            createdDocId = doc.created_document_id;
+            createdDocNumber = doc.created_document_number || `INV-${createdDocId.slice(-6)}`;
 
-          // Generate Journal Entry via PostingService (strictly required for financial posting)
-          const fullInv = { ...invPayload, id: createdDocId, invoice_number: createdDocNumber };
-          const journalData = PostingService.generateInvoiceJournal(
-            fullInv as any,
-            customers,
-            products,
-            accounts,
-            paymentMethods,
-            companySettings
-          );
+            const fullInv = { ...invPayload, id: createdDocId, invoice_number: createdDocNumber };
+            const journalData = PostingService.generateInvoiceJournal(
+              fullInv as any,
+              customers,
+              products,
+              accounts,
+              paymentMethods,
+              companySettings
+            );
 
-          const jeRes: any = await apiRequest('/journal_entries', 'POST', {
-            ...journalData,
-            reference_id: createdDocId,
-            company_id: user?.company_id
-          });
-          createdJournalId = jeRes.id;
-          createdJournalNumber = jeRes.entry_number || '';
+            if (doc.created_journal_id) {
+              await apiRequest(`/journal_entries/${doc.created_journal_id}`, 'PUT', {
+                ...journalData,
+                reference_id: createdDocId,
+                company_id: user?.company_id
+              });
+              createdJournalId = doc.created_journal_id;
+              createdJournalNumber = doc.created_journal_number || '';
+            } else {
+              const jeRes: any = await apiRequest('/journal_entries', 'POST', {
+                ...journalData,
+                reference_id: createdDocId,
+                company_id: user?.company_id
+              });
+              createdJournalId = jeRes.id;
+              createdJournalNumber = jeRes.entry_number || '';
+            }
+          } else {
+            // Create new invoice
+            const invRes: any = await apiRequest('/invoices', 'POST', invPayload);
+            createdDocId = invRes.id;
+            createdDocNumber = invRes.invoice_number || `INV-${createdDocId.slice(-6)}`;
+
+            const fullInv = { ...invPayload, id: createdDocId, invoice_number: createdDocNumber };
+            const journalData = PostingService.generateInvoiceJournal(
+              fullInv as any,
+              customers,
+              products,
+              accounts,
+              paymentMethods,
+              companySettings
+            );
+
+            const jeRes: any = await apiRequest('/journal_entries', 'POST', {
+              ...journalData,
+              reference_id: createdDocId,
+              company_id: user?.company_id
+            });
+            createdJournalId = jeRes.id;
+            createdJournalNumber = jeRes.entry_number || '';
+          }
 
         } else if (doc.doc_type === 'أمر بيع') {
           const soPayload = {
@@ -2155,6 +2423,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           created_journal_id: createdJournalId,
           created_journal_number: createdJournalNumber,
           status: 'saved',
+          is_modified: false,
           error_message: undefined
         };
         newlySavedCount++;
@@ -2633,6 +2902,28 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   <Download className="w-3 h-3" />
                   <span>تحميل النموذج</span>
                 </button>
+
+                {/* 1. Save Changes Button at Top of Screen (Requirement 1) */}
+                {documents.length > 0 && (
+                  <button
+                    onClick={handleSaveAndPostBatch}
+                    disabled={isSavingBatch || validationErrors.length > 0}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3.5 py-1 rounded-lg shadow-sm transition-all hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    title={validationErrors.length > 0 ? 'يرجى تصحيح الأخطاء أولاً قبل الحفظ' : 'حفظ التعديلات والترحيل للنظام'}
+                  >
+                    {isSavingBatch ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>جاري الحفظ...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>حفظ التعديلات {documents.filter(d => d.status !== 'saved' || d.is_modified).length > 0 ? `(${documents.filter(d => d.status !== 'saved' || d.is_modified).length})` : ''}</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
 
             </div>
@@ -3087,6 +3378,17 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                             </div>
                           )}
 
+                          {/* 3.2 Pre-validation Missing Warehouse Warning */}
+                          {doc.has_warehouse_error && doc.status !== 'saved' && doc.status !== 'failed' && (
+                            <div 
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/70 border border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-[11px] font-semibold"
+                              title={doc.warehouse_error_message}
+                            >
+                              <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
+                              <span className="truncate max-w-[340px]">{doc.warehouse_error_message || 'المستند يفتقد لتحديد المخزن'}</span>
+                            </div>
+                          )}
+
                           {/* 3.1 Error Badge if document failed during save */}
                           {doc.status === 'failed' && (
                             <div 
@@ -3133,6 +3435,16 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                           <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                             {doc.payment_type === 'cash' ? 'نقدي' : 'آجل'}
                           </span>
+
+                          {/* 10. Edit Document Header Button (Requirement 2 - Circled in User Screenshot) */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditDocModal(doc)}
+                            className="p-1 rounded-full text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700 transition-colors shadow-2xs cursor-pointer"
+                            title="تعديل بيانات المستند الأساسية (النوع، التاريخ، الطرف، المخزن، طريقة الدفع، الملاحظات)"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
 
                         {/* Left: Add Item Action & Net Total Badge & Delete Action */}
@@ -3498,6 +3810,166 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         </div>
       )}
 
+            {/* Modal 1.25: Edit Document Header Modal (Requirement 2) */}
+      {editingDoc && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-4 shadow-xl space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Edit3 className="w-4 h-4 text-emerald-600" />
+                <span>تعديل بيانات المستند الأساسية ({editingDoc.ref})</span>
+              </h3>
+              <button 
+                onClick={() => setEditingDoc(null)}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2.5 text-xs">
+              {/* Document Type & Date */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">نوع المستند:</label>
+                  <select
+                    value={editDocForm.doc_type}
+                    onChange={(e) => setEditDocForm(prev => ({ ...prev, doc_type: e.target.value }))}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 font-bold text-emerald-700 dark:text-emerald-400"
+                  >
+                    {isSales ? (
+                      <>
+                        <option value="فاتورة بيع">فاتورة بيع</option>
+                        <option value="أمر بيع">أمر بيع</option>
+                        <option value="مرتجع بيع">مرتجع بيع</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="فاتورة شراء">فاتورة شراء</option>
+                        <option value="أمر شراء">أمر شراء</option>
+                        <option value="مرتجع شراء">مرتجع شراء</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">التاريخ:</label>
+                  <input 
+                    type="date"
+                    value={editDocForm.date}
+                    onChange={(e) => setEditDocForm(prev => ({ ...prev, date: e.target.value }))}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Party (Customer / Supplier) */}
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{entityLabel}:</label>
+                <select
+                  value={editDocForm.party_id}
+                  onChange={(e) => setEditDocForm(prev => ({ ...prev, party_id: e.target.value }))}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 font-medium"
+                >
+                  <option value="">— اختر {entityLabel} —</option>
+                  {(isSales ? customers : suppliers).map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.code ? `[${p.code}] ` : ''}{p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Warehouse */}
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  المخزن {editingDoc.items.some(it => !it.is_service) ? <span className="text-rose-500 font-bold">(إلزامي لوجود أصناف مخزنية)</span> : '(اختياري)'}:
+                </label>
+                <select
+                  value={editDocForm.warehouse_id}
+                  onChange={(e) => setEditDocForm(prev => ({ ...prev, warehouse_id: e.target.value }))}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 font-medium"
+                >
+                  <option value="">— بدون مخزن (أصناف خدمية فقط) —</option>
+                  {warehouses.map(w => (
+                    <option key={w.id} value={w.id}>
+                      {w.name} {w.code ? `(${w.code})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Payment Type & Method */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">طريقة الدفع:</label>
+                  <select
+                    value={editDocForm.payment_type}
+                    onChange={(e) => setEditDocForm(prev => ({ ...prev, payment_type: e.target.value as any }))}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5"
+                  >
+                    <option value="credit">آجل (Credit)</option>
+                    <option value="cash">نقدي (Cash)</option>
+                  </select>
+                </div>
+                {editDocForm.payment_type === 'cash' ? (
+                  <div>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">الخزينة / طريقة السداد:</label>
+                    <select
+                      value={editDocForm.payment_method_id}
+                      onChange={(e) => setEditDocForm(prev => ({ ...prev, payment_method_id: e.target.value }))}
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5"
+                    >
+                      <option value="">— الخزينة الافتراضية —</option>
+                      {paymentMethods.map(pm => (
+                        <option key={pm.id} value={pm.id}>{pm.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block font-semibold text-slate-400 mb-1">الخزينة:</label>
+                    <input 
+                      disabled 
+                      value="غير مطبق على الآجل" 
+                      className="w-full bg-slate-100 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-lg p-1.5 text-slate-400"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">الملاحظات:</label>
+                <textarea 
+                  rows={2}
+                  value={editDocForm.notes}
+                  onChange={(e) => setEditDocForm(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="ملاحظات المستند..."
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <button
+                onClick={() => setEditingDoc(null)}
+                className="px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={handleSaveDocEdit}
+                className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs cursor-pointer flex items-center gap-1.5"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>حفظ التعديلات</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal 1.5: Add Item to Document Modal */}
       {addingItemDocRef && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
@@ -3516,22 +3988,114 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             </div>
 
             <div className="space-y-2.5 text-xs">
-              {/* Product selector */}
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">الصنف المطلوب إضافته:</label>
-                <select
-                  value={newItemForm.product_id}
-                  onChange={(e) => handleProductChangeInNewItem(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-medium"
-                >
-                  <option value="">— اختر الصنف —</option>
-                  {products.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.code ? `[${p.code}] ` : ''}{p.name} {p.type === 'service' ? '(خدمة)' : `(رصيد: ${p.stock ?? 0})`}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Product selector with live check (Requirement 3) */}
+              {(() => {
+                const selectedProd = products.find(p => p.id === newItemForm.product_id);
+                const targetDocForAdd = documents.find(d => d.ref === addingItemDocRef);
+                const isProdService = selectedProd?.type === 'service' || selectedProd?.is_service === true;
+                const isProdPhysical = selectedProd ? !isProdService : false;
+                const accountsCheck = getProductAccountsCheck(selectedProd, newItemForm.vat_rate, newItemForm.withholding_tax_rate);
+
+                return (
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">الصنف المطلوب إضافته:</label>
+                      <select
+                        value={newItemForm.product_id}
+                        onChange={(e) => handleProductChangeInNewItem(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-medium"
+                      >
+                        <option value="">— اختر الصنف —</option>
+                        {products.map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.code ? `[${p.code}] ` : ''}{p.name} {p.type === 'service' ? '(خدمة)' : `(رصيد: ${p.stock ?? 0})`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Warehouse assignment if targetDoc has no warehouse and item is physical */}
+                    {isProdPhysical && !targetDocForAdd?.warehouse_id && (
+                      <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-amber-800 dark:text-amber-200 font-bold text-xs">
+                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                          <span>تنبيه: المستند لا يحتوي على مخزن محدد والصنف المختار صنف مخزني!</span>
+                        </div>
+                        <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                          يرجى اختيار المخزن الذي سيتم تعيينه للمستند لصرف/استلام البند:
+                        </p>
+                        <select
+                          value={addingItemWarehouseId}
+                          onChange={(e) => setAddingItemWarehouseId(e.target.value)}
+                          className="w-full bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 rounded-lg p-1.5 text-xs font-semibold"
+                        >
+                          <option value="">— اختر المخزن للمستند —</option>
+                          {warehouses.map(w => (
+                            <option key={w.id} value={w.id}>{w.name} {w.code ? `(${w.code})` : ''}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Live Product Accounts & Warehouse Checklist (Requirement 3 - Zero Guessing Policy) */}
+                    {selectedProd && accountsCheck && (
+                      <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1.5">
+                        <div className="flex items-center justify-between text-xs font-bold">
+                          <span className="text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>فحص الحسابات اللازمة للقيود المحاسبية:</span>
+                          </span>
+                          {isProdPhysical ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                              📦 صنف مخزني (يحتاج مخزن)
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                              ⚙️ صنف خدمي (لا يلزم مخزن)
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
+                          <div className={`p-1.5 rounded-lg border flex items-center gap-1 ${accountsCheck.sales.ok ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200 dark:border-rose-800'}`}>
+                            {accountsCheck.sales.ok ? <Check className="w-3 h-3 text-emerald-600 shrink-0" /> : <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />}
+                            <span className="truncate" title={accountsCheck.sales.name}>{isSales ? 'الإيراد' : 'التكلفة'}: {accountsCheck.sales.ok ? 'مربوط' : 'مفقود'}</span>
+                          </div>
+
+                          <div className={`p-1.5 rounded-lg border flex items-center gap-1 ${accountsCheck.cost.ok ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200 dark:border-rose-800'}`}>
+                            {accountsCheck.cost.ok ? <Check className="w-3 h-3 text-emerald-600 shrink-0" /> : <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />}
+                            <span className="truncate" title={accountsCheck.cost.name}>تكلفة المبيعات: {accountsCheck.cost.exempt ? 'معفى' : (accountsCheck.cost.ok ? 'مربوط' : 'مفقود')}</span>
+                          </div>
+
+                          <div className={`p-1.5 rounded-lg border flex items-center gap-1 ${accountsCheck.inventory.ok ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200 dark:border-rose-800'}`}>
+                            {accountsCheck.inventory.ok ? <Check className="w-3 h-3 text-emerald-600 shrink-0" /> : <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />}
+                            <span className="truncate" title={accountsCheck.inventory.name}>المخزون: {accountsCheck.inventory.exempt ? 'معفى' : (accountsCheck.inventory.ok ? 'مربوط' : 'مفقود')}</span>
+                          </div>
+
+                          <div className={`p-1.5 rounded-lg border flex items-center gap-1 ${accountsCheck.vat.ok ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200 dark:border-rose-800'}`}>
+                            {accountsCheck.vat.ok ? <Check className="w-3 h-3 text-emerald-600 shrink-0" /> : <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />}
+                            <span className="truncate" title={accountsCheck.vat.name}>ض.ق.م: {accountsCheck.vat.exempt ? 'معفى' : (accountsCheck.vat.ok ? 'مربوط' : 'مفقود')}</span>
+                          </div>
+
+                          <div className={`p-1.5 rounded-lg border flex items-center gap-1 ${accountsCheck.wht.ok ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200 dark:border-rose-800'}`}>
+                            {accountsCheck.wht.ok ? <Check className="w-3 h-3 text-emerald-600 shrink-0" /> : <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />}
+                            <span className="truncate" title={accountsCheck.wht.name}>ض.خ.أ: {accountsCheck.wht.exempt ? 'معفى' : (accountsCheck.wht.ok ? 'مربوط' : 'مفقود')}</span>
+                          </div>
+                        </div>
+
+                        {accountsCheck.missingNames.length > 0 && (
+                          <div className="p-1.5 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 rounded-lg text-rose-700 dark:text-rose-300 text-[11px] flex items-start gap-1">
+                            <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                            <span>
+                              <strong>تنبيه حسابات القيود:</strong> يفتقد الصنف ربط: ({accountsCheck.missingNames.join('، ')}). لن يتمكن النظام من ترحيل القيد المحاسبي حتى يتم استكمالها في بطاقة الصنف أو إعدادات الشركة.
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Quantity & Unit Price */}
               <div className="grid grid-cols-2 gap-2">
