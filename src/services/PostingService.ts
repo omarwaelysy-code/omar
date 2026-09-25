@@ -22,7 +22,11 @@ export class PostingService {
    * Generates a Journal Entry from an Invoice
    */
   static generateInvoiceJournal(invoice: Invoice, customers: Customer[], products: Product[], accounts: Account[], paymentMethods: PaymentMethod[], settings?: any): Omit<JournalEntry, 'id'> {
-    const customer = customers.find(c => c.id === invoice.customer_id);
+    const customer = customers.find(c => 
+      (invoice.customer_id && c.id === invoice.customer_id) || 
+      (invoice.customer_name && c.name?.trim().toLowerCase() === invoice.customer_name?.trim().toLowerCase()) ||
+      ((invoice as any).customer_code && c.code?.trim().toLowerCase() === (invoice as any).customer_code?.trim().toLowerCase())
+    );
     const subtotal = Number(invoice.subtotal) || 0;
     const discount = Number(invoice.discount_amount || invoice.discount) || 0;
     const total_amount = Number(invoice.total_amount) || 0;
@@ -38,7 +42,7 @@ export class PostingService {
     let customerAccountId = customer?.account_id || '';
     let customerAccountName = customer?.account_name || 'حساب العملاء';
     if (!customerAccountId) {
-      throw new Error(`لا يمكن إنشاء القيد المحاسبي: حساب العميل غير محدد للعميل "${customer?.name || invoice.customer_id}". يمنع النظام توقع الحسابات تلقائياً.`);
+      throw new Error(`لا يمكن إنشاء القيد المحاسبي: حساب العميل غير محدد للعميل "${customer?.name || invoice.customer_name || invoice.customer_id}". يمنع النظام توقع الحسابات تلقائياً.`);
     }
 
     // Main Sales Invoice Debit Line (Customer Account)
@@ -303,7 +307,11 @@ export class PostingService {
   }
 
   static generateReturnJournal(doc: Return, customers: Customer[], products: Product[], accounts: Account[], paymentMethods: PaymentMethod[]): Omit<JournalEntry, 'id'> {
-    const customer = customers.find(c => c.id === doc.customer_id);
+    const customer = customers.find(c => 
+      (doc.customer_id && c.id === doc.customer_id) || 
+      (doc.customer_name && c.name?.trim().toLowerCase() === doc.customer_name?.trim().toLowerCase()) ||
+      ((doc as any).customer_code && c.code?.trim().toLowerCase() === (doc as any).customer_code?.trim().toLowerCase())
+    );
     const total_amount = Number(doc.total_amount) || 0;
 
     const journalItems: JournalEntryItem[] = [];
@@ -476,7 +484,11 @@ export class PostingService {
   }
 
   static generatePurchaseInvoiceJournal(doc: PurchaseInvoice, suppliers: Supplier[], products: Product[], accounts: Account[], paymentMethods: PaymentMethod[], settings?: any): Omit<JournalEntry, 'id'> {
-    const supplier = suppliers.find(s => s.id === doc.supplier_id);
+    const supplier = suppliers.find(s => 
+      (doc.supplier_id && s.id === doc.supplier_id) || 
+      (doc.supplier_name && s.name?.trim().toLowerCase() === doc.supplier_name?.trim().toLowerCase()) ||
+      ((doc as any).supplier_code && s.code?.trim().toLowerCase() === (doc as any).supplier_code?.trim().toLowerCase())
+    );
     const total_amount = Number(doc.total_amount) || 0;
 
     const journalItems: JournalEntryItem[] = [];
@@ -649,7 +661,11 @@ export class PostingService {
   }
 
   static generatePurchaseReturnJournal(doc: PurchaseReturn, suppliers: Supplier[], products: Product[], accounts: Account[], paymentMethods: PaymentMethod[]): Omit<JournalEntry, 'id'> {
-    const supplier = suppliers.find(s => s.id === doc.supplier_id);
+    const supplier = suppliers.find(s => 
+      (doc.supplier_id && s.id === doc.supplier_id) || 
+      (doc.supplier_name && s.name?.trim().toLowerCase() === doc.supplier_name?.trim().toLowerCase()) ||
+      ((doc as any).supplier_code && s.code?.trim().toLowerCase() === (doc as any).supplier_code?.trim().toLowerCase())
+    );
     const total_amount = Number(doc.total_amount) || 0;
 
     const journalItems: JournalEntryItem[] = [];

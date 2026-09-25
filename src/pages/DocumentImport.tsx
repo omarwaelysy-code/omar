@@ -410,13 +410,36 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             total += itTot;
           });
 
+          // Match party reliably from master data (zero guessing policy)
+          const matchedParty = isSales 
+            ? customers.find(c => 
+                (d.party_id && c.id === d.party_id) || 
+                (d.party_name && c.name?.trim().toLowerCase() === String(d.party_name).trim().toLowerCase()) || 
+                (d.party_code && c.code?.toLowerCase() === String(d.party_code).toLowerCase())
+              )
+            : suppliers.find(s => 
+                (d.party_id && s.id === d.party_id) || 
+                (d.party_name && s.name?.trim().toLowerCase() === String(d.party_name).trim().toLowerCase()) || 
+                (d.party_code && s.code?.toLowerCase() === String(d.party_code).toLowerCase())
+              );
+
+          const matchedWh = warehouses.find(w => 
+            (d.warehouse_id && w.id === d.warehouse_id) || 
+            (d.warehouse_name && w.name?.trim().toLowerCase() === String(d.warehouse_name).trim().toLowerCase())
+          );
+
           return {
             ref: d.ref || `Ref-${idx + 1}`,
             doc_type: d.doc_type || (isSales ? 'فاتورة بيع' : 'فاتورة شراء'),
             date: d.date || fullBatch.batch_date || batchDate,
-            party_name: d.party_name || '',
+            party_id: matchedParty?.id || d.party_id || '',
+            party_name: matchedParty?.name || d.party_name || '',
+            party_code: matchedParty?.code || d.party_code || '',
+            warehouse_id: matchedWh?.id || d.warehouse_id || null,
+            warehouse_name: matchedWh?.name || d.warehouse_name || '',
             payment_type: d.payment_type || 'آجل',
-            warehouse_name: d.warehouse_name || '',
+            payment_method_id: d.payment_method_id || '',
+            notes: d.notes || '',
             items,
             gross_total: items.length > 0 ? Number(gross.toFixed(2)) : (Number(d.gross_total) || Number(d.total_amount) || 0),
             discount_amount: Number(disc.toFixed(2)),
@@ -1001,11 +1024,29 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       if (doc.doc_type !== 'أمر بيع' && doc.doc_type !== 'أمر شراء') {
         let partyAccId = '';
         if (isSales) {
-          const c = customers.find(x => x.id === doc.party_id || (x.code && x.code.toLowerCase() === (doc.party_code || '').toLowerCase()) || x.name === doc.party_name);
+          const c = customers.find(x => 
+            (doc.party_id && x.id === doc.party_id) || 
+            (x.code && doc.party_code && x.code.toLowerCase() === doc.party_code.toLowerCase()) || 
+            (x.name && doc.party_name && x.name.trim().toLowerCase() === doc.party_name.trim().toLowerCase())
+          );
           partyAccId = c?.account_id || '';
+          if (c) {
+            doc.party_id = c.id;
+            doc.party_name = c.name;
+            if (c.code) doc.party_code = c.code;
+          }
         } else {
-          const s = suppliers.find(x => x.id === doc.party_id || (x.code && x.code.toLowerCase() === (doc.party_code || '').toLowerCase()) || x.name === doc.party_name);
+          const s = suppliers.find(x => 
+            (doc.party_id && x.id === doc.party_id) || 
+            (x.code && doc.party_code && x.code.toLowerCase() === doc.party_code.toLowerCase()) || 
+            (x.name && doc.party_name && x.name.trim().toLowerCase() === doc.party_name.trim().toLowerCase())
+          );
           partyAccId = s?.account_id || '';
+          if (s) {
+            doc.party_id = s.id;
+            doc.party_name = s.name;
+            if (s.code) doc.party_code = s.code;
+          }
         }
 
         if (!partyAccId) {
@@ -2138,6 +2179,42 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         let createdJournalId = '';
         let createdJournalNumber = '';
 
+        // Resolve party reliably
+        let effectivePartyId = doc.party_id;
+        let effectivePartyName = doc.party_name;
+        if (isSales) {
+          const c = customers.find(x => 
+            (effectivePartyId && x.id === effectivePartyId) || 
+            (effectivePartyName && x.name?.trim().toLowerCase() === effectivePartyName.trim().toLowerCase()) ||
+            (doc.party_code && x.code?.toLowerCase() === doc.party_code.toLowerCase())
+          );
+          if (c) {
+            effectivePartyId = c.id;
+            effectivePartyName = c.name;
+          }
+        } else {
+          const s = suppliers.find(x => 
+            (effectivePartyId && x.id === effectivePartyId) || 
+            (effectivePartyName && x.name?.trim().toLowerCase() === effectivePartyName.trim().toLowerCase()) ||
+            (doc.party_code && x.code?.toLowerCase() === doc.party_code.toLowerCase())
+          );
+          if (s) {
+            effectivePartyId = s.id;
+            effectivePartyName = s.name;
+          }
+        }
+
+        // Resolve warehouse reliably
+        let effectiveWarehouseId = doc.warehouse_id;
+        let effectiveWarehouseName = doc.warehouse_name;
+        if (!effectiveWarehouseId && effectiveWarehouseName) {
+          const wh = warehouses.find(w => w.name?.trim().toLowerCase() === effectiveWarehouseName.trim().toLowerCase());
+          if (wh) {
+            effectiveWarehouseId = wh.id;
+            effectiveWarehouseName = wh.name;
+          }
+        }
+
         // Standard items payload for invoices & orders
         const itemsPayload = doc.items.map(item => ({
           product_id: item.product_id,
@@ -2178,9 +2255,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
         if (doc.doc_type === 'فاتورة بيع') {
           const invPayload = {
-            customer_id: doc.party_id,
-            customer_name: doc.party_name,
-            warehouse_id: doc.warehouse_id || null,
+            customer_id: effectivePartyId,
+            customer_name: effectivePartyName,
+            warehouse_id: effectiveWarehouseId || null,
             date: doc.date,
             subtotal: doc.subtotal,
             discount_amount: doc.discount_amount,
@@ -2255,9 +2332,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
         } else if (doc.doc_type === 'أمر بيع') {
           const soPayload = {
-            customer_id: doc.party_id,
-            customer_name: doc.party_name,
-            warehouse_id: doc.warehouse_id || null,
+            customer_id: effectivePartyId,
+            customer_name: effectivePartyName,
+            warehouse_id: effectiveWarehouseId || null,
             date: doc.date,
             subtotal: doc.subtotal,
             discount_amount: doc.discount_amount,
@@ -2277,9 +2354,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         } else if (doc.doc_type === 'مرتجع بيع') {
           // Note: returns table only stores total_amount and withholding_tax_amount
           const retPayload = {
-            customer_id: doc.party_id,
-            customer_name: doc.party_name,
-            warehouse_id: doc.warehouse_id || null,
+            customer_id: effectivePartyId,
+            customer_name: effectivePartyName,
+            warehouse_id: effectiveWarehouseId || null,
             date: doc.date,
             withholding_tax_amount: doc.withholding_tax_amount,
             total_amount: doc.total_amount,
@@ -2315,9 +2392,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
         } else if (doc.doc_type === 'فاتورة شراء') {
           const pinvPayload = {
-            supplier_id: doc.party_id,
-            supplier_name: doc.party_name,
-            warehouse_id: doc.warehouse_id || null,
+            supplier_id: effectivePartyId,
+            supplier_name: effectivePartyName,
+            warehouse_id: effectiveWarehouseId || null,
             date: doc.date,
             subtotal: doc.subtotal,
             discount_amount: doc.discount_amount,
@@ -2357,9 +2434,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
         } else if (doc.doc_type === 'أمر شراء') {
           const poPayload = {
-            supplier_id: doc.party_id,
-            supplier_name: doc.party_name,
-            warehouse_id: doc.warehouse_id || null,
+            supplier_id: effectivePartyId,
+            supplier_name: effectivePartyName,
+            warehouse_id: effectiveWarehouseId || null,
             date: doc.date,
             subtotal: doc.subtotal,
             discount_amount: doc.discount_amount,
@@ -2379,9 +2456,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         } else if (doc.doc_type === 'مرتجع شراء') {
           // Note: purchase_returns table only stores total_amount and withholding_tax_amount
           const pretPayload = {
-            supplier_id: doc.party_id,
-            supplier_name: doc.party_name,
-            warehouse_id: doc.warehouse_id || null,
+            supplier_id: effectivePartyId,
+            supplier_name: effectivePartyName,
+            warehouse_id: effectiveWarehouseId || null,
             date: doc.date,
             withholding_tax_amount: doc.withholding_tax_amount,
             total_amount: doc.total_amount,
@@ -2466,7 +2543,11 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         details: updatedDocuments.map(d => ({
           ref: d.ref,
           doc_type: d.doc_type,
+          party_id: d.party_id,
           party_name: d.party_name,
+          party_code: d.party_code,
+          warehouse_id: d.warehouse_id,
+          warehouse_name: d.warehouse_name,
           date: d.date,
           gross_total: d.gross_total,
           discount_amount: d.discount_amount,
@@ -2479,7 +2560,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           withholding_tax_total: d.withholding_tax_amount,
           total_amount: d.total_amount,
           payment_type: d.payment_type,
-          warehouse_name: d.warehouse_name,
+          payment_method_id: d.payment_method_id,
           created_document_id: d.created_document_id,
           created_document_number: d.created_document_number,
           created_journal_id: d.created_journal_id,
