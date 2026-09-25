@@ -179,6 +179,8 @@ export const Accounts: React.FC = () => {
           name: result.name || '',
           type_id: matchingType?.id || '',
           opening_balance: 0,
+          opening_balance_date: new Date().toISOString().slice(0, 10),
+          counter_account_id: '',
           required_sub_account: result.name?.toLowerCase().includes('عملاء') || result.name?.toLowerCase().includes('موردين') || false,
           parent_id: '',
           is_active: true,
