@@ -33,16 +33,17 @@ export async function syncCOGSForJournalEntry(client: any, companyId: string, jo
         const prod = prodRes.rows[0];
         if (prod.type === 'service' || prod.is_service) continue;
 
-        let trueCost = parseFloat(movesRes.rows[0]?.true_cogs || '0');
+        let trueCost = Number(movesRes.rows[0]?.true_cogs) || 0;
         if (trueCost <= 0) {
             // Fall back to estimated cost using invoice item unit_cost if available
-            trueCost = parseFloat(item.quantity || '0') * parseFloat(item.item_cost || '0');
+            trueCost = (Number(item.quantity) || 0) * (Number(item.item_cost) || 0);
         }
         if (trueCost <= 0) {
             // Fall back to estimated cost using product.cost_price
-            trueCost = parseFloat(item.quantity || '0') * parseFloat(prod.cost_price || '0');
+            trueCost = (Number(item.quantity) || 0) * (Number(prod.cost_price) || 0);
         }
-        if (trueCost <= 0) continue;
+        if (!Number.isFinite(trueCost) || trueCost <= 0) continue;
+        trueCost = Math.round(trueCost * 100) / 100;
 
         let costAccId = prod.cost_account_id;
         let costAccName = prod.cost_account_name;

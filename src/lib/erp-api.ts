@@ -2633,7 +2633,7 @@ router.post('/system/auto-fix-missing-accounts', authenticateToken, authorizeRol
       const custRes = await client.query('SELECT account_id, name FROM customers WHERE id = $1', [ret.customer_id]);
       const custAccId = custRes.rows[0]?.account_id || defCustomerAcc?.id;
       const custAccName = custRes.rows[0]?.name || 'حساب العملاء';
-      const retAmt = parseFloat(ret.total_amount || 0);
+      const retAmt = Math.round((Number(ret.total_amount) || 0) * 100) / 100;
 
       if (custAccId && retAmt > 0) {
         const retDate = ret.date ? new Date(ret.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
