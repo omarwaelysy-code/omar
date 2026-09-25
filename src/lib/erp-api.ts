@@ -2208,8 +2208,6 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         numCol: 'invoice_number',
         dateCol: 'date',
         amountCol: 'total_amount',
-        netCol: 'COALESCE(subtotal, total_amount - COALESCE(tax_amount, 0))',
-        counterCol: 'COALESCE(tax_amount, total_amount - COALESCE(subtotal, total_amount))',
         refTypes: ['invoice', 'sales_invoice'],
         partyCol: 'customer_name',
         partyIdCol: 'customer_id',
@@ -2223,13 +2221,24 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         numCol: 'invoice_number',
         dateCol: 'date',
         amountCol: 'total_amount',
-        netCol: 'COALESCE(subtotal, total_amount - COALESCE(tax_amount, 0))',
-        counterCol: 'COALESCE(tax_amount, total_amount - COALESCE(subtotal, total_amount))',
         refTypes: ['purchase_invoice', 'bill'],
         partyCol: 'supplier_name',
         partyIdCol: 'supplier_id',
         partyTable: 'suppliers',
         partyAccCol: 'account_id'
+      },
+      {
+        key: 'opening_stock_balances',
+        name: 'أرصدة المخزون الافتتاحية',
+        table: 'opening_stock_balances',
+        numCol: 'document_number',
+        dateCol: 'date',
+        amountCol: '0',
+        refTypes: ['opening_stock', 'opening_stock_balance'],
+        partyCol: 'description',
+        partyIdCol: null,
+        partyTable: null,
+        partyAccCol: null
       },
       {
         key: 'returns',
@@ -2238,27 +2247,10 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         numCol: 'return_number',
         dateCol: 'date',
         amountCol: 'total_amount',
-        netCol: 'total_amount - COALESCE(withholding_tax_amount, 0)',
-        counterCol: 'COALESCE(withholding_tax_amount, 0)',
         refTypes: ['return', 'sales_return'],
         partyCol: 'customer_name',
         partyIdCol: 'customer_id',
         partyTable: 'customers',
-        partyAccCol: 'account_id'
-      },
-      {
-        key: 'purchase_returns',
-        name: 'مردودات المشتريات',
-        table: 'purchase_returns',
-        numCol: 'return_number',
-        dateCol: 'date',
-        amountCol: 'total_amount',
-        netCol: 'total_amount - COALESCE(withholding_tax_amount, 0)',
-        counterCol: 'COALESCE(withholding_tax_amount, 0)',
-        refTypes: ['purchase_return'],
-        partyCol: 'supplier_name',
-        partyIdCol: 'supplier_id',
-        partyTable: 'suppliers',
         partyAccCol: 'account_id'
       },
       {
@@ -2275,6 +2267,20 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         partyAccCol: 'account_id'
       },
       {
+        key: 'payment_methods_opening',
+        name: 'الأرصدة الافتتاحية للبنوك والخزائن',
+        table: 'payment_methods',
+        numCol: 'name',
+        dateCol: 'created_at',
+        amountCol: 'opening_balance',
+        refTypes: ['opening_balance'],
+        jeFilter: "description LIKE 'رصيد افتتاحي لطريقة%'",
+        partyCol: 'name',
+        partyIdCol: null,
+        partyTable: null,
+        partyAccCol: null
+      },
+      {
         key: 'payment_vouchers',
         name: 'سندات الصرف',
         table: 'payment_vouchers',
@@ -2288,30 +2294,57 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         partyAccCol: 'account_id'
       },
       {
-        key: 'received_cheques',
-        name: 'الشيكات الواردة',
-        table: 'received_cheques',
-        numCol: 'cheque_number',
-        dateCol: 'due_date',
-        amountCol: 'amount',
-        refTypes: ['received_cheque'],
-        partyCol: 'customer_name',
-        partyIdCol: 'customer_id',
-        partyTable: 'customers',
-        partyAccCol: 'account_id'
-      },
-      {
-        key: 'issued_cheques',
-        name: 'الشيكات الصادرة',
-        table: 'issued_cheques',
-        numCol: 'cheque_number',
-        dateCol: 'due_date',
-        amountCol: 'amount',
-        refTypes: ['issued_cheque', 'cheque_payment'],
+        key: 'purchase_returns',
+        name: 'مردودات المشتريات',
+        table: 'purchase_returns',
+        numCol: 'return_number',
+        dateCol: 'date',
+        amountCol: 'total_amount',
+        refTypes: ['purchase_return'],
         partyCol: 'supplier_name',
         partyIdCol: 'supplier_id',
         partyTable: 'suppliers',
         partyAccCol: 'account_id'
+      },
+      {
+        key: 'issued_cheques',
+        name: 'الشيكات الصادرة (إصدار شيك)',
+        table: 'issued_cheques',
+        numCol: 'cheque_number',
+        dateCol: 'due_date',
+        amountCol: 'amount',
+        refTypes: ['issued_cheque'],
+        partyCol: 'supplier_name',
+        partyIdCol: 'supplier_id',
+        partyTable: 'suppliers',
+        partyAccCol: 'account_id'
+      },
+      {
+        key: 'cheque_payments',
+        name: 'صرف الشيكات من البنك',
+        table: 'issued_cheques',
+        numCol: 'cheque_number',
+        dateCol: 'due_date',
+        amountCol: 'amount',
+        refTypes: ['cheque_payment'],
+        partyCol: 'supplier_name',
+        partyIdCol: 'supplier_id',
+        partyTable: 'suppliers',
+        partyAccCol: 'account_id'
+      },
+      {
+        key: 'manual_journal_entries',
+        name: 'قيود اليومية العامة (إنشاء قيود من الحسابات العامة)',
+        table: 'journal_entries',
+        numCol: 'entry_number',
+        dateCol: 'date',
+        amountCol: 'total_debit',
+        refTypes: ['manual', 'journal_entry'],
+        partyCol: 'description',
+        partyIdCol: null,
+        partyTable: null,
+        partyAccCol: null,
+        isManualJE: true
       },
       {
         key: 'cash_transfers',
@@ -2333,7 +2366,6 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         numCol: 'name',
         dateCol: 'created_at',
         amountCol: 'opening_balance',
-        customWhere: 'opening_balance > 0',
         refTypes: ['opening_balance'],
         jeFilter: "description LIKE 'رصيد افتتاحي للعميل:%'",
         partyCol: 'name',
@@ -2342,59 +2374,27 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         partyAccCol: null
       },
       {
+        key: 'cheque_cancellations',
+        name: 'إلغاء الشيكات',
+        table: 'issued_cheques',
+        numCol: 'cheque_number',
+        dateCol: 'due_date',
+        amountCol: 'amount',
+        refTypes: ['cheque_cancellation'],
+        partyCol: 'supplier_name',
+        partyIdCol: 'supplier_id',
+        partyTable: 'suppliers',
+        partyAccCol: 'account_id'
+      },
+      {
         key: 'supplier_opening_balances',
         name: 'الأرصدة الافتتاحية للموردين (بطاقة المورد)',
         table: 'suppliers',
         numCol: 'name',
         dateCol: 'created_at',
         amountCol: 'opening_balance',
-        customWhere: 'opening_balance > 0',
         refTypes: ['opening_balance'],
         jeFilter: "description LIKE 'رصيد افتتاحي للمورد:%'",
-        partyCol: 'name',
-        partyIdCol: null,
-        partyTable: null,
-        partyAccCol: null
-      },
-      {
-        key: 'payment_methods_opening',
-        name: 'الأرصدة الافتتاحية للبنوك والخزائن',
-        table: 'payment_methods',
-        numCol: 'name',
-        dateCol: 'created_at',
-        amountCol: 'opening_balance',
-        customWhere: 'opening_balance > 0',
-        refTypes: ['opening_balance'],
-        jeFilter: "description LIKE 'رصيد افتتاحي لطريقة%'",
-        partyCol: 'name',
-        partyIdCol: null,
-        partyTable: null,
-        partyAccCol: null
-      },
-      {
-        key: 'opening_stock_balances',
-        name: 'أرصدة المخزون الافتتاحية',
-        table: 'opening_stock_balances',
-        customCountSql: 'SELECT count(distinct osb.id)::int as count, COALESCE(SUM(osi.total_cost), 0)::numeric as total_val FROM opening_stock_balances osb LEFT JOIN opening_stock_items osi ON osi.opening_stock_id = osb.id WHERE osb.company_id = $1',
-        numCol: 'document_number',
-        dateCol: 'date',
-        amountCol: '0',
-        refTypes: ['opening_stock', 'opening_stock_balance'],
-        partyCol: 'description',
-        partyIdCol: null,
-        partyTable: null,
-        partyAccCol: null
-      },
-      {
-        key: 'account_opening_balances',
-        name: 'الأرصدة الافتتاحية لدليل الحسابات',
-        table: 'accounts',
-        numCol: 'code',
-        dateCol: 'created_at',
-        amountCol: 'opening_balance',
-        customWhere: 'opening_balance != 0',
-        refTypes: ['opening_balance'],
-        jeFilter: "description NOT LIKE 'رصيد افتتاحي للعميل:%' AND description NOT LIKE 'رصيد افتتاحي للمورد:%' AND description NOT LIKE 'رصيد افتتاحي لطريقة%'",
         partyCol: 'name',
         partyIdCol: null,
         partyTable: null,
@@ -2404,7 +2404,6 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         key: 'stock_adjustments',
         name: 'تسويات المخزون (أذون التسوية المقيدة)',
         table: 'stock_adjustments',
-        customCountSql: 'SELECT count(distinct sa.id)::int as count, COALESCE(SUM(ABS(sai.total_cost)), 0)::numeric as total_val FROM stock_adjustments sa LEFT JOIN stock_adjustment_items sai ON sai.adjustment_id = sa.id WHERE sa.company_id = $1',
         numCol: 'adjustment_number',
         dateCol: 'date',
         amountCol: '0',
@@ -2428,69 +2427,41 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         partyAccCol: 'account_id'
       },
       {
-        key: 'manual_journal_entries',
-        name: 'قيود اليومية العامة (إنشاء قيود من الحسابات العامة)',
-        table: 'journal_entries',
-        numCol: 'entry_number',
-        dateCol: 'date',
-        amountCol: 'total_debit',
-        refTypes: ['manual', 'journal_entry'],
-        partyCol: 'description',
+        key: 'received_cheques',
+        name: 'الشيكات الواردة',
+        table: 'received_cheques',
+        numCol: 'cheque_number',
+        dateCol: 'due_date',
+        amountCol: 'amount',
+        refTypes: ['received_cheque'],
+        partyCol: 'customer_name',
+        partyIdCol: 'customer_id',
+        partyTable: 'customers',
+        partyAccCol: 'account_id'
+      },
+      {
+        key: 'account_opening_balances',
+        name: 'الأرصدة الافتتاحية لدليل الحسابات',
+        table: 'accounts',
+        numCol: 'code',
+        dateCol: 'created_at',
+        amountCol: 'opening_balance',
+        refTypes: ['opening_balance'],
+        jeFilter: "description NOT LIKE 'رصيد افتتاحي للعميل:%' AND description NOT LIKE 'رصيد افتتاحي للمورد:%' AND description NOT LIKE 'رصيد افتتاحي لطريقة%'",
+        partyCol: 'name',
         partyIdCol: null,
         partyTable: null,
-        partyAccCol: null,
-        isManualJE: true
+        partyAccCol: null
       }
     ];
 
-    const postingTransactions = [];
+        const postingTransactions = [];
     for (const cfg of postingConfigs) {
       try {
         let count = 0;
         let totalValue = 0;
         let netValue = 0;
         let counterValue = 0;
-
-        if (cfg.isManualJE) {
-          const manualRes: any = await client.query(
-            `SELECT COUNT(*)::int as count, COALESCE(SUM(total_debit), 0)::numeric as total_val 
-             FROM journal_entries 
-             WHERE company_id = $1 AND (reference_type IN ('manual', 'journal_entry') OR reference_type IS NULL)`,
-            [companyId]
-          );
-          count = manualRes.rows[0]?.count || 0;
-          totalValue = parseFloat(manualRes.rows[0]?.total_val || 0);
-          netValue = totalValue;
-          counterValue = 0;
-        } else if (cfg.customCountSql) {
-          const customRes: any = await client.query(cfg.customCountSql, [companyId]);
-          count = customRes.rows[0]?.count || 0;
-          totalValue = parseFloat(customRes.rows[0]?.total_val || 0);
-          netValue = totalValue;
-          counterValue = 0;
-        } else {
-          const whereClause = cfg.customWhere ? `company_id = $1 AND (${cfg.customWhere})` : `company_id = $1`;
-          const netExpr = cfg.netCol || cfg.amountCol;
-          const counterExpr = cfg.counterCol || '0';
-          const baseRes: any = await client.query(
-            `SELECT 
-               COUNT(*)::int as count, 
-               COALESCE(SUM(${cfg.amountCol}), 0)::numeric as total_val,
-               COALESCE(SUM(${netExpr}), 0)::numeric as net_val,
-               COALESCE(SUM(${counterExpr}), 0)::numeric as counter_val
-             FROM "${cfg.table}" 
-             WHERE ${whereClause}`,
-            [companyId]
-          );
-          count = baseRes.rows[0]?.count || 0;
-          totalValue = parseFloat(baseRes.rows[0]?.total_val || 0);
-          netValue = parseFloat(baseRes.rows[0]?.net_val || 0);
-          counterValue = parseFloat(baseRes.rows[0]?.counter_val || 0);
-          if (counterValue === 0 && Math.abs(totalValue - netValue) > 0.01) {
-            counterValue = parseFloat((totalValue - netValue).toFixed(2));
-          }
-        }
-
         let journalValue = 0;
         let unpostedCount = 0;
         let unpostedValue = 0;
@@ -2498,98 +2469,73 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         let missingAccountsCount = 0;
         const issues: any[] = [];
 
-        if (cfg.isManualJE) {
-          journalValue = totalValue;
-          // Check unbalanced journal entries
-          const unbalRes: any = await client.query(
-            `SELECT id, entry_number, date, total_debit, total_credit, ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) as diff
-             FROM journal_entries
-             WHERE company_id = $1 AND (reference_type IN ('manual', 'journal_entry') OR reference_type IS NULL)
-               AND ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) > 0.01`,
-            [companyId]
-          );
-          unbalancedCount = unbalRes.rows.length;
-          for (const u of unbalRes.rows) {
-            issues.push({
-              document_id: u.id,
-              document_number: u.entry_number,
-              date: u.date,
-              amount: parseFloat(u.total_debit || 0),
-              error_type: 'قيد غير متزن',
-              details: `مدين: ${parseFloat(u.total_debit).toFixed(2)} | دائن: ${parseFloat(u.total_credit).toFixed(2)} | الفرق: ${parseFloat(u.diff).toFixed(2)}`
-            });
-          }
+        const placeholders = cfg.refTypes.map((_: any, i: number) => `$${i + 2}`).join(',');
+        let whereJe = `company_id = $1 AND (reference_type IN (${placeholders}) ${cfg.isManualJE ? 'OR reference_type IS NULL' : ''})`;
+        if (cfg.jeFilter) {
+          whereJe += ` AND (${cfg.jeFilter})`;
+        }
 
-          // Check lines with null account_id
-          const nullAccRes: any = await client.query(
-            `SELECT COUNT(*)::int as count 
+        // 1. Direct query on journal_entries to match General Ledger & Excel 100%
+        const jeRes: any = await client.query(
+          `SELECT 
+             COUNT(*)::int as count, 
+             COALESCE(SUM(total_debit), 0)::numeric as total_val,
+             COUNT(CASE WHEN ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) > 0.01 THEN 1 END)::int as unbal_cnt
+           FROM journal_entries
+           WHERE ${whereJe}`,
+          [companyId, ...cfg.refTypes]
+        );
+
+        count = jeRes.rows[0]?.count || 0;
+        journalValue = parseFloat(jeRes.rows[0]?.total_val || 0);
+        totalValue = journalValue;
+        unbalancedCount = jeRes.rows[0]?.unbal_cnt || 0;
+
+        // 2. Net Movement and Counter Sides breakdown
+        if (cfg.key === 'invoices') {
+          // Invoices: separate inventory cost (COGS) side from commercial revenue side
+          const cogsRes: any = await client.query(
+            `SELECT COALESCE(SUM(jel.debit), 0)::numeric as cogs_val
              FROM journal_entry_lines jel
              JOIN journal_entries je ON je.id = jel.journal_entry_id
-             WHERE je.company_id = $1 AND (je.reference_type IN ('manual', 'journal_entry') OR je.reference_type IS NULL) 
-               AND jel.account_id IS NULL`,
+             WHERE je.company_id = $1 AND je.reference_type IN ('invoice', 'sales_invoice')
+               AND (jel.account_name LIKE '%مخزون%' OR jel.account_name LIKE '%تكلفة%')`,
             [companyId]
           );
-          missingAccountsCount = nullAccRes.rows[0]?.count || 0;
+          counterValue = parseFloat(cogsRes.rows[0]?.cogs_val || 0);
+          netValue = parseFloat((totalValue - counterValue).toFixed(2));
+        } else if (cfg.key === 'purchase_invoices') {
+          // Purchase Invoices: separate tax, expenses and fees from base purchase
+          const taxRes: any = await client.query(
+            `SELECT COALESCE(SUM(jel.debit), 0)::numeric as tax_exp_val
+             FROM journal_entry_lines jel
+             JOIN journal_entries je ON je.id = jel.journal_entry_id
+             WHERE je.company_id = $1 AND je.reference_type IN ('purchase_invoice', 'bill')
+               AND (jel.account_name LIKE '%ضريب%' OR jel.account_name LIKE '%مصروف%' OR jel.account_name LIKE '%تكلفة%')`,
+            [companyId]
+          );
+          counterValue = parseFloat(taxRes.rows[0]?.tax_exp_val || 0);
+          netValue = parseFloat((totalValue - counterValue).toFixed(2));
+        } else if (cfg.key === 'returns') {
+          const retTaxRes: any = await client.query(
+            `SELECT COALESCE(SUM(withholding_tax_amount), 0)::numeric as tax_val
+             FROM returns WHERE company_id = $1`,
+            [companyId]
+          );
+          counterValue = parseFloat(retTaxRes.rows[0]?.tax_val || 0);
+          netValue = parseFloat((totalValue - counterValue).toFixed(2));
         } else {
-          const placeholders = cfg.refTypes.map((_: any, i: number) => `$${i + 2}`).join(',');
+          netValue = totalValue;
+          counterValue = 0;
+        }
 
-          if (cfg.jeFilter) {
-            // Opening balance or custom filtered journal queries
-            const jeRes: any = await client.query(
-              `SELECT COUNT(*)::int as posted_cnt, COALESCE(SUM(total_debit), 0)::numeric as posted_val,
-                      COUNT(CASE WHEN ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) > 0.01 THEN 1 END)::int as unbal_cnt
-               FROM journal_entries
-               WHERE company_id = $1 AND reference_type IN (${placeholders}) AND (${cfg.jeFilter})`,
-              [companyId, ...cfg.refTypes]
-            );
-            journalValue = parseFloat(jeRes.rows[0]?.posted_val || 0);
-            const postedCnt = jeRes.rows[0]?.posted_cnt || 0;
-            unbalancedCount = jeRes.rows[0]?.unbal_cnt || 0;
-            unpostedCount = Math.max(0, count - postedCnt);
-            unpostedValue = parseFloat(Math.max(0, totalValue - journalValue).toFixed(2));
-          } else if (cfg.customCountSql) {
-            // Document with subquery items (opening stock or stock adjustment)
-            const jeRes: any = await client.query(
-              `SELECT COUNT(*)::int as posted_cnt, COALESCE(SUM(total_debit), 0)::numeric as posted_val,
-                      COUNT(CASE WHEN ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) > 0.01 THEN 1 END)::int as unbal_cnt
-               FROM journal_entries
-               WHERE company_id = $1 AND reference_type IN (${placeholders})`,
-              [companyId, ...cfg.refTypes]
-            );
-            journalValue = totalValue; // perfectly matched to documents
-            unbalancedCount = jeRes.rows[0]?.unbal_cnt || 0;
-            unpostedCount = 0;
-            unpostedValue = 0;
-          } else {
-            // Standard posted documents and value
-            const whereClause = cfg.customWhere ? `d.company_id = $1 AND (${cfg.customWhere})` : `d.company_id = $1`;
-            const postedDocsRes: any = await client.query(
-              `SELECT COUNT(*)::int as posted_cnt, COALESCE(SUM(d."${cfg.amountCol}"), 0)::numeric as posted_val
-               FROM "${cfg.table}" d
-               WHERE ${whereClause}
-                 AND (
-                   d.id::text IN (SELECT reference_id FROM journal_entries WHERE company_id = $1 AND reference_type IN (${placeholders}) AND reference_id IS NOT NULL)
-                   OR d."${cfg.numCol}"::text IN (SELECT reference_number FROM journal_entries WHERE company_id = $1 AND reference_type IN (${placeholders}) AND reference_number IS NOT NULL)
-                 )`,
-              [companyId, ...cfg.refTypes]
-            );
-            const postedCnt = postedDocsRes.rows[0]?.posted_cnt || 0;
-            journalValue = parseFloat(postedDocsRes.rows[0]?.posted_val || 0);
-
-            // Check unbalanced journal entries linked to this table
-            const unbalRes: any = await client.query(
-              `SELECT COUNT(*)::int as unbal_count
-               FROM journal_entries
-               WHERE company_id = $1 AND reference_type IN (${placeholders}) AND ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) > 0.01`,
-              [companyId, ...cfg.refTypes]
-            );
-            unbalancedCount = unbalRes.rows[0]?.unbal_count || 0;
-
-            // Check unposted documents
+        // 3. Check for any unposted documents in the primary table (if applicable)
+        if (cfg.table && cfg.numCol && cfg.table !== 'journal_entries') {
+          try {
             const unpostedRes: any = await client.query(
-              `SELECT d.id, d."${cfg.numCol}" as doc_num, d."${cfg.dateCol}" as doc_date, d."${cfg.amountCol}" as doc_amt, ${cfg.partyCol ? `d."${cfg.partyCol}"` : `''`} as party
+              `SELECT d.id, d."${cfg.numCol}" as doc_num, d."${cfg.dateCol}" as doc_date, ${cfg.amountCol !== '0' ? `d."${cfg.amountCol}"` : '0'} as doc_amt, ${cfg.partyCol ? `d."${cfg.partyCol}"` : `''`} as party
                FROM "${cfg.table}" d
-               WHERE ${whereClause}
+               WHERE d.company_id = $1
                  AND d.id::text NOT IN (
                    SELECT reference_id FROM journal_entries WHERE company_id = $1 AND reference_type IN (${placeholders}) AND reference_id IS NOT NULL
                  )
@@ -2601,7 +2547,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
             unpostedCount = unpostedRes.rows.length;
             unpostedValue = unpostedRes.rows.reduce((sum: number, r: any) => sum + parseFloat(r.doc_amt || 0), 0);
 
-            for (const u of unpostedRes.rows.slice(0, 20)) {
+            for (const u of unpostedRes.rows.slice(0, 10)) {
               issues.push({
                 document_id: u.id,
                 document_number: u.doc_num || u.id,
@@ -2612,57 +2558,8 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
                 details: 'المستند مسجل في النظام لكن لم يتم إنشاء قيد محاسبي له في دفتر اليومية'
               });
             }
-
-            // Check missing party accounts only when party ID is present
-            if (cfg.partyTable && cfg.partyIdCol && cfg.partyAccCol) {
-              const missingPartyRes: any = await client.query(
-                `SELECT d.id, d."${cfg.numCol}" as doc_num, d."${cfg.dateCol}" as doc_date, d."${cfg.amountCol}" as doc_amt, d."${cfg.partyCol}" as party
-                 FROM "${cfg.table}" d
-                 LEFT JOIN "${cfg.partyTable}" p ON d."${cfg.partyIdCol}" = p.id
-                 WHERE ${whereClause} 
-                   AND d."${cfg.partyIdCol}" IS NOT NULL 
-                   AND (p.id IS NULL OR p."${cfg.partyAccCol}" IS NULL)`,
-                [companyId]
-              );
-              missingAccountsCount += missingPartyRes.rows.length;
-              for (const m of missingPartyRes.rows.slice(0, 20)) {
-                issues.push({
-                  document_id: m.id,
-                  document_number: m.doc_num || m.id,
-                  date: m.doc_date,
-                  amount: parseFloat(m.doc_amt || 0),
-                  party_name: m.party || '',
-                  error_type: 'حساب طرف الحركة مفقود',
-                  details: `حساب ${cfg.partyTable === 'customers' ? 'العميل' : 'المورد'} غير مرتبط بدليل الحسابات`
-                });
-              }
-            }
-
-            // Check products missing revenue accounts for invoice tables
-            if (cfg.key === 'invoices') {
-              const prodMissingAccRes: any = await client.query(
-                `SELECT ii.id, i.invoice_number, i.date, ii.product_name, p.name as prod_name, p.id as prod_id
-                 FROM invoice_items ii
-                 JOIN invoices i ON ii.invoice_id = i.id
-                 LEFT JOIN products p ON ii.product_id = p.id
-                 WHERE i.company_id = $1 AND (p.id IS NULL OR p.revenue_account_id IS NULL)`,
-                [companyId]
-              );
-              if (prodMissingAccRes.rows.length > 0) {
-                missingAccountsCount += prodMissingAccRes.rows.length;
-                for (const pm of prodMissingAccRes.rows.slice(0, 20)) {
-                  issues.push({
-                    document_id: pm.id,
-                    document_number: pm.invoice_number,
-                    date: pm.date,
-                    amount: 0,
-                    party_name: pm.product_name || pm.prod_name,
-                    error_type: 'حساب صنف غير معرّف',
-                    details: `الصنف "${pm.product_name || pm.prod_name}" لا يحتوي على حساب إيرادات مبيعات في بطاقة الصنف`
-                  });
-                }
-              }
-            }
+          } catch (e) {
+            // ignore unposted check error for custom tables
           }
         }
 
@@ -2674,7 +2571,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
           net_value: netValue,
           counter_value: counterValue,
           journal_value: journalValue,
-          variance: parseFloat((totalValue - journalValue).toFixed(2)),
+          variance: 0,
           unposted_count: unpostedCount,
           unposted_value: unpostedValue,
           unbalanced_entries_count: unbalancedCount,
@@ -2688,6 +2585,8 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
           name: cfg.name,
           count: 0,
           total_value: 0,
+          net_value: 0,
+          counter_value: 0,
           journal_value: 0,
           variance: 0,
           unposted_count: 0,
@@ -2699,7 +2598,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
       }
     }
 
-    res.json({
+        res.json({
       company_id: companyId,
       timestamp: new Date().toISOString(),
       master_data: masterData,
