@@ -440,7 +440,7 @@ export const DataCountsValues: React.FC = () => {
                 : 'text-stone-600 hover:bg-stone-100'
             }`}
           >
-            {language === 'ar' ? 'ثالثاً: الحركات المقيدة' : 'Posting Transactions'}
+            {language === 'ar' ? 'الحركات المالية المقيدة' : 'Posting Transactions'}
           </button>
           <button
             onClick={() => setActiveTab('operational')}
@@ -450,7 +450,7 @@ export const DataCountsValues: React.FC = () => {
                 : 'text-stone-600 hover:bg-stone-100'
             }`}
           >
-            {language === 'ar' ? 'ثانياً: العمليات غير المقيدة' : 'Non-Posting Operations'}
+            {language === 'ar' ? 'العمليات غير المقيدة' : 'Non-Posting Operations'}
           </button>
           <button
             onClick={() => setActiveTab('master')}
@@ -460,7 +460,7 @@ export const DataCountsValues: React.FC = () => {
                 : 'text-stone-600 hover:bg-stone-100'
             }`}
           >
-            {language === 'ar' ? 'أولاً: البيانات الأساسية' : 'Master Data'}
+            {language === 'ar' ? 'البيانات الأساسية' : 'Master Data'}
           </button>
         </div>
 
@@ -485,7 +485,7 @@ export const DataCountsValues: React.FC = () => {
             <div className="flex items-center gap-2.5">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
               <h2 className="text-base font-black text-emerald-950">
-                {language === 'ar' ? 'ثالثاً: الحركات المالية التي تلزم قيوداً محاسبية' : 'Posting Financial Transactions'}
+                {language === 'ar' ? 'الحركات المالية التي تلزم قيوداً محاسبية' : 'Posting Financial Transactions'}
               </h2>
             </div>
             <span className="text-xs font-bold text-emerald-700 bg-white px-2.5 py-1 rounded-lg border border-emerald-200">
@@ -497,16 +497,16 @@ export const DataCountsValues: React.FC = () => {
             <table className="w-full text-right border-collapse text-xs">
               <thead>
                 <tr className="bg-stone-50/80 text-stone-600 border-b border-stone-200 font-black">
-                  <th className="p-3.5 whitespace-nowrap">{language === 'ar' ? 'نوع الحركة / المستند' : 'Type'}</th>
-                  <th className="p-3.5 whitespace-nowrap text-center">{language === 'ar' ? 'العدد' : 'Count'}</th>
-                  <th className="p-3.5 whitespace-nowrap text-left">{language === 'ar' ? 'إجمالي القيم' : 'Total Value'}</th>
-                  <th className="p-3.5 whitespace-nowrap text-left">{language === 'ar' ? 'قيم القيود المرحلة' : 'Journal Value'}</th>
-                  <th className="p-3.5 whitespace-nowrap text-center">{language === 'ar' ? 'فرق القيمة' : 'Variance'}</th>
-                  <th className="p-3.5 whitespace-nowrap text-center">{language === 'ar' ? 'حركات غير مرحلة' : 'Unposted'}</th>
-                  <th className="p-3.5 whitespace-nowrap text-center">{language === 'ar' ? 'قيود غير متزنة' : 'Unbalanced'}</th>
-                  <th className="p-3.5 whitespace-nowrap text-center">{language === 'ar' ? 'حسابات ناقصة' : 'Missing Accounts'}</th>
-                  <th className="p-3.5 whitespace-nowrap text-center">{language === 'ar' ? 'حالة المطابقة' : 'Status'}</th>
-                  <th className="p-3.5 whitespace-nowrap text-center">{language === 'ar' ? 'الإجراءات والحل' : 'Actions'}</th>
+                  <th className="py-2 px-3 whitespace-nowrap">{language === 'ar' ? 'نوع الحركة / المستند' : 'Type'}</th>
+                  <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'العدد' : 'Count'}</th>
+                  <th className="py-2 px-3 whitespace-nowrap text-left">{language === 'ar' ? 'إجمالي القيم' : 'Total Value'}</th>
+                  <th className="py-2 px-3 whitespace-nowrap text-left">{language === 'ar' ? 'قيم القيود المرحلة' : 'Journal Value'}</th>
+                  <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'فرق القيمة' : 'Variance'}</th>
+                  <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'حركات غير مرحلة' : 'Unposted'}</th>
+                  <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'قيود غير متزنة' : 'Unbalanced'}</th>
+                  <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'حسابات ناقصة' : 'Missing Accounts'}</th>
+                  <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'حالة المطابقة' : 'Status'}</th>
+                  <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'الإجراءات والحل' : 'Actions'}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 font-bold text-stone-700">
@@ -514,89 +514,89 @@ export const DataCountsValues: React.FC = () => {
                   const hasIssues = row.unposted_count > 0 || row.unbalanced_entries_count > 0 || row.missing_accounts_count > 0 || Math.abs(row.variance) > 1;
 
                   return (
-                    <tr key={row.key} className="hover:bg-stone-50/60 transition-colors">
-                      <td className="p-3.5 flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold flex-shrink-0">
-                          <FileText size={14} />
+                    <tr key={row.key} className="hover:bg-stone-50/70 transition-colors">
+                      <td className="py-1.5 px-3 flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold flex-shrink-0">
+                          <FileText size={13} />
                         </div>
-                        <span className="font-black text-stone-900">{row.name}</span>
+                        <span className="font-black text-stone-900 text-xs">{row.name}</span>
                       </td>
 
-                      <td className="p-3.5 text-center">
-                        <span className="px-2.5 py-1 rounded-lg bg-stone-100 font-mono font-bold text-stone-800">
+                      <td className="py-1.5 px-3 text-center">
+                        <span className="px-2 py-0.5 rounded-md bg-stone-100 font-mono font-bold text-stone-800 text-xs">
                           {formatNumber(row.count)}
                         </span>
                       </td>
 
-                      <td className="p-3.5 text-left font-mono font-black text-stone-900">
+                      <td className="py-1.5 px-3 text-left font-mono font-black text-stone-900 text-xs">
                         {formatNumber(row.total_value)} EGP
                       </td>
 
-                      <td className="p-3.5 text-left font-mono font-black text-emerald-700">
+                      <td className="py-1.5 px-3 text-left font-mono font-black text-emerald-700 text-xs">
                         {formatNumber(row.journal_value)} EGP
                       </td>
 
-                      <td className="p-3.5 text-center font-mono">
+                      <td className="py-1.5 px-3 text-center font-mono text-xs">
                         {Math.abs(row.variance) < 0.05 ? (
                           <span className="text-emerald-600 font-bold">0.00</span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 font-black">
+                          <span className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 font-black">
                             {formatNumber(row.variance)}
                           </span>
                         )}
                       </td>
 
-                      <td className="p-3.5 text-center">
+                      <td className="py-1.5 px-3 text-center">
                         {row.unposted_count === 0 ? (
-                          <span className="text-emerald-600 font-bold">0</span>
+                          <span className="text-emerald-600 font-bold text-xs">0</span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-black">
+                          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-black text-xs">
                             {row.unposted_count} ({formatNumber(row.unposted_value)})
                           </span>
                         )}
                       </td>
 
-                      <td className="p-3.5 text-center">
+                      <td className="py-1.5 px-3 text-center">
                         {row.unbalanced_entries_count === 0 ? (
-                          <span className="text-emerald-600 font-bold">0</span>
+                          <span className="text-emerald-600 font-bold text-xs">0</span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-black">
+                          <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-black text-xs">
                             {row.unbalanced_entries_count}
                           </span>
                         )}
                       </td>
 
-                      <td className="p-3.5 text-center">
+                      <td className="py-1.5 px-3 text-center">
                         {row.missing_accounts_count === 0 ? (
-                          <span className="text-emerald-600 font-bold">0</span>
+                          <span className="text-emerald-600 font-bold text-xs">0</span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-black">
+                          <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-black text-xs">
                             {row.missing_accounts_count}
                           </span>
                         )}
                       </td>
 
-                      <td className="p-3.5 text-center">
+                      <td className="py-1.5 px-3 text-center">
                         {!hasIssues ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[11px] border border-emerald-200">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[11px] border border-emerald-200">
                             <CheckCircle2 size={12} />
                             {language === 'ar' ? 'سليم ومتطابق' : 'Balanced'}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 font-bold text-[11px] border border-rose-200">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 font-bold text-[11px] border border-rose-200">
                             <AlertTriangle size={12} />
                             {language === 'ar' ? 'يحتاج مراجعة' : 'Check Required'}
                           </span>
                         )}
                       </td>
 
-                      <td className="p-3.5 text-center">
+                      <td className="py-1.5 px-3 text-center">
                         {row.issues && row.issues.length > 0 ? (
                           <button
                             onClick={() => setSelectedItemIssues({ name: row.name, issues: row.issues })}
-                            className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg font-bold text-[11px] transition-all flex items-center gap-1 mx-auto"
+                            className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-md font-bold text-[11px] transition-all flex items-center gap-1 mx-auto"
                           >
-                            <Info size={12} className="text-amber-600" />
+                            <Info size={11} className="text-amber-600" />
                             <span>{language === 'ar' ? 'عرض التقرير والحل' : 'Details & Solution'}</span>
                           </button>
                         ) : (
@@ -619,7 +619,7 @@ export const DataCountsValues: React.FC = () => {
             <div className="flex items-center gap-2.5">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
               <h2 className="text-base font-black text-blue-950">
-                {language === 'ar' ? 'ثانياً: العمليات التي لا تلزم عنها قيود ولكن تشمل قيماً' : 'Non-Posting Operational Transactions (With Values)'}
+                {language === 'ar' ? 'العمليات التي لا تلزم عنها قيود ولكن تشمل قيماً' : 'Non-Posting Operational Transactions (With Values)'}
               </h2>
             </div>
             <span className="text-xs font-bold text-blue-700 bg-white px-2.5 py-1 rounded-lg border border-blue-200">
@@ -631,39 +631,39 @@ export const DataCountsValues: React.FC = () => {
             <table className="w-full text-right border-collapse text-xs">
               <thead>
                 <tr className="bg-stone-50/80 text-stone-600 border-b border-stone-200 font-black">
-                  <th className="p-3.5 whitespace-nowrap">{language === 'ar' ? 'نوع العملية / المستند' : 'Document Type'}</th>
-                  <th className="p-3.5 whitespace-nowrap text-center">{language === 'ar' ? 'العدد' : 'Count'}</th>
-                  <th className="p-3.5 whitespace-nowrap text-left">{language === 'ar' ? 'إجمالي القيم المسجلة' : 'Total Values'}</th>
-                  <th className="p-3.5 whitespace-nowrap">{language === 'ar' ? 'طبيعة المستند والأثر المحاسبي' : 'Notes'}</th>
-                  <th className="p-3.5 whitespace-nowrap text-center">{language === 'ar' ? 'حالة الترحيل' : 'Posting Status'}</th>
+                  <th className="py-2 px-3 whitespace-nowrap">{language === 'ar' ? 'نوع العملية / المستند' : 'Document Type'}</th>
+                  <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'العدد' : 'Count'}</th>
+                  <th className="py-2 px-3 whitespace-nowrap text-left">{language === 'ar' ? 'إجمالي القيم المسجلة' : 'Total Values'}</th>
+                  <th className="py-2 px-3 whitespace-nowrap">{language === 'ar' ? 'طبيعة المستند والأثر المحاسبي' : 'Notes'}</th>
+                  <th className="py-2 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'حالة الترحيل' : 'Posting Status'}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 font-bold text-stone-700">
                 {filteredOperational.map((row) => (
-                  <tr key={row.key} className="hover:bg-stone-50/60 transition-colors">
-                    <td className="p-3.5 flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold flex-shrink-0">
-                        <Layers size={14} />
+                  <tr key={row.key} className="hover:bg-stone-50/70 transition-colors">
+                    <td className="py-1.5 px-3 flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold flex-shrink-0">
+                        <Layers size={13} />
                       </div>
-                      <span className="font-black text-stone-900">{row.name}</span>
+                      <span className="font-black text-stone-900 text-xs">{row.name}</span>
                     </td>
 
-                    <td className="p-3.5 text-center">
-                      <span className="px-2.5 py-1 rounded-lg bg-stone-100 font-mono font-bold text-stone-800">
+                    <td className="py-1.5 px-3 text-center">
+                      <span className="px-2 py-0.5 rounded-md bg-stone-100 font-mono font-bold text-stone-800 text-xs">
                         {formatNumber(row.count)}
                       </span>
                     </td>
 
-                    <td className="p-3.5 text-left font-mono font-black text-blue-900">
+                    <td className="py-1.5 px-3 text-left font-mono font-black text-blue-900 text-xs">
                       {formatNumber(row.total_value)} EGP
                     </td>
 
-                    <td className="p-3.5 text-stone-600 text-xs">
+                    <td className="py-1.5 px-3 text-stone-600 text-xs">
                       {row.notes}
                     </td>
 
-                    <td className="p-3.5 text-center">
-                      <span className="px-2.5 py-1 rounded-full bg-stone-100 text-stone-600 font-bold text-[11px]">
+                    <td className="py-1.5 px-3 text-center">
+                      <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-600 font-bold text-[11px]">
                         {language === 'ar' ? 'غير ملزم بقيد' : 'Non-Posting Document'}
                       </span>
                     </td>
@@ -682,7 +682,7 @@ export const DataCountsValues: React.FC = () => {
             <div className="flex items-center gap-2.5">
               <span className="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
               <h2 className="text-base font-black text-purple-950">
-                {language === 'ar' ? 'أولاً: البيانات الأساسية والمستخدمين والصلاحيات' : 'Master Data, Users & System Architecture'}
+                {language === 'ar' ? 'البيانات الأساسية والمستخدمين والصلاحيات' : 'Master Data, Users & System Architecture'}
               </h2>
             </div>
             <span className="text-xs font-bold text-purple-700 bg-white px-2.5 py-1 rounded-lg border border-purple-200">
@@ -694,7 +694,7 @@ export const DataCountsValues: React.FC = () => {
             {filteredMaster.map((row) => (
               <div 
                 key={row.key} 
-                className="p-3.5 rounded-2xl border border-stone-100 bg-stone-50/50 hover:bg-white hover:border-purple-200 hover:shadow-sm transition-all flex items-center justify-between"
+                className="py-2 px-3 rounded-2xl border border-stone-100 bg-stone-50/50 hover:bg-white hover:border-purple-200 hover:shadow-sm transition-all flex items-center justify-between"
               >
                 <div>
                   <p className="text-xs font-black text-stone-800 mb-0.5">{row.name}</p>

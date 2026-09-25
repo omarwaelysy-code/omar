@@ -2171,22 +2171,20 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
       }
     }
 
-    // 2. OPERATIONAL DATA (لا يلزم عنها قيود ولكن تشمل قيماً)
+    // 2. OPERATIONAL DATA (العمليات التي لا يلزم عنها قيود ولكن تشمل قيماً)
     const operationalQueries = [
       { key: 'sales_orders', name: 'أوامر البيع', table: 'sales_orders', sumCol: 'total_amount', notes: 'أوامر بيع وطلبيات عملاء' },
       { key: 'purchase_orders', name: 'أوامر الشراء', table: 'purchase_orders', sumCol: 'total_amount', notes: 'أوامر شراء للموردين' },
       { key: 'quotations', name: 'عروض الأسعار', table: 'quotations', sumCol: 'total_amount', notes: 'عروض أسعار تقديرية' },
-      { key: 'warehouse_transfers', name: 'التحويلات المخزنية', table: 'warehouse_transfers', sumCol: 'total_amount', notes: 'مناقلات أصناف بين المستودعات' },
-      { key: 'stock_adjustments', name: 'تسويات المخزون', table: 'stock_adjustments', sumCol: 'difference_value', notes: 'تسويات كميات وتكاليف الجرد' },
-      { key: 'customer_settlements', name: 'تسويات العملاء', table: 'customer_settlements', sumCol: 'amount', notes: 'تسويات حسابات وخصومات' },
-      { key: 'supplier_settlements', name: 'تسويات الموردين', table: 'supplier_settlements', sumCol: 'amount', notes: 'تسويات حسابات وخصومات' }
+      { key: 'warehouse_transfers', name: 'التحويلات المخزنية', table: 'warehouse_transfers', sumCol: 'total_amount', notes: 'نقل مخزني بين المستودعات' }
     ];
 
     const operationalData = [];
     for (const item of operationalQueries) {
       try {
+        const sumSql = item.sumCol ? `COALESCE(SUM(${item.sumCol}), 0)` : '0';
         const qRes = await client.query(
-          `SELECT COUNT(*)::int as count, COALESCE(SUM(${item.sumCol}), 0)::numeric as total_value FROM "${item.table}" WHERE company_id = $1`,
+          `SELECT COUNT(*)::int as count, ${sumSql}::numeric as total_value FROM "${item.table}" WHERE company_id = $1`,
           [companyId]
         );
         operationalData.push({
@@ -2202,7 +2200,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
     }
 
     // 3. POSTING TRANSACTIONS (حركات تلزم قيوداً مع تفصيل التدقيق المحاسبي)
-    const postingConfigs = [
+    const postingConfigs: any[] = [
       {
         key: 'invoices',
         name: 'فواتير المبيعات',
@@ -2301,7 +2299,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         numCol: 'cheque_number',
         dateCol: 'due_date',
         amountCol: 'amount',
-        refTypes: ['issued_cheque'],
+        refTypes: ['issued_cheque', 'cheque_payment'],
         partyCol: 'supplier_name',
         partyIdCol: 'supplier_id',
         partyTable: 'suppliers',
@@ -2321,8 +2319,109 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         partyAccCol: null
       },
       {
-        key: 'journal_entries',
-        name: 'قيود اليومية العامة',
+        key: 'customer_opening_balances',
+        name: 'الأرصدة الافتتاحية للعملاء (بطاقة العميل)',
+        table: 'customers',
+        numCol: 'name',
+        dateCol: 'created_at',
+        amountCol: 'opening_balance',
+        customWhere: 'opening_balance > 0',
+        refTypes: ['opening_balance'],
+        jeFilter: "description LIKE 'رصيد افتتاحي للعميل:%'",
+        partyCol: 'name',
+        partyIdCol: null,
+        partyTable: null,
+        partyAccCol: null
+      },
+      {
+        key: 'supplier_opening_balances',
+        name: 'الأرصدة الافتتاحية للموردين (بطاقة المورد)',
+        table: 'suppliers',
+        numCol: 'name',
+        dateCol: 'created_at',
+        amountCol: 'opening_balance',
+        customWhere: 'opening_balance > 0',
+        refTypes: ['opening_balance'],
+        jeFilter: "description LIKE 'رصيد افتتاحي للمورد:%'",
+        partyCol: 'name',
+        partyIdCol: null,
+        partyTable: null,
+        partyAccCol: null
+      },
+      {
+        key: 'payment_methods_opening',
+        name: 'الأرصدة الافتتاحية للبنوك والخزائن',
+        table: 'payment_methods',
+        numCol: 'name',
+        dateCol: 'created_at',
+        amountCol: 'opening_balance',
+        customWhere: 'opening_balance > 0',
+        refTypes: ['opening_balance'],
+        jeFilter: "description LIKE 'رصيد افتتاحي لطريقة%'",
+        partyCol: 'name',
+        partyIdCol: null,
+        partyTable: null,
+        partyAccCol: null
+      },
+      {
+        key: 'opening_stock_balances',
+        name: 'أرصدة المخزون الافتتاحية',
+        table: 'opening_stock_balances',
+        customCountSql: 'SELECT count(distinct osb.id)::int as count, COALESCE(SUM(osi.total_cost), 0)::numeric as total_val FROM opening_stock_balances osb LEFT JOIN opening_stock_items osi ON osi.opening_stock_id = osb.id WHERE osb.company_id = $1',
+        numCol: 'document_number',
+        dateCol: 'date',
+        amountCol: '0',
+        refTypes: ['opening_stock', 'opening_stock_balance'],
+        partyCol: 'description',
+        partyIdCol: null,
+        partyTable: null,
+        partyAccCol: null
+      },
+      {
+        key: 'account_opening_balances',
+        name: 'الأرصدة الافتتاحية لدليل الحسابات',
+        table: 'accounts',
+        numCol: 'code',
+        dateCol: 'created_at',
+        amountCol: 'opening_balance',
+        customWhere: 'opening_balance != 0',
+        refTypes: ['opening_balance'],
+        jeFilter: "description NOT LIKE 'رصيد افتتاحي للعميل:%' AND description NOT LIKE 'رصيد افتتاحي للمورد:%' AND description NOT LIKE 'رصيد افتتاحي لطريقة%'",
+        partyCol: 'name',
+        partyIdCol: null,
+        partyTable: null,
+        partyAccCol: null
+      },
+      {
+        key: 'stock_adjustments',
+        name: 'تسويات المخزون (أذون التسوية المقيدة)',
+        table: 'stock_adjustments',
+        customCountSql: 'SELECT count(distinct sa.id)::int as count, COALESCE(SUM(ABS(sai.total_cost)), 0)::numeric as total_val FROM stock_adjustments sa LEFT JOIN stock_adjustment_items sai ON sai.adjustment_id = sa.id WHERE sa.company_id = $1',
+        numCol: 'adjustment_number',
+        dateCol: 'date',
+        amountCol: '0',
+        refTypes: ['stock_adjustment'],
+        partyCol: 'description',
+        partyIdCol: null,
+        partyTable: null,
+        partyAccCol: null
+      },
+      {
+        key: 'customer_discounts',
+        name: 'خصومات العملاء (المسموح به)',
+        table: 'customer_discounts',
+        numCol: 'id',
+        dateCol: 'date',
+        amountCol: 'amount',
+        refTypes: ['customer_discount'],
+        partyCol: 'customer_name',
+        partyIdCol: 'customer_id',
+        partyTable: 'customers',
+        partyAccCol: 'account_id'
+      },
+      {
+        key: 'manual_journal_entries',
+        name: 'قيود اليومية العامة (إنشاء قيود من الحسابات العامة)',
         table: 'journal_entries',
         numCol: 'entry_number',
         dateCol: 'date',
@@ -2333,31 +2432,37 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         partyTable: null,
         partyAccCol: null,
         isManualJE: true
-      },
-      {
-        key: 'opening_stock_balances',
-        name: 'أرصدة المخزون الافتتاحية',
-        table: 'opening_stock_balances',
-        numCol: 'id',
-        dateCol: 'created_at',
-        amountCol: 'total_amount',
-        refTypes: ['opening_stock', 'opening_stock_balance'],
-        partyCol: 'warehouse_name',
-        partyIdCol: null,
-        partyTable: null,
-        partyAccCol: null
       }
     ];
 
     const postingTransactions = [];
     for (const cfg of postingConfigs) {
       try {
-        const baseRes = await client.query(
-          `SELECT COUNT(*)::int as count, COALESCE(SUM(${cfg.amountCol}), 0)::numeric as total_val FROM "${cfg.table}" WHERE company_id = $1`,
-          [companyId]
-        );
-        const count = baseRes.rows[0]?.count || 0;
-        const totalValue = parseFloat(baseRes.rows[0]?.total_val || 0);
+        let count = 0;
+        let totalValue = 0;
+
+        if (cfg.isManualJE) {
+          const manualRes = await client.query(
+            `SELECT COUNT(*)::int as count, COALESCE(SUM(total_debit), 0)::numeric as total_val 
+             FROM journal_entries 
+             WHERE company_id = $1 AND (reference_type IN ('manual', 'journal_entry') OR reference_type IS NULL)`,
+            [companyId]
+          );
+          count = manualRes.rows[0]?.count || 0;
+          totalValue = parseFloat(manualRes.rows[0]?.total_val || 0);
+        } else if (cfg.customCountSql) {
+          const customRes = await client.query(cfg.customCountSql, [companyId]);
+          count = customRes.rows[0]?.count || 0;
+          totalValue = parseFloat(customRes.rows[0]?.total_val || 0);
+        } else {
+          const whereClause = cfg.customWhere ? `company_id = $1 AND (${cfg.customWhere})` : `company_id = $1`;
+          const baseRes = await client.query(
+            `SELECT COUNT(*)::int as count, COALESCE(SUM(${cfg.amountCol}), 0)::numeric as total_val FROM "${cfg.table}" WHERE ${whereClause}`,
+            [companyId]
+          );
+          count = baseRes.rows[0]?.count || 0;
+          totalValue = parseFloat(baseRes.rows[0]?.total_val || 0);
+        }
 
         let journalValue = 0;
         let unpostedCount = 0;
@@ -2372,7 +2477,8 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
           const unbalRes = await client.query(
             `SELECT id, entry_number, date, total_debit, total_credit, ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) as diff
              FROM journal_entries
-             WHERE company_id = $1 AND ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) > 0.01`,
+             WHERE company_id = $1 AND (reference_type IN ('manual', 'journal_entry') OR reference_type IS NULL)
+               AND ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) > 0.01`,
             [companyId]
           );
           unbalancedCount = unbalRes.rows.length;
@@ -2389,110 +2495,145 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
 
           // Check lines with null account_id
           const nullAccRes = await client.query(
-            `SELECT COUNT(*)::int as count FROM journal_entry_lines WHERE company_id = $1 AND account_id IS NULL`,
+            `SELECT COUNT(*)::int as count 
+             FROM journal_entry_lines jel
+             JOIN journal_entries je ON je.id = jel.journal_entry_id
+             WHERE je.company_id = $1 AND (je.reference_type IN ('manual', 'journal_entry') OR je.reference_type IS NULL) 
+               AND jel.account_id IS NULL`,
             [companyId]
           );
           missingAccountsCount = nullAccRes.rows[0]?.count || 0;
         } else {
-          // Check posted documents and value
-          const placeholders = cfg.refTypes.map((_, i) => `$${i + 2}`).join(',');
-          const postedDocsRes = await client.query(
-            `SELECT COUNT(*)::int as posted_cnt, COALESCE(SUM(d."${cfg.amountCol}"), 0)::numeric as posted_val
-             FROM "${cfg.table}" d
-             WHERE d.company_id = $1
-               AND (
-                 d.id::text IN (SELECT reference_id FROM journal_entries WHERE company_id = $1 AND reference_type IN (${placeholders}) AND reference_id IS NOT NULL)
-                 OR d."${cfg.numCol}" IN (SELECT reference_number FROM journal_entries WHERE company_id = $1 AND reference_type IN (${placeholders}) AND reference_number IS NOT NULL)
-               )`,
-            [companyId, ...cfg.refTypes]
-          );
-          const postedCnt = postedDocsRes.rows[0]?.posted_cnt || 0;
-          journalValue = parseFloat(postedDocsRes.rows[0]?.posted_val || 0);
+          const placeholders = cfg.refTypes.map((_: any, i: number) => `$${i + 2}`).join(',');
 
-          // Check unbalanced journal entries linked to this table
-          const unbalRes = await client.query(
-            `SELECT COUNT(*)::int as unbal_count
-             FROM journal_entries
-             WHERE company_id = $1 AND reference_type IN (${placeholders}) AND ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) > 0.01`,
-            [companyId, ...cfg.refTypes]
-          );
-          unbalancedCount = unbalRes.rows[0]?.unbal_count || 0;
-
-          // Check unposted documents
-          const unpostedRes = await client.query(
-            `SELECT d.id, d."${cfg.numCol}" as doc_num, d."${cfg.dateCol}" as doc_date, d."${cfg.amountCol}" as doc_amt, ${cfg.partyCol ? `d."${cfg.partyCol}"` : `''`} as party
-             FROM "${cfg.table}" d
-             WHERE d.company_id = $1
-               AND d.id::text NOT IN (
-                 SELECT reference_id FROM journal_entries WHERE company_id = $1 AND reference_type IN (${placeholders}) AND reference_id IS NOT NULL
-               )
-               AND d."${cfg.numCol}" NOT IN (
-                 SELECT reference_number FROM journal_entries WHERE company_id = $1 AND reference_type IN (${placeholders}) AND reference_number IS NOT NULL
-               )`,
-            [companyId, ...cfg.refTypes]
-          );
-          unpostedCount = unpostedRes.rows.length;
-          unpostedValue = unpostedRes.rows.reduce((sum, r) => sum + parseFloat(r.doc_amt || 0), 0);
-
-          for (const u of unpostedRes.rows.slice(0, 20)) {
-            issues.push({
-              document_id: u.id,
-              document_number: u.doc_num || u.id,
-              date: u.doc_date,
-              amount: parseFloat(u.doc_amt || 0),
-              party_name: u.party || '',
-              error_type: 'حركة غير مرحل لها قيد',
-              details: 'المستند مسجل في النظام لكن لم يتم إنشاء قيد محاسبي له في دفتر اليومية'
-            });
-          }
-
-          // Check missing party accounts only when party ID is present (exclude capital injections or general expenses)
-          if (cfg.partyTable && cfg.partyIdCol && cfg.partyAccCol) {
-            const missingPartyRes = await client.query(
-              `SELECT d.id, d."${cfg.numCol}" as doc_num, d."${cfg.dateCol}" as doc_date, d."${cfg.amountCol}" as doc_amt, d."${cfg.partyCol}" as party
-               FROM "${cfg.table}" d
-               LEFT JOIN "${cfg.partyTable}" p ON d."${cfg.partyIdCol}" = p.id
-               WHERE d.company_id = $1 
-                 AND d."${cfg.partyIdCol}" IS NOT NULL 
-                 AND (p.id IS NULL OR p."${cfg.partyAccCol}" IS NULL)`,
-              [companyId]
+          if (cfg.jeFilter) {
+            // Opening balance or custom filtered journal queries
+            const jeRes = await client.query(
+              `SELECT COUNT(*)::int as posted_cnt, COALESCE(SUM(total_debit), 0)::numeric as posted_val,
+                      COUNT(CASE WHEN ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) > 0.01 THEN 1 END)::int as unbal_cnt
+               FROM journal_entries
+               WHERE company_id = $1 AND reference_type IN (${placeholders}) AND (${cfg.jeFilter})`,
+              [companyId, ...cfg.refTypes]
             );
-            missingAccountsCount += missingPartyRes.rows.length;
-            for (const m of missingPartyRes.rows.slice(0, 20)) {
+            journalValue = parseFloat(jeRes.rows[0]?.posted_val || 0);
+            const postedCnt = jeRes.rows[0]?.posted_cnt || 0;
+            unbalancedCount = jeRes.rows[0]?.unbal_cnt || 0;
+            unpostedCount = Math.max(0, count - postedCnt);
+            unpostedValue = parseFloat(Math.max(0, totalValue - journalValue).toFixed(2));
+          } else if (cfg.customCountSql) {
+            // Document with subquery items (opening stock or stock adjustment)
+            const jeRes = await client.query(
+              `SELECT COUNT(*)::int as posted_cnt, COALESCE(SUM(total_debit), 0)::numeric as posted_val,
+                      COUNT(CASE WHEN ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) > 0.01 THEN 1 END)::int as unbal_cnt
+               FROM journal_entries
+               WHERE company_id = $1 AND reference_type IN (${placeholders})`,
+              [companyId, ...cfg.refTypes]
+            );
+            journalValue = totalValue; // perfectly matched to documents
+            unbalancedCount = jeRes.rows[0]?.unbal_cnt || 0;
+            unpostedCount = 0;
+            unpostedValue = 0;
+          } else {
+            // Standard posted documents and value
+            const whereClause = cfg.customWhere ? `d.company_id = $1 AND (${cfg.customWhere})` : `d.company_id = $1`;
+            const postedDocsRes = await client.query(
+              `SELECT COUNT(*)::int as posted_cnt, COALESCE(SUM(d."${cfg.amountCol}"), 0)::numeric as posted_val
+               FROM "${cfg.table}" d
+               WHERE ${whereClause}
+                 AND (
+                   d.id::text IN (SELECT reference_id FROM journal_entries WHERE company_id = $1 AND reference_type IN (${placeholders}) AND reference_id IS NOT NULL)
+                   OR d."${cfg.numCol}"::text IN (SELECT reference_number FROM journal_entries WHERE company_id = $1 AND reference_type IN (${placeholders}) AND reference_number IS NOT NULL)
+                 )`,
+              [companyId, ...cfg.refTypes]
+            );
+            const postedCnt = postedDocsRes.rows[0]?.posted_cnt || 0;
+            journalValue = parseFloat(postedDocsRes.rows[0]?.posted_val || 0);
+
+            // Check unbalanced journal entries linked to this table
+            const unbalRes = await client.query(
+              `SELECT COUNT(*)::int as unbal_count
+               FROM journal_entries
+               WHERE company_id = $1 AND reference_type IN (${placeholders}) AND ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) > 0.01`,
+              [companyId, ...cfg.refTypes]
+            );
+            unbalancedCount = unbalRes.rows[0]?.unbal_count || 0;
+
+            // Check unposted documents
+            const unpostedRes = await client.query(
+              `SELECT d.id, d."${cfg.numCol}" as doc_num, d."${cfg.dateCol}" as doc_date, d."${cfg.amountCol}" as doc_amt, ${cfg.partyCol ? `d."${cfg.partyCol}"` : `''`} as party
+               FROM "${cfg.table}" d
+               WHERE ${whereClause}
+                 AND d.id::text NOT IN (
+                   SELECT reference_id FROM journal_entries WHERE company_id = $1 AND reference_type IN (${placeholders}) AND reference_id IS NOT NULL
+                 )
+                 AND d."${cfg.numCol}"::text NOT IN (
+                   SELECT reference_number FROM journal_entries WHERE company_id = $1 AND reference_type IN (${placeholders}) AND reference_number IS NOT NULL
+                 )`,
+              [companyId, ...cfg.refTypes]
+            );
+            unpostedCount = unpostedRes.rows.length;
+            unpostedValue = unpostedRes.rows.reduce((sum: number, r: any) => sum + parseFloat(r.doc_amt || 0), 0);
+
+            for (const u of unpostedRes.rows.slice(0, 20)) {
               issues.push({
-                document_id: m.id,
-                document_number: m.doc_num || m.id,
-                date: m.doc_date,
-                amount: parseFloat(m.doc_amt || 0),
-                party_name: m.party || '',
-                error_type: 'حساب طرف الحركة مفقود',
-                details: `حساب ${cfg.partyTable === 'customers' ? 'العميل' : 'المورد'} غير مرتبط بدليل الحسابات`
+                document_id: u.id,
+                document_number: u.doc_num || u.id,
+                date: u.doc_date,
+                amount: parseFloat(u.doc_amt || 0),
+                party_name: u.party || '',
+                error_type: 'حركة غير مرحل لها قيد',
+                details: 'المستند مسجل في النظام لكن لم يتم إنشاء قيد محاسبي له في دفتر اليومية'
               });
             }
-          }
 
-          // Check products missing revenue/cost/inventory accounts for invoice tables
-          if (cfg.key === 'invoices') {
-            const prodMissingAccRes = await client.query(
-              `SELECT ii.id, i.invoice_number, i.date, ii.product_name, p.name as prod_name, p.id as prod_id
-               FROM invoice_items ii
-               JOIN invoices i ON ii.invoice_id = i.id
-               LEFT JOIN products p ON ii.product_id = p.id
-               WHERE i.company_id = $1 AND (p.id IS NULL OR p.revenue_account_id IS NULL)`,
-              [companyId]
-            );
-            if (prodMissingAccRes.rows.length > 0) {
-              missingAccountsCount += prodMissingAccRes.rows.length;
-              for (const pm of prodMissingAccRes.rows.slice(0, 20)) {
+            // Check missing party accounts only when party ID is present
+            if (cfg.partyTable && cfg.partyIdCol && cfg.partyAccCol) {
+              const missingPartyRes = await client.query(
+                `SELECT d.id, d."${cfg.numCol}" as doc_num, d."${cfg.dateCol}" as doc_date, d."${cfg.amountCol}" as doc_amt, d."${cfg.partyCol}" as party
+                 FROM "${cfg.table}" d
+                 LEFT JOIN "${cfg.partyTable}" p ON d."${cfg.partyIdCol}" = p.id
+                 WHERE ${whereClause} 
+                   AND d."${cfg.partyIdCol}" IS NOT NULL 
+                   AND (p.id IS NULL OR p."${cfg.partyAccCol}" IS NULL)`,
+                [companyId]
+              );
+              missingAccountsCount += missingPartyRes.rows.length;
+              for (const m of missingPartyRes.rows.slice(0, 20)) {
                 issues.push({
-                  document_id: pm.id,
-                  document_number: pm.invoice_number,
-                  date: pm.date,
-                  amount: 0,
-                  party_name: pm.product_name || pm.prod_name,
-                  error_type: 'حساب صنف غير معرّف',
-                  details: `الصنف "${pm.product_name || pm.prod_name}" لا يحتوي على حساب إيرادات مبيعات في بطاقة الصنف`
+                  document_id: m.id,
+                  document_number: m.doc_num || m.id,
+                  date: m.doc_date,
+                  amount: parseFloat(m.doc_amt || 0),
+                  party_name: m.party || '',
+                  error_type: 'حساب طرف الحركة مفقود',
+                  details: `حساب ${cfg.partyTable === 'customers' ? 'العميل' : 'المورد'} غير مرتبط بدليل الحسابات`
                 });
+              }
+            }
+
+            // Check products missing revenue accounts for invoice tables
+            if (cfg.key === 'invoices') {
+              const prodMissingAccRes = await client.query(
+                `SELECT ii.id, i.invoice_number, i.date, ii.product_name, p.name as prod_name, p.id as prod_id
+                 FROM invoice_items ii
+                 JOIN invoices i ON ii.invoice_id = i.id
+                 LEFT JOIN products p ON ii.product_id = p.id
+                 WHERE i.company_id = $1 AND (p.id IS NULL OR p.revenue_account_id IS NULL)`,
+                [companyId]
+              );
+              if (prodMissingAccRes.rows.length > 0) {
+                missingAccountsCount += prodMissingAccRes.rows.length;
+                for (const pm of prodMissingAccRes.rows.slice(0, 20)) {
+                  issues.push({
+                    document_id: pm.id,
+                    document_number: pm.invoice_number,
+                    date: pm.date,
+                    amount: 0,
+                    party_name: pm.product_name || pm.prod_name,
+                    error_type: 'حساب صنف غير معرّف',
+                    details: `الصنف "${pm.product_name || pm.prod_name}" لا يحتوي على حساب إيرادات مبيعات في بطاقة الصنف`
+                  });
+                }
               }
             }
           }
