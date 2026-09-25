@@ -100,8 +100,17 @@ export class PostingService {
 
     // Discount
     if (discountLocal > 0) {
-      const discountAccountId = settings?.customer_discount_account_id || '';
-      const discountAccount = accounts.find(a => a.id === discountAccountId);
+      let discountAccount = accounts.find(a => a.id === settings?.customer_discount_account_id);
+      if (!discountAccount) {
+        discountAccount = accounts.find(a => 
+          a.code === '4104' || 
+          a.code === '412' || 
+          a.code === '5401' || 
+          a.name.includes('الخصم المسموح به') || 
+          a.name.includes('خصم العملاء')
+        );
+      }
+      const discountAccountId = discountAccount?.id || settings?.customer_discount_account_id || '';
       journalItems.push({
         account_id: discountAccountId,
         account_name: discountAccount?.name || 'حساب الخصم المسموح به',

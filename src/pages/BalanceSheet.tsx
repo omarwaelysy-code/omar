@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { dbService } from '../services/dbService';
 import { JournalEntry, Account, AccountType } from '../types';
-import { Search, Calendar, FileText, Download, Printer, Filter, PieChart, ArrowLeftRight, Shield, CreditCard, Wallet, CheckCircle2, AlertTriangle, RefreshCcw, TrendingUp } from 'lucide-react';
+import { Search, Calendar, FileText, Download, Printer, Filter, PieChart, ArrowLeftRight, Shield, CreditCard, Wallet, CheckCircle2, AlertTriangle, RefreshCcw, TrendingUp, Building2, Coins, Scale } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
@@ -423,137 +423,345 @@ export const BalanceSheet: React.FC = () => {
       </div>
 
       <div ref={reportRef} className="space-y-6">
+        {/* IAS 1 / EAS 1 Standard Header Banner with Executive KPIs */}
+        <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 text-white p-6 rounded-3xl shadow-lg border border-emerald-900/40">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+            <div>
+              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                  <Scale size={12} />
+                  <span>IAS 1 / EAS 1</span>
+                </span>
+                <span className="text-xs text-slate-300 font-bold">
+                  {dir === 'rtl' ? 'معايير المحاسبة الدولية والمصرية (عرض القوائم المالية)' : 'Standard Presentation of Financial Position'}
+                </span>
+              </div>
+              <h2 className="text-xl md:text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
+                <Scale className="text-emerald-400 shrink-0" size={26} />
+                <span>{dir === 'rtl' ? 'قائمة المركز المالي (الميزانية العمومية)' : 'Statement of Financial Position'}</span>
+              </h2>
+              <p className="text-xs text-slate-300 font-medium mt-1">
+                {dir === 'rtl' 
+                  ? `كما في ${dateRange.end} | العملة: الجنيه المصري (EGP) | تبويب معتمد: أصول والتزامات متداولة وغير متداولة وحقوق ملكية` 
+                  : `As of ${dateRange.end} | Currency: EGP | Current & Non-Current Assets, Liabilities & Equity`}
+              </p>
+            </div>
+
+            {/* Standard Key Financial Metrics under IAS 1 */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+              <div className="bg-white/5 border border-white/10 p-2.5 rounded-2xl backdrop-blur-sm">
+                <p className="text-[10px] text-slate-400 font-bold">{dir === 'rtl' ? 'رأس المال العامل' : 'Working Capital'}</p>
+                <p className={`font-mono font-black text-sm ${((totalData as any).workingCapital || 0) >= 0 ? 'text-emerald-300' : 'text-rose-400'}`}>
+                  {formatNumber((totalData as any).workingCapital || 0)}
+                </p>
+              </div>
+              <div className="bg-white/5 border border-white/10 p-2.5 rounded-2xl backdrop-blur-sm">
+                <p className="text-[10px] text-slate-400 font-bold">{dir === 'rtl' ? 'نسبة التداول' : 'Current Ratio'}</p>
+                <p className="font-mono font-black text-sm text-cyan-300">
+                  {((totalData as any).currentRatio || 0)} : 1
+                </p>
+              </div>
+              <div className="bg-white/5 border border-white/10 p-2.5 rounded-2xl backdrop-blur-sm">
+                <p className="text-[10px] text-slate-400 font-bold">{dir === 'rtl' ? 'السيولة السريعة' : 'Quick Ratio'}</p>
+                <p className="font-mono font-black text-sm text-amber-300">
+                  {((totalData as any).quickRatio || 0)} : 1
+                </p>
+              </div>
+              <div className="bg-white/5 border border-white/10 p-2.5 rounded-2xl backdrop-blur-sm">
+                <p className="text-[10px] text-slate-400 font-bold">{dir === 'rtl' ? 'المديونية/الملكية' : 'Debt to Equity'}</p>
+                <p className="font-mono font-black text-sm text-purple-300">
+                  {((totalData as any).debtToEquity || 0)} : 1
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {viewMode === 'single' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            {/* RIGHT COLUMN: ASSETS (الأصول) */}
             <div className="space-y-6">
-              <div className="bg-white border border-zinc-200 rounded-[2.5rem] overflow-hidden shadow-sm h-full">
-                <div className={`px-8 py-6 bg-emerald-50 border-b border-emerald-100 flex items-center justify-between ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                  <h3 className={`font-black text-emerald-700 flex items-center gap-3 text-lg ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                    <Wallet size={24} />
-                    {t('balance_sheet.assets')}
-                  </h3>
-                  <span className="text-2xl font-black text-emerald-600">{formatNumber(totalData.totalAssets)}</span>
-                </div>
-                <div className="p-4 space-y-2">
-                  {totalData.assets.map(a => (
-                    <div key={a.id} className={`flex items-center justify-between p-4 hover:bg-emerald-50/30 rounded-2xl transition-all border border-transparent hover:border-emerald-100 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                      <span 
-                        onClick={() => {
-                          setPendingLedgerParams({
-                            accountId: a.id,
-                            startDate: '1900-01-01',
-                            endDate: dateRange.end
-                          });
-                          setCurrentPage('general_ledger_report');
-                        }}
-                        className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
-                      >
-                        {a.name}
-                      </span>
-                      <span className="font-black text-zinc-900">{formatNumber(a.balance)}</span>
+              <div className="bg-white border border-stone-200 rounded-[2.5rem] overflow-hidden shadow-sm">
+                {/* Assets Header */}
+                <div className={`px-8 py-5 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex items-center justify-between ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-white/15 flex items-center justify-center font-bold">
+                      <Wallet size={22} className="text-white" />
                     </div>
-                  ))}
-                  {totalData.assets.length === 0 && (
-                    <p className="p-12 text-center text-zinc-400 font-medium italic">{t('balance_sheet.no_assets')}</p>
-                  )}
+                    <div>
+                      <h3 className="font-black text-lg text-white">
+                        {dir === 'rtl' ? 'الأصول (Assets)' : 'Assets'}
+                      </h3>
+                      <p className="text-[11px] font-bold text-emerald-100">
+                        {dir === 'rtl' ? 'الموجودات والموارد الاقتصادية للمنشأة' : 'Economic Resources & Properties'}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-2xl font-mono font-black text-white">{formatNumber(totalData.totalAssets)}</span>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  {/* 1. NON-CURRENT ASSETS (الأصول غير المتداولة) */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-stone-200">
+                      <div className="flex items-center gap-2 text-stone-800 font-black text-sm">
+                        <Building2 size={16} className="text-stone-500" />
+                        <span>{dir === 'rtl' ? 'أولاً: الأصول غير المتداولة (طويلة الأجل)' : '1. Non-Current Assets'}</span>
+                      </div>
+                      <span className="font-mono font-black text-xs text-stone-700">
+                        {formatNumber((totalData as any).totalNonCurrentAssets || 0)}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 pr-2">
+                      {((totalData as any).nonCurrentAssets || []).map((a: any) => (
+                        <div key={a.id} className="flex items-center justify-between p-3 hover:bg-stone-50 rounded-xl transition-all border border-stone-100">
+                          <span 
+                            onClick={() => {
+                              setPendingLedgerParams({ accountId: a.id, startDate: '1900-01-01', endDate: dateRange.end });
+                              setCurrentPage('general_ledger_report');
+                            }}
+                            className="font-bold text-emerald-700 hover:text-emerald-900 hover:underline cursor-pointer text-xs"
+                          >
+                            <span className="font-mono text-stone-400 ml-2">{a.code}</span> {a.name}
+                          </span>
+                          <span className="font-mono font-black text-stone-900 text-xs">{formatNumber(a.balance)}</span>
+                        </div>
+                      ))}
+                      {(!((totalData as any).nonCurrentAssets) || (totalData as any).nonCurrentAssets.length === 0) && (
+                        <p className="text-[11px] text-stone-400 italic py-1 px-3 bg-stone-50 rounded-lg">
+                          {dir === 'rtl' ? 'لا توجد أصول غير متداولة مسجلة' : 'No non-current assets'}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 2. CURRENT ASSETS (الأصول المتداولة) */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-emerald-200 bg-emerald-50/50 p-2.5 rounded-xl">
+                      <div className="flex items-center gap-2 text-emerald-900 font-black text-sm">
+                        <Coins size={16} className="text-emerald-600" />
+                        <span>{dir === 'rtl' ? 'ثانياً: الأصول المتداولة' : '2. Current Assets'}</span>
+                      </div>
+                      <span className="font-mono font-black text-sm text-emerald-700">
+                        {formatNumber((totalData as any).totalCurrentAssets || totalData.totalAssets)}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 pr-2">
+                      {((totalData as any).currentAssets || totalData.assets).map((a: any) => (
+                        <div key={a.id} className="flex items-center justify-between p-3 hover:bg-emerald-50/40 rounded-xl transition-all border border-stone-100 hover:border-emerald-200">
+                          <span 
+                            onClick={() => {
+                              setPendingLedgerParams({ accountId: a.id, startDate: '1900-01-01', endDate: dateRange.end });
+                              setCurrentPage('general_ledger_report');
+                            }}
+                            className="font-bold text-emerald-700 hover:text-emerald-900 hover:underline cursor-pointer text-xs"
+                          >
+                            <span className="font-mono text-stone-400 ml-2">{a.code}</span> {a.name}
+                          </span>
+                          <span className="font-mono font-black text-stone-900 text-xs">{formatNumber(a.balance)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Total Assets Footer Bar */}
+                  <div className={`p-4 rounded-2xl bg-stone-900 text-white flex items-center justify-between ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                    <span className="font-black text-sm">{dir === 'rtl' ? 'إجمالي الأصول (الموجودات)' : 'TOTAL ASSETS'}</span>
+                    <span className="font-mono font-black text-xl text-emerald-400">{formatNumber(totalData.totalAssets)}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-8">
-              <div className="bg-white border border-zinc-200 rounded-[2.5rem] overflow-hidden shadow-sm">
-                <div className={`px-8 py-6 bg-emerald-50 border-b border-emerald-100 flex items-center justify-between ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                  <h3 className={`font-black text-emerald-700 flex items-center gap-3 text-lg ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                    <CreditCard size={24} />
-                    {dir === 'rtl' ? 'الالتزامات (الخصوم)' : 'Liabilities'}
-                  </h3>
-                  <span className="text-2xl font-black text-emerald-600">{formatNumber(totalData.totalLiabilities)}</span>
-                </div>
-                <div className="p-4 space-y-2">
-                  {totalData.liabilities.map(a => (
-                    <div key={a.id} className={`flex items-center justify-between p-4 hover:bg-emerald-50/30 rounded-2xl transition-all border border-transparent hover:border-emerald-100 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                      <span 
-                        onClick={() => {
-                          setPendingLedgerParams({
-                            accountId: a.id,
-                            startDate: '1900-01-01',
-                            endDate: dateRange.end
-                          });
-                          setCurrentPage('general_ledger_report');
-                        }}
-                        className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
-                      >
-                        {a.name}
-                      </span>
-                      <span className="font-black text-zinc-900">{formatNumber(Math.abs(a.balance))}</span>
+            {/* LEFT COLUMN: LIABILITIES & EQUITY (الالتزامات وحقوق الملكية) */}
+            <div className="space-y-6">
+              {/* 1. EQUITY (حقوق الملكية) */}
+              <div className="bg-white border border-stone-200 rounded-[2.5rem] overflow-hidden shadow-sm">
+                <div className={`px-8 py-5 bg-gradient-to-r from-blue-700 to-indigo-800 text-white flex items-center justify-between ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-white/15 flex items-center justify-center font-bold">
+                      <PieChart size={22} className="text-white" />
                     </div>
-                  ))}
-                  {totalData.liabilities.length === 0 && (
-                    <p className="p-8 text-center text-zinc-400 font-medium italic">{dir === 'rtl' ? 'لا توجد التزامات' : 'No liabilities'}</p>
-                  )}
+                    <div>
+                      <h3 className="font-black text-lg text-white">
+                        {dir === 'rtl' ? 'حقوق الملكية (Shareholders\' Equity)' : 'Equity'}
+                      </h3>
+                      <p className="text-[11px] font-bold text-blue-100">
+                        {dir === 'rtl' ? 'رأس المال والاحتياطيات والأرباح المحققة' : 'Capital, Reserves & Earnings'}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-2xl font-mono font-black text-white">{formatNumber(totalData.totalEquity)}</span>
                 </div>
-              </div>
 
-              <div className="bg-white border border-zinc-200 rounded-[2.5rem] overflow-hidden shadow-sm">
-                <div className={`px-8 py-6 bg-blue-50 border-b border-blue-100 flex items-center justify-between ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                  <h3 className={`font-black text-blue-700 flex items-center gap-3 text-lg ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                    <PieChart size={24} />
-                    {dir === 'rtl' ? 'حقوق الملكية' : 'Equity'}
-                  </h3>
-                  <span className="text-2xl font-black text-blue-600">{formatNumber(totalData.totalEquity)}</span>
-                </div>
-                <div className="p-4 space-y-2">
-                  {totalData.equity.map(a => (
-                    <div key={a.id} className={`flex items-center justify-between p-4 hover:bg-blue-50/30 rounded-2xl transition-all border border-transparent hover:border-blue-100 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                      <span 
-                        onClick={() => {
-                          setPendingLedgerParams({
-                            accountId: a.id,
-                            startDate: '1900-01-01',
-                            endDate: dateRange.end
-                          });
-                          setCurrentPage('general_ledger_report');
-                        }}
-                        className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
-                      >
-                        {a.name}
-                      </span>
-                      <span className="font-black text-zinc-900">{formatNumber(Math.abs(a.balance))}</span>
+                <div className="p-6 space-y-3">
+                  <div className="space-y-1.5">
+                    {totalData.equity.map(a => (
+                      <div key={a.id} className="flex items-center justify-between p-3 hover:bg-blue-50/40 rounded-xl transition-all border border-stone-100 hover:border-blue-200">
+                        <span 
+                          onClick={() => {
+                            setPendingLedgerParams({ accountId: a.id, startDate: '1900-01-01', endDate: dateRange.end });
+                            setCurrentPage('general_ledger_report');
+                          }}
+                          className="font-bold text-blue-700 hover:text-blue-900 hover:underline cursor-pointer text-xs"
+                        >
+                          <span className="font-mono text-stone-400 ml-2">{(a as any).code}</span> {a.name}
+                        </span>
+                        <span className="font-mono font-black text-stone-900 text-xs">{formatNumber(Math.abs(a.balance))}</span>
+                      </div>
+                    ))}
+
+                    {/* Net Profit row */}
+                    <div className="flex items-center justify-between p-3.5 bg-emerald-50 rounded-xl border border-emerald-200 font-bold text-xs">
+                      <div className="flex items-center gap-2 text-emerald-800 font-black">
+                        <TrendingUp size={16} className="text-emerald-600" />
+                        <span>{t('balance_sheet.net_profit_period')}</span>
+                      </div>
+                      <span className="font-mono font-black text-sm text-emerald-700">{formatNumber(totalData.netProfit)}</span>
                     </div>
-                  ))}
-                  <div className={`flex items-center justify-between p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                    <span className="font-bold text-emerald-700">{t('balance_sheet.net_profit_period')}</span>
-                    <span className="font-black text-emerald-600">{formatNumber(totalData.netProfit)}</span>
+                  </div>
+
+                  <div className={`p-3 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-between text-blue-900 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                    <span className="font-black text-xs">{dir === 'rtl' ? 'إجمالي حقوق الملكية' : 'Total Equity'}</span>
+                    <span className="font-mono font-black text-base text-blue-800">{formatNumber(totalData.totalEquity)}</span>
                   </div>
                 </div>
               </div>
 
-              <div className={`px-8 py-6 rounded-[2rem] flex items-center justify-between bg-zinc-900 text-white shadow-xl ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                <span className="font-black text-lg">{dir === 'rtl' ? 'إجمالي الالتزامات وحقوق الملكية' : 'Total Liabilities & Equity'}</span>
-                <span className="text-2xl font-black">{formatNumber(totalData.totalLiabilitiesEquity)}</span>
-              </div>
+              {/* 2. LIABILITIES (الالتزامات / الخصوم) */}
+              <div className="bg-white border border-stone-200 rounded-[2.5rem] overflow-hidden shadow-sm">
+                <div className={`px-8 py-5 bg-gradient-to-r from-amber-700 to-rose-700 text-white flex items-center justify-between ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-white/15 flex items-center justify-center font-bold">
+                      <CreditCard size={22} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-lg text-white">
+                        {dir === 'rtl' ? 'الالتزامات (Liabilities)' : 'Liabilities'}
+                      </h3>
+                      <p className="text-[11px] font-bold text-amber-100">
+                        {dir === 'rtl' ? 'الديون والتعهدات المستحقة للغير' : 'Obligations & Payables'}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-2xl font-mono font-black text-white">{formatNumber(totalData.totalLiabilities)}</span>
+                </div>
 
-              <div className={`p-8 rounded-[2.5rem] border-2 flex items-center justify-between shadow-lg ${
-                totalData.isBalanced 
-                  ? 'bg-emerald-500 border-emerald-400 text-white shadow-emerald-500/20' 
-                  : 'bg-rose-500 border-rose-400 text-white shadow-rose-500/20'
-              }`}>
-                <div className={`flex items-center gap-4 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse text-left'}`}>
-                  <Shield size={32} />
-                  <div>
-                    <p className="font-black text-xl">{t('balance_sheet.check_title')}</p>
-                    <p className="text-sm opacity-80 font-bold">
-                      {totalData.isBalanced 
-                        ? t('balance_sheet.balanced_msg') 
-                        : `${t('balance_sheet.unbalanced_msg')} ${formatNumber(totalData.diagnostics.difference)}`}
-                    </p>
+                <div className="p-6 space-y-6">
+                  {/* Non-Current Liabilities */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-stone-200">
+                      <span className="text-stone-800 font-black text-sm">
+                        {dir === 'rtl' ? 'أولاً: الالتزامات غير المتداولة (طويلة الأجل)' : '1. Non-Current Liabilities'}
+                      </span>
+                      <span className="font-mono font-black text-xs text-stone-700">
+                        {formatNumber((totalData as any).totalNonCurrentLiabilities || 0)}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 pr-2">
+                      {((totalData as any).nonCurrentLiabilities || []).map((l: any) => (
+                        <div key={l.id} className="flex items-center justify-between p-3 hover:bg-stone-50 rounded-xl transition-all border border-stone-100">
+                          <span 
+                            onClick={() => {
+                              setPendingLedgerParams({ accountId: l.id, startDate: '1900-01-01', endDate: dateRange.end });
+                              setCurrentPage('general_ledger_report');
+                            }}
+                            className="font-bold text-amber-700 hover:text-amber-900 hover:underline cursor-pointer text-xs"
+                          >
+                            <span className="font-mono text-stone-400 ml-2">{l.code}</span> {l.name}
+                          </span>
+                          <span className="font-mono font-black text-stone-900 text-xs">{formatNumber(Math.abs(l.balance))}</span>
+                        </div>
+                      ))}
+                      {(!((totalData as any).nonCurrentLiabilities) || (totalData as any).nonCurrentLiabilities.length === 0) && (
+                        <p className="text-[11px] text-stone-400 italic py-1 px-3 bg-stone-50 rounded-lg">
+                          {dir === 'rtl' ? 'لا توجد التزامات طويلة الأجل' : 'No non-current liabilities'}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Current Liabilities */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-amber-200 bg-amber-50/50 p-2.5 rounded-xl">
+                      <span className="text-amber-900 font-black text-sm">
+                        {dir === 'rtl' ? 'ثانياً: الالتزامات المتداولة (قصيرة الأجل)' : '2. Current Liabilities'}
+                      </span>
+                      <span className="font-mono font-black text-sm text-amber-800">
+                        {formatNumber((totalData as any).totalCurrentLiabilities || totalData.totalLiabilities)}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 pr-2">
+                      {((totalData as any).currentLiabilities || totalData.liabilities).map((l: any) => (
+                        <div key={l.id} className="flex items-center justify-between p-3 hover:bg-amber-50/40 rounded-xl transition-all border border-stone-100 hover:border-amber-200">
+                          <span 
+                            onClick={() => {
+                              setPendingLedgerParams({ accountId: l.id, startDate: '1900-01-01', endDate: dateRange.end });
+                              setCurrentPage('general_ledger_report');
+                            }}
+                            className="font-bold text-amber-800 hover:text-amber-950 hover:underline cursor-pointer text-xs"
+                          >
+                            <span className="font-mono text-stone-400 ml-2">{l.code}</span> {l.name}
+                          </span>
+                          <span className="font-mono font-black text-stone-900 text-xs">{formatNumber(Math.abs(l.balance))}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Total Liabilities Subtotal */}
+                  <div className={`p-3 rounded-xl bg-amber-50/70 border border-amber-100 flex items-center justify-between text-amber-900 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                    <span className="font-black text-xs">{dir === 'rtl' ? 'إجمالي الالتزامات (قصيرة + طويلة الأجل)' : 'Total Liabilities'}</span>
+                    <span className="font-mono font-black text-base text-amber-800">{formatNumber(totalData.totalLiabilities)}</span>
                   </div>
                 </div>
-                <div className={`${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                  <p className="text-xs font-black uppercase tracking-widest opacity-60">{t('balance_sheet.difference')}</p>
-                  <p className="text-2xl font-black">{formatNumber(totalData.diagnostics.difference)}</p>
-                </div>
               </div>
+
+              {/* Total Liabilities & Equity Footer Bar */}
+              <div className={`p-4 rounded-2xl bg-stone-900 text-white flex items-center justify-between ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                <span className="font-black text-sm">{dir === 'rtl' ? 'إجمالي الالتزامات وحقوق الملكية' : 'TOTAL LIABILITIES & EQUITY'}</span>
+                <span className="font-mono font-black text-xl text-blue-400">{formatNumber(totalData.totalLiabilitiesEquity)}</span>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* IAS 1 Balance Verification Banner */}
+        <div className={`p-6 rounded-[2rem] border-2 flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg ${
+          totalData.isBalanced 
+            ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 border-emerald-400 text-white shadow-emerald-600/20' 
+            : 'bg-gradient-to-r from-rose-600 to-red-700 border-rose-400 text-white shadow-rose-600/20'
+        }`}>
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center font-bold shrink-0">
+              {totalData.isBalanced ? <CheckCircle2 size={32} /> : <AlertTriangle size={32} />}
+            </div>
+            <div>
+              <p className="font-black text-lg">
+                {totalData.isBalanced
+                  ? (dir === 'rtl' ? 'المركز المالي متزن 100% وفق المعايير الدولية IAS 1' : 'Statement is 100% Balanced under IAS 1')
+                  : t('balance_sheet.check_title')}
+              </p>
+              <p className="text-xs opacity-90 font-medium">
+                {totalData.isBalanced
+                  ? (dir === 'rtl' 
+                      ? `المعادلة المحاسبية محققة بدقة: الأصول (${formatNumber(totalData.totalAssets)}) = الالتزامات (${formatNumber(totalData.totalLiabilities)}) + حقوق الملكية (${formatNumber(totalData.totalEquity)})`
+                      : `Accounting Equation Met: Assets (${formatNumber(totalData.totalAssets)}) = Liabilities (${formatNumber(totalData.totalLiabilities)}) + Equity (${formatNumber(totalData.totalEquity)})`)
+                  : `${t('balance_sheet.unbalanced_msg')} ${formatNumber(totalData.diagnostics.difference)}`}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 bg-white/10 px-5 py-2.5 rounded-2xl border border-white/15">
+            <div className={dir === 'rtl' ? 'text-right' : 'text-left'}>
+              <p className="text-[10px] font-black uppercase tracking-widest opacity-80">{t('balance_sheet.difference')}</p>
+              <p className="text-xl font-mono font-black">{formatNumber(totalData.diagnostics.difference)}</p>
+            </div>
+          </div>
+        </div>
 
               {!totalData.isBalanced && (
                 <motion.div 

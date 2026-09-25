@@ -24,7 +24,13 @@ export class AccountingEngine {
         const entryDateStr = (entry.date || '').slice(0, 10);
         const itemsList = (entry.items && Array.isArray(entry.items) && entry.items.length > 0) ? entry.items : ((entry as any).lines || (entry as any).journal_entry_lines || []);
         itemsList.forEach((item: any) => {
-          if (item.account_id === account.id) {
+          const isMatched = item.account_id === account.id ||
+            (!item.account_id && item.account_name && (
+              item.account_name.trim().toLowerCase() === account.name.trim().toLowerCase() ||
+              (item.account_name.includes('خصم') && account.name.includes('خصم')) ||
+              (item.account_name.includes('نقد') && account.name.includes('نقد'))
+            ));
+          if (isMatched) {
             const debit = Number(item.debit) || 0;
             const credit = Number(item.credit) || 0;
             
@@ -92,7 +98,13 @@ export class AccountingEngine {
       const entryDateStr = (entry.date || '').slice(0, 10);
       const itemsList = (entry.items && Array.isArray(entry.items) && entry.items.length > 0) ? entry.items : ((entry as any).lines || (entry as any).journal_entry_lines || []);
       itemsList.forEach((item: any) => {
-        if (item.account_id === account.id) {
+        const isMatched = item.account_id === account.id ||
+          (!item.account_id && item.account_name && (
+            item.account_name.trim().toLowerCase() === account.name.trim().toLowerCase() ||
+            (item.account_name.includes('خصم') && account.name.includes('خصم')) ||
+            (item.account_name.includes('نقد') && account.name.includes('نقد'))
+          ));
+        if (isMatched) {
           const debit = Number(item.debit) || 0;
           const credit = Number(item.credit) || 0;
 
@@ -518,13 +530,55 @@ export class AccountingEngine {
     const liabilities = bsAccounts.filter(a => ['liability', 'liability_equity', 'payables'].includes(a.typeInfo.classification));
     const equity = bsAccounts.filter(a => a.typeInfo.classification === 'equity');
 
-    const totalAssets = assets.reduce((sum, a) => sum + (a.closing.debit - a.closing.credit), 0);
-    
-    // Liabilities and Equity are normally Credit balances
-    const liabilitiesSum = liabilities.reduce((sum, a) => sum + (a.closing.credit - a.closing.debit), 0);
+    // Classification according to IAS 1 / EAS 1 (Non-Current vs Current)
+    const isNonCurrentAsset = (acc: any) => {
+      const code = String(acc.code || '');
+      const name = String(acc.name || '').toLowerCase();
+      const cls = String(acc.typeInfo?.classification || '').toLowerCase();
+      return code.startsWith('12') || 
+             cls === 'fixed_asset' || 
+             ['أصول ثابتة', 'الات', 'آلات', 'معدات', 'سيارات', 'أثاث', 'اثاث', 'مباني', 'عقارات', 'تجهيزات', 'مشروعات تحت التنفيذ', 'استثمارات طويلة', 'شهرة', 'أصول غير ملموسة'].some(k => name.includes(k));
+    };
+
+    const isNonCurrentLiability = (acc: any) => {
+      const code = String(acc.code || '');
+      const name = String(acc.name || '').toLowerCase();
+      const cls = String(acc.typeInfo?.classification || '').toLowerCase();
+      return (code.startsWith('22') && !name.includes('ضرائب') && !name.includes('قيمة مضافة')) ||
+             cls === 'non_current_liability' ||
+             ['طويلة الأجل', 'طويل الأجل', 'قروض طويلة', 'مخصصات طويلة', 'التزامات مؤجلة'].some(k => name.includes(k));
+    };
+
+    const nonCurrentAssets = assets.filter(a => isNonCurrentAsset(a));
+    const currentAssets = assets.filter(a => !isNonCurrentAsset(a));
+
+    const nonCurrentLiabilities = liabilities.filter(l => isNonCurrentLiability(l));
+    const currentLiabilities = liabilities.filter(l => !isNonCurrentLiability(l));
+
+    const totalNonCurrentAssets = nonCurrentAssets.reduce((sum, a) => sum + (a.closing.debit - a.closing.credit), 0);
+    const totalCurrentAssets = currentAssets.reduce((sum, a) => sum + (a.closing.debit - a.closing.credit), 0);
+    const totalAssets = totalNonCurrentAssets + totalCurrentAssets;
+
+    const totalNonCurrentLiabilities = nonCurrentLiabilities.reduce((sum, a) => sum + (a.closing.credit - a.closing.debit), 0);
+    const totalCurrentLiabilities = currentLiabilities.reduce((sum, a) => sum + (a.closing.credit - a.closing.debit), 0);
+    const totalLiabilities = totalNonCurrentLiabilities + totalCurrentLiabilities;
+
     const equitySum = equity.reduce((sum, a) => sum + (a.closing.credit - a.closing.debit), 0);
-    
-    const totalLiabilitiesEquity = liabilitiesSum + equitySum + incomeStatement.netProfit;
+    const totalEquity = equitySum + incomeStatement.netProfit;
+
+    const totalLiabilitiesEquity = totalLiabilities + totalEquity;
+
+    // Sub-groupings for Current Assets for IAS 1 presentation:
+    const cashAndEquivalents = currentAssets.filter(a => ['نقدية', 'خزينة', 'صندوق', 'بنك'].some(k => a.name.includes(k)) || a.code?.startsWith('113') || a.code?.startsWith('1101') || a.code?.startsWith('1102'));
+    const receivables = currentAssets.filter(a => ['عملاء', 'مدينون', 'ذمم'].some(k => a.name.includes(k)) || a.code?.startsWith('111') || a.code?.startsWith('1103'));
+    const inventory = currentAssets.filter(a => ['مخزون', 'بضاعة', 'خامات'].some(k => a.name.includes(k)) || a.code?.startsWith('1115') || a.code?.startsWith('112') || a.code?.startsWith('1104'));
+    const otherCurrentAssets = currentAssets.filter(a => !cashAndEquivalents.includes(a) && !receivables.includes(a) && !inventory.includes(a));
+
+    const inventoryTotal = inventory.reduce((sum, a) => sum + (a.closing.debit - a.closing.credit), 0);
+    const workingCapital = totalCurrentAssets - totalCurrentLiabilities;
+    const currentRatio = totalCurrentLiabilities > 0 ? Number((totalCurrentAssets / totalCurrentLiabilities).toFixed(2)) : 0;
+    const quickRatio = totalCurrentLiabilities > 0 ? Number(((totalCurrentAssets - inventoryTotal) / totalCurrentLiabilities).toFixed(2)) : 0;
+    const debtToEquity = totalEquity > 0 ? Number((totalLiabilities / totalEquity).toFixed(2)) : 0;
 
     // Additional Diagnostics
     const entriesBeforeDate = entries.filter(e => !endDate || (e.date || '').slice(0, 10) <= endDate);
@@ -563,13 +617,29 @@ export class AccountingEngine {
     });
 
     return {
-      assets: assets.map(a => ({ id: a.id, name: a.name, balance: a.closing.debit - a.closing.credit })),
-      liabilities: liabilities.map(l => ({ id: l.id, name: l.name, balance: l.closing.credit - l.closing.debit })),
-      equity: equity.map(e => ({ id: e.id, name: e.name, balance: e.closing.credit - e.closing.debit })),
+      assets: assets.map(a => ({ id: a.id, name: a.name, code: a.code, balance: a.closing.debit - a.closing.credit })),
+      liabilities: liabilities.map(l => ({ id: l.id, name: l.name, code: l.code, balance: l.closing.credit - l.closing.debit })),
+      equity: equity.map(e => ({ id: e.id, name: e.name, code: e.code, balance: e.closing.credit - e.closing.debit })),
+      nonCurrentAssets: nonCurrentAssets.map(a => ({ id: a.id, name: a.name, code: a.code, balance: a.closing.debit - a.closing.credit })),
+      currentAssets: currentAssets.map(a => ({ id: a.id, name: a.name, code: a.code, balance: a.closing.debit - a.closing.credit })),
+      nonCurrentLiabilities: nonCurrentLiabilities.map(l => ({ id: l.id, name: l.name, code: l.code, balance: l.closing.credit - l.closing.debit })),
+      currentLiabilities: currentLiabilities.map(l => ({ id: l.id, name: l.name, code: l.code, balance: l.closing.credit - l.closing.debit })),
+      cashAndEquivalents: cashAndEquivalents.map(a => ({ id: a.id, name: a.name, code: a.code, balance: a.closing.debit - a.closing.credit })),
+      receivables: receivables.map(a => ({ id: a.id, name: a.name, code: a.code, balance: a.closing.debit - a.closing.credit })),
+      inventory: inventory.map(a => ({ id: a.id, name: a.name, code: a.code, balance: a.closing.debit - a.closing.credit })),
+      otherCurrentAssets: otherCurrentAssets.map(a => ({ id: a.id, name: a.name, code: a.code, balance: a.closing.debit - a.closing.credit })),
+      totalNonCurrentAssets,
+      totalCurrentAssets,
+      totalNonCurrentLiabilities,
+      totalCurrentLiabilities,
+      workingCapital,
+      currentRatio,
+      quickRatio,
+      debtToEquity,
       netProfit: incomeStatement.netProfit,
       totalAssets,
-      totalLiabilities: liabilitiesSum,
-      totalEquity: equitySum + incomeStatement.netProfit,
+      totalLiabilities,
+      totalEquity,
       totalLiabilitiesEquity,
       isBalanced: Math.abs(totalAssets - totalLiabilitiesEquity) < 0.01,
       diagnostics: {
