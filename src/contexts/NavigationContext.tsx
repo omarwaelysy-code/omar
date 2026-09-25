@@ -129,6 +129,7 @@ export const pageLabels: { [key: string]: string } = {
   'cash_balances': 'أرصدة النقدية',
   'detailed_journal_entries': 'دفتر اليومية المفصل',
   'integrity_dashboard': 'فحص سلامة البيانات',
+  'data_counts_values': 'شاشة العدد وقيم البيانات',
   'currencies': 'العملات',
   'currency_management': 'إدارة العملات',
   'operation_categories': 'فئات العمليات',

@@ -83,6 +83,7 @@ const EtaTaxTypesGuide = React.lazy(() => import('./pages/EtaTaxTypesGuide').the
 const IfrsGuide = React.lazy(() => import('./pages/IfrsGuide'));
 const FixedAssets = React.lazy(() => import('./pages/FixedAssets').then(m => ({ default: m.FixedAssets })));
 const DocumentImport = React.lazy(() => import('./pages/DocumentImport').then(m => ({ default: m.DocumentImport })));
+const DataCountsValues = React.lazy(() => import('./pages/DataCountsValues').then(m => ({ default: m.DataCountsValues })));
 
 import { useNavigation } from './contexts/NavigationContext';
 import { useLanguage } from './contexts/LanguageContext';
@@ -302,6 +303,7 @@ export default function App() {
       case 'departments': return <Departments />;
       case 'cost_centers': return <CostCenters />;
       case 'system_check': return <SystemCheck />;
+      case 'data_counts_values': return <DataCountsValues />;
       case 'templates': return <Templates initialView="list" />;
       case 'create_template': return <Templates initialView="create" />;
       case 'pos_connected_branches': return <PosConnectedBranches />;

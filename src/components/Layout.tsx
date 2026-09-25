@@ -766,9 +766,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         icon: Settings,
         subItems: [
           { id: 'company_settings', label: t('nav.company_settings'), icon: Building2 },
+          ...(company?.settings?.enable_multi_currency || (company?.settings as any)?.enable_multi_currency === 'true' || isSuperAdmin ? [{ id: 'currencies', label: t('nav.currencies'), icon: Coins }] : []),
           { id: 'users', label: t('nav.users'), icon: UsersIcon },
           { id: 'period_closing', label: language === 'ar' ? 'إغلاق الفترات المحاسبية' : 'Period Closing', icon: Lock },
           { id: 'integrity_dashboard', label: t('nav.integrity_check') || 'Integrity Check', icon: ShieldCheck },
+          { id: 'data_counts_values', label: language === 'ar' ? 'شاشة العدد وقيم البيانات' : 'Data Counts & Values', icon: BarChart3 },
           { id: 'backup_restore', label: t('nav.backup_restore'), icon: Database },
           { id: 'div_activity', isDivider: true },
           { id: 'h_activity', label: language === 'ar' ? 'سجلات الرقابة والنشاط' : 'Audit & Activity Logs', isHeader: true },
@@ -776,8 +778,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'activity_log_modifications', label: t('nav.activity_log_modifications'), icon: Edit3 },
           { id: 'activity_log_views', label: t('nav.activity_log_views'), icon: Eye },
           { id: 'activity_log_prints', label: t('nav.activity_log_prints'), icon: Printer },
-          { id: 'activity_log', label: t('nav.activity_log'), icon: History },
-          ...(company?.settings?.enable_multi_currency || (company?.settings as any)?.enable_multi_currency === 'true' || isSuperAdmin ? [{ id: 'currencies', label: t('nav.currencies'), icon: Coins }] : [])
+          { id: 'activity_log', label: t('nav.activity_log'), icon: History }
         ]
       }
     ];

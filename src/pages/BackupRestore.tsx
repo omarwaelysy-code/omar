@@ -10,7 +10,9 @@ import {
   Clock,
   Shield,
   FileJson,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Users,
+  History
 } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { useAuth } from '../contexts/AuthContext';
@@ -42,6 +44,8 @@ export const BackupRestore: React.FC = () => {
   });
 
   const [restoreMode, setRestoreMode] = useState<'merge' | 'replace'>('merge');
+  const [includeUsers, setIncludeUsers] = useState<boolean>(false);
+  const [includeActivityLog, setIncludeActivityLog] = useState<boolean>(false);
 
   const [successModal, setSuccessModal] = useState<{
     show: boolean;
@@ -166,7 +170,7 @@ export const BackupRestore: React.FC = () => {
       formData.append('file', file);
       
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`/api/erp/system/restore?mode=${mode}&company_id=${user.company_id}`, {
+      const response = await fetch(`/api/erp/system/restore?mode=${mode}&company_id=${user.company_id}&include_users=${includeUsers}&include_activity_log=${includeActivityLog}`, {
         method: 'POST',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
@@ -575,6 +579,43 @@ export const BackupRestore: React.FC = () => {
                   </div>
                 </button>
               </div>
+              {confirmModal.type === 'json' && (
+                <div className="space-y-3 mb-6 p-4 bg-stone-50 rounded-2xl border border-stone-200 text-right">
+                  <p className="text-xs font-black text-stone-700 mb-2">
+                    {language === 'ar' ? 'خيارات إضافية للاستعادة:' : 'Additional restore options:'}
+                  </p>
+                  
+                  <label className="flex items-center justify-between cursor-pointer p-2.5 rounded-xl hover:bg-white transition-all border border-stone-100">
+                    <div className="flex items-center gap-2.5">
+                      <Users size={16} className="text-emerald-600" />
+                      <span className="text-xs font-bold text-stone-800">
+                        {language === 'ar' ? 'هل يتم نقل المستخدمين؟' : 'Transfer users?'}
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={includeUsers}
+                      onChange={(e) => setIncludeUsers(e.target.checked)}
+                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-stone-300 cursor-pointer"
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between cursor-pointer p-2.5 rounded-xl hover:bg-white transition-all border border-stone-100">
+                    <div className="flex items-center gap-2.5">
+                      <History size={16} className="text-emerald-600" />
+                      <span className="text-xs font-bold text-stone-800">
+                        {language === 'ar' ? 'هل يتم نقل سجل النشاط والرقابة؟' : 'Transfer activity logs?'}
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={includeActivityLog}
+                      onChange={(e) => setIncludeActivityLog(e.target.checked)}
+                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-stone-300 cursor-pointer"
+                    />
+                  </label>
+                </div>
+              )}
 
               <div className="flex gap-3">
                 <button

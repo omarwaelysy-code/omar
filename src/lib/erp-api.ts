@@ -1913,13 +1913,17 @@ router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 
       return res.status(403).json({ error: 'Permission denied: cannot restore to another company' });
     }
 
+    const includeUsers = String(req.query.include_users || req.body?.include_users || 'false') === 'true';
+    const includeActivityLog = String(req.query.include_activity_log || req.body?.include_activity_log || 'false') === 'true';
+
     await client.query('BEGIN');
 
     if (mode === 'replace') {
       for (const table of [...TABLES_TO_BACKUP].reverse()) {
         try {
           if (table === 'companies') continue; // Never delete company entity itself!
-          if (table === 'users' && isCrossCompany) continue; // Never delete existing users of the target company during cross-company restore!
+          if (table === 'users' && !includeUsers) continue; // Only delete users if explicitly requested to restore them!
+          if ((table === 'activity_logs' || table === 'activity_log') && !includeActivityLog) continue; // Only delete logs if explicitly requested!
           if (table === 'inventory_movement_lines') {
             await client.query(`DELETE FROM inventory_movement_lines WHERE movement_id IN (SELECT id FROM inventory_movements WHERE company_id = $1 UNION SELECT id FROM inventory_movements_v2 WHERE company_id = $1)`, [targetCompanyId]);
           } else if (table === 'asset_components') {
@@ -1987,9 +1991,14 @@ router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 
       }
 
       if (table === 'users') {
-        if (isCrossCompany) {
-          // Target company already has its own administrative users. Do not clone users across companies
-          continue;
+        if (!includeUsers) {
+          continue; // User chose not to transfer users
+        }
+      }
+
+      if (table === 'activity_logs' || table === 'activity_log') {
+        if (!includeActivityLog) {
+          continue; // User chose not to transfer activity logs
         }
       }
 
@@ -2012,8 +2021,16 @@ router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 
         }
 
         if (table === 'users') {
+          // If cross-company and user with same email exists in target company, map ID and skip
+          if (row.email) {
+            const checkUser = await client.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND company_id = $2', [row.email, targetCompanyId]);
+            if (checkUser.rows.length > 0) {
+              idMap.set(originalRow.id, checkUser.rows[0].id);
+              continue;
+            }
+          }
           if (!row.password_hash) {
-            const existingUser = await client.query('SELECT password_hash FROM users WHERE id = $1', [row.id]).catch(() => ({ rows: [] }));
+            const existingUser = await client.query('SELECT password_hash FROM users WHERE id = $1', [originalRow.id]).catch(() => ({ rows: [] }));
             if (existingUser.rows[0]?.password_hash) {
               row.password_hash = existingUser.rows[0].password_hash;
             } else {
@@ -2094,6 +2111,501 @@ router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 
       await client.query('ROLLBACK').catch(() => {});
     }
     console.error('JSON Restore failed:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Data Audit & Counts & Values Endpoint
+router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = (req.user?.role === 'super_admin' && req.query.company_id) 
+    ? String(req.query.company_id) 
+    : req.user?.company_id;
+
+  if (!companyId) return res.status(400).json({ error: 'Company ID required' });
+
+  const client = await pool.connect();
+  try {
+    // 1. MASTER DATA COUNTS
+    const masterQueries = [
+      { key: 'customers', name: 'العملاء', table: 'customers', valCol: 'opening_balance' },
+      { key: 'suppliers', name: 'الموردين', table: 'suppliers', valCol: 'opening_balance' },
+      { key: 'products', name: 'الأصناف والمنتجات', table: 'products', valCol: '(cost_price * stock)' },
+      { key: 'warehouses', name: 'المستودعات والمخازن', table: 'warehouses', valCol: null },
+      { key: 'item_groups', name: 'مجموعات الأصناف', table: 'item_groups', valCol: null },
+      { key: 'accounts', name: 'دليل الحسابات', table: 'accounts', valCol: null },
+      { key: 'account_types', name: 'أنواع الحسابات', table: 'account_types', valCol: null },
+      { key: 'payment_methods', name: 'طرق الدفع', table: 'payment_methods', valCol: null },
+      { key: 'banks', name: 'البنوك والحسابات البنكية', table: 'banks', valCol: null },
+      { key: 'employees', name: 'الموظفين', table: 'employees', valCol: null },
+      { key: 'fixed_assets', name: 'الأصول الثابتة', table: 'fixed_assets', valCol: 'purchase_price' },
+      { key: 'asset_categories', name: 'فئات الأصول', table: 'asset_categories', valCol: null },
+      { key: 'cost_centers', name: 'مراكز التكلفة', table: 'cost_centers', valCol: null },
+      { key: 'departments', name: 'الأقسام', table: 'departments', valCol: null },
+      { key: 'operation_categories', name: 'تصنيفات العمليات', table: 'operation_categories', valCol: null },
+      { key: 'operations', name: 'العمليات', table: 'operations', valCol: null },
+      { key: 'users', name: 'المستخدمين', table: 'users', valCol: null },
+      { key: 'roles', name: 'الأدوار والصلاحيات', table: 'roles', valCol: null },
+      { key: 'pos_branches', name: 'الفروع المتصلة (POS)', table: 'pos_connected_branches', valCol: null },
+      { key: 'templates', name: 'قوالب المستندات', table: 'templates', valCol: null },
+      { key: 'document_sequences', name: 'تسلسلات المستندات', table: 'document_sequences', valCol: null }
+    ];
+
+    const masterData = [];
+    for (const item of masterQueries) {
+      try {
+        const valSql = item.valCol ? `COALESCE(SUM(${item.valCol}), 0)` : '0';
+        const qRes = await client.query(
+          `SELECT COUNT(*)::int as count, ${valSql}::numeric as total_value FROM "${item.table}" WHERE company_id = $1`,
+          [companyId]
+        );
+        masterData.push({
+          key: item.key,
+          name: item.name,
+          count: qRes.rows[0]?.count || 0,
+          total_value: parseFloat(qRes.rows[0]?.total_value || 0)
+        });
+      } catch (e) {
+        masterData.push({ key: item.key, name: item.name, count: 0, total_value: 0 });
+      }
+    }
+
+    // 2. OPERATIONAL DATA (لا يلزم عنها قيود ولكن تشمل قيماً)
+    const operationalQueries = [
+      { key: 'sales_orders', name: 'أوامر البيع', table: 'sales_orders', sumCol: 'total_amount', notes: 'أوامر بيع وطلبيات عملاء' },
+      { key: 'purchase_orders', name: 'أوامر الشراء', table: 'purchase_orders', sumCol: 'total_amount', notes: 'أوامر شراء للموردين' },
+      { key: 'quotations', name: 'عروض الأسعار', table: 'quotations', sumCol: 'total_amount', notes: 'عروض أسعار تقديرية' },
+      { key: 'warehouse_transfers', name: 'التحويلات المخزنية', table: 'warehouse_transfers', sumCol: 'total_amount', notes: 'مناقلات أصناف بين المستودعات' },
+      { key: 'stock_adjustments', name: 'تسويات المخزون', table: 'stock_adjustments', sumCol: 'difference_value', notes: 'تسويات كميات وتكاليف الجرد' },
+      { key: 'customer_settlements', name: 'تسويات العملاء', table: 'customer_settlements', sumCol: 'amount', notes: 'تسويات حسابات وخصومات' },
+      { key: 'supplier_settlements', name: 'تسويات الموردين', table: 'supplier_settlements', sumCol: 'amount', notes: 'تسويات حسابات وخصومات' }
+    ];
+
+    const operationalData = [];
+    for (const item of operationalQueries) {
+      try {
+        const qRes = await client.query(
+          `SELECT COUNT(*)::int as count, COALESCE(SUM(${item.sumCol}), 0)::numeric as total_value FROM "${item.table}" WHERE company_id = $1`,
+          [companyId]
+        );
+        operationalData.push({
+          key: item.key,
+          name: item.name,
+          count: qRes.rows[0]?.count || 0,
+          total_value: parseFloat(qRes.rows[0]?.total_value || 0),
+          notes: item.notes
+        });
+      } catch (e) {
+        operationalData.push({ key: item.key, name: item.name, count: 0, total_value: 0, notes: item.notes });
+      }
+    }
+
+    // 3. POSTING TRANSACTIONS (حركات تلزم قيوداً مع تفصيل التدقيق المحاسبي)
+    const postingConfigs = [
+      {
+        key: 'invoices',
+        name: 'فواتير المبيعات',
+        table: 'invoices',
+        numCol: 'invoice_number',
+        dateCol: 'date',
+        amountCol: 'total_amount',
+        refTypes: ['invoice', 'sales_invoice'],
+        partyCol: 'customer_name',
+        partyIdCol: 'customer_id',
+        partyTable: 'customers',
+        partyAccCol: 'account_id'
+      },
+      {
+        key: 'purchase_invoices',
+        name: 'فواتير المشتريات',
+        table: 'purchase_invoices',
+        numCol: 'invoice_number',
+        dateCol: 'date',
+        amountCol: 'total_amount',
+        refTypes: ['purchase_invoice', 'bill'],
+        partyCol: 'supplier_name',
+        partyIdCol: 'supplier_id',
+        partyTable: 'suppliers',
+        partyAccCol: 'account_id'
+      },
+      {
+        key: 'returns',
+        name: 'مردودات المبيعات',
+        table: 'returns',
+        numCol: 'return_number',
+        dateCol: 'date',
+        amountCol: 'total_amount',
+        refTypes: ['return', 'sales_return'],
+        partyCol: 'customer_name',
+        partyIdCol: 'customer_id',
+        partyTable: 'customers',
+        partyAccCol: 'account_id'
+      },
+      {
+        key: 'purchase_returns',
+        name: 'مردودات المشتريات',
+        table: 'purchase_returns',
+        numCol: 'return_number',
+        dateCol: 'date',
+        amountCol: 'total_amount',
+        refTypes: ['purchase_return'],
+        partyCol: 'supplier_name',
+        partyIdCol: 'supplier_id',
+        partyTable: 'suppliers',
+        partyAccCol: 'account_id'
+      },
+      {
+        key: 'receipt_vouchers',
+        name: 'سندات القبض',
+        table: 'receipt_vouchers',
+        numCol: 'voucher_number',
+        dateCol: 'date',
+        amountCol: 'amount',
+        refTypes: ['receipt_voucher', 'receipt'],
+        partyCol: 'customer_name',
+        partyIdCol: 'customer_id',
+        partyTable: 'customers',
+        partyAccCol: 'account_id'
+      },
+      {
+        key: 'payment_vouchers',
+        name: 'سندات الصرف',
+        table: 'payment_vouchers',
+        numCol: 'voucher_number',
+        dateCol: 'date',
+        amountCol: 'amount',
+        refTypes: ['payment_voucher', 'voucher'],
+        partyCol: 'supplier_name',
+        partyIdCol: 'supplier_id',
+        partyTable: 'suppliers',
+        partyAccCol: 'account_id'
+      },
+      {
+        key: 'received_cheques',
+        name: 'الشيكات الواردة',
+        table: 'received_cheques',
+        numCol: 'cheque_number',
+        dateCol: 'due_date',
+        amountCol: 'amount',
+        refTypes: ['received_cheque'],
+        partyCol: 'customer_name',
+        partyIdCol: 'customer_id',
+        partyTable: 'customers',
+        partyAccCol: 'account_id'
+      },
+      {
+        key: 'issued_cheques',
+        name: 'الشيكات الصادرة',
+        table: 'issued_cheques',
+        numCol: 'cheque_number',
+        dateCol: 'due_date',
+        amountCol: 'amount',
+        refTypes: ['issued_cheque'],
+        partyCol: 'supplier_name',
+        partyIdCol: 'supplier_id',
+        partyTable: 'suppliers',
+        partyAccCol: 'account_id'
+      },
+      {
+        key: 'cash_transfers',
+        name: 'تحويلات النقدية والخزائن',
+        table: 'cash_transfers',
+        numCol: 'transfer_number',
+        dateCol: 'date',
+        amountCol: 'amount',
+        refTypes: ['cash_transfer'],
+        partyCol: 'description',
+        partyIdCol: null,
+        partyTable: null,
+        partyAccCol: null
+      },
+      {
+        key: 'journal_entries',
+        name: 'قيود اليومية العامة',
+        table: 'journal_entries',
+        numCol: 'entry_number',
+        dateCol: 'date',
+        amountCol: 'total_debit',
+        refTypes: ['manual', 'journal_entry'],
+        partyCol: 'description',
+        partyIdCol: null,
+        partyTable: null,
+        partyAccCol: null,
+        isManualJE: true
+      },
+      {
+        key: 'opening_stock_balances',
+        name: 'أرصدة المخزون الافتتاحية',
+        table: 'opening_stock_balances',
+        numCol: 'id',
+        dateCol: 'created_at',
+        amountCol: 'total_amount',
+        refTypes: ['opening_stock', 'opening_stock_balance'],
+        partyCol: 'warehouse_name',
+        partyIdCol: null,
+        partyTable: null,
+        partyAccCol: null
+      }
+    ];
+
+    const postingTransactions = [];
+    for (const cfg of postingConfigs) {
+      try {
+        const baseRes = await client.query(
+          `SELECT COUNT(*)::int as count, COALESCE(SUM(${cfg.amountCol}), 0)::numeric as total_val FROM "${cfg.table}" WHERE company_id = $1`,
+          [companyId]
+        );
+        const count = baseRes.rows[0]?.count || 0;
+        const totalValue = parseFloat(baseRes.rows[0]?.total_val || 0);
+
+        let journalValue = 0;
+        let unpostedCount = 0;
+        let unpostedValue = 0;
+        let unbalancedCount = 0;
+        let missingAccountsCount = 0;
+        const issues: any[] = [];
+
+        if (cfg.isManualJE) {
+          journalValue = totalValue;
+          // Check unbalanced journal entries
+          const unbalRes = await client.query(
+            `SELECT id, entry_number, date, total_debit, total_credit, ABS(total_debit - total_credit) as diff
+             FROM journal_entries
+             WHERE company_id = $1 AND ABS(total_debit - total_credit) > 0.001`,
+            [companyId]
+          );
+          unbalancedCount = unbalRes.rows.length;
+          for (const u of unbalRes.rows) {
+            issues.push({
+              document_id: u.id,
+              document_number: u.entry_number,
+              date: u.date,
+              amount: parseFloat(u.total_debit || 0),
+              error_type: 'قيد غير متزن',
+              details: `مدين: ${parseFloat(u.total_debit).toFixed(2)} | دائن: ${parseFloat(u.total_credit).toFixed(2)} | الفرق: ${parseFloat(u.diff).toFixed(2)}`
+            });
+          }
+
+          // Check lines with null account_id
+          const nullAccRes = await client.query(
+            `SELECT COUNT(*)::int as count FROM journal_entry_lines WHERE company_id = $1 AND account_id IS NULL`,
+            [companyId]
+          );
+          missingAccountsCount = nullAccRes.rows[0]?.count || 0;
+        } else {
+          // Check journal value linked to this table
+          const placeholders = cfg.refTypes.map((_, i) => `$${i + 2}`).join(',');
+          const jvRes = await client.query(
+            `SELECT COALESCE(SUM(total_debit), 0)::numeric as total_jv,
+                    COUNT(CASE WHEN ABS(total_debit - total_credit) > 0.001 THEN 1 END)::int as unbal_count
+             FROM journal_entries
+             WHERE company_id = $1 AND reference_type IN (${placeholders})`,
+            [companyId, ...cfg.refTypes]
+          );
+          journalValue = parseFloat(jvRes.rows[0]?.total_jv || 0);
+          unbalancedCount = jvRes.rows[0]?.unbal_count || 0;
+
+          // Check unposted documents
+          const unpostedRes = await client.query(
+            `SELECT d.id, d."${cfg.numCol}" as doc_num, d."${cfg.dateCol}" as doc_date, d."${cfg.amountCol}" as doc_amt, ${cfg.partyCol ? `d."${cfg.partyCol}"` : `''`} as party
+             FROM "${cfg.table}" d
+             WHERE d.company_id = $1
+               AND d.id NOT IN (
+                 SELECT reference_id FROM journal_entries WHERE company_id = $1 AND reference_type IN (${placeholders}) AND reference_id IS NOT NULL
+               )`,
+            [companyId, ...cfg.refTypes]
+          );
+          unpostedCount = unpostedRes.rows.length;
+          unpostedValue = unpostedRes.rows.reduce((sum, r) => sum + parseFloat(r.doc_amt || 0), 0);
+
+          for (const u of unpostedRes.rows.slice(0, 20)) {
+            issues.push({
+              document_id: u.id,
+              document_number: u.doc_num || u.id,
+              date: u.doc_date,
+              amount: parseFloat(u.doc_amt || 0),
+              party_name: u.party || '',
+              error_type: 'حركة غير مرحل لها قيد',
+              details: 'المستند مسجل في النظام لكن لم يتم إنشاء قيد محاسبي له في دفتر اليومية'
+            });
+          }
+
+          // Check missing party accounts (e.g. customer/supplier without account_id)
+          if (cfg.partyTable && cfg.partyIdCol && cfg.partyAccCol) {
+            const missingPartyRes = await client.query(
+              `SELECT d.id, d."${cfg.numCol}" as doc_num, d."${cfg.dateCol}" as doc_date, d."${cfg.amountCol}" as doc_amt, d."${cfg.partyCol}" as party
+               FROM "${cfg.table}" d
+               LEFT JOIN "${cfg.partyTable}" p ON d."${cfg.partyIdCol}" = p.id
+               WHERE d.company_id = $1 AND (p.id IS NULL OR p."${cfg.partyAccCol}" IS NULL)`,
+              [companyId]
+            );
+            missingAccountsCount += missingPartyRes.rows.length;
+            for (const m of missingPartyRes.rows.slice(0, 20)) {
+              issues.push({
+                document_id: m.id,
+                document_number: m.doc_num || m.id,
+                date: m.doc_date,
+                amount: parseFloat(m.doc_amt || 0),
+                party_name: m.party || '',
+                error_type: 'حساب طرف الحركة مفقود',
+                details: `حساب ${cfg.partyTable === 'customers' ? 'العميل' : 'المورد'} غير مرتبط بدليل الحسابات`
+              });
+            }
+          }
+
+          // Check products missing revenue/cost/inventory accounts for invoice tables
+          if (cfg.key === 'invoices') {
+            const prodMissingAccRes = await client.query(
+              `SELECT ii.id, i.invoice_number, i.date, ii.product_name, p.name as prod_name, p.id as prod_id
+               FROM invoice_items ii
+               JOIN invoices i ON ii.invoice_id = i.id
+               LEFT JOIN products p ON ii.product_id = p.id
+               WHERE i.company_id = $1 AND (p.id IS NULL OR p.revenue_account_id IS NULL)`,
+              [companyId]
+            );
+            if (prodMissingAccRes.rows.length > 0) {
+              missingAccountsCount += prodMissingAccRes.rows.length;
+              for (const pm of prodMissingAccRes.rows.slice(0, 20)) {
+                issues.push({
+                  document_id: pm.id,
+                  document_number: pm.invoice_number,
+                  date: pm.date,
+                  amount: 0,
+                  party_name: pm.product_name || pm.prod_name,
+                  error_type: 'حساب صنف غير معرّف',
+                  details: `الصنف "${pm.product_name || pm.prod_name}" لا يحتوي على حساب إيرادات مبيعات في بطاقة الصنف`
+                });
+              }
+            }
+          }
+        }
+
+        postingTransactions.push({
+          key: cfg.key,
+          name: cfg.name,
+          count,
+          total_value: totalValue,
+          journal_value: journalValue,
+          variance: parseFloat((totalValue - journalValue).toFixed(2)),
+          unposted_count: unpostedCount,
+          unposted_value: unpostedValue,
+          unbalanced_entries_count: unbalancedCount,
+          missing_accounts_count: missingAccountsCount,
+          issues
+        });
+      } catch (err: any) {
+        console.error(`Error in audit for ${cfg.key}:`, err);
+        postingTransactions.push({
+          key: cfg.key,
+          name: cfg.name,
+          count: 0,
+          total_value: 0,
+          journal_value: 0,
+          variance: 0,
+          unposted_count: 0,
+          unposted_value: 0,
+          unbalanced_entries_count: 0,
+          missing_accounts_count: 0,
+          issues: []
+        });
+      }
+    }
+
+    res.json({
+      company_id: companyId,
+      timestamp: new Date().toISOString(),
+      master_data: masterData,
+      operational_data: operationalData,
+      posting_transactions: postingTransactions
+    });
+  } catch (error: any) {
+    console.error('Data audit failed:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Auto repair missing accounts on products, customers, suppliers
+router.post('/system/auto-fix-missing-accounts', authenticateToken, authorizeRoles('super_admin', 'admin'), async (req: AuthRequest, res) => {
+  const companyId = (req.user?.role === 'super_admin' && req.query.company_id)
+    ? String(req.query.company_id)
+    : req.user?.company_id;
+
+  if (!companyId) return res.status(400).json({ error: 'Company ID required' });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Find default accounts in company
+    const accs = await client.query('SELECT id, code, name FROM accounts WHERE company_id = $1', [companyId]);
+    const accList = accs.rows;
+
+    const findAcc = (codePrefix: string, nameKeyword: string) => {
+      return accList.find(a => String(a.code).startsWith(codePrefix)) ||
+             accList.find(a => String(a.name).includes(nameKeyword)) ||
+             accList[0];
+    };
+
+    const defCustomerAcc = findAcc('111', 'عملاء') || findAcc('1201', 'العملاء');
+    const defSupplierAcc = findAcc('211', 'موردين') || findAcc('2101', 'الموردين');
+    const defRevenueAcc = findAcc('41', 'ايراد') || findAcc('4101', 'المبيعات');
+    const defCostAcc = findAcc('51', 'تكلفة') || findAcc('5101', 'تكلفة المبيعات');
+    const defInventoryAcc = findAcc('1115', 'مخزون') || findAcc('1301', 'مخزون البضاعة');
+
+    let fixedProducts = 0;
+    let fixedCustomers = 0;
+    let fixedSuppliers = 0;
+
+    // Fix products
+    if (defRevenueAcc || defCostAcc || defInventoryAcc) {
+      const prodRes = await client.query(
+        `UPDATE products
+         SET revenue_account_id = COALESCE(revenue_account_id, $2),
+             cost_account_id = COALESCE(cost_account_id, $3),
+             inventory_account_id = COALESCE(inventory_account_id, $4)
+         WHERE company_id = $1 AND (revenue_account_id IS NULL OR cost_account_id IS NULL OR inventory_account_id IS NULL)`,
+        [companyId, defRevenueAcc?.id || null, defCostAcc?.id || null, defInventoryAcc?.id || null]
+      );
+      fixedProducts = prodRes.rowCount || 0;
+    }
+
+    // Fix customers
+    if (defCustomerAcc) {
+      const custRes = await client.query(
+        `UPDATE customers SET account_id = COALESCE(account_id, $2) WHERE company_id = $1 AND account_id IS NULL`,
+        [companyId, defCustomerAcc.id]
+      );
+      fixedCustomers = custRes.rowCount || 0;
+    }
+
+    // Fix suppliers
+    if (defSupplierAcc) {
+      const suppRes = await client.query(
+        `UPDATE suppliers SET account_id = COALESCE(account_id, $2) WHERE company_id = $1 AND account_id IS NULL`,
+        [companyId, defSupplierAcc.id]
+      );
+      fixedSuppliers = suppRes.rowCount || 0;
+    }
+
+    await client.query('COMMIT');
+    res.json({
+      message: 'تم ربط الحسابات الناقصة بالحسابات الافتراضية بنجاح',
+      fixed_products: fixedProducts,
+      fixed_customers: fixedCustomers,
+      fixed_suppliers: fixedSuppliers,
+      default_accounts: {
+        customer_account: defCustomerAcc?.name,
+        supplier_account: defSupplierAcc?.name,
+        revenue_account: defRevenueAcc?.name,
+        cost_account: defCostAcc?.name,
+        inventory_account: defInventoryAcc?.name
+      }
+    });
+  } catch (error: any) {
+    await client.query('ROLLBACK').catch(() => {});
     res.status(500).json({ error: error.message });
   } finally {
     client.release();
