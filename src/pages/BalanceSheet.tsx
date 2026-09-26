@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { dbService } from '../services/dbService';
 import { JournalEntry, Account, AccountType } from '../types';
-import { Search, Calendar, FileText, Download, Printer, Filter, PieChart, ArrowLeftRight, Shield, CreditCard, Wallet, CheckCircle2, AlertTriangle, RefreshCcw, TrendingUp, Building2, Coins, Scale } from 'lucide-react';
+import { Search, Calendar, FileText, Download, Printer, Filter, PieChart, ArrowLeftRight, Shield, CreditCard, Wallet, CheckCircle2, AlertTriangle, RefreshCcw, TrendingUp, Building2, Coins, Scale, History } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
@@ -19,6 +19,7 @@ export const BalanceSheet: React.FC = () => {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountTypes, setAccountTypes] = useState<AccountType[]>([]);
+  const [company, setCompany] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState({
@@ -50,6 +51,10 @@ export const BalanceSheet: React.FC = () => {
 
     subscriptions.push(dbService.subscribe<Account>('accounts', user.company_id, setAccounts, onError));
     subscriptions.push(dbService.subscribe<AccountType>('account_types', user.company_id, setAccountTypes, onError));
+
+    dbService.get<any>('companies', user.company_id).then(c => {
+      if (c) setCompany(c);
+    });
 
     return () => subscriptions.forEach(unsub => unsub());
   }, [user, refreshTrigger]);
@@ -98,7 +103,8 @@ export const BalanceSheet: React.FC = () => {
         accounts,
         accountTypes,
         entries,
-        period.end
+        period.end,
+        company?.fiscal_year_end
       )
     };
   });
@@ -107,7 +113,8 @@ export const BalanceSheet: React.FC = () => {
     accounts,
     accountTypes,
     entries,
-    dateRange.end
+    dateRange.end,
+    company?.fiscal_year_end
   );
 
   const handleExportPDF = async () => {
@@ -174,10 +181,17 @@ export const BalanceSheet: React.FC = () => {
           [dir === 'rtl' ? 'الرصيد' : 'Balance']: Math.abs(e.balance)
         });
       });
+      if ((totalData as any).retainedEarnings !== 0) {
+        rows.push({
+          [dir === 'rtl' ? 'التصنيف' : 'Classification']: '',
+          [dir === 'rtl' ? 'الحساب' : 'Account']: dir === 'rtl' ? ((totalData as any).retainedEarnings < 0 ? 'خسائر مرحلة من سنوات سابقة (IAS 1)' : 'أرباح مرحلة من سنوات سابقة (IAS 1)') : 'Retained Earnings / Accumulated Losses',
+          [dir === 'rtl' ? 'الرصيد' : 'Balance']: (totalData as any).retainedEarnings
+        });
+      }
       rows.push({
         [dir === 'rtl' ? 'التصنيف' : 'Classification']: '',
-        [dir === 'rtl' ? 'الحساب' : 'Account']: t('balance_sheet.net_profit_period'),
-        [dir === 'rtl' ? 'الرصيد' : 'Balance']: totalData.netProfit
+        [dir === 'rtl' ? 'الحساب' : 'Account']: (totalData as any).retainedEarnings !== 0 ? (dir === 'rtl' ? 'صافي أرباح / (خسائر) العام الحالي' : 'Current Year Net Profit') : t('balance_sheet.net_profit_period'),
+        [dir === 'rtl' ? 'الرصيد' : 'Balance']: (totalData as any).retainedEarnings !== 0 ? (totalData as any).currentPeriodNetProfit : totalData.netProfit
       });
       rows.push({
         [dir === 'rtl' ? 'التصنيف' : 'Classification']: dir === 'rtl' ? 'إجمالي حقوق الملكية' : 'Total Equity',
@@ -599,7 +613,9 @@ export const BalanceSheet: React.FC = () => {
 
                 <div className="p-6 space-y-3">
                   <div className="space-y-1.5">
-                    {totalData.equity.map(a => (
+                    {totalData.equity
+                      .filter(a => !(a.code === '3103' && Math.abs(a.balance) < 0.01))
+                      .map(a => (
                       <div key={a.id} className="flex items-center justify-between p-3 hover:bg-blue-50/40 rounded-xl transition-all border border-stone-100 hover:border-blue-200">
                         <span 
                           onClick={() => {
@@ -614,14 +630,61 @@ export const BalanceSheet: React.FC = () => {
                       </div>
                     ))}
 
-                    {/* Net Profit row */}
+                    {/* Retained Earnings from Prior Years (IAS 1 / EAS 1) */}
+                    {((totalData as any).retainedEarnings !== 0) && (
+                      <div className={`flex items-center justify-between p-3.5 rounded-xl border font-bold text-xs ${
+                        (totalData as any).retainedEarnings < 0
+                          ? 'bg-rose-50/90 border-rose-200 text-rose-900'
+                          : 'bg-indigo-50/90 border-indigo-200 text-indigo-900'
+                      }`}>
+                        <div className="flex items-center gap-2 font-black">
+                          <History size={16} className={(totalData as any).retainedEarnings < 0 ? 'text-rose-600' : 'text-indigo-600'} />
+                          <div>
+                            <p className="leading-tight">
+                              {dir === 'rtl' 
+                                ? ((totalData as any).retainedEarnings < 0 ? 'خسائر مرحلة من سنوات سابقة' : 'أرباح مرحلة من سنوات سابقة')
+                                : ((totalData as any).retainedEarnings < 0 ? 'Accumulated Losses (Prior Years)' : 'Retained Earnings (Prior Years)')}
+                            </p>
+                            <span className="text-[10px] font-bold opacity-70">
+                              {dir === 'rtl' ? 'معايير IAS 1 / EAS 1 (الأرباح/الخسائر المبقاة)' : 'IAS 1 / EAS 1 Retained Earnings'}
+                            </span>
+                          </div>
+                        </div>
+                        <span className={`font-mono font-black text-sm ${
+                          (totalData as any).retainedEarnings < 0 ? 'text-rose-700' : 'text-indigo-700'
+                        }`}>
+                          {formatNumber((totalData as any).retainedEarnings)}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Net Profit for Current Period / Year */}
                     <div className="flex items-center justify-between p-3.5 bg-emerald-50 rounded-xl border border-emerald-200 font-bold text-xs">
                       <div className="flex items-center gap-2 text-emerald-800 font-black">
                         <TrendingUp size={16} className="text-emerald-600" />
-                        <span>{t('balance_sheet.net_profit_period')}</span>
+                        <div>
+                          <p className="leading-tight">
+                            {dir === 'rtl' 
+                              ? ((totalData as any).retainedEarnings !== 0 ? 'صافي أرباح / (خسائر) العام الحالي' : t('balance_sheet.net_profit_period'))
+                              : ((totalData as any).retainedEarnings !== 0 ? 'Current Year Net Profit / (Loss)' : t('balance_sheet.net_profit_period'))}
+                          </p>
+                          <span className="text-[10px] font-bold opacity-75 text-emerald-600">
+                            {dir === 'rtl' ? 'نتيجة أعمال الفترة الحالية' : 'Current Period Income Statement Result'}
+                          </span>
+                        </div>
                       </div>
-                      <span className="font-mono font-black text-sm text-emerald-700">{formatNumber(totalData.netProfit)}</span>
+                      <span className="font-mono font-black text-sm text-emerald-700">
+                        {formatNumber(((totalData as any).retainedEarnings !== 0 ? (totalData as any).currentPeriodNetProfit : totalData.netProfit))}
+                      </span>
                     </div>
+
+                    {/* Cumulative Total Earnings pill if there are prior retained earnings */}
+                    {((totalData as any).retainedEarnings !== 0) && (
+                      <div className={`px-3 py-1.5 rounded-lg bg-zinc-100 flex items-center justify-between text-[11px] font-bold text-zinc-600 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                        <span>{dir === 'rtl' ? 'مجموع نتائج النشاط والأرباح' : 'Total Cumulative Earnings'}</span>
+                        <span className="font-mono font-black text-zinc-800">{formatNumber(totalData.netProfit)}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className={`p-3 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-between text-blue-900 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
@@ -1018,17 +1081,32 @@ export const BalanceSheet: React.FC = () => {
                       </td>
                     </tr>
                   ))}
+                  {((totalData as any).retainedEarnings !== 0) && (
+                    <tr className="hover:bg-zinc-50/50 transition-colors">
+                      <td className={`px-6 py-3.5 font-bold text-indigo-700 sticky left-0 bg-white z-10 border-r border-zinc-100 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {dir === 'rtl' ? 'الأرباح (الخسائر) المرحلة (IAS 1)' : 'Retained Earnings (IAS 1)'}
+                      </td>
+                      {subPeriods.map((p, idx) => (
+                        <td key={p.start} className="px-6 py-3.5 text-center font-medium text-indigo-600 whitespace-nowrap">
+                          {formatNumber((periodResults[idx].data as any).retainedEarnings || 0)}
+                        </td>
+                      ))}
+                      <td className="px-6 py-3.5 text-center font-black text-indigo-600 bg-zinc-50/30 whitespace-nowrap border-l border-zinc-100">
+                        {formatNumber((totalData as any).retainedEarnings || 0)}
+                      </td>
+                    </tr>
+                  )}
                   <tr className="hover:bg-zinc-50/50 transition-colors">
                     <td className={`px-6 py-3.5 font-bold text-emerald-700 sticky left-0 bg-white z-10 border-r border-zinc-100 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                      {t('balance_sheet.net_profit_period')}
+                      {((totalData as any).retainedEarnings !== 0) ? (dir === 'rtl' ? 'صافي أرباح / (خسائر) الفترة الحالية' : 'Current Period Net Profit') : t('balance_sheet.net_profit_period')}
                     </td>
                     {subPeriods.map((p, idx) => (
                       <td key={p.start} className="px-6 py-3.5 text-center font-medium text-emerald-600 whitespace-nowrap">
-                        {formatNumber(periodResults[idx].data.netProfit)}
+                        {formatNumber(((periodResults[idx].data as any).retainedEarnings !== 0 ? (periodResults[idx].data as any).currentPeriodNetProfit : periodResults[idx].data.netProfit))}
                       </td>
                     ))}
                     <td className="px-6 py-3.5 text-center font-black text-emerald-600 bg-zinc-50/30 whitespace-nowrap border-l border-zinc-100">
-                      {formatNumber(totalData.netProfit)}
+                      {formatNumber(((totalData as any).retainedEarnings !== 0 ? (totalData as any).currentPeriodNetProfit : totalData.netProfit))}
                     </td>
                   </tr>
                   <tr className="bg-blue-50/10 font-bold">

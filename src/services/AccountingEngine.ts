@@ -2,23 +2,71 @@ import { JournalEntry, Account, TrialBalanceItem, LedgerLine, AccountType, Custo
 
 export class AccountingEngine {
   /**
+   * Computes the fiscal year start date for any given date and fiscal year end configuration.
+   * Default: Fiscal year ends December 31 -> Starts January 1 of that calendar year.
+   */
+  static getFiscalYearStartDate(dateStr: string, fiscalYearEndSetting?: string): string {
+    if (!dateStr) return '1900-01-01';
+    const targetDate = new Date(dateStr);
+    if (isNaN(targetDate.getTime())) return '1900-01-01';
+
+    const year = targetDate.getFullYear();
+    let endMonth = 12;
+    let endDay = 31;
+
+    if (fiscalYearEndSetting) {
+      const parts = fiscalYearEndSetting.split('-');
+      if (parts.length >= 2) {
+        endMonth = parseInt(parts[parts.length - 2], 10) || 12;
+        endDay = parseInt(parts[parts.length - 1], 10) || 31;
+      }
+    }
+
+    if (endMonth === 12 && endDay === 31) {
+      return `${year}-01-01`;
+    }
+
+    const fyEndThisYear = new Date(year, endMonth - 1, endDay);
+    if (targetDate <= fyEndThisYear) {
+      const prevFyEnd = new Date(year - 1, endMonth - 1, endDay);
+      prevFyEnd.setDate(prevFyEnd.getDate() + 1);
+      return prevFyEnd.toISOString().slice(0, 10);
+    } else {
+      const thisFyEnd = new Date(year, endMonth - 1, endDay);
+      thisFyEnd.setDate(thisFyEnd.getDate() + 1);
+      return thisFyEnd.toISOString().slice(0, 10);
+    }
+  }
+
+  /**
    * Calculates the Trial Balance for a given set of accounts and journal entries.
+   * Implements standard fiscal year closing (rollover) for nominal / income statement accounts,
+   * transferring prior years' accumulated earnings/losses to Retained Earnings (الأرباح المرحلة).
    */
   static calculateTrialBalance(
     accounts: Account[],
     entries: JournalEntry[],
     startDate: string,
-    endDate: string
+    endDate: string,
+    fiscalYearEndSetting?: string,
+    accountTypes?: AccountType[]
   ) {
     const startTime = performance.now();
     const startVal = startDate || '';
     const endVal = endDate || '';
+    const fiscalYearStart = startVal ? this.getFiscalYearStartDate(startVal, fiscalYearEndSetting) : '';
+
+    let priorIncomeNet = 0; // accumulated prior years net income for nominal accounts
 
     const result = accounts.map(account => {
       let openingDebit = Number(account.opening_balance) > 0 ? Number(account.opening_balance) : 0;
       let openingCredit = Number(account.opening_balance) < 0 ? Math.abs(Number(account.opening_balance)) : 0;
       let movementDebit = 0;
       let movementCredit = 0;
+
+      const typeInfo = this.resolveAccountClassification(account, accountTypes || []);
+      const isIncomeStatement = typeInfo.statement_type === 'income_statement' ||
+        ['revenue', 'cost', 'expense', 'interest_expense', 'depreciation', 'other_revenue', 'other_expense'].includes(typeInfo.classification);
 
       entries.forEach(entry => {
         const entryDateStr = (entry.date || '').slice(0, 10);
@@ -38,8 +86,14 @@ export class AccountingEngine {
             const isAfter = endVal && entryDateStr > endVal;
 
             if (isBefore) {
-              openingDebit += debit;
-              openingCredit += credit;
+              const isPriorFiscalYear = fiscalYearStart && entryDateStr < fiscalYearStart;
+              if (isIncomeStatement && isPriorFiscalYear) {
+                // Prior fiscal year nominal movement closed to Retained Earnings
+                priorIncomeNet += (credit - debit);
+              } else {
+                openingDebit += debit;
+                openingCredit += credit;
+              }
             } else if (!isBefore && !isAfter) {
               movementDebit += debit;
               movementCredit += credit;
@@ -69,6 +123,44 @@ export class AccountingEngine {
         }
       };
     });
+    // If there is prior fiscal year net income/loss from nominal accounts, reflect it in Retained Earnings (الأرباح المرحلة)
+    if (Math.abs(priorIncomeNet) > 0.0001) {
+      let retAcc = result.find(a => 
+        a.code === '3103' || 
+        (a as any).account_usage === 'retained_earnings' || 
+        a.name.includes('مرحل') || 
+        a.name.includes('مبقاة') ||
+        a.code === '33'
+      );
+
+      if (retAcc) {
+        const currentOpeningNet = retAcc.opening.credit - retAcc.opening.debit;
+        const newOpeningNet = currentOpeningNet + priorIncomeNet;
+        retAcc.opening.debit = newOpeningNet < 0 ? Math.abs(newOpeningNet) : 0;
+        retAcc.opening.credit = newOpeningNet > 0 ? newOpeningNet : 0;
+
+        const currentClosingNet = retAcc.closing.credit - retAcc.closing.debit;
+        const newClosingNet = currentClosingNet + priorIncomeNet;
+        retAcc.closing.debit = newClosingNet < 0 ? Math.abs(newClosingNet) : 0;
+        retAcc.closing.credit = newClosingNet > 0 ? newClosingNet : 0;
+      } else {
+        result.push({
+          id: 'retained_earnings_virtual',
+          code: '3103',
+          name: 'الأرباح (الخسائر) المرحلة (Retained Earnings)',
+          opening: {
+            debit: priorIncomeNet < 0 ? Math.abs(priorIncomeNet) : 0,
+            credit: priorIncomeNet > 0 ? priorIncomeNet : 0
+          },
+          movement: { debit: 0, credit: 0 },
+          closing: {
+            debit: priorIncomeNet < 0 ? Math.abs(priorIncomeNet) : 0,
+            credit: priorIncomeNet > 0 ? priorIncomeNet : 0
+          }
+        });
+      }
+    }
+
     const endTime = performance.now();
 
     return result;
@@ -502,7 +594,8 @@ export class AccountingEngine {
     accounts: Account[],
     accountTypes: AccountType[],
     entries: JournalEntry[],
-    endDate: string
+    endDate: string,
+    fiscalYearEndSetting?: string
   ) {
     // For Balance Sheet, we use trial balance from beginning of time (or very early date) until endDate
     const startDate = '1900-01-01'; 
@@ -523,12 +616,36 @@ export class AccountingEngine {
 
     const bsAccounts = mappedAccounts.filter(a => isBalanceSheetType(a.typeInfo));
     
-    // Calculate Net Profit for the entire period up to targetDate (Cumulative)
-    const incomeStatement = this.calculateIncomeStatement(accounts, accountTypes, entries, startDate, endDate);
+    // Determine current fiscal year start
+    const fiscalYearStart = this.getFiscalYearStartDate(endDate, fiscalYearEndSetting);
+    
+    // 1. Calculate Prior Periods Income Statement (Retained Earnings up to fiscalYearStart - 1 day)
+    let retainedEarnings = 0;
+    if (fiscalYearStart > '1900-01-01') {
+      const prevDate = new Date(fiscalYearStart);
+      prevDate.setDate(prevDate.getDate() - 1);
+      const priorPeriodEnd = prevDate.toISOString().slice(0, 10);
+      const priorIncome = this.calculateIncomeStatement(accounts, accountTypes, entries, '1900-01-01', priorPeriodEnd);
+      retainedEarnings = priorIncome.netProfit;
+    }
+
+    // 2. Calculate Current Period Income Statement (from fiscalYearStart to endDate)
+    const currentIncome = this.calculateIncomeStatement(accounts, accountTypes, entries, fiscalYearStart, endDate);
+    const currentPeriodNetProfit = currentIncome.netProfit;
+
+    // Cumulative net profit across all time
+    const totalCumulativeProfit = retainedEarnings + currentPeriodNetProfit;
     
     const assets = bsAccounts.filter(a => ['asset', 'cash_and_equivalents', 'receivables'].includes(a.typeInfo.classification));
     const liabilities = bsAccounts.filter(a => ['liability', 'liability_equity', 'payables'].includes(a.typeInfo.classification));
     const equity = bsAccounts.filter(a => a.typeInfo.classification === 'equity');
+
+    // For equity presentation, filter out 3103/retained_earnings account if its direct journal balance is 0 to avoid duplicates
+    const isRetainedEarningsAccount = (a: any) => {
+      const acc = accounts.find(x => x.id === a.id);
+      return a.code === '3103' || (acc as any)?.account_usage === 'retained_earnings' || a.name.includes('مرحل') || a.name.includes('مبقاة');
+    };
+    const manualEquity = equity.filter(a => !isRetainedEarningsAccount(a) || Math.abs(a.closing.credit - a.closing.debit) > 0.01);
 
     // Classification according to IAS 1 / EAS 1 (Non-Current vs Current)
     const isNonCurrentAsset = (acc: any) => {
@@ -563,8 +680,8 @@ export class AccountingEngine {
     const totalCurrentLiabilities = currentLiabilities.reduce((sum, a) => sum + (a.closing.credit - a.closing.debit), 0);
     const totalLiabilities = totalNonCurrentLiabilities + totalCurrentLiabilities;
 
-    const equitySum = equity.reduce((sum, a) => sum + (a.closing.credit - a.closing.debit), 0);
-    const totalEquity = equitySum + incomeStatement.netProfit;
+    const equitySum = manualEquity.reduce((sum, a) => sum + (a.closing.credit - a.closing.debit), 0);
+    const totalEquity = equitySum + totalCumulativeProfit;
 
     const totalLiabilitiesEquity = totalLiabilities + totalEquity;
 
@@ -619,7 +736,9 @@ export class AccountingEngine {
     return {
       assets: assets.map(a => ({ id: a.id, name: a.name, code: a.code, balance: a.closing.debit - a.closing.credit })),
       liabilities: liabilities.map(l => ({ id: l.id, name: l.name, code: l.code, balance: l.closing.credit - l.closing.debit })),
-      equity: equity.map(e => ({ id: e.id, name: e.name, code: e.code, balance: e.closing.credit - e.closing.debit })),
+      equity: manualEquity.map(e => ({ id: e.id, name: e.name, code: e.code, balance: e.closing.credit - e.closing.debit })),
+      retainedEarnings,
+      currentPeriodNetProfit,
       nonCurrentAssets: nonCurrentAssets.map(a => ({ id: a.id, name: a.name, code: a.code, balance: a.closing.debit - a.closing.credit })),
       currentAssets: currentAssets.map(a => ({ id: a.id, name: a.name, code: a.code, balance: a.closing.debit - a.closing.credit })),
       nonCurrentLiabilities: nonCurrentLiabilities.map(l => ({ id: l.id, name: l.name, code: l.code, balance: l.closing.credit - l.closing.debit })),
@@ -636,7 +755,7 @@ export class AccountingEngine {
       currentRatio,
       quickRatio,
       debtToEquity,
-      netProfit: incomeStatement.netProfit,
+      netProfit: totalCumulativeProfit,
       totalAssets,
       totalLiabilities,
       totalEquity,

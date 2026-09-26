@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
-import { JournalEntry, Account, TrialBalanceItem } from '../types';
+import { JournalEntry, Account, TrialBalanceItem, AccountType } from '../types';
 import { Search, Calendar, FileText, Download, Printer, Filter, BarChart3, ArrowLeftRight, AlertTriangle, CheckCircle2, RefreshCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF } from '../utils/pdfUtils';
@@ -18,6 +18,8 @@ export const TrialBalance: React.FC = () => {
   const reportRef = useRef<HTMLDivElement>(null);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accountTypes, setAccountTypes] = useState<AccountType[]>([]);
+  const [company, setCompany] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState({
@@ -28,6 +30,10 @@ export const TrialBalance: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
+
+    dbService.get<any>('companies', user.company_id).then(c => {
+      if (c) setCompany(c);
+    });
 
     const unsubscribeEntries = dbService.subscribe<JournalEntry>(
       'journal_entries', 
@@ -54,9 +60,19 @@ export const TrialBalance: React.FC = () => {
       }
     );
 
+    const unsubscribeAccountTypes = dbService.subscribe<AccountType>(
+      'account_types',
+      user.company_id,
+      (data) => {
+        setAccountTypes(data);
+      },
+      () => {}
+    );
+
     return () => {
       unsubscribeEntries();
       unsubscribeAccounts();
+      unsubscribeAccountTypes();
     };
   }, [user, refreshTrigger]);
 
@@ -69,7 +85,9 @@ export const TrialBalance: React.FC = () => {
     accounts,
     entries,
     dateRange.start,
-    dateRange.end
+    dateRange.end,
+    company?.fiscal_year_end,
+    accountTypes
   ).filter(a => a.opening.debit !== 0 || a.opening.credit !== 0 || a.movement.debit !== 0 || a.movement.credit !== 0);
 
   const globalBalance = AccountingEngine.validateGlobalBalance(entries);
