@@ -355,9 +355,9 @@ export class PostingService {
       const prod = products.find(p => p.id === item.product_id);
       const vatAccountId = prod?.sales_vat_account_id || prod?.vat_account_id || '';
       const vatAccountName = prod?.sales_vat_account_name || prod?.vat_account_name || 'حساب ضريبة القيمة المضافة (مبيعات)';
-      const rateVal = prod?.vat_rate || 0;
-      const itemSubtotal = Number(item.subtotal !== undefined ? item.subtotal : (Number(item.quantity || 1) * Number(item.unit_price || 0) - Number(item.discount_amount || item.discount || 0))) || 0;
-      const itemVat = Number(item.vat_amount !== undefined ? item.vat_amount : (itemSubtotal * (rateVal / 100)).toFixed(2));
+      const rateVal = (item as any).vat_rate !== undefined ? Number((item as any).vat_rate) : (prod?.vat_rate || 0);
+      const itemSubtotal = Number(item.subtotal !== undefined ? item.subtotal : (Number(item.quantity || 1) * Number(item.unit_price || 0) - Number(item.discount_amount || (item as any).discount || 0))) || 0;
+      const itemVat = Number((item as any).vat_amount !== undefined ? (item as any).vat_amount : (itemSubtotal * (rateVal / 100)).toFixed(2));
       
       if (itemVat > 0) {
         if (!vatAccountId) {
@@ -375,7 +375,7 @@ export class PostingService {
       }
     });
 
-    const taxAmountReturn = Number(doc.tax || 0);
+    const taxAmountReturn = Number((doc as any).tax_amount !== undefined ? (doc as any).tax_amount : ((doc as any).tax || 0));
     if (Object.keys(vatGroup).length > 0) {
       Object.values(vatGroup).forEach(vat => {
         journalItems.push({
@@ -760,9 +760,9 @@ export class PostingService {
       const prod = products.find(p => p.id === item.product_id);
       const vatAccountId = prod?.purchase_vat_account_id || prod?.vat_account_id || '';
       const vatAccountName = prod?.purchase_vat_account_name || prod?.vat_account_name || 'حساب ضريبة القيمة المضافة (مشتريات)';
-      const rateVal = prod?.vat_rate || 0;
-      const itemSubtotal = Number(item.subtotal !== undefined ? item.subtotal : (Number(item.quantity || 1) * Number(item.unit_price || 0) - Number(item.discount_amount || item.discount || 0))) || 0;
-      const itemVat = Number(item.vat_amount !== undefined ? item.vat_amount : (itemSubtotal * (rateVal / 100)).toFixed(2));
+      const rateVal = (item as any).vat_rate !== undefined ? Number((item as any).vat_rate) : (prod?.vat_rate || 0);
+      const itemSubtotal = Number(item.subtotal !== undefined ? item.subtotal : (Number(item.quantity || 1) * Number(item.unit_price || 0) - Number(item.discount_amount || (item as any).discount || 0))) || 0;
+      const itemVat = Number((item as any).vat_amount !== undefined ? (item as any).vat_amount : (itemSubtotal * (rateVal / 100)).toFixed(2));
       
       if (itemVat > 0) {
         if (!vatAccountId) {
@@ -780,7 +780,7 @@ export class PostingService {
       }
     });
 
-    const taxAmountPurchaseReturn = Number(doc.tax || 0);
+    const taxAmountPurchaseReturn = Number((doc as any).tax_amount !== undefined ? (doc as any).tax_amount : ((doc as any).tax || 0));
     if (Object.keys(vatGroup).length > 0) {
       Object.values(vatGroup).forEach(vat => {
         journalItems.push({

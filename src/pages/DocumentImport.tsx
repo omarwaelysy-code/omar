@@ -2353,13 +2353,18 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           cost_center_id: item.cost_center_id || null
         }));
 
-        // Clean return items payload (no vat_rate/vat_amount as returns tables lack them in DB)
+        // Return items payload preserving tax, discount, and subtotal for accurate journal posting
         const returnItemsPayload = doc.items.map(item => ({
           product_id: item.product_id,
           product_name: item.product_name,
           product_code: item.product_code,
           quantity: item.quantity,
           unit_price: item.unit_price,
+          subtotal: item.subtotal,
+          discount: item.discount_amount,
+          discount_amount: item.discount_amount,
+          vat_rate: item.vat_rate,
+          vat_amount: item.vat_amount,
           withholding_tax_rate: item.withholding_tax_rate,
           withholding_tax_amount: item.withholding_tax_amount,
           total: item.total,
@@ -2457,6 +2462,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             customer_name: effectivePartyName,
             warehouse_id: effectiveWarehouseId || null,
             date: doc.date,
+            subtotal: doc.subtotal,
+            discount_amount: doc.discount_amount,
+            tax_amount: doc.tax_amount,
+            tax: doc.tax_amount,
             withholding_tax_amount: doc.withholding_tax_amount,
             total_amount: doc.total_amount,
             payment_type: doc.payment_type,
@@ -2585,6 +2594,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             supplier_name: effectivePartyName,
             warehouse_id: effectiveWarehouseId || null,
             date: doc.date,
+            subtotal: doc.subtotal,
+            discount_amount: doc.discount_amount,
+            tax_amount: doc.tax_amount,
+            tax: doc.tax_amount,
             withholding_tax_amount: doc.withholding_tax_amount,
             total_amount: doc.total_amount,
             payment_type: doc.payment_type,
