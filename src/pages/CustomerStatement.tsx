@@ -8,6 +8,7 @@ import { dbService } from '../services/dbService';
 import { formatNumber, formatMoney, formatDate, isCustomerAccount } from '../utils/formatUtils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNavigation } from '../contexts/NavigationContext';
+import { SearchableSelect } from '../components/common/SearchableSelect';
 
 interface StatementEntry {
   id: string;
@@ -533,19 +534,20 @@ export const CustomerStatement: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div className="md:col-span-1">
             <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('discounts.column_customer')}</label>
-            <div className="relative">
-              <User className="absolute left-3 top-3 text-zinc-400" size={18} />
-              <select 
-                className="w-full pl-10 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                value={selectedCustomerId}
-                onChange={(e) => setSelectedCustomerId(e.target.value)}
-              >
-                <option value="">{t('settlements.select_customer')}</option>
-                {customers.map(customer => (
-                  <option key={customer.id} value={customer.id}>{customer.name}</option>
-                ))}
-              </select>
-            </div>
+            <SearchableSelect 
+              options={customers.map(customer => ({
+                value: customer.id,
+                label: customer.name,
+                code: customer.code,
+                subLabel: customer.mobile
+              }))}
+              value={selectedCustomerId}
+              onChange={(val) => setSelectedCustomerId(val)}
+              placeholder={t('settlements.select_customer')}
+              searchPlaceholder={language === 'ar' ? 'بحث باسم العميل أو الكود...' : 'Search customer by name or code...'}
+              emptyText={language === 'ar' ? 'لا يوجد عميل يطابق البحث' : 'No customer matches search'}
+              icon={<User size={18} />}
+            />
           </div>
           <div>
             <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{language === 'ar' ? 'من تاريخ' : 'From Date'}</label>
