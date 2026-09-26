@@ -6279,6 +6279,9 @@ modules.forEach(moduleName => {
         const isAllQuery = queryFilters.all === 'true' || queryFilters.all_companies === 'true' || queryFilters.company_id === 'all';
         delete queryFilters.all;
         delete queryFilters.all_companies;
+        if (moduleName === 'companies') {
+          delete queryFilters.company_id;
+        }
 
         const isOwnEmailQuery = moduleName === 'users' && (
           queryFilters.email === req.user?.email || 
