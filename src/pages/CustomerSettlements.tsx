@@ -12,6 +12,7 @@ import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
 import { ExportButtons } from '../components/ExportButtons';
 import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
+import { SearchableSelect } from '../components/common/SearchableSelect';
 import { useRef } from 'react';
 
 
@@ -83,13 +84,14 @@ export const CustomerSettlements: React.FC = () => {
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
 
   // UI layout and search states
-  const [layoutMode, setLayoutMode] = useState<'split' | 'unified'>('split');
+  const [layoutMode, setLayoutMode] = useState<'split' | 'unified'>('unified');
   const [showFilters, setShowFilters] = useState(false);
   const [filterSearchType, setFilterSearchType] = useState<string>('number');
   const [filterDocNumbers, setFilterDocNumbers] = useState('');
   const [filterFromDate, setFilterFromDate] = useState('');
   const [filterToDate, setFilterToDate] = useState('');
   const [filterTypes, setFilterTypes] = useState<string[]>([]);
+  const [filterCurrencies, setFilterCurrencies] = useState<string[]>([]);
 
   // Movements state
   const [debitMovements, setDebitMovements] = useState<Movement[]>([]);
@@ -147,6 +149,31 @@ export const CustomerSettlements: React.FC = () => {
     const isForeign = (m: Movement) => Boolean(m.currency && m.currency !== systemCurrency);
     return debitMovements.some(isForeign) || creditMovements.some(isForeign);
   }, [debitMovements, creditMovements, systemCurrency]);
+
+  const availableCurrencies = useMemo(() => {
+    const set = new Set<string>();
+    set.add(systemCurrency);
+    (currencies || []).forEach(c => {
+      if (c.code) set.add(c.code);
+    });
+    debitMovements.forEach(m => {
+      if (m.currency) set.add(m.currency);
+    });
+    creditMovements.forEach(m => {
+      if (m.currency) set.add(m.currency);
+    });
+    return Array.from(set);
+  }, [systemCurrency, currencies, debitMovements, creditMovements]);
+
+  const handleToggleCurrencyFilter = (curr: string) => {
+    setFilterCurrencies(prev => {
+      if (prev.includes(curr)) {
+        return prev.filter(c => c !== curr);
+      } else {
+        return [...prev, curr];
+      }
+    });
+  };
 
 
 
@@ -870,7 +897,13 @@ export const CustomerSettlements: React.FC = () => {
         if (!filterTypes.includes(m.page_name)) return false;
       }
 
-      // 4. Basic search bar (searchTerm)
+      // 4. Currency Filter
+      if (filterCurrencies.length > 0) {
+        const movCurrency = m.currency || systemCurrency;
+        if (!filterCurrencies.includes(movCurrency)) return false;
+      }
+
+      // 5. Basic search bar (searchTerm)
       if (searchTerm.trim()) {
         const query = searchTerm.toLowerCase();
         const matchesQuery = m.number.toLowerCase().includes(query) || 
@@ -885,11 +918,11 @@ export const CustomerSettlements: React.FC = () => {
 
   const processedDebitMovements = useMemo(() => {
     return applyFilters(debitMovements);
-  }, [debitMovements, filterDocNumbers, filterSearchType, filterFromDate, filterToDate, filterTypes, searchTerm]);
+  }, [debitMovements, filterDocNumbers, filterSearchType, filterFromDate, filterToDate, filterTypes, filterCurrencies, searchTerm]);
 
   const processedCreditMovements = useMemo(() => {
     return applyFilters(creditMovements);
-  }, [creditMovements, filterDocNumbers, filterSearchType, filterFromDate, filterToDate, filterTypes, searchTerm]);
+  }, [creditMovements, filterDocNumbers, filterSearchType, filterFromDate, filterToDate, filterTypes, filterCurrencies, searchTerm]);
 
   // Unified grid table array
   const unifiedMovements = useMemo(() => {
@@ -1424,19 +1457,20 @@ export const CustomerSettlements: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
               <div>
                 <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('discounts.column_customer')}</label>
-                <div className="relative group">
-                  <User className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
-                  <select 
-                    required
-                    className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
-                    value={selectedCustomerId}
-                    onChange={(e) => setSelectedCustomerId(e.target.value)}
-                  >
-                    <option value="">{t('settlements.select_customer')}</option>
-                    {customers.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
-                  </select>
-                  <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
-                </div>
+                <SearchableSelect 
+                  options={customers.map(c => ({
+                    value: c.id,
+                    label: c.name,
+                    code: c.code,
+                    subLabel: c.mobile
+                  }))}
+                  value={selectedCustomerId}
+                  onChange={(val) => setSelectedCustomerId(val)}
+                  placeholder={t('settlements.select_customer')}
+                  searchPlaceholder={language === 'ar' ? 'بحث باسم العميل أو الكود...' : 'Search customer by name or code...'}
+                  emptyText={language === 'ar' ? 'لا يوجد عميل يطابق البحث' : 'No customer matches search'}
+                  icon={<User size={18} />}
+                />
               </div>
 
               <div>
@@ -1487,7 +1521,7 @@ export const CustomerSettlements: React.FC = () => {
                   exit={{ opacity: 0, height: 0 }}
                   className="overflow-hidden"
                 >
-                  <div className="pt-4 border-t border-zinc-100 grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="pt-4 border-t border-zinc-100 grid grid-cols-1 md:grid-cols-4 gap-6">
                     {/* Bulk numbers search */}
                     <div>
                       <div className="flex items-center justify-between mb-2 px-1">
@@ -1498,7 +1532,7 @@ export const CustomerSettlements: React.FC = () => {
                           onChange={(e) => setFilterSearchType(e.target.value)}
                         >
                           <option value="number">{language === "ar" ? "رقم المستند" : "Doc Number"}</option>
-                          <option value="currency">{language === "ar" ? "العملة (EGP / USD ...)" : "Currency (EGP / USD ...)"}</option>
+                          <option value="currency">{language === "ar" ? "العملة الأجنبية (EGP / USD ...)" : "Foreign Currency (EGP / USD ...)"}</option>
                           <option value="je_number">{language === "ar" ? "رقم القيد" : "JE Number"}</option>
                           <option value="date">{language === "ar" ? "التاريخ (YYYY-MM-DD)" : "Date (YYYY-MM-DD)"}</option>
                           <option value="original_amount">{language === "ar" ? "المبلغ الأصلي" : "Original Amount"}</option>
@@ -1511,6 +1545,7 @@ export const CustomerSettlements: React.FC = () => {
                         className="w-full p-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-xs font-mono"
                         placeholder={
                           filterSearchType === 'number' ? 'INV-2026-06-000005\nINV-2026-06-000003' :
+                          filterSearchType === 'currency' ? 'USD\nEUR\nSAR' :
                           filterSearchType === 'je_number' ? 'JV-2026-0001\nJV-2026-0002' :
                           filterSearchType === 'date' ? '2026-06-01\n2026-06-05' :
                           filterSearchType === 'original_amount' ? '1500\n3400.50' :
@@ -1568,7 +1603,39 @@ export const CustomerSettlements: React.FC = () => {
                           </label>
                         ))}
                       </div>
-                      
+                    </div>
+
+                    {/* Filter by Currency */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2 px-1">
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase">{language === "ar" ? "تصفية حسب العملة" : "Filter by Currency"}</label>
+                        <span className="text-[10px] font-mono text-zinc-400">
+                          {filterCurrencies.length === 0 ? (language === 'ar' ? 'الكل' : 'All') : `${filterCurrencies.length} ${language === 'ar' ? 'محددة' : 'selected'}`}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <label className="flex items-center gap-2 p-2 bg-zinc-50 hover:bg-zinc-100 rounded-xl cursor-pointer select-none border border-transparent hover:border-zinc-200/50">
+                          <input
+                            type="checkbox"
+                            className="rounded text-emerald-600 focus:ring-emerald-500 w-4.5 h-4.5"
+                            checked={filterCurrencies.length === 0}
+                            onChange={() => setFilterCurrencies([])}
+                          />
+                          <span className={`font-semibold ${filterCurrencies.length === 0 ? 'text-emerald-700 font-bold' : 'text-zinc-700'}`}>{language === 'ar' ? 'الكل' : 'All'}</span>
+                        </label>
+                        {availableCurrencies.map(curr => (
+                          <label key={curr} className="flex items-center gap-2 p-2 bg-zinc-50 hover:bg-zinc-100 rounded-xl cursor-pointer select-none border border-transparent hover:border-zinc-200/50">
+                            <input
+                              type="checkbox"
+                              className="rounded text-emerald-600 focus:ring-emerald-500 w-4.5 h-4.5"
+                              checked={filterCurrencies.includes(curr)}
+                              onChange={() => handleToggleCurrencyFilter(curr)}
+                            />
+                            <span className={`font-semibold ${filterCurrencies.includes(curr) ? 'text-emerald-700 font-bold' : 'text-zinc-700'}`}>{curr}</span>
+                          </label>
+                        ))}
+                      </div>
+
                       {/* Clear filters button */}
                       <button
                         onClick={() => {
@@ -1577,6 +1644,7 @@ export const CustomerSettlements: React.FC = () => {
                           setFilterFromDate('');
                           setFilterToDate('');
                           setFilterTypes([]);
+                          setFilterCurrencies([]);
                           setSearchTerm('');
                         }}
                         className="mt-4 text-[10px] font-bold text-red-500 hover:text-red-600 underline text-right block ml-auto"
@@ -1627,7 +1695,7 @@ export const CustomerSettlements: React.FC = () => {
                             <th className="p-1.5 border border-zinc-200">{t('settlements.movement_date')}</th>
                             {hasForeignMovements && (
                               <>
-                                <th className="p-1.5 border border-zinc-200 text-left">{language === 'ar' ? 'المبلغ بالعملة الأخرى' : 'Foreign Amount'}</th>
+                                <th className="p-1.5 border border-zinc-200 text-left">{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</th>
                                 <th className="p-1.5 border border-zinc-200 text-center">{language === 'ar' ? 'العملة' : 'Currency'}</th>
                                 <th className="p-1.5 border border-zinc-200 text-left">{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
                               </>
@@ -1735,7 +1803,7 @@ export const CustomerSettlements: React.FC = () => {
                             <th className="p-1.5 border border-zinc-200">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
                             {hasForeignMovements && (
                               <>
-                                <th className="p-1.5 border border-zinc-200 text-left">{language === 'ar' ? 'المبلغ بالعملة الأخرى' : 'Foreign Amount'}</th>
+                                <th className="p-1.5 border border-zinc-200 text-left">{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</th>
                                 <th className="p-1.5 border border-zinc-200 text-center">{language === 'ar' ? 'العملة' : 'Currency'}</th>
                                 <th className="p-1.5 border border-zinc-200 text-left">{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
                               </>
@@ -1849,7 +1917,7 @@ export const CustomerSettlements: React.FC = () => {
                           <th className="p-2 border border-zinc-200" rowSpan={2}>{language === 'ar' ? 'رقم المستند' : 'Doc No.'}</th>
                           {hasForeignMovements && (
                             <>
-                              <th className="p-2 border border-zinc-200 text-left" rowSpan={2}>{language === 'ar' ? 'المبلغ بالعملة الأخرى' : 'Foreign Amount'}</th>
+                              <th className="p-2 border border-zinc-200 text-left" rowSpan={2}>{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</th>
                               <th className="p-2 border border-zinc-200 text-center" rowSpan={2}>{language === 'ar' ? 'العملة' : 'Currency'}</th>
                               <th className="p-2 border border-zinc-200 text-left" rowSpan={2}>{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
                             </>

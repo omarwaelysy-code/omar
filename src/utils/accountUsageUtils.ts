@@ -62,6 +62,8 @@ export const ACCOUNT_USAGE_OPTIONS: AccountUsageOption[] = [
   { key: 'service_revenue', ar: 'إيرادات خدمات', en: 'Service Revenue' },
   { key: 'other_revenue', ar: 'إيرادات أخرى', en: 'Other Revenue' },
   { key: 'financial_revenue', ar: 'إيرادات مالية', en: 'Financial Revenue' },
+  { key: 'realized_forex_gain', ar: 'أرباح فروق عملة محققة', en: 'Realized Forex Gain' },
+  { key: 'unrealized_forex_gain', ar: 'أرباح فروق عملة غير محققة', en: 'Unrealized Forex Gain' },
   { key: 'sales_returns', ar: 'مردودات مبيعات', en: 'Sales Returns' },
   { key: 'earned_discounts', ar: 'خصم مبيعات', en: 'Sales Discount' },
 
@@ -77,6 +79,8 @@ export const ACCOUNT_USAGE_OPTIONS: AccountUsageOption[] = [
   { key: 'marketing_expense', ar: 'مصروفات تسويق', en: 'Marketing Expense' },
   { key: 'selling_expense', ar: 'مصروفات بيع', en: 'Selling Expense' },
   { key: 'financial_expense', ar: 'مصروفات مالية (فوائد)', en: 'Financial Expense (Interest)' },
+  { key: 'realized_forex_loss', ar: 'خسائر فروق عملة محققة', en: 'Realized Forex Loss' },
+  { key: 'unrealized_forex_loss', ar: 'خسائر فروق عملة غير محققة', en: 'Unrealized Forex Loss' },
   { key: 'depreciation_expense', ar: 'إهلاك', en: 'Depreciation Expense' }
 ];
 
@@ -187,7 +191,7 @@ export const ACCOUNT_USAGE_GROUPS: AccountUsageGroup[] = [
     macroEn: 'Income Statement - Revenues',
     labelAr: 'الإيرادات والمبيعات والمردودات',
     labelEn: 'Revenues, Sales & Returns',
-    keys: ['sales_revenue', 'service_revenue', 'other_revenue', 'financial_revenue', 'sales_returns', 'earned_discounts']
+    keys: ['sales_revenue', 'service_revenue', 'other_revenue', 'financial_revenue', 'realized_forex_gain', 'unrealized_forex_gain', 'sales_returns', 'earned_discounts']
   },
 
   // 5. قائمة الدخل - تكاليف
@@ -205,7 +209,7 @@ export const ACCOUNT_USAGE_GROUPS: AccountUsageGroup[] = [
     macroEn: 'Income Statement - Expenses / Depreciation / Interest',
     labelAr: 'المصروفات والإهلاك والفوائد',
     labelEn: 'Expenses, Depreciation & Interest',
-    keys: ['operating_expense', 'administrative_expense', 'marketing_expense', 'selling_expense', 'financial_expense', 'depreciation_expense']
+    keys: ['operating_expense', 'administrative_expense', 'marketing_expense', 'selling_expense', 'financial_expense', 'realized_forex_loss', 'unrealized_forex_loss', 'depreciation_expense']
   }
 ];
 
@@ -289,6 +293,18 @@ export const findUsageOptionByText = (text: string): AccountUsageOption | undefi
   }
   if (clean.includes('مصروف تشغيل') || clean.includes('تشغيلية')) {
     return ACCOUNT_USAGE_OPTIONS.find(o => o.key === 'operating_expense');
+  }
+  if (clean.includes('أرباح فروق عملة محققة') || clean.includes('ارباح فروق محققة') || clean === 'realized_forex_gain') {
+    return ACCOUNT_USAGE_OPTIONS.find(o => o.key === 'realized_forex_gain');
+  }
+  if (clean.includes('أرباح فروق عملة غير محققة') || clean.includes('ارباح فروق غير محققة') || clean === 'unrealized_forex_gain') {
+    return ACCOUNT_USAGE_OPTIONS.find(o => o.key === 'unrealized_forex_gain');
+  }
+  if (clean.includes('خسائر فروق عملة محققة') || clean.includes('خسائر فروق محققة') || clean === 'realized_forex_loss') {
+    return ACCOUNT_USAGE_OPTIONS.find(o => o.key === 'realized_forex_loss');
+  }
+  if (clean.includes('خسائر فروق عملة غير محققة') || clean.includes('خسائر فروق غير محققة') || clean === 'unrealized_forex_loss') {
+    return ACCOUNT_USAGE_OPTIONS.find(o => o.key === 'unrealized_forex_loss');
   }
 
   // Partial match fallback

@@ -8,6 +8,7 @@ import { dbService } from '../services/dbService';
 import { formatNumber, formatMoney, formatDate, isSupplierAccount } from '../utils/formatUtils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNavigation } from '../contexts/NavigationContext';
+import { SearchableSelect } from '../components/common/SearchableSelect';
 
 interface StatementItem {
   id: string;
@@ -486,19 +487,20 @@ export const SupplierStatement: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div className="md:col-span-1">
             <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{t('discounts.column_supplier')}</label>
-            <div className="relative">
-              <User className="absolute left-3 top-3 text-zinc-400" size={18} />
-              <select 
-                className="w-full pl-10 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                value={selectedSupplierId}
-                onChange={(e) => setSelectedSupplierId(e.target.value)}
-              >
-                <option value="">{t('settlements.select_supplier')}</option>
-                {suppliers.map(supplier => (
-                  <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
-                ))}
-              </select>
-            </div>
+            <SearchableSelect 
+              options={suppliers.map(supplier => ({
+                value: supplier.id,
+                label: supplier.name,
+                code: supplier.code,
+                subLabel: supplier.mobile
+              }))}
+              value={selectedSupplierId}
+              onChange={(val) => setSelectedSupplierId(val)}
+              placeholder={t('settlements.select_supplier')}
+              searchPlaceholder={language === 'ar' ? 'بحث باسم المورد أو الكود...' : 'Search supplier by name or code...'}
+              emptyText={language === 'ar' ? 'لا يوجد مورد يطابق البحث' : 'No supplier matches search'}
+              icon={<User size={18} />}
+            />
           </div>
           <div>
             <label className="block text-sm font-bold text-zinc-700 mb-1 uppercase tracking-tighter">{language === 'ar' ? 'من تاريخ' : 'From Date'}</label>
