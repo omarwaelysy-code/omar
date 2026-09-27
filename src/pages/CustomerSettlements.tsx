@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
-import { Customer, Account } from '../types';
+import { Customer, Account, Currency, Company } from '../types';
 import { Search, Trash2, X, Layers, User, Calendar, RotateCcw, ChevronDown, Check, AlertCircle, Info, ArrowLeftRight, LayoutGrid, SlidersHorizontal, ExternalLink, Download, Edit3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -28,6 +28,9 @@ interface Movement {
   notes: string;
   je_number?: string;
   selected: boolean;
+  currency?: string;
+  exchange_rate?: number;
+  foreign_amount?: number | null;
 }
 
 export const CustomerSettlements: React.FC = () => {
@@ -46,6 +49,8 @@ export const CustomerSettlements: React.FC = () => {
   const [allPurchaseInvoices, setAllPurchaseInvoices] = useState<any[]>([]);
   const [allPayments, setAllPayments] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
   const tableRef = useRef<HTMLDivElement>(null);
 
@@ -104,6 +109,11 @@ export const CustomerSettlements: React.FC = () => {
       const unsubPI = dbService.subscribe<any>('purchase_invoices', user.company_id, setAllPurchaseInvoices);
       const unsubPayments = dbService.subscribe<any>('payment_vouchers', user.company_id, setAllPayments);
       const unsubAccounts = dbService.subscribe<any>('accounts', user.company_id, setAccounts);
+      const unsubCurrencies = dbService.subscribe<Currency>('currencies', user.company_id, setCurrencies);
+
+      dbService.get<Company>('companies', user.company_id).then(c => {
+        if (c) setCompany(c);
+      }).catch(err => console.error('Failed to load company for settlements:', err));
 
       setLoading(false);
 
@@ -117,9 +127,26 @@ export const CustomerSettlements: React.FC = () => {
         unsubPI();
         unsubPayments();
         unsubAccounts();
+        unsubCurrencies();
       };
     }
   }, [user]);
+
+  const systemCurrency = useMemo(() => {
+    return company?.settings?.currency || (company as any)?.currency || 'EGP';
+  }, [company]);
+
+  const currenciesMap = useMemo(() => {
+    return (currencies || []).reduce((acc, c) => {
+      acc[c.id] = c;
+      return acc;
+    }, {} as Record<string, Currency>);
+  }, [currencies]);
+
+  const hasForeignMovements = useMemo(() => {
+    const isForeign = (m: Movement) => Boolean(m.currency && m.currency !== systemCurrency);
+    return debitMovements.some(isForeign) || creditMovements.some(isForeign);
+  }, [debitMovements, creditMovements, systemCurrency]);
 
 
 
@@ -521,11 +548,26 @@ export const CustomerSettlements: React.FC = () => {
     // 1. Sales Invoices
     allInvoices.forEach(inv => {
       if (inv.customer_id === selectedCustomerId && inv.payment_type !== 'cash') {
+        let docCurrency = systemCurrency;
+        if (inv.currency_id && currenciesMap[inv.currency_id]) {
+          docCurrency = currenciesMap[inv.currency_id].code;
+        } else if (inv.currency_code) {
+          docCurrency = inv.currency_code;
+        } else if (inv.currency) {
+          docCurrency = currenciesMap[inv.currency]?.code || inv.currency;
+        }
+        const docRate = Number(inv.exchange_rate) || 1;
+        const isForeign = docCurrency !== systemCurrency;
+        const foreignAmount = isForeign ? Number(inv.total_amount || 0) : null;
+        const baseAmount = isForeign
+          ? (Number(inv.total_base_amount) || (docRate > 0 && docRate !== 1 ? Number((Number(inv.total_amount || 0) * docRate).toFixed(2)) : Number(inv.total_amount || 0)))
+          : (Number(inv.total_amount) || 0);
+
         const settlements = getInvoiceSettlements(inv);
         const settledAmount = settlements
           .filter((s: any) => s.settlement_number !== editingSettlementNum)
           .reduce((sum, s) => sum + s.amount, 0);
-        const originalAmount = Number(inv.total_amount) || 0;
+        const originalAmount = baseAmount;
         const openAmount = originalAmount - settledAmount;
 
         const editMatch = currentEditingSettlement?.debitDocs?.find((d: any) => d.original_id === inv.id || d.number === inv.invoice_number);
@@ -542,7 +584,10 @@ export const CustomerSettlements: React.FC = () => {
             open_amount: openAmount,
             settled_amount: editMatch ? editMatch.amount : 0,
             notes: inv.description || inv.notes || '',
-            selected: !!editMatch
+            selected: !!editMatch,
+            currency: docCurrency,
+            exchange_rate: docRate,
+            foreign_amount: foreignAmount
           });
         }
       }
@@ -558,6 +603,15 @@ export const CustomerSettlements: React.FC = () => {
       je.items?.forEach((item: any, idx: number) => {
         const matchesEntity = item.customer_id === selectedCustomerId || item.sub_account_id === selectedCustomerId;
         if (matchesEntity && Number(item.debit) > 0 && isCustomerAccount(item.account_id, customer, accounts)) {
+          let jeCurrency = systemCurrency;
+          let jeRate = Number(item.exchange_rate) || 1;
+          if (item.currency && item.currency !== 'local' && item.currency !== systemCurrency) {
+            jeCurrency = currenciesMap[item.currency]?.code || item.currency;
+          }
+          const isForeign = jeCurrency !== systemCurrency;
+          const foreignAmount = isForeign
+            ? (Number(item.foreign_amount) || (jeRate > 1 ? Number((Number(item.debit) / jeRate).toFixed(2)) : null))
+            : null;
           const originalAmount = Number(item.debit) || 0;
           const settled = getSettlementsForTarget(`${je.id}-${idx}`, je.reference_type);
           const openAmount = originalAmount - settled;
@@ -579,7 +633,10 @@ export const CustomerSettlements: React.FC = () => {
               settled_amount: editMatch ? editMatch.amount : 0,
               notes: item.description || je.description || '',
               je_number: je.entry_number || je.id.slice(0, 8),
-              selected: !!editMatch
+              selected: !!editMatch,
+              currency: jeCurrency,
+              exchange_rate: jeRate,
+              foreign_amount: foreignAmount
             });
           }
         }
@@ -594,6 +651,26 @@ export const CustomerSettlements: React.FC = () => {
       if (v.items && Array.isArray(v.items)) {
         v.items.forEach((item: any, idx: number) => {
           if (item.entity_id === selectedCustomerId || item.customer_id === selectedCustomerId || (item.type === 'customer' && item.entity_id === selectedCustomerId)) {
+            let vCurrency = systemCurrency;
+            let vRate = Number(v.exchange_rate) || 1;
+            if (v.currency_id && currenciesMap[v.currency_id]) {
+              vCurrency = currenciesMap[v.currency_id].code;
+            } else if (v.currency_code) {
+              vCurrency = v.currency_code;
+            } else if (v.currency) {
+              vCurrency = currenciesMap[v.currency]?.code || v.currency;
+            } else if (item.currency && item.currency !== 'local' && item.currency !== systemCurrency) {
+              vCurrency = currenciesMap[item.currency]?.code || item.currency;
+              if (item.exchange_rate) vRate = Number(item.exchange_rate);
+            }
+            const isForeign = vCurrency !== systemCurrency;
+            const foreignAmount = isForeign
+              ? (Number(item.foreign_amount) || Number(item.amount) || 0)
+              : null;
+            const baseAmount = isForeign
+              ? (Number(item.base_amount) || (vRate > 0 && vRate !== 1 ? Number((Number(item.amount || 0) * vRate).toFixed(2)) : Number(item.amount || 0)))
+              : Number(item.amount || 0);
+
             let totalSettled = 0;
             const countedInvoiceIds = new Set<string>();
 
@@ -617,7 +694,7 @@ export const CustomerSettlements: React.FC = () => {
               }
             });
 
-            const originalAmount = Number(item.amount) || 0;
+            const originalAmount = baseAmount;
             const openAmount = originalAmount - totalSettled;
 
             const editMatch = currentEditingSettlement?.creditDocs?.find((c: any) => c.original_id === v.id || c.number === (v.voucher_number || v.number));
@@ -635,7 +712,10 @@ export const CustomerSettlements: React.FC = () => {
                 settled_amount: editMatch ? editMatch.amount : 0,
                 notes: v.description || v.notes || '',
                 je_number: v.entry_number || '',
-                selected: !!editMatch
+                selected: !!editMatch,
+                currency: vCurrency,
+                exchange_rate: vRate,
+                foreign_amount: foreignAmount
               });
             }
           }
@@ -646,8 +726,23 @@ export const CustomerSettlements: React.FC = () => {
     // 2. Sales Returns
     allReturns.forEach(r => {
       if (r.customer_id === selectedCustomerId && r.payment_type !== 'cash') {
+        let retCurrency = systemCurrency;
+        let retRate = Number(r.exchange_rate) || 1;
+        if (r.currency_id && currenciesMap[r.currency_id]) {
+          retCurrency = currenciesMap[r.currency_id].code;
+        } else if (r.currency_code) {
+          retCurrency = r.currency_code;
+        } else if (r.currency) {
+          retCurrency = currenciesMap[r.currency]?.code || r.currency;
+        }
+        const isForeign = retCurrency !== systemCurrency;
+        const foreignAmount = isForeign ? (Number(r.foreign_amount) || Number(r.total_amount) || 0) : null;
+        const baseAmount = isForeign
+          ? (Number(r.total_base_amount) || (retRate > 0 && retRate !== 1 ? Number((Number(r.total_amount || 0) * retRate).toFixed(2)) : Number(r.total_amount || 0)))
+          : (Number(r.total_amount) || 0);
+
         const settled = getSettlementsForTarget(r.id);
-        const originalAmount = Number(r.total_amount) || 0;
+        const originalAmount = baseAmount;
         const openAmount = originalAmount - settled;
 
         const editMatch = currentEditingSettlement?.creditDocs?.find((c: any) => c.original_id === r.id || c.number === r.return_number);
@@ -665,7 +760,10 @@ export const CustomerSettlements: React.FC = () => {
             settled_amount: editMatch ? editMatch.amount : 0,
             notes: r.description || r.notes || '',
             je_number: r.entry_number || '',
-            selected: !!editMatch
+            selected: !!editMatch,
+            currency: retCurrency,
+            exchange_rate: retRate,
+            foreign_amount: foreignAmount
           });
         }
       }
@@ -679,6 +777,15 @@ export const CustomerSettlements: React.FC = () => {
       je.items?.forEach((item: any, idx: number) => {
         const matchesEntity = item.customer_id === selectedCustomerId || item.sub_account_id === selectedCustomerId;
         if (matchesEntity && Number(item.credit) > 0 && isCustomerAccount(item.account_id, customer, accounts)) {
+          let jeCurrency = systemCurrency;
+          let jeRate = Number(item.exchange_rate) || 1;
+          if (item.currency && item.currency !== 'local' && item.currency !== systemCurrency) {
+            jeCurrency = currenciesMap[item.currency]?.code || item.currency;
+          }
+          const isForeign = jeCurrency !== systemCurrency;
+          const foreignAmount = isForeign
+            ? (Number(item.foreign_amount) || (jeRate > 1 ? Number((Number(item.credit) / jeRate).toFixed(2)) : null))
+            : null;
           const originalAmount = Number(item.credit) || 0;
           const settled = getSettlementsForTarget(`${je.id}-${idx}`, je.reference_type);
           const openAmount = originalAmount - settled;
@@ -700,7 +807,10 @@ export const CustomerSettlements: React.FC = () => {
               settled_amount: editMatch ? editMatch.amount : 0,
               notes: item.description || je.description || '',
               je_number: je.entry_number || je.id.slice(0, 8),
-              selected: !!editMatch
+              selected: !!editMatch,
+              currency: jeCurrency,
+              exchange_rate: jeRate,
+              foreign_amount: foreignAmount
             });
           }
         }
@@ -709,7 +819,7 @@ export const CustomerSettlements: React.FC = () => {
 
     setDebitMovements(debits.sort((a, b) => b.date.localeCompare(a.date)));
     setCreditMovements(credits.sort((a, b) => b.date.localeCompare(a.date)));
-  }, [selectedCustomerId, allInvoices, allReceipts, allReturns, allJournalEntries, customers, editingSettlementNum, historyList]);
+  }, [selectedCustomerId, allInvoices, allReceipts, allReturns, allJournalEntries, customers, editingSettlementNum, historyList, currenciesMap, systemCurrency]);
 
   // Apply Advanced Filtering
   const applyFilters = (list: Movement[]) => {
@@ -724,6 +834,9 @@ export const CustomerSettlements: React.FC = () => {
           const matched = queryList.some(query => {
             if (filterSearchType === 'number') {
               return m.number.toLowerCase().includes(query);
+            }
+            if (filterSearchType === 'currency') {
+              return !!(m.currency && m.currency.toLowerCase().includes(query));
             }
             if (filterSearchType === 'je_number') {
               return !!(m.je_number && m.je_number.toLowerCase().includes(query));
@@ -1385,6 +1498,7 @@ export const CustomerSettlements: React.FC = () => {
                           onChange={(e) => setFilterSearchType(e.target.value)}
                         >
                           <option value="number">{language === "ar" ? "رقم المستند" : "Doc Number"}</option>
+                          <option value="currency">{language === "ar" ? "العملة (EGP / USD ...)" : "Currency (EGP / USD ...)"}</option>
                           <option value="je_number">{language === "ar" ? "رقم القيد" : "JE Number"}</option>
                           <option value="date">{language === "ar" ? "التاريخ (YYYY-MM-DD)" : "Date (YYYY-MM-DD)"}</option>
                           <option value="original_amount">{language === "ar" ? "المبلغ الأصلي" : "Original Amount"}</option>
@@ -1511,6 +1625,13 @@ export const CustomerSettlements: React.FC = () => {
                             <th className="p-1.5 border border-zinc-200">{language === 'ar' ? 'نوع الحركة' : 'Doc Type'}</th>
                             <th className="p-1.5 border border-zinc-200">{language === 'ar' ? 'رقم المستند' : 'Doc No.'}</th>
                             <th className="p-1.5 border border-zinc-200">{t('settlements.movement_date')}</th>
+                            {hasForeignMovements && (
+                              <>
+                                <th className="p-1.5 border border-zinc-200 text-left">{language === 'ar' ? 'المبلغ بالعملة الأخرى' : 'Foreign Amount'}</th>
+                                <th className="p-1.5 border border-zinc-200 text-center">{language === 'ar' ? 'العملة' : 'Currency'}</th>
+                                <th className="p-1.5 border border-zinc-200 text-left">{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
+                              </>
+                            )}
                             <th className="p-1.5 border border-zinc-200 text-left">{t('settlements.movement_amount')}</th>
                             <th className="p-1.5 border border-zinc-200 text-left">{t('settlements.movement_remaining')}</th>
                             <th className="p-1.5 border border-zinc-200 w-28 text-left">{t('settlements.movement_settle_amount')}</th>
@@ -1519,7 +1640,7 @@ export const CustomerSettlements: React.FC = () => {
                         <tbody className="divide-y divide-zinc-200">
                           {processedDebitMovements.length === 0 ? (
                             <tr>
-                              <td colSpan={7} className="p-6 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد حركات مدينة تطابق البحث' : 'No debit movements match search'}</td>
+                              <td colSpan={hasForeignMovements ? 10 : 7} className="p-6 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد حركات مدينة تطابق البحث' : 'No debit movements match search'}</td>
                             </tr>
                           ) : (
                             processedDebitMovements.map(m => (
@@ -1543,6 +1664,25 @@ export const CustomerSettlements: React.FC = () => {
                                   </button>
                                 </td>
                                 <td className="p-1 px-2 border border-zinc-200 text-zinc-500">{formatDate(m.date)}</td>
+                                {hasForeignMovements && (
+                                  <>
+                                    <td className="p-1 px-2 border border-zinc-200 text-left font-mono font-semibold text-zinc-700">
+                                      {m.currency && m.currency !== systemCurrency && m.foreign_amount !== null && m.foreign_amount !== undefined
+                                        ? formatNumber(m.foreign_amount)
+                                        : '-'}
+                                    </td>
+                                    <td className="p-1 px-2 border border-zinc-200 text-center">
+                                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${m.currency && m.currency !== systemCurrency ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-zinc-100 text-zinc-600'}`}>
+                                        {m.currency || systemCurrency}
+                                      </span>
+                                    </td>
+                                    <td className="p-1 px-2 border border-zinc-200 text-left font-mono text-zinc-600">
+                                      {m.currency && m.currency !== systemCurrency && m.exchange_rate && m.exchange_rate !== 1
+                                        ? formatNumber(m.exchange_rate)
+                                        : '-'}
+                                    </td>
+                                  </>
+                                )}
                                 <td className="p-1 px-2 border border-zinc-200 text-left font-semibold text-zinc-500">{formatNumber(m.original_amount)}</td>
                                 <td className="p-1 px-2 border border-zinc-200 text-left font-bold text-zinc-800">{formatNumber(m.open_amount)}</td>
                                 <td className="p-0.5 border border-zinc-200 text-left">
@@ -1582,26 +1722,33 @@ export const CustomerSettlements: React.FC = () => {
                             <th className="p-1.5 border border-zinc-200 w-20 text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <input 
-                                  type="checkbox"
+                                  type="checkbox" 
                                   className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
                                   checked={isAllCreditSelected}
                                   onChange={(e) => handleSelectAllCredits(e.target.checked)}
                                 />
-                                <span>تحديد</span>
+                                <span>{language === 'ar' ? 'تحديد' : 'Select'}</span>
                               </div>
                             </th>
-                            <th className="p-1.5 border border-zinc-200">نوع الحركة</th>
-                            <th className="p-1.5 border border-zinc-200">رقم المستند</th>
-                            <th className="p-1.5 border border-zinc-200">التاريخ</th>
-                            <th className="p-1.5 border border-zinc-200 text-left">المبلغ</th>
-                            <th className="p-1.5 border border-zinc-200 text-left">المتبقي</th>
-                            <th className="p-1.5 border border-zinc-200 w-28 text-left">المبلغ المسوى</th>
+                            <th className="p-1.5 border border-zinc-200">{language === 'ar' ? 'نوع الحركة' : 'Doc Type'}</th>
+                            <th className="p-1.5 border border-zinc-200">{language === 'ar' ? 'رقم المستند' : 'Doc No.'}</th>
+                            <th className="p-1.5 border border-zinc-200">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                            {hasForeignMovements && (
+                              <>
+                                <th className="p-1.5 border border-zinc-200 text-left">{language === 'ar' ? 'المبلغ بالعملة الأخرى' : 'Foreign Amount'}</th>
+                                <th className="p-1.5 border border-zinc-200 text-center">{language === 'ar' ? 'العملة' : 'Currency'}</th>
+                                <th className="p-1.5 border border-zinc-200 text-left">{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
+                              </>
+                            )}
+                            <th className="p-1.5 border border-zinc-200 text-left">{language === 'ar' ? 'المبلغ' : 'Amount'}</th>
+                            <th className="p-1.5 border border-zinc-200 text-left">{language === 'ar' ? 'المتبقي' : 'Remaining'}</th>
+                            <th className="p-1.5 border border-zinc-200 w-28 text-left">{language === 'ar' ? 'المبلغ المسوى' : 'Settled Amount'}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-200">
                           {processedCreditMovements.length === 0 ? (
                             <tr>
-                              <td colSpan={7} className="p-6 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد حركات دائنة تطابق البحث' : 'No credit movements match search'}</td>
+                              <td colSpan={hasForeignMovements ? 10 : 7} className="p-6 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد حركات دائنة تطابق البحث' : 'No credit movements match search'}</td>
                             </tr>
                           ) : (
                             processedCreditMovements.map(m => (
@@ -1625,6 +1772,25 @@ export const CustomerSettlements: React.FC = () => {
                                   </button>
                                 </td>
                                 <td className="p-1 px-2 border border-zinc-200 text-zinc-500">{formatDate(m.date)}</td>
+                                {hasForeignMovements && (
+                                  <>
+                                    <td className="p-1 px-2 border border-zinc-200 text-left font-mono font-semibold text-zinc-700">
+                                      {m.currency && m.currency !== systemCurrency && m.foreign_amount !== null && m.foreign_amount !== undefined
+                                        ? formatNumber(m.foreign_amount)
+                                        : '-'}
+                                    </td>
+                                    <td className="p-1 px-2 border border-zinc-200 text-center">
+                                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${m.currency && m.currency !== systemCurrency ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-zinc-100 text-zinc-600'}`}>
+                                        {m.currency || systemCurrency}
+                                      </span>
+                                    </td>
+                                    <td className="p-1 px-2 border border-zinc-200 text-left font-mono text-zinc-600">
+                                      {m.currency && m.currency !== systemCurrency && m.exchange_rate && m.exchange_rate !== 1
+                                        ? formatNumber(m.exchange_rate)
+                                        : '-'}
+                                    </td>
+                                  </>
+                                )}
                                 <td className="p-1 px-2 border border-zinc-200 text-left font-semibold text-zinc-500">{formatNumber(m.original_amount)}</td>
                                 <td className="p-1 px-2 border border-zinc-200 text-left font-bold text-zinc-800">{formatNumber(m.open_amount)}</td>
                                 <td className="p-0.5 border border-zinc-200 text-left">
@@ -1670,7 +1836,7 @@ export const CustomerSettlements: React.FC = () => {
                           <th className="p-2 border border-zinc-200 w-20 text-center" rowSpan={2}>
                             <div className="flex flex-col items-center justify-center gap-0.5">
                               <input 
-                                type="checkbox"
+                                type="checkbox" 
                                 className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5 cursor-pointer"
                                 checked={isAllUnifiedSelected}
                                 onChange={(e) => handleSelectAllUnified(e.target.checked)}
@@ -1681,6 +1847,13 @@ export const CustomerSettlements: React.FC = () => {
                           <th className="p-2 border border-zinc-200" rowSpan={2}>{t('settlements.movement_date')}</th>
                           <th className="p-2 border border-zinc-200" rowSpan={2}>{language === 'ar' ? 'نوع الحركة' : 'Doc Type'}</th>
                           <th className="p-2 border border-zinc-200" rowSpan={2}>{language === 'ar' ? 'رقم المستند' : 'Doc No.'}</th>
+                          {hasForeignMovements && (
+                            <>
+                              <th className="p-2 border border-zinc-200 text-left" rowSpan={2}>{language === 'ar' ? 'المبلغ بالعملة الأخرى' : 'Foreign Amount'}</th>
+                              <th className="p-2 border border-zinc-200 text-center" rowSpan={2}>{language === 'ar' ? 'العملة' : 'Currency'}</th>
+                              <th className="p-2 border border-zinc-200 text-left" rowSpan={2}>{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
+                            </>
+                          )}
                           <th className="p-1 border border-zinc-200 text-center bg-red-50/50 text-red-700 font-bold" colSpan={2}>{language === 'ar' ? 'الحركات المدينة (Debit)' : 'Debit Movements (Debit)'}</th>
                           <th className="p-1 border border-zinc-200 text-center bg-emerald-50/50 text-emerald-700 font-bold" colSpan={2}>{language === 'ar' ? 'الحركات الدائنة (Credit)' : 'Credit Movements (Credit)'}</th>
                         </tr>
@@ -1694,7 +1867,7 @@ export const CustomerSettlements: React.FC = () => {
                       <tbody className="divide-y divide-zinc-200">
                         {unifiedMovements.length === 0 ? (
                           <tr>
-                            <td colSpan={8} className="p-8 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد حركات تطابق خيارات التصفية والبحث' : 'No movements match selected search filters'}</td>
+                            <td colSpan={hasForeignMovements ? 11 : 8} className="p-8 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد حركات تطابق خيارات التصفية والبحث' : 'No movements match selected search filters'}</td>
                           </tr>
                         ) : (
                           unifiedMovements.map(m => (
@@ -1724,6 +1897,26 @@ export const CustomerSettlements: React.FC = () => {
                                   <ExternalLink size={10} className="opacity-40" />
                                 </button>
                               </td>
+
+                              {hasForeignMovements && (
+                                <>
+                                  <td className="p-1 px-2 border border-zinc-200 text-left font-mono font-semibold text-zinc-700">
+                                    {m.currency && m.currency !== systemCurrency && m.foreign_amount !== null && m.foreign_amount !== undefined
+                                      ? formatNumber(m.foreign_amount)
+                                      : '-'}
+                                  </td>
+                                  <td className="p-1 px-2 border border-zinc-200 text-center">
+                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${m.currency && m.currency !== systemCurrency ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-zinc-100 text-zinc-600'}`}>
+                                      {m.currency || systemCurrency}
+                                    </span>
+                                  </td>
+                                  <td className="p-1 px-2 border border-zinc-200 text-left font-mono text-zinc-600">
+                                    {m.currency && m.currency !== systemCurrency && m.exchange_rate && m.exchange_rate !== 1
+                                      ? formatNumber(m.exchange_rate)
+                                      : '-'}
+                                  </td>
+                                </>
+                              )}
                               
                               {/* Debit columns */}
                               <td className="p-1 px-2 border border-zinc-200 text-left bg-red-50/5 text-red-600 font-semibold">
