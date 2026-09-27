@@ -866,6 +866,16 @@ export const SupplierSettlements: React.FC = () => {
             if (filterSearchType === 'number') {
               return m.number.toLowerCase().includes(query);
             }
+            if (filterSearchType === 'foreign_amount') {
+              const cleanQ = query.replace(/,/g, '').trim();
+              const numVal = parseFloat(cleanQ);
+              if (m.foreign_amount !== undefined && m.foreign_amount !== null) {
+                return !isNaN(numVal)
+                  ? Math.abs(m.foreign_amount - numVal) < 0.01
+                  : String(m.foreign_amount).includes(cleanQ);
+              }
+              return false;
+            }
             if (filterSearchType === 'currency') {
               return !!(m.currency && m.currency.toLowerCase().includes(query));
             }
@@ -876,11 +886,13 @@ export const SupplierSettlements: React.FC = () => {
               return m.date.slice(0, 10).includes(query);
             }
             if (filterSearchType === 'original_amount') {
-              const numVal = parseFloat(query);
+              const cleanQ = query.replace(/,/g, '').trim();
+              const numVal = parseFloat(cleanQ);
               return !isNaN(numVal) && Math.abs(m.original_amount - numVal) < 0.01;
             }
             if (filterSearchType === 'open_amount') {
-              const numVal = parseFloat(query);
+              const cleanQ = query.replace(/,/g, '').trim();
+              const numVal = parseFloat(cleanQ);
               return !isNaN(numVal) && Math.abs(m.open_amount - numVal) < 0.01;
             }
             if (filterSearchType === 'notes') {
@@ -1537,7 +1549,8 @@ export const SupplierSettlements: React.FC = () => {
                           onChange={(e) => setFilterSearchType(e.target.value)}
                         >
                           <option value="number">{language === "ar" ? "رقم المستند" : "Doc Number"}</option>
-                          <option value="currency">{language === "ar" ? "العملة الأجنبية (رمز العملة كود)" : "Foreign Currency (Code)"}</option>
+                          <option value="foreign_amount">{language === "ar" ? "المبلغ بالعملة الأجنبية" : "Foreign Currency Amount"}</option>
+                          <option value="currency">{language === "ar" ? "رمز العملة (USD / EUR ...)" : "Currency Code (USD / EUR ...)"}</option>
                           <option value="je_number">{language === "ar" ? "رقم القيد" : "JE Number"}</option>
                           <option value="date">{language === "ar" ? "التاريخ (YYYY-MM-DD)" : "Date (YYYY-MM-DD)"}</option>
                           <option value="original_amount">{language === "ar" ? "المبلغ الأصلي" : "Original Amount"}</option>
@@ -1550,6 +1563,7 @@ export const SupplierSettlements: React.FC = () => {
                         className="w-full p-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none text-xs font-mono"
                         placeholder={
                           filterSearchType === 'number' ? 'PINV-2026-06-000005\nPAY-2026-06-000003' :
+                          filterSearchType === 'foreign_amount' ? '34400.00\n812.92' :
                           filterSearchType === 'currency' ? 'USD\nEUR\nSAR' :
                           filterSearchType === 'je_number' ? 'JV-2026-0001\nJV-2026-0002' :
                           filterSearchType === 'date' ? '2026-06-01\n2026-06-05' :
