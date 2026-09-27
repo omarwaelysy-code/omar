@@ -84,6 +84,7 @@ const IfrsGuide = React.lazy(() => import('./pages/IfrsGuide'));
 const FixedAssets = React.lazy(() => import('./pages/FixedAssets').then(m => ({ default: m.FixedAssets })));
 const DocumentImport = React.lazy(() => import('./pages/DocumentImport').then(m => ({ default: m.DocumentImport })));
 const DataCountsValues = React.lazy(() => import('./pages/DataCountsValues').then(m => ({ default: m.DataCountsValues })));
+const AgingReport = React.lazy(() => import('./pages/AgingReport').then(m => ({ default: m.AgingReport })));
 
 import { useNavigation } from './contexts/NavigationContext';
 import { useLanguage } from './contexts/LanguageContext';
@@ -272,6 +273,9 @@ export default function App() {
       case 'general_stock_movements_report': return <GeneralStockMovementsReport />;
       case 'customer_balances': return <CustomerBalances />;
       case 'supplier_balances': return <SupplierBalances />;
+      case 'customer_aging_report': return <AgingReport initialType="customer" />;
+      case 'supplier_aging_report': return <AgingReport initialType="supplier" />;
+      case 'aging_report': return <AgingReport />;
       case 'sales_report': return <SalesReport />;
       case 'expenses_report': return <ExpensesReport />;
       // case 'cash_report': return <CashReport />;

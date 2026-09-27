@@ -60,6 +60,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     nameEn: 'Reports',
     modules: [
       'customer_statement', 'supplier_statement', 'customer_balances', 'supplier_balances',
+      'customer_aging_report', 'supplier_aging_report',
       'sales_report', 'expenses_report', 'cash_report', 'general_ledger_report',
       'trial_balance', 'income_statement', 'balance_sheet', 'stock_card_report',
       'stock_balances_report', 'general_stock_movements_report'
@@ -346,6 +347,8 @@ export const MODULE_PERMISSIONS_META: { [moduleId: string]: { labelAr: string; l
   supplier_statement: { labelAr: 'كشف حساب المورد', labelEn: 'Supplier Statement', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
   customer_balances: { labelAr: 'تقرير أرصدة العملاء', labelEn: 'Customer Balances Report', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
   supplier_balances: { labelAr: 'تقرير أرصدة الموردين', labelEn: 'Supplier Balances Report', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
+  customer_aging_report: { labelAr: 'تقرير أعمار ديون العملاء', labelEn: 'Customer Aging Report', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
+  supplier_aging_report: { labelAr: 'تقرير أعمار ديون الموردين', labelEn: 'Supplier Aging Report', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
   sales_report: { labelAr: 'تقرير المبيعات والربحية', labelEn: 'Sales Report', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
   expenses_report: { labelAr: 'تقرير المصروفات', labelEn: 'Expenses Report', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },
   cash_report: { labelAr: 'تقرير حركة الخزينة البنكية', labelEn: 'Cash & Bank Book Report', hasCrud: false, special: ['print', 'export_pdf', 'export_excel'] },

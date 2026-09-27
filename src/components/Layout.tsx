@@ -18,6 +18,7 @@ import {
   ChevronDown,
   ChevronUp,
   Database,
+  Clock,
   ShieldCheck,
   BarChart3,
   Truck,
@@ -177,6 +178,10 @@ const getTabIcon = (id: string) => {
       return <Eye {...iconProps} />;
     case 'activity_log_prints':
       return <Printer {...iconProps} />;
+    case 'customer_aging_report':
+    case 'supplier_aging_report':
+    case 'aging_report':
+      return <Clock {...iconProps} />;
     case 'stock_balances_report':
     case 'customer_balances':
     case 'sales_report':
@@ -723,11 +728,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'h_sales', label: language === 'ar' ? 'العملاء والمبيعات' : 'Customers & Sales', isHeader: true },
           { id: 'customer_statement', label: t('nav.customer_statement'), icon: FileText },
           { id: 'customer_balances', label: t('nav.customer_balances'), icon: BarChart3 },
+          { id: 'customer_aging_report', label: t('nav.customer_aging_report'), icon: Clock },
           { id: 'sales_report', label: t('nav.sales_report'), icon: BarChart3 },
           { id: 'div_sales', isDivider: true },
           { id: 'h_purchases', label: language === 'ar' ? 'الموردين والمشتريات' : 'Suppliers & Purchases', isHeader: true },
           { id: 'supplier_statement', label: t('nav.supplier_statement'), icon: FileText },
           { id: 'supplier_balances', label: t('nav.supplier_balances'), icon: BarChart3 },
+          { id: 'supplier_aging_report', label: t('nav.supplier_aging_report'), icon: Clock },
           { id: 'div_purchases', isDivider: true },
           { id: 'h_cash', label: language === 'ar' ? 'النقدية والمصروفات' : 'Cash & Expenses', isHeader: true },
           // { id: 'cash_report', label: t('nav.cash_report'), icon: BarChart3 },

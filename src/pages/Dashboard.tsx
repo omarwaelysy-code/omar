@@ -1256,9 +1256,9 @@ const getErpPagesDirectory = (t: (key: string) => string): ERPPageItem[] => {
     let category = 'system';
     if (['accounts', 'chart_of_accounts', 'account_types', 'journal_entries', 'create_journal_entry', 'general_ledger_report', 'trial_balance', 'income_statement', 'balance_sheet'].includes(key)) {
       category = 'accounting';
-    } else if (['customers', 'invoices', 'sales_orders', 'returns', 'customer_discounts', 'customer_settlements', 'customer_statement', 'customer_balances', 'sales_report'].includes(key)) {
+    } else if (['customers', 'invoices', 'sales_orders', 'returns', 'customer_discounts', 'customer_settlements', 'customer_statement', 'customer_balances', 'customer_aging_report', 'sales_report'].includes(key)) {
       category = 'sales';
-    } else if (['suppliers', 'purchase_invoices', 'purchase_orders', 'purchase_returns', 'supplier_discounts', 'supplier_settlements', 'supplier_statement', 'supplier_balances'].includes(key)) {
+    } else if (['suppliers', 'purchase_invoices', 'purchase_orders', 'purchase_returns', 'supplier_discounts', 'supplier_settlements', 'supplier_statement', 'supplier_balances', 'supplier_aging_report'].includes(key)) {
       category = 'purchases';
     } else if (['products', 'warehouses', 'item_groups', 'warehouse_transfers', 'opening_stock_balances', 'stock_adjustments', 'stock_card_report', 'stock_balances_report', 'general_stock_movements_report', 'goods_receipts'].includes(key)) {
       category = 'inventory';

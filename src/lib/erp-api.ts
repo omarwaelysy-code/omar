@@ -69,7 +69,7 @@ export function getInitialPermissionsState() {
     'receipts', 'payment_vouchers', 'cash_transfers', 'cash_balances', 'issued_cheques', 'received_cheques', 'fixed_assets', 'asset_categories', 'asset_depreciation', 'account_types',
     'accounts', 'chart_of_accounts', 'create_journal_entry', 'journal_entries',
     'detailed_journal_entries', 'customer_statement', 'supplier_statement',
-    'customer_balances', 'supplier_balances', 'sales_report', 'expenses_report',
+    'customer_balances', 'supplier_balances', 'customer_aging_report', 'supplier_aging_report', 'sales_report', 'expenses_report',
     'cash_report', 'general_ledger_report', 'trial_balance', 'income_statement',
     'balance_sheet', 'stock_card_report', 'stock_balances_report', 'general_stock_movements_report',
     'users', 'companies', 'activity_log', 'audit_logs', 'system_check', 'company_settings',
@@ -129,7 +129,7 @@ export function getDefaultRolePermissions(roleName: string): any {
         'account_types', 'accounts', 'chart_of_accounts', 'create_journal_entry', 
         'journal_entries', 'detailed_journal_entries', 'receipts', 'payment_vouchers', 
         'cash_transfers', 'cash_balances', 'issued_cheques', 'received_cheques', 'customer_statement', 'supplier_statement', 
-        'customer_balances', 'supplier_balances', 'sales_report', 'expenses_report', 
+        'customer_balances', 'supplier_balances', 'customer_aging_report', 'supplier_aging_report', 'sales_report', 'expenses_report', 
         'cash_report', 'general_ledger_report', 'trial_balance', 'income_statement', 
         'balance_sheet'
       ].includes(modId);
