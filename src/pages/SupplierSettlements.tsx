@@ -852,6 +852,47 @@ export const SupplierSettlements: React.FC = () => {
     setCreditMovements(credits.sort((a, b) => b.date.localeCompare(a.date)));
   }, [selectedSupplierId, allPurchaseInvoices, allPayments, allPurchaseReturns, allJournalEntries, suppliers, editingSettlementNum, historyList, currenciesMap, systemCurrency]);
 
+  // Helper to translate doc type according to active language
+  const getDocTypeLabel = (pageName: string, isDebit?: boolean, fallbackLabel?: string) => {
+    if (language === 'ar') {
+      return fallbackLabel || (
+        pageName === 'purchase_invoices' ? 'فاتورة مشتريات' :
+        pageName === 'payments' ? 'سند صرف' :
+        pageName === 'purchase_returns' ? 'مرتجع مشتريات' :
+        pageName === 'discounts' ? 'خصم مكتسب' :
+        pageName === 'journal_entries' ? (isDebit ? 'قيد يومية (مدين)' : 'قيد يومية (دائن)') :
+        fallbackLabel || ''
+      );
+    }
+    // English
+    switch (pageName) {
+      case 'purchase_invoices':
+        return 'Purchase Invoice';
+      case 'payments':
+        return 'Payment Voucher';
+      case 'purchase_returns':
+        return 'Purchase Return';
+      case 'discounts':
+        return 'Earned Discount';
+      case 'journal_entries':
+        return isDebit ? 'Journal Entry (Debit)' : 'Journal Entry (Credit)';
+      default:
+        if (fallbackLabel === 'فاتورة مشتريات') return 'Purchase Invoice';
+        if (fallbackLabel === 'سند صرف') return 'Payment Voucher';
+        if (fallbackLabel === 'مرتجع مشتريات') return 'Purchase Return';
+        if (fallbackLabel === 'خصم مكتسب') return 'Earned Discount';
+        if (fallbackLabel?.includes('قيد')) return isDebit ? 'Journal Entry (Debit)' : 'Journal Entry (Credit)';
+        return fallbackLabel || pageName;
+    }
+  };
+
+  // Helper for foreign amount sign (+ for invoices, - for payments/returns/discounts)
+  const getMovementSign = (m: Movement & { isDebit?: boolean }) => {
+    if (m.page_name === 'purchase_invoices') return '+';
+    if (m.page_name === 'payments' || m.page_name === 'purchase_returns' || m.page_name === 'discounts') return '-';
+    return m.isDebit ? '-' : '+';
+  };
+
   // Apply Advanced Filtering
   const applyFilters = (list: Movement[]) => {
     return list.filter(m => {
@@ -922,8 +963,10 @@ export const SupplierSettlements: React.FC = () => {
       // 5. Basic search bar (searchTerm)
       if (searchTerm.trim()) {
         const query = searchTerm.toLowerCase();
+        const docLabel = getDocTypeLabel(m.page_name, (m as any).isDebit, m.type_label);
         const matchesQuery = m.number.toLowerCase().includes(query) || 
                              m.type_label.toLowerCase().includes(query) || 
+                             docLabel.toLowerCase().includes(query) ||
                              m.notes.toLowerCase().includes(query);
         if (!matchesQuery) return false;
       }
@@ -1714,14 +1757,14 @@ export const SupplierSettlements: React.FC = () => {
                             <th className="p-1.5 border border-zinc-200">{t('settlements.movement_date')}</th>
                             {hasForeignMovements && (
                               <>
-                                <th className="p-1.5 border border-zinc-200 text-left">{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</th>
+                                <th className="p-1.5 border border-zinc-200 text-right">{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</th>
                                 <th className="p-1.5 border border-zinc-200 text-center">{language === 'ar' ? 'العملة' : 'Currency'}</th>
-                                <th className="p-1.5 border border-zinc-200 text-left">{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
+                                <th className="p-1.5 border border-zinc-200 text-right">{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
                               </>
                             )}
-                            <th className="p-1.5 border border-zinc-200 text-left">{t('settlements.movement_amount')}</th>
-                            <th className="p-1.5 border border-zinc-200 text-left">{t('settlements.movement_remaining')}</th>
-                            <th className="p-1.5 border border-zinc-200 w-28 text-left">{t('settlements.movement_settle_amount')}</th>
+                            <th className="p-1.5 border border-zinc-200 text-right">{t('settlements.movement_amount')}</th>
+                            <th className="p-1.5 border border-zinc-200 text-right">{t('settlements.movement_remaining')}</th>
+                            <th className="p-1.5 border border-zinc-200 w-28 text-right">{t('settlements.movement_settle_amount')}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-200">
@@ -1740,7 +1783,7 @@ export const SupplierSettlements: React.FC = () => {
                                     onChange={(e) => handleToggleDebit(m.id, e.target.checked)}
                                   />
                                 </td>
-                                <td className="p-1 px-2 border border-zinc-200 font-semibold text-zinc-500">{m.type_label}</td>
+                                <td className="p-1 px-2 border border-zinc-200 font-semibold text-zinc-500">{getDocTypeLabel(m.page_name, true, m.type_label)}</td>
                                 <td className="p-1 px-2 border border-zinc-200 font-bold">
                                   <button
                                     onClick={() => navigateToDoc(m.page_name, m.original_id)}
@@ -1753,30 +1796,34 @@ export const SupplierSettlements: React.FC = () => {
                                 <td className="p-1 px-2 border border-zinc-200 text-zinc-500">{formatDate(m.date)}</td>
                                 {hasForeignMovements && (
                                   <>
-                                    <td className="p-1 px-2 border border-zinc-200 text-left font-mono font-semibold text-zinc-700">
-                                      {m.currency && m.currency !== systemCurrency && m.foreign_amount !== null && m.foreign_amount !== undefined
-                                        ? formatNumber(m.foreign_amount)
-                                        : '-'}
+                                    <td className="p-1 px-2 border border-zinc-200 text-right font-mono font-semibold">
+                                      {m.currency && m.currency !== systemCurrency && m.foreign_amount !== null && m.foreign_amount !== undefined ? (
+                                        <span dir="ltr" className="inline-block font-mono font-bold text-rose-700">
+                                          - {formatNumber(m.foreign_amount)}
+                                        </span>
+                                      ) : (
+                                        <span className="text-zinc-400 font-mono">-</span>
+                                      )}
                                     </td>
                                     <td className="p-1 px-2 border border-zinc-200 text-center">
                                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${m.currency && m.currency !== systemCurrency ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-zinc-100 text-zinc-600'}`}>
                                         {m.currency || systemCurrency}
                                       </span>
                                     </td>
-                                    <td className="p-1 px-2 border border-zinc-200 text-left font-mono text-zinc-600">
+                                    <td className="p-1 px-2 border border-zinc-200 text-right font-mono text-zinc-600">
                                       {m.currency && m.currency !== systemCurrency && m.exchange_rate && m.exchange_rate !== 1
                                         ? formatNumber(m.exchange_rate)
                                         : '-'}
                                     </td>
                                   </>
                                 )}
-                                <td className="p-1 px-2 border border-zinc-200 text-left font-semibold text-zinc-500">{formatNumber(m.original_amount)}</td>
-                                <td className="p-1 px-2 border border-zinc-200 text-left font-bold text-zinc-800">{formatNumber(m.open_amount)}</td>
-                                <td className="p-0.5 border border-zinc-200 text-left">
+                                <td className="p-1 px-2 border border-zinc-200 text-right font-semibold text-zinc-500">{formatNumber(m.original_amount)}</td>
+                                <td className="p-1 px-2 border border-zinc-200 text-right font-bold text-zinc-800">{formatNumber(m.open_amount)}</td>
+                                <td className="p-0.5 border border-zinc-200 text-right">
                                   <input 
                                     type="number"
                                     step="any"
-                                    className="w-full px-2 py-1 bg-transparent border-0 text-left font-black text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
+                                    className="w-full px-2 py-1 bg-transparent border-0 text-right font-black text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
                                     value={m.settled_amount || ''}
                                     placeholder="0.00"
                                     onChange={(e) => handleDebitAmountChange(m.id, parseFloat(e.target.value) || 0)}
@@ -1814,22 +1861,22 @@ export const SupplierSettlements: React.FC = () => {
                                   checked={isAllCreditSelected}
                                   onChange={(e) => handleSelectAllCredits(e.target.checked)}
                                 />
-                                <span>تحديد</span>
+                                <span>{language === 'ar' ? 'تحديد' : 'Select'}</span>
                               </div>
                             </th>
-                            <th className="p-1.5 border border-zinc-200">نوع الحركة</th>
-                            <th className="p-1.5 border border-zinc-200">رقم المستند</th>
-                            <th className="p-1.5 border border-zinc-200">التاريخ</th>
+                            <th className="p-1.5 border border-zinc-200">{language === 'ar' ? 'نوع الحركة' : 'Doc Type'}</th>
+                            <th className="p-1.5 border border-zinc-200">{language === 'ar' ? 'رقم المستند' : 'Doc No.'}</th>
+                            <th className="p-1.5 border border-zinc-200">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
                             {hasForeignMovements && (
                               <>
-                                <th className="p-1.5 border border-zinc-200 text-left">{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</th>
+                                <th className="p-1.5 border border-zinc-200 text-right">{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</th>
                                 <th className="p-1.5 border border-zinc-200 text-center">{language === 'ar' ? 'العملة' : 'Currency'}</th>
-                                <th className="p-1.5 border border-zinc-200 text-left">{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
+                                <th className="p-1.5 border border-zinc-200 text-right">{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
                               </>
                             )}
-                            <th className="p-1.5 border border-zinc-200 text-left">المبلغ</th>
-                            <th className="p-1.5 border border-zinc-200 text-left">المتبقي</th>
-                            <th className="p-1.5 border border-zinc-200 w-28 text-left">المبلغ المسوى</th>
+                            <th className="p-1.5 border border-zinc-200 text-right">{language === 'ar' ? 'المبلغ' : 'Amount'}</th>
+                            <th className="p-1.5 border border-zinc-200 text-right">{language === 'ar' ? 'المتبقي' : 'Remaining'}</th>
+                            <th className="p-1.5 border border-zinc-200 w-28 text-right">{language === 'ar' ? 'المبلغ المسوى' : 'Settled Amount'}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-200">
@@ -1848,7 +1895,7 @@ export const SupplierSettlements: React.FC = () => {
                                     onChange={(e) => handleToggleCredit(m.id, e.target.checked)}
                                   />
                                 </td>
-                                <td className="p-1 px-2 border border-zinc-200 font-semibold text-zinc-500">{m.type_label}</td>
+                                <td className="p-1 px-2 border border-zinc-200 font-semibold text-zinc-500">{getDocTypeLabel(m.page_name, false, m.type_label)}</td>
                                 <td className="p-1 px-2 border border-zinc-200 font-bold">
                                   <button
                                     onClick={() => navigateToDoc(m.page_name, m.original_id)}
@@ -1861,30 +1908,34 @@ export const SupplierSettlements: React.FC = () => {
                                 <td className="p-1 px-2 border border-zinc-200 text-zinc-500">{formatDate(m.date)}</td>
                                 {hasForeignMovements && (
                                   <>
-                                    <td className="p-1 px-2 border border-zinc-200 text-left font-mono font-semibold text-zinc-700">
-                                      {m.currency && m.currency !== systemCurrency && m.foreign_amount !== null && m.foreign_amount !== undefined
-                                        ? formatNumber(m.foreign_amount)
-                                        : '-'}
+                                    <td className="p-1 px-2 border border-zinc-200 text-right font-mono font-semibold">
+                                      {m.currency && m.currency !== systemCurrency && m.foreign_amount !== null && m.foreign_amount !== undefined ? (
+                                        <span dir="ltr" className="inline-block font-mono font-bold text-emerald-700">
+                                          + {formatNumber(m.foreign_amount)}
+                                        </span>
+                                      ) : (
+                                        <span className="text-zinc-400 font-mono">-</span>
+                                      )}
                                     </td>
                                     <td className="p-1 px-2 border border-zinc-200 text-center">
                                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${m.currency && m.currency !== systemCurrency ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-zinc-100 text-zinc-600'}`}>
                                         {m.currency || systemCurrency}
                                       </span>
                                     </td>
-                                    <td className="p-1 px-2 border border-zinc-200 text-left font-mono text-zinc-600">
+                                    <td className="p-1 px-2 border border-zinc-200 text-right font-mono text-zinc-600">
                                       {m.currency && m.currency !== systemCurrency && m.exchange_rate && m.exchange_rate !== 1
                                         ? formatNumber(m.exchange_rate)
                                         : '-'}
                                     </td>
                                   </>
                                 )}
-                                <td className="p-1 px-2 border border-zinc-200 text-left font-semibold text-zinc-500">{formatNumber(m.original_amount)}</td>
-                                <td className="p-1 px-2 border border-zinc-200 text-left font-bold text-zinc-800">{formatNumber(m.open_amount)}</td>
-                                <td className="p-0.5 border border-zinc-200 text-left">
+                                <td className="p-1 px-2 border border-zinc-200 text-right font-semibold text-zinc-500">{formatNumber(m.original_amount)}</td>
+                                <td className="p-1 px-2 border border-zinc-200 text-right font-bold text-zinc-800">{formatNumber(m.open_amount)}</td>
+                                <td className="p-0.5 border border-zinc-200 text-right">
                                   <input 
                                     type="number"
                                     step="any"
-                                    className="w-full px-2 py-1 bg-transparent border-0 text-left font-black text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
+                                    className="w-full px-2 py-1 bg-transparent border-0 text-right font-black text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
                                     value={m.settled_amount || ''}
                                     placeholder="0.00"
                                     onChange={(e) => handleCreditAmountChange(m.id, parseFloat(e.target.value) || 0)}
@@ -1936,19 +1987,19 @@ export const SupplierSettlements: React.FC = () => {
                           <th className="p-2 border border-zinc-200" rowSpan={2}>{language === 'ar' ? 'رقم المستند' : 'Doc No.'}</th>
                           {hasForeignMovements && (
                             <>
-                              <th className="p-2 border border-zinc-200 text-left" rowSpan={2}>{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</th>
+                              <th className="p-2 border border-zinc-200 text-right" rowSpan={2}>{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</th>
                               <th className="p-2 border border-zinc-200 text-center" rowSpan={2}>{language === 'ar' ? 'العملة' : 'Currency'}</th>
-                              <th className="p-2 border border-zinc-200 text-left" rowSpan={2}>{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
+                              <th className="p-2 border border-zinc-200 text-right" rowSpan={2}>{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
                             </>
                           )}
                           <th className="p-1 border border-zinc-200 text-center bg-red-50/50 text-red-700 font-bold" colSpan={2}>{language === 'ar' ? 'الحركات المدينة (Debit)' : 'Debit Movements (Debit)'}</th>
                           <th className="p-1 border border-zinc-200 text-center bg-emerald-50/50 text-emerald-700 font-bold" colSpan={2}>{language === 'ar' ? 'الحركات الدائنة (Credit)' : 'Credit Movements (Credit)'}</th>
                         </tr>
                         <tr className="bg-zinc-100 text-zinc-500 text-[9px] uppercase">
-                          <th className="p-1.5 border border-zinc-200 text-left w-24 bg-red-50/30">{language === 'ar' ? 'المتبقي' : 'Remaining'}</th>
-                          <th className="p-1.5 border border-zinc-200 text-left w-32 bg-red-50/30">{language === 'ar' ? 'المسوى' : 'Settled'}</th>
-                          <th className="p-1.5 border border-zinc-200 text-left w-24 bg-emerald-50/30">{language === 'ar' ? 'المتبقي' : 'Remaining'}</th>
-                          <th className="p-1.5 border border-zinc-200 text-left w-32 bg-emerald-50/30">{language === 'ar' ? 'المسوى' : 'Settled'}</th>
+                          <th className="p-1.5 border border-zinc-200 text-right w-24 bg-red-50/30">{language === 'ar' ? 'المتبقي' : 'Remaining'}</th>
+                          <th className="p-1.5 border border-zinc-200 text-right w-32 bg-red-50/30">{language === 'ar' ? 'المسوى' : 'Settled'}</th>
+                          <th className="p-1.5 border border-zinc-200 text-right w-24 bg-emerald-50/30">{language === 'ar' ? 'المتبقي' : 'Remaining'}</th>
+                          <th className="p-1.5 border border-zinc-200 text-right w-32 bg-emerald-50/30">{language === 'ar' ? 'المسوى' : 'Settled'}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-zinc-200">
@@ -1974,7 +2025,7 @@ export const SupplierSettlements: React.FC = () => {
                                 />
                               </td>
                               <td className="p-1 px-2 border border-zinc-200 text-zinc-500 font-semibold">{formatDate(m.date)}</td>
-                              <td className="p-1 px-2 border border-zinc-200 text-zinc-500 font-bold">{m.type_label}</td>
+                              <td className="p-1 px-2 border border-zinc-200 text-zinc-500 font-bold">{getDocTypeLabel(m.page_name, m.isDebit, m.type_label)}</td>
                               <td className="p-1 px-2 border border-zinc-200 font-bold">
                                 <button
                                   onClick={() => navigateToDoc(m.page_name, m.original_id)}
@@ -1987,17 +2038,26 @@ export const SupplierSettlements: React.FC = () => {
 
                               {hasForeignMovements && (
                                 <>
-                                  <td className="p-1 px-2 border border-zinc-200 text-left font-mono font-semibold text-zinc-700">
-                                    {m.currency && m.currency !== systemCurrency && m.foreign_amount !== null && m.foreign_amount !== undefined
-                                      ? formatNumber(m.foreign_amount)
-                                      : '-'}
+                                  <td className="p-1 px-2 border border-zinc-200 text-right font-mono font-semibold">
+                                    {m.currency && m.currency !== systemCurrency && m.foreign_amount !== null && m.foreign_amount !== undefined ? (
+                                      <span
+                                        dir="ltr"
+                                        className={`inline-block font-mono font-bold ${
+                                          getMovementSign(m) === '+' ? 'text-emerald-700' : 'text-rose-700'
+                                        }`}
+                                      >
+                                        {getMovementSign(m)} {formatNumber(m.foreign_amount)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-zinc-400 font-mono">-</span>
+                                    )}
                                   </td>
                                   <td className="p-1 px-2 border border-zinc-200 text-center">
                                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${m.currency && m.currency !== systemCurrency ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-zinc-100 text-zinc-600'}`}>
                                       {m.currency || systemCurrency}
                                     </span>
                                   </td>
-                                  <td className="p-1 px-2 border border-zinc-200 text-left font-mono text-zinc-600">
+                                  <td className="p-1 px-2 border border-zinc-200 text-right font-mono text-zinc-600">
                                     {m.currency && m.currency !== systemCurrency && m.exchange_rate && m.exchange_rate !== 1
                                       ? formatNumber(m.exchange_rate)
                                       : '-'}
@@ -2006,15 +2066,15 @@ export const SupplierSettlements: React.FC = () => {
                               )}
                               
                               {/* Debit columns */}
-                              <td className="p-1 px-2 border border-zinc-200 text-left bg-red-50/5 text-red-600 font-semibold">
+                              <td className="p-1 px-2 border border-zinc-200 text-right bg-red-50/5 text-red-600 font-semibold">
                                 {m.isDebit ? formatNumber(m.open_amount) : '-'}
                               </td>
-                              <td className="p-0.5 border border-zinc-200 text-left bg-red-50/5">
+                              <td className="p-0.5 border border-zinc-200 text-right bg-red-50/5">
                                 {m.isDebit ? (
                                   <input 
                                     type="number"
                                     step="any"
-                                    className="w-full px-2 py-1 bg-transparent border-0 text-left font-black text-red-600 focus:ring-1 focus:ring-red-500 outline-none text-xs"
+                                    className="w-full px-2 py-1 bg-transparent border-0 text-right font-black text-red-600 focus:ring-1 focus:ring-red-500 outline-none text-xs"
                                     value={m.settled_amount || ''}
                                     placeholder="0.00"
                                     onChange={(e) => handleDebitAmountChange(m.id, parseFloat(e.target.value) || 0)}
@@ -2023,15 +2083,15 @@ export const SupplierSettlements: React.FC = () => {
                               </td>
 
                               {/* Credit columns */}
-                              <td className="p-1 px-2 border border-zinc-200 text-left bg-emerald-50/5 text-emerald-600 font-semibold">
+                              <td className="p-1 px-2 border border-zinc-200 text-right bg-emerald-50/5 text-emerald-600 font-semibold">
                                 {!m.isDebit ? formatNumber(m.open_amount) : '-'}
                               </td>
-                              <td className="p-0.5 border border-zinc-200 text-left bg-emerald-50/5">
+                              <td className="p-0.5 border border-zinc-200 text-right bg-emerald-50/5">
                                 {!m.isDebit ? (
                                   <input 
                                     type="number"
                                     step="any"
-                                    className="w-full px-2 py-1 bg-transparent border-0 text-left font-black text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
+                                    className="w-full px-2 py-1 bg-transparent border-0 text-right font-black text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
                                     value={m.settled_amount || ''}
                                     placeholder="0.00"
                                     onChange={(e) => handleCreditAmountChange(m.id, parseFloat(e.target.value) || 0)}
