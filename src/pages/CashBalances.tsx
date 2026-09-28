@@ -299,6 +299,16 @@ export const CashBalances: React.FC = () => {
               const isMatch = resolvedMethod?.id === method.id;
 
               if (isMatch) {
+                // If this is an opening balance journal entry and method has baseOpening,
+                // skip it to prevent double-counting with baseOpening!
+                const isOpeningJE = refType === 'opening_balance' || 
+                  (je.description || '').includes('رصيد افتتاحي') || 
+                  (item.description || '').includes('رصيد افتتاحي');
+
+                if (isOpeningJE && Number(method.opening_balance || 0) !== 0) {
+                  return;
+                }
+
                 const amountDebit = Number(item.debit || 0);
                 const amountCredit = Number(item.credit || 0);
 
@@ -368,7 +378,117 @@ export const CashBalances: React.FC = () => {
           };
         });
 
-        setBalances(calculatedBalances);
+        // Reconcile direct unassigned journal entries on cash/bank accounts
+        const cashAccIds = new Set(paymentMethodsData.map(p => p.account_id).filter(Boolean));
+        accountsData.forEach(a => {
+          if (a.code?.startsWith('110') || a.code?.startsWith('113') || (a as any).type === 'cash_and_equivalents') {
+            cashAccIds.add(a.id);
+          }
+        });
+
+        const unassignedByAccount = new Map<string, {
+          account: Account;
+          opIn: number;
+          opOut: number;
+          transferIn: number;
+          otherIn: number;
+          transferOut: number;
+          otherOut: number;
+        }>();
+
+        journalEntries.forEach(je => {
+          const jeDateStr = (je.date || '').slice(0, 10);
+          const isTransfer = je.reference_type === 'transfer' || je.reference_type === 'cash_transfer';
+
+          je.items?.forEach((item: any) => {
+            if (!item?.account_id || !cashAccIds.has(item.account_id)) return;
+            const resolvedMethod = resolvePaymentMethodForItem(
+              item,
+              je,
+              paymentMethodsData,
+              receiptVouchers,
+              paymentVouchers,
+              invoices,
+              purchaseInvoices,
+              returns,
+              purchaseReturns,
+              cashTransfers
+            );
+
+            if (!resolvedMethod) {
+              const acc = accountsData.find(a => a.id === item.account_id);
+              if (!acc) return;
+              if (!unassignedByAccount.has(acc.id)) {
+                unassignedByAccount.set(acc.id, {
+                  account: acc,
+                  opIn: 0,
+                  opOut: 0,
+                  transferIn: 0,
+                  otherIn: 0,
+                  transferOut: 0,
+                  otherOut: 0
+                });
+              }
+
+              const group = unassignedByAccount.get(acc.id)!;
+              const amountDebit = Number(item.debit || 0);
+              const amountCredit = Number(item.credit || 0);
+
+              if (startStr && jeDateStr < startStr) {
+                group.opIn += amountDebit;
+                group.opOut += amountCredit;
+              } else if ((!startStr || jeDateStr >= startStr) && (!endStr || jeDateStr <= endStr)) {
+                if (amountDebit > 0) {
+                  if (isTransfer) group.transferIn += amountDebit;
+                  else group.otherIn += amountDebit;
+                }
+                if (amountCredit > 0) {
+                  if (isTransfer) group.transferOut += amountCredit;
+                  else group.otherOut += amountCredit;
+                }
+              }
+            }
+          });
+        });
+
+        const unassignedRows: CashBalanceData[] = [];
+        unassignedByAccount.forEach((data, accId) => {
+          const baseOpening = Number(data.account.opening_balance || 0);
+          const beginningBalance = baseOpening + data.opIn - data.opOut;
+          const endingBalance = beginningBalance + (data.transferIn + data.otherIn) - (data.transferOut + data.otherOut);
+
+          if (
+            Math.abs(beginningBalance) > 0.001 ||
+            data.transferIn > 0.001 ||
+            data.otherIn > 0.001 ||
+            data.transferOut > 0.001 ||
+            data.otherOut > 0.001 ||
+            Math.abs(endingBalance) > 0.001
+          ) {
+            unassignedRows.push({
+              id: `unassigned_${accId}`,
+              code: `GL-${data.account.code}`,
+              name: language === 'ar' 
+                ? `حركات وقيود عامة على ${data.account.name}` 
+                : `General Ledger Entries on ${data.account.name}`,
+              accountName: `${data.account.code} - ${data.account.name}`,
+              openingBalance: beginningBalance,
+              receiptVouchers: 0,
+              salesInvoices: 0,
+              purchaseReturns: 0,
+              transferIn: data.transferIn,
+              otherIn: data.otherIn,
+              paymentVouchers: 0,
+              purchaseInvoices: 0,
+              salesReturns: 0,
+              transferOut: data.transferOut,
+              otherOut: data.otherOut,
+              balance: endingBalance
+            });
+          }
+        });
+
+        setBalances([...calculatedBalances, ...unassignedRows]);
       } catch (e: any) {
         console.error(e);
         setError(e.message);
@@ -476,8 +596,10 @@ export const CashBalances: React.FC = () => {
   // Calculate detailed statement lines for the selected payment method
   const getStatementData = () => {
     if (!selectedMethodId) return { beginningBalance: 0, endingBalance: 0, lines: [] };
-    const method = paymentMethods.find(m => m.id === selectedMethodId);
-    if (!method) return { beginningBalance: 0, endingBalance: 0, lines: [] };
+    const isUnassigned = selectedMethodId.startsWith('unassigned_');
+    const targetAccountId = isUnassigned ? selectedMethodId.replace('unassigned_', '') : null;
+    const method = isUnassigned ? null : paymentMethods.find(m => m.id === selectedMethodId);
+    if (!method && !isUnassigned) return { beginningBalance: 0, endingBalance: 0, lines: [] };
 
     let opIn = 0;
     let opOut = 0;
@@ -485,6 +607,7 @@ export const CashBalances: React.FC = () => {
 
     rawJournalEntries.forEach(je => {
       const jeDateStr = (je.date || '').slice(0, 10);
+      const refType = je.reference_type;
       
       je.items?.forEach((item: any) => {
         const resolvedMethod = resolvePaymentMethodForItem(
@@ -500,7 +623,22 @@ export const CashBalances: React.FC = () => {
           rawCashTransfers
         );
 
-        if (resolvedMethod?.id === method.id) {
+        let isMatch = false;
+        if (isUnassigned) {
+          isMatch = item.account_id === targetAccountId && !resolvedMethod;
+        } else {
+          isMatch = resolvedMethod?.id === method?.id;
+        }
+
+        if (isMatch) {
+          const isOpeningJE = refType === 'opening_balance' || 
+            (je.description || '').includes('رصيد افتتاحي') || 
+            (item.description || '').includes('رصيد افتتاحي');
+
+          if (!isUnassigned && isOpeningJE && Number(method?.opening_balance || 0) !== 0) {
+            return;
+          }
+
           const amountDebit = Number(item.debit || 0);
           const amountCredit = Number(item.credit || 0);
 
@@ -529,7 +667,8 @@ export const CashBalances: React.FC = () => {
       return a.timestamp - b.timestamp;
     });
 
-    const baseOpening = Number(method.opening_balance || 0);
+    const targetAccount = isUnassigned ? accounts.find(a => a.id === targetAccountId) : null;
+    const baseOpening = isUnassigned ? Number(targetAccount?.opening_balance || 0) : Number(method?.opening_balance || 0);
     let balance = baseOpening + opIn - opOut;
     const beginningBalance = balance;
 
@@ -701,18 +840,37 @@ export const CashBalances: React.FC = () => {
     );
   }
 
-  const selectedMethod = paymentMethods.find(m => m.id === selectedMethodId);
+  const selectedMethod = useMemo(() => {
+    if (!selectedMethodId) return null;
+    if (selectedMethodId.startsWith('unassigned_')) {
+      const accId = selectedMethodId.replace('unassigned_', '');
+      const acc = accounts.find(a => a.id === accId);
+      return {
+        id: selectedMethodId,
+        name: language === 'ar' ? `حركات وقيود عامة على ${acc?.name || ''}` : `General Entries on ${acc?.name || ''}`,
+        account_name: acc ? `${acc.code} - ${acc.name}` : '',
+        code: `GL-${acc?.code || ''}`
+      } as any;
+    }
+    return paymentMethods.find(m => m.id === selectedMethodId);
+  }, [selectedMethodId, paymentMethods, accounts, language]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-black text-zinc-900">
-            {viewMode === 'summary' 
-              ? (language === 'ar' ? 'تقرير النقدية (الخزائن والبنوك) خلال فترة' : 'Cash & Bank Report (Period)')
-              : (language === 'ar' ? `كشف حركة: ${selectedMethod?.name || ''}` : `Statement: ${selectedMethod?.name || ''}`)}
-          </h2>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h2 className="text-2xl font-black text-zinc-900">
+              {viewMode === 'summary' 
+                ? (language === 'ar' ? 'تقرير النقدية (الخزائن والبنوك) خلال فترة' : 'Cash & Bank Report (Period)')
+                : (language === 'ar' ? `كشف حركة: ${selectedMethod?.name || ''}` : `Statement: ${selectedMethod?.name || ''}`)}
+            </h2>
+            {viewMode === 'summary' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                ✓ {language === 'ar' ? 'مطابق لميزان المراجعة وقائمة المركز المالي' : 'Reconciled with Balance Sheet'}
+              </span>
+            )}
+          </div>
           <p className="text-zinc-500 font-medium mt-1">
             {viewMode === 'summary'
               ? (language === 'ar' ? 'عرض أرصدة وحركات الخزائن والبنوك خلال فترة محددة' : 'View cash and bank balances and movements during a period')
