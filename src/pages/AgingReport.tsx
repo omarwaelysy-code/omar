@@ -5,6 +5,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { dbService } from '../services/dbService';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
+import * as XLSX from 'xlsx';
 import { formatNumber, formatMoney, formatDate, isCustomerAccount, isSupplierAccount } from '../utils/formatUtils';
 import { 
   Clock, 
@@ -36,10 +37,14 @@ interface AgingItem {
   openInvoices: {
     id: string;
     invoice_number: string;
+    doc_type: string;
+    doc_type_label: string;
+    sign: '+' | '-';
     date: string;
     due_date?: string;
     currency: string;
     exchange_rate: number;
+    foreign_amount: number | null;
     original_base_amount: number;
     settled_up_to_as_of: number;
     open_balance: number;
@@ -299,9 +304,10 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
         ? Number((manualOpening + totalDebit - totalCredit).toFixed(2))
         : Number((manualOpening + totalCredit - totalDebit).toFixed(2));
 
-      // 2. Gather all open invoices/bills up to asOfDate
+      // 2. Gather all open documents up to asOfDate
       const openInvoicesList: AgingItem['openInvoices'] = [];
 
+      // A. Sales / Purchase Invoices
       invoices.forEach((inv: any) => {
         const invEntityId = isCustomer ? inv.customer_id : inv.supplier_id;
         if (invEntityId !== entityId) return;
@@ -322,6 +328,7 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
 
         const docRate = Number(inv.exchange_rate) || 1;
         const isForeign = docCurrency !== systemCurrency;
+        const foreignAmount = isForeign ? (Number(inv.total_amount) || 0) : null;
         const originalBaseAmount = isForeign
           ? (Number(inv.total_base_amount) || (docRate > 0 && docRate !== 1 ? Number((Number(inv.total_amount || 0) * docRate).toFixed(2)) : Number(inv.total_amount || 0)))
           : (Number(inv.total_amount) || 0);
@@ -396,10 +403,16 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
           openInvoicesList.push({
             id: inv.id,
             invoice_number: inv.invoice_number || inv.number || inv.id.slice(0, 8),
+            doc_type: isCustomer ? 'invoices' : 'purchase_invoices',
+            doc_type_label: isCustomer 
+              ? (language === 'ar' ? 'فاتورة مبيعات' : 'Sales Invoice') 
+              : (language === 'ar' ? 'فاتورة مشتريات' : 'Purchase Invoice'),
+            sign: '+',
             date: invDateStr,
             due_date: dueDateStr,
             currency: docCurrency,
             exchange_rate: docRate,
+            foreign_amount: foreignAmount,
             original_base_amount: originalBaseAmount,
             settled_up_to_as_of: settledUpToAsOf,
             open_balance: openBalance,
@@ -409,12 +422,283 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
         }
       });
 
-      // Sort invoices oldest first
+      // B. Returns (Sales / Purchase Returns)
+      returns.forEach((ret: any) => {
+        const retEntityId = isCustomer ? ret.customer_id : ret.supplier_id;
+        if (retEntityId !== entityId) return;
+        if (ret.payment_type === 'cash') return;
+
+        const retDateStr = toDateStr(ret.date);
+        if (!retDateStr || retDateStr > asOfDate) return;
+
+        let retCurrency = systemCurrency;
+        if (ret.currency_id && currenciesMap[ret.currency_id]) {
+          retCurrency = currenciesMap[ret.currency_id].code;
+        } else if (ret.currency_code) {
+          retCurrency = ret.currency_code;
+        } else if (ret.currency) {
+          retCurrency = currenciesMap[ret.currency]?.code || ret.currency;
+        }
+
+        const retRate = Number(ret.exchange_rate) || 1;
+        const isRetForeign = retCurrency !== systemCurrency;
+        const retForeignAmount = isRetForeign ? (Number(ret.foreign_amount) || Number(ret.total_amount) || 0) : null;
+        const retOriginalBase = isRetForeign
+          ? (Number(ret.total_base_amount) || (retRate > 0 && retRate !== 1 ? Number((Number(ret.total_amount || 0) * retRate).toFixed(2)) : Number(ret.total_amount || 0)))
+          : (Number(ret.total_amount) || 0);
+
+        let retSettled = 0;
+        if (Array.isArray(ret.settlements)) {
+          ret.settlements.forEach((s: any) => {
+            const sDate = toDateStr(s.settlement_date || s.date || retDateStr);
+            if (sDate <= asOfDate) {
+              retSettled += Number(s.settled_amount || s.amount || 0);
+            }
+          });
+        }
+
+        receipts.forEach((v: any) => {
+          if (Array.isArray(v.items)) {
+            v.items.forEach((item: any) => {
+              if (Array.isArray(item.settlements)) {
+                item.settlements.forEach((s: any) => {
+                  if (String(s.target_id) === String(ret.id)) {
+                    const sDate = toDateStr(s.settlement_date || s.date || v.date);
+                    if (sDate <= asOfDate) {
+                      const alreadyInRet = ret.settlements?.some((rs: any) => 
+                        rs.target_id === v.id || String(rs.reference_number) === String(v.voucher_number || v.number)
+                      );
+                      if (!alreadyInRet) {
+                        retSettled += Number(s.settled_amount || s.amount || 0);
+                      }
+                    }
+                  }
+                });
+              }
+            });
+          }
+        });
+
+        const retOpen = Number(Math.max(0, retOriginalBase - retSettled).toFixed(2));
+        if (retOpen > 0.009) {
+          const retTime = new Date(`${retDateStr}T00:00:00.000Z`).getTime();
+          const ageDays = Math.floor((asOfTime - retTime) / (1000 * 3600 * 24));
+          let bracket: AgingItem['openInvoices'][0]['bracket'] = 'current';
+          if (ageDays <= 30) bracket = 'current';
+          else if (ageDays <= 60) bracket = '31-60';
+          else if (ageDays <= 90) bracket = '61-90';
+          else if (ageDays <= 120) bracket = '91-120';
+          else bracket = 'over120';
+
+          openInvoicesList.push({
+            id: ret.id,
+            invoice_number: ret.return_number || ret.number || ret.id.slice(0, 8),
+            doc_type: isCustomer ? 'returns' : 'purchase_returns',
+            doc_type_label: isCustomer 
+              ? (language === 'ar' ? 'مرتجع مبيعات' : 'Sales Return') 
+              : (language === 'ar' ? 'مرتجع مشتريات' : 'Purchase Return'),
+            sign: '-',
+            date: retDateStr,
+            due_date: retDateStr,
+            currency: retCurrency,
+            exchange_rate: retRate,
+            foreign_amount: retForeignAmount,
+            original_base_amount: retOriginalBase,
+            settled_up_to_as_of: retSettled,
+            open_balance: retOpen,
+            age_days: ageDays,
+            bracket
+          });
+        }
+      });
+
+      // C. Unallocated Receipts / Payments
+      receipts.forEach((v: any) => {
+        const vDateStr = toDateStr(v.date);
+        if (!vDateStr || vDateStr > asOfDate) return;
+
+        if (Array.isArray(v.items)) {
+          v.items.forEach((item: any, idx: number) => {
+            const match = isCustomer
+              ? (item.customer_id === entityId || item.entity_id === entityId)
+              : (item.supplier_id === entityId || item.entity_id === entityId);
+            if (!match) return;
+
+            let docCurrency = systemCurrency;
+            if (v.currency_id && currenciesMap[v.currency_id]) {
+              docCurrency = currenciesMap[v.currency_id].code;
+            } else if (v.currency_code) {
+              docCurrency = v.currency_code;
+            } else if (v.currency) {
+              docCurrency = currenciesMap[v.currency]?.code || v.currency;
+            } else if (item.currency && item.currency !== 'local' && item.currency !== systemCurrency) {
+              docCurrency = currenciesMap[item.currency]?.code || item.currency;
+            }
+
+            const docRate = Number(item.exchange_rate || v.exchange_rate) || 1;
+            const isForeign = docCurrency !== systemCurrency;
+            const originalBaseAmount = isForeign
+              ? (Number(item.base_amount) || (docRate > 0 && docRate !== 1 ? Number((Number(item.amount || 0) * docRate).toFixed(2)) : Number(item.amount || 0)))
+              : Number(item.amount || 0);
+
+            let settledUpToAsOf = 0;
+            const countedInvoices = new Set<string>();
+            if (Array.isArray(item.settlements)) {
+              item.settlements.forEach((s: any) => {
+                const sDate = toDateStr(s.settlement_date || s.date || vDateStr);
+                if (sDate <= asOfDate) {
+                  settledUpToAsOf += Number(s.settled_amount || s.amount || 0);
+                  countedInvoices.add(String(s.target_id));
+                }
+              });
+            }
+
+            invoices.forEach((inv: any) => {
+              if (Array.isArray(inv.settlements)) {
+                inv.settlements.forEach((s: any) => {
+                  const sDate = toDateStr(s.settlement_date || s.date || inv.date);
+                  if (sDate <= asOfDate) {
+                    if (String(s.target_id) === `${v.id}-${idx}` || String(s.target_id) === String(v.id)) {
+                      if (!countedInvoices.has(String(inv.id))) {
+                        settledUpToAsOf += Number(s.settled_amount || s.amount || 0);
+                      }
+                    }
+                  }
+                });
+              }
+            });
+
+            const openBalance = Number(Math.max(0, originalBaseAmount - settledUpToAsOf).toFixed(2));
+            if (openBalance > 0.009) {
+              const vTime = new Date(`${vDateStr}T00:00:00.000Z`).getTime();
+              const ageDays = Math.floor((asOfTime - vTime) / (1000 * 3600 * 24));
+              let bracket: AgingItem['openInvoices'][0]['bracket'] = 'current';
+              if (ageDays <= 30) bracket = 'current';
+              else if (ageDays <= 60) bracket = '31-60';
+              else if (ageDays <= 90) bracket = '61-90';
+              else if (ageDays <= 120) bracket = '91-120';
+              else bracket = 'over120';
+
+              const foreignAmt = isForeign
+                ? (Number(item.foreign_amount) || (docRate > 0 ? Number((openBalance / docRate).toFixed(2)) : openBalance))
+                : null;
+
+              openInvoicesList.push({
+                id: `${v.id}-${idx}`,
+                invoice_number: v.voucher_number || v.number || v.id.slice(0, 8),
+                doc_type: isCustomer ? 'receipts' : 'payments',
+                doc_type_label: isCustomer 
+                  ? (language === 'ar' ? 'سند قبض' : 'Receipt Voucher') 
+                  : (language === 'ar' ? 'سند صرف' : 'Payment Voucher'),
+                sign: '-',
+                date: vDateStr,
+                due_date: vDateStr,
+                currency: docCurrency,
+                exchange_rate: docRate,
+                foreign_amount: foreignAmt,
+                original_base_amount: originalBaseAmount,
+                settled_up_to_as_of: settledUpToAsOf,
+                open_balance: openBalance,
+                age_days: ageDays,
+                bracket
+              });
+            }
+          });
+        }
+      });
+
+      // D. Debit / Credit Notes and Non-standard Journal Entries
+      rawJournalEntries.forEach((je: any) => {
+        const standardTypes = ['invoice', 'purchase_invoice', 'receipt', 'payment', 'return', 'purchase_return', 'receipt_voucher', 'payment_voucher'];
+        if (je.reference_type && standardTypes.includes(je.reference_type)) return;
+
+        const jeDateStr = toDateStr(je.date);
+        if (!jeDateStr || jeDateStr > asOfDate) return;
+
+        (je.items || []).forEach((item: any, idx: number) => {
+          const match = isCustomer
+            ? (item.customer_id === entityId || item.sub_account_id === entityId)
+            : (item.supplier_id === entityId || item.sub_account_id === entityId);
+          const isEntityAcct = isCustomer
+            ? isCustomerAccount(item.account_id, entity, rawAccounts)
+            : isSupplierAccount(item.account_id, entity, rawAccounts);
+
+          if (!match || !isEntityAcct) return;
+
+          const deb = Number(item.debit) || 0;
+          const crd = Number(item.credit) || 0;
+          if (deb <= 0 && crd <= 0) return;
+
+          const isDebit = deb > 0;
+          const sign: '+' | '-' = isCustomer 
+            ? (isDebit ? '+' : '-')
+            : (isDebit ? '-' : '+');
+
+          const originalBaseAmount = isDebit ? deb : crd;
+          
+          let docCurrency = systemCurrency;
+          if (item.currency && item.currency !== 'local' && item.currency !== systemCurrency) {
+            docCurrency = currenciesMap[item.currency]?.code || item.currency;
+          }
+          const docRate = Number(item.exchange_rate) || 1;
+          const isForeign = docCurrency !== systemCurrency;
+          const foreignAmt = isForeign
+            ? (Number(item.foreign_amount) || (docRate > 1 ? Number((originalBaseAmount / docRate).toFixed(2)) : originalBaseAmount))
+            : null;
+
+          let docTypeLabel = '';
+          if (je.reference_type === 'opening_balance' || (item.description && item.description.includes('افتتاحي'))) {
+            docTypeLabel = language === 'ar' ? 'رصيد افتتاحي' : 'Opening Balance';
+          } else if (je.reference_type === 'debit_note') {
+            docTypeLabel = language === 'ar' ? 'إشعار مدين' : 'Debit Note';
+          } else if (je.reference_type === 'credit_note') {
+            docTypeLabel = language === 'ar' ? 'إشعار دائن' : 'Credit Note';
+          } else if (je.reference_type === 'customer_discount' || je.reference_type === 'supplier_discount') {
+            docTypeLabel = isCustomer 
+              ? (language === 'ar' ? 'خصم مسموح به' : 'Granted Discount') 
+              : (language === 'ar' ? 'خصم مكتسب' : 'Earned Discount');
+          } else {
+            docTypeLabel = isDebit
+              ? (language === 'ar' ? 'قيد يومية (مدين)' : 'Journal Entry (Debit)')
+              : (language === 'ar' ? 'قيد يومية (دائن)' : 'Journal Entry (Credit)');
+          }
+
+          const jeTime = new Date(`${jeDateStr}T00:00:00.000Z`).getTime();
+          const ageDays = Math.floor((asOfTime - jeTime) / (1000 * 3600 * 24));
+          let bracket: AgingItem['openInvoices'][0]['bracket'] = 'current';
+          if (ageDays <= 30) bracket = 'current';
+          else if (ageDays <= 60) bracket = '31-60';
+          else if (ageDays <= 90) bracket = '61-90';
+          else if (ageDays <= 120) bracket = '91-120';
+          else bracket = 'over120';
+
+          openInvoicesList.push({
+            id: `${je.id}-${idx}`,
+            invoice_number: je.entry_number || je.reference_number || je.id.slice(0, 8),
+            doc_type: je.reference_type || 'journal_entries',
+            doc_type_label: docTypeLabel,
+            sign,
+            date: jeDateStr,
+            due_date: jeDateStr,
+            currency: docCurrency,
+            exchange_rate: docRate,
+            foreign_amount: foreignAmt,
+            original_base_amount: originalBaseAmount,
+            settled_up_to_as_of: 0,
+            open_balance: originalBaseAmount,
+            age_days: ageDays,
+            bracket
+          });
+        });
+      });
+
+      // Sort invoices & documents oldest first
       openInvoicesList.sort((a, b) => b.age_days - a.age_days);
 
-      const totalInvoicesBalance = Number(
-        openInvoicesList.reduce((sum, inv) => sum + inv.open_balance, 0).toFixed(2)
+      const totalPositiveDocs = Number(
+        openInvoicesList.filter(d => d.sign === '+').reduce((sum, inv) => sum + inv.open_balance, 0).toFixed(2)
       );
+      const totalInvoicesBalance = totalPositiveDocs;
 
       // 3. Brackets distribution strictly reconciled with General Ledger balance
       const brackets = {
@@ -429,7 +713,7 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
         // Customer or Supplier is paid in advance or zero balance
       } else if (totalInvoicesBalance <= actualLedgerBalance) {
         // Invoices sum up to or less than ledger balance -> place open invoices in their respective brackets
-        openInvoicesList.forEach(i => {
+        openInvoicesList.filter(d => d.sign === '+').forEach(i => {
           if (i.bracket === 'current') brackets.current += i.open_balance;
           else if (i.bracket === '31-60') brackets.b31_60 += i.open_balance;
           else if (i.bracket === '61-90') brackets.b61_90 += i.open_balance;
@@ -443,7 +727,7 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
         // Invoices total exceeds ledger balance -> customer has unallocated payments/credits!
         // Allocate the active ledger balance starting from the most recent open invoices
         let remainingToAllocate = actualLedgerBalance;
-        const sortedByNewest = [...openInvoicesList].sort((a, b) => a.age_days - b.age_days);
+        const sortedByNewest = [...openInvoicesList.filter(d => d.sign === '+')].sort((a, b) => a.age_days - b.age_days);
         sortedByNewest.forEach(i => {
           if (remainingToAllocate <= 0) return;
           const take = Math.min(i.open_balance, remainingToAllocate);
@@ -581,6 +865,190 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
     }));
 
     exportToExcel(exportData, `${entityType}_aging_${asOfDate}`);
+  };
+
+  // Export individual customer/supplier Excel (Debts on top row, details below)
+  const handleExportCustomerExcel = (item: AgingItem) => {
+    const isCustomer = entityType === 'customer';
+    const hasForeign = item.openInvoices.some(
+      inv => inv.currency !== systemCurrency || (inv.foreign_amount !== null && inv.foreign_amount > 0)
+    );
+
+    const rows: any[][] = [];
+
+    // Title Block
+    rows.push([
+      language === 'ar'
+        ? `تقرير أعمار ديون ${isCustomer ? 'العميل' : 'المورد'}: ${item.name} (${item.code})`
+        : `${isCustomer ? 'Customer' : 'Supplier'} Aging Report: ${item.name} (${item.code})`
+    ]);
+    rows.push([
+      `${language === 'ar' ? 'حتى تاريخ:' : 'As of:'} ${formatDate(asOfDate)}`,
+      '',
+      `${language === 'ar' ? 'أساس الاحتساب:' : 'Basis:'} ${agingBasis === 'due_date' ? (language === 'ar' ? 'تاريخ الاستحقاق' : 'Due Date') : (language === 'ar' ? 'تاريخ المستند' : 'Document Date')}`
+    ]);
+    rows.push([]); // blank
+
+    // Section 1: Top Debt Row (ملخص أعمار الديون)
+    rows.push([
+      language === 'ar' ? 'ملخص أعمار الديون (الديون بالعملة المحلية)' : 'Debt Aging Summary (Local Currency)'
+    ]);
+
+    const debtHeaders = [
+      isCustomer ? (language === 'ar' ? 'كود العميل' : 'Customer Code') : (language === 'ar' ? 'كود المورد' : 'Supplier Code'),
+      isCustomer ? (language === 'ar' ? 'اسم العميل' : 'Customer Name') : (language === 'ar' ? 'اسم المورد' : 'Supplier Name'),
+      language === 'ar' ? 'الهاتف' : 'Phone',
+      language === 'ar' ? 'فترة الائتمان (يوم)' : 'Credit Days',
+      language === 'ar' ? '0 - 30 يوم' : '0-30 Days',
+      language === 'ar' ? '31 - 60 يوم' : '31-60 Days',
+      language === 'ar' ? '61 - 90 يوم' : '61-90 Days',
+      language === 'ar' ? '91 - 120 يوم' : '91-120 Days',
+      language === 'ar' ? '+120 يوم' : '+120 Days',
+      language === 'ar' ? 'دفعات غير مخصصة' : 'Unallocated',
+      language === 'ar' ? 'إجمالي الرصيد الدفتري' : 'Total Balance'
+    ];
+    rows.push(debtHeaders);
+
+    const debtValues = [
+      item.code,
+      item.name,
+      item.phone || '-',
+      item.credit_period_days || 0,
+      item.brackets.current,
+      item.brackets.b31_60,
+      item.brackets.b61_90,
+      item.brackets.b91_120,
+      item.brackets.over120,
+      item.unallocatedCredits > 0 ? -item.unallocatedCredits : 0,
+      item.finalBalance
+    ];
+    rows.push(debtValues);
+
+    rows.push([]); // blank
+    rows.push([]); // blank
+
+    // Section 2: Details Below (التفصيل تحت)
+    rows.push([
+      language === 'ar'
+        ? `تفاصيل المستندات غير المسواة (${item.openInvoices.length} مستند)`
+        : `Unsettled Documents Breakdown (${item.openInvoices.length} documents)`
+    ]);
+
+    const detailHeaders = [
+      '#',
+      language === 'ar' ? 'رقم المستند' : 'Doc No.',
+      language === 'ar' ? 'نوع المستند' : 'Doc Type',
+      language === 'ar' ? 'تاريخ المستند' : 'Doc Date',
+      language === 'ar' ? 'تاريخ الاستحقاق' : 'Due Date',
+      ...(hasForeign ? [
+        language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount',
+        language === 'ar' ? 'العملة' : 'Currency',
+        language === 'ar' ? 'سعر الصرف' : 'Exchange Rate',
+      ] : []),
+      language === 'ar' ? 'المبلغ الأصلي' : 'Original Amount',
+      language === 'ar' ? 'المسوى حتى التاريخ' : 'Settled to Date',
+      language === 'ar' ? 'المتبقي' : 'Open Balance',
+      language === 'ar' ? 'العمر (يوم)' : 'Age (Days)',
+      language === 'ar' ? 'الشريحة' : 'Bracket'
+    ];
+    rows.push(detailHeaders);
+
+    let totalOrig = 0;
+    let totalSettled = 0;
+    let totalOpen = 0;
+
+    item.openInvoices.forEach((doc, idx) => {
+      const signedOrig = doc.sign === '-' ? -doc.original_base_amount : doc.original_base_amount;
+      const signedOpen = doc.sign === '-' ? -doc.open_balance : doc.open_balance;
+      totalOrig += signedOrig;
+      totalSettled += doc.settled_up_to_as_of;
+      totalOpen += signedOpen;
+
+      const bracketText = 
+        doc.bracket === 'current' ? (language === 'ar' ? '0 - 30 يوم' : '0-30 Days') :
+        doc.bracket === '31-60' ? (language === 'ar' ? '31 - 60 يوم' : '31-60 Days') :
+        doc.bracket === '61-90' ? (language === 'ar' ? '61 - 90 يوم' : '61-90 Days') :
+        doc.bracket === '91-120' ? (language === 'ar' ? '91 - 120 يوم' : '91-120 Days') :
+        (language === 'ar' ? '+120 يوم' : '+120 Days');
+
+      const foreignVal = (doc.foreign_amount !== null && doc.foreign_amount !== undefined && doc.foreign_amount > 0)
+        ? (doc.sign === '-' ? -doc.foreign_amount : doc.foreign_amount)
+        : '';
+
+      rows.push([
+        idx + 1,
+        doc.invoice_number,
+        doc.doc_type_label,
+        doc.date,
+        doc.due_date || '-',
+        ...(hasForeign ? [
+          foreignVal,
+          doc.currency,
+          doc.exchange_rate > 1 ? doc.exchange_rate : 1,
+        ] : []),
+        signedOrig,
+        doc.settled_up_to_as_of,
+        signedOpen,
+        doc.age_days,
+        bracketText
+      ]);
+    });
+
+    // Details Total Row
+    rows.push([
+      '',
+      language === 'ar' ? 'الإجمالي' : 'Total',
+      '',
+      '',
+      '',
+      ...(hasForeign ? ['', '', ''] : []),
+      totalOrig,
+      totalSettled,
+      totalOpen,
+      '',
+      ''
+    ]);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    const colWidths = [
+      { wch: 6 },
+      { wch: 22 },
+      { wch: 18 },
+      { wch: 14 },
+      { wch: 14 },
+      ...(hasForeign ? [
+        { wch: 16 },
+        { wch: 10 },
+        { wch: 12 },
+      ] : []),
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 12 },
+      { wch: 16 },
+    ];
+    ws['!cols'] = colWidths;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Aging');
+    XLSX.writeFile(wb, `${item.code}_${entityType}_aging_${asOfDate}.xlsx`);
+  };
+
+  // Export individual customer/supplier PDF (Card with summary on top and details below)
+  const handleExportCustomerPDF = async (item: AgingItem) => {
+    const cardEl = document.getElementById(`customer-expanded-card-${item.id}`);
+    if (!cardEl) return;
+    const isCustomer = entityType === 'customer';
+    const title = isCustomer
+      ? `${language === 'ar' ? 'كشف أعمار ديون العميل' : 'Customer Aging Report'}: ${item.name} (${item.code})`
+      : `${language === 'ar' ? 'كشف أعمار ديون المورد' : 'Supplier Aging Report'}: ${item.name} (${item.code})`;
+
+    await exportToPDF(cardEl, {
+      filename: `${entityType}_${item.code}_aging_${asOfDate}`,
+      orientation: 'landscape',
+      reportTitle: `${title} - ${language === 'ar' ? 'حتى تاريخ:' : 'As of:'} ${formatDate(asOfDate)}`
+    });
   };
 
   const handlePrint = () => {
@@ -1177,74 +1645,257 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
                       </tr>
 
                       {/* Expandable Invoices Breakdown */}
-                      {isExpanded && hasInvoices && (
-                        <tr className="bg-zinc-50/70">
-                          <td colSpan={12} className="p-3 pr-8 border border-zinc-200">
-                            <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-inner">
-                              <div className="p-2.5 bg-zinc-100/80 border-b border-zinc-200 flex items-center justify-between text-xs">
-                                <span className="font-bold text-zinc-700 flex items-center gap-1.5">
-                                  <FileText size={14} className="text-emerald-600" />
-                                  {language === 'ar' 
-                                    ? `الفواتير غير المسواة حتى تاريخ ${formatDate(asOfDate)} (${item.openInvoices.length} فاتورة)` 
-                                    : `Unpaid Invoices as of ${formatDate(asOfDate)} (${item.openInvoices.length} invoices)`}
-                                </span>
-                                <span className="text-[11px] text-zinc-500 font-mono">
-                                  {language === 'ar' ? 'المبالغ الموضحة بالعملة المحلية' : 'Amounts in local currency'}
-                                </span>
-                              </div>
-                              <table className="w-full text-right text-xs">
-                                <thead>
-                                  <tr className="bg-zinc-50 text-zinc-500 font-bold border-b border-zinc-200 text-[10px]">
-                                    <th className="p-2">{language === 'ar' ? 'رقم الفاتورة' : 'Invoice No.'}</th>
-                                    <th className="p-2">{language === 'ar' ? 'تاريخ الفاتورة' : 'Invoice Date'}</th>
-                                    <th className="p-2">{language === 'ar' ? 'تاريخ الاستحقاق' : 'Due Date'}</th>
-                                    <th className="p-2 text-right">{language === 'ar' ? 'المبلغ الأصلي' : 'Original Amount'}</th>
-                                    <th className="p-2 text-right">{language === 'ar' ? 'المسوى حتى التاريخ' : 'Settled to Date'}</th>
-                                    <th className="p-2 text-right font-black text-zinc-800">{language === 'ar' ? 'المتبقي' : 'Open Balance'}</th>
-                                    <th className="p-2 text-center">{language === 'ar' ? 'العمر (يوم)' : 'Age (Days)'}</th>
-                                    <th className="p-2 text-center">{language === 'ar' ? 'الشريحة' : 'Bracket'}</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-zinc-100 font-mono text-[11px]">
-                                  {item.openInvoices.map(inv => (
-                                    <tr key={inv.id} className="hover:bg-zinc-50/50">
-                                      <td className="p-2 font-bold text-emerald-700 flex items-center gap-1">
-                                        <span>{inv.invoice_number}</span>
-                                        {inv.currency !== systemCurrency ? (
-                                          <span className="text-[9px] px-1 bg-amber-50 text-amber-700 rounded border border-amber-200">
-                                            {inv.currency}
-                                          </span>
-                                        ) : null}
-                                      </td>
-                                      <td className="p-2 text-zinc-600">{formatDate(inv.date)}</td>
-                                      <td className="p-2 text-zinc-600">{formatDate(inv.due_date)}</td>
-                                      <td className="p-2 text-right text-zinc-600">{formatNumber(inv.original_base_amount)}</td>
-                                      <td className="p-2 text-right text-emerald-600 font-semibold">{formatNumber(inv.settled_up_to_as_of)}</td>
-                                      <td className="p-2 text-right font-black text-zinc-900">{formatNumber(inv.open_balance)}</td>
-                                      <td className="p-2 text-center text-zinc-700 font-bold">{inv.age_days}</td>
-                                      <td className="p-2 text-center">
-                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                          inv.bracket === 'current' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                                          inv.bracket === '31-60' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                                          inv.bracket === '61-90' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
-                                          inv.bracket === '91-120' ? 'bg-orange-50 text-orange-700 border border-orange-200' :
-                                          'bg-rose-50 text-rose-700 border border-rose-200'
-                                        }`}>
-                                          {inv.bracket === 'current' ? (language === 'ar' ? '0 - 30 يوم' : '0-30 Days') :
-                                           inv.bracket === '31-60' ? (language === 'ar' ? '31 - 60 يوم' : '31-60 Days') :
-                                           inv.bracket === '61-90' ? (language === 'ar' ? '61 - 90 يوم' : '61-90 Days') :
-                                           inv.bracket === '91-120' ? (language === 'ar' ? '91 - 120 يوم' : '91-120 Days') :
-                                           (language === 'ar' ? '+120 يوم' : '+120 Days')}
+                      {isExpanded && hasInvoices && (() => {
+                        const hasForeign = item.openInvoices.some(
+                          inv => inv.currency !== systemCurrency || (inv.foreign_amount !== null && inv.foreign_amount > 0)
+                        );
+
+                        return (
+                          <tr className="bg-zinc-50/70">
+                            <td colSpan={12} className="p-3 pr-8 border border-zinc-200">
+                              <div id={`customer-expanded-card-${item.id}`} className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-inner">
+                                
+                                {/* Header with EX and PDF export buttons */}
+                                <div className="p-2.5 bg-zinc-100/90 border-b border-zinc-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-zinc-700 flex items-center gap-1.5">
+                                      <FileText size={14} className="text-emerald-600" />
+                                      {language === 'ar' 
+                                        ? `المستندات والفواتير غير المسواة حتى تاريخ ${formatDate(asOfDate)} (${item.openInvoices.length} مستند)` 
+                                        : `Unsettled Invoices & Documents as of ${formatDate(asOfDate)} (${item.openInvoices.length} docs)`}
+                                    </span>
+                                    <span className="text-[11px] text-zinc-500 font-mono">
+                                      ({language === 'ar' ? 'المبالغ الموضحة بالعملة المحلية' : 'Amounts in local currency'})
+                                    </span>
+                                  </div>
+
+                                  {/* Export Buttons: Excel (EX) and PDF */}
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleExportCustomerExcel(item);
+                                      }}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-emerald-50 text-emerald-700 hover:text-emerald-800 border border-emerald-300 hover:border-emerald-500 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                      title={language === 'ar' ? 'تصدير إكسيل للديون والتفاصيل' : 'Export Excel (Summary & Details)'}
+                                    >
+                                      <FileSpreadsheet size={13} className="text-emerald-600" />
+                                      <span>{language === 'ar' ? 'إكسيل (EX)' : 'Excel (EX)'}</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleExportCustomerPDF(item);
+                                      }}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-rose-50 text-rose-700 hover:text-rose-800 border border-rose-300 hover:border-rose-500 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                      title={language === 'ar' ? 'تصدير PDF للديون والتفاصيل' : 'Export PDF (Summary & Details)'}
+                                    >
+                                      <Printer size={13} className="text-rose-600" />
+                                      <span>PDF</span>
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Top Section: Debt Aging Summary Row (الديون فى الصف إلى فوق) */}
+                                <div className="p-3 bg-zinc-50/70 border-b border-zinc-200">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="font-bold text-zinc-800 text-xs flex items-center gap-2 flex-wrap">
+                                      <span className="text-zinc-500">{entityType === 'customer' ? (language === 'ar' ? 'العميل: ' : 'Customer: ') : (language === 'ar' ? 'المورد: ' : 'Supplier: ')}</span>
+                                      <span className="text-emerald-700 font-extrabold">{item.name}</span>
+                                      <span className="text-zinc-500 font-mono">({item.code})</span>
+                                      {item.phone && item.phone !== '-' ? <span className="text-zinc-500 font-mono text-[11px]">{item.phone}</span> : null}
+                                      {item.credit_period_days ? (
+                                        <span className="text-zinc-400 text-[11px] font-normal">
+                                          - {item.credit_period_days} {language === 'ar' ? 'يوم ائتمان' : 'days credit'}
                                         </span>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
+                                      ) : null}
+                                    </div>
+                                    <span className="text-[11px] text-zinc-600 font-bold bg-zinc-200/60 px-2 py-0.5 rounded">
+                                      {language === 'ar' ? 'ملخص أعمار الديون' : 'Debt Aging Summary'}
+                                    </span>
+                                  </div>
+
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-right text-[11px] border border-zinc-200 bg-white rounded-lg">
+                                      <thead className="bg-zinc-100 text-zinc-600 font-bold border-b border-zinc-200 text-[10px]">
+                                        <tr>
+                                          <th className="p-1.5 px-2 border-l border-zinc-200 text-right">{language === 'ar' ? '0 - 30 يوم' : '0-30 Days'}</th>
+                                          <th className="p-1.5 px-2 border-l border-zinc-200 text-right">{language === 'ar' ? '31 - 60 يوم' : '31-60 Days'}</th>
+                                          <th className="p-1.5 px-2 border-l border-zinc-200 text-right">{language === 'ar' ? '61 - 90 يوم' : '61-90 Days'}</th>
+                                          <th className="p-1.5 px-2 border-l border-zinc-200 text-right">{language === 'ar' ? '91 - 120 يوم' : '91-120 Days'}</th>
+                                          <th className="p-1.5 px-2 border-l border-zinc-200 text-right">{language === 'ar' ? '+120 يوم' : '+120 Days'}</th>
+                                          <th className="p-1.5 px-2 border-l border-zinc-200 text-right">{language === 'ar' ? 'دفعات غير مخصصة' : 'Unallocated'}</th>
+                                          <th className="p-1.5 px-2 text-right bg-zinc-200/70 font-black text-zinc-900">{language === 'ar' ? 'إجمالي الرصيد الدفتري' : 'Total Balance'}</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="font-mono text-[11px]">
+                                        <tr>
+                                          <td className="p-1.5 px-2 border-l border-zinc-200 text-right font-semibold text-emerald-800 bg-emerald-50/10">
+                                            {item.brackets.current > 0 ? formatNumber(item.brackets.current) : '-'}
+                                          </td>
+                                          <td className="p-1.5 px-2 border-l border-zinc-200 text-right font-semibold text-blue-800 bg-blue-50/10">
+                                            {item.brackets.b31_60 > 0 ? formatNumber(item.brackets.b31_60) : '-'}
+                                          </td>
+                                          <td className="p-1.5 px-2 border-l border-zinc-200 text-right font-semibold text-amber-800 bg-amber-50/10">
+                                            {item.brackets.b61_90 > 0 ? formatNumber(item.brackets.b61_90) : '-'}
+                                          </td>
+                                          <td className="p-1.5 px-2 border-l border-zinc-200 text-right font-semibold text-orange-800 bg-orange-50/10">
+                                            {item.brackets.b91_120 > 0 ? formatNumber(item.brackets.b91_120) : '-'}
+                                          </td>
+                                          <td className="p-1.5 px-2 border-l border-zinc-200 text-right font-bold text-rose-700 bg-rose-50/10">
+                                            {item.brackets.over120 > 0 ? formatNumber(item.brackets.over120) : '-'}
+                                          </td>
+                                          <td className="p-1.5 px-2 border-l border-zinc-200 text-right font-semibold text-zinc-500">
+                                            {item.unallocatedCredits > 0 ? `(${formatNumber(item.unallocatedCredits)})` : '-'}
+                                          </td>
+                                          <td className="p-1.5 px-2 text-right font-black text-zinc-900 bg-zinc-100">
+                                            {formatNumber(item.finalBalance)}
+                                          </td>
+                                        </tr>
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+
+                                {/* Bottom Section: Details Table (التفصيل تحت) */}
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-right text-xs">
+                                    <thead>
+                                      <tr className="bg-zinc-50 text-zinc-500 font-bold border-b border-zinc-200 text-[10px]">
+                                        <th className="p-2 text-right">{language === 'ar' ? 'رقم المستند' : 'Doc No.'}</th>
+                                        <th className="p-2 text-right">{language === 'ar' ? 'نوع المستند' : 'Doc Type'}</th>
+                                        <th className="p-2 text-right">{language === 'ar' ? 'تاريخ المستند' : 'Doc Date'}</th>
+                                        <th className="p-2 text-right">{language === 'ar' ? 'تاريخ الاستحقاق' : 'Due Date'}</th>
+                                        {hasForeign && (
+                                          <>
+                                            <th className="p-2 text-right">{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</th>
+                                            <th className="p-2 text-center">{language === 'ar' ? 'العملة' : 'Currency'}</th>
+                                            <th className="p-2 text-right">{language === 'ar' ? 'سعر الصرف' : 'Rate'}</th>
+                                          </>
+                                        )}
+                                        <th className="p-2 text-right">{language === 'ar' ? 'المبلغ الأصلي' : 'Original Amount'}</th>
+                                        <th className="p-2 text-right">{language === 'ar' ? 'المسوى حتى التاريخ' : 'Settled to Date'}</th>
+                                        <th className="p-2 text-right font-black text-zinc-800">{language === 'ar' ? 'المتبقي' : 'Open Balance'}</th>
+                                        <th className="p-2 text-right">{language === 'ar' ? 'العمر (يوم)' : 'Age (Days)'}</th>
+                                        <th className="p-2 text-center">{language === 'ar' ? 'الشريحة' : 'Bracket'}</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-zinc-100 font-mono text-[11px]">
+                                      {item.openInvoices.map(inv => (
+                                        <tr key={inv.id} className="hover:bg-zinc-50/50">
+                                          <td className="p-2 font-bold text-emerald-700 flex items-center gap-1 text-right">
+                                            <span>{inv.invoice_number}</span>
+                                            {!hasForeign && inv.currency !== systemCurrency ? (
+                                              <span className="text-[9px] px-1 bg-amber-50 text-amber-700 rounded border border-amber-200">
+                                                {inv.currency}
+                                              </span>
+                                            ) : null}
+                                          </td>
+                                          <td className="p-2 text-right font-sans">
+                                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border inline-block ${
+                                              inv.doc_type.includes('return') 
+                                                ? 'bg-rose-50 text-rose-700 border-rose-200' 
+                                                : inv.doc_type.includes('receipt') || inv.doc_type.includes('payment')
+                                                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                                : inv.doc_type.includes('journal') || inv.doc_type.includes('discount')
+                                                ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                            }`}>
+                                              {inv.doc_type_label}
+                                            </span>
+                                          </td>
+                                          <td className="p-2 text-right text-zinc-600">{formatDate(inv.date)}</td>
+                                          <td className="p-2 text-right text-zinc-600">{formatDate(inv.due_date)}</td>
+                                          
+                                          {hasForeign && (
+                                            <>
+                                              <td className="p-2 text-right font-mono font-bold">
+                                                {inv.foreign_amount !== null && inv.foreign_amount !== undefined && inv.foreign_amount > 0 ? (
+                                                  <span className={inv.sign === '-' ? "text-rose-600" : "text-amber-700"}>
+                                                    {inv.sign} {formatNumber(inv.foreign_amount)}
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-zinc-400">-</span>
+                                                )}
+                                              </td>
+                                              <td className="p-2 text-center font-mono">
+                                                {inv.currency !== systemCurrency ? (
+                                                  <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-800 rounded border border-amber-300 font-bold">
+                                                    {inv.currency}
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-[10px] text-zinc-500 font-medium">
+                                                    {systemCurrency}
+                                                  </span>
+                                                )}
+                                              </td>
+                                              <td className="p-2 text-right font-mono text-zinc-600">
+                                                {inv.exchange_rate > 1 ? formatNumber(inv.exchange_rate) : '-'}
+                                              </td>
+                                            </>
+                                          )}
+
+                                          <td className="p-2 text-right font-mono font-semibold">
+                                            <span className={inv.sign === '-' ? "text-rose-600 font-bold" : "text-zinc-700"}>
+                                              {inv.sign} {formatNumber(inv.original_base_amount)}
+                                            </span>
+                                          </td>
+                                          <td className="p-2 text-right font-mono text-emerald-600 font-semibold">
+                                            {formatNumber(inv.settled_up_to_as_of)}
+                                          </td>
+                                          <td className="p-2 text-right font-mono font-black">
+                                            <span className={inv.sign === '-' ? "text-rose-700" : "text-zinc-900"}>
+                                              {inv.sign} {formatNumber(inv.open_balance)}
+                                            </span>
+                                          </td>
+                                          <td className="p-2 text-right text-zinc-700 font-bold font-mono">
+                                            {inv.age_days}
+                                          </td>
+                                          <td className="p-2 text-center">
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                              inv.bracket === 'current' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                                              inv.bracket === '31-60' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                                              inv.bracket === '61-90' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                                              inv.bracket === '91-120' ? 'bg-orange-50 text-orange-700 border border-orange-200' :
+                                              'bg-rose-50 text-rose-700 border border-rose-200'
+                                            }`}>
+                                              {inv.bracket === 'current' ? (language === 'ar' ? '0 - 30 يوم' : '0-30 Days') :
+                                               inv.bracket === '31-60' ? (language === 'ar' ? '31 - 60 يوم' : '31-60 Days') :
+                                               inv.bracket === '61-90' ? (language === 'ar' ? '61 - 90 يوم' : '61-90 Days') :
+                                               inv.bracket === '91-120' ? (language === 'ar' ? '91 - 120 يوم' : '91-120 Days') :
+                                               (language === 'ar' ? '+120 يوم' : '+120 Days')}
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                    <tfoot className="bg-zinc-50 border-t border-zinc-200 font-mono text-[11px] font-bold">
+                                      <tr>
+                                        <td colSpan={hasForeign ? 7 : 4} className="p-2 text-center text-zinc-500 font-bold">
+                                          {language === 'ar' ? 'الإجمالي:' : 'Total:'}
+                                        </td>
+                                        <td className="p-2 text-right text-zinc-800">
+                                          {formatNumber(item.openInvoices.reduce((s, i) => s + (i.sign === '-' ? -i.original_base_amount : i.original_base_amount), 0))}
+                                        </td>
+                                        <td className="p-2 text-right text-emerald-700">
+                                          {formatNumber(item.openInvoices.reduce((s, i) => s + i.settled_up_to_as_of, 0))}
+                                        </td>
+                                        <td className="p-2 text-right font-black text-zinc-900">
+                                          {formatNumber(item.openInvoices.reduce((s, i) => s + (i.sign === '-' ? -i.open_balance : i.open_balance), 0))}
+                                        </td>
+                                        <td colSpan={2}></td>
+                                      </tr>
+                                    </tfoot>
+                                  </table>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })()}
                     </React.Fragment>
                   );
                 })
