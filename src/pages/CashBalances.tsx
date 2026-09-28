@@ -815,6 +815,21 @@ export const CashBalances: React.FC = () => {
     }
   };
 
+  const selectedMethod = useMemo(() => {
+    if (!selectedMethodId) return null;
+    if (selectedMethodId.startsWith('unassigned_')) {
+      const accId = selectedMethodId.replace('unassigned_', '');
+      const acc = accounts.find(a => a.id === accId);
+      return {
+        id: selectedMethodId,
+        name: language === 'ar' ? `حركات وقيود عامة على ${acc?.name || ''}` : `General Entries on ${acc?.name || ''}`,
+        account_name: acc ? `${acc.code} - ${acc.name}` : '',
+        code: `GL-${acc?.code || ''}`
+      } as any;
+    }
+    return paymentMethods.find(m => m.id === selectedMethodId);
+  }, [selectedMethodId, paymentMethods, accounts, language]);
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
@@ -839,21 +854,6 @@ export const CashBalances: React.FC = () => {
       </div>
     );
   }
-
-  const selectedMethod = useMemo(() => {
-    if (!selectedMethodId) return null;
-    if (selectedMethodId.startsWith('unassigned_')) {
-      const accId = selectedMethodId.replace('unassigned_', '');
-      const acc = accounts.find(a => a.id === accId);
-      return {
-        id: selectedMethodId,
-        name: language === 'ar' ? `حركات وقيود عامة على ${acc?.name || ''}` : `General Entries on ${acc?.name || ''}`,
-        account_name: acc ? `${acc.code} - ${acc.name}` : '',
-        code: `GL-${acc?.code || ''}`
-      } as any;
-    }
-    return paymentMethods.find(m => m.id === selectedMethodId);
-  }, [selectedMethodId, paymentMethods, accounts, language]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
