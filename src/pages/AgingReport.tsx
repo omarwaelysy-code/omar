@@ -64,7 +64,7 @@ interface AgingReportProps {
 }
 
 export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'customer' }) => {
-  const { user, company } = useAuth();
+  const { user } = useAuth();
   const { language, t } = useLanguage();
   const { setCurrentPage } = useNavigation();
 
@@ -98,8 +98,9 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
 
   // System currency detection
   const systemCurrency = useMemo(() => {
-    return company?.currency_code || (company?.settings as any)?.currency_code || (company?.settings as any)?.currency || 'EGP';
-  }, [company]);
+    const defaultCurr = (rawCurrencies || []).find((c: any) => c.is_default || c.code === 'EGP');
+    return defaultCurr?.code || 'EGP';
+  }, [rawCurrencies]);
 
   const currenciesMap = useMemo(() => {
     return (rawCurrencies || []).reduce((acc: any, c: any) => {
@@ -165,7 +166,7 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
 
   useEffect(() => {
     fetchData();
-  }, [user, company]);
+  }, [user]);
 
   // Quick Preset Handlers
   const handleApplyPreset = (preset: string) => {
