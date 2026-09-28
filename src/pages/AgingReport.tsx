@@ -709,35 +709,20 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
         over120: 0
       };
 
-      if (actualLedgerBalance <= 0) {
-        // Customer or Supplier is paid in advance or zero balance
-      } else if (totalInvoicesBalance <= actualLedgerBalance) {
-        // Invoices sum up to or less than ledger balance -> place open invoices in their respective brackets
-        openInvoicesList.filter(d => d.sign === '+').forEach(i => {
-          if (i.bracket === 'current') brackets.current += i.open_balance;
-          else if (i.bracket === '31-60') brackets.b31_60 += i.open_balance;
-          else if (i.bracket === '61-90') brackets.b61_90 += i.open_balance;
-          else if (i.bracket === '91-120') brackets.b91_120 += i.open_balance;
-          else if (i.bracket === 'over120') brackets.over120 += i.open_balance;
-        });
-        // Remaining older balance (e.g. from opening balance or older unbilled balance) sits in +120 days
-        const remainingOld = actualLedgerBalance - totalInvoicesBalance;
+      // Populate age brackets directly from all positive open invoices & documents
+      openInvoicesList.filter(d => d.sign === '+').forEach(i => {
+        if (i.bracket === 'current') brackets.current += i.open_balance;
+        else if (i.bracket === '31-60') brackets.b31_60 += i.open_balance;
+        else if (i.bracket === '61-90') brackets.b61_90 += i.open_balance;
+        else if (i.bracket === '91-120') brackets.b91_120 += i.open_balance;
+        else if (i.bracket === 'over120') brackets.over120 += i.open_balance;
+      });
+
+      // If General Ledger balance exceeds total positive open documents (e.g. unbilled opening balance from prior periods),
+      // place the remaining older balance into +120 days
+      if (actualLedgerBalance > totalPositiveDocs) {
+        const remainingOld = actualLedgerBalance - totalPositiveDocs;
         brackets.over120 += remainingOld;
-      } else {
-        // Invoices total exceeds ledger balance -> customer has unallocated payments/credits!
-        // Allocate the active ledger balance starting from the most recent open invoices
-        let remainingToAllocate = actualLedgerBalance;
-        const sortedByNewest = [...openInvoicesList.filter(d => d.sign === '+')].sort((a, b) => a.age_days - b.age_days);
-        sortedByNewest.forEach(i => {
-          if (remainingToAllocate <= 0) return;
-          const take = Math.min(i.open_balance, remainingToAllocate);
-          if (i.bracket === 'current') brackets.current += take;
-          else if (i.bracket === '31-60') brackets.b31_60 += take;
-          else if (i.bracket === '61-90') brackets.b61_90 += take;
-          else if (i.bracket === '91-120') brackets.b91_120 += take;
-          else if (i.bracket === 'over120') brackets.over120 += take;
-          remainingToAllocate -= take;
-        });
       }
 
       brackets.current = Number(brackets.current.toFixed(2));
@@ -746,8 +731,12 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
       brackets.b91_120 = Number(brackets.b91_120.toFixed(2));
       brackets.over120 = Number(brackets.over120.toFixed(2));
 
-      // Unallocated credits = difference between invoice open balance and actual ledger balance
-      const unallocatedCredits = Number(Math.max(0, totalInvoicesBalance - actualLedgerBalance).toFixed(2));
+      const sumPositiveBrackets = Number(
+        (brackets.current + brackets.b31_60 + brackets.b61_90 + brackets.b91_120 + brackets.over120).toFixed(2)
+      );
+
+      // Unallocated credits = difference between sum of positive brackets and actual ledger balance
+      const unallocatedCredits = Number(Math.max(0, sumPositiveBrackets - actualLedgerBalance).toFixed(2));
       const finalBalance = actualLedgerBalance;
 
       return {
@@ -758,7 +747,7 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
         credit_period_days: creditDays,
         openInvoices: openInvoicesList,
         brackets,
-        totalInvoicesBalance,
+        totalInvoicesBalance: sumPositiveBrackets,
         unallocatedCredits,
         ledgerBalance: actualLedgerBalance,
         finalBalance
