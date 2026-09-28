@@ -3,10 +3,16 @@ export interface PDFOptions {
   margin?: number;
   orientation?: 'portrait' | 'landscape';
   reportTitle?: string;
+  detailsTitle?: string;
   columns?: any[];
   rows?: any[];
   totals?: Record<string, any>;
   templateName?: string;
+  summaryTable?: {
+    title?: string;
+    columns: any[];
+    rows: any[];
+  };
 }
 
 /**
@@ -249,6 +255,8 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
   const dto = {
     company,
     reportTitle: options.reportTitle || 'تقرير النظام',
+    detailsTitle: options.detailsTitle,
+    summaryTable: options.summaryTable,
     columns,
     rows,
     totals,

@@ -1583,6 +1583,27 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
           drawHeader(title, dto.branchName, dto.userName);
 
+          // Render Optional Top Summary Table (e.g. Debt Aging Summary row above details)
+          if (dto.summaryTable && Array.isArray(dto.summaryTable.columns) && Array.isArray(dto.summaryTable.rows) && dto.summaryTable.rows.length > 0) {
+            const sumTitle = dto.summaryTable.title || (isRtl ? 'ملخص أعمار الديون:' : 'Debt Aging Summary:');
+            renderText(sumTitle, sideMargin, currentY, { width: usableWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 8 : 10 });
+            currentY += isThermal ? 10 : 14;
+
+            const sumCols: ColumnDef[] = dto.summaryTable.columns.map((col: any) => ({
+              id: col.id,
+              label: col.label || '',
+              width: col.width || (100 / dto.summaryTable.columns.length),
+              align: 'right'
+            }));
+
+            drawTable(sumCols, dto.summaryTable.rows, null);
+            currentY += isThermal ? 10 : 15;
+
+            const detTitle = dto.detailsTitle || (isRtl ? 'تفاصيل المستندات والفواتير غير المسواة:' : 'Unsettled Invoices & Documents Breakdown:');
+            renderText(detTitle, sideMargin, currentY, { width: usableWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 8 : 10 });
+            currentY += isThermal ? 10 : 14;
+          }
+
           const columns: ColumnDef[] = columnsRaw.map((col: any) => ({
             id: col.id,
             label: col.label || '',

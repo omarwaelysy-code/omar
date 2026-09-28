@@ -1037,17 +1037,44 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
 
   // Export individual customer/supplier PDF (Card with summary on top and details below)
   const handleExportCustomerPDF = async (item: AgingItem) => {
-    const cardEl = document.getElementById(`customer-expanded-card-${item.id}`);
-    if (!cardEl) return;
+    const tableEl = document.getElementById(`customer-details-table-${item.id}`);
+    if (!tableEl) return;
     const isCustomer = entityType === 'customer';
     const title = isCustomer
       ? `${language === 'ar' ? 'كشف أعمار ديون العميل' : 'Customer Aging Report'}: ${item.name} (${item.code})`
       : `${language === 'ar' ? 'كشف أعمار ديون المورد' : 'Supplier Aging Report'}: ${item.name} (${item.code})`;
 
-    await exportToPDF(cardEl, {
+    const summaryCols = [
+      { id: 'b0_30', label: language === 'ar' ? '0 - 30 يوم' : '0-30 Days' },
+      { id: 'b31_60', label: language === 'ar' ? '31 - 60 يوم' : '31-60 Days' },
+      { id: 'b61_90', label: language === 'ar' ? '61 - 90 يوم' : '61-90 Days' },
+      { id: 'b91_120', label: language === 'ar' ? '91 - 120 يوم' : '91-120 Days' },
+      { id: 'b120', label: language === 'ar' ? '+120 يوم' : '+120 Days' },
+      { id: 'unallocated', label: language === 'ar' ? 'دفعات غير مخصصة' : 'Unallocated' },
+      { id: 'total', label: language === 'ar' ? 'إجمالي الرصيد الدفتري' : 'Total Balance' },
+    ];
+    const summaryRows = [{
+      b0_30: item.brackets.current > 0 ? formatNumber(item.brackets.current) : '-',
+      b31_60: item.brackets.b31_60 > 0 ? formatNumber(item.brackets.b31_60) : '-',
+      b61_90: item.brackets.b61_90 > 0 ? formatNumber(item.brackets.b61_90) : '-',
+      b91_120: item.brackets.b91_120 > 0 ? formatNumber(item.brackets.b91_120) : '-',
+      b120: item.brackets.over120 > 0 ? formatNumber(item.brackets.over120) : '-',
+      unallocated: item.unallocatedCredits > 0 ? `(${formatNumber(item.unallocatedCredits)})` : '-',
+      total: formatNumber(item.finalBalance)
+    }];
+
+    await exportToPDF(tableEl, {
       filename: `${entityType}_${item.code}_aging_${asOfDate}`,
       orientation: 'landscape',
-      reportTitle: `${title} - ${language === 'ar' ? 'حتى تاريخ:' : 'As of:'} ${formatDate(asOfDate)}`
+      reportTitle: `${title} - ${language === 'ar' ? 'حتى تاريخ:' : 'As of:'} ${formatDate(asOfDate)}`,
+      detailsTitle: language === 'ar' 
+        ? `تفاصيل الفواتير والمستندات غير المسواة (${item.openInvoices.length} مستند):` 
+        : `Unsettled Invoices & Documents Breakdown (${item.openInvoices.length} docs):`,
+      summaryTable: {
+        title: language === 'ar' ? 'ملخص أعمار الديون:' : 'Debt Aging Summary:',
+        columns: summaryCols,
+        rows: summaryRows
+      }
     });
   };
 
@@ -1762,7 +1789,7 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
 
                                 {/* Bottom Section: Details Table (التفصيل تحت) */}
                                 <div className="overflow-x-auto">
-                                  <table className="w-full text-right text-xs">
+                                  <table id={`customer-details-table-${item.id}`} className="w-full text-right text-xs">
                                     <thead>
                                       <tr className="bg-zinc-50 text-zinc-500 font-bold border-b border-zinc-200 text-[10px]">
                                         <th className="p-2 text-right">{language === 'ar' ? 'رقم المستند' : 'Doc No.'}</th>
