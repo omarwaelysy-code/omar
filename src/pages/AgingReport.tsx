@@ -64,7 +64,7 @@ interface AgingReportProps {
 }
 
 export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'customer' }) => {
-  const { user } = useAuth();
+  const { user, company } = useAuth();
   const { language, t } = useLanguage();
   const { setCurrentPage } = useNavigation();
 
@@ -93,14 +93,13 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
   const [rawJournalEntries, setRawJournalEntries] = useState<any[]>([]);
   const [rawAccounts, setRawAccounts] = useState<any[]>([]);
   const [rawCurrencies, setRawCurrencies] = useState<any[]>([]);
-  const [companySettings, setCompanySettings] = useState<any>(null);
 
   const reportRef = useRef<HTMLDivElement>(null);
 
   // System currency detection
   const systemCurrency = useMemo(() => {
-    return companySettings?.currency_code || companySettings?.currency || 'EGP';
-  }, [companySettings]);
+    return company?.currency_code || (company?.settings as any)?.currency_code || (company?.settings as any)?.currency || 'EGP';
+  }, [company]);
 
   const currenciesMap = useMemo(() => {
     return (rawCurrencies || []).reduce((acc: any, c: any) => {
@@ -108,6 +107,12 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
       return acc;
     }, {});
   }, [rawCurrencies]);
+
+  const toDateStr = (d: any) => {
+    if (!d) return '';
+    if (d instanceof Date) return d.toISOString().slice(0, 10);
+    return String(d).slice(0, 10);
+  };
 
   // Fetch all necessary data
   const fetchData = async () => {
@@ -125,8 +130,7 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
         preturns,
         jes,
         accs,
-        currs,
-        comp
+        currs
       ] = await Promise.all([
         dbService.list('customers', user.company_id),
         dbService.list('suppliers', user.company_id),
@@ -138,8 +142,7 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
         dbService.list('purchase_returns', user.company_id),
         dbService.list('journal_entries', user.company_id),
         dbService.list('accounts', user.company_id),
-        dbService.list('currencies', user.company_id),
-        dbService.list('company_settings', user.company_id)
+        dbService.list('currencies', user.company_id)
       ]);
 
       setRawCustomers(custs || []);
@@ -153,7 +156,6 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
       setRawJournalEntries(jes || []);
       setRawAccounts(accs || []);
       setRawCurrencies(currs || []);
-      setCompanySettings((comp && comp[0]) || null);
     } catch (err) {
       console.error('Error fetching aging data:', err);
     } finally {
@@ -163,7 +165,7 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
 
   useEffect(() => {
     fetchData();
-  }, [user]);
+  }, [user, company]);
 
   // Quick Preset Handlers
   const handleApplyPreset = (preset: string) => {
@@ -247,7 +249,56 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
       const entityId = entity.id;
       const creditDays = Number(entity.credit_period_days) || 0;
 
-      // 1. Gather all invoices up to asOfDate
+      // 1. Calculate General Ledger balance from journal entries as of asOfDate
+      const entityLines: any[] = [];
+      rawJournalEntries.forEach((je: any) => {
+        const jeDateStr = toDateStr(je.date);
+        if (jeDateStr > asOfDate) return;
+
+        const cItems = (je.items || []).filter((item: any) => {
+          const matchEntity = isCustomer 
+            ? (item.customer_id === entityId || item.sub_account_id === entityId)
+            : (item.supplier_id === entityId || item.sub_account_id === entityId);
+          
+          const isEntityAcct = isCustomer 
+            ? isCustomerAccount(item.account_id, entity, rawAccounts)
+            : isSupplierAccount(item.account_id, entity, rawAccounts);
+
+          return matchEntity && isEntityAcct;
+        });
+
+        if (cItems.length === 0) return;
+
+        const deb = Number(cItems.reduce((s: number, it: any) => s + (Number(it.debit) || 0), 0).toFixed(2));
+        const crd = Number(cItems.reduce((s: number, it: any) => s + (Number(it.credit) || 0), 0).toFixed(2));
+
+        entityLines.push({
+          date: jeDateStr,
+          reference_type: je.reference_type,
+          debit: deb,
+          credit: crd,
+          description: cItems[0]?.description || je.description || ''
+        });
+      });
+
+      const hasOpBalInEntries = entityLines.some(
+        (line: any) => line.reference_type === 'opening_balance' || (line.description && line.description.includes('رصيد افتتاحي'))
+      );
+      const manualOpening = hasOpBalInEntries ? 0 : (Number(entity.opening_balance) || 0);
+
+      let totalDebit = 0;
+      let totalCredit = 0;
+      entityLines.forEach((l: any) => {
+        totalDebit += l.debit;
+        totalCredit += l.credit;
+      });
+
+      // Customer is Debit minus Credit; Supplier is Credit minus Debit
+      const actualLedgerBalance = isCustomer 
+        ? Number((manualOpening + totalDebit - totalCredit).toFixed(2))
+        : Number((manualOpening + totalCredit - totalDebit).toFixed(2));
+
+      // 2. Gather all open invoices/bills up to asOfDate
       const openInvoicesList: AgingItem['openInvoices'] = [];
 
       invoices.forEach((inv: any) => {
@@ -255,7 +306,7 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
         if (invEntityId !== entityId) return;
         if (inv.payment_type === 'cash') return;
 
-        const invDateStr = (inv.date || '').slice(0, 10);
+        const invDateStr = toDateStr(inv.date);
         if (!invDateStr || invDateStr > asOfDate) return;
 
         // Base currency amount in system currency
@@ -277,26 +328,24 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
         // Calculate all settlements occurred ON OR BEFORE asOfDate
         let settledUpToAsOf = 0;
 
-        // Check settlements stored on the invoice itself
-        if (inv.settlements && Array.isArray(inv.settlements)) {
+        if (Array.isArray(inv.settlements)) {
           inv.settlements.forEach((s: any) => {
-            const sDate = (s.settlement_date || s.date || invDateStr).slice(0, 10);
+            const sDate = toDateStr(s.settlement_date || s.date || invDateStr);
             if (sDate <= asOfDate) {
               settledUpToAsOf += Number(s.settled_amount || s.amount || 0);
             }
           });
         }
 
-        // Check voucher settlements linked directly to this invoice
+        // Voucher settlements
         receipts.forEach((v: any) => {
-          if (v.items && Array.isArray(v.items)) {
+          if (Array.isArray(v.items)) {
             v.items.forEach((item: any) => {
-              if (item.settlements && Array.isArray(item.settlements)) {
+              if (Array.isArray(item.settlements)) {
                 item.settlements.forEach((s: any) => {
                   if (String(s.target_id) === String(inv.id)) {
-                    const sDate = (s.settlement_date || s.date || v.date || '').slice(0, 10);
+                    const sDate = toDateStr(s.settlement_date || s.date || v.date);
                     if (sDate <= asOfDate) {
-                      // Prevent duplicate counting if already counted in inv.settlements
                       const alreadyInInv = inv.settlements?.some((is: any) => 
                         is.target_id === v.id || String(is.reference_number) === String(v.voucher_number || v.number)
                       );
@@ -314,15 +363,13 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
         const openBalance = Number(Math.max(0, originalBaseAmount - settledUpToAsOf).toFixed(2));
 
         if (openBalance > 0.009) {
-          // Determine due date
-          let dueDateStr = inv.due_date ? String(inv.due_date).slice(0, 10) : '';
+          let dueDateStr = toDateStr(inv.due_date);
           if (!dueDateStr) {
             const baseD = new Date(invDateStr);
             baseD.setDate(baseD.getDate() + creditDays);
             dueDateStr = baseD.toISOString().slice(0, 10);
           }
 
-          // Calculate age in days
           let ageDays = 0;
           if (agingBasis === 'due_date') {
             const dueTime = new Date(`${dueDateStr}T00:00:00.000Z`).getTime();
@@ -332,34 +379,17 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
             ageDays = Math.floor((asOfTime - invTime) / (1000 * 3600 * 24));
           }
 
-          // Assign bucket
           let bracket: AgingItem['openInvoices'][0]['bracket'] = 'current';
-          if (agingBasis === 'due_date') {
-            if (ageDays <= 0) {
-              bracket = 'current'; // Not due yet
-            } else if (ageDays <= 30) {
-              bracket = 'current'; // 1-30 days overdue
-            } else if (ageDays <= 60) {
-              bracket = '31-60';
-            } else if (ageDays <= 90) {
-              bracket = '61-90';
-            } else if (ageDays <= 120) {
-              bracket = '91-120';
-            } else {
-              bracket = 'over120';
-            }
+          if (ageDays <= 30) {
+            bracket = 'current';
+          } else if (ageDays <= 60) {
+            bracket = '31-60';
+          } else if (ageDays <= 90) {
+            bracket = '61-90';
+          } else if (ageDays <= 120) {
+            bracket = '91-120';
           } else {
-            if (ageDays <= 30) {
-              bracket = 'current';
-            } else if (ageDays <= 60) {
-              bracket = '31-60';
-            } else if (ageDays <= 90) {
-              bracket = '61-90';
-            } else if (ageDays <= 120) {
-              bracket = '91-120';
-            } else {
-              bracket = 'over120';
-            }
+            bracket = 'over120';
           }
 
           openInvoicesList.push({
@@ -378,7 +408,14 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
         }
       });
 
-      // Sum by bracket
+      // Sort invoices oldest first
+      openInvoicesList.sort((a, b) => b.age_days - a.age_days);
+
+      const totalInvoicesBalance = Number(
+        openInvoicesList.reduce((sum, inv) => sum + inv.open_balance, 0).toFixed(2)
+      );
+
+      // 3. Brackets distribution strictly reconciled with General Ledger balance
       const brackets = {
         current: 0,
         b31_60: 0,
@@ -387,64 +424,46 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
         over120: 0
       };
 
-      openInvoicesList.forEach(inv => {
-        if (inv.bracket === 'current') brackets.current += inv.open_balance;
-        else if (inv.bracket === '31-60') brackets.b31_60 += inv.open_balance;
-        else if (inv.bracket === '61-90') brackets.b61_90 += inv.open_balance;
-        else if (inv.bracket === '91-120') brackets.b91_120 += inv.open_balance;
-        else if (inv.bracket === 'over120') brackets.over120 += inv.open_balance;
-      });
-
-      const totalInvoicesBalance = Number(
-        (brackets.current + brackets.b31_60 + brackets.b61_90 + brackets.b91_120 + brackets.over120).toFixed(2)
-      );
-
-      // 2. Reconcile with Journal Entries & Ledger balance as of asOfDate
-      let ledgerDebit = 0;
-      let ledgerCredit = 0;
-
-      rawJournalEntries.forEach((je: any) => {
-        const jeDate = (je.date || '').slice(0, 10);
-        if (jeDate > asOfDate) return;
-
-        (je.items || []).forEach((item: any) => {
-          const matchEntity = isCustomer 
-            ? (item.customer_id === entityId || item.sub_account_id === entityId)
-            : (item.supplier_id === entityId || item.sub_account_id === entityId);
-          
-          const isEntityAcct = isCustomer 
-            ? isCustomerAccount(item.account_id, entity, rawAccounts)
-            : isSupplierAccount(item.account_id, entity, rawAccounts);
-
-          if (matchEntity && isEntityAcct) {
-            ledgerDebit += Number(item.debit) || 0;
-            ledgerCredit += Number(item.credit) || 0;
-          }
+      if (actualLedgerBalance <= 0) {
+        // Customer or Supplier is paid in advance or zero balance
+      } else if (totalInvoicesBalance <= actualLedgerBalance) {
+        // Invoices sum up to or less than ledger balance -> place open invoices in their respective brackets
+        openInvoicesList.forEach(i => {
+          if (i.bracket === 'current') brackets.current += i.open_balance;
+          else if (i.bracket === '31-60') brackets.b31_60 += i.open_balance;
+          else if (i.bracket === '61-90') brackets.b61_90 += i.open_balance;
+          else if (i.bracket === '91-120') brackets.b91_120 += i.open_balance;
+          else if (i.bracket === 'over120') brackets.over120 += i.open_balance;
         });
-      });
-
-      // Check if opening balance is reflected in JEs or needs manual addition
-      const hasOpBalInJEs = rawJournalEntries.some(je => {
-        const jeDate = (je.date || '').slice(0, 10);
-        return jeDate <= asOfDate && (je.reference_type === 'opening_balance' || je.description?.includes('افتتاحي'));
-      });
-      const manualOpening = hasOpBalInJEs ? 0 : (Number(entity.opening_balance) || 0);
-
-      // For customer: Balance = Opening + Debit - Credit
-      // For supplier: Balance = Opening + Credit - Debit
-      let actualLedgerBalance = 0;
-      if (isCustomer) {
-        actualLedgerBalance = Number((manualOpening + ledgerDebit - ledgerCredit).toFixed(2));
+        // Remaining older balance (e.g. from opening balance or older unbilled balance) sits in +120 days
+        const remainingOld = actualLedgerBalance - totalInvoicesBalance;
+        brackets.over120 += remainingOld;
       } else {
-        actualLedgerBalance = Number((manualOpening + ledgerCredit - ledgerDebit).toFixed(2));
+        // Invoices total exceeds ledger balance -> customer has unallocated payments/credits!
+        // Allocate the active ledger balance starting from the most recent open invoices
+        let remainingToAllocate = actualLedgerBalance;
+        const sortedByNewest = [...openInvoicesList].sort((a, b) => a.age_days - b.age_days);
+        sortedByNewest.forEach(i => {
+          if (remainingToAllocate <= 0) return;
+          const take = Math.min(i.open_balance, remainingToAllocate);
+          if (i.bracket === 'current') brackets.current += take;
+          else if (i.bracket === '31-60') brackets.b31_60 += take;
+          else if (i.bracket === '61-90') brackets.b61_90 += take;
+          else if (i.bracket === '91-120') brackets.b91_120 += take;
+          else if (i.bracket === 'over120') brackets.over120 += take;
+          remainingToAllocate -= take;
+        });
       }
+
+      brackets.current = Number(brackets.current.toFixed(2));
+      brackets.b31_60 = Number(brackets.b31_60.toFixed(2));
+      brackets.b61_90 = Number(brackets.b61_90.toFixed(2));
+      brackets.b91_120 = Number(brackets.b91_120.toFixed(2));
+      brackets.over120 = Number(brackets.over120.toFixed(2));
 
       // Unallocated credits = difference between invoice open balance and actual ledger balance
       const unallocatedCredits = Number(Math.max(0, totalInvoicesBalance - actualLedgerBalance).toFixed(2));
-      
-      // If ledger balance is greater than open invoices (e.g. manual debit JE not yet linked to an invoice),
-      // we reflect the full ledger balance so Trial Balance matches exactly to the cent!
-      const finalBalance = actualLedgerBalance !== 0 ? actualLedgerBalance : totalInvoicesBalance;
+      const finalBalance = actualLedgerBalance;
 
       return {
         id: entity.id,
@@ -452,14 +471,8 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
         name: entity.name || entity.company_name || '-',
         phone: entity.phone || entity.mobile || '-',
         credit_period_days: creditDays,
-        openInvoices: openInvoicesList.sort((a, b) => b.age_days - a.age_days),
-        brackets: {
-          current: Number(brackets.current.toFixed(2)),
-          b31_60: Number(brackets.b31_60.toFixed(2)),
-          b61_90: Number(brackets.b61_90.toFixed(2)),
-          b91_120: Number(brackets.b91_120.toFixed(2)),
-          over120: Number(brackets.over120.toFixed(2))
-        },
+        openInvoices: openInvoicesList,
+        brackets,
         totalInvoicesBalance,
         unallocatedCredits,
         ledgerBalance: actualLedgerBalance,
@@ -498,7 +511,7 @@ export const AgingReport: React.FC<AgingReportProps> = ({ initialType = 'custome
       }
 
       // 2. Only with balance filter
-      if (onlyWithBalance && Math.abs(item.finalBalance) < 0.01) {
+      if (onlyWithBalance && Math.abs(item.finalBalance) < 0.01 && item.totalInvoicesBalance < 0.01) {
         return false;
       }
 
