@@ -342,6 +342,10 @@ export interface CashTransfer {
   from_payment_method_name?: string;
   to_payment_method_id: string;
   to_payment_method_name?: string;
+  from_currency?: string;
+  to_currency?: string;
+  exchange_rate?: number;
+  converted_amount?: number;
   description: string;
   company_id: string;
   created_at: string;

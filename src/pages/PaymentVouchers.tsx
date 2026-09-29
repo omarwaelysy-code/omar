@@ -1012,6 +1012,13 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
       ? voucherData.items.reduce((sum, item) => sum + item.amount, 0)
       : voucherData.amount;
 
+    const baseCurrency = (companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase();
+    const activeCurrency = companyCurrencies.find(c => c.id === voucherData.currency_id);
+    const currencyCode = (activeCurrency?.code || baseCurrency).toUpperCase();
+    const rate = Number(voucherData.exchange_rate) || 1;
+    const isForeign = currencyCode !== baseCurrency && rate > 0 && rate !== 1;
+    const finalBaseAmount = Number((finalAmount * rate).toFixed(2));
+
     if (finalAmount <= 0) {
       showNotification(language === 'ar' ? 'يرجى إدخال مبلغ صحيح' : 'Please enter a valid amount', 'error');
       return;
@@ -1103,6 +1110,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
         manual_reference: voucherData.manual_reference,
         date: voucherData.date,
         amount: finalAmount,
+        base_amount: finalBaseAmount,
         description: voucherData.notes,
         payment_method_id: voucherData.payment_method_id,
         payment_method_name: paymentMethod?.name || '',
@@ -1117,7 +1125,9 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
         paid_to_employee_id: voucherData.paid_to_employee_id,
         paid_to_external_name: voucherData.paid_to_external_name,
         currency_id: voucherData.currency_id || null,
-        exchange_rate: voucherData.exchange_rate || 1
+        currency: currencyCode,
+        exchange_rate: rate,
+        foreign_amount: isForeign ? finalAmount : null
       };
 
       const journalItems: any[] = [];
@@ -1160,16 +1170,21 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
             }
           }
 
+          const itemBaseAmount = Number((item.amount * rate).toFixed(2));
+
           journalItems.push({
             account_id: debitAccountId,
             account_name: debitAccountName,
-            debit: item.amount,
+            debit: itemBaseAmount,
             credit: 0,
             description: (item.description || `سند صرف رقم ${voucher_number}`) + (voucherData.notes ? ` - ${voucherData.notes}` : ''),
             sub_account_id: subAccountId,
             sub_account_type: subAccountType,
             customer_id: item.type === 'customer' ? item.entity_id : undefined,
             supplier_id: item.type === 'supplier' ? item.entity_id : undefined,
+            currency: isForeign ? currencyCode : undefined,
+            exchange_rate: isForeign ? rate : undefined,
+            foreign_amount: isForeign ? item.amount : undefined,
           });
         });
       } else {
@@ -1192,15 +1207,20 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
           debitAccountName = category?.account_name || '';
         }
 
+        const singleBaseAmount = Number((voucherData.amount * rate).toFixed(2));
+
         journalItems.push({
           account_id: debitAccountId,
           account_name: debitAccountName,
-          debit: voucherData.amount,
+          debit: singleBaseAmount,
           credit: 0,
           description: `سند صرف رقم ${voucher_number} - ${voucherData.type === 'supplier' ? (supplier?.name || '') : (category?.name || '')}` + (voucherData.notes ? ` - ${voucherData.notes}` : ''),
           sub_account_id: voucherData.type === 'supplier' ? voucherData.supplier_id : (voucherData.type === 'expense' ? voucherData.expense_category_id : undefined),
           sub_account_type: voucherData.type === 'supplier' ? 'supplier' : (voucherData.type === 'expense' ? 'expense' : undefined),
-          supplier_id: voucherData.type === 'supplier' ? voucherData.supplier_id : undefined
+          supplier_id: voucherData.type === 'supplier' ? voucherData.supplier_id : undefined,
+          currency: isForeign ? currencyCode : undefined,
+          exchange_rate: isForeign ? rate : undefined,
+          foreign_amount: isForeign ? voucherData.amount : undefined,
         });
       }
 
@@ -1212,10 +1232,13 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
         account_id: creditAccountId,
         account_name: creditAccountName,
         debit: 0,
-        credit: finalAmount,
+        credit: finalBaseAmount,
         description: `سند صرف رقم ${voucher_number} من حساب: ${paymentMethod?.name}` + (voucherData.notes ? ` - ${voucherData.notes}` : ''),
         sub_account_id: paymentMethod?.id,
-        sub_account_type: 'payment_method'
+        sub_account_type: 'payment_method',
+        currency: isForeign ? currencyCode : undefined,
+        exchange_rate: isForeign ? rate : undefined,
+        foreign_amount: isForeign ? finalAmount : undefined,
       });
 
       const journalEntryData = {
@@ -1224,8 +1247,8 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
         reference_type: 'payment',
         description: `قيد سند صرف رقم ${voucher_number}`,
         items: journalItems,
-        total_debit: finalAmount,
-        total_credit: finalAmount,
+        total_debit: finalBaseAmount,
+        total_credit: finalBaseAmount,
         company_id: user.company_id,
         created_at: new Date().toISOString(),
         created_by: user.id
@@ -2908,101 +2931,69 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                   animate={{ x: 0 }}
                   exit={{ x: dir === 'rtl' ? '-100%' : '100%' }}
                   transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                  className={`absolute inset-y-0 ${dir === 'rtl' ? 'left-0' : 'right-0'} z-50 w-full lg:w-[480px] shadow-2xl border-l border-slate-100 bg-white flex flex-col`}
-                >
-                  <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-indigo-600 font-bold">
-                      <Sparkles size={20} className="animate-pulse" />
-                      <span className="text-sm font-black">{language === 'ar' ? 'الإنشاء الذكي بالذكاء الاصطناعي' : 'Smart AI Creation'}</span>
-                    </div>
-                    <button onClick={() => setShowAiInput(false)} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50 transition-all">
-                      <X size={20} />
-                    </button>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50">
-                    <SmartAIInput 
-                      onDataExtracted={(data) => {
-                        if (data.amount) setVoucherData(prev => ({ ...prev, amount: data.amount! }));
-                        if (data.date) setVoucherData(prev => ({ ...prev, date: data.date! }));
-                        if (data.description || data.notes) setVoucherData(prev => ({ ...prev, notes: data.description || data.notes || '' }));
-                        if (data.paymentMethod) {
-                          const pm = paymentMethods.find(p => p.name.includes(data.paymentMethod!) || data.paymentMethod!.includes(p.name));
-                          if (pm) setVoucherData(prev => ({ ...prev, payment_method_id: pm.id }));
-                        }
-                        setShowAiInput(false);
-                      }}
-                      transactionType="payment_voucher"
-                    />
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <form id="voucher-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32 md:pb-8">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-3 space-y-6">
-                  {/* Card 1: Basic Info */}
-                  <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                    <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
-                      <FileText className="w-4 h-4" />
-                      <span className="text-xs font-bold">{language === 'ar' ? 'البيانات الأساسية' : 'Basic Info'}</span>
-                    </div>
-
-                    {/* Total Amount & Tafqeet Banner */}
+                  className={`absolute inset-y-0 ${dir === 'rtl' ? 'left-0' : 'right-0'} z-50 w-fu                    {/* Total Amount & Tafqeet Banner */}
                     {(() => {
                       const totalAmount = voucherData.items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-                      const currencyCode = (companyCurrencies.find(c => c.id === voucherData.currency_id)?.code || companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase();
+                      const baseCurrency = (companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase();
+                      const activeCurrency = companyCurrencies.find(c => c.id === voucherData.currency_id);
+                      const currencyCode = (activeCurrency?.code || baseCurrency).toUpperCase();
                       const tafqeetText = tafqeet(totalAmount, currencyCode, language === 'ar' ? 'ar' : 'en');
+                      const isForeign = currencyCode !== baseCurrency && (Number(voucherData.exchange_rate) > 0 && Number(voucherData.exchange_rate) !== 1);
 
                       return (
-                        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 p-4 rounded-2xl border border-emerald-100/80 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xs">
+                        <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 p-3.5 rounded-2xl border border-emerald-100/80 flex flex-col md:flex-row items-center justify-between gap-3 shadow-xs">
                           <div className="flex items-center gap-3">
-                            <div className="p-3 bg-emerald-600 text-white rounded-xl shadow-md">
-                              <Wallet className="w-6 h-6" />
+                            <div className="p-2.5 bg-emerald-600 text-white rounded-xl shadow-md">
+                              <Wallet className="w-5 h-5" />
                             </div>
                             <div>
-                              <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">{language === 'ar' ? 'إجمالي مبلغ السند' : 'Total Amount'}</span>
+                              <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">{language === 'ar' ? 'إجمالي مبلغ السند' : 'Total Amount'}</span>
                               <div className="flex items-baseline gap-2">
-                                <span className="text-2xl md:text-3xl font-black text-emerald-700 font-mono tracking-tight">
+                                <span className="text-xl md:text-2xl font-black text-emerald-700 font-mono tracking-tight">
                                   {formatNumber(totalAmount)}
                                 </span>
-                                <span className="text-sm font-black text-emerald-800 bg-white px-2.5 py-0.5 rounded-lg border border-emerald-200 shadow-xs">
+                                <span className="text-xs font-black text-emerald-800 bg-white px-2 py-0.5 rounded-lg border border-emerald-200 shadow-xs">
                                   {currencyCode}
                                 </span>
                               </div>
+                              {isForeign && (
+                                <span className="text-[11px] font-bold text-emerald-700 block mt-0.5 font-mono">
+                                  {language === 'ar' ? 'المعادل بالعملة المحلية:' : 'Local Eq.:'} {formatNumber(totalAmount * (voucherData.exchange_rate || 1))} {baseCurrency}
+                                </span>
+                              )}
                             </div>
                           </div>
 
-                          <div className="text-right bg-white/90 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-emerald-100/80 shadow-xs flex-1 max-w-lg">
-                            <span className="text-[11px] font-bold text-zinc-400 block mb-0.5 uppercase">{language === 'ar' ? 'المبلغ بالحروف (التفقيط)' : 'Amount in Words'}</span>
+                          <div className="text-right bg-white/90 backdrop-blur-sm px-3.5 py-2 rounded-xl border border-emerald-100/80 shadow-xs flex-1 max-w-lg">
+                            <span className="text-[10px] font-bold text-zinc-400 block mb-0.5 uppercase">{language === 'ar' ? 'المبلغ بالحروف (التفقيط)' : 'Amount in Words'}</span>
                             <span className="text-xs font-black text-emerald-900 italic">{tafqeetText}</span>
                           </div>
                         </div>
                       );
                     })()}
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'مرجع البرنامج' : 'System Ref'}</label>
+                        <label className="block text-[11px] font-bold text-zinc-500 mb-1 px-1 uppercase">{language === 'ar' ? 'مرجع البرنامج' : 'System Ref'}</label>
                         <div className="relative">
-                          <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <Hash className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                           <input 
                             readOnly
                             type="text" 
-                            className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-zinc-100 border border-zinc-200 cursor-not-allowed rounded-2xl font-bold text-zinc-500 text-sm outline-none font-mono`}
+                            className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2 bg-zinc-100 border border-zinc-200 cursor-not-allowed rounded-xl font-bold text-zinc-500 text-xs outline-none font-mono h-9`}
                             value={editingVoucher ? voucherData.internal_reference : (internalRef || voucherData.internal_reference)}
                           />
                         </div>
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'مرجع يدوي / آخر' : 'Manual / Other Ref'}</label>
+                        <label className="block text-[11px] font-bold text-zinc-500 mb-1 px-1 uppercase">{language === 'ar' ? 'مرجع يدوي / آخر' : 'Manual / Other Ref'}</label>
                         <div className="relative group">
-                          <FileText className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <FileText className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                           <input 
                             type="text" 
                             placeholder={language === 'ar' ? 'ادخل رقم المرجع اليدوي...' : 'Enter manual reference...'}
-                            className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                            className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs h-9`}
                             value={voucherData.manual_reference}
                             onChange={(e) => setVoucherData({...voucherData, manual_reference: e.target.value})}
                           />
@@ -3010,13 +3001,13 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'تاريخ السند' : 'Voucher Date'}</label>
+                        <label className="block text-[11px] font-bold text-zinc-500 mb-1 px-1 uppercase">{language === 'ar' ? 'تاريخ السند' : 'Voucher Date'}</label>
                         <div className="relative">
-                          <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <Calendar className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                           <input 
                             required
-                            type="date"
-                            className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                            type="date" 
+                            className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs h-9`}
                             value={voucherData.date}
                             onChange={(e) => setVoucherData({...voucherData, date: e.target.value})}
                           />
@@ -3025,13 +3016,13 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
 
                       {editingVoucher?.entry_number && (
                         <div>
-                          <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'رقم القيد المرتبط' : 'Linked Journal Entry'}</label>
+                          <label className="block text-[11px] font-bold text-zinc-500 mb-1 px-1 uppercase">{language === 'ar' ? 'رقم القيد المرتبط' : 'Linked Journal Entry'}</label>
                           <div className="relative">
-                            <Layers className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-emerald-500 pointer-events-none`} />
+                            <Layers className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 w-4 h-4 text-emerald-500 pointer-events-none`} />
                             <input 
                               readOnly
-                              type="text"
-                              className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-emerald-50 border border-emerald-200 rounded-2xl outline-none transition-all font-bold text-emerald-800 text-sm`}
+                              type="text" 
+                              className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2 bg-emerald-50 border border-emerald-200 rounded-xl outline-none transition-all font-bold text-emerald-800 text-xs h-9`}
                               value={editingVoucher.entry_number}
                             />
                           </div>
@@ -3040,99 +3031,143 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
 
                       {/* Payment Method */}
                       <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'طريقة الصرف (من خزينة/بنك)' : 'Payment Method (From Safe/Bank)'}</label>
+                        <label className="block text-[11px] font-bold text-zinc-500 mb-1 px-1 uppercase">{language === 'ar' ? 'طريقة الصرف (من خزينة/بنك)' : 'Payment Method (From Safe/Bank)'}</label>
                         <div className="relative group">
-                          <CreditCard className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <CreditCard className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                           <select 
                             required
-                            className={`w-full ${dir === 'rtl' ? 'pr-12 pl-10' : 'pl-12 pr-10'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
+                            className={`w-full ${dir === 'rtl' ? 'pr-9 pl-8' : 'pl-9 pr-8'} py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-xs cursor-pointer h-9`}
                             value={voucherData.payment_method_id}
                             onChange={(e) => {
-                              if (e.target.value === 'new_payment_method') {
+                              const newPmId = e.target.value;
+                              if (newPmId === 'new_payment_method') {
                                 setIsPaymentMethodModalOpen(true);
                               } else {
-                                setVoucherData({...voucherData, payment_method_id: e.target.value});
+                                setVoucherData(prev => ({...prev, payment_method_id: newPmId}));
+                                const selectedPm = paymentMethods.find(p => p.id === newPmId);
+                                if (selectedPm?.currency) {
+                                  const pmCurr = companyCurrencies.find(c => c.code.toLowerCase() === selectedPm.currency.toLowerCase());
+                                  if (pmCurr) {
+                                    handleCurrencyChange(pmCurr.id);
+                                  } else {
+                                    handleCurrencyChange('');
+                                  }
+                                } else {
+                                  handleCurrencyChange('');
+                                }
                               }
                             }}
                           >
                             <option value="">{t('discount_settings.select_account')}</option>
-                            {paymentMethods.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
+                            {paymentMethods.map(pm => (
+                              <option key={pm.id} value={pm.id}>
+                                {pm.name} {pm.currency ? `(${pm.currency.toUpperCase()})` : ''}
+                              </option>
+                            ))}
                             <option value="new_payment_method" className="font-bold text-emerald-600">+ {language === 'ar' ? 'إضافة طريقة دفع جديدة...' : 'Add New Payment Method...'}</option>
                           </select>
-                          <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                         </div>
                       </div>
 
                       {/* Currency & Exchange Rate Selection */}
                       <div>
-                        <div className="flex items-center justify-between mb-2 px-2">
-                          <label className="block text-xs font-bold text-zinc-400 tracking-tighter uppercase">
+                        <div className="flex items-center justify-between mb-1 px-1">
+                          <label className="block text-[11px] font-bold text-zinc-500 uppercase">
                             {language === 'ar' ? 'العملة وسعر الصرف' : 'Currency & Exchange Rate'}
                           </label>
-                          {voucherData.currency_id && (
-                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${exchangeRateType === 'auto' ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
-                              {exchangeRateType === 'auto' 
-                                ? (language === 'ar' ? 'سعر تلقائي' : 'Auto Rate') 
-                                : (language === 'ar' ? 'سعر يدوي' : 'Manual Rate')}
-                            </span>
-                          )}
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div className="relative">
-                            <Coins className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-3.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
-                            <select 
-                              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-8' : 'pl-10 pr-8'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs appearance-none cursor-pointer`}
-                              value={voucherData.currency_id}
-                              onChange={(e) => handleCurrencyChange(e.target.value)}
-                            >
-                              <option value="">
-                                {language === 'ar' 
-                                  ? `عملة الشركة الافتراضية (${(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()})` 
-                                  : `Company Base Currency (${(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()})`}
-                              </option>
-                              {companyCurrencies.map(curr => (
-                                <option key={curr.id} value={curr.id}>{curr.code} - {language === 'ar' ? curr.name_ar : curr.name_en}</option>
-                              ))}
-                            </select>
-                            <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
-                          </div>
-                          <div className="relative">
-                            <DollarSign className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-3.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
-                            <input 
-                              type="number"
-                              step="any"
-                              placeholder={language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}
-                              className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs`}
-                              value={voucherData.exchange_rate}
-                              onChange={(e) => {
-                                setVoucherData({ ...voucherData, exchange_rate: Number(e.target.value) || 1 });
-                                setExchangeRateType('manual');
-                              }}
-                            />
+                          <div className="flex items-center gap-1">
+                            {voucherData.currency_id && (
+                              <button
+                                type="button"
+                                onClick={() => handleCurrencyChange(voucherData.currency_id)}
+                                className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-1 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 cursor-pointer"
+                                title={language === 'ar' ? 'جلب سعر الصرف المحدث من النظام' : 'Fetch system rate'}
+                              >
+                                <RotateCcw size={10} />
+                                <span>{language === 'ar' ? 'سعر النظام' : 'System'}</span>
+                              </button>
+                            )}
+                            {voucherData.currency_id && (
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${exchangeRateType === 'auto' ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
+                                {exchangeRateType === 'auto' 
+                                  ? (language === 'ar' ? 'سعر تلقائي' : 'Auto Rate') 
+                                  : (language === 'ar' ? 'سعر يدوي' : 'Manual Rate')}
+                              </span>
+                            )}
                           </div>
                         </div>
+                        {(() => {
+                          const baseCurrency = (companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase();
+                          const activeCurrency = companyCurrencies.find(c => c.id === voucherData.currency_id);
+                          const currencyCode = (activeCurrency?.code || baseCurrency).toUpperCase();
+
+                          return (
+                            <>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div className="relative">
+                                  <Coins className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                                  <select 
+                                    className={`w-full ${dir === 'rtl' ? 'pr-9 pl-7' : 'pl-9 pr-7'} py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs appearance-none cursor-pointer h-9`}
+                                    value={voucherData.currency_id}
+                                    onChange={(e) => handleCurrencyChange(e.target.value)}
+                                  >
+                                    <option value="">
+                                      {language === 'ar' 
+                                        ? `عملة الشركة الافتراضية (${baseCurrency})` 
+                                        : `Base Currency (${baseCurrency})`}
+                                    </option>
+                                    {companyCurrencies.map(curr => (
+                                      <option key={curr.id} value={curr.id}>{curr.code} - {language === 'ar' ? curr.name_ar : curr.name_en}</option>
+                                    ))}
+                                  </select>
+                                  <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-2.5' : 'right-2.5'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                                </div>
+                                <div className="relative">
+                                  <DollarSign className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                                  <input 
+                                    type="number"
+                                    step="any"
+                                    placeholder={language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}
+                                    className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs h-9 font-mono`}
+                                    value={voucherData.exchange_rate}
+                                    onChange={(e) => {
+                                      setVoucherData({ ...voucherData, exchange_rate: Number(e.target.value) || 1 });
+                                      setExchangeRateType('manual');
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                              {voucherData.currency_id && (
+                                <div className="text-[10px] text-zinc-500 font-mono mt-1 px-1">
+                                  1 {currencyCode} = {voucherData.exchange_rate} {baseCurrency}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
 
                       {/* Paid To (يصرف إلى): Employee / External Party Selection */}
-                      <div className="md:col-span-3 bg-zinc-50/70 p-4 rounded-2xl border border-zinc-200/80 space-y-3">
+                      <div className="md:col-span-3 bg-zinc-50/70 p-3 rounded-2xl border border-zinc-200/80 space-y-2">
                         <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold text-zinc-700 uppercase tracking-wider flex items-center gap-2">
-                            <User className="w-4 h-4 text-emerald-600" />
+                          <label className="text-[11px] font-bold text-zinc-700 uppercase tracking-wider flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-emerald-600" />
                             <span>{language === 'ar' ? 'يصرف إلى:' : 'Paid To:'}</span>
                           </label>
 
-                          <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-zinc-200">
+                          <div className="flex items-center gap-1.5 bg-white p-0.5 rounded-lg border border-zinc-200">
                             <button
                               type="button"
                               onClick={() => setVoucherData({ ...voucherData, paid_to_type: 'employee', paid_to_external_name: '' })}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${voucherData.paid_to_type === 'employee' ? 'bg-emerald-600 text-white shadow-xs' : 'text-zinc-600 hover:bg-zinc-100'}`}
+                              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${voucherData.paid_to_type === 'employee' ? 'bg-emerald-600 text-white shadow-xs' : 'text-zinc-600 hover:bg-zinc-100'}`}
                             >
                               {language === 'ar' ? 'موظف' : 'Employee'}
                             </button>
                             <button
                               type="button"
                               onClick={() => setVoucherData({ ...voucherData, paid_to_type: 'external', paid_to_employee_id: '' })}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${voucherData.paid_to_type === 'external' ? 'bg-emerald-600 text-white shadow-xs' : 'text-zinc-600 hover:bg-zinc-100'}`}
+                              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${voucherData.paid_to_type === 'external' ? 'bg-emerald-600 text-white shadow-xs' : 'text-zinc-600 hover:bg-zinc-100'}`}
                             >
                               {language === 'ar' ? 'جهة خارجية' : 'External Party'}
                             </button>
@@ -3141,9 +3176,9 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
 
                         {voucherData.paid_to_type === 'employee' ? (
                           <div className="relative">
-                            <User className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                            <User className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                             <select
-                              className={`w-full ${dir === 'rtl' ? 'pr-12 pl-10' : 'pl-12 pr-10'} py-3 bg-white border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm appearance-none cursor-pointer`}
+                              className={`w-full ${dir === 'rtl' ? 'pr-9 pl-8' : 'pl-9 pr-8'} py-2 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs appearance-none cursor-pointer h-9`}
                               value={voucherData.paid_to_employee_id}
                               onChange={(e) => setVoucherData({ ...voucherData, paid_to_employee_id: e.target.value })}
                             >
@@ -3154,16 +3189,16 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                                 </option>
                               ))}
                             </select>
-                            <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                            <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                           </div>
                         ) : (
                           <div className="relative">
-                            <Globe className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                            <Globe className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none`} />
                             <input
                               type="text"
                               required={voucherData.paid_to_type === 'external'}
                               placeholder={language === 'ar' ? 'كتابة اسم الجهة الخارجية...' : 'Write external party name...'}
-                              className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-white border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
+                              className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs h-9`}
                               value={voucherData.paid_to_external_name}
                               onChange={(e) => setVoucherData({ ...voucherData, paid_to_external_name: e.target.value })}
                             />
@@ -3173,15 +3208,14 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
 
                       {/* General Description / Additional Notes Relocated to Basic Info */}
                       <div className="md:col-span-3">
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{language === 'ar' ? 'البيان العام / ملاحظات إضافية' : 'General Description / Additional Notes'}</label>
+                        <label className="block text-[11px] font-bold text-zinc-500 mb-1 px-1 uppercase">{language === 'ar' ? 'البيان العام / ملاحظات إضافية' : 'General Description / Additional Notes'}</label>
                         <textarea 
-                          rows={3}
-                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-3xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none font-bold text-sm text-zinc-800"
+                          rows={2}
+                          className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none font-bold text-xs text-zinc-800"
                           placeholder={language === 'ar' ? "اكتب بيان/ملاحظات السند هنا..." : "Write voucher notes/description here..."}
                           value={voucherData.notes}
                           onChange={(e) => setVoucherData({...voucherData, notes: e.target.value})}
                         />
-                      </div>
                     </div>
                   </section>
 
@@ -3212,20 +3246,26 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                         <table className="w-full">
                           <thead>
                             <tr className={`text-zinc-500 text-[10px] uppercase font-black tracking-widest ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              <th className="px-2 py-3 w-32 tracking-tighter">{language === 'ar' ? 'النوع' : 'Type'}</th>
-                              <th className="px-2 py-3 tracking-tighter">{language === 'ar' ? 'المستفيد / الحساب' : 'Beneficiary / Account'}</th>
-                              <th className="px-2 py-3 w-32 tracking-tighter uppercase tracking-widest">{t('common.amount')}</th>
-                              <th className="px-2 py-3 tracking-tighter uppercase tracking-widest">{t('common.description')}</th>
-                              <th className="px-2 py-3 w-10"></th>
+                              <th className="px-2 py-2 w-32 tracking-tighter">{language === 'ar' ? 'النوع' : 'Type'}</th>
+                              <th className="px-2 py-2 tracking-tighter">{language === 'ar' ? 'المستفيد / الحساب' : 'Beneficiary / Account'}</th>
+                              <th className="px-2 py-2 w-32 tracking-tighter uppercase tracking-widest">
+                                {t('common.amount')} {(() => {
+                                  const baseCurrency = (companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase();
+                                  const activeCurrency = companyCurrencies.find(c => c.id === voucherData.currency_id);
+                                  return `(${(activeCurrency?.code || baseCurrency).toUpperCase()})`;
+                                })()}
+                              </th>
+                              <th className="px-2 py-2 tracking-tighter uppercase tracking-widest">{t('common.description')}</th>
+                              <th className="px-2 py-2 w-10"></th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-zinc-50">
                             {voucherData.items.map((item, idx) => (
                               <React.Fragment key={idx}>
                                 <tr className="group hover:bg-zinc-50 transition-colors">
-                                  <td className="px-1 py-1 relative">
+                                  <td className="px-1 py-1.5 relative">
                                     <select 
-                                      className="w-full px-2 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] font-bold outline-none appearance-none"
+                                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold outline-none appearance-none h-9"
                                       disabled={isSupplierOnly}
                                       value={isSupplierOnly ? 'supplier' : item.type}
                                       onChange={(e) => {
@@ -3247,11 +3287,11 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                                         </>
                                       )}
                                     </select>
-                                    <ChevronDown size={12} className="absolute right-3 top-4 text-zinc-400 pointer-events-none" />
+                                    <ChevronDown size={12} className="absolute right-3 top-3.5 text-zinc-400 pointer-events-none" />
                                   </td>
-                                  <td className="px-1 py-1 relative">
+                                  <td className="px-1 py-1.5 relative">
                                     <select 
-                                      className="w-full px-2 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] font-black outline-none appearance-none"
+                                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-black outline-none appearance-none h-9"
                                       value={item.entity_id}
                                       onChange={(e) => {
                                         const newItems = [...voucherData.items];
@@ -3268,10 +3308,10 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                                       {item.type === 'expense' && categories.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
                                       {item.type === 'account' && accounts.map(a => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)}
                                     </select>
-                                    <ChevronDown size={12} className="absolute right-4 top-4 text-zinc-400 pointer-events-none" />
+                                    <ChevronDown size={12} className="absolute right-4 top-3.5 text-zinc-400 pointer-events-none" />
                                     {item.type === 'account' && accounts.find(a => a.id === item.entity_id)?.required_sub_account && (
                                       <select
-                                        className="w-full px-2 py-2 mt-1 bg-emerald-50 border border-emerald-200 rounded-xl text-[10px] font-bold outline-none"
+                                        className="w-full px-2 py-1.5 mt-1 bg-emerald-50 border border-emerald-200 rounded-xl text-[10px] font-bold outline-none h-8"
                                         value={item.sub_account_id || ''}
                                         onChange={(e) => {
                                           const newItems = [...voucherData.items];
@@ -3287,10 +3327,10 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                                       </select>
                                     )}
                                   </td>
-                                  <td className="px-1 py-1">
+                                  <td className="px-1 py-1.5">
                                     <input 
                                       type="number" 
-                                      className="w-full px-2 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-black text-emerald-600 outline-none text-center"
+                                      className="w-full px-2 py-1.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-black text-emerald-600 outline-none text-center h-9 font-mono"
                                       placeholder="0"
                                       value={item.amount || ''}
                                       onChange={(e) => {
@@ -3300,11 +3340,11 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                                       }}
                                     />
                                   </td>
-                                  <td className="px-1 py-1">
+                                  <td className="px-1 py-1.5">
                                     <input 
                                       type="text" 
                                       placeholder={language === 'ar' ? 'بيان تفصيلي...' : 'Detailed statement...'}
-                                      className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-[11px] font-bold outline-none"
+                                      className="w-full px-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-bold outline-none h-9"
                                       value={item.description}
                                       onChange={(e) => {
                                         const newItems = [...voucherData.items];
@@ -3313,16 +3353,16 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                                       }}
                                     />
                                   </td>
-                                  <td className="px-1 py-1 text-center">
+                                  <td className="px-1 py-1.5 text-center">
                                     <button 
                                       type="button"
                                       onClick={() => {
                                         const newItems = voucherData.items.filter((_, i) => i !== idx);
                                         setVoucherData({...voucherData, items: newItems});
                                       }}
-                                      className="p-2 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                      className="p-1.5 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
                                     >
-                                      <Trash2 size={16} />
+                                      <Trash2 size={15} />
                                     </button>
                                   </td>
                                 </tr>
@@ -3544,9 +3584,13 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                           </tbody>
                           <tfoot>
                             <tr className="bg-zinc-50/50">
-                              <td colSpan={2} className="px-4 py-4 font-black text-zinc-900 border-t border-zinc-100 text-sm italic tracking-tighter uppercase underline decoration-emerald-300 decoration-2 underline-offset-4 tracking-tight">إجمالي المبلغ المنصرف:</td>
-                              <td className="px-2 py-4 font-black text-2xl text-emerald-600 border-t border-zinc-100 text-center tracking-tighter">
-                                {formatNumber(voucherData.items.reduce((sum, item) => sum + item.amount, 0))}
+                              <td colSpan={2} className="px-3 py-3 font-black text-zinc-900 border-t border-zinc-100 text-xs italic tracking-tighter uppercase underline decoration-emerald-300 decoration-2 underline-offset-4 tracking-tight">إجمالي المبلغ المنصرف:</td>
+                              <td className="px-2 py-3 font-black text-lg text-emerald-600 border-t border-zinc-100 text-center tracking-tighter font-mono">
+                                {formatNumber(voucherData.items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0))} {(() => {
+                                  const baseCurrency = (companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase();
+                                  const activeCurrency = companyCurrencies.find(c => c.id === voucherData.currency_id);
+                                  return (activeCurrency?.code || baseCurrency).toUpperCase();
+                                })()}
                               </td>
                               <td colSpan={2} className="border-t border-zinc-100"></td>
                             </tr>

@@ -857,36 +857,75 @@ export class PostingService {
     const fromPm = paymentMethods.find(p => p.id === doc.from_payment_method_id);
     const toPm = paymentMethods.find(p => p.id === doc.to_payment_method_id);
     const amount = Number(doc.amount) || 0;
+    const rate = Number(doc.exchange_rate) || 1;
+    const convertedAmount = Number(doc.converted_amount) || Number((amount * rate).toFixed(4));
+    const isDifferentCurrencies = doc.from_currency && doc.to_currency && doc.from_currency !== doc.to_currency;
+
+    let baseAmount = amount;
+    let toForeign: any = undefined;
+    let fromForeign: any = undefined;
+
+    if (isDifferentCurrencies) {
+      if (doc.to_currency === 'EGP') {
+        baseAmount = convertedAmount;
+        fromForeign = {
+          currency: doc.from_currency,
+          exchange_rate: rate,
+          foreign_amount: amount
+        };
+      } else if (doc.from_currency === 'EGP') {
+        baseAmount = amount;
+        toForeign = {
+          currency: doc.to_currency,
+          exchange_rate: rate,
+          foreign_amount: convertedAmount
+        };
+      } else {
+        baseAmount = convertedAmount;
+        fromForeign = {
+          currency: doc.from_currency,
+          exchange_rate: rate,
+          foreign_amount: amount
+        };
+        toForeign = {
+          currency: doc.to_currency,
+          exchange_rate: rate,
+          foreign_amount: convertedAmount
+        };
+      }
+    }
 
     return {
       date: doc.date,
-      reference_number: doc.id.slice(-6),
+      reference_number: doc.id ? doc.id.slice(-6) : (doc.transfer_number || 'TR'),
       reference_id: doc.id,
       reference_type: 'transfer',
-      description: `تحويل نقدية: من ${fromPm?.name || ''} إلى ${toPm?.name || ''} - ${doc.description || ''}`,
+      description: `تحويل بين البنوك والخزائن: من ${fromPm?.name || ''} إلى ${toPm?.name || ''}${doc.description ? ' - ' + doc.description : ''}`,
       items: [
         {
           account_id: toPm?.account_id || '',
           account_name: toPm?.account_name || 'حساب بنك/خزينة (مستلم)',
-          debit: amount,
+          debit: baseAmount,
           credit: 0,
-          description: `وارد تحويل من ${fromPm?.name || ''}`,
+          description: `وارد تحويل من ${fromPm?.name || ''}${isDifferentCurrencies ? ` (${amount} ${doc.from_currency} @ ${rate})` : ''}`,
           sub_account_id: toPm?.id,
-          sub_account_type: 'payment_method'
+          sub_account_type: 'payment_method',
+          ...(toForeign || {})
         },
         {
           account_id: fromPm?.account_id || '',
           account_name: fromPm?.account_name || 'حساب بنك/خزينة (محول)',
           debit: 0,
-          credit: amount,
-          description: `صادر تحويل إلى ${toPm?.name || ''}`,
+          credit: baseAmount,
+          description: `صادر تحويل إلى ${toPm?.name || ''}${isDifferentCurrencies ? ` (${convertedAmount} ${doc.to_currency})` : ''}`,
           sub_account_id: fromPm?.id,
-          sub_account_type: 'payment_method'
+          sub_account_type: 'payment_method',
+          ...(fromForeign || {})
         }
       ],
-      total_debit: amount,
-      total_credit: amount,
-      company_id: '',
+      total_debit: baseAmount,
+      total_credit: baseAmount,
+      company_id: doc.company_id || '',
       created_at: new Date().toISOString(),
       created_by: 'system'
     };

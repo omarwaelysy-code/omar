@@ -30,7 +30,7 @@ const moduleLabels: Record<string, { ar: string; en: string }> = {
   stock_adjustments: { ar: 'تسويات المخزون', en: 'Stock Adjustments' },
   receipt_vouchers: { ar: 'سندات القبض', en: 'Receipt Vouchers' },
   payment_vouchers: { ar: 'سندات الصرف', en: 'Payment Vouchers' },
-  cash_transfers: { ar: 'التحويل بين الخزائن', en: 'Cash Transfers' },
+  cash_transfers: { ar: 'التحويل بين البنوك والخزائن', en: 'Transfers Between Banks & Safes' },
   customers: { ar: 'العملاء', en: 'Customers' },
   suppliers: { ar: 'الموردين', en: 'Suppliers' },
   products: { ar: 'الأصناف والمنتجات', en: 'Products' },

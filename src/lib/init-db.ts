@@ -707,8 +707,16 @@ export async function initDatabase() {
         "from_payment_method_name" VARCHAR(255),
         "to_payment_method_name" VARCHAR(255),
         "transfer_number" VARCHAR(50),
+        "from_currency" VARCHAR(10) DEFAULT 'EGP',
+        "to_currency" VARCHAR(10) DEFAULT 'EGP',
+        "exchange_rate" DECIMAL(18, 6) DEFAULT 1,
+        "converted_amount" DECIMAL(18, 4),
         "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+      ALTER TABLE "cash_transfers" ADD COLUMN IF NOT EXISTS "from_currency" VARCHAR(10) DEFAULT 'EGP';
+      ALTER TABLE "cash_transfers" ADD COLUMN IF NOT EXISTS "to_currency" VARCHAR(10) DEFAULT 'EGP';
+      ALTER TABLE "cash_transfers" ADD COLUMN IF NOT EXISTS "exchange_rate" DECIMAL(18, 6) DEFAULT 1;
+      ALTER TABLE "cash_transfers" ADD COLUMN IF NOT EXISTS "converted_amount" DECIMAL(18, 4);
     `, 'cash_transfers table');
 
     // Phase 5: Transaction Items
