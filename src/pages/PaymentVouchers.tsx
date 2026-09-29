@@ -3256,6 +3256,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                           value={voucherData.notes}
                           onChange={(e) => setVoucherData({...voucherData, notes: e.target.value})}
                         />
+                      </div>
                     </div>
                   </section>
 

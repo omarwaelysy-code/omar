@@ -1402,9 +1402,8 @@ export const CashTransfers: React.FC = () => {
                       </div>
                     </motion.div>
                   )}
-                </div>
 
-                {/* Attachments Section */}
+                  {/* Attachments Section */}
                   <div className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm max-w-4xl mx-auto w-full mt-6">
                     <AttachmentsManager
                       attachments={attachments}
