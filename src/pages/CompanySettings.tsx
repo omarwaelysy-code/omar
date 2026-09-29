@@ -488,8 +488,6 @@ export function CompanySettings() {
       </div>
 
       <form id="company-settings-form" onSubmit={handleSave} className="grid grid-cols-1 xl:grid-cols-2 gap-2.5 items-start">
-        {/* ================= COLUMN 1: Basic, Financial & Inventory ================= */}
-        <div className="space-y-2.5">
         {/* ================= COLUMN 1: Basic Information & Barcode Settings ================= */}
         <div className="space-y-2.5">
         {/* Card 1: Logo & Basic Info */}
