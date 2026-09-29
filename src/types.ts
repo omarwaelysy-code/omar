@@ -558,6 +558,9 @@ export interface ReceiptVoucher {
   account_id?: string;
   company_id: string;
   entry_number?: string;
+  currency_id?: string;
+  currency?: string;
+  exchange_rate?: number;
   items?: ReceiptVoucherItem[];
   voucher_type?: string;
   created_at?: string;
@@ -596,6 +599,9 @@ export interface PaymentVoucher {
   account_id?: string;
   company_id: string;
   items?: PaymentVoucherItem[];
+  currency_id?: string;
+  currency?: string;
+  exchange_rate?: number;
   entry_number?: string;
   number?: string;
   voucher_type?: string;

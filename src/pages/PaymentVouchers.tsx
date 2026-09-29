@@ -3935,7 +3935,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                                                 </td>
                                                 <td className="py-1 font-mono">{s.date ? formatDate(s.date) : ''}</td>
                                                 <td className="py-1">{formatNumber(s.original_amount)}</td>
-                                                <td className="py-1 text-left text-emerald-600 font-bold">{formatNumber(s.settled_amount)} {(() => { const vc = companyCurrencies.find(c => c.id === viewVoucher.currency_id); return (vc?.code || viewVoucher.currency || (companyData?.settings?.currency || 'EGP')).toUpperCase(); })()}</td>
+                                                <td className="py-1 text-left text-emerald-600 font-bold">{formatNumber(s.settled_amount)} {(() => { const vc = companyCurrencies.find(c => c.id === (viewVoucher as any).currency_id); return (vc?.code || (viewVoucher as any).currency || (companyData?.settings?.currency || 'EGP')).toUpperCase(); })()}</td>
                                               </tr>
                                             ))}
                                           </tbody>
@@ -3951,7 +3951,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                         <tfoot className="bg-zinc-50/50">
                           <tr>
                             <td colSpan={2} className="px-4 py-3 font-bold text-zinc-900 text-left">الإجمالي:</td>
-                            <td className="px-4 py-3 text-left font-black text-emerald-600 text-lg">{formatNumber(viewVoucher.amount)} {(() => { const vc = companyCurrencies.find(c => c.id === viewVoucher.currency_id); return (vc?.code || viewVoucher.currency || (companyData?.settings?.currency || 'EGP')).toUpperCase(); })()}</td>
+                            <td className="px-4 py-3 text-left font-black text-emerald-600 text-lg">{formatNumber(viewVoucher.amount)} {(() => { const vc = companyCurrencies.find(c => c.id === (viewVoucher as any).currency_id); return (vc?.code || (viewVoucher as any).currency || (companyData?.settings?.currency || 'EGP')).toUpperCase(); })()}</td>
                           </tr>
                         </tfoot>
                       </table>
@@ -3964,7 +3964,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                       </div>
                       <div className="text-left">
                         <p className="text-xs text-zinc-400 uppercase tracking-wider mb-1">المبلغ</p>
-                        <p className="text-2xl font-black text-emerald-600">{formatNumber(viewVoucher.amount)} {(() => { const vc = companyCurrencies.find(c => c.id === viewVoucher.currency_id); return (vc?.code || viewVoucher.currency || (companyData?.settings?.currency || 'EGP')).toUpperCase(); })()}</p>
+                        <p className="text-2xl font-black text-emerald-600">{formatNumber(viewVoucher.amount)} {(() => { const vc = companyCurrencies.find(c => c.id === (viewVoucher as any).currency_id); return (vc?.code || (viewVoucher as any).currency || (companyData?.settings?.currency || 'EGP')).toUpperCase(); })()}</p>
                       </div>
                     </div>
                   )}
@@ -4535,7 +4535,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                         {formatNumber(viewVoucher.amount)}
                       </span>
                       <span className="text-xs font-bold bg-white/20 px-1.5 py-0.5 rounded">
-                        {(companyCurrencies.find(c => c.id === viewVoucher.currency_id)?.code || companyData?.settings?.currency || 'EGP').toUpperCase()}
+                        {(companyCurrencies.find(c => c.id === (viewVoucher as any).currency_id)?.code || companyData?.settings?.currency || 'EGP').toUpperCase()}
                       </span>
                     </div>
                   </div>
@@ -4563,7 +4563,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                     recipientName = viewVoucher.category_name;
                   }
 
-                  const currencyCode = (companyCurrencies.find(c => c.id === viewVoucher.currency_id)?.code || companyData?.settings?.currency || 'EGP').toUpperCase();
+                  const currencyCode = (companyCurrencies.find(c => c.id === (viewVoucher as any).currency_id)?.code || companyData?.settings?.currency || 'EGP').toUpperCase();
                   const tafqeetText = tafqeet(Number(viewVoucher.amount) || 0, currencyCode, 'ar');
                   const pmName = viewVoucher.payment_method_name || paymentMethods.find(p => p.id === viewVoucher.payment_method_id)?.name || 'نقداً';
                   const voucherDesc = viewVoucher.description || viewVoucher.notes || 'سند صرف نقدية';

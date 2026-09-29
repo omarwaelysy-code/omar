@@ -3601,7 +3601,7 @@ export const Receipts: React.FC = () => {
                                     {item.sub_account_id && ` (فرعي: ${item.sub_account_id})`}
                                   </td>
                                   <td className="px-4 py-3 text-left text-emerald-600 font-black">
-                                    {formatNumber(item.amount)} {(() => { const rc = companyCurrencies.find(c => c.id === viewReceipt.currency_id); return (rc?.code || viewReceipt.currency || (companyData?.settings?.currency || 'EGP')).toUpperCase(); })()}
+                                    {formatNumber(item.amount)} {(() => { const rc = companyCurrencies.find(c => c.id === (viewReceipt as any).currency_id); return (rc?.code || (viewReceipt as any).currency || (companyData?.settings?.currency || 'EGP')).toUpperCase(); })()}
                                   </td>
                                   <td className="px-4 py-3 text-zinc-500 font-normal">
                                     {item.description || '---'}
@@ -3689,7 +3689,7 @@ export const Receipts: React.FC = () => {
                                                 </td>
                                                 <td className="py-1 font-mono">{s.date ? formatDate(s.date) : ''}</td>
                                                 <td className="py-1">{formatNumber(s.original_amount)}</td>
-                                                <td className="py-1 text-left text-emerald-600 font-bold">{formatNumber(s.settled_amount)} {(() => { const rc = companyCurrencies.find(c => c.id === viewReceipt.currency_id); return (rc?.code || viewReceipt.currency || (companyData?.settings?.currency || 'EGP')).toUpperCase(); })()}</td>
+                                                <td className="py-1 text-left text-emerald-600 font-bold">{formatNumber(s.settled_amount)} {(() => { const rc = companyCurrencies.find(c => c.id === (viewReceipt as any).currency_id); return (rc?.code || (viewReceipt as any).currency || (companyData?.settings?.currency || 'EGP')).toUpperCase(); })()}</td>
                                               </tr>
                                             ))}
                                           </tbody>
@@ -3707,7 +3707,7 @@ export const Receipts: React.FC = () => {
                       <div className="flex justify-between items-center bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
                         <span className="font-bold text-zinc-700 text-sm">إجمالي المبلغ المستلم:</span>
                         <span className="font-black text-2xl text-emerald-600 tracking-tighter">
-                          {formatNumber(viewReceipt.amount)} {(() => { const rc = companyCurrencies.find(c => c.id === viewReceipt.currency_id); return (rc?.code || viewReceipt.currency || (companyData?.settings?.currency || 'EGP')).toUpperCase(); })()}
+                          {formatNumber(viewReceipt.amount)} {(() => { const rc = companyCurrencies.find(c => c.id === (viewReceipt as any).currency_id); return (rc?.code || (viewReceipt as any).currency || (companyData?.settings?.currency || 'EGP')).toUpperCase(); })()}
                         </span>
                       </div>
                     </div>
@@ -3719,7 +3719,7 @@ export const Receipts: React.FC = () => {
                       </div>
                       <div className="text-left">
                         <p className="text-xs text-zinc-400 uppercase tracking-wider mb-1">المبلغ</p>
-                        <p className="text-2xl font-black text-emerald-600">{formatNumber(viewReceipt.amount)} {(() => { const rc = companyCurrencies.find(c => c.id === viewReceipt.currency_id); return (rc?.code || viewReceipt.currency || (companyData?.settings?.currency || 'EGP')).toUpperCase(); })()}</p>
+                        <p className="text-2xl font-black text-emerald-600">{formatNumber(viewReceipt.amount)} {(() => { const rc = companyCurrencies.find(c => c.id === (viewReceipt as any).currency_id); return (rc?.code || (viewReceipt as any).currency || (companyData?.settings?.currency || 'EGP')).toUpperCase(); })()}</p>
                       </div>
                     </div>
                   )}
