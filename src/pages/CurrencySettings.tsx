@@ -90,12 +90,12 @@ export function CurrencySettings() {
 
       // Load registered currencies and recent rates
       try {
-        const currencies = await dbService.getAll<any>('currencies');
+        const currencies = await dbService.listAll<any>('currencies');
         const companyCurrencies = currencies.filter((c: any) => c.company_id === user.company_id);
         
         let ratesMap: Record<string, { rate: number; date: string }> = {};
         try {
-          const rates = await dbService.getAll<any>('currency_rates');
+          const rates = await dbService.listAll<any>('currency_rates');
           const companyRates = rates.filter((r: any) => r.company_id === user.company_id);
           companyRates.forEach((r: any) => {
             if (!ratesMap[r.currency_id] || new Date(r.rate_date) > new Date(ratesMap[r.currency_id].date)) {
