@@ -164,6 +164,7 @@ const getTabIcon = (id: string) => {
     case 'general_ledger_report':
     case 'ifrs_guide':
       return <BookOpen {...iconProps} />;
+    case 'currency_settings':
     case 'currencies': return <Coins {...iconProps} />;
     case 'create_journal_entry': return <Plus {...iconProps} />;
     case 'detailed_journal_entries': return <FileSpreadsheet {...iconProps} />;
@@ -774,6 +775,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         icon: Settings,
         subItems: [
           { id: 'company_settings', label: t('nav.company_settings'), icon: Building2 },
+          { id: 'currency_settings', label: t('nav.currency_settings'), icon: Coins },
           { id: 'eta_settings', label: t('nav.eta_settings'), icon: Receipt },
           ...(company?.settings?.enable_multi_currency || (company?.settings as any)?.enable_multi_currency === 'true' || isSuperAdmin ? [{ id: 'currencies', label: t('nav.currencies'), icon: Coins }] : []),
           { id: 'users', label: t('nav.users'), icon: UsersIcon },

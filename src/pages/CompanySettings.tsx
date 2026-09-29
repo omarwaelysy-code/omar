@@ -4,7 +4,6 @@ import {
   Building2, 
   Upload, 
   Globe, 
-  Coins, 
   Calendar, 
   MapPin, 
   FileText, 
@@ -190,14 +189,7 @@ export function CompanySettings() {
     goods_receipt_matching_mode: 'SmartMatching'
   });
 
-  // ─── Exchange Rate Settings state ──────────────────────────────────────────────────
-  const [erIsUpdating,   setErIsUpdating]   = useState(false);
-  const [erIsTesting,    setErIsTesting]     = useState(false);
-  const [erAutoUpdate,   setErAutoUpdate]   = useState(false);
-  const [erFrequency,    setErFrequency]    = useState<'daily' | 'weekly'>('daily');
-  const [erLastUpdate,   setErLastUpdate]   = useState<string | null>(null);
-  const [erConnStatus,   setErConnStatus]   = useState<'idle' | 'ok' | 'error'>('idle');
-  const [erLastResult,   setErLastResult]   = useState<string | null>(null);
+
 
   // ─── Barcode Scanner Settings state ────────────────────────────────────────────────
   const [barcodeSettings, setBarcodeSettings] = useState({
@@ -210,88 +202,7 @@ export function CompanySettings() {
     show_success_message: true,
   });
 
-  const formatSyncDateTime = () => {
-    const now = new Date();
-    const day = String(now.getDate()).padStart(2, '0');
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const year = now.getFullYear();
-    let hours = now.getHours();
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    const seconds = String(now.getSeconds()).padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12;
-    hours = hours ? hours : 12;
-    const hoursStr = String(hours).padStart(2, '0');
-    return `${day}/${month}/${year} ${hoursStr}:${minutes}:${seconds} ${ampm}`;
-  };
 
-  /** Update Exchange Rates Now */
-  const handleErUpdate = useCallback(async () => {
-    if (!data.currency) return;
-    setErIsUpdating(true);
-    setErLastResult(null);
-    try {
-      const result = await apiRequest<{
-        success: boolean;
-        inserted: number;
-        updated: number;
-        skipped: number;
-        message: string;
-      }>('/currencies/update-rates', 'POST', { baseCurrency: data.currency });
-
-      if (result.success) {
-        const totalUpdated = result.updated + result.inserted;
-        const summary = `${totalUpdated} currencies updated successfully. (تم تحديث ${totalUpdated} من العملات بنجاح.)`;
-        setErLastUpdate(formatSyncDateTime());
-        setErConnStatus('ok');
-        setErLastResult(summary);
-        showNotification('تم تحديث أسعار الصرف بنجاح', 'success');
-      } else {
-        setErConnStatus('error');
-        setErLastResult(`فشل: ${result.message}`);
-        showNotification(`فشل التحديث: ${result.message}`, 'error');
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setErConnStatus('error');
-      setErLastResult(`خطأ: ${msg}`);
-      showNotification(`خطأ: ${msg}`, 'error');
-    } finally {
-      setErIsUpdating(false);
-    }
-  }, [data.currency]);
-
-  /** Test Connection only (fetch without persisting) */
-  const handleErTest = useCallback(async () => {
-    setErIsTesting(true);
-    setErConnStatus('idle');
-    setErLastResult(null);
-    try {
-      const result = await apiRequest<{
-        success: boolean;
-        inserted: number;
-        updated: number;
-        skipped: number;
-        message: string;
-      }>('/currencies/update-rates', 'POST', { baseCurrency: data.currency || 'EGP' });
-      if (result.success) {
-        setErConnStatus('ok');
-        setErLastResult('الاتصال ناجح — تم استقبال بيانات أسعار الصرف بنجاح');
-        showNotification('اختبار الاتصال ناجح', 'success');
-      } else {
-        setErConnStatus('error');
-        setErLastResult(`فشل الاتصال: ${result.message}`);
-        showNotification('فشل اختبار الاتصال', 'error');
-      }
-    } catch (err: unknown) {
-      setErConnStatus('error');
-      const msg = err instanceof Error ? err.message : String(err);
-      setErLastResult(`خطأ الاتصال: ${msg}`);
-      showNotification('فشل اختبار الاتصال', 'error');
-    } finally {
-      setErIsTesting(false);
-    }
-  }, [data.currency]);
 
   useEffect(() => {
     if (user?.company_id) {
@@ -348,11 +259,6 @@ export function CompanySettings() {
             allow_negative_stock: settings.allow_negative_stock || false
           });
 
-          setErAutoUpdate(settings.er_auto_update || false);
-          setErFrequency(settings.er_frequency || 'daily');
-          setErLastUpdate(settings.er_last_update || null);
-          setErConnStatus(settings.er_conn_status || 'idle');
-          setErLastResult(settings.er_last_result || null);
 
           // Load barcode scanner settings
           const bs = settings.barcode_scanner || {};
@@ -392,12 +298,6 @@ export function CompanySettings() {
         ...originalSettings,
         currency: data.currency,
         enable_multi_currency: data.enable_multi_currency,
-        exchange_rate_update_method: data.exchange_rate_update_method || 'manual',
-        er_auto_update: erAutoUpdate,
-        er_frequency: erFrequency,
-        er_last_update: erLastUpdate,
-        er_conn_status: erConnStatus,
-        er_last_result: erLastResult,
         inventory_cost_method_level: 'item',
         inventory_cost_method: data.inventory_cost_method || 'wac',
         vat_enabled: data.vat_enabled,
@@ -615,6 +515,61 @@ export function CompanySettings() {
               </div>
             </div>
 
+            {/* Fiscal Year End Section (نقل تاريخ انتهاء السنة المالية هنا) */}
+            <div className="sm:col-span-2 lg:col-span-4 p-2.5 bg-slate-50/80 rounded-xl border border-slate-200/70">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                <div className="text-right">
+                  <div className="flex items-center gap-1.5 text-indigo-600 mb-0.5">
+                    <Calendar className="w-3.5 h-3.5" />
+                    <label className="text-[11px] font-bold text-slate-700">
+                      {t('company_settings.fiscal_year_end')}*
+                    </label>
+                  </div>
+                  <p className="text-[10px] font-semibold text-slate-400">
+                    * {language === 'ar' 
+                      ? 'سيتم تعيين السنة المالية لتنتهي في هذا التاريخ من كل عام.' 
+                      : 'Fiscal year will close automatically on this day annually.'}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:min-w-[250px]">
+                  <div className="relative group">
+                    <select
+                      value={data.fiscal_year_month}
+                      onChange={(e) => {
+                          const m = parseInt(e.target.value);
+                          const maxDays = daysInMonth(m);
+                          setData({ 
+                              ...data, 
+                              fiscal_year_month: m,
+                              fiscal_year_day: data.fiscal_year_day > maxDays ? maxDays : data.fiscal_year_day
+                          });
+                      }}
+                      className="w-full px-3 py-1.5 h-8 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-semibold hover:border-indigo-500 outline-none appearance-none cursor-pointer transition-all"
+                    >
+                      {MONTHS.map(m => (
+                        <option key={m.value} value={m.value} className="text-slate-900">
+                          {language === 'ar' ? m.nameAr : m.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform group-focus-within:rotate-180`} />
+                  </div>
+                  <div className="relative group">
+                    <select
+                      value={data.fiscal_year_day}
+                      onChange={(e) => setData({ ...data, fiscal_year_day: parseInt(e.target.value) })}
+                      className="w-full px-3 py-1.5 h-8 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-semibold hover:border-indigo-500 outline-none appearance-none cursor-pointer transition-all"
+                    >
+                      {Array.from({ length: daysInMonth(data.fiscal_year_month) }, (_, i) => i + 1).map(d => (
+                        <option key={d} value={d} className="text-slate-900">{d}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform group-focus-within:rotate-180`} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* VAT & WHT Toggles side-by-side in grid */}
             <div className="sm:col-span-2 lg:col-span-4 pt-2.5 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-2">
               {/* VAT Toggle */}
@@ -732,417 +687,11 @@ export function CompanySettings() {
             </div>
           </div>
         </div>
-
-        {/* Card 4: Barcode Scanner Settings (Optimized into 2 columns grid to cut height by 50%!) */}
-        <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs space-y-2">
-          <div className="flex items-center gap-2 text-indigo-600 justify-end">
-            <span className="font-bold text-xs sm:text-sm">
-              {language === 'ar' ? 'إعدادات قراءة الباركود' : 'Barcode Scanner Settings'}
-            </span>
-            <ScanLine className="w-5 h-5" />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {([
-              {
-                key: 'enable_camera_scanner',
-                labelAr: 'تفعيل استخدام كاميرا الباركود',
-                labelEn: 'Enable Camera Barcode Scanner',
-                descAr: 'يسمح بفتح الكاميرا لمسح الباركود داخل الفواتير.',
-                descEn: 'Allow opening camera to scan barcodes.',
-              },
-              {
-                key: 'enable_hid_scanner',
-                labelAr: 'تفعيل Barcode Scanner (USB / Bluetooth)',
-                labelEn: 'Enable USB / Bluetooth Scanner',
-                descAr: 'يدعم القارئات المتصلة عبر USB أو Bluetooth تلقائياً.',
-                descEn: 'Auto-detect USB and Bluetooth readers.',
-              },
-              {
-                key: 'enable_continuous_mode',
-                labelAr: 'تفعيل وضع القراءة المستمرة',
-                labelEn: 'Enable Continuous Scan Mode',
-                descAr: 'تبقى الكاميرا مفتوحة لمسح أكثر من صنف متتالياً.',
-                descEn: 'Keep camera open for sequential scanning.',
-              },
-              {
-                key: 'play_sound_on_success',
-                labelAr: 'تشغيل صوت عند نجاح القراءة',
-                labelEn: 'Play Sound on Successful Scan',
-                descAr: 'يصدر صوت Beep قصير عند كل قراءة ناجحة.',
-                descEn: 'Plays a short beep on successful scan.',
-              },
-              {
-                key: 'prevent_unknown_items',
-                labelAr: 'منع إضافة أصناف غير معروفة',
-                labelEn: 'Block Unknown Barcodes',
-                descAr: 'لا يضيف أي صنف إذا لم يعثر على الباركود بالنظام.',
-                descEn: 'Block adding items when barcode is not found.',
-              },
-              {
-                key: 'auto_increase_quantity',
-                labelAr: 'زيادة الكمية تلقائياً عند تكرار القراءة',
-                labelEn: 'Auto-Increase Qty on Duplicate Scan',
-                descAr: 'إذا كان الصنف موجوداً تزاد كميته بدلاً من تكراره.',
-                descEn: 'Increase quantity instead of adding a new line.',
-              },
-              {
-                key: 'show_success_message',
-                labelAr: 'إظهار رسالة نجاح بعد القراءة',
-                labelEn: 'Show Success Notification After Scan',
-                descAr: 'يعرض إشعار مؤقت بعد إضافة الصنف بنجاح.',
-                descEn: 'Shows brief toast notification after scan.',
-              },
-            ] as const).map(({ key, labelAr, labelEn, descAr, descEn }) => (
-              <div
-                key={key}
-                className="flex items-center justify-between cursor-pointer select-none p-2 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors"
-                onClick={() =>
-                  setBarcodeSettings((prev) => ({ ...prev, [key]: !prev[key] }))
-                }
-              >
-                <div className="flex flex-col gap-0.5 flex-1 me-2">
-                  <span className="font-bold text-slate-800 text-xs">
-                    {language === 'ar' ? labelAr : labelEn}
-                  </span>
-                  <span className="text-[10.5px] text-slate-400 font-medium leading-normal">
-                    {language === 'ar' ? descAr : descEn}
-                  </span>
-                </div>
-                <div
-                  className={`relative w-9 h-5 rounded-full transition-all duration-300 shadow-inner flex-shrink-0 ${
-                    barcodeSettings[key] ? 'bg-indigo-600' : 'bg-slate-200'
-                  }`}
-                >
-                  <div
-                    className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-xs transition-all duration-300 transform ${
-                      dir === 'rtl'
-                        ? barcodeSettings[key] ? 'translate-x-[-110%]' : 'translate-x-[-5%]'
-                        : barcodeSettings[key] ? 'translate-x-[110%]' : 'translate-x-[5%]'
-                    }`}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ================= COLUMN 2: Currency & Inventory Settings ================= */}
-      <div className="space-y-2.5">
-        {/* Card 2: Financial, Currency & Exchange Rates Section (ALL Currency settings unified in ONE place) */}
-        <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs space-y-2">
-          <div className="flex items-center gap-2 text-indigo-600 justify-end">
-            <span className="font-bold text-xs sm:text-sm">{language === 'ar' ? 'إعدادات العملات وأسعار الصرف' : 'Currency & Exchange Rate Settings'}</span>
-            <Coins className="w-5 h-5" />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
-            <div>
-              <SearchableSelect
-                label={t('company_settings.currency')}
-                placeholder={t('common.select_category')}
-                value={data.currency}
-                onChange={(val) => setData({ ...data, currency: val })}
-                options={CURRENCIES}
-                dir={dir}
-                icon={<Coins className="w-5 h-5 text-slate-400" />}
-                renderOption={(o) => (
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl">{o.flag}</span>
-                    <div className="flex flex-col">
-                      <span className="font-bold text-slate-800 leading-tight">{language === 'ar' ? o.nameAr : o.name}</span>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{o.code} ({o.symbol})</span>
-                    </div>
-                  </div>
-                )}
-                filterFn={(o, q) => 
-                  o.name.toLowerCase().includes(q.toLowerCase()) || 
-                  o.nameAr.includes(q) || 
-                  o.code.toLowerCase().includes(q.toLowerCase())
-                }
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold text-slate-600 mb-0.5">
-                {t('company_settings.fiscal_year_end')}*
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="relative group">
-                  <select
-                    value={data.fiscal_year_month}
-                    onChange={(e) => {
-                        const m = parseInt(e.target.value);
-                        const maxDays = daysInMonth(m);
-                        setData({ 
-                            ...data, 
-                            fiscal_year_month: m,
-                            fiscal_year_day: data.fiscal_year_day > maxDays ? maxDays : data.fiscal_year_day
-                        });
-                    }}
-                    className="w-full px-3 py-1.5 h-8 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-semibold hover:border-indigo-500 outline-none appearance-none cursor-pointer transition-all"
-                  >
-                    {MONTHS.map(m => (
-                      <option key={m.value} value={m.value} className="text-slate-900">
-                        {language === 'ar' ? m.nameAr : m.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform group-focus-within:rotate-180`} />
-                </div>
-                <div className="relative group">
-                  <select
-                    value={data.fiscal_year_day}
-                    onChange={(e) => setData({ ...data, fiscal_year_day: parseInt(e.target.value) })}
-                    className="w-full px-3 py-1.5 h-8 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-semibold hover:border-indigo-500 outline-none appearance-none cursor-pointer transition-all"
-                  >
-                    {Array.from({ length: daysInMonth(data.fiscal_year_month) }, (_, i) => i + 1).map(d => (
-                      <option key={d} value={d} className="text-slate-900">{d}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none transition-transform group-focus-within:rotate-180`} />
-                </div>
-              </div>
-              <p className="text-[10px] font-bold text-slate-400 text-center leading-relaxed mt-1">
-                * {language === 'ar' 
-                  ? 'سيتم تعيين السنة المالية لتنتهي في هذا التاريخ من كل عام.' 
-                  : 'Fiscal year will close automatically on this day annually.'}
-              </p>
-            </div>
-          </div>
-
-          {/* Multi-Currency Toggle Section */}
-          <div className="pt-5 border-t border-slate-100 space-y-4">
-            <div 
-              className="flex items-center justify-between cursor-pointer select-none p-2 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors"
-              onClick={() => setData(prev => ({ ...prev, enable_multi_currency: !prev.enable_multi_currency }))}
-            >
-              <div className="flex flex-col gap-0.5">
-                <span className="font-bold text-slate-800 text-base">
-                  {language === 'ar' ? 'تفعيل العملات المتعددة' : 'Enable Multi-Currency'}
-                </span>
-                <span className="text-xs font-semibold text-slate-400">
-                  {language === 'ar' 
-                    ? 'إدارة حسابات الصرف والتحويل الدولي.' 
-                    : 'Manage international exchange rates.'}
-                </span>
-              </div>
-              <div 
-                className={`relative w-14 h-8 rounded-full transition-all duration-300 shadow-inner ms-4 flex-shrink-0 ${data.enable_multi_currency ? 'bg-indigo-600' : 'bg-slate-200'}`}
-              >
-                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-xs transition-all duration-300 transform ${
-                  dir === 'rtl'
-                    ? (data.enable_multi_currency ? 'translate-x-[-120%]' : 'translate-x-[-10%]')
-                    : (data.enable_multi_currency ? 'translate-x-[120%]' : 'translate-x-[10%]')
-                }`} />
-              </div>
-            </div>
-
-            {/* Method Selection (Manual vs Automatic) */}
-            {data.enable_multi_currency && (
-              <div className="pt-3 space-y-4">
-                <label className="block text-sm font-semibold text-slate-500">
-                  {language === 'ar' ? 'طريقة تحديث أسعار الصرف' : 'Exchange Rate Update Method'}
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Manual option */}
-                  <div
-                    onClick={() => setData(prev => ({ ...prev, exchange_rate_update_method: 'manual' }))}
-                    className={`p-2.5 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
-                      data.exchange_rate_update_method === 'manual'
-                        ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
-                        : 'border-slate-100 bg-white hover:border-slate-200'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-800 text-sm">التحديث اليدوي (Manual)</span>
-                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        data.exchange_rate_update_method === 'manual' ? 'border-indigo-600' : 'border-slate-300'
-                      }`}>
-                        {data.exchange_rate_update_method === 'manual' && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
-                      </div>
-                    </div>
-                    <span className="text-xs text-slate-400 mt-2 leading-relaxed">
-                      يقوم المستخدم بإدخال أسعار الصرف يدوياً وإدارتها بنفسه.
-                    </span>
-                  </div>
-
-                  {/* Auto option */}
-                  <div
-                    onClick={() => setData(prev => ({ ...prev, exchange_rate_update_method: 'auto' }))}
-                    className={`p-2.5 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
-                      data.exchange_rate_update_method === 'auto'
-                        ? 'border-indigo-600 bg-indigo-50/20 shadow-sm'
-                        : 'border-slate-100 bg-white hover:border-slate-200'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-800 text-sm">التحديث التلقائي (Automatic)</span>
-                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        data.exchange_rate_update_method === 'auto' ? 'border-indigo-600' : 'border-slate-300'
-                      }`}>
-                        {data.exchange_rate_update_method === 'auto' && <div className="w-2 h-2 rounded-full bg-indigo-600" />}
-                      </div>
-                    </div>
-                    <span className="text-xs text-slate-400 mt-2 leading-relaxed">
-                      يتم جلب أسعار الصرف تلقائياً من مزود خارجي.
-                    </span>
-                  </div>
-                </div>
-
-                {/* Automatic Exchange Rate Settings Block embedded directly HERE in ONE place */}
-                {data.exchange_rate_update_method === 'auto' && (
-                  <div className="p-6 bg-slate-50/80 rounded-2xl border border-slate-200/70 space-y-5 mt-4" dir="rtl">
-                    <div className="flex items-center gap-2 text-indigo-600 justify-between">
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4" />
-                        <span className="font-bold text-base text-slate-800">إعدادات أسعار الصرف التلقائية</span>
-                      </div>
-                    </div>
-
-                    {/* Provider info row */}
-                    <div className="flex flex-wrap items-center justify-between bg-white rounded-xl p-4 border border-slate-200/80 gap-3">
-                      <div className="flex items-center gap-3">
-                        {erConnStatus === 'ok'  && <Wifi    className="w-5 h-5 text-emerald-500" />}
-                        {erConnStatus === 'error' && <WifiOff className="w-5 h-5 text-rose-500" />}
-                        {erConnStatus === 'idle'  && <Wifi    className="w-5 h-5 text-slate-300" />}
-                        <div className="flex flex-col">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">حالة الاتصال (Connection Status)</span>
-                          <span className={`text-xs font-bold ${
-                            erConnStatus === 'ok'    ? 'text-emerald-600'
-                            : erConnStatus === 'error' ? 'text-rose-600'
-                            : 'text-slate-400'
-                          }`}>
-                            {erConnStatus === 'ok'    ? 'متصل (Connected)' : erConnStatus === 'error' ? 'فشل الاتصال (Failed)' : 'لم يختبر بعد'}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">اسم مزود الأسعار</span>
-                        <span className="text-xs font-bold text-slate-700 block">ExchangeRate.host</span>
-                        <a 
-                          href="https://exchangerate.host" 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="text-[11px] text-indigo-600 hover:underline font-semibold block"
-                        >
-                          https://exchangerate.host
-                        </a>
-                      </div>
-                    </div>
-
-                    {/* Last update row */}
-                    <div className="flex items-center gap-2 px-1">
-                      <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                      <div>
-                        <span className="text-xs font-bold text-slate-400">آخر مزامنة ناجحة: </span>
-                        <span className="text-xs font-semibold text-slate-700">
-                          {erLastUpdate ?? 'لم يتم التحديث بعد'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Action buttons row */}
-                    <div className="flex flex-wrap gap-3">
-                      <button
-                        type="button"
-                        id="er-update-now-btn"
-                        onClick={handleErUpdate}
-                        disabled={erIsUpdating}
-                        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white px-4 py-2 rounded-xl font-bold text-xs transition-all shadow-sm shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <RefreshCw className={`w-3.5 h-3.5 ${erIsUpdating ? 'animate-spin' : ''}`} />
-                        {erIsUpdating ? 'جاري التحديث...' : 'تحديث أسعار الصرف الآن (Sync Now)'}
-                      </button>
-
-                      <button
-                        type="button"
-                        id="er-test-conn-btn"
-                        onClick={handleErTest}
-                        disabled={erIsTesting}
-                        className="flex items-center gap-2 bg-white hover:bg-slate-100 active:scale-95 text-slate-700 border border-slate-200 px-4 py-2 rounded-xl font-bold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {erIsTesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
-                        {erIsTesting ? 'جاري الاختبار...' : 'اختبار الاتصال (Test)'}
-                      </button>
-                    </div>
-
-                    {/* Last sync result */}
-                    {erLastResult && (
-                      <div className={`flex items-start gap-2.5 rounded-xl p-3 border ${
-                        erConnStatus === 'ok'
-                          ? 'bg-emerald-50 border-emerald-100'
-                          : 'bg-rose-50 border-rose-100'
-                      }`}>
-                        {erConnStatus === 'ok'
-                          ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                          : <XCircle      className="w-4 h-4 text-rose-500    shrink-0 mt-0.5" />}
-                        <span className={`text-xs font-semibold ${
-                          erConnStatus === 'ok' ? 'text-emerald-700' : 'text-rose-700'
-                        }`}>
-                          {erLastResult}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="border-t border-slate-200/60 pt-3" />
-
-                    {/* Automatic Update toggle */}
-                    <div
-                      className="flex items-center justify-between cursor-pointer select-none"
-                      onClick={() => setErAutoUpdate(p => !p)}
-                    >
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-bold text-slate-800 text-sm">تحديث تلقائي (Auto Update)</span>
-                        <span className="text-xs text-slate-400">تحديث أسعار الصرف تلقائياً وفق الجدول المحدد</span>
-                      </div>
-                      <div className={`relative w-9 h-5 rounded-full transition-all duration-300 shadow-inner ${erAutoUpdate ? 'bg-indigo-600' : 'bg-slate-200'}`}>
-                        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-xs transition-all duration-300 transform ${
-                          erAutoUpdate ? 'translate-x-[-110%]' : 'translate-x-[-5%]'
-                        }`} />
-                      </div>
-                    </div>
-
-                    {/* Update Frequency */}
-                    <AnimatePresence>
-                      {erAutoUpdate && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="overflow-hidden"
-                        >
-                          <div className="pt-2">
-                            <label className="block text-xs font-semibold text-slate-500 mb-2">تكرار التحديث (Frequency)</label>
-                            <div className="flex gap-3">
-                              {(['daily', 'weekly'] as const).map(freq => (
-                                <button
-                                  key={freq}
-                                  type="button"
-                                  onClick={() => setErFrequency(freq)}
-                                  className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${
-                                    erFrequency === freq
-                                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                                      : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400'
-                                  }`}
-                                >
-                                  {freq === 'daily' ? 'يومي (Once Daily)' : 'أسبوعي (Once Weekly)'}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
         </div>
 
-        {/* Card 3: Inventory & Purchase Settings & Negative Stock (Compact layout) */}
+        {/* ================= COLUMN 2: Inventory Policies & Barcode Scanner Settings ================= */}
+        <div className="space-y-2.5">
+          {/* Card 3: Inventory & Purchase Settings & Negative Stock (Compact layout) */}
         <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs space-y-2">
           <div className="flex items-center gap-2 text-indigo-600 justify-end">
             <span className="font-bold text-xs sm:text-sm">{language === 'ar' ? 'إعدادات المخازن والمشتريات' : 'Inventory & Purchase Settings'}</span>
@@ -1384,6 +933,99 @@ export function CompanySettings() {
           </div>
         </div>
 
+          {/* Card 4: Barcode Scanner Settings (Optimized into 2 columns grid to cut height by 50%!) */}
+        <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs space-y-2">
+          <div className="flex items-center gap-2 text-indigo-600 justify-end">
+            <span className="font-bold text-xs sm:text-sm">
+              {language === 'ar' ? 'إعدادات قراءة الباركود' : 'Barcode Scanner Settings'}
+            </span>
+            <ScanLine className="w-5 h-5" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {([
+              {
+                key: 'enable_camera_scanner',
+                labelAr: 'تفعيل استخدام كاميرا الباركود',
+                labelEn: 'Enable Camera Barcode Scanner',
+                descAr: 'يسمح بفتح الكاميرا لمسح الباركود داخل الفواتير.',
+                descEn: 'Allow opening camera to scan barcodes.',
+              },
+              {
+                key: 'enable_hid_scanner',
+                labelAr: 'تفعيل Barcode Scanner (USB / Bluetooth)',
+                labelEn: 'Enable USB / Bluetooth Scanner',
+                descAr: 'يدعم القارئات المتصلة عبر USB أو Bluetooth تلقائياً.',
+                descEn: 'Auto-detect USB and Bluetooth readers.',
+              },
+              {
+                key: 'enable_continuous_mode',
+                labelAr: 'تفعيل وضع القراءة المستمرة',
+                labelEn: 'Enable Continuous Scan Mode',
+                descAr: 'تبقى الكاميرا مفتوحة لمسح أكثر من صنف متتالياً.',
+                descEn: 'Keep camera open for sequential scanning.',
+              },
+              {
+                key: 'play_sound_on_success',
+                labelAr: 'تشغيل صوت عند نجاح القراءة',
+                labelEn: 'Play Sound on Successful Scan',
+                descAr: 'يصدر صوت Beep قصير عند كل قراءة ناجحة.',
+                descEn: 'Plays a short beep on successful scan.',
+              },
+              {
+                key: 'prevent_unknown_items',
+                labelAr: 'منع إضافة أصناف غير معروفة',
+                labelEn: 'Block Unknown Barcodes',
+                descAr: 'لا يضيف أي صنف إذا لم يعثر على الباركود بالنظام.',
+                descEn: 'Block adding items when barcode is not found.',
+              },
+              {
+                key: 'auto_increase_quantity',
+                labelAr: 'زيادة الكمية تلقائياً عند تكرار القراءة',
+                labelEn: 'Auto-Increase Qty on Duplicate Scan',
+                descAr: 'إذا كان الصنف موجوداً تزاد كميته بدلاً من تكراره.',
+                descEn: 'Increase quantity instead of adding a new line.',
+              },
+              {
+                key: 'show_success_message',
+                labelAr: 'إظهار رسالة نجاح بعد القراءة',
+                labelEn: 'Show Success Notification After Scan',
+                descAr: 'يعرض إشعار مؤقت بعد إضافة الصنف بنجاح.',
+                descEn: 'Shows brief toast notification after scan.',
+              },
+            ] as const).map(({ key, labelAr, labelEn, descAr, descEn }) => (
+              <div
+                key={key}
+                className="flex items-center justify-between cursor-pointer select-none p-2 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors"
+                onClick={() =>
+                  setBarcodeSettings((prev) => ({ ...prev, [key]: !prev[key] }))
+                }
+              >
+                <div className="flex flex-col gap-0.5 flex-1 me-2">
+                  <span className="font-bold text-slate-800 text-xs">
+                    {language === 'ar' ? labelAr : labelEn}
+                  </span>
+                  <span className="text-[10.5px] text-slate-400 font-medium leading-normal">
+                    {language === 'ar' ? descAr : descEn}
+                  </span>
+                </div>
+                <div
+                  className={`relative w-9 h-5 rounded-full transition-all duration-300 shadow-inner flex-shrink-0 ${
+                    barcodeSettings[key] ? 'bg-indigo-600' : 'bg-slate-200'
+                  }`}
+                >
+                  <div
+                    className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-xs transition-all duration-300 transform ${
+                      dir === 'rtl'
+                        ? barcodeSettings[key] ? 'translate-x-[-110%]' : 'translate-x-[-5%]'
+                        : barcodeSettings[key] ? 'translate-x-[110%]' : 'translate-x-[5%]'
+                    }`}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
         </div>
       </form>
     </div>
