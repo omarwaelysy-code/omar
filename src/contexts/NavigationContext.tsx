@@ -141,6 +141,7 @@ export const pageLabels: { [key: string]: string } = {
   'departments': 'الأقسام',
   'cost_centers': 'مراكز التكلفة',
   'company_settings': 'إعدادات الشركة',
+  'eta_settings': 'إعدادات الفاتورة الإلكترونية المصرية (ETA)',
   'quotations': 'عروض الأسعار',
   'pos_connected_branches': 'الفروع المتصلة',
   'pos_branch_linking': 'ربط الفرع',

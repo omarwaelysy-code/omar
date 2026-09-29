@@ -2159,17 +2159,17 @@ export function EtaReceivedInvoices() {
               <p className="text-xs md:text-sm text-amber-800 mt-1 leading-relaxed">
                 {(allPortalInvoices.length > 0 || invoices.length > 0)
                   ? (language === 'ar'
-                      ? 'يتم الآن استعراض الوثائق والفواتير الإلكترونية المسجلة والمحفوظة مسبقاً. لإجراء المزامنة المباشرة مع مصلحة الضرائب، يرجى تفعيل مفاتيح الربط من إعدادات الشركة.'
-                      : 'Displaying previously saved electronic documents. To perform live synchronization with ETA, please configure your credentials in Company Settings.')
+                      ? 'يتم الآن استعراض الوثائق والفواتير الإلكترونية المسجلة والمحفوظة مسبقاً. لإجراء المزامنة المباشرة مع مصلحة الضرائب، يرجى تفعيل مفاتيح الربط من إعدادات الفاتورة الإلكترونية.'
+                      : 'Displaying previously saved electronic documents. To perform live synchronization with ETA, please configure your credentials in ETA Settings.')
                   : (language === 'ar'
-                      ? 'لعرض الوثائق الإلكترونية المستلمة، يرجى إدخال بيانات الاعتماد (Client ID و Client Secret) واختيار البيئة من إعدادات الشركة.'
-                      : 'To view incoming electronic documents, please provide ETA credentials (Client ID & Client Secret) in Company Settings.')}
+                      ? 'لعرض الوثائق الإلكترونية المستلمة، يرجى إدخال بيانات الاعتماد (Client ID و Client Secret) واختيار البيئة من إعدادات الفاتورة الإلكترونية.'
+                      : 'To view incoming electronic documents, please provide ETA credentials (Client ID & Client Secret) in ETA Settings.')}
               </p>
             </div>
           </div>
           <button
             type="button"
-            onClick={() => openTab('company_settings', language === 'ar' ? 'إعدادات الشركة' : 'Company Settings')}
+            onClick={() => openTab('eta_settings', language === 'ar' ? 'إعدادات الفاتورة الإلكترونية (ETA)' : 'ETA Settings')}
             className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs md:text-sm font-bold shadow-sm transition-colors flex items-center gap-2 flex-shrink-0"
           >
             <Building2 className="w-4 h-4" />

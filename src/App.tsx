@@ -32,6 +32,7 @@ import { ExpensesReport } from './pages/ExpensesReport';
 // import { CashReport } from './pages/CashReport';
 import { CashBalances } from './pages/CashBalances';
 import { CompanySettings } from './pages/CompanySettings';
+import { EtaSettings } from './pages/EtaSettings';
 import Currencies from './pages/Currencies';
 import { AccountTypes } from './pages/AccountTypes';
 import { Accounts } from './pages/Accounts';
@@ -300,6 +301,7 @@ export default function App() {
       case 'activity_log_views': return <ActivityLogViewsPage />;
       case 'activity_log_prints': return <ActivityLogPrintsPage />;
       case 'company_settings': return <CompanySettings />;
+      case 'eta_settings': return <EtaSettings />;
       case 'currencies': return <Currencies />;
       case 'operation_categories': return <OperationCategories />;
       case 'operation_fields': return <OperationFields />;

@@ -272,6 +272,7 @@ export const en = {
   'nav.cash_balances': 'Cash & Bank Report (Period)',
   'nav.admin': 'Administration',
   'nav.company_settings': 'Company Settings',
+  'nav.eta_settings': 'Egyptian E-Invoice Settings (ETA)',
   'nav.users': 'User Management',
   'nav.backup_restore': 'Backup & Restore',
   'nav.activity_log': 'All Activity Logs',

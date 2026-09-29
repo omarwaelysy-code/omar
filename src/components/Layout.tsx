@@ -142,6 +142,7 @@ const getTabIcon = (id: string) => {
     case 'eta_supplier_mapping':
     case 'eta_item_mapping':
     case 'eta_sent_item_mapping':
+    case 'eta_settings':
       return <Receipt {...iconProps} />;
     case 'eta_tax_types':
       return <HelpCircle {...iconProps} />;
@@ -773,6 +774,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         icon: Settings,
         subItems: [
           { id: 'company_settings', label: t('nav.company_settings'), icon: Building2 },
+          { id: 'eta_settings', label: t('nav.eta_settings'), icon: Receipt },
           ...(company?.settings?.enable_multi_currency || (company?.settings as any)?.enable_multi_currency === 'true' || isSuperAdmin ? [{ id: 'currencies', label: t('nav.currencies'), icon: Coins }] : []),
           { id: 'users', label: t('nav.users'), icon: UsersIcon },
           { id: 'period_closing', label: language === 'ar' ? 'إغلاق الفترات المحاسبية' : 'Period Closing', icon: Lock },

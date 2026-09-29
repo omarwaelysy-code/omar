@@ -273,6 +273,7 @@ export const ar = {
   'nav.cash_balances': 'تقرير النقدية (الخزائن والبنوك)',
   'nav.admin': 'الإدارة',
   'nav.company_settings': 'إعدادات الشركة',
+  'nav.eta_settings': 'إعدادات الفاتورة الإلكترونية المصرية (ETA)',
   'nav.users': 'إدارة المستخدمين',
   'nav.backup_restore': 'النسخ الاحتياطي والاستعادة',
   'nav.activity_log': 'سجل النشاط الشامل',
