@@ -6,7 +6,7 @@ import {
   Search, Plus, Trash2, X, Wallet, User, CreditCard, Calendar, 
   Hash, FileText, FileSpreadsheet, Save, Pencil, Eye, Download, History, Printer, 
   Phone, Mail, MapPin, Layers, LayoutGrid, List, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, ChevronDown,
-  Copy, Sparkles, DollarSign, Coins, Globe
+  Copy, Sparkles, DollarSign, Coins, Globe, Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
@@ -3251,12 +3251,12 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                             return (
                               <>
                                 <div className="grid grid-cols-2 gap-2">
-                                  <div className="relative">
+                                  <div className="relative" title={language === 'ar' ? 'العملة مطابقة لطريقة السداد المحددة ولا يسمح بتغييرها' : 'Currency is locked to match the selected payment method'}>
                                     <Coins className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2.5 w-3.5 h-3.5 text-zinc-400 pointer-events-none`} />
                                     <select 
-                                      className={`w-full ${dir === 'rtl' ? 'pr-8 pl-6' : 'pl-8 pr-6'} py-1.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs appearance-none cursor-pointer h-9`}
+                                      disabled
+                                      className={`w-full ${dir === 'rtl' ? 'pr-8 pl-7' : 'pl-8 pr-7'} py-1.5 bg-zinc-100/90 border border-zinc-200 rounded-xl font-bold text-zinc-700 text-xs appearance-none cursor-not-allowed h-9 shadow-inner`}
                                       value={voucherData.currency_id}
-                                      onChange={(e) => handleCurrencyChange(e.target.value)}
                                     >
                                       <option value="">
                                         {language === 'ar' 
@@ -3267,7 +3267,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                                         <option key={curr.id} value={curr.id}>{curr.code} - {language === 'ar' ? curr.name_ar : curr.name_en}</option>
                                       ))}
                                     </select>
-                                    <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-2' : 'right-2'} top-2.5 w-3.5 h-3.5 text-zinc-400 pointer-events-none`} />
+                                    <Lock className={`absolute ${dir === 'rtl' ? 'left-2' : 'right-2'} top-2.5 w-3.5 h-3.5 text-amber-600/80 pointer-events-none`} />
                                   </div>
                                   <div className="relative">
                                     <DollarSign className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2.5 w-3.5 h-3.5 text-zinc-400 pointer-events-none`} />
@@ -3284,11 +3284,17 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                                     />
                                   </div>
                                 </div>
-                                {voucherData.currency_id && (
-                                  <div className="text-[10px] text-zinc-500 font-mono mt-0.5 px-1">
-                                    1 {currencyCode} = {voucherData.exchange_rate} {baseCurrency}
-                                  </div>
-                                )}
+                                <div className="flex items-center justify-between text-[10px] text-zinc-500 font-mono mt-0.5 px-1">
+                                  <span className="flex items-center gap-1 text-[10px] text-amber-700 font-medium">
+                                    <Lock size={9} />
+                                    {language === 'ar' ? 'مطابقة لطريقة السداد' : 'Bound to method'}
+                                  </span>
+                                  {voucherData.currency_id && (
+                                    <span>
+                                      1 {currencyCode} = {voucherData.exchange_rate} {baseCurrency}
+                                    </span>
+                                  )}
+                                </div>
                               </>
                             );
                           })()}
