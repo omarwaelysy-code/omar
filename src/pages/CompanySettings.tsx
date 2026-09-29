@@ -20,7 +20,10 @@ import {
   TrendingUp,
   ScanLine,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  Zap,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
