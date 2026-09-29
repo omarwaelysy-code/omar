@@ -1055,7 +1055,7 @@ export const CashTransfers: React.FC = () => {
                   } border`}
                 >
                   <History size={18} />
-                  <span>language === 'ar' ? 'قيد اليومية \\ سجل التعديلات' : 'Journal Entry \\ Activity Log'</span>
+                  <span>{language === 'ar' ? 'قيد اليومية \\ سجل التعديلات' : 'Journal Entry \\ Activity Log'}</span>
                 </button>
               </div>
 
@@ -1067,7 +1067,30 @@ export const CashTransfers: React.FC = () => {
                       onClick={handlePrevTransfer}
                       className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
                       disabled={transfers.findIndex(t => t.id === editingTransfer.id) === 0}
-                                   <h3 className="text-lg md:text-xl font-black text-zinc-900 tracking-tight flex items-center gap-2">
+                    >
+                      <ChevronRight size={16} />
+                      {language === 'ar' ? 'السابق' : 'Prev'}
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={handleNextTransfer}
+                      className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
+                      disabled={transfers.findIndex(t => t.id === editingTransfer.id) === transfers.length - 1}
+                    >
+                      {language === 'ar' ? 'التالي' : 'Next'}
+                      <ChevronLeft size={16} />
+                    </button>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsFullScreen(!isFullScreen)}
+                  className="p-2 text-zinc-400 hover:bg-zinc-100 rounded-xl transition-all hidden md:block"
+                  title={isFullScreen ? 'تصغير' : 'تكبير'}
+                >
+                  {isFullScreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+                </button>
+                <h3 className="text-lg md:text-xl font-black text-zinc-900 tracking-tight flex items-center gap-2">
                   {editingTransfer 
                     ? (language === 'ar' ? 'تعديل التحويل بين البنوك والخزائن' : 'Edit Transfer Between Banks & Safes') 
                     : (language === 'ar' ? 'تحويل جديد بين البنوك والخزائن' : 'New Transfer Between Banks & Safes')}
