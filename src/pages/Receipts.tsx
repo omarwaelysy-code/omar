@@ -152,28 +152,37 @@ export const Receipts: React.FC = () => {
     }
 
     setVoucherData(prev => ({ ...prev, currency_id: currencyId }));
-    const updateMethod = companyData?.settings?.exchange_rate_update_method || 'manual';
 
-    if (updateMethod === 'auto') {
-      try {
-        const latestAutoRates = await apiRequest<Array<{
-          currency_id: string;
-          rate: number | null;
-          rate_date: string | null;
-        }>>(`/currency-rates/latest?company_id=${user.company_id}`);
-        
-        const rateObj = latestAutoRates.find(r => r.currency_id === currencyId);
+    const targetCurr = companyCurrencies.find(c => c.id === currencyId);
+    const targetCode = targetCurr?.code?.toUpperCase();
+
+    // 1. Live system rates from /currency-rates/latest
+    try {
+      const latestAutoRates = await apiRequest<Array<{
+        currency_id: string;
+        code?: string;
+        currency_code?: string;
+        rate: number | null;
+        rate_date: string | null;
+      }>>(`/currency-rates/latest?company_id=${user.company_id}`);
+      
+      if (Array.isArray(latestAutoRates)) {
+        const rateObj = latestAutoRates.find(r => 
+          r.currency_id === currencyId || 
+          (targetCode && (r.code?.toUpperCase() === targetCode || (r as any).currency_code?.toUpperCase() === targetCode))
+        );
         if (rateObj && rateObj.rate !== null && Number(rateObj.rate) > 0) {
-          const autoRate = Number(rateObj.rate);
+          const autoRate = Number(Number(rateObj.rate).toFixed(4));
           setVoucherData(prev => ({ ...prev, currency_id: currencyId, exchange_rate: autoRate }));
           setExchangeRateType('auto');
           return;
         }
-      } catch (error) {
-        console.error('Error fetching auto currency rate in Receipts:', error);
       }
+    } catch (error) {
+      console.error('Error fetching live system currency rate in Receipts:', error);
     }
 
+    // 2. Fallback: manual exchange_rates table
     try {
       const manualRates = await dbService.list<any>('exchange_rates', {
         currency_id: currencyId,
@@ -187,21 +196,19 @@ export const Receipts: React.FC = () => {
         setExchangeRateType('manual');
         return;
       }
-
-      const curr = companyCurrencies.find(c => c.id === currencyId);
-      if (curr && (curr as any).exchange_rate && Number((curr as any).exchange_rate) > 0) {
-        setVoucherData(prev => ({ ...prev, currency_id: currencyId, exchange_rate: Number((curr as any).exchange_rate) }));
-        setExchangeRateType('manual');
-        return;
-      }
-
-      setVoucherData(prev => ({ ...prev, currency_id: currencyId, exchange_rate: 1 }));
-      setExchangeRateType('manual');
     } catch (e) {
-      console.error(e);
-      setVoucherData(prev => ({ ...prev, currency_id: currencyId, exchange_rate: 1 }));
-      setExchangeRateType('manual');
+      console.error('Error fetching manual rates in Receipts:', e);
     }
+
+    // 3. Fallback: currency master record rate
+    if (targetCurr && (targetCurr as any).exchange_rate && Number((targetCurr as any).exchange_rate) > 0) {
+      setVoucherData(prev => ({ ...prev, currency_id: currencyId, exchange_rate: Number((targetCurr as any).exchange_rate) }));
+      setExchangeRateType('manual');
+      return;
+    }
+
+    setVoucherData(prev => ({ ...prev, currency_id: currencyId, exchange_rate: 1 }));
+    setExchangeRateType('manual');
   };
 
   const [allInvoices, setAllInvoices] = useState<any[]>([]);
@@ -305,12 +312,18 @@ export const Receipts: React.FC = () => {
     const accountId = entity.account_id;
     const transactions: any[] = [];
     
+    const baseCurrCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase();
+    
     // Invoices / Purchase Invoices
     const relevantInvoices = entityType === 'customer'
       ? allInvoices.filter(inv => inv.customer_id === entityId && inv.payment_type === 'credit')
       : allPurchaseInvoices.filter(inv => inv.supplier_id === entityId && inv.payment_type === 'credit');
     
     relevantInvoices.forEach(inv => {
+      const invCurr = companyCurrencies.find(c => c.id === inv.currency_id);
+      const invCurrCode = (invCurr?.code || inv.currency || baseCurrCode).toUpperCase();
+      const invRate = Number(inv.exchange_rate) || 1;
+
       transactions.push({
         id: inv.id,
         date: inv.date,
@@ -319,7 +332,9 @@ export const Receipts: React.FC = () => {
         reference_number: inv.invoice_number,
         entry_number: inv.entry_number || inv.invoice_number || '',
         original_amount: Number(inv.total_amount) || 0,
-        open_amount: Number(inv.total_amount) || 0
+        open_amount: Number(inv.total_amount) || 0,
+        currency_code: invCurrCode,
+        exchange_rate: invRate
       });
     });
     
@@ -336,7 +351,9 @@ export const Receipts: React.FC = () => {
           reference_number: `OPEN-${entity.code || entity.id.slice(0, 8)}`,
           entry_number: '-',
           original_amount: Math.abs(opBal),
-          open_amount: Math.abs(opBal)
+          open_amount: Math.abs(opBal),
+          currency_code: baseCurrCode,
+          exchange_rate: 1
         });
       }
     }
@@ -367,7 +384,9 @@ export const Receipts: React.FC = () => {
               reference_number: je.reference_number || je.entry_number || je.id.slice(0, 8),
               entry_number: je.entry_number || '',
               original_amount: entityType === 'customer' ? Number(item.debit) : Number(item.credit),
-              open_amount: entityType === 'customer' ? Number(item.debit) : Number(item.credit)
+              open_amount: entityType === 'customer' ? Number(item.debit) : Number(item.credit),
+              currency_code: (item.currency || baseCurrCode).toUpperCase(),
+              exchange_rate: Number(item.exchange_rate) || 1
             });
           }
         }
@@ -641,7 +660,7 @@ export const Receipts: React.FC = () => {
       const unsubPR = dbService.subscribe<any>('purchase_returns', user.company_id, setAllPurchaseReturns);
       const unsubAllReceipts = dbService.subscribe<any>('receipt_vouchers', user.company_id, setAllReceipts);
       const unsubEmployees = dbService.subscribe<Employee>('employees', user.company_id, setEmployees);
-      const unsubCurrencies = dbService.subscribe<Currency>('company_currencies', user.company_id, setCompanyCurrencies);
+      const unsubCurrencies = dbService.subscribe<Currency>('currencies', user.company_id, setCompanyCurrencies);
       
       const fetchCompany = async () => {
         try {
@@ -2853,17 +2872,29 @@ export const Receipts: React.FC = () => {
                                 setVoucherData(prev => ({...prev, payment_method_id: newPmId}));
                                 const selectedPm = paymentMethods.find(pm => pm.id === newPmId);
                                 const selectedAcc = accounts.find(a => a.id === selectedPm?.account_id);
-                                const pmCurrCode = (selectedPm?.currency || '').toUpperCase();
-                                
+                                const baseCurrency = (companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase();
+
+                                let targetCode = (selectedPm?.currency || '').trim().toUpperCase();
+                                if (!targetCode || targetCode === 'LOCAL' || targetCode === 'DEFAULT' || targetCode === baseCurrency) {
+                                  const pmMatch = (selectedPm?.name || '').match(/\((USD|EUR|SAR|AED|EGP|GBP|KWD|QAR|BHD|OMR|JOD|[A-Z]{3})\)/i);
+                                  if (pmMatch) {
+                                    targetCode = pmMatch[1].toUpperCase();
+                                  } else {
+                                    const accMatch = (selectedAcc?.name || '').match(/\((USD|EUR|SAR|AED|EGP|GBP|KWD|QAR|BHD|OMR|JOD|[A-Z]{3})\)/i);
+                                    if (accMatch) targetCode = accMatch[1].toUpperCase();
+                                  }
+                                }
+
                                 const matchedCurr = companyCurrencies.find(c => 
-                                  (pmCurrCode && (c.id === selectedPm?.currency || c.code.toUpperCase() === pmCurrCode)) ||
+                                  (targetCode && c.code.toUpperCase() === targetCode) || 
+                                  (selectedPm?.currency && (c.id === selectedPm.currency || c.code.toUpperCase() === selectedPm.currency.toUpperCase())) ||
                                   (selectedPm?.name && (selectedPm.name.toUpperCase().includes(c.code.toUpperCase()) || (c.name_ar && selectedPm.name.includes(c.name_ar)))) ||
                                   (selectedAcc?.name && (selectedAcc.name.toUpperCase().includes(c.code.toUpperCase()) || (c.name_ar && selectedAcc.name.includes(c.name_ar))))
                                 );
-                                
-                                if (matchedCurr) {
+
+                                if (matchedCurr && matchedCurr.code.toUpperCase() !== baseCurrency) {
                                   handleCurrencyChange(matchedCurr.id);
-                                } else if (pmCurrCode === 'EGP' || pmCurrCode === 'LOCAL') {
+                                } else {
                                   handleCurrencyChange('');
                                 }
                               }
@@ -3216,6 +3247,10 @@ export const Receipts: React.FC = () => {
                                               />
                                             </div>
                                             {(() => {
+                                              const baseCurrency = (companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase();
+                                              const activeCurrency = companyCurrencies.find(c => c.id === voucherData.currency_id);
+                                              const currCode = (activeCurrency?.code || baseCurrency).toUpperCase();
+
                                               const uniqueSettlements = getUniqueSettlementsForVoucherItem(item, idx);
                                               const totalSettled = uniqueSettlements.reduce((sum: number, s: any) => sum + s.settled_amount, 0);
                                               const difference = (item.amount || 0) - totalSettled;
@@ -3223,12 +3258,12 @@ export const Receipts: React.FC = () => {
                                                 <div className="flex flex-wrap items-center gap-4 text-xs font-bold">
                                                   <div className="flex items-center gap-1.5">
                                                     <span className="text-zinc-400">{language === 'ar' ? 'إجمالي المسوى:' : 'Total Settled:'}</span>
-                                                    <span className="text-emerald-600 font-mono font-black bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">{formatNumber(totalSettled)} {t('common.currency')}</span>
+                                                    <span className="text-emerald-600 font-mono font-black bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">{formatNumber(totalSettled)} {currCode}</span>
                                                   </div>
                                                   <div className="flex items-center gap-1.5">
                                                     <span className="text-zinc-400">{language === 'ar' ? 'الفرق:' : 'Difference:'}</span>
                                                     <span className={`font-mono font-black px-2.5 py-1 rounded-lg border ${difference === 0 ? 'text-zinc-600 bg-zinc-50 border-zinc-200' : difference > 0 ? 'text-blue-600 bg-blue-50 border-blue-100' : 'text-red-600 bg-red-50 border-red-100'}`}>
-                                                      {formatNumber(difference)} {t('common.currency')}
+                                                      {formatNumber(difference)} {currCode}
                                                     </span>
                                                   </div>
                                                 </div>
@@ -3243,144 +3278,195 @@ export const Receipts: React.FC = () => {
                                             </div>
                                           ) : (
                                             <div className="overflow-x-auto">
-                                              <table className="w-full text-xs">
-                                                <thead>
-                                                  <tr className="text-zinc-400 border-b border-zinc-100 text-[11px] font-bold">
-                                                    <th className="py-2 text-right">رقم القيد</th>
-                                                    <th className="py-2 text-right">نوع الحركة</th>
-                                                    <th className="py-2 text-right">رقم الفاتورة / المرجع</th>
-                                                    <th className="py-2 text-right">التاريخ</th>
-                                                    <th className="py-2 text-center">رقم التسوية</th>
-                                                    <th className="py-2 text-center">تاريخ التسوية</th>
-                                                    <th className="py-2 text-right">القيمة الأصلية</th>
-                                                    <th className="py-2 text-right">المبلغ المفتوح</th>
-                                                    <th className="py-2 text-center">تسوية بالكامل</th>
-                                                    <th className="py-2 text-center">تسوية بقيمة السند</th>
-                                                    <th className="py-2 text-center w-28">المبلغ المسوى</th>
-                                                  </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-zinc-50">
-                                                  {openTransactions.map(t => {
-                                                    const uniqueSettlements = getUniqueSettlementsForVoucherItem(item, idx);
-                                                    const settlement = uniqueSettlements.find((s: any) => s.target_id === t.id);
-                                                    const settledAmount = settlement ? settlement.settled_amount : 0;
-                                                    const otherSettlementsTotal = uniqueSettlements
-                                                      .filter((s: any) => s.target_id !== t.id)
-                                                      .reduce((sum: number, s: any) => sum + s.settled_amount, 0);
-                                                    const remainingVoucherAmount = Math.max(0, (item.amount || 0) - otherSettlementsTotal);
-                                                    const maxAllocation = Math.min(t.open_amount, remainingVoucherAmount);
-                                                    const maxAllowed = Math.min(t.open_amount, remainingVoucherAmount + settledAmount);
+                                              {(() => {
+                                                const baseCurrency = (companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase();
+                                                const activeCurrency = companyCurrencies.find(c => c.id === voucherData.currency_id);
+                                                const currCode = (activeCurrency?.code || baseCurrency).toUpperCase();
 
-                                                    const isFullySettled = settledAmount === t.open_amount && t.open_amount > 0;
-                                                    const isVoucherAmountSettled = settledAmount === maxAllocation && maxAllocation > 0;
-
-                                                    return (
-                                                      <tr key={t.id} className="hover:bg-zinc-50/50">
-                                                        <td className="py-2.5">
-                                                          {t.entry_number && t.entry_number !== '-' ? (
-                                                            <button
-                                                              type="button"
-                                                              onClick={() => {
-                                                                setPendingViewDoc({ type: 'journal', idOrNumber: t.entry_number });
-                                                                setCurrentPage('journal_entries');
-                                                              }}
-                                                              className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-black"
-                                                            >
-                                                              {t.entry_number}
-                                                            </button>
-                                                          ) : (
-                                                            <span className="text-zinc-400 font-mono font-normal">-</span>
-                                                          )}
-                                                        </td>
-                                                        <td className="py-2.5 text-zinc-500 font-semibold">{t.type_label}</td>
-                                                        <td className="py-2.5">
-                                                          {t.reference_number && t.reference_number !== '-' ? (
-                                                            <button
-                                                              type="button"
-                                                              onClick={() => {
-                                                                if (t.type === 'invoice') {
-                                                                  setPendingViewDoc({ type: 'invoice', idOrNumber: t.reference_number });
-                                                                  setCurrentPage('invoices');
-                                                                } else if (t.type === 'purchase_invoice') {
-                                                                  setPendingViewDoc({ type: 'purchase_invoice', idOrNumber: t.reference_number });
-                                                                  setCurrentPage('purchase_invoices');
-                                                                } else {
-                                                                  setPendingViewDoc({ type: 'journal', idOrNumber: t.reference_number });
-                                                                  setCurrentPage('journal_entries');
-                                                                }
-                                                              }}
-                                                              className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-black"
-                                                            >
-                                                              {t.reference_number}
-                                                            </button>
-                                                          ) : (
-                                                            <span className="text-zinc-400 font-mono font-normal">-</span>
-                                                          )}
-                                                        </td>
-                                                        <td className="py-2.5 text-zinc-400 font-normal font-mono">{t.date}</td>
-                                                        <td className="py-2.5">
-                                                          <input
-                                                            disabled
-                                                            type="text"
-                                                            className="w-36 bg-zinc-50 border border-zinc-200 rounded-lg px-2 py-1 text-center text-zinc-500 font-mono text-xs font-black"
-                                                            value={settlement?.settlement_number || ''}
-                                                            placeholder="-"
-                                                          />
-                                                        </td>
-                                                        <td className="py-2.5">
-                                                          <input
-                                                            type="date"
-                                                            className="w-36 bg-white border border-zinc-200 rounded-lg px-2 py-1 text-center text-zinc-700 text-xs font-bold focus:ring-1 focus:ring-emerald-500"
-                                                            value={rowSettlementDates[`${idx}-${t.id}`] || voucherData.date.slice(0, 10)}
-                                                            onChange={(e) => handleRowDateChange(idx, t, e.target.value)}
-                                                          />
-                                                        </td>
-                                                        <td className="py-2.5 text-zinc-500 font-semibold">{formatNumber(t.original_amount)}</td>
-                                                        <td className="py-2.5 text-zinc-900 font-black">{formatNumber(t.open_amount)}</td>
-                                                        <td className="py-2.5 text-center">
-                                                          <input
-                                                            type="checkbox"
-                                                            className="w-4 h-4 rounded border-zinc-350 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                                                            disabled={remainingVoucherAmount < t.open_amount && !isFullySettled}
-                                                            checked={isFullySettled}
-                                                            onChange={(e) => {
-                                                              const checked = e.target.checked;
-                                                              handleSettlementChange(idx, t, checked ? t.open_amount : 0);
-                                                            }}
-                                                          />
-                                                        </td>
-                                                        <td className="py-2.5 text-center">
-                                                          <input
-                                                            type="checkbox"
-                                                            className="w-4 h-4 rounded border-zinc-350 text-blue-650 focus:ring-blue-500 cursor-pointer"
-                                                            disabled={maxAllocation <= 0 && settledAmount === 0}
-                                                            checked={isVoucherAmountSettled}
-                                                            onChange={(e) => {
-                                                              const checked = e.target.checked;
-                                                              handleSettlementChange(idx, t, checked ? maxAllocation : 0);
-                                                            }}
-                                                          />
-                                                        </td>
-                                                        <td className="py-2.5 text-center">
-                                                          <input
-                                                            type="number"
-                                                            step="any"
-                                                            className="w-full px-2 py-1 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-black text-center text-emerald-600 outline-none focus:ring-2 focus:ring-emerald-500"
-                                                            placeholder="0"
-                                                            value={settledAmount || ''}
-                                                            max={maxAllowed}
-                                                            onChange={(e) => {
-                                                              const val = Number(e.target.value);
-                                                              const cappedVal = Math.min(Math.max(0, val), maxAllowed);
-                                                              handleSettlementChange(idx, t, cappedVal);
-                                                            }}
-                                                          />
-                                                        </td>
+                                                return (
+                                                  <table className="w-full text-xs">
+                                                    <thead>
+                                                      <tr className="text-zinc-400 border-b border-zinc-100 text-[11px] font-bold">
+                                                        <th className="py-2 text-right">رقم القيد</th>
+                                                        <th className="py-2 text-right">نوع الحركة</th>
+                                                        <th className="py-2 text-right">رقم الفاتورة / المرجع</th>
+                                                        <th className="py-2 text-right">التاريخ</th>
+                                                        <th className="py-2 text-center w-28">رقم التسوية</th>
+                                                        <th className="py-2 text-center w-28">تاريخ التسوية</th>
+                                                        <th className="py-2 text-center">العملة الأصلية</th>
+                                                        <th className="py-2 text-center">سعر الصرف</th>
+                                                        <th className="py-2 text-right">المبلغ بالعملة الأصلية</th>
+                                                        <th className="py-2 text-right">المبلغ المفتوح</th>
+                                                        <th className="py-2 text-center">تسوية بالكامل</th>
+                                                        <th className="py-2 text-center">تسوية بقيمة السند</th>
+                                                        <th className="py-2 text-center w-32">المبلغ المسوى ({currCode})</th>
                                                       </tr>
-                                                    );
-                                                  })}
-                                                </tbody>
-                                              </table>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-zinc-50">
+                                                      {openTransactions.map(t => {
+                                                        const txCurrCode = (t.currency_code || baseCurrency).toUpperCase();
+                                                        const txRate = Number(t.exchange_rate) || 1;
+                                                        const voucherRate = Number(voucherData.exchange_rate) || 1;
+
+                                                        let openInVoucherCurr = t.open_amount;
+                                                        if (currCode !== txCurrCode) {
+                                                          if (currCode !== baseCurrency && txCurrCode === baseCurrency) {
+                                                            openInVoucherCurr = voucherRate > 0 ? t.open_amount / voucherRate : t.open_amount;
+                                                          } else if (currCode === baseCurrency && txCurrCode !== baseCurrency) {
+                                                            openInVoucherCurr = t.open_amount * txRate;
+                                                          } else {
+                                                            const inBase = t.open_amount * txRate;
+                                                            openInVoucherCurr = voucherRate > 0 ? inBase / voucherRate : inBase;
+                                                          }
+                                                        }
+                                                        openInVoucherCurr = Number(openInVoucherCurr.toFixed(2));
+
+                                                        const uniqueSettlements = getUniqueSettlementsForVoucherItem(item, idx);
+                                                        const settlement = uniqueSettlements.find((s: any) => s.target_id === t.id);
+                                                        const settledAmount = settlement ? settlement.settled_amount : 0;
+                                                        const otherSettlementsTotal = uniqueSettlements
+                                                          .filter((s: any) => s.target_id !== t.id)
+                                                          .reduce((sum: number, s: any) => sum + s.settled_amount, 0);
+                                                        const remainingVoucherAmount = Math.max(0, (item.amount || 0) - otherSettlementsTotal);
+                                                        const maxAllocation = Math.min(openInVoucherCurr, remainingVoucherAmount);
+                                                        const maxAllowed = Math.min(openInVoucherCurr, remainingVoucherAmount + settledAmount);
+
+                                                        const isFullySettled = settledAmount > 0 && Math.abs(settledAmount - openInVoucherCurr) < 0.01;
+                                                        const isVoucherAmountSettled = settledAmount > 0 && Math.abs(settledAmount - maxAllocation) < 0.01;
+
+                                                        return (
+                                                          <tr key={t.id} className="hover:bg-zinc-50/50">
+                                                            <td className="py-2.5">
+                                                              {t.entry_number && t.entry_number !== '-' ? (
+                                                                <button
+                                                                  type="button"
+                                                                  onClick={() => {
+                                                                    setPendingViewDoc({ type: 'journal', idOrNumber: t.entry_number });
+                                                                    setCurrentPage('journal_entries');
+                                                                  }}
+                                                                  className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-black"
+                                                                >
+                                                                  {t.entry_number}
+                                                                </button>
+                                                              ) : (
+                                                                <span className="text-zinc-400 font-mono font-normal">-</span>
+                                                              )}
+                                                            </td>
+                                                            <td className="py-2.5 text-zinc-500 font-semibold">{t.type_label}</td>
+                                                            <td className="py-2.5">
+                                                              {t.reference_number && t.reference_number !== '-' ? (
+                                                                <button
+                                                                  type="button"
+                                                                  onClick={() => {
+                                                                    if (t.type === 'invoice') {
+                                                                      setPendingViewDoc({ type: 'invoice', idOrNumber: t.reference_number });
+                                                                      setCurrentPage('invoices');
+                                                                    } else if (t.type === 'purchase_invoice') {
+                                                                      setPendingViewDoc({ type: 'purchase_invoice', idOrNumber: t.reference_number });
+                                                                      setCurrentPage('purchase_invoices');
+                                                                    } else {
+                                                                      setPendingViewDoc({ type: 'journal', idOrNumber: t.reference_number });
+                                                                      setCurrentPage('journal_entries');
+                                                                    }
+                                                                  }}
+                                                                  className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono font-black"
+                                                                >
+                                                                  {t.reference_number}
+                                                                </button>
+                                                              ) : (
+                                                                <span className="text-zinc-400 font-mono font-normal">-</span>
+                                                              )}
+                                                            </td>
+                                                            <td className="py-2.5 text-zinc-400 font-normal font-mono">{t.date}</td>
+                                                            <td className="py-2.5">
+                                                              <input
+                                                                disabled
+                                                                type="text"
+                                                                className="w-28 bg-zinc-50 border border-zinc-200 rounded-lg px-2 py-1 text-center text-zinc-500 font-mono text-xs font-black"
+                                                                value={settlement?.settlement_number || ''}
+                                                                placeholder="-"
+                                                              />
+                                                            </td>
+                                                            <td className="py-2.5">
+                                                              <input
+                                                                type="date"
+                                                                className="w-28 bg-white border border-zinc-200 rounded-lg px-1.5 py-1 text-center text-zinc-700 text-xs font-bold focus:ring-1 focus:ring-emerald-500"
+                                                                value={rowSettlementDates[`${idx}-${t.id}`] || voucherData.date.slice(0, 10)}
+                                                                onChange={(e) => handleRowDateChange(idx, t, e.target.value)}
+                                                              />
+                                                            </td>
+                                                            <td className="py-2.5 text-center">
+                                                              <span className="px-2 py-0.5 rounded-md font-mono text-[10px] font-black bg-zinc-100 text-zinc-700 border border-zinc-200">
+                                                                {txCurrCode}
+                                                              </span>
+                                                            </td>
+                                                            <td className="py-2.5 text-center font-mono text-zinc-600 font-bold text-[11px]">
+                                                              {txRate > 0 ? txRate.toFixed(2) : '1.00'}
+                                                            </td>
+                                                            <td className="py-2.5 text-right text-zinc-600 font-semibold font-mono">
+                                                              {formatNumber(t.original_amount)}
+                                                            </td>
+                                                            <td className="py-2.5 text-right font-mono">
+                                                              <div className="flex flex-col items-end">
+                                                                <span className="text-zinc-900 font-black">{formatNumber(t.open_amount)}</span>
+                                                                {currCode !== txCurrCode && (
+                                                                  <span className="text-[10px] text-amber-700 font-mono font-bold" title={`المعادل بعملة السند: ${formatNumber(openInVoucherCurr)} ${currCode}`}>
+                                                                    ≈ {formatNumber(openInVoucherCurr)} {currCode}
+                                                                  </span>
+                                                                )}
+                                                              </div>
+                                                            </td>
+                                                            <td className="py-2.5 text-center">
+                                                              <input
+                                                                type="checkbox"
+                                                                className="w-4 h-4 rounded border-zinc-350 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                                                disabled={remainingVoucherAmount < openInVoucherCurr && !isFullySettled}
+                                                                checked={isFullySettled}
+                                                                onChange={(e) => {
+                                                                  const checked = e.target.checked;
+                                                                  handleSettlementChange(idx, t, checked ? openInVoucherCurr : 0);
+                                                                }}
+                                                              />
+                                                            </td>
+                                                            <td className="py-2.5 text-center">
+                                                              <input
+                                                                type="checkbox"
+                                                                className="w-4 h-4 rounded border-zinc-350 text-blue-650 focus:ring-blue-500 cursor-pointer"
+                                                                disabled={maxAllocation <= 0 && settledAmount === 0}
+                                                                checked={isVoucherAmountSettled}
+                                                                onChange={(e) => {
+                                                                  const checked = e.target.checked;
+                                                                  handleSettlementChange(idx, t, checked ? maxAllocation : 0);
+                                                                }}
+                                                              />
+                                                            </td>
+                                                            <td className="py-2.5 text-center">
+                                                              <div className="relative">
+                                                                <input
+                                                                  type="number"
+                                                                  step="any"
+                                                                  className="w-full pl-7 pr-2 py-1 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-black text-center text-emerald-600 outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                                                                  placeholder="0"
+                                                                  value={settledAmount || ''}
+                                                                  max={maxAllowed}
+                                                                  onChange={(e) => {
+                                                                    const val = Number(e.target.value);
+                                                                    const cappedVal = Math.min(Math.max(0, val), maxAllowed);
+                                                                    handleSettlementChange(idx, t, cappedVal);
+                                                                  }}
+                                                                />
+                                                                <span className="absolute left-1.5 top-1.5 text-[9px] font-mono font-bold text-zinc-400">
+                                                                  {currCode}
+                                                                </span>
+                                                              </div>
+                                                            </td>
+                                                          </tr>
+                                                        );
+                                                      })}
+                                                    </tbody>
+                                                  </table>
+                                                );
+                                              })()}
                                             </div>
                                           )}
                                         </div>
@@ -3515,7 +3601,7 @@ export const Receipts: React.FC = () => {
                                     {item.sub_account_id && ` (فرعي: ${item.sub_account_id})`}
                                   </td>
                                   <td className="px-4 py-3 text-left text-emerald-600 font-black">
-                                    {formatNumber(item.amount)} ج.م
+                                    {formatNumber(item.amount)} {(() => { const rc = companyCurrencies.find(c => c.id === viewReceipt.currency_id); return (rc?.code || viewReceipt.currency || (companyData?.settings?.currency || 'EGP')).toUpperCase(); })()}
                                   </td>
                                   <td className="px-4 py-3 text-zinc-500 font-normal">
                                     {item.description || '---'}
@@ -3603,7 +3689,7 @@ export const Receipts: React.FC = () => {
                                                 </td>
                                                 <td className="py-1 font-mono">{s.date ? formatDate(s.date) : ''}</td>
                                                 <td className="py-1">{formatNumber(s.original_amount)}</td>
-                                                <td className="py-1 text-left text-emerald-600 font-bold">{formatNumber(s.settled_amount)} ج.م</td>
+                                                <td className="py-1 text-left text-emerald-600 font-bold">{formatNumber(s.settled_amount)} {(() => { const rc = companyCurrencies.find(c => c.id === viewReceipt.currency_id); return (rc?.code || viewReceipt.currency || (companyData?.settings?.currency || 'EGP')).toUpperCase(); })()}</td>
                                               </tr>
                                             ))}
                                           </tbody>
@@ -3621,7 +3707,7 @@ export const Receipts: React.FC = () => {
                       <div className="flex justify-between items-center bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
                         <span className="font-bold text-zinc-700 text-sm">إجمالي المبلغ المستلم:</span>
                         <span className="font-black text-2xl text-emerald-600 tracking-tighter">
-                          {formatNumber(viewReceipt.amount)} ج.م
+                          {formatNumber(viewReceipt.amount)} {(() => { const rc = companyCurrencies.find(c => c.id === viewReceipt.currency_id); return (rc?.code || viewReceipt.currency || (companyData?.settings?.currency || 'EGP')).toUpperCase(); })()}
                         </span>
                       </div>
                     </div>
@@ -3633,7 +3719,7 @@ export const Receipts: React.FC = () => {
                       </div>
                       <div className="text-left">
                         <p className="text-xs text-zinc-400 uppercase tracking-wider mb-1">المبلغ</p>
-                        <p className="text-2xl font-black text-emerald-600">{formatNumber(viewReceipt.amount)} ج.م</p>
+                        <p className="text-2xl font-black text-emerald-600">{formatNumber(viewReceipt.amount)} {(() => { const rc = companyCurrencies.find(c => c.id === viewReceipt.currency_id); return (rc?.code || viewReceipt.currency || (companyData?.settings?.currency || 'EGP')).toUpperCase(); })()}</p>
                       </div>
                     </div>
                   )}

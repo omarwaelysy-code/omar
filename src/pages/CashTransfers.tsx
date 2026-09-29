@@ -71,9 +71,23 @@ export const CashTransfers: React.FC = () => {
   const { t, language, dir } = useLanguage();
 
   const getPmCurrency = (pmId: string) => {
-    if (!pmId) return (companyData?.settings?.currency || 'EGP').toUpperCase();
+    const baseCurr = (companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase();
+    if (!pmId) return baseCurr;
     const pm = paymentMethods.find(p => p.id === pmId);
-    return (pm?.currency || companyData?.settings?.currency || 'EGP').toUpperCase();
+    if (!pm) return baseCurr;
+    const acc = accounts.find(a => a.id === pm.account_id);
+
+    let code = (pm.currency || '').trim().toUpperCase();
+    if (code && code !== 'LOCAL' && code !== 'DEFAULT' && code !== 'EGP') {
+      return code;
+    }
+    const match = (pm.name || '').match(/\((USD|EUR|SAR|AED|EGP|GBP|KWD|QAR|BHD|OMR|JOD|[A-Z]{3})\)/i);
+    if (match) return match[1].toUpperCase();
+
+    const accMatch = (acc?.name || '').match(/\((USD|EUR|SAR|AED|EGP|GBP|KWD|QAR|BHD|OMR|JOD|[A-Z]{3})\)/i);
+    if (accMatch) return accMatch[1].toUpperCase();
+
+    return (pm.currency || baseCurr).toUpperCase();
   };
 
   const loadTransferToForm = (transfer: CashTransfer) => {
@@ -180,7 +194,7 @@ export const CashTransfers: React.FC = () => {
       });
       const unsubPM = dbService.subscribe<PaymentMethod>('payment_methods', user.company_id, setPaymentMethods);
       const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
-      const unsubCurr = dbService.subscribe<Currency>('company_currencies', user.company_id, setCompanyCurrencies);
+      const unsubCurr = dbService.subscribe<Currency>('currencies', user.company_id, setCompanyCurrencies);
       const unsubComp = dbService.subscribe<Company>('companies', user.company_id, (comps) => {
         if (comps && comps.length > 0) {
           setCompanyData(comps[0]);
