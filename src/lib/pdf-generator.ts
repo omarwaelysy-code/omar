@@ -1512,11 +1512,12 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           const title = dto.isReceipt ? 'سند قبض نقدي / بنكي' : 'سند صرف نقدي / بنكي';
           drawHeader(title, dto.branchName, dto.userName, dto.date);
 
+          const curSuffix = dto.currency_code ? ` (${dto.currency_code})` : '';
           const metaItems = [
             { label: 'رقم السند:', val: dto.voucher_number || '' },
             { label: 'طريقة الدفع:', val: dto.payment_method || '' },
             { label: dto.isReceipt ? 'مستلم من:' : 'مدفوع لـ:', val: dto.party_name || '' },
-            { label: 'المبلغ الإجمالي:', val: dto.amount || '0.00' }
+            { label: 'المبلغ الإجمالي:', val: `${dto.amount || '0.00'} ${dto.currency_code || ''}`.trim() }
           ];
           drawMetaGrid(metaItems);
 
@@ -1557,15 +1558,15 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           if (dto.items && dto.items.length > 0) {
             const columns: ColumnDef[] = isThermal ? [
               { id: 'account_name', label: 'الحساب الموجه', width: 60, align: 'right' },
-              { id: 'amount', label: 'المبلغ', width: 40, align: 'right' }
+              { id: 'amount', label: `المبلغ${curSuffix}`, width: 40, align: 'right' }
             ] : [
               { id: 'account_code', label: 'كود الحساب', width: 18, align: 'right' },
               { id: 'account_name', label: 'اسم الحساب الموجه', width: 33, align: 'right' },
               { id: 'description', label: 'شرح السطر', width: 33, align: 'right' },
-              { id: 'amount', label: 'المبلغ', width: 16, align: 'right' }
+              { id: 'amount', label: `المبلغ${curSuffix}`, width: 16, align: 'right' }
             ];
             const totals = {
-              amount: dto.amount || '0.00'
+              amount: `${dto.amount || '0.00'} ${dto.currency_code || ''}`.trim()
             };
             drawTable(columns, dto.items, totals);
           }

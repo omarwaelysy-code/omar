@@ -68,11 +68,12 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
 
   const getVoucherCurrencyInfo = (v: any) => {
     const baseCurrency = (companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase();
-    let code = (v?.currency || '').trim().toUpperCase();
+    let code = (v?.currency || v?.currency_code || '').trim().toUpperCase();
     
     if (!code && v?.currency_id) {
-      const found = companyCurrencies.find(c => c.id === v.currency_id);
+      const found = companyCurrencies.find(c => c.id === v.currency_id || c.code?.toUpperCase() === String(v.currency_id).toUpperCase());
       if (found?.code) code = found.code.toUpperCase();
+      else if (typeof v.currency_id === 'string' && v.currency_id.length === 3) code = v.currency_id.toUpperCase();
     }
     
     if (!code && v?.payment_method_id) {
@@ -84,20 +85,26 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
         if (match) code = match[1].toUpperCase();
       }
     }
+
+    if (!code && v?.payment_method_name) {
+      const match = v.payment_method_name.match(/\((USD|EUR|SAR|AED|EGP|GBP|KWD|QAR|BHD|OMR|JOD|[A-Z]{3})\)/i);
+      if (match) code = match[1].toUpperCase();
+    }
     
     if (!code) code = baseCurrency;
     
     const rate = Number(v?.exchange_rate) || 1;
-    const voucherAmount = Number(v?.amount) || 0;
+    const voucherAmount = Number(v?.amount || (v?.items && Array.isArray(v.items) ? v.items.reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0) : 0)) || 0;
     const baseAmount = Number(v?.base_amount) || (voucherAmount * (rate > 0 ? rate : 1));
-    const isForeign = code !== baseCurrency && rate > 0 && rate !== 1;
+    const isForeign = code !== baseCurrency;
     
     return {
       code,
       rate,
       voucherAmount,
       baseAmount,
-      isForeign
+      isForeign,
+      baseCurrency
     };
   };
 
@@ -1515,8 +1522,9 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
     const kindTitle = kind === 'supplier' ? 'سند صرف مورد' : 'إيصال صرف نقدية';
     const voucherNum = v.internal_reference || v.voucher_number || v.number || 'جديد';
     const voucherDate = formatDate(v.date);
-    const currencyCode = (companyCurrencies.find(c => c.id === v.currency_id)?.code || companyData?.settings?.currency || 'EGP').toUpperCase();
-    const amountVal = Number(v.amount || (v.items && Array.isArray(v.items) ? v.items.reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0) : 0)) || 0;
+    const curInfo = getVoucherCurrencyInfo(v);
+    const currencyCode = curInfo.code;
+    const amountVal = curInfo.voucherAmount;
     const voucherAmount = formatNumber(amountVal);
     const tafqeetText = tafqeet(amountVal, currencyCode, 'ar');
 
@@ -1573,7 +1581,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                 <th style="padding:6px 10px;border:1px solid #99f6e4;width:40px;text-align:center;">م</th>
                 <th style="padding:6px 10px;border:1px solid #99f6e4;">النوع / المستفيد</th>
                 <th style="padding:6px 10px;border:1px solid #99f6e4;">البيان والتفاصيل</th>
-                <th style="padding:6px 10px;border:1px solid #99f6e4;width:110px;text-align:left;">المبلغ</th>
+                <th style="padding:6px 10px;border:1px solid #99f6e4;width:110px;text-align:left;">المبلغ (${currencyCode})</th>
               </tr>
             </thead>
             <tbody>
@@ -1781,6 +1789,12 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                 <span>${voucherAmount}</span>
                 <span style="font-size:12px;background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:6px;">${currencyCode}</span>
               </div>
+              ${curInfo.isForeign ? `
+                <div style="font-size:12px;font-weight:bold;color:#0f766e;margin-top:6px;direction:rtl;">
+                  <span>المعادل: <strong>${formatNumber(curInfo.baseAmount)} ${curInfo.baseCurrency}</strong></span>
+                  ${curInfo.rate > 0 && curInfo.rate !== 1 ? `<span style="margin-right:8px;color:#475569;">(سعر الصرف: ${curInfo.rate})</span>` : ''}
+                </div>
+              ` : ''}
             </div>
           </div>
 
@@ -2243,7 +2257,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
         paid_to_type: fullData.paid_to_type || 'employee',
         paid_to_employee_id: fullData.paid_to_employee_id || '',
         paid_to_external_name: fullData.paid_to_external_name || '',
-        currency_id: fullData.currency_id || '',
+        currency_id: fullData.currency_id || (companyCurrencies.find(c => c.code === fullData.currency)?.id) || '',
         exchange_rate: fullData.exchange_rate || 1
       });
       const datesDict: Record<string, string> = {};
@@ -2921,7 +2935,10 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
               {/* Print, PDF, Excel Buttons */}
               <button 
                 type="button"
-                onClick={() => printOfficialVoucher(editingVoucher || voucherData)}
+                onClick={() => {
+                  const merged = editingVoucher ? { ...editingVoucher, ...voucherData, items: voucherData.items || editingVoucher.items } : voucherData;
+                  printOfficialVoucher(merged);
+                }}
                 className="flex items-center gap-1.5 px-3 py-2 text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-xl transition-all font-bold text-xs border border-teal-200 shadow-xs cursor-pointer active:scale-95"
                 title={language === 'ar' ? 'طباعة السند الرسمي' : 'Print Voucher'}
               >
@@ -2931,7 +2948,10 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
 
               <button 
                 type="button"
-                onClick={() => printOfficialVoucher(editingVoucher || voucherData)}
+                onClick={() => {
+                  const merged = editingVoucher ? { ...editingVoucher, ...voucherData, items: voucherData.items || editingVoucher.items } : voucherData;
+                  printOfficialVoucher(merged);
+                }}
                 className="flex items-center gap-1.5 px-3 py-2 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all font-bold text-xs border border-rose-200 shadow-xs cursor-pointer active:scale-95"
                 title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
               >
@@ -4679,15 +4699,28 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                       <span className="font-mono bg-zinc-50 px-2 py-0.5 rounded border border-zinc-200">{formatDate(viewVoucher.date)} م</span>
                     </div>
                     {/* Amount Box */}
-                    <div className="mt-1 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-4 py-2 rounded-xl shadow-sm flex items-center gap-2">
-                      <span className="text-xs font-bold">المبلغ:</span>
-                      <span className="text-lg md:text-xl font-black font-mono tracking-tight">
-                        {formatNumber(viewVoucher.amount)}
-                      </span>
-                      <span className="text-xs font-bold bg-white/20 px-1.5 py-0.5 rounded">
-                        {(companyCurrencies.find(c => c.id === (viewVoucher as any).currency_id)?.code || companyData?.settings?.currency || 'EGP').toUpperCase()}
-                      </span>
-                    </div>
+                    {(() => {
+                      const curInfo = getVoucherCurrencyInfo(viewVoucher);
+                      return (
+                        <div className="mt-1 bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-4 py-2 rounded-xl shadow-sm flex flex-col items-end">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold">المبلغ:</span>
+                            <span className="text-lg md:text-xl font-black font-mono tracking-tight">
+                              {formatNumber(viewVoucher.amount)}
+                            </span>
+                            <span className="text-xs font-bold bg-white/20 px-1.5 py-0.5 rounded">
+                              {curInfo.code}
+                            </span>
+                          </div>
+                          {curInfo.isForeign && (
+                            <div className="text-[11px] font-bold text-teal-100 mt-1">
+                              المعادل: {formatNumber(curInfo.baseAmount)} {curInfo.baseCurrency}
+                              {curInfo.rate > 0 && curInfo.rate !== 1 && ` | سعر الصرف: ${curInfo.rate}`}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -4713,7 +4746,8 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                     recipientName = viewVoucher.category_name;
                   }
 
-                  const currencyCode = (companyCurrencies.find(c => c.id === (viewVoucher as any).currency_id)?.code || companyData?.settings?.currency || 'EGP').toUpperCase();
+                  const curInfo = getVoucherCurrencyInfo(viewVoucher);
+                  const currencyCode = curInfo.code;
                   const tafqeetText = tafqeet(Number(viewVoucher.amount) || 0, currencyCode, 'ar');
                   const pmName = viewVoucher.payment_method_name || paymentMethods.find(p => p.id === viewVoucher.payment_method_id)?.name || 'نقداً';
                   const voucherDesc = viewVoucher.description || viewVoucher.notes || 'سند صرف نقدية';
@@ -4772,7 +4806,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                                 <th className="p-2 border-b border-zinc-200 w-12 text-center">م</th>
                                 <th className="p-2 border-b border-zinc-200">النوع / المستفيد</th>
                                 <th className="p-2 border-b border-zinc-200">البيان والتفاصيل</th>
-                                <th className="p-2 border-b border-zinc-200 w-28 text-left">المبلغ</th>
+                                <th className="p-2 border-b border-zinc-200 w-28 text-left">المبلغ ({curInfo.code})</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-100 font-medium">

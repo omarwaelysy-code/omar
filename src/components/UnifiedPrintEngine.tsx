@@ -662,6 +662,7 @@ export function UnifiedPrintEngine() {
         payment_method: normalized.payment_method || '',
         party_name: normalized.customer_name || normalized.supplier_name || '',
         amount: String(normalized.net_total || '0'),
+        currency_code: normalized.currency_code || (companyDto as any).currency || 'EGP',
         description: documentData?.description || '',
         items: itemsDto.map(itm => ({
           account_code: itm.product_code,

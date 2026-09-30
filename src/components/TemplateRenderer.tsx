@@ -151,7 +151,7 @@ export function normalizeDocumentData(
     time: data?.created_at ? new Date(data.created_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
     current_date: new Date().toLocaleDateString('ar-SA'),
     current_time: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
-    currency_code: company?.currency || data?.currency_code || 'SAR',
+    currency_code: data?.currency || data?.currency_code || company?.settings?.currency || company?.currency || 'EGP',
     payment_method: data?.payment_method_name || data?.payment_type || 'نقداً',
     items: [],
     dynamicFields: {},
@@ -330,7 +330,8 @@ export function normalizeDocumentData(
     }));
   } 
   else if (type === 'receipt_vouchers' || type === 'payment_vouchers') {
-    doc.document_number = data.voucher_number;
+    doc.document_number = data.internal_reference || data.voucher_number || data.number;
+    doc.currency_code = (data.currency || data.currency_code || doc.currency_code || 'EGP').toUpperCase();
     doc.customer_name = data.customer_name || '';
     doc.supplier_name = data.supplier_name || '';
     doc.subtotal = Number(data.amount || 0);

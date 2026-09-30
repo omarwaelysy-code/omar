@@ -21,6 +21,22 @@ const CURRENCIES: Record<string, CurrencyConfig> = {
   BHD: { mainAr: 'دينار بحريني', fractionAr: 'فلس', mainEn: 'Bahraini Dinar', fractionEn: 'Fils' },
   OMR: { mainAr: 'ريال عماني', fractionAr: 'بيسة', mainEn: 'Omani Rial', fractionEn: 'Baisa' },
   JOD: { mainAr: 'دينار أردني', fractionAr: 'قرش', mainEn: 'Jordanian Dinar', fractionEn: 'Piaster' },
+  GBP: { mainAr: 'جنيه إسترليني', fractionAr: 'بنس', mainEn: 'British Pound', fractionEn: 'Penny' },
+  TRY: { mainAr: 'ليرة تركية', fractionAr: 'قروش', mainEn: 'Turkish Lira', fractionEn: 'Kurus' },
+  CAD: { mainAr: 'دولار كندي', fractionAr: 'سنت', mainEn: 'Canadian Dollar', fractionEn: 'Cent' },
+  AUD: { mainAr: 'دولار أسترالي', fractionAr: 'سنت', mainEn: 'Australian Dollar', fractionEn: 'Cent' },
+  CHF: { mainAr: 'فرنك سويسري', fractionAr: 'سنتيم', mainEn: 'Swiss Franc', fractionEn: 'Centime' },
+  JPY: { mainAr: 'ين ياباني', fractionAr: 'سن', mainEn: 'Japanese Yen', fractionEn: 'Sen' },
+  CNY: { mainAr: 'يوان صيني', fractionAr: 'فين', mainEn: 'Chinese Yuan', fractionEn: 'Fen' },
+  LYD: { mainAr: 'دينار ليبي', fractionAr: 'درهم', mainEn: 'Libyan Dinar', fractionEn: 'Dirham' },
+  IQD: { mainAr: 'دينار عراقي', fractionAr: 'فلس', mainEn: 'Iraqi Dinar', fractionEn: 'Fils' },
+  SDG: { mainAr: 'جنيه سوداني', fractionAr: 'قرش', mainEn: 'Sudanese Pound', fractionEn: 'Piaster' },
+  SYP: { mainAr: 'ليرة سورية', fractionAr: 'قرش', mainEn: 'Syrian Pound', fractionEn: 'Piaster' },
+  LBP: { mainAr: 'ليرة لبنانية', fractionAr: 'قرش', mainEn: 'Lebanese Pound', fractionEn: 'Piaster' },
+  TND: { mainAr: 'دينار تونسي', fractionAr: 'مليم', mainEn: 'Tunisian Dinar', fractionEn: 'Millime' },
+  DZD: { mainAr: 'دينار جزائري', fractionAr: 'سنتيم', mainEn: 'Algerian Dinar', fractionEn: 'Centime' },
+  MAD: { mainAr: 'درهم مغربي', fractionAr: 'سنتيم', mainEn: 'Moroccan Dirham', fractionEn: 'Centime' },
+  YER: { mainAr: 'ريال يمني', fractionAr: 'فلس', mainEn: 'Yemeni Rial', fractionEn: 'Fils' },
 };
 
 // --- ARABIC CONVERSION HELPERS ---
