@@ -179,6 +179,7 @@ export const CashBalances: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [hideEmptyColumns, setHideEmptyColumns] = useState(false);
   const [hideEmptyPaymentMethods, setHideEmptyPaymentMethods] = useState(false);
+  const [isCompact, setIsCompact] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -949,37 +950,46 @@ export const CashBalances: React.FC = () => {
       {viewMode === 'summary' ? (
         <>
           {/* Checkbox Options */}
-          <div className="flex flex-col md:flex-row gap-6 bg-zinc-50 border border-zinc-200/80 p-4 rounded-2xl">
-            <label className="flex items-center gap-3 text-sm font-bold text-zinc-700 cursor-pointer select-none">
+          <div className="flex flex-wrap items-center gap-6 bg-zinc-50 border border-zinc-200/80 px-4 py-2.5 rounded-2xl">
+            <label className="flex items-center gap-2.5 text-xs font-bold text-zinc-700 cursor-pointer select-none">
               <input
                 type="checkbox"
-                className="w-5 h-5 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 transition-all cursor-pointer"
+                className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 transition-all cursor-pointer"
                 checked={hideEmptyColumns}
                 onChange={(e) => setHideEmptyColumns(e.target.checked)}
               />
               {language === 'ar' ? 'إخفاء الأعمدة التي لا تحتوي على أي حركة' : 'Hide columns with no movement'}
             </label>
-            <label className="flex items-center gap-3 text-sm font-bold text-zinc-700 cursor-pointer select-none">
+            <label className="flex items-center gap-2.5 text-xs font-bold text-zinc-700 cursor-pointer select-none">
               <input
                 type="checkbox"
-                className="w-5 h-5 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 transition-all cursor-pointer"
+                className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 transition-all cursor-pointer"
                 checked={hideEmptyPaymentMethods}
                 onChange={(e) => setHideEmptyPaymentMethods(e.target.checked)}
               />
               {language === 'ar' ? 'إخفاء طرق السداد التي لا تحتوي على أي حركة' : 'Hide payment methods with no movement'}
             </label>
+            <label className="flex items-center gap-2.5 text-xs font-bold text-zinc-700 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 transition-all cursor-pointer"
+                checked={isCompact}
+                onChange={(e) => setIsCompact(e.target.checked)}
+              />
+              {language === 'ar' ? 'عرض مدمج ومصغر (تقليل حجم الخلايا والصفوف والأعمدة)' : 'Compact View (Slim rows & cells)'}
+            </label>
           </div>
 
           {/* Summary Table */}
-          <div ref={reportRef} className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
+          <div ref={reportRef} className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-right border-collapse">
                 <thead>
-                  <tr className="bg-zinc-50 border-b border-zinc-200">
+                  <tr className="bg-zinc-50/90 border-b border-zinc-200">
                     {visibleColumns.map(col => (
                       <th 
                         key={col.id} 
-                        className={`px-4 py-3.5 text-sm font-bold text-zinc-700 border-l border-zinc-200 ${col.type === 'meta' ? '' : 'text-center'}`}
+                        className={`${isCompact ? 'px-2 py-1.5 text-xs' : 'px-3.5 py-2.5 text-sm'} font-bold text-zinc-700 border-l border-zinc-200 whitespace-nowrap ${col.type === 'meta' ? '' : 'text-center'}`}
                       >
                         {language === 'ar' ? col.labelAr : col.labelEn}
                       </th>
@@ -989,7 +999,7 @@ export const CashBalances: React.FC = () => {
                 <tbody className="divide-y divide-zinc-100">
                   {filteredBalances.length > 0 ? (
                     filteredBalances.map((b) => (
-                      <tr key={b.id} className="hover:bg-zinc-50/50 transition-colors">
+                      <tr key={b.id} className="hover:bg-zinc-50/70 transition-colors">
                         {visibleColumns.map(col => {
                           const value = b[col.id as keyof typeof b];
                           const isMeta = col.type === 'meta';
@@ -1009,7 +1019,7 @@ export const CashBalances: React.FC = () => {
                           return (
                             <td 
                               key={col.id} 
-                              className={`px-4 py-3.5 text-sm border-l border-zinc-100 ${isMeta ? 'font-medium' : 'text-center font-black'} ${textColor}`}
+                              className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm'} border-l border-zinc-100 whitespace-nowrap ${isMeta ? 'font-medium' : 'text-center font-bold font-mono tabular-nums'} ${textColor}`}
                             >
                               {col.id === 'name' ? (
                                 <button 
@@ -1017,12 +1027,15 @@ export const CashBalances: React.FC = () => {
                                     setSelectedMethodId(b.id);
                                     setViewMode('statement');
                                   }} 
-                                  className="text-indigo-600 hover:text-indigo-900 hover:underline font-bold text-right cursor-pointer"
+                                  className="text-indigo-600 hover:text-indigo-900 hover:underline font-bold text-right cursor-pointer truncate max-w-[180px] inline-block align-middle"
+                                  title={value as string}
                                 >
                                   {value as string}
                                 </button>
                               ) : isMeta ? (
-                                (value as string)
+                                <span className="truncate max-w-[140px] inline-block align-middle" title={value as string}>
+                                  {value as string}
+                                </span>
                               ) : (
                                 numVal > 0.001 || numVal < -0.001 ? formatNumber(numVal) : '-'
                               )}
@@ -1033,13 +1046,13 @@ export const CashBalances: React.FC = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={visibleColumns.length} className="px-6 py-8 text-center text-zinc-400 italic">
+                      <td colSpan={visibleColumns.length} className="px-4 py-6 text-center text-zinc-400 italic text-xs">
                         {language === 'ar' ? 'لا توجد بيانات تطابق البحث' : 'No data matching the search'}
                       </td>
                     </tr>
                   )}
                   {/* Totals Row */}
-                  <tr className="bg-zinc-900 text-white font-black">
+                  <tr className="bg-zinc-900 text-white font-bold text-xs">
                     {visibleColumns.map((col, idx) => {
                       const isMeta = col.type === 'meta';
                       if (isMeta) {
@@ -1048,7 +1061,7 @@ export const CashBalances: React.FC = () => {
                             <td 
                               key={col.id} 
                               colSpan={3} 
-                              className="px-6 py-4 text-sm text-center border-l border-zinc-800"
+                              className={`${isCompact ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'} text-center border-l border-zinc-800 font-bold`}
                             >
                               {language === 'ar' ? 'الإجمالي' : 'Total'}
                             </td>
@@ -1068,7 +1081,7 @@ export const CashBalances: React.FC = () => {
                       return (
                         <td 
                           key={col.id} 
-                          className={`px-4 py-4 text-sm text-center border-l border-zinc-800 ${textColor}`}
+                          className={`${isCompact ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm'} text-center border-l border-zinc-800 font-mono tabular-nums ${textColor}`}
                         >
                           {formatNumber(value)}
                         </td>
@@ -1083,68 +1096,68 @@ export const CashBalances: React.FC = () => {
       ) : (
         <>
           {/* Detailed Statement View */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-zinc-50 border border-zinc-200/80 p-6 rounded-3xl">
-            <div className="bg-white p-4 rounded-2xl border border-zinc-100 shadow-sm text-center">
-              <span className="text-xs text-zinc-400 font-bold block mb-1">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-zinc-50 border border-zinc-200/80 p-3.5 rounded-2xl">
+            <div className="bg-white p-3 rounded-xl border border-zinc-100 shadow-sm text-center">
+              <span className="text-[11px] text-zinc-400 font-bold block mb-0.5">
                 {language === 'ar' ? 'رصيد أول الفترة' : 'Beginning Balance'}
               </span>
-              <span className="text-2xl font-black text-zinc-700">
+              <span className="text-lg font-black text-zinc-700 font-mono tabular-nums">
                 {formatNumber(statementData.beginningBalance)}
               </span>
             </div>
-            <div className="bg-white p-4 rounded-2xl border border-zinc-100 shadow-sm text-center">
-              <span className="text-xs text-zinc-400 font-bold block mb-1">
+            <div className="bg-white p-3 rounded-xl border border-zinc-100 shadow-sm text-center">
+              <span className="text-[11px] text-zinc-400 font-bold block mb-0.5">
                 {language === 'ar' ? 'إجمالي القبض' : 'Total Receipts'}
               </span>
-              <span className="text-2xl font-black text-emerald-600">
+              <span className="text-lg font-black text-emerald-600 font-mono tabular-nums">
                 {formatNumber(statementData.lines.reduce((sum, l) => sum + l.debit, 0))}
               </span>
             </div>
-            <div className="bg-white p-4 rounded-2xl border border-zinc-100 shadow-sm text-center">
-              <span className="text-xs text-zinc-400 font-bold block mb-1">
+            <div className="bg-white p-3 rounded-xl border border-zinc-100 shadow-sm text-center">
+              <span className="text-[11px] text-zinc-400 font-bold block mb-0.5">
                 {language === 'ar' ? 'إجمالي الصرف' : 'Total Payments'}
               </span>
-              <span className="text-2xl font-black text-rose-600">
+              <span className="text-lg font-black text-rose-600 font-mono tabular-nums">
                 {formatNumber(statementData.lines.reduce((sum, l) => sum + l.credit, 0))}
               </span>
             </div>
-            <div className="bg-white p-4 rounded-2xl border border-zinc-100 shadow-sm text-center">
-              <span className="text-xs text-zinc-400 font-bold block mb-1">
+            <div className="bg-white p-3 rounded-xl border border-zinc-100 shadow-sm text-center">
+              <span className="text-[11px] text-zinc-400 font-bold block mb-0.5">
                 {language === 'ar' ? 'رصيد آخر الفترة' : 'Ending Balance'}
               </span>
-              <span className={statementData.endingBalance >= 0 ? "text-2xl font-black text-emerald-700" : "text-2xl font-black text-rose-600"}>
+              <span className={statementData.endingBalance >= 0 ? "text-lg font-black text-emerald-700 font-mono tabular-nums" : "text-lg font-black text-rose-600 font-mono tabular-nums"}>
                 {formatNumber(statementData.endingBalance)}
               </span>
             </div>
           </div>
 
-          <div ref={reportRef} className="bg-white border border-zinc-200 rounded-3xl overflow-hidden shadow-sm">
+          <div ref={reportRef} className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-right border-collapse">
                 <thead>
                   <tr className="bg-zinc-50 border-b border-zinc-200">
-                    <th className="px-4 py-3 text-sm font-bold text-zinc-700 border-l border-zinc-200">
+                    <th className={`${isCompact ? 'px-2 py-1.5 text-xs' : 'px-4 py-3 text-sm'} font-bold text-zinc-700 border-l border-zinc-200 whitespace-nowrap`}>
                       {language === 'ar' ? 'التاريخ' : 'Date'}
                     </th>
-                    <th className="px-4 py-3 text-sm font-bold text-zinc-700 border-l border-zinc-200">
+                    <th className={`${isCompact ? 'px-2 py-1.5 text-xs' : 'px-4 py-3 text-sm'} font-bold text-zinc-700 border-l border-zinc-200 whitespace-nowrap`}>
                       {language === 'ar' ? 'رقم القيد' : 'Journal Entry'}
                     </th>
-                    <th className="px-4 py-3 text-sm font-bold text-zinc-700 border-l border-zinc-200">
+                    <th className={`${isCompact ? 'px-2 py-1.5 text-xs' : 'px-4 py-3 text-sm'} font-bold text-zinc-700 border-l border-zinc-200 whitespace-nowrap`}>
                       {language === 'ar' ? 'نوع الحركة' : 'Type'}
                     </th>
-                    <th className="px-4 py-3 text-sm font-bold text-zinc-700 border-l border-zinc-200">
+                    <th className={`${isCompact ? 'px-2 py-1.5 text-xs' : 'px-4 py-3 text-sm'} font-bold text-zinc-700 border-l border-zinc-200 whitespace-nowrap`}>
                       {language === 'ar' ? 'المرجع' : 'Reference'}
                     </th>
-                    <th className="px-4 py-3 text-sm font-bold text-zinc-700 border-l border-zinc-200">
+                    <th className={`${isCompact ? 'px-2 py-1.5 text-xs' : 'px-4 py-3 text-sm'} font-bold text-zinc-700 border-l border-zinc-200 whitespace-nowrap`}>
                       {language === 'ar' ? 'البيان' : 'Description'}
                     </th>
-                    <th className="px-4 py-3 text-sm font-bold text-zinc-700 text-center border-l border-zinc-200">
+                    <th className={`${isCompact ? 'px-2 py-1.5 text-xs' : 'px-4 py-3 text-sm'} font-bold text-zinc-700 text-center border-l border-zinc-200 whitespace-nowrap`}>
                       {language === 'ar' ? 'القبض' : 'Debit'}
                     </th>
-                    <th className="px-4 py-3 text-sm font-bold text-zinc-700 text-center border-l border-zinc-200">
+                    <th className={`${isCompact ? 'px-2 py-1.5 text-xs' : 'px-4 py-3 text-sm'} font-bold text-zinc-700 text-center border-l border-zinc-200 whitespace-nowrap`}>
                       {language === 'ar' ? 'الصرف' : 'Credit'}
                     </th>
-                    <th className="px-4 py-3 text-sm font-bold text-zinc-700 text-center">
+                    <th className={`${isCompact ? 'px-2 py-1.5 text-xs' : 'px-4 py-3 text-sm'} font-bold text-zinc-700 text-center whitespace-nowrap`}>
                       {language === 'ar' ? 'الرصيد' : 'Balance'}
                     </th>
                   </tr>
@@ -1154,20 +1167,20 @@ export const CashBalances: React.FC = () => {
                     <>
                       {/* Beginning Balance Row (رصيد منقول) */}
                       <tr className="bg-zinc-50/50 font-bold text-zinc-500 italic">
-                        <td className="px-4 py-3 text-sm border-l border-zinc-100 font-medium">
+                        <td className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm'} border-l border-zinc-100 font-medium whitespace-nowrap`}>
                           {dateRange.start || '-'}
                         </td>
-                        <td className="px-4 py-3 text-sm border-l border-zinc-100">-</td>
-                        <td className="px-4 py-3 text-sm border-l border-zinc-100 font-bold text-indigo-600">
+                        <td className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm'} border-l border-zinc-100 whitespace-nowrap`}>-</td>
+                        <td className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm'} border-l border-zinc-100 font-bold text-indigo-600 whitespace-nowrap`}>
                           {language === 'ar' ? 'رصيد منقول' : 'Balance Forward'}
                         </td>
-                        <td className="px-4 py-3 text-sm border-l border-zinc-100">-</td>
-                        <td className="px-4 py-3 text-sm border-l border-zinc-100 text-zinc-400">
+                        <td className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm'} border-l border-zinc-100 whitespace-nowrap`}>-</td>
+                        <td className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm'} border-l border-zinc-100 text-zinc-400 whitespace-nowrap`}>
                           {language === 'ar' ? 'رصيد أول الفترة' : 'Beginning Balance'}
                         </td>
-                        <td className="px-4 py-3 text-sm text-center border-l border-zinc-100 font-black text-zinc-400">-</td>
-                        <td className="px-4 py-3 text-sm text-center border-l border-zinc-100 font-black text-zinc-400">-</td>
-                        <td className="px-4 py-3 text-sm text-center font-black">
+                        <td className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm'} text-center border-l border-zinc-100 font-bold font-mono text-zinc-400 whitespace-nowrap`}>-</td>
+                        <td className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm'} text-center border-l border-zinc-100 font-bold font-mono text-zinc-400 whitespace-nowrap`}>-</td>
+                        <td className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm'} text-center font-bold font-mono tabular-nums whitespace-nowrap`}>
                           <span className={statementData.beginningBalance >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
                             {formatNumber(statementData.beginningBalance)}
                           </span>
@@ -1175,11 +1188,11 @@ export const CashBalances: React.FC = () => {
                       </tr>
                       
                       {statementData.lines.map((l, idx) => (
-                        <tr key={idx} className="hover:bg-zinc-50/50 transition-colors">
-                          <td className="px-4 py-3.5 text-sm text-zinc-500 border-l border-zinc-100 font-medium">
+                        <tr key={idx} className="hover:bg-zinc-50/70 transition-colors">
+                          <td className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm'} text-zinc-500 border-l border-zinc-100 font-medium whitespace-nowrap`}>
                             {l.date}
                           </td>
-                          <td className="px-4 py-3.5 text-sm border-l border-zinc-100 font-bold text-indigo-600">
+                          <td className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm'} border-l border-zinc-100 font-bold text-indigo-600 whitespace-nowrap`}>
                             <button 
                               onClick={() => {
                                 setPendingViewDoc({ type: 'journal', idOrNumber: l.entryNumber });
@@ -1188,33 +1201,33 @@ export const CashBalances: React.FC = () => {
                               className="hover:underline flex items-center gap-1 cursor-pointer"
                             >
                               {l.entryNumber}
-                              <ExternalLink size={12} />
+                              <ExternalLink size={11} />
                             </button>
                           </td>
-                          <td className="px-4 py-3.5 text-sm text-zinc-600 border-l border-zinc-100 font-bold">
+                          <td className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm'} text-zinc-600 border-l border-zinc-100 font-bold whitespace-nowrap`}>
                             {getTransactionTypeLabel(l.referenceType)}
                           </td>
-                          <td className="px-4 py-3.5 text-sm border-l border-zinc-100 font-bold text-indigo-600">
+                          <td className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm'} border-l border-zinc-100 font-bold text-indigo-600 whitespace-nowrap`}>
                             {l.referenceNumber !== '-' ? (
                               <button 
                                 onClick={() => handleTransactionClick(l.referenceType, l.referenceNumber)}
                                 className="hover:underline flex items-center gap-1 cursor-pointer"
                               >
                                 {l.referenceNumber}
-                                <ExternalLink size={12} />
+                                <ExternalLink size={11} />
                               </button>
                             ) : '-'}
                           </td>
-                          <td className="px-4 py-3.5 text-sm text-zinc-800 border-l border-zinc-100 max-w-[240px] truncate" title={l.description}>
+                          <td className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm'} text-zinc-800 border-l border-zinc-100 max-w-[200px] truncate whitespace-nowrap`} title={l.description}>
                             {l.description}
                           </td>
-                          <td className="px-4 py-3.5 text-sm text-emerald-600 text-center border-l border-zinc-100 font-black">
+                          <td className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm'} text-emerald-600 text-center border-l border-zinc-100 font-bold font-mono tabular-nums whitespace-nowrap`}>
                             {l.debit > 0 ? formatNumber(l.debit) : '-'}
                           </td>
-                          <td className="px-4 py-3.5 text-sm text-rose-600 text-center border-l border-zinc-100 font-black">
+                          <td className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm'} text-rose-600 text-center border-l border-zinc-100 font-bold font-mono tabular-nums whitespace-nowrap`}>
                             {l.credit > 0 ? formatNumber(l.credit) : '-'}
                           </td>
-                          <td className="px-4 py-3.5 text-sm text-center font-black">
+                          <td className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-4 py-3 text-sm'} text-center font-bold font-mono tabular-nums whitespace-nowrap`}>
                             <span className={l.runningBalance >= 0 ? 'text-emerald-700' : 'text-rose-600'}>
                               {formatNumber(l.runningBalance)}
                             </span>
