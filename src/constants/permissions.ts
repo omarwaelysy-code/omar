@@ -46,7 +46,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     id: 'general_ledger',
     nameAr: 'الحسابات العامة',
     nameEn: 'General Ledger',
-    modules: ['account_types', 'accounts', 'chart_of_accounts', 'ifrs_guide']
+    modules: ['account_types', 'accounts', 'chart_of_accounts', 'default_accounts_settings', 'ifrs_guide']
   },
   {
     id: 'journal_entries',

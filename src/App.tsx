@@ -41,6 +41,7 @@ import { ChartOfAccounts } from './pages/ChartOfAccounts';
 import { JournalEntries } from './pages/JournalEntries';
 import { IntegrityDashboard } from './pages/IntegrityDashboard';
 import { DiscountSettings } from './pages/DiscountSettings';
+import { DefaultAccountsSettings } from './pages/DefaultAccountsSettings';
 import { BackupRestore } from './pages/BackupRestore';
 import { PeriodClosing } from './pages/PeriodClosing';
 import { Login } from './pages/Login';
@@ -293,6 +294,7 @@ export default function App() {
       case 'income_statement': return <IncomeStatement />;
       case 'balance_sheet': return <BalanceSheet />;
       case 'discount_settings': return <DiscountSettings />;
+      case 'default_accounts_settings': return <DefaultAccountsSettings />;
       case 'backup_restore': return <BackupRestore />;
       case 'period_closing': return <PeriodClosing />;
       case 'integrity_dashboard': return <IntegrityDashboard />;

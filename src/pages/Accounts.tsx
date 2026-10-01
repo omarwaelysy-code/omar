@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Account, AccountType, JournalEntry } from '../types';
-import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, BookOpen, User, Layers, AlertCircle, LayoutGrid, List, ChevronRight, ChevronLeft, Save, ChevronDown, CheckCircle2, Upload, Wallet, Calendar } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, BookOpen, User, Layers, AlertCircle, LayoutGrid, List, ChevronRight, ChevronLeft, Save, ChevronDown, CheckCircle2, Upload, Wallet, Calendar, Lock } from 'lucide-react';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
@@ -48,6 +48,7 @@ export const Accounts: React.FC = () => {
   const [isGeneratingCoa, setIsGeneratingCoa] = useState(false);
   const [coaProgress, setCoaProgress] = useState('');
   const [isExcelImportModalOpen, setIsExcelImportModalOpen] = useState(false);
+  const [defaultAccountMap, setDefaultAccountMap] = useState<Record<string, string>>({});
   const tableRef = useRef<HTMLTableElement>(null);
   const usageDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -158,11 +159,17 @@ export const Accounts: React.FC = () => {
       const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
       const unsubTypes = dbService.subscribe<AccountType>('account_types', user.company_id, setTypes);
       const unsubJournals = dbService.subscribe<JournalEntry>('journal_entries', user.company_id, setEntries);
+      const unsubDefaults = dbService.subscribe<any>('default_account_mappings', user.company_id, (data) => {
+        const map: Record<string, string> = {};
+        (data || []).forEach((r: any) => { if (r.setting_key && r.account_id) map[r.setting_key] = r.account_id; });
+        setDefaultAccountMap(map);
+      });
       setLoading(false);
       return () => {
         unsubAccounts();
         unsubTypes();
         unsubJournals();
+        unsubDefaults();
       };
     }
   }, [user?.company_id]);
@@ -305,7 +312,23 @@ export const Accounts: React.FC = () => {
     }
   };
 
+  const isDefaultAccount = (account: Account) => {
+    const isMapped = Object.values(defaultAccountMap).includes(account.id);
+    const CORE_DEFAULT_CODES = [
+      '110101', '110103', '110201', '110301', '110402', '110403',
+      '210101', '210202', '210203', '3101', '3103', '3104',
+      '4101', '4103', '4104', '5101', '5103', '5104', '5105',
+      '420201', '630201', '420202', '630202'
+    ];
+    return isMapped || CORE_DEFAULT_CODES.includes(account.code);
+  };
+
   const handleDelete = (id: string) => {
+    const account = accounts.find(a => a.id === id);
+    if (account && isDefaultAccount(account)) {
+      showNotification('لا يمكن حذف هذا الحساب لأنه حساب افتراضي معتمد ومحمي من الحذف.', 'error');
+      return;
+    }
     setAccountToDelete(id);
     setIsDeleteModalOpen(true);
   };
@@ -541,15 +564,22 @@ export const Accounts: React.FC = () => {
                       >
                         <Edit2 size={16} />
                       </button>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(account.id);
-                        }}
-                        className="p-2 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {isDefaultAccount(account) ? (
+                        <span className="p-2 text-slate-300" title="حساب افتراضي محمي من الحذف">
+                          <Lock size={16} />
+                        </span>
+                      ) : (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(account.id);
+                          }}
+                          className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                          title="حذف الحساب"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -606,9 +636,15 @@ export const Accounts: React.FC = () => {
                 <button onClick={() => openModal(account)} className="p-2 text-slate-300 hover:text-sky-600 hover:bg-sky-50 rounded-xl transition-all">
                   <Edit2 size={16} />
                 </button>
-                <button onClick={() => handleDelete(account.id)} className="p-2 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all">
-                  <Trash2 size={16} />
-                </button>
+                {isDefaultAccount(account) ? (
+                  <span className="p-2 text-slate-300" title="حساب افتراضي محمي من الحذف">
+                    <Lock size={16} />
+                  </span>
+                ) : (
+                  <button onClick={() => handleDelete(account.id)} className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all" title="حذف الحساب">
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
             </div>
             

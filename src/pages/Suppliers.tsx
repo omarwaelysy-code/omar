@@ -41,6 +41,7 @@ export const Suppliers: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [defaultAccountMap, setDefaultAccountMap] = useState<Record<string, string>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -139,6 +140,12 @@ export const Suppliers: React.FC = () => {
         setAccounts(data);
       });
 
+      const unsubscribeDefaultAccs = dbService.subscribe<any>('default_account_mappings', user.company_id, (data) => {
+        const map: Record<string, string> = {};
+        (data || []).forEach((r: any) => { if (r.setting_key && r.account_id) map[r.setting_key] = r.account_id; });
+        setDefaultAccountMap(map);
+      });
+
       const unsubscribeEntries = dbService.subscribe<JournalEntry>('journal_entries', user.company_id, setEntries);
       const unsubscribeInvoices = dbService.subscribe<any>('purchase_invoices', user.company_id, setInvoices);
       const unsubscribeReturns = dbService.subscribe<any>('purchase_returns', user.company_id, setReturns);
@@ -148,6 +155,7 @@ export const Suppliers: React.FC = () => {
       return () => {
         unsubscribe();
         unsubscribeAccounts();
+        unsubscribeDefaultAccs();
         unsubscribeEntries();
         unsubscribeInvoices();
         unsubscribeReturns();
@@ -470,8 +478,8 @@ export const Suppliers: React.FC = () => {
         return;
       }
     } else {
-      const defaultAccount = accounts.find(a => a.account_usage === 'supplier') || accounts.find(a => a.account_usage === 'accounts_payable');
-      const defaultCounterAccount = accounts.find(a => a.account_usage === 'opening_balance');
+      const defaultAccount = accounts.find(a => a.id === defaultAccountMap['supplier']) || accounts.find(a => a.code === '210101') || accounts.find(a => a.account_usage === 'supplier') || accounts.find(a => a.account_usage === 'accounts_payable');
+      const defaultCounterAccount = accounts.find(a => a.id === defaultAccountMap['opening_balance']) || accounts.find(a => a.code === '3104') || accounts.find(a => a.account_usage === 'opening_balance');
       setEditingSupplier(null);
       setFormData({
         name: pendingEtaSupplierForCreation ? pendingEtaSupplierForCreation.name : '',

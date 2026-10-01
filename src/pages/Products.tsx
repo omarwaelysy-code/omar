@@ -327,6 +327,8 @@ export const Products: React.FC = () => {
     is_active: true
   });
 
+  const [defaultAccountMap, setDefaultAccountMap] = useState<Record<string, string>>({});
+
   useEffect(() => {
     if (user) {
       const unsubscribe = dbService.subscribe<Product>('products', user.company_id, (data) => {
@@ -336,6 +338,12 @@ export const Products: React.FC = () => {
 
       const unsubscribeAccounts = dbService.subscribe<Account>('accounts', user.company_id, (data) => {
         setAccounts(data);
+      });
+
+      const unsubscribeDefaultAccs = dbService.subscribe<any>('default_account_mappings', user.company_id, (data) => {
+        const map: Record<string, string> = {};
+        (data || []).forEach((r: any) => { if (r.setting_key && r.account_id) map[r.setting_key] = r.account_id; });
+        setDefaultAccountMap(map);
       });
 
       const unsubscribeItemGroups = dbService.subscribe<ItemGroup>('item_groups', user.company_id, (data) => {
@@ -349,6 +357,7 @@ export const Products: React.FC = () => {
       return () => {
         unsubscribe();
         unsubscribeAccounts();
+        unsubscribeDefaultAccs();
         unsubscribeItemGroups();
         unsubscribeCompany();
       };
@@ -692,14 +701,13 @@ export const Products: React.FC = () => {
   };
 
   const resetForm = () => {
-    const defaultRevenue = accounts.find(a => ['sales_revenue', 'service_revenue', 'other_revenue', 'financial_revenue', 'sales_returns', 'earned_discounts'].includes(a.account_usage || ''));
-    const defaultCost = accounts.find(a => ['cost_of_sales', 'purchases', 'purchase_returns', 'granted_discounts'].includes(a.account_usage || ''));
-    const defaultInventory = accounts.find(a => ['inventory', 'raw_materials', 'work_in_progress', 'finished_goods'].includes(a.account_usage || ''));
-    const defaultVat = accounts.find(a => a.account_usage === 'vat');
-    const defaultSalesVat = accounts.find(a => a.account_usage === 'output_vat') || defaultVat || accounts.find(a => a.code?.startsWith('222'));
-    const defaultPurchaseVat = accounts.find(a => a.account_usage === 'input_vat') || defaultVat || accounts.find(a => a.code?.startsWith('118') || a.code?.startsWith('222'));
-    const defaultSalesWht = accounts.find(a => a.account_usage === 'withholding_tax_customers' || a.name.includes('خصم من العملاء'));
-    const defaultPurchaseWht = accounts.find(a => a.account_usage === 'withholding_tax_suppliers' || a.name.includes('خصم على الموردين') || a.name.includes('خصم من الموردين'));
+    const defaultRevenue = accounts.find(a => a.id === defaultAccountMap['sales_revenue']) || accounts.find(a => a.code === '4101') || accounts.find(a => ['sales_revenue', 'service_revenue', 'other_revenue'].includes(a.account_usage || ''));
+    const defaultCost = accounts.find(a => a.id === defaultAccountMap['cost_of_sales']) || accounts.find(a => a.code === '5101') || accounts.find(a => ['cost_of_sales', 'purchases'].includes(a.account_usage || ''));
+    const defaultInventory = accounts.find(a => a.id === defaultAccountMap['inventory']) || accounts.find(a => a.code === '110301') || accounts.find(a => ['inventory', 'raw_materials', 'work_in_progress', 'finished_goods'].includes(a.account_usage || ''));
+    const defaultSalesVat = accounts.find(a => a.id === defaultAccountMap['output_vat']) || accounts.find(a => a.code === '210202') || accounts.find(a => a.account_usage === 'output_vat' || a.account_usage === 'vat');
+    const defaultPurchaseVat = accounts.find(a => a.id === defaultAccountMap['input_vat']) || accounts.find(a => a.code === '110402') || accounts.find(a => a.account_usage === 'input_vat' || a.account_usage === 'vat');
+    const defaultSalesWht = accounts.find(a => a.id === defaultAccountMap['withholding_tax_customers']) || accounts.find(a => a.code === '110403') || accounts.find(a => a.account_usage === 'withholding_tax_customers');
+    const defaultPurchaseWht = accounts.find(a => a.id === defaultAccountMap['withholding_tax_suppliers']) || accounts.find(a => a.code === '210203') || accounts.find(a => a.account_usage === 'withholding_tax_suppliers');
 
     setEditingProduct(null);
     setFormData({ 

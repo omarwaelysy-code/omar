@@ -66,7 +66,8 @@ export const STANDARD_COA_TEMPLATE: TemplateType[] = [
             name_en: 'Other Receivables',
             children: [
               { code: '110401', name_ar: 'سلف الموظفين', name_en: 'Employee Advances', usage: 'employee_advances' },
-              { code: '110402', name_ar: 'ضريبة القيمة المضافة - مدخلات', name_en: 'Input VAT', usage: 'vat' }
+              { code: '110402', name_ar: 'ضريبة القيمة المضافة - مدخلات', name_en: 'Input VAT', usage: 'vat' },
+              { code: '110403', name_ar: 'ضرائب خصم من العملاء (أ.ت.ص)', name_en: 'Tax Withheld by Customers', usage: 'withholding_tax_customers' }
             ]
           }
         ]
@@ -133,7 +134,8 @@ export const STANDARD_COA_TEMPLATE: TemplateType[] = [
             name_en: 'Other Payables',
             children: [
               { code: '210201', name_ar: 'رواتب مستحقة', name_en: 'Accrued Salaries', usage: 'payroll' },
-              { code: '210202', name_ar: 'ضريبة القيمة المضافة - مخرجات', name_en: 'Output VAT', usage: 'vat' }
+              { code: '210202', name_ar: 'ضريبة القيمة المضافة - مخرجات', name_en: 'Output VAT', usage: 'vat' },
+              { code: '210203', name_ar: 'ضرائب خصم على الموردين (أ.ت.ص)', name_en: 'Tax Withheld for Suppliers', usage: 'withholding_tax_suppliers' }
             ]
           }
         ]
@@ -159,7 +161,8 @@ export const STANDARD_COA_TEMPLATE: TemplateType[] = [
     accounts: [
       { code: '3101', name_ar: 'رأس المال', name_en: 'Capital', usage: 'capital' },
       { code: '3102', name_ar: 'جاري الشركاء / مسحوبات', name_en: 'Drawings / Partner Current', usage: 'drawings' },
-      { code: '3103', name_ar: 'أرباح مبقاة (محتجزة)', name_en: 'Retained Earnings', usage: 'retained_earnings' }
+      { code: '3103', name_ar: 'أرباح مبقاة (مرحلة)', name_en: 'Retained Earnings', usage: 'retained_earnings' },
+      { code: '3104', name_ar: 'رصيد افتتاحي (وسيط الافتتاح)', name_en: 'Opening Balance Equity', usage: 'opening_balance' }
     ]
   },
   {
@@ -187,7 +190,15 @@ export const STANDARD_COA_TEMPLATE: TemplateType[] = [
         usage: 'other_revenue',
         children: [
           { code: '4201', name_ar: 'إيرادات متنوعة', name_en: 'Miscellaneous Revenue' },
-          { code: '4202', name_ar: 'أرباح فروق عملة', name_en: 'Exchange Difference Gain' }
+          { 
+            code: '4202', 
+            name_ar: 'أرباح فروق عملة', 
+            name_en: 'Exchange Difference Gain',
+            children: [
+              { code: '420201', name_ar: 'أرباح فروق عملة محققة', name_en: 'Realized Forex Gain', usage: 'realized_forex_gain' },
+              { code: '420202', name_ar: 'أرباح فروق عملة غير محققة', name_en: 'Unrealized Forex Gain', usage: 'unrealized_forex_gain' }
+            ]
+          }
         ]
       }
     ]
@@ -243,7 +254,15 @@ export const STANDARD_COA_TEMPLATE: TemplateType[] = [
         name_en: 'Financial & Depreciation Expenses',
         children: [
           { code: '6301', name_ar: 'مصروف الإهلاك', name_en: 'Depreciation Expense', usage: 'depreciation_expense' },
-          { code: '6302', name_ar: 'خسائر فروق عملة', name_en: 'Exchange Difference Loss' }
+          { 
+            code: '6302', 
+            name_ar: 'خسائر فروق عملة', 
+            name_en: 'Exchange Difference Loss',
+            children: [
+              { code: '630201', name_ar: 'خسائر فروق عملة محققة', name_en: 'Realized Forex Loss', usage: 'realized_forex_loss' },
+              { code: '630202', name_ar: 'خسائر فروق عملة غير محققة', name_en: 'Unrealized Forex Loss', usage: 'unrealized_forex_loss' }
+            ]
+          }
         ]
       }
     ]

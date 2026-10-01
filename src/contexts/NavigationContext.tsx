@@ -111,6 +111,7 @@ export const pageLabels: { [key: string]: string } = {
   'income_statement': 'قائمة الدخل',
   'balance_sheet': 'المركز المالي',
   'discount_settings': 'إعدادات الخصومات',
+  'default_accounts_settings': 'إعدادات الحسابات الافتراضية',
   'activity_log': 'سجل النشاط',
   'companies': 'إدارة الشركات',
   'system_check': 'فحص النظام',

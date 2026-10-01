@@ -694,6 +694,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'create_journal_entry', label: t('nav.create_journal_entry'), icon: Plus },
           { id: 'journal_entries', label: t('nav.journal_entries'), icon: FileText },
           { id: 'detailed_journal_entries', label: t('nav.detailed_journal_entries') || 'قيود يومية تفصيلية', icon: FileSpreadsheet },
+          { id: 'default_accounts_settings', label: t('nav.default_accounts_settings') || 'إعدادات الحسابات الافتراضية', icon: Sliders },
           { id: 'ifrs_guide', label: t('nav.ifrs_guide') || 'دليل معايير IFRS 2026', icon: BookOpen }
         ]
       },

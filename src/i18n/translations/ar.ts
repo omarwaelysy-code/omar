@@ -250,6 +250,7 @@ export const ar = {
   'nav.create_journal_entry': 'إضافة قيد يومية',
   'nav.journal_entries': 'قيود اليومية',
   'nav.detailed_journal_entries': 'قيود يومية تفصيلية',
+  'nav.default_accounts_settings': 'إعدادات الحسابات الافتراضية',
   'nav.ifrs_guide': 'دليل معايير IFRS 2026',
   'nav.general_ledger_report': 'حساب الأستاذ',
   'nav.trial_balance': 'ميزان المراجعة',

@@ -2763,6 +2763,302 @@ router.post('/system/auto-fix-missing-accounts', authenticateToken, authorizeRol
   }
 });
 
+// ==========================================
+// DEFAULT ACCOUNTS CONFIGURATION & MERGE API
+// ==========================================
+const DEFAULT_ACCOUNT_DEFS = [
+  { key: 'main_cash', code: '110101', nameAr: 'الصندوق الرئيسي', nameEn: 'Main Cash', classification: 'asset', classificationAr: 'الميزانية / أصول متداولة', usage: 'cash', typeCode: '1', parentCode: '1101', targetScreen: 'شاشة طرق الدفع والخزائن' },
+  { key: 'bank', code: '110103', nameAr: 'البنك', nameEn: 'Bank', classification: 'asset', classificationAr: 'الميزانية / أصول متداولة', usage: 'bank', typeCode: '1', parentCode: '1101', targetScreen: 'شاشة طرق الدفع والبنوك' },
+  { key: 'customer', code: '110201', nameAr: 'العملاء', nameEn: 'Accounts Receivable', classification: 'asset', classificationAr: 'الميزانية / أصول متداولة', usage: 'customer', typeCode: '1', parentCode: '1102', targetScreen: 'شاشة البيانات الأساسية للعملاء' },
+  { key: 'inventory', code: '110301', nameAr: 'مخزون بضاعة', nameEn: 'Goods Inventory', classification: 'asset', classificationAr: 'الميزانية / أصول متداولة', usage: 'inventory', typeCode: '1', parentCode: '1103', targetScreen: 'شاشة بطاقة الصنف' },
+  { key: 'input_vat', code: '110402', nameAr: 'ضريبة القيمة المضافة - مدخلات', nameEn: 'Input VAT', classification: 'asset', classificationAr: 'الميزانية / أصول متداولة', usage: 'vat', typeCode: '1', parentCode: '1104', targetScreen: 'شاشة بطاقة الصنف' },
+  { key: 'withholding_tax_customers', code: '110403', nameAr: 'ضرائب خصم من العملاء (أ.ت.ص)', nameEn: 'Tax Withheld by Customers', classification: 'asset', classificationAr: 'الميزانية / أصول متداولة', usage: 'withholding_tax_customers', typeCode: '1', parentCode: '1104', targetScreen: 'شاشة بطاقة الصنف' },
+  { key: 'supplier', code: '210101', nameAr: 'الموردون', nameEn: 'Accounts Payable', classification: 'liability', classificationAr: 'الميزانية / التزامات متداولة', usage: 'supplier', typeCode: '2', parentCode: '2101', targetScreen: 'شاشة البيانات الأساسية للموردين' },
+  { key: 'output_vat', code: '210202', nameAr: 'ضريبة القيمة المضافة - مخرجات', nameEn: 'Output VAT', classification: 'liability', classificationAr: 'الميزانية / التزامات متداولة', usage: 'vat', typeCode: '2', parentCode: '2102', targetScreen: 'شاشة بطاقة الصنف' },
+  { key: 'withholding_tax_suppliers', code: '210203', nameAr: 'ضرائب خصم على الموردين (أ.ت.ص)', nameEn: 'Tax Withheld for Suppliers', classification: 'liability', classificationAr: 'الميزانية / التزامات متداولة', usage: 'withholding_tax_suppliers', typeCode: '2', parentCode: '2102', targetScreen: 'شاشة بطاقة الصنف' },
+  { key: 'capital', code: '3101', nameAr: 'رأس المال', nameEn: 'Capital', classification: 'equity', classificationAr: 'الميزانية / حقوق ملكية', usage: 'capital', typeCode: '3', parentCode: null, targetScreen: 'شاشة إعدادات الشركة' },
+  { key: 'retained_earnings', code: '3103', nameAr: 'أرباح مبقاة (مرحلة)', nameEn: 'Retained Earnings', classification: 'equity', classificationAr: 'الميزانية / حقوق ملكية', usage: 'retained_earnings', typeCode: '3', parentCode: null, targetScreen: 'شاشة إعدادات الحسابات الافتراضية' },
+  { key: 'opening_balance', code: '3104', nameAr: 'رصيد افتتاحي (وسيط الافتتاح)', nameEn: 'Opening Balance Equity', classification: 'equity', classificationAr: 'الميزانية / حقوق ملكية', usage: 'opening_balance', typeCode: '3', parentCode: null, targetScreen: 'شاشة الأرصدة الافتتاحية' },
+  { key: 'sales_revenue', code: '4101', nameAr: 'إيرادات مبيعات بضاعة', nameEn: 'Sales Revenue', classification: 'revenue', classificationAr: 'قائمة الدخل / إيرادات', usage: 'sales_revenue', typeCode: '4', parentCode: '41', targetScreen: 'شاشة بطاقة الصنف' },
+  { key: 'sales_returns', code: '4103', nameAr: 'مردودات مبيعات', nameEn: 'Sales Returns', classification: 'revenue', classificationAr: 'قائمة الدخل / إيرادات', usage: 'sales_returns', typeCode: '4', parentCode: '41', targetScreen: 'شاشة بطاقة الصنف' },
+  { key: 'customer_discount', code: '4104', nameAr: 'خصم مسموح به (خصم عملاء)', nameEn: 'Sales / Customer Discount', classification: 'revenue', classificationAr: 'قائمة الدخل / إيرادات', usage: 'earned_discounts', typeCode: '4', parentCode: '41', targetScreen: 'شاشة إعدادات الخصم' },
+  { key: 'cost_of_sales', code: '5101', nameAr: 'تكلفة البضاعة المباعة', nameEn: 'Cost of Goods Sold (COGS)', classification: 'cost', classificationAr: 'قائمة الدخل / تكاليف', usage: 'cost_of_sales', typeCode: '5', parentCode: null, targetScreen: 'شاشة بطاقة الصنف' },
+  { key: 'purchases', code: '5103', nameAr: 'المشتريات', nameEn: 'Purchases', classification: 'cost', classificationAr: 'قائمة الدخل / تكاليف', usage: 'purchases', typeCode: '5', parentCode: null, targetScreen: 'شاشة بطاقة الصنف' },
+  { key: 'purchase_returns', code: '5104', nameAr: 'مردودات مشتريات', nameEn: 'Purchase Returns', classification: 'cost', classificationAr: 'قائمة الدخل / تكاليف', usage: 'purchase_returns', typeCode: '5', parentCode: null, targetScreen: 'شاشة بطاقة الصنف' },
+  { key: 'supplier_discount', code: '5105', nameAr: 'خصم مكتسب (خصم موردين)', nameEn: 'Purchase / Supplier Discount', classification: 'cost', classificationAr: 'قائمة الدخل / تكاليف', usage: 'granted_discounts', typeCode: '5', parentCode: null, targetScreen: 'شاشة إعدادات الخصم' },
+  { key: 'realized_forex_gain', code: '420201', nameAr: 'أرباح فروق عملة محققة', nameEn: 'Realized Forex Gain', classification: 'revenue', classificationAr: 'قائمة الدخل / إيرادات أخرى', usage: 'realized_forex_gain', typeCode: '4', parentCode: '4202', targetScreen: 'شاشة إعدادات الحسابات الافتراضية' },
+  { key: 'realized_forex_loss', code: '630201', nameAr: 'خسائر فروق عملة محققة', nameEn: 'Realized Forex Loss', classification: 'expense', classificationAr: 'قائمة الدخل / مصروفات مالية', usage: 'realized_forex_loss', typeCode: '6', parentCode: '6302', targetScreen: 'شاشة إعدادات الحسابات الافتراضية' },
+  { key: 'unrealized_forex_gain', code: '420202', nameAr: 'أرباح فروق عملة غير محققة', nameEn: 'Unrealized Forex Gain', classification: 'revenue', classificationAr: 'قائمة الدخل / إيرادات أخرى', usage: 'unrealized_forex_gain', typeCode: '4', parentCode: '4202', targetScreen: 'شاشة إعدادات الحسابات الافتراضية' },
+  { key: 'unrealized_forex_loss', code: '630202', nameAr: 'خسائر فروق عملة غير محققة', nameEn: 'Unrealized Forex Loss', classification: 'expense', classificationAr: 'قائمة الدخل / مصروفات مالية', usage: 'unrealized_forex_loss', typeCode: '6', parentCode: '6302', targetScreen: 'شاشة إعدادات الحسابات الافتراضية' }
+];
+
+async function ensureDefaultAccountsForCompany(client: any, companyId: string) {
+  // Ensure default_account_mappings table exists
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS default_account_mappings (
+      id VARCHAR(36) PRIMARY KEY,
+      company_id VARCHAR(36) NOT NULL,
+      setting_key VARCHAR(100) NOT NULL,
+      account_id VARCHAR(36) NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+      account_code VARCHAR(50),
+      account_name VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT unq_company_setting_key UNIQUE(company_id, setting_key)
+    )
+  `);
+
+  // 1. Fetch existing account types for this company
+  const typesRes = await client.query('SELECT id, code, name FROM account_types WHERE company_id = $1', [companyId]);
+  const typesByCode: Record<string, any> = {};
+  typesRes.rows.forEach((t: any) => { typesByCode[t.code] = t; });
+
+  const ensureType = async (code: string, nameAr: string, nameEn: string, statementType: string, classification: string) => {
+    if (typesByCode[code]) return typesByCode[code].id;
+    const newTypeId = uuidv4();
+    await client.query(`
+      INSERT INTO account_types (id, code, name, statement_type, classification, is_active, company_id)
+      VALUES ($1, $2, $3, $4, $5, true, $6)
+    `, [newTypeId, code, nameAr, statementType, classification, companyId]);
+    typesByCode[code] = { id: newTypeId, code, name: nameAr };
+    return newTypeId;
+  };
+
+  await ensureType('1', 'الأصول', 'Assets', 'balance_sheet', 'asset');
+  await ensureType('2', 'الالتزامات', 'Liabilities', 'balance_sheet', 'liability');
+  await ensureType('3', 'حقوق الملكية', 'Equity', 'balance_sheet', 'equity');
+  await ensureType('4', 'الإيرادات', 'Revenue', 'income_statement', 'revenue');
+  await ensureType('5', 'تكلفة المبيعات', 'Cost of Sales', 'income_statement', 'cost');
+  await ensureType('6', 'المصروفات', 'Expenses', 'income_statement', 'expense');
+
+  // 2. Fetch existing accounts for this company
+  const accsRes = await client.query('SELECT id, code, name, parent_id, type_id, account_usage FROM accounts WHERE company_id = $1', [companyId]);
+  const accounts = accsRes.rows;
+  const accByCode: Record<string, any> = {};
+  accounts.forEach((a: any) => { accByCode[a.code] = a; });
+
+  const ensureParent = async (code: string, nameAr: string, typeCode: string, parentOfParentCode?: string) => {
+    if (accByCode[code]) return accByCode[code].id;
+    const typeId = typesByCode[typeCode]?.id;
+    let parentId = null;
+    if (parentOfParentCode && accByCode[parentOfParentCode]) {
+      parentId = accByCode[parentOfParentCode].id;
+    }
+    const newAccId = uuidv4();
+    await client.query(`
+      INSERT INTO accounts (id, code, name, type_id, type_name, parent_id, is_active, company_id, opening_balance, required_sub_account)
+      VALUES ($1, $2, $3, $4, $5, $6, true, $7, 0, true)
+    `, [newAccId, code, nameAr, typeId, typesByCode[typeCode]?.name || '', parentId, companyId]);
+    accByCode[code] = { id: newAccId, code, name: nameAr };
+    return newAccId;
+  };
+
+  // Ensure intermediate parent accounts if missing
+  await ensureParent('11', 'الأصول المتداولة', '1');
+  await ensureParent('1101', 'النقدية وما في حكمها', '1', '11');
+  await ensureParent('1102', 'الذمم المدينة', '1', '11');
+  await ensureParent('1103', 'المخزون', '1', '11');
+  await ensureParent('1104', 'أرصدة مدينة أخرى', '1', '11');
+  await ensureParent('21', 'الالتزامات المتداولة', '2');
+  await ensureParent('2101', 'الذمم الدائنة', '2', '21');
+  await ensureParent('2102', 'أرصدة دائنة أخرى', '2', '21');
+  await ensureParent('41', 'الإيرادات التشغيلية', '4');
+  await ensureParent('42', 'إيرادات أخرى', '4');
+  await ensureParent('4202', 'أرباح فروق عملة', '4', '42');
+  await ensureParent('63', 'المصروفات المالية والإهلاكات', '6');
+  await ensureParent('6302', 'خسائر فروق عملة', '6', '63');
+
+  // 3. For each of the 23 items, ensure the account exists and is mapped
+  let addedCount = 0;
+  for (const def of DEFAULT_ACCOUNT_DEFS) {
+    let targetAcc = accByCode[def.code] || accounts.find((a: any) => a.account_usage === def.usage);
+    if (!targetAcc) {
+      const typeId = typesByCode[def.typeCode]?.id;
+      const parentId = def.parentCode && accByCode[def.parentCode] ? accByCode[def.parentCode].id : null;
+      const newAccId = uuidv4();
+      await client.query(`
+        INSERT INTO accounts (id, code, name, type_id, type_name, parent_id, is_active, company_id, opening_balance, required_sub_account, account_usage)
+        VALUES ($1, $2, $3, $4, $5, $6, true, $7, 0, false, $8)
+      `, [newAccId, def.code, def.nameAr, typeId, typesByCode[def.typeCode]?.name || '', parentId, companyId, def.usage]);
+      targetAcc = { id: newAccId, code: def.code, name: def.nameAr, account_usage: def.usage };
+      accByCode[def.code] = targetAcc;
+      addedCount++;
+    }
+
+    // Ensure mapping in default_account_mappings
+    await client.query(`
+      INSERT INTO default_account_mappings (id, company_id, setting_key, account_id, account_code, account_name, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+      ON CONFLICT (company_id, setting_key) 
+      DO NOTHING
+    `, [uuidv4(), companyId, def.key, targetAcc.id, targetAcc.code, targetAcc.name]);
+  }
+  return addedCount;
+}
+
+// GET /api/erp/default-accounts
+router.get('/default-accounts', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = req.user?.company_id;
+  if (!companyId) return res.status(400).json({ error: 'Company ID required' });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await ensureDefaultAccountsForCompany(client, companyId);
+    await client.query('COMMIT');
+
+    const mappingsRes = await client.query(`
+      SELECT m.setting_key, m.account_id, a.code as account_code, a.name as account_name
+      FROM default_account_mappings m
+      LEFT JOIN accounts a ON m.account_id = a.id
+      WHERE m.company_id = $1
+    `, [companyId]);
+
+    const mappings: Record<string, string> = {};
+    const mapDetails: Record<string, { id: string; code: string; name: string }> = {};
+    mappingsRes.rows.forEach((r: any) => {
+      mappings[r.setting_key] = r.account_id;
+      mapDetails[r.setting_key] = { id: r.account_id, code: r.account_code, name: r.account_name };
+    });
+
+    const accountsList = DEFAULT_ACCOUNT_DEFS.map(def => {
+      const current = mapDetails[def.key];
+      return {
+        id: def.key,
+        key: def.key,
+        defaultCode: def.code,
+        nameAr: def.nameAr,
+        nameEn: def.nameEn,
+        classificationAr: def.classificationAr,
+        accountUsage: def.usage,
+        targetScreen: def.targetScreen,
+        accountId: current?.id,
+        accountCode: current?.code || def.code,
+        accountName: current?.name || def.nameAr,
+        isCustom: current && current.code !== def.code
+      };
+    });
+
+    res.json({ success: true, mappings, accounts: accountsList });
+  } catch (err: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// PUT /api/erp/default-accounts (single update)
+router.put('/default-accounts', authenticateToken, authorizeRoles('super_admin', 'admin'), async (req: AuthRequest, res) => {
+  const companyId = req.user?.company_id;
+  const { key, accountId } = req.body;
+  if (!companyId || !key || !accountId) return res.status(400).json({ error: 'Missing parameters' });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const accRes = await client.query('SELECT id, code, name FROM accounts WHERE id = $1 AND company_id = $2', [accountId, companyId]);
+    if (accRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Account not found in company' });
+    }
+    const acc = accRes.rows[0];
+
+    await client.query(`
+      INSERT INTO default_account_mappings (id, company_id, setting_key, account_id, account_code, account_name, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+      ON CONFLICT (company_id, setting_key)
+      DO UPDATE SET account_id = $4, account_code = $5, account_name = $6, updated_at = CURRENT_TIMESTAMP
+    `, [uuidv4(), companyId, key, acc.id, acc.code, acc.name]);
+
+    // Keep discount_settings in sync if updating discount accounts
+    if (key === 'customer_discount' || key === 'supplier_discount') {
+      const discCol = key === 'customer_discount' ? 'customer_discount_account_id' : 'supplier_discount_account_id';
+      const existingSettings = await client.query('SELECT id FROM settings WHERE company_id = $1 AND type = $2', [companyId, 'discount_settings']);
+      if (existingSettings.rows.length > 0) {
+        await client.query(`UPDATE settings SET ${discCol} = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`, [acc.id, existingSettings.rows[0].id]);
+      } else {
+        await client.query(`INSERT INTO settings (id, company_id, type, ${discCol}, created_at) VALUES ($1, $2, 'discount_settings', $3, CURRENT_TIMESTAMP)`, [uuidv4(), companyId, acc.id]);
+      }
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true, message: 'Default account updated successfully' });
+  } catch (err: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// PUT /api/erp/default-accounts/bulk (bulk update)
+router.put('/default-accounts/bulk', authenticateToken, authorizeRoles('super_admin', 'admin'), async (req: AuthRequest, res) => {
+  const companyId = req.user?.company_id;
+  const { mappings } = req.body;
+  if (!companyId || !mappings || typeof mappings !== 'object') return res.status(400).json({ error: 'Invalid parameters' });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (const [key, accountId] of Object.entries(mappings)) {
+      if (!accountId) continue;
+      const accRes = await client.query('SELECT id, code, name FROM accounts WHERE id = $1 AND company_id = $2', [accountId, companyId]);
+      if (accRes.rows.length > 0) {
+        const acc = accRes.rows[0];
+        await client.query(`
+          INSERT INTO default_account_mappings (id, company_id, setting_key, account_id, account_code, account_name, updated_at)
+          VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+          ON CONFLICT (company_id, setting_key)
+          DO UPDATE SET account_id = $4, account_code = $5, account_name = $6, updated_at = CURRENT_TIMESTAMP
+        `, [uuidv4(), companyId, key, acc.id, acc.code, acc.name]);
+
+        if (key === 'customer_discount' || key === 'supplier_discount') {
+          const discCol = key === 'customer_discount' ? 'customer_discount_account_id' : 'supplier_discount_account_id';
+          const existingSettings = await client.query('SELECT id FROM settings WHERE company_id = $1 AND type = $2', [companyId, 'discount_settings']);
+          if (existingSettings.rows.length > 0) {
+            await client.query(`UPDATE settings SET ${discCol} = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`, [acc.id, existingSettings.rows[0].id]);
+          } else {
+            await client.query(`INSERT INTO settings (id, company_id, type, ${discCol}, created_at) VALUES ($1, $2, 'discount_settings', $3, CURRENT_TIMESTAMP)`, [uuidv4(), companyId, acc.id]);
+          }
+        }
+      }
+    }
+    await client.query('COMMIT');
+    res.json({ success: true, message: 'All default accounts saved successfully' });
+  } catch (err: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// POST /api/erp/default-accounts/merge (ensure all 23 default accounts exist and merge with COA)
+router.post('/default-accounts/merge', authenticateToken, authorizeRoles('super_admin', 'admin'), async (req: AuthRequest, res) => {
+  const companyId = req.user?.company_id;
+  if (!companyId) return res.status(400).json({ error: 'Company ID required' });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const addedCount = await ensureDefaultAccountsForCompany(client, companyId);
+    await client.query('COMMIT');
+    res.json({ 
+      success: true, 
+      addedAccounts: addedCount,
+      message: addedCount > 0 
+        ? `تم فحص الدليل وإضافة ${addedCount} حسابات افتراضية ناقصة بنجاح`
+        : 'دليل الحسابات متكامل بالفعل ويحتوي على كافة الحسابات الافتراضية'
+    });
+  } catch (err: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
 // Import Excel
 router.post('/system/import-excel', authenticateToken, authorizeRoles('super_admin', 'admin'), upload.single('file') as any, async (req: AuthRequest, res) => {
   const client = await pool.connect();
@@ -7742,6 +8038,34 @@ modules.forEach(moduleName => {
 
         if (transactionalModules.includes(moduleName)) {
           await reverseAndRecalculate(client, companyId || '', id);
+        }
+
+        if (moduleName === 'accounts') {
+          // Check if mapped in default_account_mappings
+          const mappedRes = await client.query('SELECT setting_key FROM default_account_mappings WHERE account_id = $1', [id]);
+          if (mappedRes.rows.length > 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            return res.status(400).json({
+              error: 'لا يمكن حذف هذا الحساب لأنه محدد كحساب افتراضي في شاشة الحسابات الافتراضية.'
+            });
+          }
+          // Check if core default code
+          const accRes = await client.query('SELECT code FROM accounts WHERE id = $1', [id]);
+          const code = accRes.rows[0]?.code;
+          const protectedCodes = [
+            '110101', '110103', '110201', '110301', '110402', '110403',
+            '210101', '210202', '210203', '3101', '3103', '3104',
+            '4101', '4103', '4104', '5101', '5103', '5104', '5105',
+            '420201', '630201', '420202', '630202'
+          ];
+          if (code && protectedCodes.includes(code)) {
+            await client.query('ROLLBACK');
+            client.release();
+            return res.status(400).json({
+              error: 'لا يمكن حذف هذا الحساب لأنه من الحسابات الافتراضية الأساسية للنظام.'
+            });
+          }
         }
 
         let query = `DELETE FROM "${moduleName}" WHERE id = $1`;

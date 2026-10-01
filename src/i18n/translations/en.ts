@@ -250,6 +250,7 @@ export const en = {
   'nav.create_journal_entry': 'Add Journal Entry',
   'nav.journal_entries': 'Journal Entries',
   'nav.detailed_journal_entries': 'Detailed Journal Entries',
+  'nav.default_accounts_settings': 'Default Accounts Settings',
   'nav.ifrs_guide': 'IFRS Guide 2026',
   'nav.general_ledger_report': 'Ledger Account',
   'nav.trial_balance': 'Trial Balance',
