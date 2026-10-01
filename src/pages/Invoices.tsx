@@ -39,6 +39,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import type { BarcodeScannerSettings } from '../hooks/useBarcodeScanner';
 import { DEFAULT_BARCODE_SETTINGS } from '../hooks/useBarcodeScanner';
+import { useEtaStatus } from '../hooks/useEtaStatus';
 
 export const Invoices: React.FC = () => {
   const { t, dir, language } = useLanguage();
@@ -48,6 +49,7 @@ export const Invoices: React.FC = () => {
   const { pendingViewDoc, setPendingViewDoc, setCurrentPage, closeTab } = useNavigation();
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const { showEtaColumns } = useEtaStatus(user?.company_id, invoices);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
   const [isExportingPDFSelected, setIsExportingPDFSelected] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -3235,7 +3237,7 @@ export const Invoices: React.FC = () => {
 
     const keyMap: Record<string, string> = {};
     if (visibleColumns.invoice_number) keyMap['formatted_invoice_number'] = 'رقم الفاتورة';
-    if (visibleColumns.eta_invoice_number) keyMap['formatted_eta_invoice_number'] = language === 'ar' ? 'رقم الوثيقة الإلكترونية' : 'Electronic Doc No.';
+    if (showEtaColumns && visibleColumns.eta_invoice_number) keyMap['formatted_eta_invoice_number'] = language === 'ar' ? 'رقم الوثيقة الإلكترونية' : 'Electronic Doc No.';
     if (visibleColumns.customer_name) keyMap['formatted_customer_name'] = 'العميل';
     if (visibleColumns.date) keyMap['formatted_date'] = 'التاريخ';
     if (visibleColumns.description) keyMap['formatted_description'] = 'وصف الفاتورة';
@@ -3757,6 +3759,9 @@ export const Invoices: React.FC = () => {
                         if (colKey === 'withholding_tax_amount') {
                           return isWhtEnabled;
                         }
+                        if (colKey === 'eta_invoice_number' || colKey === 'eta_uuid' || colKey === 'eta_status') {
+                          return showEtaColumns;
+                        }
                         return true;
                       }).map((colKey) => {
                         const labels: Record<string, string> = {
@@ -3849,7 +3854,7 @@ export const Invoices: React.FC = () => {
                           {renderResizeHandles('invoice_number')}
                         </th>
                       )}
-                      {visibleColumns.eta_invoice_number && (
+                      {showEtaColumns && visibleColumns.eta_invoice_number && (
                         <th 
                           style={{ width: columnWidths.eta_invoice_number, minWidth: columnWidths.eta_invoice_number }} 
                           className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
@@ -3864,7 +3869,7 @@ export const Invoices: React.FC = () => {
                           {renderResizeHandles('eta_invoice_number')}
                         </th>
                       )}
-                      {visibleColumns.eta_uuid && (
+                      {showEtaColumns && visibleColumns.eta_uuid && (
                         <th 
                           style={{ width: columnWidths.eta_uuid, minWidth: columnWidths.eta_uuid }} 
                           className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
@@ -3879,7 +3884,7 @@ export const Invoices: React.FC = () => {
                           {renderResizeHandles('eta_uuid')}
                         </th>
                       )}
-                      {visibleColumns.eta_status && (
+                      {showEtaColumns && visibleColumns.eta_status && (
                         <th 
                           style={{ width: columnWidths.eta_status, minWidth: columnWidths.eta_status }} 
                           className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
@@ -4205,6 +4210,7 @@ export const Invoices: React.FC = () => {
                           if (k === 'currency' || k === 'foreign_amount' || k === 'remaining_foreign') return isMultiCurrencyEnabled;
                           if (k === 'subtotal' || k === 'tax_amount') return isVatEnabled;
                           if (k === 'withholding_tax_amount') return isWhtEnabled;
+                          if ((k === 'eta_invoice_number' || k === 'eta_uuid' || k === 'eta_status') && !showEtaColumns) return false;
                           return true;
                         }).length + 2} className="px-6 py-12 text-center text-slate-500 italic font-medium whitespace-nowrap">{t('common.no_data')}</td>
                       </tr>
@@ -4240,7 +4246,7 @@ export const Invoices: React.FC = () => {
                               </span>
                             </td>
                           )}
-                          {visibleColumns.eta_invoice_number && (
+                          {showEtaColumns && visibleColumns.eta_invoice_number && (
                             <td style={{ width: columnWidths.eta_invoice_number, minWidth: columnWidths.eta_invoice_number }} className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>
                               {inv.eta_invoice_number ? (
                                 <span className="font-mono text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded select-all inline-block shadow-sm" title={inv.eta_uuid || ''}>
@@ -4251,12 +4257,12 @@ export const Invoices: React.FC = () => {
                               )}
                             </td>
                           )}
-                          {visibleColumns.eta_uuid && (
+                          {showEtaColumns && visibleColumns.eta_uuid && (
                             <td style={{ width: columnWidths.eta_uuid, minWidth: columnWidths.eta_uuid }} className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {renderEtaUuidCell(inv.eta_uuid)}
                             </td>
                           )}
-                          {visibleColumns.eta_status && (
+                          {showEtaColumns && visibleColumns.eta_status && (
                             <td style={{ width: columnWidths.eta_status, minWidth: columnWidths.eta_status }} className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {renderEtaStatusBadge(inv.eta_status, inv.eta_uuid)}
                             </td>

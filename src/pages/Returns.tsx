@@ -26,6 +26,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import { DEFAULT_BARCODE_SETTINGS } from '../hooks/useBarcodeScanner';
 import type { BarcodeScannerSettings } from '../hooks/useBarcodeScanner';
+import { useEtaStatus } from '../hooks/useEtaStatus';
 
 export const Returns: React.FC = () => {
   const { user } = useAuth();
@@ -33,6 +34,7 @@ export const Returns: React.FC = () => {
   const { showNotification } = useNotification();
   const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
   const [returns, setReturns] = useState<Return[]>([]);
+  const { showEtaColumns } = useEtaStatus(user?.company_id, returns);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -2048,12 +2050,16 @@ export const Returns: React.FC = () => {
                   <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                     {language === 'ar' ? 'رقم القيد' : 'Journal Entry'}
                   </th>
-                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    {language === 'ar' ? 'المعرف الرقمي (UUID)' : 'UUID'}
-                  </th>
-                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    {language === 'ar' ? 'حالة المرتجع بالضرائب' : 'ETA Status'}
-                  </th>
+                  {showEtaColumns && (
+                    <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      {language === 'ar' ? 'المعرف الرقمي (UUID)' : 'UUID'}
+                    </th>
+                  )}
+                  {showEtaColumns && (
+                    <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      {language === 'ar' ? 'حالة المرتجع بالضرائب' : 'ETA Status'}
+                    </th>
+                  )}
                   <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.actions')}</th>
                 </tr>
               </thead>
@@ -2098,12 +2104,16 @@ export const Returns: React.FC = () => {
                         <span className="text-zinc-400 font-mono text-xs">-</span>
                       )}
                     </td>
-                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                      {renderEtaUuidCell(ret.eta_uuid)}
-                    </td>
-                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                      {renderEtaStatusBadge(ret.eta_status, ret.eta_uuid)}
-                    </td>
+                    {showEtaColumns && (
+                      <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {renderEtaUuidCell(ret.eta_uuid)}
+                      </td>
+                    )}
+                    {showEtaColumns && (
+                      <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {renderEtaStatusBadge(ret.eta_status, ret.eta_uuid)}
+                      </td>
+                    )}
                     <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                       <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
                         <button 
@@ -2187,7 +2197,7 @@ export const Returns: React.FC = () => {
                 ))}
                 {filteredReturns.length === 0 && !loading && (
                   <tr>
-                    <td colSpan={isSalesWhtEnabled ? 9 : 8} className="px-6 py-12 text-center text-zinc-500">{t('common.no_data')}</td>
+                    <td colSpan={(isSalesWhtEnabled ? 7 : 6) + (showEtaColumns ? 2 : 0)} className="px-6 py-12 text-center text-zinc-500">{t('common.no_data')}</td>
                   </tr>
                 )}
               </tbody>

@@ -39,6 +39,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import { DEFAULT_BARCODE_SETTINGS } from '../hooks/useBarcodeScanner';
 import type { BarcodeScannerSettings } from '../hooks/useBarcodeScanner';
+import { useEtaStatus } from '../hooks/useEtaStatus';
 
 export const PurchaseInvoices: React.FC = () => {
   const { user } = useAuth();
@@ -75,6 +76,7 @@ export const PurchaseInvoices: React.FC = () => {
   const isMultiCurrencyEnabled = companyData?.settings?.enable_multi_currency || (companyData as any)?.enable_multi_currency || false;
   const [settings, setSettings] = useState<any>(null);
   const [purchaseInvoices, setPurchaseInvoices] = useState<any[]>([]);
+  const { showEtaColumns } = useEtaStatus(user?.company_id, purchaseInvoices);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
   const [isExportingPDFSelected, setIsExportingPDFSelected] = useState(false);
   const [isColumnSelectorOpen, setIsColumnSelectorOpen] = useState(false);
@@ -3748,7 +3750,7 @@ export const PurchaseInvoices: React.FC = () => {
 
     const keyMap: Record<string, string> = {};
     if (visibleColumns.invoice_number) keyMap['formatted_invoice_number'] = 'رقم الفاتورة';
-    if (visibleColumns.eta_invoice_number) keyMap['formatted_eta_invoice_number'] = language === 'ar' ? 'رقم الوثيقة الإلكترونية' : 'Electronic Doc No.';
+    if (showEtaColumns && visibleColumns.eta_invoice_number) keyMap['formatted_eta_invoice_number'] = language === 'ar' ? 'رقم الوثيقة الإلكترونية' : 'Electronic Doc No.';
     if (visibleColumns.supplier_name) keyMap['formatted_supplier_name'] = 'المورد';
     if (visibleColumns.date) keyMap['formatted_date'] = 'التاريخ';
     if (visibleColumns.description) keyMap['formatted_description'] = 'وصف الفاتورة';
@@ -4038,6 +4040,9 @@ export const PurchaseInvoices: React.FC = () => {
                         if (colKey === 'withholding_tax_amount') {
                           return isPurchaseWhtEnabled;
                         }
+                        if (colKey === 'eta_invoice_number') {
+                          return showEtaColumns;
+                        }
                         return true;
                       }).map((colKey) => {
                         const labels: Record<string, string> = {
@@ -4127,7 +4132,7 @@ export const PurchaseInvoices: React.FC = () => {
                           {renderResizeHandles('invoice_number')}
                         </th>
                       )}
-                      {visibleColumns.eta_invoice_number && (
+                      {showEtaColumns && visibleColumns.eta_invoice_number && (
                         <th 
                           style={{ width: columnWidths.eta_invoice_number, minWidth: columnWidths.eta_invoice_number }} 
                           className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
@@ -4453,6 +4458,7 @@ export const PurchaseInvoices: React.FC = () => {
                           if (k === 'currency' || k === 'foreign_amount' || k === 'remaining_foreign') return isMultiCurrencyEnabled;
                           if (k === 'subtotal' || k === 'tax_amount') return isVatEnabled;
                           if (k === 'withholding_tax_amount') return isPurchaseWhtEnabled;
+                          if (k === 'eta_invoice_number' && !showEtaColumns) return false;
                           return true;
                         }).length + 2} className="px-6 py-12 text-center text-slate-500 italic font-medium whitespace-nowrap">{t('common.no_data')}</td>
                       </tr>
@@ -4495,7 +4501,7 @@ export const PurchaseInvoices: React.FC = () => {
                               </div>
                             </td>
                           )}
-                          {visibleColumns.eta_invoice_number && (
+                          {showEtaColumns && visibleColumns.eta_invoice_number && (
                             <td style={{ width: columnWidths.eta_invoice_number, minWidth: columnWidths.eta_invoice_number }} className={`px-6 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>
                               {inv.eta_invoice_number ? (
                                 <span className="font-mono text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded select-all inline-block shadow-sm" title={inv.eta_uuid || ''}>
