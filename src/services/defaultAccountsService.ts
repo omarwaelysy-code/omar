@@ -236,7 +236,22 @@ export const defaultAccountsService = {
     } catch (err) {
       console.error('Failed to fetch default accounts:', err);
     }
-    return { mappings: {}, accounts: [] };
+    return { 
+      mappings: {}, 
+      accounts: DEFAULT_ACCOUNTS_CONFIG.map(d => ({
+        id: d.key,
+        key: d.key,
+        defaultCode: d.defaultCode,
+        nameAr: d.nameAr,
+        nameEn: d.nameEn,
+        classificationAr: d.classificationAr,
+        accountUsage: d.accountUsage,
+        targetScreen: d.targetScreen,
+        accountCode: d.defaultCode,
+        accountName: d.nameAr,
+        isCustom: false
+      }))
+    };
   },
 
   async updateDefaultAccount(key: string, accountId: string): Promise<boolean> {

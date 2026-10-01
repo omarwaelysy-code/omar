@@ -52,6 +52,7 @@ export function getEffectiveModule(moduleName: string): string {
     asset_maintenance: 'fixed_assets',
     asset_revaluations: 'fixed_assets',
     asset_disposals: 'fixed_assets',
+    default_account_mappings: 'accounts',
     roles: 'users'
   };
   return mapping[moduleName] || moduleName;
@@ -2846,9 +2847,9 @@ async function ensureDefaultAccountsForCompany(client: any, companyId: string) {
     }
     const newAccId = uuidv4();
     await client.query(`
-      INSERT INTO accounts (id, code, name, type_id, type_name, parent_id, is_active, company_id, opening_balance, required_sub_account)
-      VALUES ($1, $2, $3, $4, $5, $6, true, $7, 0, true)
-    `, [newAccId, code, nameAr, typeId, typesByCode[typeCode]?.name || '', parentId, companyId]);
+      INSERT INTO accounts (id, code, name, type_id, parent_id, is_active, company_id, opening_balance, required_sub_account)
+      VALUES ($1, $2, $3, $4, $5, true, $6, 0, true)
+    `, [newAccId, code, nameAr, typeId, parentId, companyId]);
     accByCode[code] = { id: newAccId, code, name: nameAr };
     return newAccId;
   };
@@ -2877,9 +2878,9 @@ async function ensureDefaultAccountsForCompany(client: any, companyId: string) {
       const parentId = def.parentCode && accByCode[def.parentCode] ? accByCode[def.parentCode].id : null;
       const newAccId = uuidv4();
       await client.query(`
-        INSERT INTO accounts (id, code, name, type_id, type_name, parent_id, is_active, company_id, opening_balance, required_sub_account, account_usage)
-        VALUES ($1, $2, $3, $4, $5, $6, true, $7, 0, false, $8)
-      `, [newAccId, def.code, def.nameAr, typeId, typesByCode[def.typeCode]?.name || '', parentId, companyId, def.usage]);
+        INSERT INTO accounts (id, code, name, type_id, parent_id, is_active, company_id, opening_balance, required_sub_account, account_usage)
+        VALUES ($1, $2, $3, $4, $5, true, $6, 0, false, $7)
+      `, [newAccId, def.code, def.nameAr, typeId, parentId, companyId, def.usage]);
       targetAcc = { id: newAccId, code: def.code, name: def.nameAr, account_usage: def.usage };
       accByCode[def.code] = targetAcc;
       addedCount++;
@@ -3736,7 +3737,8 @@ const modules = [
   'sales_orders', 'sales_order_items', 'purchase_orders', 'purchase_order_items', 'employees',
   'warehouse_transfers', 'warehouse_transfer_items', 'opening_stock_balances', 'opening_stock_items',
   'stock_adjustments', 'stock_adjustment_items', 'templates', 'paper_sizes', 'template_versions', 'print_profiles',
-  'dashboards', 'widgets', 'goods_receipts', 'goods_receipt_items', 'purchase_invoice_goods_receipts'
+  'dashboards', 'widgets', 'goods_receipts', 'goods_receipt_items', 'purchase_invoice_goods_receipts',
+  'default_account_mappings'
 ];
 
 // --- Flexible Operations Logic ---

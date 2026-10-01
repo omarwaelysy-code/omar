@@ -376,6 +376,9 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'accumulated_depreciation', 'net_book_value', 'disposal_proceeds', 'gain_loss_amount',
     'buyer_name', 'customer_id', 'payment_account_id', 'invoice_number', 'journal_entry_id',
     'notes', 'created_by', 'created_at'
+  ],
+  default_account_mappings: [
+    'id', 'company_id', 'setting_key', 'account_id', 'account_code', 'account_name', 'created_at', 'updated_at'
   ]
 };
 
