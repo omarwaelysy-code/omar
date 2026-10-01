@@ -704,8 +704,9 @@ export const Products: React.FC = () => {
     const defaultRevenue = accounts.find(a => a.id === defaultAccountMap['sales_revenue']) || accounts.find(a => a.code === '4101') || accounts.find(a => ['sales_revenue', 'service_revenue', 'other_revenue'].includes(a.account_usage || ''));
     const defaultCost = accounts.find(a => a.id === defaultAccountMap['cost_of_sales']) || accounts.find(a => a.code === '5101') || accounts.find(a => ['cost_of_sales', 'purchases'].includes(a.account_usage || ''));
     const defaultInventory = accounts.find(a => a.id === defaultAccountMap['inventory']) || accounts.find(a => a.code === '110301') || accounts.find(a => ['inventory', 'raw_materials', 'work_in_progress', 'finished_goods'].includes(a.account_usage || ''));
-    const defaultSalesVat = accounts.find(a => a.id === defaultAccountMap['output_vat']) || accounts.find(a => a.code === '210202') || accounts.find(a => a.account_usage === 'output_vat' || a.account_usage === 'vat');
-    const defaultPurchaseVat = accounts.find(a => a.id === defaultAccountMap['input_vat']) || accounts.find(a => a.code === '110402') || accounts.find(a => a.account_usage === 'input_vat' || a.account_usage === 'vat');
+    const defaultVat = accounts.find(a => a.account_usage === 'vat');
+    const defaultSalesVat = accounts.find(a => a.id === defaultAccountMap['output_vat']) || accounts.find(a => a.code === '210202') || accounts.find(a => a.account_usage === 'output_vat') || defaultVat;
+    const defaultPurchaseVat = accounts.find(a => a.id === defaultAccountMap['input_vat']) || accounts.find(a => a.code === '110402') || accounts.find(a => a.account_usage === 'input_vat') || defaultVat;
     const defaultSalesWht = accounts.find(a => a.id === defaultAccountMap['withholding_tax_customers']) || accounts.find(a => a.code === '110403') || accounts.find(a => a.account_usage === 'withholding_tax_customers');
     const defaultPurchaseWht = accounts.find(a => a.id === defaultAccountMap['withholding_tax_suppliers']) || accounts.find(a => a.code === '210203') || accounts.find(a => a.account_usage === 'withholding_tax_suppliers');
 
