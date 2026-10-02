@@ -3051,6 +3051,22 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                 <FileSpreadsheet size={14} />
                 <span>Excel</span>
               </button>
+
+              {editingVoucher && !editingVoucher.is_reversed && !editingVoucher.is_reversal_doc && (
+                <button 
+                  type="button"
+                  onClick={() => {
+                    const v = editingVoucher;
+                    closeModal();
+                    setReversingVoucher(v);
+                  }} 
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-xl transition-all font-black text-xs whitespace-nowrap border border-amber-300 shadow-sm active:scale-95 cursor-pointer"
+                  title={language === 'ar' ? 'عكس السند بالكامل (Reverse Document)' : 'Reverse Payment Voucher'}
+                >
+                  <RotateCcw size={14} className="text-amber-800" />
+                  <span>{language === 'ar' ? 'عكس السند' : 'Reverse'}</span>
+                </button>
+              )}
             </div>
 
             <div className="flex items-center gap-4">
@@ -3166,6 +3182,19 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
             </AnimatePresence>
 
             <form id="voucher-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 pb-32 md:pb-8">
+              {editingVoucher && (
+                <ReversalBanner
+                  isReversed={editingVoucher.is_reversed}
+                  reversedAt={editingVoucher.reversed_at}
+                  reversalReason={editingVoucher.reversal_reason}
+                  reversedByDocNumber={editingVoucher.reversed_by_doc_number}
+                  reversedByEntryNumber={editingVoucher.reversed_by_entry_number}
+                  reversalSettlementNumber={editingVoucher.reversal_settlement_number}
+                  isReversalDoc={editingVoucher.is_reversal_doc}
+                  originalDocNumber={editingVoucher.original_doc_number}
+                  originalEntryNumber={editingVoucher.original_entry_number}
+                />
+              )}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className="lg:col-span-3 space-y-4">
                   {/* Card 1: Basic Info */}

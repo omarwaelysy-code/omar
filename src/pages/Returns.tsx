@@ -2526,6 +2526,17 @@ export const Returns: React.FC = () => {
 
               {editingReturn && (
                 <>
+                  {!editingReturn.is_reversed && !editingReturn.is_reversal_doc && (
+                    <button 
+                      type="button"
+                      onClick={() => setReversingReturn(editingReturn)} 
+                      className="flex items-center gap-1.5 px-3 py-1 text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-xl transition-all font-black text-[11px] whitespace-nowrap border border-amber-300 shadow-sm active:scale-95 cursor-pointer"
+                      title={language === 'ar' ? 'عكس المردود بالكامل (Reverse Document)' : 'Reverse Return'}
+                    >
+                      <RotateCcw size={13} className="text-amber-800" />
+                      <span>{language === 'ar' ? 'عكس المردود' : 'Reverse'}</span>
+                    </button>
+                  )}
                   <button 
                     type="button"
                     onClick={handleCopyReturn} 
@@ -2628,6 +2639,19 @@ export const Returns: React.FC = () => {
           <div className="flex-1 overflow-y-auto flex flex-col h-full relative">
             <div className="flex-1 p-1.5 md:p-2.5 space-y-1.5 overflow-y-auto pb-3">
               <form id="return-form" onSubmit={handleSubmit} className="space-y-1.5">
+                {editingReturn && (
+                  <ReversalBanner
+                    isReversed={editingReturn.is_reversed}
+                    reversedAt={editingReturn.reversed_at}
+                    reversalReason={editingReturn.reversal_reason}
+                    reversedByDocNumber={editingReturn.reversed_by_doc_number}
+                    reversedByEntryNumber={editingReturn.reversed_by_entry_number}
+                    reversalSettlementNumber={editingReturn.reversal_settlement_number}
+                    isReversalDoc={editingReturn.is_reversal_doc}
+                    originalDocNumber={editingReturn.original_doc_number}
+                    originalEntryNumber={editingReturn.original_entry_number}
+                  />
+                )}
                 {/* Upper Layout: Combined Totals Summary and Metadata Form into a single card */}
                 <section className="bg-white p-2 md:p-2.5 rounded-xl border border-zinc-200 shadow-sm grid grid-cols-1 lg:grid-cols-4 gap-2 lg:gap-2.5 items-stretch">
                   

@@ -5056,6 +5056,18 @@ export const PurchaseInvoices: React.FC = () => {
             </button>
           )}
 
+          {editingInvoice && !editingInvoice.is_reversed && !editingInvoice.is_reversal_doc && (
+            <button 
+              type="button"
+              onClick={() => setReversingInvoice(editingInvoice)} 
+              className="flex items-center gap-1.5 px-3 py-1 text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-xl transition-all font-black text-[11px] whitespace-nowrap border border-amber-300 shadow-sm active:scale-95 cursor-pointer"
+              title={language === 'ar' ? 'عكس الفاتورة بالكامل (Reverse Document)' : 'Reverse Invoice'}
+            >
+              <RotateCcw size={13} className="text-amber-800" />
+              <span>{language === 'ar' ? 'عكس الفاتورة' : 'Reverse'}</span>
+            </button>
+          )}
+
           <button 
             type="button"
             onClick={() => handleExportPurchaseInvoicePDF(editingInvoice)} 
@@ -5170,7 +5182,20 @@ export const PurchaseInvoices: React.FC = () => {
 
               <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32 md:pb-8">
                 <form id="purchase-invoice-form" onSubmit={handleSubmit} className="space-y-6">
-                                      {/* Unified Totals & Metadata Form single card layout */}
+                  {editingInvoice && (
+                    <ReversalBanner
+                      isReversed={editingInvoice.is_reversed}
+                      reversedAt={editingInvoice.reversed_at}
+                      reversalReason={editingInvoice.reversal_reason}
+                      reversedByDocNumber={editingInvoice.reversed_by_doc_number}
+                      reversedByEntryNumber={editingInvoice.reversed_by_entry_number}
+                      reversalSettlementNumber={editingInvoice.reversal_settlement_number}
+                      isReversalDoc={editingInvoice.is_reversal_doc}
+                      originalDocNumber={editingInvoice.original_doc_number}
+                      originalEntryNumber={editingInvoice.original_entry_number}
+                    />
+                  )}
+                  {/* Unified Totals & Metadata Form single card layout */}
                     <section className="bg-white p-2 md:p-2.5 rounded-xl border border-zinc-200 shadow-sm grid grid-cols-1 lg:grid-cols-4 gap-2 lg:gap-2.5 items-stretch relative">
                       {editingInvoice && (
                         <div className={`absolute ${dir === 'rtl' ? 'left-12' : 'right-12'} top-4 z-20 pointer-events-none select-none opacity-80 transform -rotate-12`}>

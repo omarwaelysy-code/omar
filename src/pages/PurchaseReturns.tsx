@@ -2770,6 +2770,17 @@ export const PurchaseReturns: React.FC = () => {
               </button>
               {editingReturn && (
                 <>
+                  {!editingReturn.is_reversed && !editingReturn.is_reversal_doc && (
+                    <button 
+                      type="button"
+                      onClick={() => setReversingReturn(editingReturn)} 
+                      className="flex items-center gap-1.5 px-3 py-1 text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-xl transition-all font-black text-[11px] whitespace-nowrap border border-amber-300 shadow-sm active:scale-95 cursor-pointer"
+                      title={language === 'ar' ? 'عكس المرتجع بالكامل (Reverse Document)' : 'Reverse Purchase Return'}
+                    >
+                      <RotateCcw size={13} className="text-amber-800" />
+                      <span>{language === 'ar' ? 'عكس المرتجع' : 'Reverse'}</span>
+                    </button>
+                  )}
                   <button 
                     type="button"
                     onClick={async () => {
@@ -2993,6 +3004,19 @@ export const PurchaseReturns: React.FC = () => {
             </button>
 
             <form id="purchase-return-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 pb-32">
+              {editingReturn && (
+                <ReversalBanner
+                  isReversed={editingReturn.is_reversed}
+                  reversedAt={editingReturn.reversed_at}
+                  reversalReason={editingReturn.reversal_reason}
+                  reversedByDocNumber={editingReturn.reversed_by_doc_number}
+                  reversedByEntryNumber={editingReturn.reversed_by_entry_number}
+                  reversalSettlementNumber={editingReturn.reversal_settlement_number}
+                  isReversalDoc={editingReturn.is_reversal_doc}
+                  originalDocNumber={editingReturn.original_doc_number}
+                  originalEntryNumber={editingReturn.original_entry_number}
+                />
+              )}
               {/* Upper Layout: Combined Totals Summary and Metadata Form into a single card */}
               <section className="bg-white p-3 rounded-2xl border border-zinc-200 shadow-sm grid grid-cols-1 lg:grid-cols-4 gap-4 items-stretch">
                 

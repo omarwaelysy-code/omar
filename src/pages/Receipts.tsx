@@ -2787,6 +2787,22 @@ export const Receipts: React.FC = () => {
                 <FileSpreadsheet size={14} />
                 <span>Excel</span>
               </button>
+
+              {editingReceipt && !editingReceipt.is_reversed && !editingReceipt.is_reversal_doc && (
+                <button 
+                  type="button"
+                  onClick={() => {
+                    const r = editingReceipt;
+                    closeModal();
+                    setReversingReceipt(r);
+                  }} 
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-xl transition-all font-black text-xs whitespace-nowrap border border-amber-300 shadow-sm active:scale-95 cursor-pointer"
+                  title={language === 'ar' ? 'عكس السند بالكامل (Reverse Document)' : 'Reverse Receipt Voucher'}
+                >
+                  <RotateCcw size={14} className="text-amber-800" />
+                  <span>{language === 'ar' ? 'عكس السند' : 'Reverse'}</span>
+                </button>
+              )}
             </div>
 
             <div className="flex items-center gap-4">
@@ -2935,6 +2951,19 @@ export const Receipts: React.FC = () => {
             </AnimatePresence>
 
             <form id="receipt-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32 md:pb-8">
+              {editingReceipt && (
+                <ReversalBanner
+                  isReversed={editingReceipt.is_reversed}
+                  reversedAt={editingReceipt.reversed_at}
+                  reversalReason={editingReceipt.reversal_reason}
+                  reversedByDocNumber={editingReceipt.reversed_by_doc_number}
+                  reversedByEntryNumber={editingReceipt.reversed_by_entry_number}
+                  reversalSettlementNumber={editingReceipt.reversal_settlement_number}
+                  isReversalDoc={editingReceipt.is_reversal_doc}
+                  originalDocNumber={editingReceipt.original_doc_number}
+                  originalEntryNumber={editingReceipt.original_entry_number}
+                />
+              )}
               
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-3 space-y-6">

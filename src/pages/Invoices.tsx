@@ -4929,6 +4929,18 @@ export const Invoices: React.FC = () => {
                 </button>
               )}
 
+              {editingInvoice && !editingInvoice.is_reversed && !editingInvoice.is_reversal_doc && (
+                <button 
+                  type="button"
+                  onClick={() => setReversingInvoice(editingInvoice)} 
+                  className="flex items-center gap-1.5 px-3 py-1 text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-xl transition-all font-black text-[11px] whitespace-nowrap border border-amber-300 shadow-sm active:scale-95 cursor-pointer"
+                  title={language === 'ar' ? 'عكس الفاتورة بالكامل (Reverse Document)' : 'Reverse Invoice'}
+                >
+                  <RotateCcw size={13} className="text-amber-800" />
+                  <span>{language === 'ar' ? 'عكس الفاتورة' : 'Reverse'}</span>
+                </button>
+              )}
+
               <button 
                 type="button"
                 onClick={() => handleExportInvoicePDF(editingInvoice)} 
@@ -5057,6 +5069,19 @@ export const Invoices: React.FC = () => {
                 <div className="space-y-1.5">
 
                   <form id="invoice-form" onSubmit={handleSubmit} className="space-y-1.5">
+                    {editingInvoice && (
+                      <ReversalBanner
+                        isReversed={editingInvoice.is_reversed}
+                        reversedAt={editingInvoice.reversed_at}
+                        reversalReason={editingInvoice.reversal_reason}
+                        reversedByDocNumber={editingInvoice.reversed_by_doc_number}
+                        reversedByEntryNumber={editingInvoice.reversed_by_entry_number}
+                        reversalSettlementNumber={editingInvoice.reversal_settlement_number}
+                        isReversalDoc={editingInvoice.is_reversal_doc}
+                        originalDocNumber={editingInvoice.original_doc_number}
+                        originalEntryNumber={editingInvoice.original_entry_number}
+                      />
+                    )}
                     {/* Upper Layout: Combined Totals Summary and Metadata Form into a single card */}
                     <section className="bg-white p-2 md:p-2.5 rounded-xl border border-zinc-200 shadow-sm grid grid-cols-1 lg:grid-cols-4 gap-2 lg:gap-2.5 items-stretch">
                       
