@@ -27,7 +27,8 @@ import {
   Radio, 
   Settings, 
   Sparkles,
-  ChevronDown
+  ChevronDown,
+  FileSpreadsheet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -40,7 +41,7 @@ interface FeatureItem {
   id: string;
   nameAr: string;
   nameEn: string;
-  description?: string;
+  isReport?: boolean;
 }
 
 interface FeatureCategory {
@@ -54,10 +55,11 @@ interface FeatureCategory {
     border: string;
     badge: string;
   };
-  features: FeatureItem[];
+  modules: FeatureItem[];
+  reports?: FeatureItem[];
 }
 
-// All System Features arranged in sequential order from Dashboard to Admin
+// All System Features arranged in sequential order from Dashboard to Admin with their dedicated reports
 const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
   {
     id: 'dashboard',
@@ -65,9 +67,9 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
     nameEn: 'Dashboard',
     icon: LayoutDashboard,
     color: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', badge: 'bg-emerald-500' },
-    features: [
-      { id: 'dashboard', nameAr: 'لوحة التحكم والمؤشرات العامة', nameEn: 'Main Dashboard & KPIs', description: 'عرض البطاقات والرسوم البيانية وملخص الحركات' },
-      { id: 'ai', nameAr: 'المساعد الذكي (AI Assistant)', nameEn: 'AI Intelligence Engine', description: 'المحادثة الذكية وتحليل البيانات والتقارير' }
+    modules: [
+      { id: 'dashboard', nameAr: 'لوحة التحكم والمؤشرات', nameEn: 'Main Dashboard' },
+      { id: 'ai', nameAr: 'المساعد الذكي (AI)', nameEn: 'AI Assistant Engine' }
     ]
   },
   {
@@ -76,13 +78,14 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
     nameEn: 'Master Data',
     icon: Database,
     color: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', badge: 'bg-blue-500' },
-    features: [
-      { id: 'customers', nameAr: 'إدارة العملاء', nameEn: 'Customers Directory', description: 'سجل العملاء، الأرصدة الافتتاحية، وحدود الائتمان' },
-      { id: 'suppliers', nameAr: 'إدارة الموردين', nameEn: 'Suppliers Directory', description: 'سجل الموردين وبيانات الاتصال والتعاملات' },
-      { id: 'employees', nameAr: 'إدارة الموظفين', nameEn: 'Employees Register', description: 'بيانات الموظفين والمسؤولين' },
-      { id: 'expenses', nameAr: 'تصنيفات المصروفات', nameEn: 'Expense Categories', description: 'دليل بنود وتصنيفات المصروفات التشغيلية' },
-      { id: 'crm', nameAr: 'إدارة علاقات العملاء (CRM)', nameEn: 'Customer Relationship Mgmt', description: 'سجل التواصل والفرص والمهام' },
-      { id: 'payment_methods', nameAr: 'طرق ووسائل الدفع', nameEn: 'Payment Methods', description: 'تحديد قنوات وطرق السداد المعتمدة' }
+    modules: [
+      { id: 'customers', nameAr: 'العملاء', nameEn: 'Customers' },
+      { id: 'suppliers', nameAr: 'الموردين', nameEn: 'Suppliers' },
+      { id: 'employees', nameAr: 'الموظفين', nameEn: 'Employees' },
+      { id: 'expenses', nameAr: 'المصروفات', nameEn: 'Expenses' },
+      { id: 'crm', nameAr: 'إدارة علاقات العملاء (CRM)', nameEn: 'CRM' },
+      { id: 'payment_methods', nameAr: 'طرق الدفع', nameEn: 'Payment Methods' },
+      { id: 'discount_settings', nameAr: 'إعدادات الخصم', nameEn: 'Discount Settings' }
     ]
   },
   {
@@ -91,16 +94,21 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
     nameEn: 'Warehouses & Inventory',
     icon: Package,
     color: { bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-200', badge: 'bg-amber-500' },
-    features: [
-      { id: 'inventory', nameAr: 'نظام إدارة المخازن الرئيسي', nameEn: 'Core Inventory System', description: 'تفعيل كامل لمنظومة المخزون وحساب التكلفة' },
-      { id: 'products', nameAr: 'دليل الأصناف والمنتجات', nameEn: 'Product Catalog', description: 'تسجيل المنتجات، الأسعار، الوحدات، والباركود' },
-      { id: 'item_groups', nameAr: 'مجموعات وتصنيفات الأصناف', nameEn: 'Item Categories & Groups', description: 'الهيكل الشجري لتصنيف الأصناف' },
-      { id: 'warehouses', nameAr: 'المستودعات والمخازن', nameEn: 'Warehouses Setup', description: 'إنشاء المستودعات وربطها بالفروع' },
-      { id: 'goods_receipts', nameAr: 'أذون استلام المخزون', nameEn: 'Goods Receipts', description: 'استلام وفحص بضائع الموردين' },
-      { id: 'warehouse_transfers', nameAr: 'التحويل بين المخازن', nameEn: 'Inter-warehouse Transfers', description: 'نقل الأصناف بين الفروع والمستودعات' },
-      { id: 'opening_stock_balances', nameAr: 'أرصدة أول المدة للمخزون', nameEn: 'Opening Stock Balances', description: 'إدخال جرد البداية وكمياته' },
-      { id: 'stock_adjustments', nameAr: 'تسوية وجرد الأصناف', nameEn: 'Stock Adjustments & Counts', description: 'تسوية الفروقات الجردية والعجز والزيادة' },
-      { id: 'manufacturing', nameAr: 'إدارة التصنيع والتشغيل', nameEn: 'Manufacturing & Assembly', description: 'أوامر الإنتاج ومعادلات التصنيع' }
+    modules: [
+      { id: 'inventory', nameAr: 'نظام المخازن الرئيسي', nameEn: 'Core Inventory' },
+      { id: 'products', nameAr: 'دليل الأصناف والمنتجات', nameEn: 'Products' },
+      { id: 'item_groups', nameAr: 'مجموعات الأصناف', nameEn: 'Item Groups' },
+      { id: 'warehouses', nameAr: 'المستودعات', nameEn: 'Warehouses' },
+      { id: 'goods_receipts', nameAr: 'أذون استلام المخزون', nameEn: 'Goods Receipts' },
+      { id: 'warehouse_transfers', nameAr: 'التحويل بين المخازن', nameEn: 'Stock Transfers' },
+      { id: 'opening_stock_balances', nameAr: 'أرصدة أول المدة', nameEn: 'Opening Balances' },
+      { id: 'stock_adjustments', nameAr: 'تسوية وجرد الأصناف', nameEn: 'Stock Adjustments' },
+      { id: 'manufacturing', nameAr: 'إدارة التصنيع والتشغيل', nameEn: 'Manufacturing' }
+    ],
+    reports: [
+      { id: 'stock_card_report', nameAr: 'كارت حركة وتكلفة الصنف', nameEn: 'Stock Card Report', isReport: true },
+      { id: 'stock_balances_report', nameAr: 'أرصدة المخزون خلال فترة', nameEn: 'Stock Balances Report', isReport: true },
+      { id: 'general_stock_movements_report', nameAr: 'حركة المخزن العامة للأصناف', nameEn: 'General Stock Movements', isReport: true }
     ]
   },
   {
@@ -109,13 +117,20 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
     nameEn: 'Sales & Invoicing',
     icon: ShoppingCart,
     color: { bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200', badge: 'bg-emerald-600' },
-    features: [
-      { id: 'sales', nameAr: 'نظام المبيعات الرئيسي', nameEn: 'Core Sales Module', description: 'تفعيل مسار عمليات المبيعات بالكامل' },
-      { id: 'invoices', nameAr: 'فواتير المبيعات', nameEn: 'Sales Invoices', description: 'إصدار وطباعة وترحيل فواتير البيع' },
-      { id: 'sales_orders', nameAr: 'أوامر البيع وعروض الأسعار', nameEn: 'Sales Orders & Quotes', description: 'إدارة طلبيات البيع قبل إصدار الفواتير' },
-      { id: 'returns', nameAr: 'مرتجعات المبيعات', nameEn: 'Sales Returns', description: 'إرجاع البضائع ورد قيمتها وحساباتها' },
-      { id: 'sales_import', nameAr: 'استيراد مستندات بيع إلكترونياً', nameEn: 'Import Sales Documents', description: 'استيراد الفواتير من ملفات خارجية وExcel' },
-      { id: 'customer_discounts', nameAr: 'خصومات وتسويات العملاء', nameEn: 'Customer Discounts & Adjustments', description: 'إشعارات الخصم والتسويات الائتمانية' }
+    modules: [
+      { id: 'sales', nameAr: 'نظام المبيعات الرئيسي', nameEn: 'Core Sales' },
+      { id: 'invoices', nameAr: 'فواتير المبيعات', nameEn: 'Sales Invoices' },
+      { id: 'sales_orders', nameAr: 'أوامر البيع وعروض الأسعار', nameEn: 'Sales Orders' },
+      { id: 'returns', nameAr: 'مرتجعات المبيعات', nameEn: 'Sales Returns' },
+      { id: 'sales_import', nameAr: 'استيراد مستندات بيع', nameEn: 'Import Sales' },
+      { id: 'customer_discounts', nameAr: 'خصومات العملاء', nameEn: 'Customer Discounts' },
+      { id: 'customer_settlements', nameAr: 'تسويات العملاء', nameEn: 'Customer Settlements' }
+    ],
+    reports: [
+      { id: 'customer_statement', nameAr: 'كشف حساب العميل', nameEn: 'Customer Statement', isReport: true },
+      { id: 'customer_balances', nameAr: 'أرصدة العملاء', nameEn: 'Customer Balances', isReport: true },
+      { id: 'customer_aging_report', nameAr: 'أعمار ديون العملاء', nameEn: 'Customer Aging Report', isReport: true },
+      { id: 'sales_report', nameAr: 'تقرير المبيعات', nameEn: 'Sales Report', isReport: true }
     ]
   },
   {
@@ -124,13 +139,19 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
     nameEn: 'Purchases & Procurement',
     icon: Truck,
     color: { bg: 'bg-indigo-50', text: 'text-indigo-800', border: 'border-indigo-200', badge: 'bg-indigo-600' },
-    features: [
-      { id: 'purchases', nameAr: 'نظام المشتريات الرئيسي', nameEn: 'Core Purchases Module', description: 'تفعيل دورة الشراء وإدارة التوريدات' },
-      { id: 'purchase_invoices', nameAr: 'فواتير المشتريات', nameEn: 'Purchase Invoices', description: 'تسجيل فواتير المشتريات وحساب الضرائب' },
-      { id: 'purchase_orders', nameAr: 'أوامر الشراء', nameEn: 'Purchase Orders', description: 'طلبات التوريد والمتابعة مع الموردين' },
-      { id: 'purchase_returns', nameAr: 'مرتجعات المشتريات', nameEn: 'Purchase Returns', description: 'رد البضائع المشتراة وتسوية حساب المورد' },
-      { id: 'purchases_import', nameAr: 'استيراد مستندات شراء', nameEn: 'Import Purchase Documents', description: 'استيراد الفواتير من ملفات خارجية' },
-      { id: 'supplier_discounts', nameAr: 'خصومات وتسويات الموردين', nameEn: 'Supplier Discounts & Adjustments', description: 'إشعارات الخصم المكتسب والتسويات' }
+    modules: [
+      { id: 'purchases', nameAr: 'نظام المشتريات الرئيسي', nameEn: 'Core Purchases' },
+      { id: 'purchase_invoices', nameAr: 'فواتير المشتريات', nameEn: 'Purchase Invoices' },
+      { id: 'purchase_orders', nameAr: 'أوامر الشراء', nameEn: 'Purchase Orders' },
+      { id: 'purchase_returns', nameAr: 'مرتجعات المشتريات', nameEn: 'Purchase Returns' },
+      { id: 'purchases_import', nameAr: 'استيراد مستندات شراء', nameEn: 'Import Purchases' },
+      { id: 'supplier_discounts', nameAr: 'خصومات الموردين', nameEn: 'Supplier Discounts' },
+      { id: 'supplier_settlements', nameAr: 'تسويات الموردين', nameEn: 'Supplier Settlements' }
+    ],
+    reports: [
+      { id: 'supplier_statement', nameAr: 'كشف حساب المورد', nameEn: 'Supplier Statement', isReport: true },
+      { id: 'supplier_balances', nameAr: 'أرصدة الموردين', nameEn: 'Supplier Balances', isReport: true },
+      { id: 'supplier_aging_report', nameAr: 'أعمار ديون الموردين', nameEn: 'Supplier Aging Report', isReport: true }
     ]
   },
   {
@@ -139,11 +160,12 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
     nameEn: 'Egyptian Tax Authority (ETA)',
     icon: Receipt,
     color: { bg: 'bg-rose-50', text: 'text-rose-800', border: 'border-rose-200', badge: 'bg-rose-600' },
-    features: [
-      { id: 'eta_integration', nameAr: 'الربط المباشر مع الضرائب المصرية', nameEn: 'Direct ETA Integration', description: 'إرسال واستلام الوثائق المعتمدة إلكترونياً' },
-      { id: 'eta_received_invoices', nameAr: 'الوثائق الإلكترونية المستلمة', nameEn: 'ETA Received Documents', description: 'استعراض فواتير المشتريات المستلمة من المنظومة' },
-      { id: 'eta_detailed_invoices', nameAr: 'الوثائق الإلكترونية بالتفصيل', nameEn: 'ETA Detailed Invoices', description: 'تفاصيل البنود والضرائب والفروقات' },
-      { id: 'eta_mapping', nameAr: 'ربط الموردين والأصناف (ETA Mapping)', nameEn: 'ETA Item & Partner Mapping', description: 'مطابقة الأكواد وضبط الضرائب والرسوم' }
+    modules: [
+      { id: 'eta_integration', nameAr: 'الربط المباشر مع الضرائب', nameEn: 'Direct ETA Integration' },
+      { id: 'eta_received_invoices', nameAr: 'الوثائق الإلكترونية المستلمة', nameEn: 'Received E-Docs' },
+      { id: 'eta_detailed_invoices', nameAr: 'الوثائق الإلكترونية بالتفصيل', nameEn: 'Detailed E-Docs' },
+      { id: 'eta_mapping', nameAr: 'ربط الموردين والأصناف (Mapping)', nameEn: 'ETA Mapping' },
+      { id: 'eta_tax_types', nameAr: 'دليل أنواع الضرائب والرسوم', nameEn: 'Tax Types Guide' }
     ]
   },
   {
@@ -152,12 +174,16 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
     nameEn: 'Cash & Banking',
     icon: Coins,
     color: { bg: 'bg-teal-50', text: 'text-teal-800', border: 'border-teal-200', badge: 'bg-teal-600' },
-    features: [
-      { id: 'cash', nameAr: 'حركات النقدية والخزائن', nameEn: 'Cash Register Management', description: 'إدارة الخزائن النقدية وحسابات الصندوق' },
-      { id: 'receipts', nameAr: 'سندات القبض', nameEn: 'Receipt Vouchers', description: 'تحصيل النقدية من العملاء وجهات أخرى' },
-      { id: 'payment_vouchers', nameAr: 'سندات الصرف', nameEn: 'Payment Vouchers', description: 'صرف النقدية للموردين والمصروفات' },
-      { id: 'cash_transfers', nameAr: 'التحويلات النقدية والبنكية', nameEn: 'Cash Transfers', description: 'تحويل الأموال بين الخزائن والحسابات' },
-      { id: 'egyptian_banks', nameAr: 'دليل البنوك المصرية', nameEn: 'Egyptian Banks Directory', description: 'قائمة البنوك وأكواد الفروع' }
+    modules: [
+      { id: 'cash', nameAr: 'حركات النقدية والخزائن', nameEn: 'Cash Management' },
+      { id: 'receipts', nameAr: 'سندات القبض', nameEn: 'Receipt Vouchers' },
+      { id: 'payment_vouchers', nameAr: 'سندات الصرف', nameEn: 'Payment Vouchers' },
+      { id: 'cash_transfers', nameAr: 'التحويلات النقدية والبنكية', nameEn: 'Cash Transfers' },
+      { id: 'egyptian_banks', nameAr: 'دليل البنوك المصرية', nameEn: 'Egyptian Banks' }
+    ],
+    reports: [
+      { id: 'cash_balances', nameAr: 'تقرير النقدية والخزائن والبنوك', nameEn: 'Cash & Bank Balances', isReport: true },
+      { id: 'expenses_report', nameAr: 'تقرير المصروفات', nameEn: 'Expenses Report', isReport: true }
     ]
   },
   {
@@ -166,10 +192,10 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
     nameEn: 'Bank Cheques',
     icon: Landmark,
     color: { bg: 'bg-cyan-50', text: 'text-cyan-800', border: 'border-cyan-200', badge: 'bg-cyan-600' },
-    features: [
-      { id: 'cheques', nameAr: 'نظام إدارة الشيكات', nameEn: 'Core Cheques Module', description: 'تتبع حركة ومحافظ الشيكات بالكامل' },
-      { id: 'issued_cheques', nameAr: 'إدارة الشيكات الصادرة', nameEn: 'Issued Cheques', description: 'شيكات الموردين والتحرير والمقاصة' },
-      { id: 'received_cheques', nameAr: 'إدارة الشيكات الواردة', nameEn: 'Received Cheques', description: 'استلام شيكات العملاء، التحصيل، والارتداد' }
+    modules: [
+      { id: 'cheques', nameAr: 'نظام إدارة الشيكات', nameEn: 'Cheques Module' },
+      { id: 'issued_cheques', nameAr: 'إدارة الشيكات الصادرة', nameEn: 'Issued Cheques' },
+      { id: 'received_cheques', nameAr: 'إدارة الشيكات الواردة', nameEn: 'Received Cheques' }
     ]
   },
   {
@@ -178,11 +204,11 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
     nameEn: 'Flexible Operations',
     icon: Layers,
     color: { bg: 'bg-purple-50', text: 'text-purple-800', border: 'border-purple-200', badge: 'bg-purple-600' },
-    features: [
-      { id: 'flexible_operations', nameAr: 'نظام العمليات المرنة', nameEn: 'Operations Framework', description: 'سجلات العمليات والحركات الديناميكية' },
-      { id: 'departments', nameAr: 'الإدارات والهيكل التنظيمي', nameEn: 'Departments & Hierarchy', description: 'هيكل الإدارات والوحدات الإدارية' },
-      { id: 'cost_centers', nameAr: 'مراكز التكلفة', nameEn: 'Cost Centers', description: 'تحليل المصروفات والإيرادات حسب المراكز' },
-      { id: 'operation_categories', nameAr: 'تصنيفات وحقول العمليات', nameEn: 'Custom Fields & Categories', description: 'حقول البيانات المخصصة وسجلات التتبع' }
+    modules: [
+      { id: 'flexible_operations', nameAr: 'نظام العمليات المرنة', nameEn: 'Operations Framework' },
+      { id: 'departments', nameAr: 'الإدارات والهيكل التنظيمي', nameEn: 'Departments' },
+      { id: 'cost_centers', nameAr: 'مراكز التكلفة', nameEn: 'Cost Centers' },
+      { id: 'operation_categories', nameAr: 'تصنيفات وسجلات العمليات', nameEn: 'Categories & Fields' }
     ]
   },
   {
@@ -191,13 +217,19 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
     nameEn: 'General Ledger & Accounting',
     icon: BookOpen,
     color: { bg: 'bg-blue-50', text: 'text-blue-900', border: 'border-blue-300', badge: 'bg-blue-700' },
-    features: [
-      { id: 'accounting', nameAr: 'النظام المحاسبي العام', nameEn: 'General Ledger System', description: 'تفعيل كامل للدورة المحاسبية والأستاذ' },
-      { id: 'chart_of_accounts', nameAr: 'شجرة ودليل الحسابات', nameEn: 'Chart of Accounts', description: 'بناء وتعديل دليل الحسابات المالي' },
-      { id: 'journal_entries', nameAr: 'قيود اليومية العامة', nameEn: 'Journal Entries', description: 'إنشاء وترحيل ومراجعة القيود المحاسبية' },
-      { id: 'detailed_journal_entries', nameAr: 'القيود اليومية التفصيلية', nameEn: 'Detailed Journal Entries', description: 'استعراض الحركات التفصيلية للأطراف' },
-      { id: 'multi_currency', nameAr: 'العملات المتعددة وفروق الصرف', nameEn: 'Multi-Currency Engine', description: 'التعامل بأكثر من عملة وتحديث الأسعار' },
-      { id: 'ifrs_guide', nameAr: 'دليل معايير IFRS 2026', nameEn: 'IFRS Standards Guide', description: 'دليل معايير المحاسبة الدولية والمصرية' }
+    modules: [
+      { id: 'accounting', nameAr: 'النظام المحاسبي العام', nameEn: 'General Ledger' },
+      { id: 'chart_of_accounts', nameAr: 'شجرة ودليل الحسابات', nameEn: 'Chart of Accounts' },
+      { id: 'journal_entries', nameAr: 'قيود اليومية العامة', nameEn: 'Journal Entries' },
+      { id: 'detailed_journal_entries', nameAr: 'القيود اليومية التفصيلية', nameEn: 'Detailed Entries' },
+      { id: 'multi_currency', nameAr: 'العملات المتعددة وفروق الصرف', nameEn: 'Multi-Currency' },
+      { id: 'ifrs_guide', nameAr: 'دليل معايير IFRS 2026', nameEn: 'IFRS Standards' }
+    ],
+    reports: [
+      { id: 'general_ledger_report', nameAr: 'حساب الأستاذ العام', nameEn: 'General Ledger Report', isReport: true },
+      { id: 'trial_balance', nameAr: 'ميزان المراجعة', nameEn: 'Trial Balance', isReport: true },
+      { id: 'income_statement', nameAr: 'قائمة الدخل', nameEn: 'Income Statement', isReport: true },
+      { id: 'balance_sheet', nameAr: 'الميزانية والمركز المالي', nameEn: 'Balance Sheet', isReport: true }
     ]
   },
   {
@@ -206,10 +238,13 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
     nameEn: 'Fixed Assets',
     icon: Briefcase,
     color: { bg: 'bg-orange-50', text: 'text-orange-800', border: 'border-orange-200', badge: 'bg-orange-600' },
-    features: [
-      { id: 'fixed_assets', nameAr: 'سجل الأصول الثابتة', nameEn: 'Fixed Assets Register', description: 'إضافة ومتابعة الأصول الثابتة وقيمتها' },
-      { id: 'asset_categories', nameAr: 'تصنيفات ومجموعات الأصول', nameEn: 'Asset Categories', description: 'نسب الإهلاك ومجموعات الأصول' },
-      { id: 'asset_depreciation', nameAr: 'تشغيل الإهلاك المحاسبي', nameEn: 'Depreciation Engine', description: 'حساب الإهلاك الآلي وتوليد القيود' }
+    modules: [
+      { id: 'fixed_assets', nameAr: 'سجل الأصول الثابتة', nameEn: 'Fixed Assets Register' },
+      { id: 'asset_categories', nameAr: 'تصنيفات الأصول', nameEn: 'Asset Categories' },
+      { id: 'asset_depreciation', nameAr: 'تشغيل الإهلاك المحاسبي', nameEn: 'Depreciation Engine' }
+    ],
+    reports: [
+      { id: 'fixed_assets_reports', nameAr: 'تقارير الأصول الثابتة', nameEn: 'Fixed Assets Reports', isReport: true }
     ]
   },
   {
@@ -218,22 +253,22 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
     nameEn: 'Document Templates',
     icon: LayoutTemplate,
     color: { bg: 'bg-slate-50', text: 'text-slate-800', border: 'border-slate-200', badge: 'bg-slate-600' },
-    features: [
-      { id: 'templates', nameAr: 'إدارة وتخصيص القوالب', nameEn: 'Templates Manager', description: 'تخصيص قوالب طباعة الفواتير والسندات' },
-      { id: 'create_template', nameAr: 'مصمم القوالب الجديد', nameEn: 'Template Designer', description: 'إنشاء قوالب طباعة مخصصة بالشعار والتصميم' }
+    modules: [
+      { id: 'templates', nameAr: 'إدارة وتخصيص القوالب', nameEn: 'Templates Manager' },
+      { id: 'create_template', nameAr: 'مصمم القوالب الجديد', nameEn: 'Template Designer' }
     ]
   },
   {
     id: 'reports',
-    nameAr: 'التقارير المالية والتشغيلية',
-    nameEn: 'Reports & Analytics',
+    nameAr: 'قائمة التقارير العامة',
+    nameEn: 'Reports Center',
     icon: BarChart3,
     color: { bg: 'bg-sky-50', text: 'text-sky-800', border: 'border-sky-200', badge: 'bg-sky-600' },
-    features: [
-      { id: 'reports', nameAr: 'مركز التقارير العام', nameEn: 'Reports Center', description: 'الوصول لكافة التقارير المتقدمة' },
-      { id: 'financial_reports', nameAr: 'التقارير المالية (قائمة الدخل، الميزانية، ميزان المراجعة)', nameEn: 'Financial Reports', description: 'المركز المالي، الأرباح والخسائر، والأستاذ العام' },
-      { id: 'inventory_reports', nameAr: 'تقارير حركة وكارت الصنف والمخزون', nameEn: 'Inventory Movements Reports', description: 'أرصدة المخزن خلال فترة وكارت الصنف' },
-      { id: 'partner_reports', nameAr: 'كشوف الحسابات وأعمار الديون', nameEn: 'Partner Statements & Aging', description: 'كشف حساب العميل والمورد وتقارير التحصيل' }
+    modules: [
+      { id: 'reports', nameAr: 'قائمة التقارير الرئيسية', nameEn: 'Main Reports Menu' },
+      { id: 'financial_reports', nameAr: 'حزمة التقارير المالية', nameEn: 'Financial Reports Suite' },
+      { id: 'inventory_reports', nameAr: 'حزمة تقارير المخازن', nameEn: 'Inventory Reports Suite' },
+      { id: 'partner_reports', nameAr: 'حزمة تقارير الحسابات', nameEn: 'Partner Reports Suite' }
     ]
   },
   {
@@ -242,9 +277,9 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
     nameEn: 'Point of Sale',
     icon: Radio,
     color: { bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-300', badge: 'bg-emerald-700' },
-    features: [
-      { id: 'pos', nameAr: 'نظام نقاط البيع والكاشير', nameEn: 'POS System', description: 'شاشة الكاشير السريع وطباعة الإيصالات' },
-      { id: 'pos_branches', nameAr: 'الفروع المتصلة وربط الأجهزة', nameEn: 'Connected POS Devices', description: 'ربط ومزامنة أجهزة الكاشير بالفروع' }
+    modules: [
+      { id: 'pos', nameAr: 'نظام نقاط البيع والكاشير', nameEn: 'POS System' },
+      { id: 'pos_branches', nameAr: 'الفروع المتصلة وربط الأجهزة', nameEn: 'Connected POS Branches' }
     ]
   },
   {
@@ -253,15 +288,15 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
     nameEn: 'Administration & System',
     icon: Settings,
     color: { bg: 'bg-stone-50', text: 'text-stone-800', border: 'border-stone-300', badge: 'bg-stone-700' },
-    features: [
-      { id: 'admin', nameAr: 'لوحة إعدادات الشركة', nameEn: 'Company Settings', description: 'البيانات الضريبية، الشعار، والسياسات' },
-      { id: 'user_management', nameAr: 'إدارة المستخدمين والأدوار', nameEn: 'Users & Permissions', description: 'إضافة المستخدمين وتعيين الصلاحيات' },
-      { id: 'period_closing', nameAr: 'إغلاق الفترات والسنوات المالية', nameEn: 'Period Closing', description: 'إقفال الأشهر والسنوات وترحيل الأرصدة' },
-      { id: 'data_integrity', nameAr: 'فحص وتدقيق سلامة البيانات', nameEn: 'Data Integrity Audit', description: 'التحقق الآلي من تطابق القيود والوثائق' },
-      { id: 'backup_restore', nameAr: 'النسخ الاحتياطي واستعادة البيانات', nameEn: 'Backup & Restore', description: 'أخذ وحفظ واسترجاع النسخ الاحتياطية' },
-      { id: 'activity_logs', nameAr: 'سجلات الرقابة والنشاط', nameEn: 'Audit & Activity Logs', description: 'تتبع كافة التعديلات وعمليات الحذف والطباعة' },
-      { id: 'api', nameAr: 'الربط البرمجي الخارجي (API)', nameEn: 'External API Integration', description: 'تكامل النظام مع المنصات والأنظمة الخارجية' },
-      { id: 'hr', nameAr: 'الموارد البشرية وشؤون الموظفين (HR)', nameEn: 'Human Resources (HR)', description: 'الرواتب والعهد والإجازات' }
+    modules: [
+      { id: 'admin', nameAr: 'لوحة إعدادات الشركة', nameEn: 'Company Settings' },
+      { id: 'user_management', nameAr: 'إدارة المستخدمين والأدوار', nameEn: 'Users & Permissions' },
+      { id: 'period_closing', nameAr: 'إغلاق الفترات والسنوات المالية', nameEn: 'Period Closing' },
+      { id: 'data_integrity', nameAr: 'فحص وتدقيق سلامة البيانات', nameEn: 'Data Integrity Audit' },
+      { id: 'backup_restore', nameAr: 'النسخ الاحتياطي واستعادة البيانات', nameEn: 'Backup & Restore' },
+      { id: 'activity_logs', nameAr: 'سجلات الرقابة والنشاط', nameEn: 'Audit & Activity Logs' },
+      { id: 'api', nameAr: 'الربط البرمجي الخارجي (API)', nameEn: 'API Integration' },
+      { id: 'hr', nameAr: 'الموارد البشرية وشؤون الموظفين (HR)', nameEn: 'HR Management' }
     ]
   }
 ];
@@ -325,11 +360,16 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
       const data = await subscriptionApiService.getFeatures(companyId);
       
       const map: Record<string, boolean> = {};
-      // Populate defaults for all known categories
+      // Populate defaults for all known categories (modules + reports)
       SYSTEM_FEATURE_CATEGORIES.forEach(cat => {
-        cat.features.forEach(f => {
-          map[f.id] = true; // Default to enabled
+        cat.modules.forEach(f => {
+          map[f.id] = true;
         });
+        if (cat.reports) {
+          cat.reports.forEach(f => {
+            map[f.id] = true;
+          });
+        }
       });
 
       // Override with DB data
@@ -357,14 +397,30 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
     }));
   };
 
-  // Toggle entire category
+  // Toggle entire category (both modules & reports)
   const toggleCategory = (category: FeatureCategory) => {
-    const allEnabled = category.features.every(f => featureMap[f.id] === true);
+    const allItems = [...category.modules, ...(category.reports || [])];
+    const allEnabled = allItems.every(f => featureMap[f.id] === true);
     const targetState = !allEnabled;
 
     setFeatureMap(prev => {
       const updated = { ...prev };
-      category.features.forEach(f => {
+      allItems.forEach(f => {
+        updated[f.id] = targetState;
+      });
+      return updated;
+    });
+  };
+
+  // Toggle only reports in a category
+  const toggleCategoryReports = (category: FeatureCategory) => {
+    if (!category.reports || category.reports.length === 0) return;
+    const allReportsEnabled = category.reports.every(f => featureMap[f.id] === true);
+    const targetState = !allReportsEnabled;
+
+    setFeatureMap(prev => {
+      const updated = { ...prev };
+      category.reports!.forEach(f => {
         updated[f.id] = targetState;
       });
       return updated;
@@ -376,9 +432,14 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
     setFeatureMap(prev => {
       const updated = { ...prev };
       SYSTEM_FEATURE_CATEGORIES.forEach(cat => {
-        cat.features.forEach(f => {
+        cat.modules.forEach(f => {
           updated[f.id] = true;
         });
+        if (cat.reports) {
+          cat.reports.forEach(f => {
+            updated[f.id] = true;
+          });
+        }
       });
       return updated;
     });
@@ -389,9 +450,14 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
     setFeatureMap(prev => {
       const updated = { ...prev };
       SYSTEM_FEATURE_CATEGORIES.forEach(cat => {
-        cat.features.forEach(f => {
+        cat.modules.forEach(f => {
           updated[f.id] = false;
         });
+        if (cat.reports) {
+          cat.reports.forEach(f => {
+            updated[f.id] = false;
+          });
+        }
       });
       return updated;
     });
@@ -430,7 +496,7 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
 
   // Total features stats
   const totalFeaturesCount = useMemo(() => {
-    return SYSTEM_FEATURE_CATEGORIES.reduce((acc, cat) => acc + cat.features.length, 0);
+    return SYSTEM_FEATURE_CATEGORIES.reduce((acc, cat) => acc + cat.modules.length + (cat.reports?.length || 0), 0);
   }, []);
 
   const enabledFeaturesCount = useMemo(() => {
@@ -438,7 +504,7 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
   }, [featureMap]);
 
   return (
-    <div className="p-4 md:p-6 space-y-6 min-h-[85vh] flex flex-col font-sans" dir="rtl">
+    <div className="p-3 md:p-5 space-y-4 min-h-[85vh] flex flex-col font-sans text-slate-800" dir="rtl">
       
       {/* Toast Notification */}
       <AnimatePresence>
@@ -447,58 +513,56 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl shadow-xl border flex items-center gap-3 font-bold text-sm ${
+            className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl shadow-xl border flex items-center gap-2.5 font-bold text-xs ${
               toastMessage.type === 'success' 
                 ? 'bg-emerald-600 text-white border-emerald-500 shadow-emerald-500/20' 
                 : 'bg-rose-600 text-white border-rose-500 shadow-rose-500/20'
             }`}
           >
-            {toastMessage.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+            {toastMessage.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
             <span>{toastMessage.text}</span>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Top Bar: Company Selector & Global Controls */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 md:p-5 transition-all space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      {/* Top Bar: Company Selector & Compact Global Controls */}
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs p-3 md:p-4 transition-all space-y-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           
           {/* Header Title */}
-          <div>
-            <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
-                <Sparkles size={20} />
-              </div>
-              <div>
-                <h2 className="text-lg font-black text-slate-900 tracking-tight">إدارة ميزات النظام (Feature Flags)</h2>
-                <p className="text-xs text-slate-500 font-semibold mt-0.5">
-                  حدد الشركة لتخصيص وتفعيل أو إيقاف الميزات بالترتيب المنهجي للنظام
-                </p>
-              </div>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-xs">
+              <Sparkles size={16} />
+            </div>
+            <div>
+              <h2 className="text-sm font-black text-slate-900 tracking-tight">إدارة ميزات النظام والتقارير (Feature Flags)</h2>
+              <p className="text-[11px] text-slate-500 font-semibold">
+                حدد الشركة للتحكم الكامل في ظهور الوحدات والتقارير من لوحة التحكم وحتى الإدارة
+              </p>
             </div>
           </div>
 
           {/* Search & Company Select Dropdown */}
-          <div className="relative flex-1 max-w-xl">
+          <div className="relative flex-1 max-w-md">
             <div className="relative">
-              <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
               <input 
                 type="text" 
-                placeholder="ابحث عن شركة (بالاسم، كود الشركة، أو إيميل المدير)..." 
+                placeholder="ابحث عن شركة (الاسم، الكود، أو إيميل المدير)..." 
                 value={searchQuery}
                 onFocus={() => setIsDropdownOpen(true)}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
                   setIsDropdownOpen(true);
                 }}
-                className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl pr-10 pl-10 py-2.5 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all text-xs font-bold text-slate-800 placeholder:text-slate-400 shadow-2xs"
+                className="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-lg pr-9 pl-8 py-1.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all text-xs font-bold text-slate-800 placeholder:text-slate-400"
               />
               <button 
                 type="button" 
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
-                <ChevronDown size={16} className={`transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown size={14} className={`transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
             </div>
 
@@ -509,10 +573,10 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
                   className="fixed inset-0 z-20" 
                   onClick={() => setIsDropdownOpen(false)} 
                 />
-                <div className="absolute top-full right-0 left-0 mt-2 bg-white rounded-2xl border border-slate-200 shadow-2xl z-30 max-h-72 overflow-y-auto custom-scrollbar p-2 animate-in fade-in-50 zoom-in-95 duration-150">
+                <div className="absolute top-full right-0 left-0 mt-1 bg-white rounded-xl border border-slate-200 shadow-xl z-30 max-h-64 overflow-y-auto custom-scrollbar p-1.5 animate-in fade-in-50 zoom-in-95 duration-100">
                   {filteredCompanies.length === 0 ? (
-                    <div className="p-4 text-center text-xs text-slate-400 font-bold">
-                      لا توجد شركة مطابقة لبحثك
+                    <div className="p-3 text-center text-xs text-slate-400 font-bold">
+                      لا توجد شركة مطابقة
                     </div>
                   ) : (
                     filteredCompanies.map(c => {
@@ -527,35 +591,35 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
                             setIsDropdownOpen(false);
                             setSearchQuery(c.name);
                           }}
-                          className={`w-full text-right p-3 rounded-xl transition-all flex items-center justify-between mb-1 cursor-pointer ${
+                          className={`w-full text-right p-2 rounded-lg transition-all flex items-center justify-between mb-0.5 cursor-pointer ${
                             isSelected 
                               ? 'bg-blue-50/80 border border-blue-200 text-blue-900 shadow-2xs' 
                               : 'hover:bg-slate-50 border border-transparent text-slate-700'
                           }`}
                         >
-                          <div className="flex items-center gap-3 truncate">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-xs ${
+                          <div className="flex items-center gap-2 truncate">
+                            <div className={`w-6 h-6 rounded flex items-center justify-center shrink-0 font-bold text-[10px] ${
                               isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
                             }`}>
-                              <Building2 size={15} />
+                              <Building2 size={12} />
                             </div>
                             <div className="truncate">
-                              <div className="font-bold text-xs text-slate-900 flex items-center gap-2">
+                              <div className="font-bold text-xs text-slate-900 flex items-center gap-1.5">
                                 <span>{c.name}</span>
-                                <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-mono font-bold">
+                                <span className="px-1 py-0.2 rounded bg-slate-100 text-slate-600 text-[9px] font-mono font-bold">
                                   {c.code}
                                 </span>
                               </div>
                               {managerEmail && (
-                                <div className="text-[11px] text-slate-400 flex items-center gap-1 font-mono mt-0.5">
-                                  <Mail size={11} />
+                                <div className="text-[10px] text-slate-400 flex items-center gap-1 font-mono">
+                                  <Mail size={10} />
                                   <span>{managerEmail}</span>
                                 </div>
                               )}
                             </div>
                           </div>
                           {isSelected && (
-                            <span className="text-xs font-bold text-blue-600 bg-white px-2 py-0.5 rounded-md border border-blue-200">
+                            <span className="text-[10px] font-bold text-blue-600 bg-white px-1.5 py-0.5 rounded border border-blue-200">
                               محددة
                             </span>
                           )}
@@ -571,49 +635,49 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
 
         {/* Selected Company Banner & Action Bar */}
         {selectedCompany && (
-          <div className="pt-3 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <div className="flex items-center gap-2 bg-blue-50 text-blue-900 px-3 py-1.5 rounded-xl border border-blue-200/80">
-                <Building2 size={14} className="text-blue-600" />
+          <div className="pt-2 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-blue-50 text-blue-900 px-2.5 py-1 rounded-lg border border-blue-200/80">
+                <Building2 size={13} className="text-blue-600" />
                 <span className="font-black text-xs">{selectedCompany.name}</span>
-                <span className="bg-white px-1.5 py-0.5 rounded text-[10px] font-mono font-bold text-blue-700 shadow-2xs">
+                <span className="bg-white px-1 py-0.2 rounded text-[10px] font-mono font-bold text-blue-700 shadow-2xs">
                   {selectedCompany.code}
                 </span>
               </div>
 
               {getManagerEmail(selectedCompany) && (
-                <div className="flex items-center gap-1.5 bg-slate-100 text-slate-600 px-2.5 py-1.5 rounded-xl border border-slate-200 text-[11px] font-mono font-bold">
-                  <Mail size={12} className="text-slate-400" />
+                <div className="flex items-center gap-1 bg-slate-100 text-slate-600 px-2 py-1 rounded-lg border border-slate-200 text-[10px] font-mono font-bold">
+                  <Mail size={11} className="text-slate-400" />
                   <span>{getManagerEmail(selectedCompany)}</span>
                 </div>
               )}
 
-              <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-2.5 py-1.5 rounded-xl border border-emerald-200 text-xs font-bold">
-                <CheckCircle2 size={13} className="text-emerald-600" />
-                <span>الميزات المفعلة:</span>
+              <div className="flex items-center gap-1 bg-emerald-50 text-emerald-800 px-2 py-1 rounded-lg border border-emerald-200 text-xs font-bold">
+                <CheckCircle2 size={12} className="text-emerald-600" />
+                <span>المفعل:</span>
                 <span className="font-black font-mono">{enabledFeaturesCount} / {totalFeaturesCount}</span>
               </div>
 
               {hasUnsavedChanges && (
-                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold border border-amber-300 animate-pulse">
-                  يوجد تعديلات غير محفوظة
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[10px] font-bold border border-amber-300">
+                  تعديلات غير محفوظة
                 </span>
               )}
             </div>
 
             {/* Quick Actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={handleSelectAllSystemFeatures}
-                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs"
               >
                 تحديد الكل
               </button>
               <button
                 type="button"
                 onClick={handleDeselectAllSystemFeatures}
-                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs"
               >
                 إلغاء التحديد
               </button>
@@ -621,22 +685,22 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
                 type="button"
                 onClick={() => loadFeatures(selectedCompany.id)}
                 disabled={loading}
-                className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+                className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all cursor-pointer"
                 title="تحديث البيانات"
               >
-                <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
               </button>
               <button
                 type="button"
                 onClick={handleSaveChanges}
                 disabled={saving || !hasUnsavedChanges}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3.5 py-1 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer ${
                   hasUnsavedChanges 
                     ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/25 active:scale-95' 
                     : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
                 }`}
               >
-                {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                {saving ? <RefreshCw size={12} className="animate-spin" /> : <Save size={12} />}
                 <span>حفظ التغييرات</span>
               </button>
             </div>
@@ -644,65 +708,85 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
         )}
       </div>
 
-      {/* Main Body: Full Screen Features Grid */}
+      {/* Main Body: Ultra-compact, Sleek Features Grid */}
       {!selectedCompanyId ? (
-        <div className="flex-1 bg-white rounded-2xl border border-dashed border-slate-200 flex flex-col items-center justify-center p-12 text-center text-slate-400">
-          <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-4 text-slate-300">
-            <Building2 size={32} />
+        <div className="flex-1 bg-white rounded-xl border border-dashed border-slate-200 flex flex-col items-center justify-center p-8 text-center text-slate-400">
+          <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-3 text-slate-300">
+            <Building2 size={24} />
           </div>
-          <h3 className="text-base font-black text-slate-700 mb-1">يرجى اختيار شركة للبدء</h3>
+          <h3 className="text-sm font-black text-slate-700 mb-1">يرجى اختيار شركة للبدء</h3>
           <p className="text-xs text-slate-400 max-w-sm">
-            اختر شركة من شريط البحث بالأعلى لعرض كافة الميزات والوحدات مرتبة ومصنفة من لوحة التحكم وحتى الإدارة.
+            اختر شركة من شريط البحث بالأعلى لعرض كافة الميزات والتقارير مرتبة ومصنفة من لوحة التحكم وحتى الإدارة.
           </p>
         </div>
       ) : loading ? (
-        <div className="flex-1 bg-white rounded-2xl border border-slate-200 flex flex-col items-center justify-center p-12">
-          <RefreshCw size={30} className="animate-spin text-blue-600 mb-3" />
-          <p className="text-xs font-bold text-slate-500">جاري تحميل ميزات الشركة المحددة...</p>
+        <div className="flex-1 bg-white rounded-xl border border-slate-200 flex flex-col items-center justify-center p-8">
+          <RefreshCw size={24} className="animate-spin text-blue-600 mb-2" />
+          <p className="text-xs font-bold text-slate-500">جاري تحميل ميزات وتقارير الشركة...</p>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-3">
           {SYSTEM_FEATURE_CATEGORIES.map((category, catIndex) => {
-            const enabledCount = category.features.filter(f => featureMap[f.id] === true).length;
-            const totalCount = category.features.length;
+            const allItems = [...category.modules, ...(category.reports || [])];
+            const enabledCount = allItems.filter(f => featureMap[f.id] === true).length;
+            const totalCount = allItems.length;
             const isAllEnabled = enabledCount === totalCount;
             const isNoneEnabled = enabledCount === 0;
             const isPartial = !isAllEnabled && !isNoneEnabled;
 
+            const hasReports = category.reports && category.reports.length > 0;
+            const enabledReportsCount = hasReports ? category.reports!.filter(f => featureMap[f.id] === true).length : 0;
+            const totalReportsCount = hasReports ? category.reports!.length : 0;
+
             return (
               <div 
                 key={category.id} 
-                className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden transition-all hover:shadow-xs"
+                className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden transition-all"
               >
-                {/* Category Header */}
-                <div className="p-3.5 md:p-4 bg-slate-50/70 border-b border-slate-200/70 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-lg bg-slate-200/80 text-slate-700 text-[11px] font-black flex items-center justify-center font-mono">
+                {/* Category Header - Compact */}
+                <div className="px-3 py-2 bg-slate-50/80 border-b border-slate-200/70 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded bg-slate-200/80 text-slate-700 text-[10px] font-black flex items-center justify-center font-mono">
                       {catIndex + 1}
                     </span>
-                    <div className={`p-2 rounded-xl ${category.color.bg} ${category.color.text} border ${category.color.border}`}>
-                      <category.icon size={18} />
+                    <div className={`p-1.5 rounded-lg ${category.color.bg} ${category.color.text} border ${category.color.border}`}>
+                      <category.icon size={14} />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-black text-sm text-slate-900">{category.nameAr}</h3>
-                        <span className="text-[10px] font-mono text-slate-400">{category.nameEn}</span>
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="font-black text-xs text-slate-900">{category.nameAr}</h3>
+                        <span className="text-[9px] font-mono text-slate-400">{category.nameEn}</span>
                       </div>
-                      <div className="text-[11px] text-slate-500 font-semibold mt-0.5">
-                        <span>المفعل: </span>
-                        <span className="font-black font-mono text-slate-800">{enabledCount}</span>
-                        <span> من </span>
-                        <span className="font-black font-mono text-slate-800">{totalCount}</span>
-                      </div>
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-semibold mr-2 bg-white px-2 py-0.5 rounded border border-slate-200">
+                      <span>المفعل: </span>
+                      <span className="font-black font-mono text-slate-800">{enabledCount}</span>
+                      <span> من </span>
+                      <span className="font-black font-mono text-slate-800">{totalCount}</span>
                     </div>
                   </div>
 
                   {/* Group Master Checkbox & Fast Toggles */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    {hasReports && (
+                      <button
+                        type="button"
+                        onClick={() => toggleCategoryReports(category)}
+                        className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-all cursor-pointer ${
+                          enabledReportsCount === totalReportsCount
+                            ? 'bg-sky-50 text-sky-800 border-sky-300'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        }`}
+                        title="تحديد أو إلغاء تحديد كافة تقارير هذا القسم"
+                      >
+                        📊 التقارير ({enabledReportsCount}/{totalReportsCount})
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => toggleCategory(category)}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-bold text-xs transition-all cursor-pointer shadow-2xs ${
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border font-bold text-[11px] transition-all cursor-pointer shadow-2xs ${
                         isAllEnabled 
                           ? 'bg-emerald-600 text-white border-emerald-600' 
                           : isPartial 
@@ -710,15 +794,15 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
                             : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
                       }`}
                     >
-                      <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${
+                      <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-all ${
                         isAllEnabled 
                           ? 'bg-white text-emerald-700 border-white' 
                           : isPartial 
                             ? 'bg-blue-600 text-white border-blue-600' 
                             : 'bg-white border-slate-400'
                       }`}>
-                        {isAllEnabled && <Check size={11} className="stroke-[3]" />}
-                        {isPartial && <Minus size={11} className="stroke-[3]" />}
+                        {isAllEnabled && <Check size={10} className="stroke-[3]" />}
+                        {isPartial && <Minus size={10} className="stroke-[3]" />}
                       </div>
                       <span>
                         {isAllEnabled ? 'محددة بالكامل' : isPartial ? 'محددة جزئياً' : 'تحديد القائمة كاملة'}
@@ -727,57 +811,110 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
                   </div>
                 </div>
 
-                {/* Features Cards Grid */}
-                <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 bg-white">
-                  {category.features.map(feature => {
-                    const isEnabled = featureMap[feature.id] === true;
-                    return (
-                      <div
-                        key={feature.id}
-                        onClick={() => toggleFeature(feature.id)}
-                        className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-start gap-3 select-none ${
-                          isEnabled 
-                            ? 'bg-emerald-50/40 border-emerald-200 hover:border-emerald-300 shadow-2xs' 
-                            : 'bg-slate-50/40 border-slate-200/80 hover:border-slate-300 opacity-70 hover:opacity-100'
-                        }`}
-                      >
-                        {/* Custom Square Checkbox */}
-                        <div 
-                          className={`w-5 h-5 rounded-lg flex items-center justify-center mt-0.5 shrink-0 transition-all border ${
-                            isEnabled 
-                              ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs' 
-                              : 'bg-white border-slate-300 hover:border-slate-400'
-                          }`}
-                        >
-                          {isEnabled && <Check size={12} className="stroke-[3]" />}
-                        </div>
+                {/* Modules & Reports Body - Ultra Compact Cells & Tight Gap */}
+                <div className="p-2.5 space-y-2.5 bg-white">
+                  
+                  {/* Operational Modules Grid */}
+                  <div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5">
+                      {category.modules.map(feature => {
+                        const isEnabled = featureMap[feature.id] === true;
+                        return (
+                          <div
+                            key={feature.id}
+                            onClick={() => toggleFeature(feature.id)}
+                            className={`px-2 py-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-2 select-none min-h-[38px] ${
+                              isEnabled 
+                                ? 'bg-emerald-50/50 border-emerald-300/80 hover:border-emerald-400 shadow-2xs' 
+                                : 'bg-slate-50/50 border-slate-200/80 hover:border-slate-300 opacity-60 hover:opacity-100'
+                            }`}
+                            title={feature.nameAr + ' (' + feature.id + ')'}
+                          >
+                            {/* Custom Square Checkbox */}
+                            <div 
+                              className={`w-4 h-4 rounded flex items-center justify-center shrink-0 transition-all border ${
+                                isEnabled 
+                                  ? 'bg-emerald-600 border-emerald-600 text-white shadow-2xs' 
+                                  : 'bg-white border-slate-300 hover:border-slate-400'
+                              }`}
+                            >
+                              {isEnabled && <Check size={11} className="stroke-[3]" />}
+                            </div>
 
-                        {/* Feature Information */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className={`text-xs font-black truncate ${isEnabled ? 'text-slate-900' : 'text-slate-600'}`}>
-                              {feature.nameAr}
-                            </span>
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0 font-mono ${
-                              isEnabled ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'
-                            }`}>
-                              {isEnabled ? 'مفعلة' : 'معطلة'}
-                            </span>
-                          </div>
-                          
-                          <div className="text-[10px] font-mono text-slate-400 mt-0.5 truncate">
-                            {feature.id}
-                          </div>
+                            {/* Feature Text */}
+                            <div className="flex-1 min-w-0">
+                              <div className={`text-[11px] font-bold truncate leading-tight ${isEnabled ? 'text-slate-900' : 'text-slate-600'}`}>
+                                {feature.nameAr}
+                              </div>
+                              <div className="text-[8.5px] font-mono text-slate-400 truncate leading-none mt-0.5">
+                                {feature.id}
+                              </div>
+                            </div>
 
-                          {feature.description && (
-                            <p className="text-[11px] text-slate-500 leading-snug mt-1 font-medium">
-                              {feature.description}
-                            </p>
-                          )}
-                        </div>
+                            {/* Tiny status indicator */}
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Reports Sub-section within Category */}
+                  {hasReports && (
+                    <div className="pt-2 border-t border-slate-100">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-[10px] font-black text-sky-800 uppercase tracking-wider flex items-center gap-1 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
+                          <FileSpreadsheet size={11} className="text-sky-600" />
+                          <span>تقارير {category.nameAr}</span>
+                        </span>
+                        <span className="text-[9px] text-slate-400 font-bold">
+                          (يمكن تحديد كل تقرير أو استبعاده من القائمة)
+                        </span>
                       </div>
-                    );
-                  })}
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5">
+                        {category.reports!.map(report => {
+                          const isEnabled = featureMap[report.id] === true;
+                          return (
+                            <div
+                              key={report.id}
+                              onClick={() => toggleFeature(report.id)}
+                              className={`px-2 py-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-2 select-none min-h-[38px] ${
+                                isEnabled 
+                                  ? 'bg-sky-50/60 border-sky-300 hover:border-sky-400 shadow-2xs' 
+                                  : 'bg-slate-50/50 border-slate-200/80 hover:border-slate-300 opacity-60 hover:opacity-100'
+                              }`}
+                              title={'تقرير: ' + report.nameAr + ' (' + report.id + ')'}
+                            >
+                              {/* Custom Square Checkbox */}
+                              <div 
+                                className={`w-4 h-4 rounded flex items-center justify-center shrink-0 transition-all border ${
+                                  isEnabled 
+                                    ? 'bg-sky-600 border-sky-600 text-white shadow-2xs' 
+                                    : 'bg-white border-slate-300 hover:border-slate-400'
+                                }`}
+                              >
+                                {isEnabled && <Check size={11} className="stroke-[3]" />}
+                              </div>
+
+                              {/* Report Text */}
+                              <div className="flex-1 min-w-0">
+                                <div className={`text-[11px] font-bold truncate leading-tight ${isEnabled ? 'text-sky-950' : 'text-slate-600'}`}>
+                                  {report.nameAr}
+                                </div>
+                                <div className="text-[8.5px] font-mono text-slate-400 truncate leading-none mt-0.5">
+                                  {report.id}
+                                </div>
+                              </div>
+
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEnabled ? 'bg-sky-500' : 'bg-slate-300'}`} />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                 </div>
               </div>
             );
@@ -790,12 +927,12 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="sticky bottom-4 z-40 bg-slate-900 text-white p-3.5 px-6 rounded-2xl shadow-2xl flex items-center justify-between gap-4 border border-slate-800"
+          className="sticky bottom-3 z-40 bg-slate-900 text-white p-3 px-5 rounded-xl shadow-2xl flex items-center justify-between gap-3 border border-slate-800"
         >
-          <div className="flex items-center gap-3">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+          <div className="flex items-center gap-2.5">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
             <span className="text-xs font-bold">
-              لديك تعديلات غير محفوظة لميزات شركة ({selectedCompany?.name})
+              تعديلات غير محفوظة لميزات شركة ({selectedCompany?.name})
             </span>
           </div>
 
@@ -803,7 +940,7 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
             <button
               type="button"
               onClick={() => setFeatureMap({ ...initialFeatureMap })}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all cursor-pointer"
+              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all cursor-pointer"
             >
               تراجع
             </button>
@@ -811,9 +948,9 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
               type="button"
               onClick={handleSaveChanges}
               disabled={saving}
-              className="flex items-center gap-2 px-5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black transition-all shadow-lg shadow-emerald-500/30 active:scale-95 cursor-pointer"
+              className="flex items-center gap-1.5 px-4 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black transition-all shadow-md shadow-emerald-500/25 active:scale-95 cursor-pointer"
             >
-              {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+              {saving ? <RefreshCw size={12} className="animate-spin" /> : <Save size={12} />}
               <span>حفظ التغييرات الآن</span>
             </button>
           </div>

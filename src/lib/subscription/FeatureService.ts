@@ -81,22 +81,27 @@ export class FeatureService {
       'customers', 'suppliers', 'employees', 'expenses', 'crm', 'payment_methods',
       // 3. Warehouses & Inventory
       'inventory', 'products', 'item_groups', 'warehouses', 'goods_receipts', 'warehouse_transfers', 'opening_stock_balances', 'stock_adjustments', 'manufacturing',
+      'stock_card_report', 'stock_balances_report', 'general_stock_movements_report',
       // 4. Sales
       'sales', 'invoices', 'sales_orders', 'returns', 'sales_import', 'customer_discounts',
+      'customer_statement', 'customer_balances', 'customer_aging_report', 'sales_report',
       // 5. Purchases
       'purchases', 'purchase_invoices', 'purchase_orders', 'purchase_returns', 'purchases_import', 'supplier_discounts',
+      'supplier_statement', 'supplier_balances', 'supplier_aging_report',
       // 6. ETA E-Invoicing
       'eta_integration', 'eta_received_invoices', 'eta_detailed_invoices', 'eta_mapping',
       // 7. Cash & Banks
       'cash', 'receipts', 'payment_vouchers', 'cash_transfers', 'egyptian_banks',
+      'cash_balances', 'expenses_report',
       // 8. Cheques
       'cheques', 'issued_cheques', 'received_cheques',
       // 9. Operations
       'flexible_operations', 'departments', 'cost_centers', 'operation_categories',
       // 10. General Ledger
       'accounting', 'chart_of_accounts', 'journal_entries', 'detailed_journal_entries', 'multi_currency', 'ifrs_guide',
+      'general_ledger_report', 'trial_balance', 'income_statement', 'balance_sheet',
       // 11. Fixed Assets
-      'fixed_assets', 'asset_categories', 'asset_depreciation',
+      'fixed_assets', 'asset_categories', 'asset_depreciation', 'fixed_assets_reports',
       // 12. Templates
       'templates', 'create_template',
       // 13. Reports

@@ -9,7 +9,7 @@ const router = Router();
 // GET /api/subscriptions/my-features & /api/subscriptions/my_features
 router.get(['/my-features', '/my_features'], authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const companyId = req.user?.company_id || 'system';
+    const companyId = (req.headers['x-company-id'] as string) || req.user?.company_id || 'system';
     const features = await featureService.getFeatures(companyId);
     res.json(features);
   } catch (error: any) {

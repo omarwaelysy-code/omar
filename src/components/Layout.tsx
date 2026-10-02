@@ -223,6 +223,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
   const [activeDesktopMenu, setActiveDesktopMenu] = React.useState<string | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [activeFeatures, setActiveFeatures] = useState<string[]>([]);
+  const [disabledFeatures, setDisabledFeatures] = useState<Set<string>>(new Set());
   const [featuresLoaded, setFeaturesLoaded] = useState(false);
   const [unreadContactMessagesCount, setUnreadContactMessagesCount] = useState(0);
 
@@ -387,18 +388,24 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       }
     });
     
-    // Fetch active features
+    // Fetch active & disabled features for the current active company
     const fetchFeatures = async () => {
       try {
         const token = localStorage.getItem('auth_token');
         if (!token) return;
+        const activeCompId = localStorage.getItem('current_company_id') || user?.company_id || '';
         const res = await fetch('/api/subscriptions/my-features', {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'x-company-id': activeCompId
+          }
         });
         if (res.ok) {
           const featuresData = await res.json();
-          const active = featuresData.filter((f: any) => f.is_enabled).map((f: any) => f.feature_name);
+          const active = featuresData.filter((f: any) => f.is_enabled !== false).map((f: any) => f.feature_name);
+          const disabled = featuresData.filter((f: any) => f.is_enabled === false).map((f: any) => f.feature_name);
           setActiveFeatures(active);
+          setDisabledFeatures(new Set(disabled));
         }
       } catch (err) {
         console.error('Failed to fetch features', err);
@@ -840,40 +847,178 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       return superAdminNavItems;
     }
 
-    let filteredByFeatures = navItems;
-    if (featuresLoaded && activeFeatures.length > 0) {
-      const featureMap: Record<string, string> = {
-        'sales': 'sales',
-        'purchases': 'purchases',
-        'warehouses_menu': 'inventory',
-        'general_ledger': 'accounting',
-        'fixed_assets_menu': 'accounting',
-        'cash': 'accounting'
-      };
-      
-      filteredByFeatures = navItems.filter(item => {
-        const requiredFeature = featureMap[item.id];
-        if (requiredFeature) {
-           return activeFeatures.includes(requiredFeature);
-        }
-        return true;
-      });
-    }
+    const topLevelFeatureMap: Record<string, string> = {
+      'master_data': 'master_data',
+      'warehouses_menu': 'inventory',
+      'sales': 'sales',
+      'purchases': 'purchases',
+      'eta_menu': 'eta_integration',
+      'cash': 'cash',
+      'issued_cheques_menu': 'cheques',
+      'flexible_operations': 'flexible_operations',
+      'general_ledger': 'accounting',
+      'fixed_assets_menu': 'fixed_assets',
+      'templates_menu': 'templates',
+      'reports_menu': 'reports',
+      'pos_menu': 'pos',
+      'admin': 'admin'
+    };
 
-    if (isCompanyAdmin) return filteredByFeatures;
-
-    return filteredByFeatures.map(item => {
-      // Check if top-level item should be visible
-      const canView = hasPermission(item.id, 'view') || item.id === 'currencies' || item.id === 'templates_menu' || item.id === 'pos_menu' || item.id === 'eta_menu' || item.id === 'flexible_operations';
+    const subItemFeatureMap: Record<string, string> = {
+      // Master Data
+      'customers': 'customers',
+      'suppliers': 'suppliers',
+      'employees': 'employees',
+      'expenses': 'expenses',
+      'payment_methods': 'payment_methods',
+      'discount_settings': 'discount_settings',
       
+      // Warehouses
+      'products': 'products',
+      'item_groups': 'item_groups',
+      'warehouses': 'warehouses',
+      'goods_receipts': 'goods_receipts',
+      'warehouse_transfers': 'warehouse_transfers',
+      'opening_stock_balances': 'opening_stock_balances',
+      'stock_adjustments': 'stock_adjustments',
+      'stock_card_report': 'stock_card_report',
+      'stock_balances_report': 'stock_balances_report',
+      'general_stock_movements_report': 'general_stock_movements_report',
+      
+      // Sales
+      'invoices': 'invoices',
+      'sales_orders': 'sales_orders',
+      'returns': 'returns',
+      'sales_import': 'sales_import',
+      'customer_discounts': 'customer_discounts',
+      'customer_settlements': 'customer_settlements',
+      'customer_statement': 'customer_statement',
+      'customer_balances': 'customer_balances',
+      'customer_aging_report': 'customer_aging_report',
+      'sales_report': 'sales_report',
+      
+      // Purchases
+      'purchase_invoices': 'purchase_invoices',
+      'purchase_orders': 'purchase_orders',
+      'purchase_returns': 'purchase_returns',
+      'purchases_import': 'purchases_import',
+      'supplier_discounts': 'supplier_discounts',
+      'supplier_settlements': 'supplier_settlements',
+      'supplier_statement': 'supplier_statement',
+      'supplier_balances': 'supplier_balances',
+      'supplier_aging_report': 'supplier_aging_report',
+      
+      // ETA
+      'eta_dashboard': 'eta_integration',
+      'eta_received_invoices': 'eta_received_invoices',
+      'eta_detailed_invoices': 'eta_detailed_invoices',
+      'eta_supplier_mapping': 'eta_mapping',
+      'eta_item_mapping': 'eta_mapping',
+      'eta_sent_item_mapping': 'eta_mapping',
+      'eta_tax_types': 'eta_tax_types',
+      
+      // Cash
+      'receipts': 'receipts',
+      'payment_vouchers': 'payment_vouchers',
+      'cash_transfers': 'cash_transfers',
+      'egyptian_banks': 'egyptian_banks',
+      'cash_balances': 'cash_balances',
+      'expenses_report': 'expenses_report',
+      
+      // Cheques
+      'issued_cheques': 'issued_cheques',
+      'received_cheques': 'received_cheques',
+      'create_issued_cheque': 'issued_cheques',
+      'create_other_cheque': 'issued_cheques',
+      'receive_customer_cheque': 'received_cheques',
+      'receive_other_cheque': 'received_cheques',
+      
+      // Operations
+      'operations': 'flexible_operations',
+      'departments': 'departments',
+      'cost_centers': 'cost_centers',
+      'operation_categories': 'operation_categories',
+      'operation_fields': 'operation_categories',
+      
+      // General Ledger
+      'account_types': 'chart_of_accounts',
+      'accounts': 'chart_of_accounts',
+      'currencies': 'multi_currency',
+      'chart_of_accounts': 'chart_of_accounts',
+      'create_journal_entry': 'journal_entries',
+      'journal_entries': 'journal_entries',
+      'detailed_journal_entries': 'detailed_journal_entries',
+      'default_accounts_settings': 'accounting',
+      'ifrs_guide': 'ifrs_guide',
+      'general_ledger_report': 'general_ledger_report',
+      'trial_balance': 'trial_balance',
+      'income_statement': 'income_statement',
+      'balance_sheet': 'balance_sheet',
+      
+      // Fixed Assets
+      'fixed_assets': 'fixed_assets',
+      'asset_categories': 'asset_categories',
+      'asset_depreciation': 'asset_depreciation',
+      'fixed_assets_reports': 'fixed_assets_reports',
+      
+      // Templates
+      'templates': 'templates',
+      'create_template': 'create_template',
+      
+      // POS
+      'pos_connected_branches': 'pos_branches',
+      'pos_branch_linking': 'pos_branches',
+      
+      // Admin
+      'company_settings': 'admin',
+      'currency_settings': 'admin',
+      'eta_settings': 'admin',
+      'users': 'user_management',
+      'period_closing': 'period_closing',
+      'integrity_dashboard': 'data_integrity',
+      'data_counts_values': 'data_integrity',
+      'backup_restore': 'backup_restore',
+      'activity_log': 'activity_logs',
+      'activity_log_cancellations': 'activity_logs',
+      'activity_log_modifications': 'activity_logs',
+      'activity_log_views': 'activity_logs',
+      'activity_log_prints': 'activity_logs'
+    };
+
+    return navItems.map(item => {
+      // 1. Check if top-level menu is disabled
+      const topFeatureKey = topLevelFeatureMap[item.id];
+      if (topFeatureKey && disabledFeatures.has(topFeatureKey)) {
+        return null;
+      }
+
+      // 2. Check top-level permission if not company admin
+      if (!isCompanyAdmin) {
+        const canView = hasPermission(item.id, 'view') || item.id === 'currencies' || item.id === 'templates_menu' || item.id === 'pos_menu' || item.id === 'eta_menu' || item.id === 'flexible_operations';
+        if (!canView && !item.subItems) return null;
+      }
+
+      // 3. Filter sub-items
       if (item.subItems) {
         const visibleSubItems = (item.subItems as any[]).filter((sub: any) => {
           if (sub.isDivider || sub.isHeader) return true;
-          if (sub.id === 'create_issued_cheque' || sub.id === 'create_other_cheque') return hasPermission('issued_cheques', 'create') || hasPermission('issued_cheques', 'view');
-          if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking' || sub.id === 'pos_connected_branches' || sub.id === 'eta_dashboard' || sub.id === 'eta_received_invoices' || sub.id === 'eta_detailed_invoices' || sub.id === 'eta_supplier_mapping' || sub.id === 'eta_item_mapping' || sub.id === 'eta_sent_item_mapping' || sub.id === 'eta_tax_types' || sub.id === 'operations' || sub.id === 'operation_categories' || sub.id === 'operation_fields') return true;
-          return hasPermission(sub.id, 'view');
+
+          // Check if sub-item is disabled in Feature Flags
+          const subKey = subItemFeatureMap[sub.id] || sub.id;
+          if (disabledFeatures.has(subKey) || disabledFeatures.has(sub.id)) {
+            return false;
+          }
+
+          // Role-based permissions for non-admin users
+          if (!isCompanyAdmin) {
+            if (sub.id === 'create_issued_cheque' || sub.id === 'create_other_cheque') return hasPermission('issued_cheques', 'create') || hasPermission('issued_cheques', 'view');
+            if (sub.id === 'currencies' || sub.id === 'templates' || sub.id === 'create_template' || sub.id === 'contact_messages' || sub.id === 'pos_branch_linking' || sub.id === 'pos_connected_branches' || sub.id === 'eta_dashboard' || sub.id === 'eta_received_invoices' || sub.id === 'eta_detailed_invoices' || sub.id === 'eta_supplier_mapping' || sub.id === 'eta_item_mapping' || sub.id === 'eta_sent_item_mapping' || sub.id === 'eta_tax_types' || sub.id === 'operations' || sub.id === 'operation_categories' || sub.id === 'operation_fields') return true;
+            return hasPermission(sub.id, 'view');
+          }
+
+          return true;
         });
-        
+
         // Clean up empty headers and trailing dividers
         const cleanedSubItems = visibleSubItems.filter((sub: any, idx: number) => {
           if (sub.isHeader) {
@@ -894,10 +1039,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         }
         return null;
       }
-      
-      return canView ? item : null;
+
+      return item;
     }).filter(Boolean) as typeof navItems;
-  }, [user, isSuperAdmin, isCompanyAdmin, hasPermission, company, t, language, featuresLoaded, activeFeatures, etaVisible]);
+  }, [user, isSuperAdmin, isCompanyAdmin, hasPermission, company, t, language, featuresLoaded, activeFeatures, disabledFeatures, etaVisible]);
 
 
   // Update nav item click to use openTab
