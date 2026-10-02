@@ -860,8 +860,8 @@ export const Accounts: React.FC = () => {
                <div className="w-2 h-2 rounded-full bg-slate-200 group-hover:bg-emerald-500 transition-all duration-500 group-hover:scale-125" />
             </div>
           </div>
-        ))
-      }
+        );
+      })}
     </div>
   )}
 
