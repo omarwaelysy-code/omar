@@ -390,10 +390,32 @@ export const Accounts: React.FC = () => {
 
   const handleDelete = (id: string) => {
     const account = accounts.find(a => a.id === id);
-    if (account && isDefaultAccount(account)) {
+    if (!account) return;
+
+    if (isDefaultAccount(account)) {
       showNotification('لا يمكن حذف هذا الحساب لأنه حساب افتراضي معتمد ومحمي من الحذف.', 'error');
       return;
     }
+
+    // 1. Check if account has sub-accounts / children
+    const hasChildren = accounts.some(a => a.parent_id === account.id);
+    if (hasChildren) {
+      showNotification(language === 'ar' ? `لا يمكن حذف الحساب "${account.name}" لأنه حساب رئيسي تتبعه حسابات فرعية.` : `Cannot delete account "${account.name}" because it has child accounts.`, 'error');
+      return;
+    }
+
+    // 2. Check if account has recorded movements/transactions in journal entries
+    const hasTransactions = entries.some(entry => {
+      const itemsList = (entry.items && Array.isArray(entry.items)) ? entry.items : ((entry as any).lines || []);
+      return itemsList.some((item: any) => item.account_id === id);
+    });
+    const bal = accountBalances[id];
+    const hasMovements = hasTransactions || (bal && (bal.debit !== 0 || bal.credit !== 0));
+    if (hasMovements) {
+      showNotification(language === 'ar' ? `لا يمكن حذف الحساب "${account.name}" لوجود حركات وقيود مسجلة عليه حالياً.` : `Cannot delete account "${account.name}" because it has recorded transactions.`, 'error');
+      return;
+    }
+
     setAccountToDelete(id);
     setIsDeleteModalOpen(true);
   };
@@ -402,6 +424,30 @@ export const Accounts: React.FC = () => {
     if (!accountToDelete || !user) return;
     try {
       const account = accounts.find(a => a.id === accountToDelete);
+      if (!account) return;
+
+      // Double-check constraints
+      const hasChildren = accounts.some(a => a.parent_id === account.id);
+      if (hasChildren) {
+        showNotification(language === 'ar' ? `لا يمكن حذف الحساب "${account.name}" لأنه حساب رئيسي تتبعه حسابات فرعية.` : `Cannot delete account "${account.name}" because it has child accounts.`, 'error');
+        setIsDeleteModalOpen(false);
+        setAccountToDelete(null);
+        return;
+      }
+
+      const hasTransactions = entries.some(entry => {
+        const itemsList = (entry.items && Array.isArray(entry.items)) ? entry.items : ((entry as any).lines || []);
+        return itemsList.some((item: any) => item.account_id === account.id);
+      });
+      const bal = accountBalances[account.id];
+      const hasMovements = hasTransactions || (bal && (bal.debit !== 0 || bal.credit !== 0));
+      if (hasMovements) {
+        showNotification(language === 'ar' ? `لا يمكن حذف الحساب "${account.name}" لوجود حركات وقيود مسجلة عليه حالياً.` : `Cannot delete account "${account.name}" because it has recorded transactions.`, 'error');
+        setIsDeleteModalOpen(false);
+        setAccountToDelete(null);
+        return;
+      }
+
       await dbService.delete('accounts', accountToDelete);
       await dbService.logActivity(user.id, user.username, user.company_id, 'حذف حساب', `حذف الحساب: ${account?.name}`, 'accounts', accountToDelete);
       setIsDeleteModalOpen(false);
@@ -587,20 +633,21 @@ export const Accounts: React.FC = () => {
             <table ref={tableRef} className="w-full text-right border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold whitespace-nowrap">
-                  <th className="py-2.5 px-2 w-8 text-center text-slate-400">#</th>
-                  <th className="py-2.5 px-2.5 w-24">كود الحساب</th>
-                  <th className="py-2.5 px-3 min-w-[150px]">اسم الحساب</th>
-                  <th className="py-2.5 px-2.5 min-w-[120px]">نوع الحساب</th>
-                  <th className="py-2.5 px-2.5 w-28 text-center">تابع لـ (القائمة)</th>
-                  <th className="py-2.5 px-2.5 w-24 text-center">التصنيف</th>
-                  <th className="py-2.5 px-2.5 min-w-[110px]">استخدام الحساب</th>
-                  <th className="py-2.5 px-2.5 min-w-[120px]">الحساب الأب</th>
-                  <th className="py-2.5 px-2.5 w-28 text-center">الرصيد الافتتاحي</th>
-                  <th className="py-2.5 px-2.5 w-24 text-center">تاريخ الرصيد</th>
-                  <th className="py-2.5 px-2.5 w-28 text-center">الرصيد الحالي</th>
-                  <th className="py-2.5 px-2 w-16 text-center">فرعي</th>
-                  <th className="py-2.5 px-2 w-16 text-center">الحالة</th>
-                  <th className="py-2.5 px-2 w-20 text-center no-pdf">الإجراءات</th>
+                  <th className="py-1.5 px-1.5 w-7 text-center text-slate-400">#</th>
+                  <th className="py-1.5 px-1.5 w-20">كود الحساب</th>
+                  <th className="py-1.5 px-2 min-w-[130px]">اسم الحساب</th>
+                  <th className="py-1.5 px-1.5 w-16 text-center text-slate-800">كود النوع</th>
+                  <th className="py-1.5 px-1.5 min-w-[100px]">نوع الحساب</th>
+                  <th className="py-1.5 px-1.5 w-24 text-center">تابع لـ (القائمة)</th>
+                  <th className="py-1.5 px-1.5 w-20 text-center">التصنيف</th>
+                  <th className="py-1.5 px-1.5 min-w-[95px]">استخدام الحساب</th>
+                  <th className="py-1.5 px-1.5 min-w-[100px]">الحساب الأب</th>
+                  <th className="py-1.5 px-1.5 w-24 text-center">الرصيد الافتتاحي</th>
+                  <th className="py-1.5 px-1.5 w-20 text-center">تاريخ الرصيد</th>
+                  <th className="py-1.5 px-1.5 w-24 text-center">الرصيد الحالي</th>
+                  <th className="py-1.5 px-1 w-12 text-center">فرعي</th>
+                  <th className="py-1.5 px-1 w-12 text-center">الحالة</th>
+                  <th className="py-1.5 px-1 w-16 text-center no-pdf">الإجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
@@ -618,43 +665,42 @@ export const Accounts: React.FC = () => {
                       className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
                     >
                       {/* 1. Index */}
-                      <td className="py-1.5 px-2 text-center font-mono text-[11px] text-slate-400">
+                      <td className="py-0.5 px-1.5 text-center font-mono text-[10px] text-slate-400">
                         {index + 1}
                       </td>
 
                       {/* 2. Code */}
-                      <td className="py-1.5 px-2.5 font-mono font-bold text-emerald-600 text-xs whitespace-nowrap">
+                      <td className="py-0.5 px-1.5 font-mono font-bold text-emerald-600 text-xs whitespace-nowrap">
                         {account.code}
                       </td>
 
                       {/* 3. Name */}
-                      <td className="py-1.5 px-3 font-bold text-slate-900 whitespace-nowrap">
+                      <td className="py-0.5 px-2 font-bold text-slate-900 text-xs whitespace-nowrap">
                         {account.name}
                       </td>
 
-                      {/* 4. Type */}
+                      {/* NEW: Type Code */}
+                      <td className="py-0.5 px-1.5 text-center font-mono font-bold text-slate-700 text-xs whitespace-nowrap">
+                        {type?.code || '-'}
+                      </td>
+
+                      {/* 4. Type Name */}
                       <td 
                         onClick={(e) => {
                           e.stopPropagation();
                           setPendingAccountTypeEditId(account.type_id);
                           setCurrentPage('account_types');
                         }}
-                        className="py-1.5 px-2.5 text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer font-bold whitespace-nowrap"
+                        className="py-0.5 px-1.5 text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer font-bold whitespace-nowrap text-xs"
                         title="انتقل إلى أنواع الحسابات"
                       >
-                        {type ? (
-                          <span>
-                            {type.name} <span className="font-mono text-[10px] text-slate-400">({type.code})</span>
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">{account.type_name || '-'}</span>
-                        )}
+                        {type ? type.name : (account.type_name || '-')}
                       </td>
 
                       {/* 5. Statement Type */}
-                      <td className="py-1.5 px-2.5 text-center whitespace-nowrap">
+                      <td className="py-0.5 px-1.5 text-center whitespace-nowrap">
                         {type?.statement_type ? (
-                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          <span className={`inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold ${
                             type.statement_type === 'balance_sheet'
                               ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
                               : 'bg-purple-50 text-purple-700 border border-purple-200/60'
@@ -667,9 +713,9 @@ export const Accounts: React.FC = () => {
                       </td>
 
                       {/* 6. Classification */}
-                      <td className="py-1.5 px-2.5 text-center whitespace-nowrap">
+                      <td className="py-0.5 px-1.5 text-center whitespace-nowrap">
                         {type?.classification ? (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200/60">
+                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-slate-100 text-slate-700 border border-slate-200/60">
                             {getClassificationLabel(type.classification)}
                           </span>
                         ) : (
@@ -678,9 +724,9 @@ export const Accounts: React.FC = () => {
                       </td>
 
                       {/* 7. Usage */}
-                      <td className="py-1.5 px-2.5 whitespace-nowrap">
+                      <td className="py-0.5 px-1.5 whitespace-nowrap">
                         {account.account_usage ? (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
                             {getAccountUsageLabel(account.account_usage, language)}
                           </span>
                         ) : (
@@ -689,10 +735,10 @@ export const Accounts: React.FC = () => {
                       </td>
 
                       {/* 8. Parent */}
-                      <td className="py-1.5 px-2.5 text-slate-600 whitespace-nowrap">
+                      <td className="py-0.5 px-1.5 text-slate-600 whitespace-nowrap text-[11px]">
                         {parent ? (
                           <span title={`${parent.code} - ${parent.name}`}>
-                            <span className="font-mono text-[10px] text-slate-400 font-bold">{parent.code}</span> {parent.name}
+                            <span className="font-mono text-[9.5px] text-slate-400 font-bold">{parent.code}</span> {parent.name}
                           </span>
                         ) : (
                           <span className="text-slate-300">-</span>
@@ -700,41 +746,41 @@ export const Accounts: React.FC = () => {
                       </td>
 
                       {/* 9. Opening Balance */}
-                      <td className="py-1.5 px-2.5 text-center font-mono whitespace-nowrap">
+                      <td className="py-0.5 px-1.5 text-center font-mono whitespace-nowrap text-[11px]">
                         <span className={`font-bold ${opening !== 0 ? (isOpeningDebit ? 'text-blue-700' : 'text-amber-700') : 'text-slate-400'}`}>
                           {formatMoney(Math.abs(opening))}
                         </span>
                         {opening !== 0 && (
-                          <span className="text-[9px] text-slate-400 mr-1">
+                          <span className="text-[8.5px] text-slate-400 mr-1">
                             ({isOpeningDebit ? 'مدين' : 'دائن'})
                           </span>
                         )}
                       </td>
 
                       {/* 10. Opening Date */}
-                      <td className="py-1.5 px-2.5 text-center font-mono text-[10px] text-slate-500 whitespace-nowrap">
+                      <td className="py-0.5 px-1.5 text-center font-mono text-[9.5px] text-slate-500 whitespace-nowrap">
                         {account.opening_balance_date || '-'}
                       </td>
 
                       {/* 11. Current Balance */}
-                      <td className="py-1.5 px-2.5 text-center font-mono font-black whitespace-nowrap">
+                      <td className="py-0.5 px-1.5 text-center font-mono font-black whitespace-nowrap text-[11px]">
                         <span className={bal > 0 ? 'text-emerald-700' : (bal < 0 ? 'text-rose-700' : 'text-slate-500')}>
                           {formatMoney(bal)}
                         </span>
                       </td>
 
                       {/* 12. Required Sub Account */}
-                      <td className="py-1.5 px-2 text-center whitespace-nowrap">
+                      <td className="py-0.5 px-1 text-center whitespace-nowrap">
                         {account.required_sub_account ? (
-                          <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200/60">نعم</span>
+                          <span className="inline-flex px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-amber-50 text-amber-700 border border-amber-200/60">نعم</span>
                         ) : (
                           <span className="text-slate-300">-</span>
                         )}
                       </td>
 
                       {/* 13. Status */}
-                      <td className="py-1.5 px-2 text-center whitespace-nowrap">
-                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                      <td className="py-0.5 px-1 text-center whitespace-nowrap">
+                        <span className={`inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold border ${
                           account.is_active !== false 
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60' 
                             : 'bg-slate-100 text-slate-500 border-slate-200'
@@ -744,7 +790,7 @@ export const Accounts: React.FC = () => {
                       </td>
 
                       {/* 14. Actions */}
-                      <td className="py-1.5 px-2 text-center no-pdf whitespace-nowrap">
+                      <td className="py-0.5 px-1 text-center no-pdf whitespace-nowrap">
                         <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
                           <button 
                             onClick={(e) => {

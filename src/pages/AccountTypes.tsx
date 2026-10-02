@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
-import { AccountType } from '../types';
+import { AccountType, Account } from '../types';
 import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, PieChart, LayoutGrid, List, Save, ChevronRight, ChevronLeft } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
@@ -17,6 +17,7 @@ export const AccountTypes: React.FC = () => {
   const { pendingAccountTypeEditId, setPendingAccountTypeEditId } = useNavigation();
   const [view, setView] = useViewPreference('account_types', 'card');
   const [types, setTypes] = useState<AccountType[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -59,8 +60,12 @@ export const AccountTypes: React.FC = () => {
   useEffect(() => {
     if (user) {
       const unsub = dbService.subscribe<AccountType>('account_types', user.company_id, setTypes);
+      const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
       setLoading(false);
-      return () => unsub();
+      return () => {
+        unsub();
+        unsubAccounts();
+      };
     }
   }, [user]);
 
@@ -154,6 +159,17 @@ export const AccountTypes: React.FC = () => {
   };
 
   const handleDelete = (id: string) => {
+    const type = types.find(t => t.id === id);
+    const linkedCount = accounts.filter(a => a.type_id === id || (type && a.type_name === type.name)).length;
+    if (linkedCount > 0) {
+      showNotification(
+        language === 'ar'
+          ? `لا يمكن حذف نوع الحساب "${type?.name}" لوجود (${linkedCount}) حسابات مرتبطة به في دليل الحسابات.`
+          : `Cannot delete account type "${type?.name}" because ${linkedCount} accounts are linked to it.`,
+        'error'
+      );
+      return;
+    }
     setTypeToDelete(id);
     setIsDeleteModalOpen(true);
   };
@@ -162,6 +178,19 @@ export const AccountTypes: React.FC = () => {
     if (!typeToDelete || !user) return;
     try {
       const type = types.find(t => t.id === typeToDelete);
+      const linkedCount = accounts.filter(a => a.type_id === typeToDelete || (type && a.type_name === type.name)).length;
+      if (linkedCount > 0) {
+        showNotification(
+          language === 'ar'
+            ? `لا يمكن حذف نوع الحساب "${type?.name}" لوجود (${linkedCount}) حسابات مرتبطة به في دليل الحسابات.`
+            : `Cannot delete account type "${type?.name}" because ${linkedCount} accounts are linked to it.`,
+          'error'
+        );
+        setIsDeleteModalOpen(false);
+        setTypeToDelete(null);
+        return;
+      }
+
       await dbService.delete('account_types', typeToDelete);
       await dbService.logActivity(user.id, user.username, user.company_id, 'حذف نوع حساب', `حذف نوع الحساب: ${type?.name}`, 'account_types', typeToDelete);
       setIsDeleteModalOpen(false);
