@@ -1511,9 +1511,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           </div>
 
           {/* Universal Fixed Bottom Scrollbar for all screens */}
-          <div className="mb-20 md:mb-0 shrink-0">
-            <FixedBottomScrollBar />
-          </div>
+          <FixedBottomScrollBar />
 
           {/* Mobile Bottom Navigation - Floating Pill */}
           <div className="md:hidden fixed bottom-6 left-0 right-0 px-6 z-40">

@@ -91,123 +91,36 @@
   }
 }
 
-/* Universal System Scrollbar - High Visibility Classic ERP Style */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 16px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
-
-::-webkit-scrollbar-track:horizontal {
-  background: #f1f5f9;
-  border-top: 1px solid #cbd5e1;
-  border-bottom: 1px solid #cbd5e1;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #94a3b8;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:horizontal {
-  background: #64748b;
-  border-radius: 4px;
-  border: 2px solid #f1f5f9;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
-}
-
-::-webkit-scrollbar-thumb:horizontal:hover {
-  background: #475569;
-}
-
-::-webkit-scrollbar-thumb:active {
-  background: #334155;
-}
-
-/* Horizontal scrollbar buttons (left / right arrows) */
-::-webkit-scrollbar-button:horizontal:single-button:decrement {
-  display: block;
-  width: 18px;
-  height: 16px;
-  background-color: #e2e8f0;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 8px 8px;
-  border: 1px solid #cbd5e1;
-  cursor: pointer;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23334155'%3E%3Cpath d='M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z'/%3E%3C/svg%3E");
-}
-
-::-webkit-scrollbar-button:horizontal:single-button:decrement:hover {
-  background-color: #cbd5e1;
-}
-
-::-webkit-scrollbar-button:horizontal:single-button:increment {
-  display: block;
-  width: 18px;
-  height: 16px;
-  background-color: #e2e8f0;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 8px 8px;
-  border: 1px solid #cbd5e1;
-  cursor: pointer;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23334155'%3E%3Cpath d='M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z'/%3E%3C/svg%3E");
-}
-
-::-webkit-scrollbar-button:horizontal:single-button:increment:hover {
-  background-color: #cbd5e1;
-}
-
-/* Specific styling for the dedicated Fixed Bottom Scrollbar */
-.fixed-bottom-scroll-bar::-webkit-scrollbar {
-  height: 16px;
-}
-
-.fixed-bottom-scroll-bar::-webkit-scrollbar-button {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-}
-
-.fixed-bottom-scroll-bar::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border: none;
-}
-
-.fixed-bottom-scroll-bar::-webkit-scrollbar-thumb {
-  background: #64748b;
-  border-radius: 4px;
-  border: 2px solid #f1f5f9;
-}
-
-.fixed-bottom-scroll-bar::-webkit-scrollbar-thumb:hover {
-  background: #475569;
-}
-
-/* Custom scrollbar override */
+/* Custom Scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
-  height: 16px;
+  height: 6px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: transparent;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #64748b;
-  border-radius: 4px;
+  @apply bg-slate-300 rounded-full hover:bg-slate-400 transition-colors;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+/* Fixed Bottom Scrollbar Styling */
+.fixed-bottom-scroll-bar::-webkit-scrollbar {
+  height: 6px;
+}
+
+.fixed-bottom-scroll-bar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.fixed-bottom-scroll-bar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+.fixed-bottom-scroll-bar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 
