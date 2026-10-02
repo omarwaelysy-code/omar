@@ -3,7 +3,7 @@ import {
   Search, SlidersHorizontal, Calendar, RotateCcw, Eye, ExternalLink, 
   RefreshCw, ChevronDown, CheckSquare, Square, X, Layers, FileText, 
   DollarSign, ArrowDownLeft, ArrowUpRight, Check, Users, Building2,
-  Filter, CheckCircle2, Clock, AlertCircle
+  Filter, CheckCircle2, Clock, AlertCircle, Equal, Hash
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,7 +11,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { dbService } from '../services/dbService';
 import { formatMoney, formatDate } from '../utils/formatUtils';
 import { ExportButtons } from '../components/ExportButtons';
-import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
+import { exportToExcel } from '../utils/excelUtils';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
 
 export interface UnifiedMovement {
@@ -44,12 +44,8 @@ export interface UnifiedMovement {
 export const TransactionsSearch: React.FC = () => {
   const { t, dir, language } = useLanguage();
   const { user } = useAuth();
-  const { openTab, closeTab, setCurrentPage } = useNavigation();
+  const { openTab, closeTab, setCurrentPage, setPendingViewDoc } = useNavigation();
   const isAr = language === 'ar';
-
-  const navigateToPage = (page: string) => {
-    openTab(page);
-  };
 
   const tableRef = useRef<HTMLDivElement>(null);
 
@@ -79,6 +75,7 @@ export const TransactionsSearch: React.FC = () => {
   // Filters State
   const [filterSearchType, setFilterSearchType] = useState<string>('number');
   const [filterDocNumbers, setFilterDocNumbers] = useState<string>('');
+  const [searchExactMatch, setSearchExactMatch] = useState<boolean>(false); // يساوى exact match
   const [filterFromDate, setFilterFromDate] = useState<string>('');
   const [filterToDate, setFilterToDate] = useState<string>('');
   const [filterTypes, setFilterTypes] = useState<string[]>([]);
@@ -94,11 +91,11 @@ export const TransactionsSearch: React.FC = () => {
 
   const [filterMinAmount, setFilterMinAmount] = useState<string>('');
   const [filterMaxAmount, setFilterMaxAmount] = useState<string>('');
+  const [filterExactAmount, setFilterExactAmount] = useState<string>(''); // المبلغ يساوى
   const [filterPaymentStatus, setFilterPaymentStatus] = useState<string>('all');
   const [filterPaymentType, setFilterPaymentType] = useState<string>('all');
   const [filterJeStatus, setFilterJeStatus] = useState<string>('all');
 
-  const [showAdvancedSection, setShowAdvancedSection] = useState(true);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
 
   // Load data
@@ -530,7 +527,6 @@ export const TransactionsSearch: React.FC = () => {
       });
     });
 
-    // Sort by date descending by default
     return list.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
   }, [
     invoices, returns, salesOrders, purchaseInvoices, purchaseReturns, purchaseOrders,
@@ -562,7 +558,20 @@ export const TransactionsSearch: React.FC = () => {
         else if (filterSearchType === 'open_amount') matchFieldVal = m.remaining_amount.toString();
         else if (filterSearchType === 'notes') matchFieldVal = (m.notes || '').toLowerCase();
 
-        const matchesBulk = parsedBulkSearchTokens.some(token => matchFieldVal.includes(token));
+        const matchesBulk = parsedBulkSearchTokens.some(token => {
+          if (searchExactMatch) {
+            // Exact match (يساوى)
+            if (filterSearchType === 'original_amount' || filterSearchType === 'open_amount' || filterSearchType === 'foreign_amount') {
+              const numToken = Number(token);
+              const numVal = Number(matchFieldVal);
+              return !isNaN(numToken) && !isNaN(numVal) && Math.abs(numToken - numVal) < 0.01;
+            }
+            return matchFieldVal.trim() === token.trim();
+          } else {
+            // Partial match (يحتوى على)
+            return matchFieldVal.includes(token);
+          }
+        });
         if (!matchesBulk) return false;
       }
 
@@ -590,9 +599,14 @@ export const TransactionsSearch: React.FC = () => {
         }
       }
 
-      // 7. Amount Range
-      if (filterMinAmount && m.amount < Number(filterMinAmount)) return false;
-      if (filterMaxAmount && m.amount > Number(filterMaxAmount)) return false;
+      // 7. Amount Range / Exact Amount
+      if (filterExactAmount) {
+        const exactNum = Number(filterExactAmount);
+        if (!isNaN(exactNum) && Math.abs(m.amount - exactNum) >= 0.01) return false;
+      } else {
+        if (filterMinAmount && m.amount < Number(filterMinAmount)) return false;
+        if (filterMaxAmount && m.amount > Number(filterMaxAmount)) return false;
+      }
 
       // 8. Payment Status
       if (filterPaymentStatus !== 'all') {
@@ -611,9 +625,9 @@ export const TransactionsSearch: React.FC = () => {
       return true;
     });
   }, [
-    allMovements, parsedBulkSearchTokens, filterSearchType, filterFromDate, filterToDate,
+    allMovements, parsedBulkSearchTokens, filterSearchType, searchExactMatch, filterFromDate, filterToDate,
     filterTypes, filterCurrencies, selectedCustomerIds, selectedSupplierIds,
-    filterMinAmount, filterMaxAmount, filterPaymentStatus, filterPaymentType, filterJeStatus
+    filterMinAmount, filterMaxAmount, filterExactAmount, filterPaymentStatus, filterPaymentType, filterJeStatus
   ]);
 
   // Statistics calculation
@@ -635,10 +649,11 @@ export const TransactionsSearch: React.FC = () => {
     };
   }, [filteredMovements]);
 
-  // Reset all filters (Red button as in Image 2)
+  // Reset all filters
   const handleResetFilters = () => {
     setFilterSearchType('number');
     setFilterDocNumbers('');
+    setSearchExactMatch(false);
     setFilterFromDate('');
     setFilterToDate('');
     setFilterTypes([]);
@@ -647,19 +662,22 @@ export const TransactionsSearch: React.FC = () => {
     setSelectedSupplierIds([]);
     setFilterMinAmount('');
     setFilterMaxAmount('');
+    setFilterExactAmount('');
     setFilterPaymentStatus('all');
     setFilterPaymentType('all');
     setFilterJeStatus('all');
     setSelectedRowIds([]);
   };
 
-  const handleToggleDocType = (typeKey: string) => {
-    setFilterTypes(prev => 
-      prev.includes(typeKey) ? prev.filter(k => k !== typeKey) : [...prev, typeKey]
-    );
+  // Toggle helpers (robust, zero double-click issues)
+  const toggleDocType = (typeKey: string) => {
+    setFilterTypes(prev => {
+      if (prev.includes(typeKey)) return prev.filter(k => k !== typeKey);
+      return [...prev, typeKey];
+    });
   };
 
-  const handleToggleAllDocTypes = () => {
+  const toggleAllDocTypes = () => {
     if (filterTypes.length === movementTypeOptions.length) {
       setFilterTypes([]);
     } else {
@@ -667,10 +685,50 @@ export const TransactionsSearch: React.FC = () => {
     }
   };
 
-  const handleToggleCurrency = (curr: string) => {
-    setFilterCurrencies(prev => 
-      prev.includes(curr) ? prev.filter(c => c !== curr) : [...prev, curr]
-    );
+  const toggleCurrency = (curr: string) => {
+    setFilterCurrencies(prev => {
+      if (prev.includes(curr)) return prev.filter(c => c !== curr);
+      return [...prev, curr];
+    });
+  };
+
+  const toggleCustomer = (id: string) => {
+    setSelectedCustomerIds(prev => {
+      if (prev.includes(id)) return prev.filter(c => c !== id);
+      return [...prev, id];
+    });
+  };
+
+  const toggleSupplier = (id: string) => {
+    setSelectedSupplierIds(prev => {
+      if (prev.includes(id)) return prev.filter(s => s !== id);
+      return [...prev, id];
+    });
+  };
+
+  // Click on Document Number to open document directly!
+  const handleOpenDocument = (m: UnifiedMovement) => {
+    if (m.doc_type === 'invoices') {
+      setPendingViewDoc({ type: 'invoice', idOrNumber: m.doc_number || m.doc_id });
+      openTab('invoices');
+    } else if (m.doc_type === 'purchase_invoices') {
+      setPendingViewDoc({ type: 'purchase_invoice', idOrNumber: m.doc_number || m.doc_id });
+      openTab('purchase_invoices');
+    } else if (m.doc_type === 'returns') {
+      setPendingViewDoc({ type: 'return', idOrNumber: m.doc_number || m.doc_id });
+      openTab('returns');
+    } else if (m.doc_type === 'journal_entries') {
+      setPendingViewDoc({ type: 'journal', idOrNumber: m.entry_number || m.doc_number });
+      openTab('journal_entries');
+    } else {
+      openTab(m.nav_page);
+    }
+  };
+
+  // Click on Journal Entry Number to open JE directly!
+  const handleOpenJournalEntry = (entryNumber: string) => {
+    setPendingViewDoc({ type: 'journal', idOrNumber: entryNumber });
+    openTab('journal_entries');
   };
 
   // Export handlers
@@ -698,7 +756,7 @@ export const TransactionsSearch: React.FC = () => {
     exportToExcel(data, { filename: 'Movements_Search_Report', sheetName: 'الحركات' });
   };
 
-  const handleExportPDF = (onlySelected: boolean = false) => {
+  const handleExportPDF = () => {
     if (!tableRef.current) return;
     exportToPDFUtil(tableRef.current, {
       filename: 'Movements_Search_Report',
@@ -712,25 +770,20 @@ export const TransactionsSearch: React.FC = () => {
   };
 
   return (
-    <div className="space-y-2.5 animate-in fade-in duration-300 font-sans" dir={dir}>
-      {/* 1. Header Bar: Title, Quick Actions & Page Control */}
-      <div className="flex flex-wrap items-center justify-between gap-2 bg-white px-4 py-2 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold">
-            <Search size={18} />
+    <div className="space-y-2 animate-in fade-in duration-300 font-sans" dir={dir}>
+      {/* 1. Header Bar: Compact, Title & Actions */}
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-white px-3.5 py-1.5 rounded-xl border border-slate-200/80 shadow-2xs">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold">
+            <Search size={15} />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold tracking-tight text-slate-900">
-                {isAr ? 'محرك بحث الحركات' : 'Movements Search Engine'}
-              </h2>
-              <span className="text-[11px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md border border-emerald-100">
-                {isAr ? 'الخطوة الأولى للحركات' : 'Phase 1: Movements'}
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500">
-              {isAr ? 'البحث والتقصي الشامل في كافة الحركات المالية والمستندات والطلبيات' : 'Comprehensive inquiry across all financial & operational movements'}
-            </p>
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-base font-bold tracking-tight text-slate-900">
+              {isAr ? 'محرك بحث الحركات' : 'Movements Search Engine'}
+            </h2>
+            <span className="text-[11px] text-slate-400 hidden sm:inline">
+              {isAr ? 'البحث والتقصي الشامل في كافة الحركات المالية والمستندات' : 'Comprehensive movement inquiry'}
+            </span>
           </div>
         </div>
 
@@ -739,19 +792,19 @@ export const TransactionsSearch: React.FC = () => {
             type="button"
             onClick={() => setRefreshIndex(i => i + 1)}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-slate-600 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-xs"
+            className="flex items-center gap-1 px-2.5 py-1 bg-white text-slate-600 border border-slate-200 rounded-lg text-xs font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-2xs"
             title={isAr ? 'تحديث البيانات' : 'Refresh Data'}
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin text-emerald-600' : ''} />
+            <RefreshCw size={13} className={loading ? 'animate-spin text-emerald-600' : ''} />
             <span className="hidden sm:inline">{isAr ? 'تحديث' : 'Refresh'}</span>
           </button>
 
           <ExportButtons 
             onExportExcel={() => handleExportExcel(false)}
-            onExportPDF={() => handleExportPDF(false)}
+            onExportPDF={handleExportPDF}
             onPrint={handlePrint}
             onExportExcelSelected={() => handleExportExcel(true)}
-            onExportPDFSelected={() => handleExportPDF(true)}
+            onExportPDFSelected={handleExportPDF}
             selectedCount={selectedRowIds.length}
             size="sm"
           />
@@ -762,63 +815,78 @@ export const TransactionsSearch: React.FC = () => {
               closeTab('transactions_search');
               setCurrentPage('dashboard');
             }}
-            className="w-7 h-7 flex items-center justify-center bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-slate-200 transition-all shadow-xs active:scale-95 shrink-0"
+            className="w-7 h-7 flex items-center justify-center bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-slate-200 transition-all shadow-2xs active:scale-95 shrink-0"
             title={isAr ? 'إغلاق الشاشة' : 'Close Page'}
           >
-            <X size={15} className="stroke-[2.5]" />
+            <X size={14} className="stroke-[2.5]" />
           </button>
         </div>
       </div>
 
-      {/* 2. Advanced Search Filter Panel (مطابق تماماً للصورة 2) */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-4 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" dir={dir}>
-          {/* Column 1 (Far Right in RTL): البحث المتعدد (Multi Search) */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between px-1">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+      {/* 2. Compact Search Filter Panel (مُعاد ترتيبه لتوفير أقصى مساحة رأسية) */}
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-3 space-y-2.5">
+        {/* Row 1: The 4 Core Filters Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5" dir={dir}>
+          {/* Box 1: البحث المتعدد (Multi-Search) */}
+          <div className="bg-slate-50/70 p-2 rounded-xl border border-slate-200/70 flex flex-col justify-between space-y-1">
+            <div className="flex items-center justify-between gap-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0">
                 {isAr ? 'البحث المتعدد' : 'Multi Search'}
               </label>
-              <select
-                className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/70 rounded-lg outline-none py-0.5 px-2 cursor-pointer transition-all"
-                value={filterSearchType}
-                onChange={(e) => setFilterSearchType(e.target.value)}
-              >
-                <option value="number">{isAr ? 'رقم المستند' : 'Doc Number'}</option>
-                <option value="foreign_amount">{isAr ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</option>
-                <option value="currency">{isAr ? 'رمز العملة (USD / EUR ..)' : 'Currency Code'}</option>
-                <option value="je_number">{isAr ? 'رقم القيد' : 'JE Number'}</option>
-                <option value="date">{isAr ? 'التاريخ (YYYY-MM-DD)' : 'Date'}</option>
-                <option value="original_amount">{isAr ? 'المبلغ الأصلي' : 'Original Amount'}</option>
-                <option value="open_amount">{isAr ? 'المبلغ المتبقي' : 'Remaining Amount'}</option>
-                <option value="notes">{isAr ? 'ملاحظات / وصف' : 'Notes / Description'}</option>
-              </select>
+              <div className="flex items-center gap-1">
+                {/* Search Type Selector */}
+                <select
+                  className="text-[10px] font-bold text-emerald-700 bg-white border border-slate-200 rounded-md py-0.5 px-1 outline-none cursor-pointer"
+                  value={filterSearchType}
+                  onChange={(e) => setFilterSearchType(e.target.value)}
+                >
+                  <option value="number">{isAr ? 'رقم المستند' : 'Doc No'}</option>
+                  <option value="original_amount">{isAr ? 'المبلغ الأصلي' : 'Amount'}</option>
+                  <option value="open_amount">{isAr ? 'المبلغ المتبقي' : 'Remaining'}</option>
+                  <option value="foreign_amount">{isAr ? 'مبلغ بالعملة' : 'Foreign Amt'}</option>
+                  <option value="currency">{isAr ? 'رمز العملة' : 'Currency'}</option>
+                  <option value="je_number">{isAr ? 'رقم القيد' : 'JE No'}</option>
+                  <option value="date">{isAr ? 'التاريخ' : 'Date'}</option>
+                  <option value="notes">{isAr ? 'البيان/الوصف' : 'Notes'}</option>
+                </select>
+
+                {/* Exact Match Toggle (يساوى) */}
+                <button
+                  type="button"
+                  onClick={() => setSearchExactMatch(!searchExactMatch)}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-all ${
+                    searchExactMatch 
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs' 
+                      : 'bg-white text-slate-500 border-slate-200 hover:text-slate-800'
+                  }`}
+                  title={isAr ? 'المطابقة التامة (= يساوى)' : 'Exact Match (=)'}
+                >
+                  {isAr ? '= يساوى' : '= Exact'}
+                </button>
+              </div>
             </div>
+
             <textarea
-              rows={4}
-              className="w-full p-2.5 bg-slate-50/70 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none text-xs font-mono transition-all resize-none shadow-2xs"
+              rows={2}
+              className="w-full p-1.5 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-emerald-500 outline-none text-[11px] font-mono resize-none shadow-2xs"
               placeholder={
                 filterSearchType === 'number' ? "INV-2026-06-000005\nINV-2026-06-000003" :
-                filterSearchType === 'foreign_amount' ? "34400.00\n812.92" :
-                filterSearchType === 'currency' ? "USD\nEUR\nSAR" :
-                filterSearchType === 'je_number' ? "JV-2026-0001\nJV-2026-0002" :
-                filterSearchType === 'date' ? "2026-06-01\n2026-06-05" :
                 filterSearchType === 'original_amount' ? "1500\n3400.50" :
-                filterSearchType === 'open_amount' ? "500\n1000" : (isAr ? 'وصف أو بيان الحركة...' : 'Notes or description...')
+                filterSearchType === 'open_amount' ? "500\n1000" :
+                filterSearchType === 'currency' ? "USD\nEUR\nSAR" :
+                filterSearchType === 'je_number' ? "JV-2026-0001" :
+                (isAr ? 'اكتب أو الصق أرقام متعددة...' : 'Paste numbers...')
               }
               value={filterDocNumbers}
               onChange={(e) => setFilterDocNumbers(e.target.value)}
             />
-            <p className="text-[10px] text-slate-400 px-1">
-              {isAr ? 'يمكن لصق عدة قيم مفصولة بأسطر جديدة أو فواصل' : 'Paste multiple values separated by newlines or commas'}
-            </p>
           </div>
 
-          {/* Column 2: البحث بنطاق تاريخي (Date Range) */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between px-1">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                {isAr ? 'البحث بنطاق تاريخي' : 'Date Range'}
+          {/* Box 2: النطاق التاريخي (Date Range - Compact Inline) */}
+          <div className="bg-slate-50/70 p-2 rounded-xl border border-slate-200/70 flex flex-col justify-between space-y-1">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                {isAr ? 'النطاق التاريخي' : 'Date Range'}
               </label>
               <div className="flex items-center gap-1 text-[10px]">
                 <button
@@ -828,7 +896,7 @@ export const TransactionsSearch: React.FC = () => {
                     setFilterFromDate(today);
                     setFilterToDate(today);
                   }}
-                  className="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold"
+                  className="px-1 py-0.2 rounded bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-100"
                 >
                   {isAr ? 'اليوم' : 'Today'}
                 </button>
@@ -837,11 +905,10 @@ export const TransactionsSearch: React.FC = () => {
                   onClick={() => {
                     const now = new Date();
                     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-                    const today = now.toISOString().slice(0, 10);
                     setFilterFromDate(firstDay);
-                    setFilterToDate(today);
+                    setFilterToDate(now.toISOString().slice(0, 10));
                   }}
-                  className="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold"
+                  className="px-1 py-0.2 rounded bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-100"
                 >
                   {isAr ? 'الشهر' : 'Month'}
                 </button>
@@ -850,32 +917,41 @@ export const TransactionsSearch: React.FC = () => {
                   onClick={() => {
                     const now = new Date();
                     const firstDay = new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10);
-                    const today = now.toISOString().slice(0, 10);
                     setFilterFromDate(firstDay);
-                    setFilterToDate(today);
+                    setFilterToDate(now.toISOString().slice(0, 10));
                   }}
-                  className="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold"
+                  className="px-1 py-0.2 rounded bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-100"
                 >
                   {isAr ? 'العام' : 'Year'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterFromDate('');
+                    setFilterToDate('');
+                  }}
+                  className="px-1 py-0.2 rounded bg-white border border-slate-200 text-slate-400 font-bold hover:text-slate-600"
+                >
+                  {isAr ? 'الكل' : 'All'}
                 </button>
               </div>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="grid grid-cols-2 gap-1.5 pt-0.5">
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 mb-0.5 px-1">{isAr ? 'من تاريخ' : 'From Date'}</label>
+                <span className="block text-[9px] text-slate-400 font-medium mb-0.5">{isAr ? 'من تاريخ' : 'From'}</span>
                 <input
                   type="date"
-                  className="w-full p-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-emerald-500 shadow-2xs"
+                  className="w-full p-1 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500 shadow-2xs font-mono"
                   value={filterFromDate}
                   onChange={(e) => setFilterFromDate(e.target.value)}
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 mb-0.5 px-1">{isAr ? 'إلى تاريخ' : 'To Date'}</label>
+                <span className="block text-[9px] text-slate-400 font-medium mb-0.5">{isAr ? 'إلى تاريخ' : 'To'}</span>
                 <input
                   type="date"
-                  className="w-full p-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-emerald-500 shadow-2xs"
+                  className="w-full p-1 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500 shadow-2xs font-mono"
                   value={filterToDate}
                   onChange={(e) => setFilterToDate(e.target.value)}
                 />
@@ -883,49 +959,52 @@ export const TransactionsSearch: React.FC = () => {
             </div>
           </div>
 
-          {/* Column 3: تصفية حسب نوع المستند (Doc Type Filter) */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between px-1">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                {isAr ? 'تصفية حسب نوع المستند' : 'Document Type'}
+          {/* Box 3: نوع المستند (Doc Types - Compact 2-col Checklist) */}
+          <div className="bg-slate-50/70 p-2 rounded-xl border border-slate-200/70 flex flex-col justify-between space-y-1">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                {isAr ? 'نوع المستند' : 'Doc Types'}
               </label>
               <button
                 type="button"
-                onClick={handleToggleAllDocTypes}
+                onClick={toggleAllDocTypes}
                 className="text-[10px] font-bold text-emerald-600 hover:underline"
               >
-                {filterTypes.length === movementTypeOptions.length ? (isAr ? 'إلغاء التحديد' : 'Deselect All') : (isAr ? 'تحديد الكل' : 'Select All')}
+                {filterTypes.length === movementTypeOptions.length ? (isAr ? 'إلغاء الكل' : 'Deselect') : (isAr ? 'تحديد الكل' : 'Select All')}
               </button>
             </div>
-            <div className="max-h-36 overflow-y-auto p-2 bg-slate-50/70 border border-slate-200 rounded-xl space-y-1 custom-scrollbar text-xs">
+
+            <div className="h-16 overflow-y-auto grid grid-cols-2 gap-1 p-1 bg-white border border-slate-200 rounded-lg custom-scrollbar">
               {movementTypeOptions.map(opt => {
                 const checked = filterTypes.includes(opt.key);
                 return (
-                  <label
+                  <button
                     key={opt.key}
-                    onClick={() => handleToggleDocType(opt.key)}
-                    className={`flex items-center gap-2 p-1.5 rounded-lg cursor-pointer transition-all select-none ${
-                      checked ? 'bg-white font-bold text-emerald-800 shadow-2xs' : 'text-slate-600 hover:bg-white/60'
+                    type="button"
+                    onClick={() => toggleDocType(opt.key)}
+                    className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded text-start transition-all cursor-pointer select-none text-[10.5px] ${
+                      checked 
+                        ? 'bg-emerald-50 font-bold text-emerald-800 border border-emerald-200' 
+                        : 'text-slate-600 hover:bg-slate-50 border border-transparent'
                     }`}
                   >
-                    <input
-                      type="checkbox"
-                      className="rounded text-emerald-600 focus:ring-emerald-500 h-3.5 w-3.5 pointer-events-none"
-                      checked={checked}
-                      readOnly
-                    />
-                    <span className="text-[11px] flex-1">{isAr ? opt.labelAr : opt.labelEn}</span>
-                  </label>
+                    <div className={`w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 border ${
+                      checked ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 bg-white'
+                    }`}>
+                      {checked && <Check size={10} className="stroke-[3]" />}
+                    </div>
+                    <span className="truncate">{isAr ? opt.labelAr : opt.labelEn}</span>
+                  </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Column 4: تصفية حسب العملة (Currency Filter) */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between px-1">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                {isAr ? 'تصفية حسب العملة' : 'Currency'}
+          {/* Box 4: العملة (Currency - Compact Pills) */}
+          <div className="bg-slate-50/70 p-2 rounded-xl border border-slate-200/70 flex flex-col justify-between space-y-1">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                {isAr ? 'العملة' : 'Currency'}
               </label>
               {filterCurrencies.length > 0 && (
                 <button
@@ -938,222 +1017,220 @@ export const TransactionsSearch: React.FC = () => {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-1.5 p-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs max-h-36 overflow-y-auto custom-scrollbar">
-              <label
+            <div className="h-16 overflow-y-auto flex flex-wrap gap-1 p-1 bg-white border border-slate-200 rounded-lg custom-scrollbar content-start">
+              <button
+                type="button"
                 onClick={() => setFilterCurrencies([])}
-                className={`flex items-center gap-2 p-1.5 rounded-lg cursor-pointer transition-all col-span-2 ${
-                  filterCurrencies.length === 0 ? 'bg-emerald-600 text-white font-bold shadow-2xs' : 'hover:bg-white text-slate-600'
+                className={`px-2 py-0.5 rounded text-[10.5px] font-bold border transition-all cursor-pointer ${
+                  filterCurrencies.length === 0
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                 }`}
               >
-                <input
-                  type="checkbox"
-                  className="rounded pointer-events-none"
-                  checked={filterCurrencies.length === 0}
-                  readOnly
-                />
-                <span className="text-[11px]">{isAr ? 'الكل' : 'All Currencies'}</span>
-              </label>
+                {isAr ? 'الكل' : 'All'}
+              </button>
 
               {availableCurrencies.map(curr => {
                 const isSelected = filterCurrencies.includes(curr);
                 return (
-                  <label
+                  <button
                     key={curr}
-                    onClick={() => handleToggleCurrency(curr)}
-                    className={`flex items-center gap-2 p-1.5 rounded-lg cursor-pointer transition-all ${
-                      isSelected ? 'bg-white font-bold text-emerald-700 shadow-2xs border border-emerald-100' : 'hover:bg-white text-slate-600'
+                    type="button"
+                    onClick={() => toggleCurrency(curr)}
+                    className={`px-2 py-0.5 rounded text-[10.5px] font-mono font-bold border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                     }`}
                   >
-                    <input
-                      type="checkbox"
-                      className="rounded text-emerald-600 pointer-events-none h-3.5 w-3.5"
-                      checked={isSelected}
-                      readOnly
-                    />
-                    <span className="text-[11px] font-mono">{curr}</span>
-                  </label>
+                    {curr}
+                  </button>
                 );
               })}
             </div>
           </div>
         </div>
 
-        {/* Extended Section (Customer/Supplier Multi-Select, Amounts, Payment Status) */}
-        {showAdvancedSection && (
-          <div className="pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-            {/* Customer Multi-Select */}
-            <div className="space-y-1">
-              <label className="block text-[11px] font-bold text-slate-500 flex items-center justify-between">
-                <span>{isAr ? 'تصفية العملاء (اختيار متعدد)' : 'Customers (Multi-Select)'}</span>
-                {selectedCustomerIds.length > 0 && (
-                  <span className="text-[10px] px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded-full font-bold">
-                    {selectedCustomerIds.length} {isAr ? 'محدد' : 'selected'}
-                  </span>
-                )}
+        {/* Row 2: Secondary Filters (Customers, Suppliers, Amounts, Payment Status, Reset) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2 text-xs pt-1 border-t border-slate-100 items-end">
+          {/* Customer Multi-Select */}
+          <div className="space-y-0.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold text-slate-500">
+                {isAr ? 'تصفية العملاء' : 'Customers'}
               </label>
-              <button
-                type="button"
-                onClick={() => setIsCustomerModalOpen(true)}
-                className="w-full flex items-center justify-between p-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl font-bold text-slate-700 transition-all text-xs text-start"
-              >
-                <div className="flex items-center gap-1.5 truncate">
-                  <Users size={14} className="text-emerald-600 shrink-0" />
-                  <span className="truncate">
-                    {selectedCustomerIds.length === 0
-                      ? (isAr ? 'جميع العملاء' : 'All Customers')
-                      : selectedCustomerIds.length === 1
-                      ? customerMap.get(selectedCustomerIds[0])?.name || (isAr ? 'عميل واحد محدد' : '1 Selected')
-                      : `${selectedCustomerIds.length} ${isAr ? 'عملاء محددين' : 'Customers selected'}`}
-                  </span>
-                </div>
-                <ChevronDown size={14} className="text-slate-400 shrink-0" />
-              </button>
+              {selectedCustomerIds.length > 0 && (
+                <span className="text-[9px] px-1 py-0.2 bg-emerald-100 text-emerald-800 rounded-md font-bold">
+                  {selectedCustomerIds.length}
+                </span>
+              )}
             </div>
+            <button
+              type="button"
+              onClick={() => setIsCustomerModalOpen(true)}
+              className="w-full flex items-center justify-between p-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg font-bold text-slate-700 text-xs transition-all text-start"
+            >
+              <div className="flex items-center gap-1.5 truncate">
+                <Users size={13} className="text-emerald-600 shrink-0" />
+                <span className="truncate">
+                  {selectedCustomerIds.length === 0
+                    ? (isAr ? 'جميع العملاء' : 'All Customers')
+                    : selectedCustomerIds.length === 1
+                    ? customerMap.get(selectedCustomerIds[0])?.name || (isAr ? 'عميل محدد' : '1 Selected')
+                    : `${selectedCustomerIds.length} ${isAr ? 'عملاء محددين' : 'Selected'}`}
+                </span>
+              </div>
+              <ChevronDown size={13} className="text-slate-400 shrink-0" />
+            </button>
+          </div>
 
-            {/* Supplier Multi-Select */}
-            <div className="space-y-1">
-              <label className="block text-[11px] font-bold text-slate-500 flex items-center justify-between">
-                <span>{isAr ? 'تصفية الموردين (اختيار متعدد)' : 'Suppliers (Multi-Select)'}</span>
-                {selectedSupplierIds.length > 0 && (
-                  <span className="text-[10px] px-1.5 py-0.2 bg-blue-100 text-blue-800 rounded-full font-bold">
-                    {selectedSupplierIds.length} {isAr ? 'محدد' : 'selected'}
-                  </span>
-                )}
+          {/* Supplier Multi-Select */}
+          <div className="space-y-0.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold text-slate-500">
+                {isAr ? 'تصفية الموردين' : 'Suppliers'}
               </label>
-              <button
-                type="button"
-                onClick={() => setIsSupplierModalOpen(true)}
-                className="w-full flex items-center justify-between p-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl font-bold text-slate-700 transition-all text-xs text-start"
-              >
-                <div className="flex items-center gap-1.5 truncate">
-                  <Building2 size={14} className="text-blue-600 shrink-0" />
-                  <span className="truncate">
-                    {selectedSupplierIds.length === 0
-                      ? (isAr ? 'جميع الموردين' : 'All Suppliers')
-                      : selectedSupplierIds.length === 1
-                      ? supplierMap.get(selectedSupplierIds[0])?.name || (isAr ? 'مورد واحد محدد' : '1 Selected')
-                      : `${selectedSupplierIds.length} ${isAr ? 'موردين محددين' : 'Suppliers selected'}`}
-                  </span>
-                </div>
-                <ChevronDown size={14} className="text-slate-400 shrink-0" />
-              </button>
+              {selectedSupplierIds.length > 0 && (
+                <span className="text-[9px] px-1 py-0.2 bg-blue-100 text-blue-800 rounded-md font-bold">
+                  {selectedSupplierIds.length}
+                </span>
+              )}
             </div>
+            <button
+              type="button"
+              onClick={() => setIsSupplierModalOpen(true)}
+              className="w-full flex items-center justify-between p-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg font-bold text-slate-700 text-xs transition-all text-start"
+            >
+              <div className="flex items-center gap-1.5 truncate">
+                <Building2 size={13} className="text-blue-600 shrink-0" />
+                <span className="truncate">
+                  {selectedSupplierIds.length === 0
+                    ? (isAr ? 'جميع الموردين' : 'All Suppliers')
+                    : selectedSupplierIds.length === 1
+                    ? supplierMap.get(selectedSupplierIds[0])?.name || (isAr ? 'مورد محدد' : '1 Selected')
+                    : `${selectedSupplierIds.length} ${isAr ? 'موردين محددين' : 'Selected'}`}
+                </span>
+              </div>
+              <ChevronDown size={13} className="text-slate-400 shrink-0" />
+            </button>
+          </div>
 
-            {/* Amount Range */}
-            <div className="space-y-1">
-              <label className="block text-[11px] font-bold text-slate-500">
-                {isAr ? 'نطاق المبلغ (الحد الأدنى - الأقصى)' : 'Amount Range (Min - Max)'}
+          {/* Amount: Exact or Range */}
+          <div className="space-y-0.5 lg:col-span-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold text-slate-500">
+                {isAr ? 'المبلغ' : 'Amount'}
               </label>
-              <div className="grid grid-cols-2 gap-1.5">
-                <input
-                  type="number"
-                  placeholder={isAr ? 'من مبلغ' : 'Min'}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-                  value={filterMinAmount}
-                  onChange={(e) => setFilterMinAmount(e.target.value)}
-                />
-                <input
-                  type="number"
-                  placeholder={isAr ? 'إلى مبلغ' : 'Max'}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-                  value={filterMaxAmount}
-                  onChange={(e) => setFilterMaxAmount(e.target.value)}
-                />
+              <div className="flex items-center gap-1 text-[9px]">
+                <span className="text-slate-400">{isAr ? '(أو محدد يساوى)' : '(or exact)'}</span>
               </div>
             </div>
-
-            {/* Payment & JE Status */}
-            <div className="space-y-1">
-              <label className="block text-[11px] font-bold text-slate-500">
-                {isAr ? 'حالة السداد / القيد' : 'Payment / JE Status'}
-              </label>
-              <div className="grid grid-cols-2 gap-1.5">
-                <select
-                  value={filterPaymentStatus}
-                  onChange={(e) => setFilterPaymentStatus(e.target.value)}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none cursor-pointer"
-                >
-                  <option value="all">{isAr ? 'كافة حالات السداد' : 'All Payments'}</option>
-                  <option value="paid">{isAr ? 'مدفوع بالكامل' : 'Paid'}</option>
-                  <option value="partial">{isAr ? 'مدفوع جزئياً' : 'Partial'}</option>
-                  <option value="unpaid">{isAr ? 'غير مدفوع' : 'Unpaid'}</option>
-                </select>
-
-                <select
-                  value={filterJeStatus}
-                  onChange={(e) => setFilterJeStatus(e.target.value)}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none cursor-pointer"
-                >
-                  <option value="all">{isAr ? 'كافة القيود' : 'All JEs'}</option>
-                  <option value="has_je">{isAr ? 'له قيد محاسبي' : 'Has JE'}</option>
-                  <option value="no_je">{isAr ? 'بدون قيد' : 'No JE'}</option>
-                </select>
-              </div>
+            <div className="grid grid-cols-3 gap-1">
+              <input
+                type="number"
+                placeholder={isAr ? 'يساوى =' : '= Exact'}
+                className="w-full p-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
+                value={filterExactAmount}
+                onChange={(e) => {
+                  setFilterExactAmount(e.target.value);
+                  if (e.target.value) {
+                    setFilterMinAmount('');
+                    setFilterMaxAmount('');
+                  }
+                }}
+              />
+              <input
+                type="number"
+                placeholder={isAr ? 'من مبلغ' : 'Min'}
+                disabled={Boolean(filterExactAmount)}
+                className="w-full p-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500 font-mono disabled:opacity-40"
+                value={filterMinAmount}
+                onChange={(e) => setFilterMinAmount(e.target.value)}
+              />
+              <input
+                type="number"
+                placeholder={isAr ? 'إلى مبلغ' : 'Max'}
+                disabled={Boolean(filterExactAmount)}
+                className="w-full p-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500 font-mono disabled:opacity-40"
+                value={filterMaxAmount}
+                onChange={(e) => setFilterMaxAmount(e.target.value)}
+              />
             </div>
           </div>
-        )}
 
-        {/* Footer of Search Filter: Reset All Filters Button (Exactly as Image 2) */}
-        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={handleResetFilters}
-            className="text-xs font-bold text-rose-600 hover:text-rose-700 hover:underline flex items-center gap-1.5 transition-colors"
-          >
-            <RotateCcw size={13} />
-            <span>{isAr ? 'إعادة تعيين كافة المرشحات' : 'Reset All Filters'}</span>
-          </button>
+          {/* Payment Status */}
+          <div className="space-y-0.5">
+            <label className="text-[10px] font-bold text-slate-500 block">
+              {isAr ? 'حالة السداد' : 'Payment Status'}
+            </label>
+            <select
+              value={filterPaymentStatus}
+              onChange={(e) => setFilterPaymentStatus(e.target.value)}
+              className="w-full p-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium outline-none cursor-pointer"
+            >
+              <option value="all">{isAr ? 'كافة الحالات' : 'All'}</option>
+              <option value="paid">{isAr ? 'مدفوع بالكامل' : 'Paid'}</option>
+              <option value="partial">{isAr ? 'مدفوع جزئياً' : 'Partial'}</option>
+              <option value="unpaid">{isAr ? 'غير مدفوع' : 'Unpaid'}</option>
+            </select>
+          </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-slate-400 font-medium">
-              {isAr ? `تم العثور على ${filteredMovements.length} حركة` : `Found ${filteredMovements.length} movements`}
-            </span>
+          {/* Reset Filters Button */}
+          <div className="flex items-center justify-between sm:justify-end gap-2 pb-0.5">
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="w-full p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-bold border border-rose-200 flex items-center justify-center gap-1 transition-all active:scale-95 shadow-2xs"
+            >
+              <RotateCcw size={12} />
+              <span>{isAr ? 'إعادة تعيين المرشحات' : 'Reset Filters'}</span>
+            </button>
           </div>
         </div>
       </div>
 
       {/* 3. Summary Toolbar Strip */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-white border border-slate-200/90 rounded-2xl shadow-xs text-xs">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 font-bold">
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-400 text-[11px] font-medium">{isAr ? 'إجمالي الحركات:' : 'Count:'}</span>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-1.5 bg-white border border-slate-200/90 rounded-xl shadow-2xs text-xs">
+        <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 font-bold text-xs">
+          <div className="flex items-center gap-1">
+            <span className="text-slate-400 text-[11px] font-medium">{isAr ? 'النتائج:' : 'Found:'}</span>
             <span className="text-slate-900 font-mono text-sm">{summaryStats.count}</span>
           </div>
           <span className="text-slate-200 hidden sm:inline">|</span>
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-400 text-[11px] font-medium">{isAr ? 'إجمالي المدين:' : 'Total Debit:'}</span>
-            <span className="text-emerald-700 font-mono text-sm">{formatMoney(summaryStats.totalDebit)} {systemCurrency}</span>
+          <div className="flex items-center gap-1">
+            <span className="text-slate-400 text-[11px] font-medium">{isAr ? 'المدين:' : 'Debit:'}</span>
+            <span className="text-emerald-700 font-mono text-xs sm:text-sm">{formatMoney(summaryStats.totalDebit)} {systemCurrency}</span>
           </div>
           <span className="text-slate-200 hidden sm:inline">|</span>
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-400 text-[11px] font-medium">{isAr ? 'إجمالي الدائن:' : 'Total Credit:'}</span>
-            <span className="text-rose-600 font-mono text-sm">{formatMoney(summaryStats.totalCredit)} {systemCurrency}</span>
+          <div className="flex items-center gap-1">
+            <span className="text-slate-400 text-[11px] font-medium">{isAr ? 'الدائن:' : 'Credit:'}</span>
+            <span className="text-rose-600 font-mono text-xs sm:text-sm">{formatMoney(summaryStats.totalCredit)} {systemCurrency}</span>
           </div>
           <span className="text-slate-200 hidden sm:inline">|</span>
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-400 text-[11px] font-medium">{isAr ? 'صافي الحركة:' : 'Net Difference:'}</span>
-            <span className={`font-mono text-sm ${summaryStats.netDifference >= 0 ? 'text-blue-700' : 'text-amber-700'}`}>
+          <div className="flex items-center gap-1">
+            <span className="text-slate-400 text-[11px] font-medium">{isAr ? 'صافي الرصيد:' : 'Net:'}</span>
+            <span className={`font-mono text-xs sm:text-sm ${summaryStats.netDifference >= 0 ? 'text-blue-700' : 'text-amber-700'}`}>
               {formatMoney(Math.abs(summaryStats.netDifference))} {summaryStats.netDifference >= 0 ? (isAr ? 'مدين' : 'Dr') : (isAr ? 'دائن' : 'Cr')}
             </span>
           </div>
           <span className="text-slate-200 hidden sm:inline">|</span>
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-400 text-[11px] font-medium">{isAr ? 'إجمالي المتبقي:' : 'Total Remaining:'}</span>
-            <span className="text-amber-700 font-mono text-sm">{formatMoney(summaryStats.totalRemaining)} {systemCurrency}</span>
+          <div className="flex items-center gap-1">
+            <span className="text-slate-400 text-[11px] font-medium">{isAr ? 'المتبقي:' : 'Remaining:'}</span>
+            <span className="text-amber-700 font-mono text-xs sm:text-sm">{formatMoney(summaryStats.totalRemaining)} {systemCurrency}</span>
           </div>
         </div>
 
         {selectedRowIds.length > 0 && (
-          <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800 animate-in fade-in">
+          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-bold text-emerald-800 animate-in fade-in">
             <span>{isAr ? `المحدد (${selectedRowIds.length})` : `Selected (${selectedRowIds.length})`}</span>
             <button 
               type="button" 
               onClick={() => setSelectedRowIds([])}
-              className="text-slate-400 hover:text-slate-600 text-[11px]"
+              className="text-slate-400 hover:text-slate-600 text-[10px]"
             >
               ✕
             </button>
@@ -1161,13 +1238,13 @@ export const TransactionsSearch: React.FC = () => {
         )}
       </div>
 
-      {/* 4. Table Results View */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
-        <div ref={tableRef} className="overflow-x-auto min-h-[350px]">
+      {/* 4. Table Results View with Clickable Links */}
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+        <div ref={tableRef} className="overflow-x-auto min-h-[300px]">
           <table className="w-full text-xs text-start border-collapse">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200/80 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
-                <th className="p-3 w-10 text-center">
+              <tr className="bg-slate-50 border-b border-slate-200/80 text-slate-500 font-bold uppercase tracking-wider text-[10.5px]">
+                <th className="p-2.5 w-8 text-center">
                   <input
                     type="checkbox"
                     checked={filteredMovements.length > 0 && selectedRowIds.length === filteredMovements.length}
@@ -1175,39 +1252,38 @@ export const TransactionsSearch: React.FC = () => {
                       if (e.target.checked) setSelectedRowIds(filteredMovements.map(m => m.id));
                       else setSelectedRowIds([]);
                     }}
-                    className="rounded text-emerald-600 focus:ring-emerald-500"
+                    className="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                   />
                 </th>
-                <th className={`p-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{isAr ? 'رقم المستند' : 'Doc No'}</th>
-                <th className={`p-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{isAr ? 'نوع الحركة' : 'Type'}</th>
-                <th className={`p-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{isAr ? 'التاريخ' : 'Date'}</th>
-                <th className={`p-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{isAr ? 'الطرف / العميل / المورد' : 'Party / Entity'}</th>
-                <th className={`p-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{isAr ? 'المبلغ الأصلي' : 'Amount'}</th>
-                <th className={`p-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{isAr ? 'المتبقي' : 'Remaining'}</th>
-                <th className={`p-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{isAr ? 'العملة' : 'Currency'}</th>
-                <th className={`p-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{isAr ? 'حالة الدفع' : 'Status'}</th>
-                <th className={`p-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{isAr ? 'رقم القيد' : 'JE Number'}</th>
-                <th className={`p-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{isAr ? 'ملاحظات / وصف' : 'Notes'}</th>
-                <th className="p-3 text-center w-20">{isAr ? 'الإجراء' : 'Action'}</th>
+                <th className={`p-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{isAr ? 'رقم المستند (انقر للفتح)' : 'Doc No (Click to Open)'}</th>
+                <th className={`p-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{isAr ? 'نوع الحركة' : 'Type'}</th>
+                <th className={`p-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{isAr ? 'التاريخ' : 'Date'}</th>
+                <th className={`p-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{isAr ? 'الطرف / العميل / المورد' : 'Party / Entity'}</th>
+                <th className={`p-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{isAr ? 'المبلغ الأصلي' : 'Amount'}</th>
+                <th className={`p-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{isAr ? 'المتبقي' : 'Remaining'}</th>
+                <th className={`p-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{isAr ? 'العملة' : 'Currency'}</th>
+                <th className={`p-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{isAr ? 'حالة الدفع' : 'Status'}</th>
+                <th className={`p-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{isAr ? 'رقم القيد (انقر للفتح)' : 'JE No (Click to Open)'}</th>
+                <th className={`p-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{isAr ? 'ملاحظات / وصف' : 'Notes'}</th>
+                <th className="p-2.5 text-center w-16">{isAr ? 'إجراء' : 'Action'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {loading ? (
                 <tr>
-                  <td colSpan={12} className="p-12 text-center text-slate-500">
+                  <td colSpan={12} className="p-10 text-center text-slate-500">
                     <div className="flex flex-col items-center justify-center gap-2">
-                      <RefreshCw size={24} className="animate-spin text-emerald-600" />
-                      <span className="font-bold text-xs">{isAr ? 'جاري فحص وجلب حركات النظام...' : 'Loading system movements...'}</span>
+                      <RefreshCw size={22} className="animate-spin text-emerald-600" />
+                      <span className="font-bold text-xs">{isAr ? 'جاري فحص وجلب حركات النظام...' : 'Loading movements...'}</span>
                     </div>
                   </td>
                 </tr>
               ) : filteredMovements.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="p-12 text-center text-slate-400 italic">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <Search size={28} className="text-slate-300" />
-                      <p className="font-bold text-slate-600 text-sm">{isAr ? 'لا توجد حركات تطابق معايير البحث الحالية' : 'No movements match your criteria'}</p>
-                      <p className="text-xs text-slate-400">{isAr ? 'جرب تغيير أو إعادة تعيين المرشحات أعلاه' : 'Try adjusting the filters above'}</p>
+                  <td colSpan={12} className="p-10 text-center text-slate-400 italic">
+                    <div className="flex flex-col items-center justify-center gap-1.5">
+                      <Search size={24} className="text-slate-300" />
+                      <p className="font-bold text-slate-600 text-xs">{isAr ? 'لا توجد حركات تطابق معايير البحث' : 'No movements match your criteria'}</p>
                     </div>
                   </td>
                 </tr>
@@ -1217,16 +1293,11 @@ export const TransactionsSearch: React.FC = () => {
                   return (
                     <tr
                       key={m.id}
-                      className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${
+                      className={`hover:bg-slate-50/80 transition-colors ${
                         isSelected ? 'bg-emerald-50/40' : ''
                       }`}
-                      onClick={() => {
-                        setSelectedRowIds(prev => 
-                          prev.includes(m.id) ? prev.filter(x => x !== m.id) : [...prev, m.id]
-                        );
-                      }}
                     >
-                      <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                      <td className="p-2.5 text-center">
                         <input
                           type="checkbox"
                           checked={isSelected}
@@ -1234,42 +1305,51 @@ export const TransactionsSearch: React.FC = () => {
                             if (e.target.checked) setSelectedRowIds(prev => [...prev, m.id]);
                             else setSelectedRowIds(prev => prev.filter(x => x !== m.id));
                           }}
-                          className="rounded text-emerald-600 focus:ring-emerald-500"
+                          className="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                         />
                       </td>
 
-                      <td className="p-3 font-mono font-bold text-slate-800 whitespace-nowrap">
-                        {m.doc_number}
+                      {/* Clickable Document Number to open the document */}
+                      <td className="p-2.5 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDocument(m)}
+                          className="font-mono font-bold text-emerald-600 hover:text-emerald-800 hover:underline inline-flex items-center gap-1 group text-xs text-start cursor-pointer"
+                          title={isAr ? `انقر لفتح مستند ${m.doc_number}` : `Click to open ${m.doc_number}`}
+                        >
+                          <span>{m.doc_number}</span>
+                          <ExternalLink size={11} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
                       </td>
 
-                      <td className="p-3 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-bold ${m.badge_color}`}>
+                      <td className="p-2.5 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-1.5 py-0.2 rounded-md border text-[10.5px] font-bold ${m.badge_color}`}>
                           {isAr ? m.doc_type_label_ar : m.doc_type_label_en}
                         </span>
                       </td>
 
-                      <td className="p-3 whitespace-nowrap text-slate-600">
+                      <td className="p-2.5 whitespace-nowrap text-slate-600 text-[11px]">
                         {formatDate(m.date)}
                       </td>
 
-                      <td className="p-3 font-bold text-slate-900 max-w-[200px] truncate" title={m.party_name}>
+                      <td className="p-2.5 font-bold text-slate-900 max-w-[180px] truncate" title={m.party_name}>
                         {m.party_name}
                       </td>
 
-                      <td className="p-3 font-mono font-bold text-slate-800 whitespace-nowrap">
+                      <td className="p-2.5 font-mono font-bold text-slate-800 whitespace-nowrap">
                         {formatMoney(m.amount)}
                       </td>
 
-                      <td className="p-3 font-mono font-bold whitespace-nowrap text-amber-700">
+                      <td className="p-2.5 font-mono font-bold whitespace-nowrap text-amber-700">
                         {m.remaining_amount > 0 ? formatMoney(m.remaining_amount) : '-'}
                       </td>
 
-                      <td className="p-3 font-mono text-slate-500 text-[11px] whitespace-nowrap">
+                      <td className="p-2.5 font-mono text-slate-500 text-[10.5px] whitespace-nowrap">
                         {m.currency}
                       </td>
 
-                      <td className="p-3 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      <td className="p-2.5 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-1.5 py-0.2 rounded-full text-[9.5px] font-bold ${
                           m.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-800' :
                           m.payment_status === 'partial' ? 'bg-amber-100 text-amber-800' :
                           m.payment_status === 'unpaid' ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-700'
@@ -1280,37 +1360,35 @@ export const TransactionsSearch: React.FC = () => {
                         </span>
                       </td>
 
-                      <td className="p-3 font-mono whitespace-nowrap text-slate-600">
+                      {/* Clickable Journal Entry Number to open the Journal Entry */}
+                      <td className="p-2.5 font-mono whitespace-nowrap">
                         {m.entry_number ? (
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigateToPage('journal_entries');
-                            }}
-                            className="text-emerald-600 hover:text-emerald-800 hover:underline font-bold"
+                            onClick={() => handleOpenJournalEntry(m.entry_number!)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline font-bold inline-flex items-center gap-1 group cursor-pointer"
+                            title={isAr ? `انقر لفتح القيد رقم ${m.entry_number}` : `Click to open JE ${m.entry_number}`}
                           >
-                            {m.entry_number}
+                            <span>{m.entry_number}</span>
+                            <ExternalLink size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
                           </button>
                         ) : (
                           <span className="text-slate-300">-</span>
                         )}
                       </td>
 
-                      <td className="p-3 text-slate-500 max-w-[220px] truncate text-[11px]" title={m.notes}>
+                      <td className="p-2.5 text-slate-500 max-w-[200px] truncate text-[10.5px]" title={m.notes}>
                         {m.notes || '-'}
                       </td>
 
-                      <td className="p-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      <td className="p-2.5 text-center whitespace-nowrap">
                         <button
                           type="button"
-                          onClick={() => {
-                            navigateToPage(m.nav_page);
-                          }}
-                          className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                          title={isAr ? `الانتقال لشاشة ${m.doc_type_label_ar}` : `Open ${m.doc_type_label_en}`}
+                          onClick={() => handleOpenDocument(m)}
+                          className="p-1 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-all cursor-pointer"
+                          title={isAr ? `فتح ${m.doc_number}` : `Open ${m.doc_number}`}
                         >
-                          <ExternalLink size={15} />
+                          <ExternalLink size={14} />
                         </button>
                       </td>
                     </tr>
@@ -1322,9 +1400,9 @@ export const TransactionsSearch: React.FC = () => {
         </div>
       </div>
 
-      {/* Customer Multi-Select Modal */}
+      {/* Customer Multi-Select Modal with Solid Toggles */}
       {isCustomerModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-2xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-md p-4 space-y-3 animate-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
@@ -1334,7 +1412,7 @@ export const TransactionsSearch: React.FC = () => {
               <button 
                 type="button" 
                 onClick={() => setIsCustomerModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 ✕
               </button>
@@ -1357,14 +1435,14 @@ export const TransactionsSearch: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedCustomerIds(customers.map(c => c.id))}
-                className="text-emerald-600 font-bold hover:underline"
+                className="text-emerald-600 font-bold hover:underline cursor-pointer"
               >
                 {isAr ? 'تحديد الكل' : 'Select All'}
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedCustomerIds([])}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 {isAr ? 'إلغاء التحديد' : 'Deselect All'}
               </button>
@@ -1380,26 +1458,22 @@ export const TransactionsSearch: React.FC = () => {
                 .map(cust => {
                   const checked = selectedCustomerIds.includes(cust.id);
                   return (
-                    <label
+                    <button
                       key={cust.id}
-                      onClick={() => {
-                        setSelectedCustomerIds(prev =>
-                          prev.includes(cust.id) ? prev.filter(x => x !== cust.id) : [...prev, cust.id]
-                        );
-                      }}
-                      className={`flex items-center gap-2.5 p-2 rounded-xl cursor-pointer transition-all ${
-                        checked ? 'bg-emerald-50 text-emerald-900 font-bold' : 'hover:bg-slate-50 text-slate-700'
+                      type="button"
+                      onClick={() => toggleCustomer(cust.id)}
+                      className={`w-full flex items-center gap-2.5 p-2 rounded-xl text-start transition-all cursor-pointer ${
+                        checked ? 'bg-emerald-50 text-emerald-900 font-bold border border-emerald-200' : 'hover:bg-slate-50 text-slate-700 border border-transparent'
                       }`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        readOnly
-                        className="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4 pointer-events-none"
-                      />
+                      <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${
+                        checked ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 bg-white'
+                      }`}>
+                        {checked && <Check size={11} className="stroke-[3]" />}
+                      </div>
                       <span className="truncate flex-1">{cust.name}</span>
                       {cust.code && <span className="font-mono text-[10px] text-slate-400">{cust.code}</span>}
-                    </label>
+                    </button>
                   );
                 })}
             </div>
@@ -1408,7 +1482,7 @@ export const TransactionsSearch: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsCustomerModalOpen(false)}
-                className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold text-xs hover:bg-emerald-700 transition-all shadow-xs"
+                className="px-4 py-1.5 bg-emerald-600 text-white rounded-xl font-bold text-xs hover:bg-emerald-700 transition-all shadow-2xs cursor-pointer"
               >
                 {isAr ? 'تم التطبيق' : 'Apply'}
               </button>
@@ -1417,9 +1491,9 @@ export const TransactionsSearch: React.FC = () => {
         </div>
       )}
 
-      {/* Supplier Multi-Select Modal */}
+      {/* Supplier Multi-Select Modal with Solid Toggles */}
       {isSupplierModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-2xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-md p-4 space-y-3 animate-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
@@ -1429,7 +1503,7 @@ export const TransactionsSearch: React.FC = () => {
               <button 
                 type="button" 
                 onClick={() => setIsSupplierModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 ✕
               </button>
@@ -1452,14 +1526,14 @@ export const TransactionsSearch: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedSupplierIds(suppliers.map(s => s.id))}
-                className="text-blue-600 font-bold hover:underline"
+                className="text-blue-600 font-bold hover:underline cursor-pointer"
               >
                 {isAr ? 'تحديد الكل' : 'Select All'}
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedSupplierIds([])}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 {isAr ? 'إلغاء التحديد' : 'Deselect All'}
               </button>
@@ -1475,26 +1549,22 @@ export const TransactionsSearch: React.FC = () => {
                 .map(supp => {
                   const checked = selectedSupplierIds.includes(supp.id);
                   return (
-                    <label
+                    <button
                       key={supp.id}
-                      onClick={() => {
-                        setSelectedSupplierIds(prev =>
-                          prev.includes(supp.id) ? prev.filter(x => x !== supp.id) : [...prev, supp.id]
-                        );
-                      }}
-                      className={`flex items-center gap-2.5 p-2 rounded-xl cursor-pointer transition-all ${
-                        checked ? 'bg-blue-50 text-blue-900 font-bold' : 'hover:bg-slate-50 text-slate-700'
+                      type="button"
+                      onClick={() => toggleSupplier(supp.id)}
+                      className={`w-full flex items-center gap-2.5 p-2 rounded-xl text-start transition-all cursor-pointer ${
+                        checked ? 'bg-blue-50 text-blue-900 font-bold border border-blue-200' : 'hover:bg-slate-50 text-slate-700 border border-transparent'
                       }`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        readOnly
-                        className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 pointer-events-none"
-                      />
+                      <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${
+                        checked ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 bg-white'
+                      }`}>
+                        {checked && <Check size={11} className="stroke-[3]" />}
+                      </div>
                       <span className="truncate flex-1">{supp.name}</span>
                       {supp.code && <span className="font-mono text-[10px] text-slate-400">{supp.code}</span>}
-                    </label>
+                    </button>
                   );
                 })}
             </div>
@@ -1503,7 +1573,7 @@ export const TransactionsSearch: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsSupplierModalOpen(false)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-xl font-bold text-xs hover:bg-blue-700 transition-all shadow-xs"
+                className="px-4 py-1.5 bg-blue-600 text-white rounded-xl font-bold text-xs hover:bg-blue-700 transition-all shadow-2xs cursor-pointer"
               >
                 {isAr ? 'تم التطبيق' : 'Apply'}
               </button>
