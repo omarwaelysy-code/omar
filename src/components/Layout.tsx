@@ -571,7 +571,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'goods_receipts', label: t('nav.goods_receipts') || 'إذن استلام المخزون', icon: PackageCheck },
           { id: 'warehouse_transfers', label: t('nav.warehouse_transfers') || 'تحويل بين المخازن', icon: ArrowLeftRight },
           { id: 'opening_stock_balances', label: t('nav.opening_stock_balances') || 'أرصدة أول المدة للمخزون', icon: ListPlus },
-          { id: 'stock_adjustments', label: t('nav.stock_adjustments') || 'تسوية الأصناف', icon: Sliders }
+          { id: 'stock_adjustments', label: t('nav.stock_adjustments') || 'تسوية الأصناف', icon: Sliders },
+          { id: 'div_wh_reports', isDivider: true },
+          { id: 'h_wh_reports', label: language === 'ar' ? 'تقارير' : 'Reports', isHeader: true },
+          { id: 'stock_card_report', label: t('nav.stock_card_report'), icon: History },
+          { id: 'stock_balances_report', label: t('nav.stock_balances_report') || 'أرصدة المخزون خلال فترة', icon: BarChart3 },
+          { id: 'general_stock_movements_report', label: t('nav.general_stock_movements_report') || 'حركة المخزن العامة لجميع الأصناف', icon: History }
         ]
       },
       {
@@ -584,7 +589,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'returns', label: t('nav.returns'), icon: RotateCcw },
           { id: 'sales_import', label: t('nav.sales_import') || (language === 'ar' ? 'استيراد مستندات بيع' : 'Import Sales Documents'), icon: FileSpreadsheet },
           { id: 'customer_discounts', label: t('nav.customer_discounts'), icon: Tags },
-          { id: 'customer_settlements', label: t('nav.customer_settlements') || 'تسويات العملاء', icon: Layers }
+          { id: 'customer_settlements', label: t('nav.customer_settlements') || 'تسويات العملاء', icon: Layers },
+          { id: 'div_sales_reports', isDivider: true },
+          { id: 'h_sales_reports', label: language === 'ar' ? 'تقارير' : 'Reports', isHeader: true },
+          { id: 'customer_statement', label: t('nav.customer_statement'), icon: FileText },
+          { id: 'customer_balances', label: t('nav.customer_balances'), icon: BarChart3 },
+          { id: 'customer_aging_report', label: t('nav.customer_aging_report'), icon: Clock },
+          { id: 'sales_report', label: t('nav.sales_report'), icon: BarChart3 }
         ]
       },
       {
@@ -600,7 +611,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'purchase_returns', label: t('nav.purchase_returns'), icon: RotateCcw },
           { id: 'purchases_import', label: t('nav.purchases_import') || (language === 'ar' ? 'استيراد مستندات شراء' : 'Import Purchase Documents'), icon: FileSpreadsheet },
           { id: 'supplier_discounts', label: t('nav.supplier_discounts'), icon: Tags },
-          { id: 'supplier_settlements', label: t('nav.supplier_settlements') || 'تسويات الموردين', icon: Layers }
+          { id: 'supplier_settlements', label: t('nav.supplier_settlements') || 'تسويات الموردين', icon: Layers },
+          { id: 'div_purchases_reports', isDivider: true },
+          { id: 'h_purchases_reports', label: language === 'ar' ? 'تقارير' : 'Reports', isHeader: true },
+          { id: 'supplier_statement', label: t('nav.supplier_statement'), icon: FileText },
+          { id: 'supplier_balances', label: t('nav.supplier_balances'), icon: BarChart3 },
+          { id: 'supplier_aging_report', label: t('nav.supplier_aging_report'), icon: Clock }
         ]
       },
       ...(etaVisible ? [{
@@ -655,7 +671,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'issued_cheques', label: language === 'ar' ? 'إدارة الشيكات الصادرة' : 'Issued Cheques', icon: Landmark },
           { id: 'received_cheques', label: language === 'ar' ? 'إدارة الشيكات الواردة' : 'Received Cheques', icon: ArrowDownToLine },
           { id: 'cash_transfers', label: t('nav.cash_transfers'), icon: ArrowLeftRight },
-          { id: 'egyptian_banks', label: language === 'ar' ? 'دليل البنوك المصرية' : 'Egyptian Banks Directory', icon: Building2 }
+          { id: 'egyptian_banks', label: language === 'ar' ? 'دليل البنوك المصرية' : 'Egyptian Banks Directory', icon: Building2 },
+          { id: 'div_cash_reports', isDivider: true },
+          { id: 'h_cash_reports', label: language === 'ar' ? 'تقارير' : 'Reports', isHeader: true },
+          { id: 'cash_balances', label: t('nav.cash_balances'), icon: BarChart3 },
+          { id: 'expenses_report', label: t('nav.expenses_report'), icon: BarChart3 }
         ]
       },
       {
@@ -696,7 +716,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'journal_entries', label: t('nav.journal_entries'), icon: FileText },
           { id: 'detailed_journal_entries', label: t('nav.detailed_journal_entries') || 'قيود يومية تفصيلية', icon: FileSpreadsheet },
           { id: 'default_accounts_settings', label: t('nav.default_accounts_settings') || 'إعدادات الحسابات الافتراضية', icon: Sliders },
-          { id: 'ifrs_guide', label: t('nav.ifrs_guide') || 'دليل معايير IFRS 2026', icon: BookOpen }
+          { id: 'ifrs_guide', label: t('nav.ifrs_guide') || 'دليل معايير IFRS 2026', icon: BookOpen },
+          { id: 'div_gl_reports', isDivider: true },
+          { id: 'h_gl_reports', label: language === 'ar' ? 'تقارير' : 'Reports', isHeader: true },
+          { id: 'general_ledger_report', label: t('nav.general_ledger_report'), icon: BookOpen },
+          { id: 'trial_balance', label: t('nav.trial_balance'), icon: BarChart3 },
+          { id: 'income_statement', label: t('nav.income_statement'), icon: BarChart3 },
+          { id: 'balance_sheet', label: t('nav.balance_sheet'), icon: Shield }
         ]
       },
       { 
@@ -1125,7 +1151,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                       ? 'opacity-100 translate-y-0 pointer-events-auto' 
                       : 'opacity-0 translate-y-1 pointer-events-none'
                   }`}>
-                    <div className="bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 min-w-[240px]">
+                    <div className="bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 min-w-[240px] max-h-[85vh] overflow-y-auto custom-scrollbar">
                       {item.subItems.map((sub: any) => {
                         if (sub.isDivider) {
                            return (
