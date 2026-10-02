@@ -171,6 +171,7 @@ BEGIN
       ADD COLUMN IF NOT EXISTS "reversed_by_entry_number" VARCHAR(100) NULL,
       ADD COLUMN IF NOT EXISTS "is_reversal_entry" BOOLEAN DEFAULT FALSE,
       ADD COLUMN IF NOT EXISTS "original_entry_id" VARCHAR(100) NULL,
-      ADD COLUMN IF NOT EXISTS "original_entry_number" VARCHAR(100) NULL;
+      ADD COLUMN IF NOT EXISTS "original_entry_number" VARCHAR(100) NULL,
+      ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
   END IF;
 END $$;

@@ -346,6 +346,10 @@ async function startServer() {
       'ALTER TABLE "journal_entries" ADD COLUMN IF NOT EXISTS "is_reversal_entry" BOOLEAN DEFAULT FALSE',
       'ALTER TABLE "journal_entries" ADD COLUMN IF NOT EXISTS "original_entry_id" VARCHAR(100) NULL',
       'ALTER TABLE "journal_entries" ADD COLUMN IF NOT EXISTS "original_entry_number" VARCHAR(100) NULL',
+      'ALTER TABLE "journal_entries" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+      'ALTER TABLE "customer_discounts" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+      'ALTER TABLE "cash_transfers" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+      'ALTER TABLE "opening_stock_balances" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
 
       // Currency Rates
       'CREATE TABLE IF NOT EXISTS "currency_rates" ("id" VARCHAR(36) PRIMARY KEY, "currency_id" VARCHAR(36) REFERENCES "currencies"("id") ON DELETE CASCADE, "rate" DECIMAL(18, 6) NOT NULL, "rate_date" DATE NOT NULL, "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)',
