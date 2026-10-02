@@ -2,7 +2,9 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Supplier, Product, PaymentMethod, JournalEntry, JournalEntryItem, Account, Company, Operation, Department, CostCenter, Currency, ExchangeRate } from '../types';
+import { Supplier, Product, PaymentMethod, JournalEntry, JournalEntryItem, Account, Company, Operation, Department, CostCenter, Currency, ExchangeRate, PurchaseReturn } from '../types';
+import { ReversalModal } from '../components/common/ReversalModal';
+import { ReversalBanner } from '../components/common/ReversalBanner';
 import { 
   Search, Plus, Trash2, X, RotateCcw, User, CreditCard, Calendar, Hash, Package, 
   Save, Eye, Download, History, Printer, Edit, Phone, Mail, MapPin, Wallet, Box, 
@@ -40,6 +42,7 @@ export const PurchaseReturns: React.FC = () => {
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
   const { pendingViewDoc, setPendingViewDoc, setCurrentPage, pendingEtaInvoiceForReturn, setPendingEtaInvoiceForReturn } = useNavigation();
+  const [reversingReturn, setReversingReturn] = useState<PurchaseReturn | null>(null);
 
   // Catalogs
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -2533,15 +2536,47 @@ export const PurchaseReturns: React.FC = () => {
                               >
                                 <Download size={18} />
                               </button>
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDelete(ret.id);
-                                }}
-                                className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all no-pdf"
-                              >
-                                <Trash2 size={18} />
-                              </button>
+                              {/* Reversal action */}
+                              {ret.is_reversed ? (
+                                <span
+                                  className="px-2 py-1 bg-amber-100/80 text-amber-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
+                                  title={language === 'ar' ? `تم عكس هذا المرتجع بالمستند: ${ret.reversed_by_doc_number || ''}` : `Reversed by: ${ret.reversed_by_doc_number || ''}`}
+                                >
+                                  <RotateCcw size={13} className="text-amber-700" />
+                                  <span>معكوس</span>
+                                </span>
+                              ) : ret.is_reversal_doc ? (
+                                <span
+                                  className="px-2 py-1 bg-indigo-100/80 text-indigo-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
+                                  title={language === 'ar' ? `مرتجع عكسي للمستند: ${ret.original_doc_number || ''}` : `Reversal of: ${ret.original_doc_number || ''}`}
+                                >
+                                  <RotateCcw size={13} className="text-indigo-700" />
+                                  <span>عكسي</span>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setReversingReturn(ret);
+                                  }}
+                                  className="p-2 text-zinc-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all no-pdf"
+                                  title={language === 'ar' ? 'عكس المرتجع (Reverse)' : 'Reverse Return'}
+                                >
+                                  <RotateCcw size={18} />
+                                </button>
+                              )}
+                              {!ret.is_reversed && !ret.is_reversal_doc && (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDelete(ret.id);
+                                  }}
+                                  className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all no-pdf"
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -4121,6 +4156,20 @@ export const PurchaseReturns: React.FC = () => {
                 >
                   <History size={20} />
                 </button>
+                {viewReturn && !viewReturn.is_reversed && !viewReturn.is_reversal_doc && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const ret = viewReturn;
+                      setViewReturn(null);
+                      setReversingReturn(ret);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-black transition-all"
+                  >
+                    <RotateCcw size={14} className="text-amber-700" />
+                    <span>{language === 'ar' ? 'عكس المرتجع' : 'Reverse'}</span>
+                  </button>
+                )}
               </div>
               <button onClick={() => setViewReturn(null)} className="text-zinc-400 hover:text-zinc-650 p-2 hover:bg-zinc-100 rounded-full transition-all">
                 <X size={24} />
@@ -4139,6 +4188,18 @@ export const PurchaseReturns: React.FC = () => {
                   documentNumber={viewReturn.return_number}
                   documentDate={formatDate(viewReturn.date)}
                   title="مرتجع مشتريات"
+                />
+
+                <ReversalBanner
+                  isReversed={viewReturn.is_reversed}
+                  reversedAt={viewReturn.reversed_at}
+                  reversalReason={viewReturn.reversal_reason}
+                  reversedByDocNumber={viewReturn.reversed_by_doc_number}
+                  reversedByEntryNumber={viewReturn.reversed_by_entry_number}
+                  reversalSettlementNumber={viewReturn.reversal_settlement_number}
+                  isReversalDoc={viewReturn.is_reversal_doc}
+                  originalDocNumber={viewReturn.original_doc_number}
+                  originalEntryNumber={viewReturn.original_entry_number}
                 />
 
                 <div className="grid grid-cols-2 gap-8">
@@ -4910,6 +4971,25 @@ export const PurchaseReturns: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {reversingReturn && (
+        <ReversalModal
+          isOpen={!!reversingReturn}
+          onClose={() => setReversingReturn(null)}
+          onSuccess={() => {
+            setReversingReturn(null);
+            window.dispatchEvent(new CustomEvent('refresh-purchase-returns'));
+          }}
+          moduleName="purchase_returns"
+          docId={reversingReturn.id}
+          docNumber={reversingReturn.return_number}
+          docDate={reversingReturn.date}
+          docAmount={reversingReturn.total_amount}
+          entityName={reversingReturn.supplier_name}
+          entityType="supplier"
+          moduleTitleAr="مردودات مشتريات"
+        />
       )}
     </div>
   );

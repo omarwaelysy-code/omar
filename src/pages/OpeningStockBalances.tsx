@@ -5,10 +5,12 @@ import { Warehouse, Product, OpeningStockBalance, OpeningStockItem, Account } fr
 import { 
   Search, Plus, Trash2, X, ListPlus, Pencil, 
   Download, Upload, Eye, FileText, History, Printer, FileSpreadsheet, Copy,
-  Calendar, Hash, Layers, Save, ChevronRight, ChevronLeft, LayoutGrid, List
+  Calendar, Hash, Layers, Save, ChevronRight, ChevronLeft, LayoutGrid, List, RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
+import { ReversalModal } from '../components/common/ReversalModal';
+import { ReversalBanner } from '../components/common/ReversalBanner';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { dbService } from '../services/dbService';
 import { formatNumber, formatDate } from '../utils/formatUtils';
@@ -36,6 +38,7 @@ export const OpeningStockBalances: React.FC = () => {
 
   // Data states
   const [documents, setDocuments] = useState<OpeningStockBalance[]>([]);
+  const [reversingDoc, setReversingDoc] = useState<OpeningStockBalance | null>(null);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -762,20 +765,54 @@ export const OpeningStockBalances: React.FC = () => {
                         >
                           <Eye size={16} />
                         </button>
-                        <button
-                          onClick={() => handleOpenEditModal(doc)}
-                          title={language === 'ar' ? 'تعديل السند' : 'Edit Document'}
-                          className="p-2.5 bg-sky-50 hover:bg-sky-100 border border-sky-100 rounded-xl hover:scale-105 active:scale-95 transition-all text-sky-600"
-                        >
-                          <Pencil size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleOpenDeleteModal(doc.id)}
-                          title={language === 'ar' ? 'حذف السند' : 'Delete Document'}
-                          className="p-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-100 rounded-xl hover:scale-105 active:scale-95 transition-all text-rose-600"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        {/* Reversal action */}
+                        {doc.is_reversed ? (
+                          <span
+                            className="px-2 py-1 bg-amber-100/80 text-amber-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
+                            title={language === 'ar' ? `تم عكس هذا الرصيد بالمستند: ${doc.reversed_by_doc_number || ''}` : `Reversed by: ${doc.reversed_by_doc_number || ''}`}
+                          >
+                            <RotateCcw size={13} className="text-amber-700" />
+                            <span>معكوس</span>
+                          </span>
+                        ) : doc.is_reversal_doc ? (
+                          <span
+                            className="px-2 py-1 bg-indigo-100/80 text-indigo-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
+                            title={language === 'ar' ? `سند رصيد عكسي للمستند: ${doc.original_doc_number || ''}` : `Reversal of: ${doc.original_doc_number || ''}`}
+                          >
+                            <RotateCcw size={13} className="text-indigo-700" />
+                            <span>عكسي</span>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setReversingDoc(doc);
+                            }}
+                            className="p-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-xl hover:scale-105 active:scale-95 transition-all"
+                            title={language === 'ar' ? 'عكس السند (Reverse)' : 'Reverse Opening Stock'}
+                          >
+                            <RotateCcw size={16} />
+                          </button>
+                        )}
+                        {!doc.is_reversed && !doc.is_reversal_doc && (
+                          <button
+                            onClick={() => handleOpenEditModal(doc)}
+                            title={language === 'ar' ? 'تعديل السند' : 'Edit Document'}
+                            className="p-2.5 bg-sky-50 hover:bg-sky-100 border border-sky-100 rounded-xl hover:scale-105 active:scale-95 transition-all text-sky-600"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                        )}
+                        {!doc.is_reversed && !doc.is_reversal_doc && (
+                          <button
+                            onClick={() => handleOpenDeleteModal(doc.id)}
+                            title={language === 'ar' ? 'حذف السند' : 'Delete Document'}
+                            className="p-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-100 rounded-xl hover:scale-105 active:scale-95 transition-all text-rose-600"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1098,6 +1135,22 @@ export const OpeningStockBalances: React.FC = () => {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  {viewDoc && !viewDoc.is_reversed && !viewDoc.is_reversal_doc && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = viewDoc;
+                        setViewDoc(null);
+                        setReversingDoc(d);
+                      }}
+                      className="px-3 py-2 bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100 rounded-2xl transition-all font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95"
+                      title={language === 'ar' ? 'عكس السند' : 'Reverse Document'}
+                    >
+                      <RotateCcw size={16} className="text-amber-700" />
+                      <span>{language === 'ar' ? 'عكس السند' : 'Reverse'}</span>
+                    </button>
+                  )}
+
                   <button
                     onClick={() => handlePrint(viewDoc)}
                     className="p-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-2xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5 font-bold text-xs"
@@ -1143,6 +1196,17 @@ export const OpeningStockBalances: React.FC = () => {
               </div>
 
               <div className="p-6 md:p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+                <ReversalBanner
+                  isReversed={viewDoc.is_reversed}
+                  reversedAt={viewDoc.reversed_at}
+                  reversalReason={viewDoc.reversal_reason}
+                  reversedByDocNumber={viewDoc.reversed_by_doc_number}
+                  reversedByEntryNumber={viewDoc.reversed_by_entry_number}
+                  reversalSettlementNumber={viewDoc.reversal_settlement_number}
+                  isReversalDoc={viewDoc.is_reversal_doc}
+                  originalDocNumber={viewDoc.original_doc_number}
+                  originalEntryNumber={viewDoc.original_entry_number}
+                />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-3xl">
                   <div className="space-y-3">
                     <div className="flex justify-between items-center text-sm">
@@ -1269,6 +1333,25 @@ export const OpeningStockBalances: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {reversingDoc && (
+        <ReversalModal
+          isOpen={!!reversingDoc}
+          onClose={() => setReversingDoc(null)}
+          onSuccess={() => {
+            setReversingDoc(null);
+            fetchDocuments();
+          }}
+          moduleName="opening_stock_balances"
+          docId={reversingDoc.id}
+          docNumber={reversingDoc.document_number}
+          docDate={reversingDoc.date}
+          docAmount={(reversingDoc.items || []).reduce((sum, item) => sum + Number(item.total_cost || 0), 0)}
+          entityName={reversingDoc.description || 'رصيد افتتاحي'}
+          entityType="general"
+          moduleTitleAr="رصيد مخزون افتتاحي"
+        />
+      )}
     </div>
   );
 };

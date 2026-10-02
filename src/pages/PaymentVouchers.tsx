@@ -23,7 +23,9 @@ import { ExportButtons } from '../components/ExportButtons';
 import { printDocument } from '../utils/printEngine';
 import { TransactionManager } from '../services/TransactionManager';
 import { VoucherSchema, JournalEntrySchema } from '../lib/schemas';
-import { ActivityLog, Supplier, ExpenseCategory, PaymentMethod, JournalEntry, JournalEntryItem, Account, Company, Currency, Employee } from '../types';
+import { ActivityLog, Supplier, ExpenseCategory, PaymentMethod, JournalEntry, JournalEntryItem, Account, Company, Currency, Employee, PaymentVoucher } from '../types';
+import { ReversalModal } from '../components/common/ReversalModal';
+import { ReversalBanner } from '../components/common/ReversalBanner';
 import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { PaginationControls } from '../components/PaginationControls';
 import { useViewPreference } from '../hooks/useViewPreference';
@@ -45,6 +47,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
   const { showNotification } = useNotification();
   const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [reversingVoucher, setReversingVoucher] = useState<any | null>(null);
   const [companyCurrencies, setCompanyCurrencies] = useState<Currency[]>([]);
   const [exchangeRateType, setExchangeRateType] = useState<'manual' | 'auto'>('manual');
   const [showAiInput, setShowAiInput] = useState(false);
@@ -2705,26 +2708,60 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                           >
                             <Printer size={16} />
                           </button>
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openEditModal(voucher);
-                            }}
-                            className="p-1.5 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-                            title="تعديل"
-                          >
-                            <Pencil size={16} />
-                          </button>
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(voucher.id);
-                            }}
-                            className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                            title="حذف"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          {/* Reversal action */}
+                          {voucher.is_reversed ? (
+                            <span
+                              className="px-2 py-0.5 bg-amber-100/80 text-amber-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
+                              title={language === 'ar' ? `تم عكس هذا السند بالمستند: ${voucher.reversed_by_doc_number || ''}` : `Reversed by: ${voucher.reversed_by_doc_number || ''}`}
+                            >
+                              <RotateCcw size={13} className="text-amber-700" />
+                              <span>معكوس</span>
+                            </span>
+                          ) : voucher.is_reversal_doc ? (
+                            <span
+                              className="px-2 py-0.5 bg-indigo-100/80 text-indigo-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
+                              title={language === 'ar' ? `سند عكسي للمستند: ${voucher.original_doc_number || ''}` : `Reversal of: ${voucher.original_doc_number || ''}`}
+                            >
+                              <RotateCcw size={13} className="text-indigo-700" />
+                              <span>عكسي</span>
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReversingVoucher(voucher);
+                              }}
+                              className="p-1.5 text-zinc-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                              title={language === 'ar' ? 'عكس السند (Reverse)' : 'Reverse Payment Voucher'}
+                            >
+                              <RotateCcw size={16} />
+                            </button>
+                          )}
+                          {!voucher.is_reversed && !voucher.is_reversal_doc && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditModal(voucher);
+                              }}
+                              className="p-1.5 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                              title="تعديل"
+                            >
+                              <Pencil size={16} />
+                            </button>
+                          )}
+                          {!voucher.is_reversed && !voucher.is_reversal_doc && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(voucher.id);
+                              }}
+                              className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                              title="حذف"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -3948,6 +3985,20 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                 <h3 className="text-xl font-bold text-zinc-900">سند صرف رقم {viewVoucher.id}</h3>
               </div>
               <div className="flex items-center gap-2">
+                {viewVoucher && !viewVoucher.is_reversed && !viewVoucher.is_reversal_doc && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const vc = viewVoucher;
+                      setViewVoucher(null);
+                      setReversingVoucher(vc);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-black transition-all"
+                  >
+                    <RotateCcw size={14} className="text-amber-700" />
+                    <span>{language === 'ar' ? 'عكس السند' : 'Reverse'}</span>
+                  </button>
+                )}
                 <button 
                   onClick={() => {
                     setActivityLogDocumentId(viewVoucher.id);
@@ -3991,6 +4042,18 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                   documentNumber={viewVoucher.voucher_number || viewVoucher.number}
                   documentDate={formatDate(viewVoucher.date)}
                   title="سند صرف"
+                />
+
+                <ReversalBanner
+                  isReversed={viewVoucher.is_reversed}
+                  reversedAt={viewVoucher.reversed_at}
+                  reversalReason={viewVoucher.reversal_reason}
+                  reversedByDocNumber={viewVoucher.reversed_by_doc_number}
+                  reversedByEntryNumber={viewVoucher.reversed_by_entry_number}
+                  reversalSettlementNumber={viewVoucher.reversal_settlement_number}
+                  isReversalDoc={viewVoucher.is_reversal_doc}
+                  originalDocNumber={viewVoucher.original_doc_number}
+                  originalEntryNumber={viewVoucher.original_entry_number}
                 />
                 
                 <div className="space-y-8">
@@ -4885,6 +4948,25 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
         category="payment_vouchers"
         documentId={activityLogDocumentId}
       />
+
+      {reversingVoucher && (
+        <ReversalModal
+          isOpen={!!reversingVoucher}
+          onClose={() => setReversingVoucher(null)}
+          onSuccess={() => {
+            setReversingVoucher(null);
+            window.dispatchEvent(new CustomEvent('refresh-payment-vouchers'));
+          }}
+          moduleName="payment_vouchers"
+          docId={reversingVoucher.id}
+          docNumber={reversingVoucher.voucher_number || reversingVoucher.number || reversingVoucher.id}
+          docDate={reversingVoucher.date}
+          docAmount={reversingVoucher.amount}
+          entityName={reversingVoucher.supplier_name || reversingVoucher.category_name}
+          entityType="supplier"
+          moduleTitleAr="سند صرف"
+        />
+      )}
     </div>
   );
 };

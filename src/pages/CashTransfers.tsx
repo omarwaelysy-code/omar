@@ -24,6 +24,8 @@ import { formatNumber, formatDate, formatMoney, parseNumber } from '../utils/for
 import { ExportButtons } from '../components/ExportButtons';
 import { PaginationControls } from '../components/PaginationControls';
 import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
+import { ReversalModal } from '../components/common/ReversalModal';
+import { ReversalBanner } from '../components/common/ReversalBanner';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -32,6 +34,7 @@ export const CashTransfers: React.FC = () => {
   const { showNotification } = useNotification();
   const { setPendingViewDoc, setCurrentPage } = useNavigation();
   const [transfers, setTransfers] = useState<CashTransfer[]>([]);
+  const [reversingTransfer, setReversingTransfer] = useState<CashTransfer | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [companyCurrencies, setCompanyCurrencies] = useState<Currency[]>([]);
@@ -899,28 +902,62 @@ export const CashTransfers: React.FC = () => {
                           >
                             <Eye size={15} />
                           </button>
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              loadTransferToForm(transfer);
-                              setIsModalOpen(true);
-                            }}
-                            className="p-1.5 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-                            title="تعديل"
-                          >
-                            <Pencil size={15} />
-                          </button>
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setTransferToDelete(transfer.id);
-                              setIsDeleteModalOpen(true);
-                            }}
-                            className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                            title="حذف"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                          {/* Reversal action */}
+                          {transfer.is_reversed ? (
+                            <span
+                              className="px-2 py-0.5 bg-amber-100/80 text-amber-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
+                              title={language === 'ar' ? `تم عكس هذا التحويل بالمستند: ${transfer.reversed_by_doc_number || ''}` : `Reversed by: ${transfer.reversed_by_doc_number || ''}`}
+                            >
+                              <RotateCcw size={13} className="text-amber-700" />
+                              <span>معكوس</span>
+                            </span>
+                          ) : transfer.is_reversal_doc ? (
+                            <span
+                              className="px-2 py-0.5 bg-indigo-100/80 text-indigo-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
+                              title={language === 'ar' ? `تحويل عكسي للمستند: ${transfer.original_doc_number || ''}` : `Reversal of: ${transfer.original_doc_number || ''}`}
+                            >
+                              <RotateCcw size={13} className="text-indigo-700" />
+                              <span>عكسي</span>
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReversingTransfer(transfer);
+                              }}
+                              className="p-1.5 text-zinc-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                              title={language === 'ar' ? 'عكس التحويل (Reverse)' : 'Reverse Transfer'}
+                            >
+                              <RotateCcw size={15} />
+                            </button>
+                          )}
+                          {!transfer.is_reversed && !transfer.is_reversal_doc && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                loadTransferToForm(transfer);
+                                setIsModalOpen(true);
+                              }}
+                              className="p-1.5 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                              title="تعديل"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                          {!transfer.is_reversed && !transfer.is_reversal_doc && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setTransferToDelete(transfer.id);
+                                setIsDeleteModalOpen(true);
+                              }}
+                              className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                              title="حذف"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1664,13 +1701,41 @@ export const CashTransfers: React.FC = () => {
               className="w-full max-w-lg bg-white h-full shadow-2xl flex flex-col"
             >
               <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
-                <h3 className="text-xl font-bold text-zinc-900">{language === 'ar' ? 'تفاصيل التحويل بين البنوك والخزائن' : 'Transfer Details'}</h3>
+                <div className="flex items-center gap-3">
+                  <h3 className="text-xl font-bold text-zinc-900">{language === 'ar' ? 'تفاصيل التحويل بين البنوك والخزائن' : 'Transfer Details'}</h3>
+                  {viewTransfer && !viewTransfer.is_reversed && !viewTransfer.is_reversal_doc && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const tr = viewTransfer;
+                        setShowSidePanel(false);
+                        setReversingTransfer(tr);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-black transition-all"
+                    >
+                      <RotateCcw size={14} className="text-amber-700" />
+                      <span>{language === 'ar' ? 'عكس التحويل' : 'Reverse'}</span>
+                    </button>
+                  )}
+                </div>
                 <button onClick={() => setShowSidePanel(false)} className="p-2 hover:bg-zinc-100 rounded-xl transition-all">
                   <X size={24} />
                 </button>
               </div>
               
               <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
+                <ReversalBanner
+                  isReversed={viewTransfer.is_reversed}
+                  reversedAt={viewTransfer.reversed_at}
+                  reversalReason={viewTransfer.reversal_reason}
+                  reversedByDocNumber={viewTransfer.reversed_by_doc_number}
+                  reversedByEntryNumber={viewTransfer.reversed_by_entry_number}
+                  reversalSettlementNumber={viewTransfer.reversal_settlement_number}
+                  isReversalDoc={viewTransfer.is_reversal_doc}
+                  originalDocNumber={viewTransfer.original_doc_number}
+                  originalEntryNumber={viewTransfer.original_entry_number}
+                />
+
                 <div className="flex items-center justify-between p-5 bg-zinc-50 rounded-2xl border border-zinc-100">
                   <div>
                     <p className="text-xs font-bold text-zinc-500 uppercase tracking-tighter mb-1">{language === 'ar' ? 'المبلغ المحول' : 'Transferred Amount'}</p>
@@ -1763,6 +1828,25 @@ export const CashTransfers: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {reversingTransfer && (
+        <ReversalModal
+          isOpen={!!reversingTransfer}
+          onClose={() => setReversingTransfer(null)}
+          onSuccess={() => {
+            setReversingTransfer(null);
+            window.dispatchEvent(new CustomEvent('refresh-cash-transfers'));
+          }}
+          moduleName="cash_transfers"
+          docId={reversingTransfer.id}
+          docNumber={reversingTransfer.transfer_number || reversingTransfer.id}
+          docDate={reversingTransfer.date}
+          docAmount={reversingTransfer.amount}
+          entityName={`${reversingTransfer.from_payment_method_name} ➔ ${reversingTransfer.to_payment_method_name}`}
+          entityType="general"
+          moduleTitleAr="تحويل خزائن ونقدية"
+        />
+      )}
     </div>
   );
 };

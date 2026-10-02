@@ -40,6 +40,8 @@ import { BarcodeScanner } from '../components/BarcodeScanner';
 import type { BarcodeScannerSettings } from '../hooks/useBarcodeScanner';
 import { DEFAULT_BARCODE_SETTINGS } from '../hooks/useBarcodeScanner';
 import { useEtaStatus } from '../hooks/useEtaStatus';
+import { ReversalModal } from '../components/common/ReversalModal';
+import { ReversalBanner } from '../components/common/ReversalBanner';
 
 export const Invoices: React.FC = () => {
   const { t, dir, language } = useLanguage();
@@ -49,6 +51,7 @@ export const Invoices: React.FC = () => {
   const { pendingViewDoc, setPendingViewDoc, setCurrentPage, closeTab } = useNavigation();
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [reversingInvoice, setReversingInvoice] = useState<Invoice | null>(null);
   const { showEtaColumns } = useEtaStatus(user?.company_id, invoices);
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
   const [isExportingPDFSelected, setIsExportingPDFSelected] = useState(false);
@@ -4472,7 +4475,37 @@ export const Invoices: React.FC = () => {
                                   <UploadCloud size={18} />
                                 )}
                               </button>
-                              {canEdit && (
+                              {/* Reversal action */}
+                              {inv.is_reversed ? (
+                                <span
+                                  className="px-2 py-1 bg-amber-100/80 text-amber-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
+                                  title={language === 'ar' ? `تم عكس هذه الفاتورة بالمستند: ${inv.reversed_by_doc_number || ''}` : `Reversed by: ${inv.reversed_by_doc_number || ''}`}
+                                >
+                                  <RotateCcw size={13} className="text-amber-700" />
+                                  <span>معكوسة</span>
+                                </span>
+                              ) : inv.is_reversal_doc ? (
+                                <span
+                                  className="px-2 py-1 bg-indigo-100/80 text-indigo-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
+                                  title={language === 'ar' ? `فاتورة عكسية للمستند: ${inv.original_doc_number || ''}` : `Reversal of: ${inv.original_doc_number || ''}`}
+                                >
+                                  <RotateCcw size={13} className="text-indigo-700" />
+                                  <span>عكسي</span>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setReversingInvoice(inv);
+                                  }}
+                                  className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all no-pdf"
+                                  title={language === 'ar' ? 'عكس الفاتورة (Reverse)' : 'Reverse Invoice'}
+                                >
+                                  <RotateCcw size={18} />
+                                </button>
+                              )}
+                              {!inv.is_reversed && !inv.is_reversal_doc && canEdit && (
                                 (inv.eta_uuid || inv.eta_status === 'Valid' || inv.eta_status === 'Submitted') ? (
                                   <span 
                                     className="p-2 text-slate-300 cursor-not-allowed rounded-lg inline-flex items-center"
@@ -4493,7 +4526,7 @@ export const Invoices: React.FC = () => {
                                   </button>
                                 )
                               )}
-                              {canDelete && (
+                              {!inv.is_reversed && !inv.is_reversal_doc && canDelete && (
                                 (inv.eta_uuid || inv.eta_status === 'Valid' || inv.eta_status === 'Submitted') ? (
                                   <span 
                                     className="p-2 text-slate-300 cursor-not-allowed rounded-lg inline-flex items-center"
@@ -6598,7 +6631,23 @@ export const Invoices: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center md:p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full h-full md:h-auto md:max-w-6xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col md:max-h-[90vh] border border-slate-200">
             <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
-              <h3 className="text-lg md:text-xl font-bold text-slate-900">{t('invoices.view_invoice')}</h3>
+              <div className="flex items-center gap-3">
+                <h3 className="text-lg md:text-xl font-bold text-slate-900">{t('invoices.view_invoice')}</h3>
+                {!viewInvoice.is_reversed && !viewInvoice.is_reversal_doc && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const inv = viewInvoice;
+                      setViewInvoice(null);
+                      setReversingInvoice(inv);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-black transition-all"
+                  >
+                    <RotateCcw size={14} className="text-amber-700" />
+                    <span>{language === 'ar' ? 'عكس الفاتورة' : 'Reverse'}</span>
+                  </button>
+                )}
+              </div>
               <button onClick={() => setViewInvoice(null)} className="p-2 text-slate-400 hover:text-slate-600"><X size={24} /></button>
             </div>
             
@@ -6608,6 +6657,18 @@ export const Invoices: React.FC = () => {
                   company={companyData} 
                   documentNumber={viewInvoice.invoice_number}
                   documentDate={formatDate(viewInvoice.date)}
+                />
+
+                <ReversalBanner
+                  isReversed={viewInvoice.is_reversed}
+                  reversedAt={viewInvoice.reversed_at}
+                  reversalReason={viewInvoice.reversal_reason}
+                  reversedByDocNumber={viewInvoice.reversed_by_doc_number}
+                  reversedByEntryNumber={viewInvoice.reversed_by_entry_number}
+                  reversalSettlementNumber={viewInvoice.reversal_settlement_number}
+                  isReversalDoc={viewInvoice.is_reversal_doc}
+                  originalDocNumber={viewInvoice.original_doc_number}
+                  originalEntryNumber={viewInvoice.original_entry_number}
                 />
 
                 <div className="grid grid-cols-2 gap-8 py-2">
@@ -7795,6 +7856,27 @@ export const Invoices: React.FC = () => {
             );
           }}
           onClose={() => setShowBarcodeScanner(false)}
+        />
+      )}
+
+      {reversingInvoice && (
+        <ReversalModal
+          isOpen={!!reversingInvoice}
+          onClose={() => setReversingInvoice(null)}
+          onSuccess={() => {
+            setReversingInvoice(null);
+            // Trigger refresh
+            setPage(p => p);
+            window.dispatchEvent(new CustomEvent('refresh-invoices'));
+          }}
+          moduleName="sales_invoices"
+          docId={reversingInvoice.id}
+          docNumber={reversingInvoice.invoice_number}
+          docDate={reversingInvoice.date}
+          docAmount={reversingInvoice.total_amount}
+          entityName={reversingInvoice.customer_name}
+          entityType="customer"
+          moduleTitleAr="فاتورة مبيعات"
         />
       )}
     </div>

@@ -2,7 +2,9 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Company, Supplier, Product, PaymentMethod, ExpenseCategory, Account, JournalEntry, JournalEntryItem, Operation, Department, CostCenter, Currency, ExchangeRate } from '../types';
+import { Company, Supplier, Product, PaymentMethod, ExpenseCategory, Account, JournalEntry, JournalEntryItem, Operation, Department, CostCenter, Currency, ExchangeRate, PurchaseInvoice } from '../types';
+import { ReversalModal } from '../components/common/ReversalModal';
+import { ReversalBanner } from '../components/common/ReversalBanner';
 import { 
   Search, Plus, Trash2, X, ShoppingCart, User, CreditCard, 
   Calendar, Hash, Package, Save, FileText, Pencil, Download, 
@@ -46,6 +48,7 @@ export const PurchaseInvoices: React.FC = () => {
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
   const { pendingViewDoc, setPendingViewDoc, setCurrentPage, closeTab, pendingEtaInvoiceForPurchase, setPendingEtaInvoiceForPurchase } = useNavigation();
+  const [reversingInvoice, setReversingInvoice] = useState<PurchaseInvoice | null>(null);
 
   // ETA Invoices Conversion State & Lock
   const [etaLockData, setEtaLockData] = useState<{
@@ -4694,26 +4697,60 @@ export const PurchaseInvoices: React.FC = () => {
                               >
                                 <Eye size={18} />
                               </button>
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openModal(inv);
-                                }}
-                                className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
-                                title={t('common.edit')}
-                              >
-                                <Pencil size={18} />
-                              </button>
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDelete(inv.id);
-                                }}
-                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
-                                title={t('common.delete')}
-                              >
-                                <Trash2 size={18} />
-                              </button>
+                              {/* Reversal action */}
+                              {inv.is_reversed ? (
+                                <span
+                                  className="px-2 py-1 bg-amber-100/80 text-amber-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
+                                  title={language === 'ar' ? `تم عكس هذه الفاتورة بالمستند: ${inv.reversed_by_doc_number || ''}` : `Reversed by: ${inv.reversed_by_doc_number || ''}`}
+                                >
+                                  <RotateCcw size={13} className="text-amber-700" />
+                                  <span>معكوسة</span>
+                                </span>
+                              ) : inv.is_reversal_doc ? (
+                                <span
+                                  className="px-2 py-1 bg-indigo-100/80 text-indigo-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
+                                  title={language === 'ar' ? `فاتورة عكسية للمستند: ${inv.original_doc_number || ''}` : `Reversal of: ${inv.original_doc_number || ''}`}
+                                >
+                                  <RotateCcw size={13} className="text-indigo-700" />
+                                  <span>عكسي</span>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setReversingInvoice(inv);
+                                  }}
+                                  className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all no-pdf"
+                                  title={language === 'ar' ? 'عكس الفاتورة (Reverse)' : 'Reverse Invoice'}
+                                >
+                                  <RotateCcw size={18} />
+                                </button>
+                              )}
+                              {!inv.is_reversed && !inv.is_reversal_doc && (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openModal(inv);
+                                  }}
+                                  className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
+                                  title={t('common.edit')}
+                                >
+                                  <Pencil size={18} />
+                                </button>
+                              )}
+                              {!inv.is_reversed && !inv.is_reversal_doc && (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDelete(inv.id);
+                                  }}
+                                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
+                                  title={t('common.delete')}
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -6461,7 +6498,23 @@ export const PurchaseInvoices: React.FC = () => {
           <div className="fixed inset-0 z-[60] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white w-full h-full md:h-auto md:max-w-5xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col md:max-h-[90vh]">
               <div className="p-4 md:p-6 border-b border-zinc-50 flex items-center justify-between sticky top-0 bg-white z-10">
-                <h3 className="text-lg font-bold text-zinc-900">{t('pi.view_invoice')}</h3>
+                <div className="flex items-center gap-3">
+                  <h3 className="text-lg font-bold text-zinc-900">{t('pi.view_invoice')}</h3>
+                  {!viewInvoice.is_reversed && !viewInvoice.is_reversal_doc && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const inv = viewInvoice;
+                        setViewInvoice(null);
+                        setReversingInvoice(inv);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-black transition-all"
+                    >
+                      <RotateCcw size={14} className="text-amber-700" />
+                      <span>{language === 'ar' ? 'عكس الفاتورة' : 'Reverse'}</span>
+                    </button>
+                  )}
+                </div>
                 <button onClick={() => setViewInvoice(null)} className="p-2 text-zinc-400 hover:text-zinc-600"><X size={24} /></button>
               </div>
               
@@ -6478,6 +6531,18 @@ export const PurchaseInvoices: React.FC = () => {
                     documentNumber={viewInvoice.invoice_number}
                     documentDate={viewInvoice.date}
                     title={t('pi.title')}
+                  />
+
+                  <ReversalBanner
+                    isReversed={viewInvoice.is_reversed}
+                    reversedAt={viewInvoice.reversed_at}
+                    reversalReason={viewInvoice.reversal_reason}
+                    reversedByDocNumber={viewInvoice.reversed_by_doc_number}
+                    reversedByEntryNumber={viewInvoice.reversed_by_entry_number}
+                    reversalSettlementNumber={viewInvoice.reversal_settlement_number}
+                    isReversalDoc={viewInvoice.is_reversal_doc}
+                    originalDocNumber={viewInvoice.original_doc_number}
+                    originalEntryNumber={viewInvoice.original_entry_number}
                   />
 
                   <div className="grid grid-cols-2 gap-8">
@@ -7675,6 +7740,25 @@ export const PurchaseInvoices: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {reversingInvoice && (
+        <ReversalModal
+          isOpen={!!reversingInvoice}
+          onClose={() => setReversingInvoice(null)}
+          onSuccess={() => {
+            setReversingInvoice(null);
+            window.dispatchEvent(new CustomEvent('refresh-purchase-invoices'));
+          }}
+          moduleName="purchase_invoices"
+          docId={reversingInvoice.id}
+          docNumber={reversingInvoice.invoice_number}
+          docDate={reversingInvoice.date}
+          docAmount={reversingInvoice.total_amount}
+          entityName={reversingInvoice.supplier_name}
+          entityType="supplier"
+          moduleTitleAr="فاتورة مشتريات"
+        />
       )}
     </div>
   );

@@ -17,6 +17,7 @@ import multer from 'multer';
 import { syncCOGSForJournalEntry, balanceAndValidateJournalEntry } from './sync-cogs';
 import { recordPurchase, recordSale, recordSalesReturn, recordPurchaseReturn, recalculateProductStock, reverseAndRecalculate, recordTransfer, recordAdjustment, recordGoodsReceipt } from './cost-engine';
 import { InventoryMovementService } from '../services/InventoryMovementService';
+import { ReversalEngine } from '../services/ReversalEngine';
 import { LicensingMiddleware } from './subscription/middlewares/LicensingMiddleware';
 import { FeatureFlagMiddleware } from './subscription/middlewares/FeatureFlagMiddleware';
 import { UsersLimitMiddleware } from './subscription/middlewares/limits/UsersLimitMiddleware';
@@ -15268,6 +15269,39 @@ router.get('/returns/:id/eta-status', authenticateToken, async (req: AuthRequest
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(400).json({ success: false, error: err.message || 'تعذر تحديث حالة المرتجع من الضرائب' });
+  }
+});
+
+// POST /api/erp/documents/reverse - Unified Reversal Endpoint
+router.post('/documents/reverse', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = getAuthenticatedCompanyId(req);
+  if (!companyId) return sendError(res, 401, 'Unauthorized');
+
+  const { moduleName, docId, reversalDate, reason } = req.body;
+  if (!moduleName || !docId || !reversalDate) {
+    return res.status(400).json({ success: false, error: 'جميع الحقول المطلوبة (النوع، المعرف، التاريخ) إلزامية.' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await ReversalEngine.reverseDocument(client, {
+      companyId,
+      userId: req.user?.id || 'system',
+      userName: req.user?.username || req.user?.name || req.user?.email || 'مستخدم النظام',
+      moduleName,
+      docId,
+      reversalDate,
+      reason: reason || ''
+    });
+    await client.query('COMMIT');
+    res.json(result);
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Error executing document reversal:', err);
+    res.status(400).json({ success: false, error: err.message || 'فشل عكس المستند' });
+  } finally {
+    client.release();
   }
 });
 

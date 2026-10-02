@@ -27,6 +27,8 @@ import { BarcodeScanner } from '../components/BarcodeScanner';
 import { DEFAULT_BARCODE_SETTINGS } from '../hooks/useBarcodeScanner';
 import type { BarcodeScannerSettings } from '../hooks/useBarcodeScanner';
 import { useEtaStatus } from '../hooks/useEtaStatus';
+import { ReversalModal } from '../components/common/ReversalModal';
+import { ReversalBanner } from '../components/common/ReversalBanner';
 
 export const Returns: React.FC = () => {
   const { user } = useAuth();
@@ -34,6 +36,7 @@ export const Returns: React.FC = () => {
   const { showNotification } = useNotification();
   const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
   const [returns, setReturns] = useState<Return[]>([]);
+  const [reversingReturn, setReversingReturn] = useState<Return | null>(null);
   const { showEtaColumns } = useEtaStatus(user?.company_id, returns);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -2178,24 +2181,56 @@ export const Returns: React.FC = () => {
                         >
                           <Eye size={18} />
                         </button>
-                        {ret.eta_uuid ? (
-                          <div 
-                            className="p-2 text-zinc-300 cursor-not-allowed rounded-lg"
-                            title={language === 'ar' ? 'لا يمكن حذف المرتجع بعد رفعه للضرائب' : 'Cannot delete return submitted to ETA'}
+                        {/* Reversal action */}
+                        {ret.is_reversed ? (
+                          <span
+                            className="px-2 py-1 bg-amber-100/80 text-amber-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
+                            title={language === 'ar' ? `تم عكس هذا المرتجع بالمستند: ${ret.reversed_by_doc_number || ''}` : `Reversed by: ${ret.reversed_by_doc_number || ''}`}
                           >
-                            <Lock size={18} />
-                          </div>
+                            <RotateCcw size={13} className="text-amber-700" />
+                            <span>معكوس</span>
+                          </span>
+                        ) : ret.is_reversal_doc ? (
+                          <span
+                            className="px-2 py-1 bg-indigo-100/80 text-indigo-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
+                            title={language === 'ar' ? `مرتجع عكسي للمستند: ${ret.original_doc_number || ''}` : `Reversal of: ${ret.original_doc_number || ''}`}
+                          >
+                            <RotateCcw size={13} className="text-indigo-700" />
+                            <span>عكسي</span>
+                          </span>
                         ) : (
-                          <button 
+                          <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDelete(ret.id);
+                              setReversingReturn(ret);
                             }}
-                            className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
-                            title={t('common.delete')}
+                            className="p-2 text-zinc-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all no-pdf"
+                            title={language === 'ar' ? 'عكس المرتجع (Reverse)' : 'Reverse Return'}
                           >
-                            <Trash2 size={18} />
+                            <RotateCcw size={18} />
                           </button>
+                        )}
+                        {!ret.is_reversed && !ret.is_reversal_doc && (
+                          ret.eta_uuid ? (
+                            <div 
+                              className="p-2 text-zinc-300 cursor-not-allowed rounded-lg"
+                              title={language === 'ar' ? 'لا يمكن حذف المرتجع بعد رفعه للضرائب' : 'Cannot delete return submitted to ETA'}
+                            >
+                              <Lock size={18} />
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(ret.id);
+                              }}
+                              className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
+                              title={t('common.delete')}
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )
                         )}
                       </div>
                     </td>
@@ -3724,7 +3759,23 @@ export const Returns: React.FC = () => {
           <div className="fixed inset-0 z-[60] flex items-center justify-center md:p-4 bg-zinc-900/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white w-full h-full md:h-auto md:max-w-6xl md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col md:max-h-[90vh] border border-slate-200">
               <div className="p-4 md:p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
-                <h3 className="text-lg md:text-xl font-bold text-slate-900">{t('returns.view_return')}</h3>
+                <div className="flex items-center gap-3">
+                  <h3 className="text-lg md:text-xl font-bold text-slate-900">{t('returns.view_return')}</h3>
+                  {!viewReturn.is_reversed && !viewReturn.is_reversal_doc && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const ret = viewReturn;
+                        setViewReturn(null);
+                        setReversingReturn(ret);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-black transition-all"
+                    >
+                      <RotateCcw size={14} className="text-amber-700" />
+                      <span>{language === 'ar' ? 'عكس المرتجع' : 'Reverse'}</span>
+                    </button>
+                  )}
+                </div>
                 <button onClick={() => setViewReturn(null)} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-100 rounded-xl transition-all"><X size={24} /></button>
               </div>
               
@@ -3734,6 +3785,18 @@ export const Returns: React.FC = () => {
                     company={company} 
                     documentNumber={viewReturn.return_number}
                     documentDate={formatDate(viewReturn.date)}
+                  />
+
+                  <ReversalBanner
+                    isReversed={viewReturn.is_reversed}
+                    reversedAt={viewReturn.reversed_at}
+                    reversalReason={viewReturn.reversal_reason}
+                    reversedByDocNumber={viewReturn.reversed_by_doc_number}
+                    reversedByEntryNumber={viewReturn.reversed_by_entry_number}
+                    reversalSettlementNumber={viewReturn.reversal_settlement_number}
+                    isReversalDoc={viewReturn.is_reversal_doc}
+                    originalDocNumber={viewReturn.original_doc_number}
+                    originalEntryNumber={viewReturn.original_entry_number}
                   />
 
                   <div className="grid grid-cols-2 gap-8 py-2">
@@ -4458,6 +4521,25 @@ export const Returns: React.FC = () => {
             );
           }}
           onClose={() => setShowBarcodeScanner(false)}
+        />
+      )}
+
+      {reversingReturn && (
+        <ReversalModal
+          isOpen={!!reversingReturn}
+          onClose={() => setReversingReturn(null)}
+          onSuccess={() => {
+            setReversingReturn(null);
+            window.dispatchEvent(new CustomEvent('refresh-returns'));
+          }}
+          moduleName="sales_returns"
+          docId={reversingReturn.id}
+          docNumber={reversingReturn.return_number}
+          docDate={reversingReturn.date}
+          docAmount={reversingReturn.total_amount}
+          entityName={reversingReturn.customer_name}
+          entityType="customer"
+          moduleTitleAr="مردودات مبيعات"
         />
       )}
     </div>

@@ -24,6 +24,8 @@ import { printDocument } from '../utils/printEngine';
 import { TransactionManager } from '../services/TransactionManager';
 import { VoucherSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog, ReceiptVoucher, Customer, Supplier, ExpenseCategory, PaymentMethod, JournalEntry, JournalEntryItem, Account, Company, Currency, Employee } from '../types';
+import { ReversalModal } from '../components/common/ReversalModal';
+import { ReversalBanner } from '../components/common/ReversalBanner';
 import { formatNumber, formatDate, formatMoney } from '../utils/formatUtils';
 import { PaginationControls } from '../components/PaginationControls';
 import { useViewPreference } from '../hooks/useViewPreference';
@@ -37,6 +39,7 @@ export const Receipts: React.FC = () => {
   const { showNotification } = useNotification();
   const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
   const [receipts, setReceipts] = useState<ReceiptVoucher[]>([]);
+  const [reversingReceipt, setReversingReceipt] = useState<ReceiptVoucher | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
@@ -2459,26 +2462,60 @@ export const Receipts: React.FC = () => {
                           >
                             <Printer size={16} />
                           </button>
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openEditModal(receipt);
-                            }}
-                            className="p-1.5 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-                            title="تعديل"
-                          >
-                            <Pencil size={16} />
-                          </button>
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(receipt.id);
-                            }}
-                            className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                            title="حذف"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          {/* Reversal action */}
+                          {receipt.is_reversed ? (
+                            <span
+                              className="px-2 py-0.5 bg-amber-100/80 text-amber-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
+                              title={language === 'ar' ? `تم عكس هذا السند بالمستند: ${receipt.reversed_by_doc_number || ''}` : `Reversed by: ${receipt.reversed_by_doc_number || ''}`}
+                            >
+                              <RotateCcw size={13} className="text-amber-700" />
+                              <span>معكوس</span>
+                            </span>
+                          ) : receipt.is_reversal_doc ? (
+                            <span
+                              className="px-2 py-0.5 bg-indigo-100/80 text-indigo-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
+                              title={language === 'ar' ? `سند عكسي للمستند: ${receipt.original_doc_number || ''}` : `Reversal of: ${receipt.original_doc_number || ''}`}
+                            >
+                              <RotateCcw size={13} className="text-indigo-700" />
+                              <span>عكسي</span>
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReversingReceipt(receipt);
+                              }}
+                              className="p-1.5 text-zinc-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                              title={language === 'ar' ? 'عكس السند (Reverse)' : 'Reverse Receipt'}
+                            >
+                              <RotateCcw size={16} />
+                            </button>
+                          )}
+                          {!receipt.is_reversed && !receipt.is_reversal_doc && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditModal(receipt);
+                              }}
+                              className="p-1.5 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                              title="تعديل"
+                            >
+                              <Pencil size={16} />
+                            </button>
+                          )}
+                          {!receipt.is_reversed && !receipt.is_reversal_doc && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(receipt.id);
+                              }}
+                              className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                              title="حذف"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -3701,6 +3738,20 @@ export const Receipts: React.FC = () => {
                 <h3 className="text-xl font-bold text-zinc-900">سند قبض رقم {viewReceipt.id}</h3>
               </div>
               <div className="flex items-center gap-2">
+                {viewReceipt && !viewReceipt.is_reversed && !viewReceipt.is_reversal_doc && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const rec = viewReceipt;
+                      setViewReceipt(null);
+                      setReversingReceipt(rec);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-black transition-all"
+                  >
+                    <RotateCcw size={14} className="text-amber-700" />
+                    <span>{language === 'ar' ? 'عكس السند' : 'Reverse'}</span>
+                  </button>
+                )}
                 <button 
                   onClick={() => {
                     setActivityLogDocumentId(viewReceipt.id);
@@ -3744,6 +3795,18 @@ export const Receipts: React.FC = () => {
                   documentNumber={viewReceipt.voucher_number || viewReceipt.id}
                   documentDate={formatDate(viewReceipt.date)}
                   title="سند قبض"
+                />
+
+                <ReversalBanner
+                  isReversed={viewReceipt.is_reversed}
+                  reversedAt={viewReceipt.reversed_at}
+                  reversalReason={viewReceipt.reversal_reason}
+                  reversedByDocNumber={viewReceipt.reversed_by_doc_number}
+                  reversedByEntryNumber={viewReceipt.reversed_by_entry_number}
+                  reversalSettlementNumber={viewReceipt.reversal_settlement_number}
+                  isReversalDoc={viewReceipt.is_reversal_doc}
+                  originalDocNumber={viewReceipt.original_doc_number}
+                  originalEntryNumber={viewReceipt.original_entry_number}
                 />
                 
                 <div className="space-y-8">
@@ -4588,6 +4651,25 @@ export const Receipts: React.FC = () => {
         }} 
         documentId={activityLogDocumentId}
       />
+
+      {reversingReceipt && (
+        <ReversalModal
+          isOpen={!!reversingReceipt}
+          onClose={() => setReversingReceipt(null)}
+          onSuccess={() => {
+            setReversingReceipt(null);
+            window.dispatchEvent(new CustomEvent('refresh-receipts'));
+          }}
+          moduleName="receipt_vouchers"
+          docId={reversingReceipt.id}
+          docNumber={reversingReceipt.voucher_number || reversingReceipt.id}
+          docDate={reversingReceipt.date}
+          docAmount={reversingReceipt.amount}
+          entityName={reversingReceipt.customer_name}
+          entityType="customer"
+          moduleTitleAr="سند قبض"
+        />
+      )}
     </div>
   );
 };

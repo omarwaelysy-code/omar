@@ -334,7 +334,7 @@ export interface PaymentMethod {
   contact_phone?: string;
 }
 
-export interface CashTransfer {
+export interface CashTransfer extends ReversalTrackingFields {
   id: string;
   date: string;
   amount: number;
@@ -414,7 +414,23 @@ export interface Product {
   is_active?: boolean;
 }
 
-export interface Invoice {
+export interface ReversalTrackingFields {
+  is_reversed?: boolean;
+  reversed_at?: string;
+  reversal_reason?: string;
+  reversed_by_doc_id?: string;
+  reversed_by_doc_number?: string;
+  reversed_by_entry_id?: string;
+  reversed_by_entry_number?: string;
+  is_reversal_doc?: boolean;
+  original_doc_id?: string;
+  original_doc_number?: string;
+  original_entry_id?: string;
+  original_entry_number?: string;
+  reversal_settlement_number?: string;
+}
+
+export interface Invoice extends ReversalTrackingFields {
   id: string;
   invoice_number: string;
   customer_id: string;
@@ -462,7 +478,7 @@ export interface Invoice {
   attachments?: AttachmentItem[];
 }
 
-export interface PurchaseInvoice {
+export interface PurchaseInvoice extends ReversalTrackingFields {
   id: string;
   invoice_number: string;
   supplier_id: string;
@@ -541,7 +557,7 @@ export interface ReceiptVoucherItem {
   settlement_date?: string;
 }
 
-export interface ReceiptVoucher {
+export interface ReceiptVoucher extends ReversalTrackingFields {
   id: string;
   customer_id?: string;
   customer_name?: string;
@@ -582,7 +598,7 @@ export interface PaymentVoucherItem {
   settlement_date?: string;
 }
 
-export interface PaymentVoucher {
+export interface PaymentVoucher extends ReversalTrackingFields {
   id: string;
   voucher_number?: string;
   internal_reference?: string;
@@ -765,7 +781,7 @@ export interface ReceivedChequeStats {
   futureReceivablesCount?: number;
 }
 
-export interface Return {
+export interface Return extends ReversalTrackingFields {
   id: string;
   return_number: string;
   customer_id: string;
@@ -802,7 +818,7 @@ export interface Return {
   attachments?: AttachmentItem[];
 }
 
-export interface PurchaseReturn {
+export interface PurchaseReturn extends ReversalTrackingFields {
   id: string;
   return_number: string;
   supplier_id: string;
@@ -853,7 +869,7 @@ export interface ReturnItem {
   withholding_tax_amount?: number;
 }
 
-export interface CustomerDiscount {
+export interface CustomerDiscount extends ReversalTrackingFields {
   id: string;
   customer_id: string;
   customer_name?: string;
@@ -863,7 +879,7 @@ export interface CustomerDiscount {
   attachments?: AttachmentItem[];
 }
 
-export interface SupplierDiscount {
+export interface SupplierDiscount extends ReversalTrackingFields {
   id: string;
   supplier_id: string;
   supplier_name?: string;
@@ -966,7 +982,7 @@ export interface Setting {
   created_at?: string;
 }
 
-export interface JournalEntry {
+export interface JournalEntry extends ReversalTrackingFields {
   id: string;
   date: string;
   description: string;
@@ -1250,7 +1266,7 @@ export interface OpeningStockItem {
   created_at?: string;
 }
 
-export interface OpeningStockBalance {
+export interface OpeningStockBalance extends ReversalTrackingFields {
   id: string;
   company_id: string;
   document_number: string;

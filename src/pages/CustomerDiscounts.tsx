@@ -18,15 +18,16 @@ import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { PaginationControls } from '../components/PaginationControls';
 import { ExportButtons } from '../components/ExportButtons';
 import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
+import { ReversalModal } from '../components/common/ReversalModal';
+import { ReversalBanner } from '../components/common/ReversalBanner';
 import { useRef } from 'react';
-
-
 
 export const CustomerDiscounts: React.FC = () => {
   const { user } = useAuth();
   const { showNotification } = useNotification();
   const { t, dir, language } = useLanguage();
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [reversingDiscount, setReversingDiscount] = useState<any | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [discounts, setDiscounts] = useState<any[]>([]);
@@ -564,13 +565,45 @@ export const CustomerDiscounts: React.FC = () => {
                     <td className="px-6 py-4 text-zinc-500 text-sm">{discount.notes || '-'}</td>
                     <td className="px-6 py-4 text-left">
                       <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button 
-                          onClick={() => openEditModal(discount)}
-                          className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
-                          title="تعديل"
-                        >
-                          <Tag size={18} />
-                        </button>
+                        {/* Reversal action */}
+                        {discount.is_reversed ? (
+                          <span
+                            className="px-2 py-0.5 bg-amber-100/80 text-amber-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
+                            title={language === 'ar' ? `تم عكس هذا الخصم بالمستند: ${discount.reversed_by_doc_number || ''}` : `Reversed by: ${discount.reversed_by_doc_number || ''}`}
+                          >
+                            <RotateCcw size={13} className="text-amber-700" />
+                            <span>معكوس</span>
+                          </span>
+                        ) : discount.is_reversal_doc ? (
+                          <span
+                            className="px-2 py-0.5 bg-indigo-100/80 text-indigo-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
+                            title={language === 'ar' ? `إشعار خصم عكسي للمستند: ${discount.original_doc_number || ''}` : `Reversal of: ${discount.original_doc_number || ''}`}
+                          >
+                            <RotateCcw size={13} className="text-indigo-700" />
+                            <span>عكسي</span>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setReversingDiscount(discount);
+                            }}
+                            className="p-2 text-zinc-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"
+                            title={language === 'ar' ? 'عكس الخصم (Reverse)' : 'Reverse Discount'}
+                          >
+                            <RotateCcw size={18} />
+                          </button>
+                        )}
+                        {!discount.is_reversed && !discount.is_reversal_doc && (
+                          <button 
+                            onClick={() => openEditModal(discount)}
+                            className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                            title="تعديل"
+                          >
+                            <Tag size={18} />
+                          </button>
+                        )}
                         <button 
                           onClick={() => {
                             setActivityLogDocumentId(discount.id);
@@ -581,12 +614,14 @@ export const CustomerDiscounts: React.FC = () => {
                         >
                           <History size={18} />
                         </button>
-                        <button 
-                          onClick={() => handleDelete(discount.id)}
-                          className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                        >
-                          <Trash2 size={18} />
-                        </button>
+                        {!discount.is_reversed && !discount.is_reversal_doc && (
+                          <button 
+                            onClick={() => handleDelete(discount.id)}
+                            className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -684,6 +719,20 @@ export const CustomerDiscounts: React.FC = () => {
                 </div>
               </button>
               <div className="w-px h-6 bg-zinc-200 mx-2" />
+              {editingDiscount && !editingDiscount.is_reversed && !editingDiscount.is_reversal_doc && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const d = editingDiscount;
+                    closeModal();
+                    setReversingDiscount(d);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-black transition-all"
+                >
+                  <RotateCcw size={14} className="text-amber-700" />
+                  <span>{language === 'ar' ? 'عكس الإشعار' : 'Reverse'}</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setShowSidePanel(!showSidePanel)}
@@ -759,6 +808,19 @@ export const CustomerDiscounts: React.FC = () => {
             </AnimatePresence>
 
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32 md:pb-8">
+              {editingDiscount && (
+                <ReversalBanner
+                  isReversed={editingDiscount.is_reversed}
+                  reversedAt={editingDiscount.reversed_at}
+                  reversalReason={editingDiscount.reversal_reason}
+                  reversedByDocNumber={editingDiscount.reversed_by_doc_number}
+                  reversedByEntryNumber={editingDiscount.reversed_by_entry_number}
+                  reversalSettlementNumber={editingDiscount.reversal_settlement_number}
+                  isReversalDoc={editingDiscount.is_reversal_doc}
+                  originalDocNumber={editingDiscount.original_doc_number}
+                  originalEntryNumber={editingDiscount.original_entry_number}
+                />
+              )}
               <SmartAIInput 
                 onDataExtracted={(data) => {
                   if (data.customerName) {
@@ -1074,6 +1136,25 @@ export const CustomerDiscounts: React.FC = () => {
         category="customer_discounts"
         documentId={activityLogDocumentId}
       />
+
+      {reversingDiscount && (
+        <ReversalModal
+          isOpen={!!reversingDiscount}
+          onClose={() => setReversingDiscount(null)}
+          onSuccess={() => {
+            setReversingDiscount(null);
+            fetchDiscounts();
+          }}
+          moduleName="customer_discounts"
+          docId={reversingDiscount.id}
+          docNumber={reversingDiscount.number || reversingDiscount.id}
+          docDate={reversingDiscount.date}
+          docAmount={reversingDiscount.amount}
+          entityName={reversingDiscount.customer_name}
+          entityType="customer"
+          moduleTitleAr="خصم عميل"
+        />
+      )}
     </div>
   );
 };
