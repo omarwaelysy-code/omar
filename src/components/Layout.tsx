@@ -986,24 +986,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
     };
 
     return navItems.map(item => {
-      // 1. Check if top-level menu is disabled
-      const topFeatureKey = topLevelFeatureMap[item.id];
-      if (topFeatureKey && disabledFeatures.has(topFeatureKey)) {
-        return null;
-      }
-
-      // 2. Check top-level permission if not company admin
-      if (!isCompanyAdmin) {
-        const canView = hasPermission(item.id, 'view') || item.id === 'currencies' || item.id === 'templates_menu' || item.id === 'pos_menu' || item.id === 'eta_menu' || item.id === 'flexible_operations';
-        if (!canView && !item.subItems) return null;
-      }
-
-      // 3. Filter sub-items
+      // If item has sub-items, its visibility is determined by whether it has any enabled sub-items/reports:
+      // "فى حالة تحديد اى شاشة او تقرير يعنى ذلك معنه تحديد النظام نفسة والعكس فى حالة عدم تحديد اى شىء فلا معنى من تحديد النظام"
       if (item.subItems) {
         const visibleSubItems = (item.subItems as any[]).filter((sub: any) => {
           if (sub.isDivider || sub.isHeader) return true;
 
-          // Check if sub-item is disabled in Feature Flags
+          // Check if sub-item or report is disabled in Feature Flags
           const subKey = subItemFeatureMap[sub.id] || sub.id;
           if (disabledFeatures.has(subKey) || disabledFeatures.has(sub.id)) {
             return false;
@@ -1034,10 +1023,23 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           return true;
         });
 
+        // In case any screen or report is enabled, the system is visible!
+        // If nothing is enabled, the system is hidden!
         if (cleanedSubItems.length > 0) {
           return { ...item, subItems: cleanedSubItems };
         }
         return null;
+      }
+
+      // Standalone top-level item without sub-items
+      const topFeatureKey = topLevelFeatureMap[item.id] || item.id;
+      if (disabledFeatures.has(topFeatureKey)) {
+        return null;
+      }
+
+      if (!isCompanyAdmin) {
+        const canView = hasPermission(item.id, 'view') || item.id === 'currencies' || item.id === 'templates_menu' || item.id === 'pos_menu' || item.id === 'eta_menu' || item.id === 'flexible_operations';
+        if (!canView) return null;
       }
 
       return item;

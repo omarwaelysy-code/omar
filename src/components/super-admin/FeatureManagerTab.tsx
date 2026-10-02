@@ -46,6 +46,7 @@ interface FeatureItem {
 
 interface FeatureCategory {
   id: string;
+  systemKey: string;
   nameAr: string;
   nameEn: string;
   icon: any;
@@ -63,6 +64,7 @@ interface FeatureCategory {
 const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
   {
     id: 'dashboard',
+    systemKey: 'dashboard',
     nameAr: 'لوحة التحكم',
     nameEn: 'Dashboard',
     icon: LayoutDashboard,
@@ -74,11 +76,13 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
   },
   {
     id: 'master_data',
+    systemKey: 'master_data',
     nameAr: 'البيانات الأساسية',
     nameEn: 'Master Data',
     icon: Database,
     color: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', badge: 'bg-blue-500' },
     modules: [
+      { id: 'master_data', nameAr: 'نظام البيانات الأساسية', nameEn: 'Core Master Data' },
       { id: 'customers', nameAr: 'العملاء', nameEn: 'Customers' },
       { id: 'suppliers', nameAr: 'الموردين', nameEn: 'Suppliers' },
       { id: 'employees', nameAr: 'الموظفين', nameEn: 'Employees' },
@@ -90,6 +94,7 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
   },
   {
     id: 'inventory',
+    systemKey: 'inventory',
     nameAr: 'المخازن والمستودعات',
     nameEn: 'Warehouses & Inventory',
     icon: Package,
@@ -113,6 +118,7 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
   },
   {
     id: 'sales',
+    systemKey: 'sales',
     nameAr: 'المبيعات والعملاء',
     nameEn: 'Sales & Invoicing',
     icon: ShoppingCart,
@@ -135,6 +141,7 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
   },
   {
     id: 'purchases',
+    systemKey: 'purchases',
     nameAr: 'المشتريات والموردين',
     nameEn: 'Purchases & Procurement',
     icon: Truck,
@@ -156,6 +163,7 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
   },
   {
     id: 'eta',
+    systemKey: 'eta_integration',
     nameAr: 'الفاتورة والضرائب الإلكترونية (ETA)',
     nameEn: 'Egyptian Tax Authority (ETA)',
     icon: Receipt,
@@ -170,6 +178,7 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
   },
   {
     id: 'cash',
+    systemKey: 'cash',
     nameAr: 'النقدية والبنوك',
     nameEn: 'Cash & Banking',
     icon: Coins,
@@ -188,6 +197,7 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
   },
   {
     id: 'cheques',
+    systemKey: 'cheques',
     nameAr: 'الشيكات المصرفية',
     nameEn: 'Bank Cheques',
     icon: Landmark,
@@ -200,6 +210,7 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
   },
   {
     id: 'operations',
+    systemKey: 'flexible_operations',
     nameAr: 'العمليات المرنة',
     nameEn: 'Flexible Operations',
     icon: Layers,
@@ -213,6 +224,7 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
   },
   {
     id: 'accounting',
+    systemKey: 'accounting',
     nameAr: 'الحسابات العامة والقيود',
     nameEn: 'General Ledger & Accounting',
     icon: BookOpen,
@@ -234,6 +246,7 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
   },
   {
     id: 'fixed_assets',
+    systemKey: 'fixed_assets',
     nameAr: 'الأصول الثابتة',
     nameEn: 'Fixed Assets',
     icon: Briefcase,
@@ -249,6 +262,7 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
   },
   {
     id: 'templates',
+    systemKey: 'templates',
     nameAr: 'القوالب والتصميم',
     nameEn: 'Document Templates',
     icon: LayoutTemplate,
@@ -260,6 +274,7 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
   },
   {
     id: 'reports',
+    systemKey: 'reports',
     nameAr: 'قائمة التقارير العامة',
     nameEn: 'Reports Center',
     icon: BarChart3,
@@ -273,6 +288,7 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
   },
   {
     id: 'pos',
+    systemKey: 'pos',
     nameAr: 'نقاط البيع (POS)',
     nameEn: 'Point of Sale',
     icon: Radio,
@@ -284,6 +300,7 @@ const SYSTEM_FEATURE_CATEGORIES: FeatureCategory[] = [
   },
   {
     id: 'admin',
+    systemKey: 'admin',
     nameAr: 'الإدارة والأمان وإعدادات النظام',
     nameEn: 'Administration & System',
     icon: Settings,
@@ -370,6 +387,9 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
             map[f.id] = true;
           });
         }
+        if (cat.systemKey) {
+          map[cat.systemKey] = true;
+        }
       });
 
       // Override with DB data
@@ -378,6 +398,19 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
           map[item.feature_name] = item.is_enabled;
         });
       }
+
+      // Synchronize systemKey according to the rule:
+      // "فى حالة تحديد اى شاشة او تقرير يعنى ذلك معنه تحديد النظام نفسة والعكس فى حالة عدم تحديد اى شىء فلا معنى من تحديد النظام"
+      SYSTEM_FEATURE_CATEGORIES.forEach(cat => {
+        const systemKey = cat.systemKey;
+        if (!systemKey) return;
+        const allItems = [...cat.modules, ...(cat.reports || [])];
+        const childItems = allItems.filter(item => item.id !== systemKey);
+        if (childItems.length > 0) {
+          const anyChildActive = childItems.some(item => map[item.id] === true);
+          map[systemKey] = anyChildActive;
+        }
+      });
 
       setFeatureMap(map);
       setInitialFeatureMap({ ...map });
@@ -389,12 +422,38 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
     }
   };
 
-  // Toggle single feature
-  const toggleFeature = (featureId: string) => {
-    setFeatureMap(prev => ({
-      ...prev,
-      [featureId]: !prev[featureId]
-    }));
+  // Toggle single feature with automatic systemKey synchronization:
+  // "فى حالة تحديد اى شاشة او تقرير يعنى ذلك معنه تحديد النظام نفسة والعكس فى حالة عدم تحديد اى شىء فلا معنى من تحديد النظام"
+  const toggleFeature = (category: FeatureCategory, featureId: string) => {
+    setFeatureMap(prev => {
+      const updated = { ...prev };
+      const systemKey = category.systemKey;
+      const allCategoryItems = [...category.modules, ...(category.reports || [])];
+
+      // If user toggles the master system feature itself (e.g. inventory / sales / etc.)
+      if (featureId === systemKey) {
+        const nextSystemState = !prev[systemKey];
+        updated[systemKey] = nextSystemState;
+        // Cascade to all modules & reports in this category
+        allCategoryItems.forEach(item => {
+          updated[item.id] = nextSystemState;
+        });
+        return updated;
+      }
+
+      // User toggles an individual module screen or report
+      const nextFeatureState = !prev[featureId];
+      updated[featureId] = nextFeatureState;
+
+      // Check if any child item (excluding systemKey) is now enabled
+      const childItems = allCategoryItems.filter(item => item.id !== systemKey);
+      const isAnyChildActive = childItems.some(item => updated[item.id] === true);
+
+      // Rule: selecting any screen or report enables the system; if nothing is selected, the system is disabled
+      updated[systemKey] = isAnyChildActive;
+
+      return updated;
+    });
   };
 
   // Toggle entire category (both modules & reports)
@@ -408,6 +467,9 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
       allItems.forEach(f => {
         updated[f.id] = targetState;
       });
+      if (category.systemKey) {
+        updated[category.systemKey] = targetState;
+      }
       return updated;
     });
   };
@@ -423,6 +485,14 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
       category.reports!.forEach(f => {
         updated[f.id] = targetState;
       });
+      // Check if any child item in category is now enabled
+      const systemKey = category.systemKey;
+      const allItems = [...category.modules, ...category.reports!];
+      const childItems = allItems.filter(item => item.id !== systemKey);
+      const isAnyChildActive = childItems.some(item => updated[item.id] === true);
+      if (systemKey) {
+        updated[systemKey] = isAnyChildActive;
+      }
       return updated;
     });
   };
@@ -439,6 +509,9 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
           cat.reports.forEach(f => {
             updated[f.id] = true;
           });
+        }
+        if (cat.systemKey) {
+          updated[cat.systemKey] = true;
         }
       });
       return updated;
@@ -457,6 +530,9 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
           cat.reports.forEach(f => {
             updated[f.id] = false;
           });
+        }
+        if (cat.systemKey) {
+          updated[cat.systemKey] = false;
         }
       });
       return updated;
@@ -822,7 +898,7 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
                         return (
                           <div
                             key={feature.id}
-                            onClick={() => toggleFeature(feature.id)}
+                            onClick={() => toggleFeature(category, feature.id)}
                             className={`px-2 py-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-2 select-none min-h-[38px] ${
                               isEnabled 
                                 ? 'bg-emerald-50/50 border-emerald-300/80 hover:border-emerald-400 shadow-2xs' 
@@ -878,7 +954,7 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
                           return (
                             <div
                               key={report.id}
-                              onClick={() => toggleFeature(report.id)}
+                              onClick={() => toggleFeature(category, report.id)}
                               className={`px-2 py-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-2 select-none min-h-[38px] ${
                                 isEnabled 
                                   ? 'bg-sky-50/60 border-sky-300 hover:border-sky-400 shadow-2xs' 
