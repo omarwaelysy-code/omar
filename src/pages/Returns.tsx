@@ -1931,42 +1931,47 @@ export const Returns: React.FC = () => {
     <div className="space-y-3 animate-in fade-in duration-500">
       {!isModalOpen ? (
         <>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight text-zinc-900">{t('returns.title')}</h2>
-          <p className="text-xs text-zinc-500">{t('returns.subtitle')}</p>
+          {/* Header Line 1: Title & Actions in a single compact row */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-lg font-bold tracking-tight text-zinc-900">{t('returns.title')}</h2>
+              <span className="text-xs text-zinc-400 hidden md:inline">| {t('returns.subtitle')}</span>
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button 
+                onClick={() => openModal()}
+                className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-sm shadow-emerald-500/20"
+              >
+                <Plus size={15} />
+                <span>{t('returns.add')}</span>
+              </button>
+              <ExportButtons 
+                onExportExcel={handleExportExcel} 
+                onExportPDF={handleExportPDF} 
+                onPrint={() => printElement(tableRef.current, 'مرتجعات المبيعات')}
+                size="sm"
+              />
+              <button 
+                onClick={() => setIsActivityLogOpen(true)}
+                className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-white text-zinc-600 border border-zinc-200 rounded-xl text-xs font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm"
+                title={t('common.activity_log')}
+              >
+                <History size={15} />
+                <span className="hidden md:inline">{t('common.activity_log')}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Header Line 2: Full-width compact summary strip */}
           {serverSummary.total_amount !== undefined && (
-            <div className={`mt-1.5 flex items-center gap-2 text-xs ${dir === 'rtl' ? 'flex-row-reverse' : ''}`}>
-               <span className="bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-lg border border-emerald-100 font-bold text-xs">
-                 {t('returns.summary_total')}: {formatMoney(serverSummary.total_amount)} {t('returns.currency')}
-               </span>
+            <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-white border border-zinc-200/80 rounded-xl shadow-xs text-xs">
+              <div className="flex items-center gap-1.5">
+                <span className="text-zinc-500 text-xs font-medium">{t('returns.summary_total')}:</span>
+                <span className="font-bold text-emerald-700">{formatMoney(serverSummary.total_amount)} <span className="text-[10px] text-zinc-400 font-mono">{t('returns.currency')}</span></span>
+              </div>
             </div>
           )}
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <button 
-            onClick={() => setIsActivityLogOpen(true)}
-            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white text-zinc-600 border border-zinc-200 rounded-xl text-xs font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm"
-            title={t('common.activity_log')}
-          >
-            <History size={16} />
-            <span className="hidden md:inline">{t('common.activity_log')}</span>
-          </button>
-          <ExportButtons 
-            onExportExcel={handleExportExcel} 
-            onExportPDF={handleExportPDF} 
-            onPrint={() => printElement(tableRef.current, 'مرتجعات المبيعات')}
-            size="sm"
-          />
-          <button 
-            onClick={() => openModal()}
-            className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-sm shadow-emerald-200"
-          >
-            <Plus size={16} />
-            {t('returns.add')}
-          </button>
-        </div>
-      </div>
 
       <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
         <div className="p-3 border-b border-zinc-50 flex items-center justify-between gap-3">
