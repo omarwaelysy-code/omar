@@ -3827,8 +3827,8 @@ export const Invoices: React.FC = () => {
             />
 
             {view === 'table' ? (
-              <div ref={tableRef} id="invoices-list-table" className="overflow-x-auto hidden md:block [transform:rotateX(180deg)]">
-                <table className="w-full [transform:rotateX(180deg)]">
+              <div ref={tableRef} id="invoices-list-table" className="overflow-x-auto hidden md:block">
+                <table className="w-full">
                   <thead>
                     <tr className="bg-slate-50/50 text-slate-500 text-[10px] uppercase tracking-widest font-bold border-b border-slate-100">
                       <th className="px-6 py-0.5 text-center w-12 no-pdf whitespace-nowrap">

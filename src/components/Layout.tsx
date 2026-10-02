@@ -74,6 +74,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { Company, Product } from '../types';
 
 import { Logo } from './Logo';
+import { FixedBottomScrollBar } from './FixedBottomScrollBar';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -1507,6 +1508,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             className="flex-1 overflow-y-auto p-4 md:p-6 pb-36 md:pb-10"
           >
             {children}
+          </div>
+
+          {/* Universal Fixed Bottom Scrollbar for all screens */}
+          <div className="mb-20 md:mb-0 shrink-0">
+            <FixedBottomScrollBar />
           </div>
 
           {/* Mobile Bottom Navigation - Floating Pill */}
