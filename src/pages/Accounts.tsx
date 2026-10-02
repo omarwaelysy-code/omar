@@ -117,19 +117,84 @@ export const Accounts: React.FC = () => {
     return Array.from(map.values());
   }, [groupedAndFilteredOptions]);
 
+  const formatMoney = (val: number) => {
+    return Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const accountBalances = React.useMemo(() => {
+    const balances: Record<string, { current: number; debit: number; credit: number }> = {};
+    accounts.forEach(acc => {
+      balances[acc.id] = {
+        current: Number(acc.opening_balance || 0),
+        debit: 0,
+        credit: 0
+      };
+    });
+
+    entries.forEach(entry => {
+      const itemsList = (entry.items && Array.isArray(entry.items)) ? entry.items : ((entry as any).lines || []);
+      itemsList.forEach((item: any) => {
+        if (item.account_id && balances[item.account_id]) {
+          balances[item.account_id].debit += Number(item.debit || 0);
+          balances[item.account_id].credit += Number(item.credit || 0);
+        }
+      });
+    });
+
+    accounts.forEach(acc => {
+      const type = types.find(t => t.id === acc.type_id);
+      const classification = type?.classification || '';
+      const b = balances[acc.id];
+      if (!b) return;
+      const isDebitNormal = ['asset', 'expense', 'cost', 'cash_and_equivalents', 'receivables', 'interest_expense', 'depreciation', 'other_expense'].includes(classification);
+      const opening = Number(acc.opening_balance || 0);
+      if (isDebitNormal) {
+        b.current = opening + (b.debit - b.credit);
+      } else {
+        b.current = opening + (b.credit - b.debit);
+      }
+    });
+
+    return balances;
+  }, [accounts, entries, types]);
+
   const handleExportExcel = () => {
     const headers = {
-      'code': t('accounts.column_code'),
-      'name': t('accounts.column_name'),
-      'type_name': t('accounts.column_type'),
-      'account_usage_label': language === 'ar' ? 'استخدام الحساب' : 'Account Usage'
+      'code': language === 'ar' ? 'كود الحساب' : 'Account Code',
+      'name': language === 'ar' ? 'اسم الحساب' : 'Account Name',
+      'type_name': language === 'ar' ? 'نوع الحساب' : 'Account Type',
+      'type_code': language === 'ar' ? 'كود النوع' : 'Type Code',
+      'statement_type': language === 'ar' ? 'التابعية (القائمة)' : 'Statement',
+      'classification': language === 'ar' ? 'التصنيف' : 'Classification',
+      'account_usage_label': language === 'ar' ? 'استخدام الحساب' : 'Account Usage',
+      'parent_name': language === 'ar' ? 'الحساب الأب' : 'Parent Account',
+      'opening_balance': language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance',
+      'opening_balance_date': language === 'ar' ? 'تاريخ الرصيد' : 'Opening Date',
+      'current_balance': language === 'ar' ? 'الرصيد الحالي' : 'Current Balance',
+      'status': language === 'ar' ? 'الحالة' : 'Status'
     };
-    const mappedAccounts = accounts.map(a => ({
-      ...a,
-      account_usage_label: getAccountUsageLabel(a.account_usage, language)
-    }));
+    const mappedAccounts = accounts.map(a => {
+      const type = types.find(t => t.id === a.type_id);
+      const parent = accounts.find(p => p.id === a.parent_id);
+      const bal = accountBalances[a.id]?.current ?? Number(a.opening_balance || 0);
+      return {
+        ...a,
+        type_name: type?.name || a.type_name || '',
+        type_code: type?.code || '',
+        statement_type: type?.statement_type === 'balance_sheet' 
+          ? (language === 'ar' ? 'الميزانية العمومية' : 'Balance Sheet') 
+          : (type?.statement_type === 'income_statement' ? (language === 'ar' ? 'قائمة الدخل' : 'Income Statement') : ''),
+        classification: getClassificationLabel(type?.classification),
+        account_usage_label: getAccountUsageLabel(a.account_usage, language),
+        parent_name: parent ? `${parent.code} - ${parent.name}` : '-',
+        opening_balance: Number(a.opening_balance || 0),
+        opening_balance_date: a.opening_balance_date || '-',
+        current_balance: bal,
+        status: a.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'معطل' : 'Inactive')
+      };
+    });
     const formattedData = formatDataForExcel(mappedAccounts, headers);
-    exportToExcel(formattedData, { filename: 'Accounts_List', sheetName: language === 'ar' ? 'الحسابات' : 'Accounts' });
+    exportToExcel(formattedData, { filename: 'Accounts_List', sheetName: language === 'ar' ? 'دليل الحسابات' : 'Accounts' });
   };
 
   const handleExportPDF = async () => {
@@ -403,36 +468,53 @@ export const Accounts: React.FC = () => {
     setUsageSearchTerm('');
   };
 
-  const filteredAccounts = accounts.filter(a => 
-    a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getAccountUsageLabel(a.account_usage, language).toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const sortedFilteredAccounts = React.useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    const filtered = accounts.filter(a => {
+      if (!term) return true;
+      const type = types.find(t => t.id === a.type_id);
+      const parent = accounts.find(p => p.id === a.parent_id);
+      const usage = getAccountUsageLabel(a.account_usage, language);
+      const classification = type ? getClassificationLabel(type.classification) : '';
+      return (
+        a.name.toLowerCase().includes(term) ||
+        a.code.toLowerCase().includes(term) ||
+        (type?.name && type.name.toLowerCase().includes(term)) ||
+        (type?.code && type.code.toLowerCase().includes(term)) ||
+        (parent?.name && parent.name.toLowerCase().includes(term)) ||
+        (parent?.code && parent.code.toLowerCase().includes(term)) ||
+        usage.toLowerCase().includes(term) ||
+        classification.toLowerCase().includes(term)
+      );
+    });
+
+    return [...filtered].sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+  }, [accounts, searchTerm, types, language]);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 max-w-[1400px] mx-auto p-4 md:p-8" dir={dir}>
+    <div className="space-y-4 animate-in fade-in duration-500 max-w-[1600px] mx-auto p-3 md:p-6" dir={dir}>
       {!isModalOpen ? (
         <>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 bg-emerald-600 text-white rounded-3xl flex items-center justify-center shadow-xl shadow-emerald-500/20">
-            <BookOpen size={28} />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+            <BookOpen size={24} />
           </div>
           <div>
-            <h2 className="text-3xl font-black tracking-tight text-slate-900 italic serif">{t('accounts.title')}</h2>
-            <p className="text-slate-500 font-medium">{t('accounts.subtitle')}</p>
+            <h2 className="text-2xl font-black tracking-tight text-slate-900 italic serif">{t('accounts.title')}</h2>
+            <p className="text-xs text-slate-500 font-medium">{t('accounts.subtitle')}</p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <button 
             onClick={() => {
               setActivityLogDocumentId(undefined);
               setIsActivityLogOpen(true);
             }}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-white text-slate-600 border border-slate-200 rounded-xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-xs text-xs"
             title={language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
           >
-            <History size={20} />
+            <History size={16} />
             <span className="hidden md:inline">{language === 'ar' ? 'سجل النشاط' : 'Activity Log'}</span>
           </button>
           <ExportButtons 
@@ -441,177 +523,302 @@ export const Accounts: React.FC = () => {
           />
           <button 
             onClick={() => setIsExcelImportModalOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-2xl font-bold hover:bg-emerald-100 transition-all active:scale-95 shadow-sm"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl font-bold hover:bg-emerald-100 transition-all active:scale-95 shadow-xs text-xs"
             title={language === 'ar' ? 'استيراد دليل الحسابات والأنواع من إكسيل' : 'Import Accounts from Excel'}
           >
-            <Upload size={20} className="text-emerald-600" />
+            <Upload size={16} className="text-emerald-600" />
             <span className="hidden md:inline">{language === 'ar' ? 'استيراد إكسيل' : 'Import Excel'}</span>
           </button>
           {accounts.length === 0 && (
             <button 
               onClick={() => setIsCoaWizardOpen(true)}
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-indigo-50 text-indigo-600 rounded-2xl font-bold hover:bg-indigo-100 transition-all active:scale-95 border border-indigo-200"
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-indigo-50 text-indigo-600 rounded-xl font-bold hover:bg-indigo-100 transition-all active:scale-95 border border-indigo-200 text-xs"
               title={language === 'ar' ? 'إنشاء دليل محاسبي افتراضي' : 'Generate Default COA'}
             >
-              <Sparkles size={20} />
+              <Sparkles size={16} />
               <span className="hidden md:inline">{language === 'ar' ? 'دليل آلي' : 'Auto COA'}</span>
             </button>
           )}
           <button 
             onClick={() => openModal()}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20 active:scale-95 border border-emerald-500/50"
+            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-md shadow-emerald-500/20 active:scale-95 border border-emerald-500/50 text-xs"
           >
-            <Plus size={20} />
+            <Plus size={16} />
             {t('accounts.add')}
           </button>
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/30">
+      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="relative flex-1 group w-full">
-          <Search className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={20} />
+          <Search className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={16} />
           <input 
             type="text" 
-            placeholder={t('accounts.search_placeholder')}
-            className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/50 outline-none transition-all font-bold text-slate-900 placeholder:text-slate-400`}
+            placeholder={language === 'ar' ? 'بحث باسم الحساب، الكود، النوع، التصنيف أو الاستخدام...' : t('accounts.search_placeholder')}
+            className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2 bg-slate-50/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500/50 outline-none transition-all font-bold text-xs text-slate-900 placeholder:text-slate-400`}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
-        <div className="flex bg-zinc-100 p-1.5 rounded-2xl gap-1 shrink-0">
+        <div className="flex bg-zinc-100 p-1 rounded-xl gap-1 shrink-0">
           <button 
             type="button"
             onClick={() => setView('card')} 
-            className={`p-2 rounded-xl transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-700'}`}
+            className={`p-1.5 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-xs' : 'text-slate-400 hover:text-slate-700'}`}
             title="عرض كروت"
           >
-            <LayoutGrid size={18} />
+            <LayoutGrid size={16} />
           </button>
           <button 
             type="button"
             onClick={() => setView('table')} 
-            className={`p-2 rounded-xl transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-700'}`}
+            className={`p-1.5 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-xs' : 'text-slate-400 hover:text-slate-700'}`}
             title="عرض جدول"
           >
-            <List size={18} />
+            <List size={16} />
           </button>
         </div>
       </div>
 
       {view === 'table' && !loading ? (
-        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm" dir={dir}>
-          <table ref={tableRef} className="w-full text-right border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className={`px-6 py-4 text-sm font-bold text-slate-700 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.column_code')}</th>
-                <th className={`px-6 py-4 text-sm font-bold text-slate-700 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.column_name')}</th>
-                <th className={`px-6 py-4 text-sm font-bold text-slate-700 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('accounts.column_type')}</th>
-                <th className={`px-6 py-4 text-sm font-bold text-slate-700 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'استخدام الحساب' : 'Account Usage'}</th>
-                <th className="px-6 py-4 text-sm font-bold text-slate-700 text-left no-pdf">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-              {filteredAccounts.map((account) => (
-                <tr 
-                  key={account.id}
-                  onClick={() => openModal(account)}
-                  className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
-                >
-                  <td className="px-6 py-4 font-mono font-bold text-emerald-600 text-sm">
-                    {account.code}
-                  </td>
-                  <td className="px-6 py-4 font-bold text-slate-900">
-                    {account.name}
-                  </td>
-                  <td 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPendingAccountTypeEditId(account.type_id);
-                      setCurrentPage('account_types');
-                    }}
-                    className="px-6 py-4 text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer font-bold"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span>{account.type_name}</span>
-                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${account.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                        {account.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 font-bold text-slate-800">
-                    {getAccountUsageLabel(account.account_usage, language)}
-                  </td>
-                  <td className="px-6 py-4 text-left no-pdf">
-                    <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActivityLogDocumentId(account.id);
-                          setIsActivityLogOpen(true);
-                        }}
-                        className="p-2 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
-                        title={language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
-                      >
-                        <History size={16} />
-                      </button>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openModal(account);
-                        }}
-                        className="p-2 text-slate-300 hover:text-sky-600 hover:bg-sky-50 rounded-xl transition-all"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      {isDefaultAccount(account) ? (
-                        <span className="p-2 text-slate-300" title="حساب افتراضي محمي من الحذف">
-                          <Lock size={16} />
-                        </span>
-                      ) : (
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(account.id);
-                          }}
-                          className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
-                          title="حذف الحساب"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs" dir={dir}>
+          <div className="overflow-x-auto custom-scrollbar">
+            <table ref={tableRef} className="w-full text-right border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold whitespace-nowrap">
+                  <th className="py-2.5 px-2 w-8 text-center text-slate-400">#</th>
+                  <th className="py-2.5 px-2.5 w-24">كود الحساب</th>
+                  <th className="py-2.5 px-3 min-w-[150px]">اسم الحساب</th>
+                  <th className="py-2.5 px-2.5 min-w-[120px]">نوع الحساب</th>
+                  <th className="py-2.5 px-2.5 w-28 text-center">تابع لـ (القائمة)</th>
+                  <th className="py-2.5 px-2.5 w-24 text-center">التصنيف</th>
+                  <th className="py-2.5 px-2.5 min-w-[110px]">استخدام الحساب</th>
+                  <th className="py-2.5 px-2.5 min-w-[120px]">الحساب الأب</th>
+                  <th className="py-2.5 px-2.5 w-28 text-center">الرصيد الافتتاحي</th>
+                  <th className="py-2.5 px-2.5 w-24 text-center">تاريخ الرصيد</th>
+                  <th className="py-2.5 px-2.5 w-28 text-center">الرصيد الحالي</th>
+                  <th className="py-2.5 px-2 w-16 text-center">فرعي</th>
+                  <th className="py-2.5 px-2 w-16 text-center">الحالة</th>
+                  <th className="py-2.5 px-2 w-20 text-center no-pdf">الإجراءات</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {loading ? (
-            [1,2,3,4,5,6].map(i => <div key={i} className="h-24 bg-slate-100 animate-pulse rounded-3xl border border-slate-200" />)
-          ) : filteredAccounts.map(account => (
-          <div key={account.id} className="group bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 hover:border-emerald-200 transition-all duration-300 flex flex-col justify-between gap-4" dir={dir}>
-            <div className="flex items-start justify-between gap-4">
-               <div className={`flex items-center gap-3 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse text-left'}`}>
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold border border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300 shadow-sm">
-                    <BookOpen size={24} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-black text-slate-900 tracking-tight leading-tight group-hover:text-emerald-700 transition-colors">{account.name}</h3>
-                    <div className={`flex items-center gap-2 mt-1.5 flex-wrap ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                      <span className="font-mono text-[10px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md uppercase tracking-wider border border-slate-200">{account.code}</span>
-                      <span 
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                {sortedFilteredAccounts.map((account, index) => {
+                  const type = types.find(t => t.id === account.type_id);
+                  const parent = accounts.find(p => p.id === account.parent_id);
+                  const bal = accountBalances[account.id]?.current ?? Number(account.opening_balance || 0);
+                  const opening = Number(account.opening_balance || 0);
+                  const isOpeningDebit = opening > 0;
+
+                  return (
+                    <tr 
+                      key={account.id}
+                      onClick={() => openModal(account)}
+                      className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
+                    >
+                      {/* 1. Index */}
+                      <td className="py-1.5 px-2 text-center font-mono text-[11px] text-slate-400">
+                        {index + 1}
+                      </td>
+
+                      {/* 2. Code */}
+                      <td className="py-1.5 px-2.5 font-mono font-bold text-emerald-600 text-xs whitespace-nowrap">
+                        {account.code}
+                      </td>
+
+                      {/* 3. Name */}
+                      <td className="py-1.5 px-3 font-bold text-slate-900 whitespace-nowrap">
+                        {account.name}
+                      </td>
+
+                      {/* 4. Type */}
+                      <td 
                         onClick={(e) => {
                           e.stopPropagation();
                           setPendingAccountTypeEditId(account.type_id);
                           setCurrentPage('account_types');
                         }}
-                        className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md uppercase tracking-wider cursor-pointer hover:bg-emerald-100 transition-colors"
+                        className="py-1.5 px-2.5 text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer font-bold whitespace-nowrap"
+                        title="انتقل إلى أنواع الحسابات"
                       >
-                        {account.type_name}
-                      </span>
+                        {type ? (
+                          <span>
+                            {type.name} <span className="font-mono text-[10px] text-slate-400">({type.code})</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">{account.type_name || '-'}</span>
+                        )}
+                      </td>
+
+                      {/* 5. Statement Type */}
+                      <td className="py-1.5 px-2.5 text-center whitespace-nowrap">
+                        {type?.statement_type ? (
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            type.statement_type === 'balance_sheet'
+                              ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                              : 'bg-purple-50 text-purple-700 border border-purple-200/60'
+                          }`}>
+                            {type.statement_type === 'balance_sheet' ? 'الميزانية العمومية' : 'قائمة الدخل'}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">-</span>
+                        )}
+                      </td>
+
+                      {/* 6. Classification */}
+                      <td className="py-1.5 px-2.5 text-center whitespace-nowrap">
+                        {type?.classification ? (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200/60">
+                            {getClassificationLabel(type.classification)}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">-</span>
+                        )}
+                      </td>
+
+                      {/* 7. Usage */}
+                      <td className="py-1.5 px-2.5 whitespace-nowrap">
+                        {account.account_usage ? (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                            {getAccountUsageLabel(account.account_usage, language)}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">-</span>
+                        )}
+                      </td>
+
+                      {/* 8. Parent */}
+                      <td className="py-1.5 px-2.5 text-slate-600 whitespace-nowrap">
+                        {parent ? (
+                          <span title={`${parent.code} - ${parent.name}`}>
+                            <span className="font-mono text-[10px] text-slate-400 font-bold">{parent.code}</span> {parent.name}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">-</span>
+                        )}
+                      </td>
+
+                      {/* 9. Opening Balance */}
+                      <td className="py-1.5 px-2.5 text-center font-mono whitespace-nowrap">
+                        <span className={`font-bold ${opening !== 0 ? (isOpeningDebit ? 'text-blue-700' : 'text-amber-700') : 'text-slate-400'}`}>
+                          {formatMoney(Math.abs(opening))}
+                        </span>
+                        {opening !== 0 && (
+                          <span className="text-[9px] text-slate-400 mr-1">
+                            ({isOpeningDebit ? 'مدين' : 'دائن'})
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 10. Opening Date */}
+                      <td className="py-1.5 px-2.5 text-center font-mono text-[10px] text-slate-500 whitespace-nowrap">
+                        {account.opening_balance_date || '-'}
+                      </td>
+
+                      {/* 11. Current Balance */}
+                      <td className="py-1.5 px-2.5 text-center font-mono font-black whitespace-nowrap">
+                        <span className={bal > 0 ? 'text-emerald-700' : (bal < 0 ? 'text-rose-700' : 'text-slate-500')}>
+                          {formatMoney(bal)}
+                        </span>
+                      </td>
+
+                      {/* 12. Required Sub Account */}
+                      <td className="py-1.5 px-2 text-center whitespace-nowrap">
+                        {account.required_sub_account ? (
+                          <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200/60">نعم</span>
+                        ) : (
+                          <span className="text-slate-300">-</span>
+                        )}
+                      </td>
+
+                      {/* 13. Status */}
+                      <td className="py-1.5 px-2 text-center whitespace-nowrap">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                          account.is_active !== false 
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60' 
+                            : 'bg-slate-100 text-slate-500 border-slate-200'
+                        }`}>
+                          {account.is_active !== false ? 'نشط' : 'معطل'}
+                        </span>
+                      </td>
+
+                      {/* 14. Actions */}
+                      <td className="py-1.5 px-2 text-center no-pdf whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActivityLogDocumentId(account.id);
+                              setIsActivityLogOpen(true);
+                            }}
+                            className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                            title={language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
+                          >
+                            <History size={14} />
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openModal(account);
+                            }}
+                            className="p-1 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all"
+                            title={language === 'ar' ? 'تعديل الحساب' : 'Edit Account'}
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          {isDefaultAccount(account) ? (
+                            <span className="p-1 text-amber-500" title="حساب افتراضي محمي من الحذف">
+                              <Lock size={14} />
+                            </span>
+                          ) : (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(account.id);
+                              }}
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                              title="حذف الحساب"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {loading ? (
+            [1,2,3,4,5,6].map(i => <div key={i} className="h-24 bg-slate-100 animate-pulse rounded-3xl border border-slate-200" />)
+          ) : sortedFilteredAccounts.map(account => {
+            const type = types.find(t => t.id === account.type_id);
+            return (
+              <div key={account.id} className="group bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 hover:border-emerald-200 transition-all duration-300 flex flex-col justify-between gap-4" dir={dir}>
+                <div className="flex items-start justify-between gap-4">
+                   <div className={`flex items-center gap-3 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse text-left'}`}>
+                      <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold border border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300 shadow-sm">
+                        <BookOpen size={24} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-black text-slate-900 tracking-tight leading-tight group-hover:text-emerald-700 transition-colors">{account.name}</h3>
+                        <div className={`flex items-center gap-2 mt-1.5 flex-wrap ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                          <span className="font-mono text-[10px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md uppercase tracking-wider border border-slate-200">{account.code}</span>
+                          <span 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPendingAccountTypeEditId(account.type_id);
+                              setCurrentPage('account_types');
+                            }}
+                            className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md uppercase tracking-wider cursor-pointer hover:bg-emerald-100 transition-colors"
+                          >
+                            {type?.name || account.type_name || '-'}
+                          </span>
                       <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${account.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
                         {account.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
                       </span>
