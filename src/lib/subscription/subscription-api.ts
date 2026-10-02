@@ -143,6 +143,27 @@ router.get('/:companyId/features', authenticateToken, authorizeRoles('super_admi
   }
 });
 
+// Batch update features for a company
+router.put('/:companyId/features', authenticateToken, authorizeRoles('super_admin'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { companyId } = req.params;
+    const { features } = req.body;
+    
+    if (!features) {
+      return res.status(400).json({ error: 'Features payload is required' });
+    }
+
+    const featureList = Array.isArray(features)
+      ? features
+      : Object.entries(features).map(([featureName, isEnabled]) => ({ featureName, isEnabled: Boolean(isEnabled) }));
+
+    await featureService.batchUpdateFeatures(companyId, featureList);
+    res.json({ success: true, message: 'Features updated successfully' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Toggle a feature for a company
 router.put('/:companyId/features/:featureName', authenticateToken, authorizeRoles('super_admin'), async (req: AuthRequest, res: Response) => {
   try {

@@ -1557,7 +1557,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
           )}
 
           {activeTab === 'feature-manager' && (
-            <FeatureManagerTab companies={companies} />
+            <FeatureManagerTab companies={companies} users={users} />
           )}
 
           {activeTab === 'settings' && (

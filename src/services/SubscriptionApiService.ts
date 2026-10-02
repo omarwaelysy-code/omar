@@ -24,7 +24,7 @@ const API_BASE = '/api/subscriptions';
 
 class SubscriptionApiService {
   private getHeaders(): Record<string, string> {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
     return {
       'Content-Type': 'application/json',
       'Authorization': token ? `Bearer ${token}` : '',
@@ -98,6 +98,13 @@ class SubscriptionApiService {
     return this.fetchApi<any>(`/${companyId}/features/${featureName}`, {
       method: 'PUT',
       body: JSON.stringify({ isEnabled }),
+    });
+  }
+
+  async batchUpdateFeatures(companyId: string, features: { featureName: string; isEnabled: boolean }[]): Promise<any> {
+    return this.fetchApi<any>(`/${companyId}/features`, {
+      method: 'PUT',
+      body: JSON.stringify({ features }),
     });
   }
 }
