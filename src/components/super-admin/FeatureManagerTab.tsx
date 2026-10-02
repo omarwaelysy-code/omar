@@ -278,7 +278,7 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
 
   // Helper to find manager email for a company
   const getManagerEmail = (company: Company): string => {
-    const adminUser = users.find(u => u.company_id === company.id && (u.role === 'company_admin' || u.role === 'admin'));
+    const adminUser = users.find(u => u.company_id === company.id && (u.role === 'admin' || (u.role as string) === 'company_admin' || u.role === 'manager'));
     if (adminUser?.email) return adminUser.email;
     return company.email || '';
   };
