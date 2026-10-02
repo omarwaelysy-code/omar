@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, User as UserIcon, ArrowRight, Eye, EyeOff, Languages, Shield, AlertCircle, MonitorX, LogIn } from 'lucide-react';
+import { Lock, User as UserIcon, ArrowRight, Eye, EyeOff, Languages, Shield, AlertCircle, MonitorX, LogIn, Home, ArrowLeft } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Logo } from '../components/Logo';
@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface LoginProps {
   onToggle: () => void;
+  onBack?: () => void;
 }
 
 interface SessionConflict {
@@ -17,7 +18,7 @@ interface SessionConflict {
   password: string;
 }
 
-export const Login: React.FC<LoginProps> = ({ onToggle }) => {
+export const Login: React.FC<LoginProps> = ({ onToggle, onBack }) => {
   const { t, dir, language, setLanguage } = useLanguage();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
@@ -117,13 +118,26 @@ export const Login: React.FC<LoginProps> = ({ onToggle }) => {
         <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-brand-primary/5 blur-[120px] rounded-full" />
       </div>
 
-      <div className={`absolute top-8 ${dir === 'rtl' ? 'left-8' : 'right-8'}`}>
+      {/* Navigation Buttons: Main Website & Language */}
+      <div className={`absolute top-6 ${dir === 'rtl' ? 'right-6 sm:right-8' : 'left-6 sm:left-8'} z-20`}>
+        <button 
+          type="button"
+          onClick={() => onBack ? onBack() : (window.location.href = '/')}
+          className="flex items-center gap-2 px-3.5 py-2 bg-white/90 backdrop-blur-md border border-slate-200/90 rounded-xl text-slate-700 font-bold hover:text-emerald-700 hover:border-emerald-300 hover:bg-white transition-all shadow-sm active:scale-95 text-xs sm:text-sm"
+          title={language === 'ar' ? 'العودة للموقع الرئيسي' : 'Return to Home'}
+        >
+          <Home size={16} className="text-emerald-600" />
+          <span>{language === 'ar' ? 'الموقع التعريفي' : 'Main Website'}</span>
+        </button>
+      </div>
+
+      <div className={`absolute top-6 ${dir === 'rtl' ? 'left-6 sm:left-8' : 'right-6 sm:right-8'} z-20`}>
         <button 
           onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
-          className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-md border border-slate-200 rounded-xl text-slate-600 font-bold hover:bg-white transition-all shadow-sm active:scale-95"
+          className="flex items-center gap-2 px-3.5 py-2 bg-white/90 backdrop-blur-md border border-slate-200/90 rounded-xl text-slate-600 font-bold hover:bg-white transition-all shadow-sm active:scale-95 text-xs sm:text-sm"
         >
-          <Languages size={20} />
-          <span className="text-sm">{language === 'ar' ? 'English' : 'العربية'}</span>
+          <Languages size={16} />
+          <span>{language === 'ar' ? 'English' : 'العربية'}</span>
         </button>
       </div>
 
@@ -256,13 +270,24 @@ export const Login: React.FC<LoginProps> = ({ onToggle }) => {
           </form>
 
           {/* Security badges */}
-          <div className="mt-8 flex items-center justify-center gap-6 border-t border-slate-100 pt-8 opacity-60">
+          <div className="mt-8 flex items-center justify-center gap-6 border-t border-slate-100 pt-6 opacity-70">
             <div className="flex items-center gap-1.5">
               <Shield size={14} className="text-slate-400" />
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Secure AES-256</span>
             </div>
             <div className="w-1 h-1 rounded-full bg-slate-200" />
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">ERP Premium v2.0</span>
+          </div>
+
+          {/* Direct Return to Landing Page */}
+          <div className="mt-4 pt-3 border-t border-slate-100/60 text-center">
+            <button 
+              type="button" 
+              onClick={() => onBack ? onBack() : (window.location.href = '/')}
+              className="inline-flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-emerald-600 transition-colors p-1"
+            >
+              <span>{language === 'ar' ? '← العودة إلى الموقع التعريفي والخدمات' : '← Back to Website & Services'}</span>
+            </button>
           </div>
         </div>
         

@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Logo } from '../Logo';
 import { motion } from 'framer-motion';
+import { LogIn } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
 interface LandingHeaderProps {
   activeSection: string;
   onGetStarted: () => void;
+  onLogin?: () => void;
   onNavigateToSection: (sectionId: string) => void;
 }
 
 export const LandingHeader: React.FC<LandingHeaderProps> = ({ 
   activeSection, 
   onGetStarted,
+  onLogin,
   onNavigateToSection 
 }) => {
   const [scrolled, setScrolled] = useState(false);
@@ -80,14 +83,23 @@ export const LandingHeader: React.FC<LandingHeaderProps> = ({
           })}
         </nav>
 
-        {/* Right Section: Language Switcher + Get Started Button */}
-        <div className="flex items-center gap-3 sm:gap-4">
+        {/* Right Section: Language Switcher + Sign In + Get Started Button */}
+        <div className="flex items-center gap-2 sm:gap-3">
           <LanguageSwitcher />
 
           <button
             type="button"
+            onClick={onLogin || onGetStarted}
+            className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 text-slate-700 hover:text-[#1B853A] hover:bg-slate-50 border border-slate-200/80 rounded-xl font-bold text-sm transition-all duration-200 active:scale-[0.98] cursor-pointer shrink-0"
+          >
+            <LogIn className="w-4 h-4 text-[#1B853A]" />
+            <span>{t('landing.nav.log_in') || 'تسجيل الدخول'}</span>
+          </button>
+
+          <button
+            type="button"
             onClick={onGetStarted}
-            className="bg-[#1B853A] hover:bg-[#167431] active:scale-[0.98] text-white px-6 sm:px-7 py-2.5 rounded-xl font-semibold text-base transition-all duration-200 shadow-xs hover:shadow-md cursor-pointer shrink-0"
+            className="bg-[#1B853A] hover:bg-[#167431] active:scale-[0.98] text-white px-4 sm:px-6 py-2 rounded-xl font-semibold text-sm transition-all duration-200 shadow-xs hover:shadow-md cursor-pointer shrink-0 hidden sm:inline-flex"
           >
             {t('landing.nav.get_started')}
           </button>

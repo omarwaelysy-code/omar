@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { Shield, Lock, User as UserIcon, ArrowRight, Building2, Mail, Languages } from 'lucide-react';
+import { Shield, Lock, User as UserIcon, ArrowRight, Building2, Mail, Languages, Home } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
 
 interface RegisterProps {
   onToggle: () => void;
+  onBack?: () => void;
 }
 
-export const Register: React.FC<RegisterProps> = ({ onToggle }) => {
+export const Register: React.FC<RegisterProps> = ({ onToggle, onBack }) => {
   const { t, dir, language, setLanguage } = useLanguage();
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
@@ -70,12 +71,24 @@ export const Register: React.FC<RegisterProps> = ({ onToggle }) => {
 
   return (
     <div className="min-h-screen bg-stone-50 flex items-center justify-center p-4 relative" dir={dir}>
-      <div className={`absolute top-8 ${dir === 'rtl' ? 'left-8' : 'right-8'}`}>
+      {/* Navigation Buttons: Main Website & Language */}
+      <div className={`absolute top-6 ${dir === 'rtl' ? 'right-6 sm:right-8' : 'left-6 sm:left-8'} z-20`}>
+        <button 
+          type="button"
+          onClick={() => onBack ? onBack() : (window.location.href = '/')}
+          className="flex items-center gap-2 px-3.5 py-2 bg-white/90 backdrop-blur-md border border-zinc-200 rounded-xl text-zinc-700 font-bold hover:text-emerald-700 hover:border-emerald-300 hover:bg-white transition-all shadow-sm active:scale-95 text-xs sm:text-sm"
+        >
+          <Home size={16} className="text-emerald-600" />
+          <span>{language === 'ar' ? 'الموقع التعريفي' : 'Main Website'}</span>
+        </button>
+      </div>
+
+      <div className={`absolute top-6 ${dir === 'rtl' ? 'left-6 sm:left-8' : 'right-6 sm:right-8'} z-20`}>
         <button 
           onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-zinc-200 rounded-2xl text-zinc-600 font-bold hover:bg-zinc-50 transition-all shadow-sm"
+          className="flex items-center gap-2 px-3.5 py-2 bg-white/90 backdrop-blur-md border border-zinc-200 rounded-xl text-zinc-600 font-bold hover:bg-white transition-all shadow-sm active:scale-95 text-xs sm:text-sm"
         >
-          <Languages size={20} />
+          <Languages size={16} />
           <span>{language === 'ar' ? 'English' : 'العربية'}</span>
         </button>
       </div>
@@ -183,12 +196,20 @@ export const Register: React.FC<RegisterProps> = ({ onToggle }) => {
             </button>
           </form>
           
-          <div className="mt-8 text-center">
+          <div className="mt-6 flex flex-col items-center gap-3">
             <button 
+              type="button"
               onClick={onToggle}
               className="text-sm text-emerald-600 font-bold hover:underline"
             >
               {t('common.have_account')}
+            </button>
+            <button 
+              type="button"
+              onClick={() => onBack ? onBack() : (window.location.href = '/')}
+              className="text-xs text-zinc-500 hover:text-emerald-700 font-medium transition-colors"
+            >
+              {language === 'ar' ? '← العودة إلى الموقع التعريفي' : '← Back to Website'}
             </button>
           </div>
         </div>

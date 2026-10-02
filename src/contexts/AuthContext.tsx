@@ -464,7 +464,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Preserve preferred_company_ on logout so last opened company is remembered upon re-login
     setUser(null);
     setUserMemberships([]);
-    window.location.href = '/login';
+    window.location.href = '/';
   };
 
   const isSuperAdmin = isSuperAdminAccount && workspaceMode === 'super_admin';

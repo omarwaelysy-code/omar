@@ -57,6 +57,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, onLogin 
       <LandingHeader 
         activeSection={activeSection}
         onGetStarted={onGetStarted}
+        onLogin={onLogin}
         onNavigateToSection={handleNavigateToSection}
       />
 

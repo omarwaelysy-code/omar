@@ -250,12 +250,13 @@ export async function apiRequest<T>(path: string, method: string = 'GET', body?:
       
       if (error.error === 'SESSION_INVALIDATED') {
         // Session was invalidated by a force login from another device
-        // Clear local storage and redirect to login with a message
+        // Clear local storage and only redirect to login if currently in ERP app
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_user');
-        // Store the message to show on the login page
-        sessionStorage.setItem('session_invalidated_message', error.message || 'تم تسجيل دخولك من مكان آخر. تم إنهاء هذه الجلسة.');
-        window.location.href = '/login';
+        if (window.location.pathname !== '/' && window.location.pathname !== '/login' && window.location.pathname !== '') {
+          sessionStorage.setItem('session_invalidated_message', error.message || 'تم تسجيل دخولك من مكان آخر. تم إنهاء هذه الجلسة.');
+          window.location.href = '/login';
+        }
         throw new Error(error.message);
       }
 
@@ -270,11 +271,12 @@ export async function apiRequest<T>(path: string, method: string = 'GET', body?:
       ) {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_user');
-        sessionStorage.setItem(
-          'session_invalidated_message',
-          'انتهت صلاحية جلسة العمل، يرجى تسجيل الدخول مجدداً للمتابعة واستعراض كافة البيانات والوثائق.'
-        );
-        if (window.location.pathname !== '/login') {
+        // Only redirect to /login if user was currently inside the authenticated ERP app
+        if (window.location.pathname !== '/' && window.location.pathname !== '/login' && window.location.pathname !== '') {
+          sessionStorage.setItem(
+            'session_invalidated_message',
+            'انتهت صلاحية جلسة العمل، يرجى تسجيل الدخول مجدداً للمتابعة واستعراض كافة البيانات والوثائق.'
+          );
           window.location.href = '/login';
         }
         throw new Error('انتهت صلاحية جلسة العمل، يرجى تسجيل الدخول مجدداً.');

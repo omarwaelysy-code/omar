@@ -159,21 +159,19 @@ export default function App() {
           <MaintenanceModeGuard key="app">
             <ChangePasswordModal />
             {!isAuthenticated ? (
-              currentPath === '/login' ? (
+              currentPath === '/login' || currentPath === '/register' ? (
                 <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4">
                   {authMode === 'login' ? (
-                    <Login onToggle={() => setAuthMode('register')} />
+                    <Login onToggle={() => setAuthMode('register')} onBack={() => navigateTo('/')} />
                   ) : (
-                    <Register onToggle={() => setAuthMode('login')} />
+                    <Register onToggle={() => setAuthMode('login')} onBack={() => navigateTo('/')} />
                   )}
                 </div>
-              ) : currentPath === '/' ? (
+              ) : (
                 <LandingPage
                   onGetStarted={() => navigateTo('/login')}
                   onLogin={() => navigateTo('/login')}
                 />
-              ) : (
-                <NotFound onGoHome={() => navigateTo('/')} />
               )
             ) : isSubscriptionExpired && window.location.pathname !== '/super-admin@m@r2020' ? (
               <SubscriptionExpiredScreen />
