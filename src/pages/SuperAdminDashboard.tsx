@@ -815,20 +815,20 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
   }
 
   return (
-    <div className="p-6 space-y-6" dir="rtl">
+    <div className="p-3 md:p-4 space-y-3" dir="rtl">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-stone-800">إدارة النظام - المدير العام</h1>
-          <p className="text-stone-500">إدارة الشركات والمستخدمين ومراجعة سلامة البيانات</p>
+          <h1 className="text-lg md:text-xl font-black text-stone-800">إدارة النظام - المدير العام</h1>
+          <p className="text-xs text-stone-500">إدارة الشركات والمستخدمين ومراجعة سلامة البيانات</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={fetchData}
             disabled={loading}
-            className="p-2 text-stone-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+            className="p-1.5 text-stone-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
             title="تحديث البيانات"
           >
-            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
           <button 
             onClick={() => {
@@ -855,118 +855,118 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
               });
               setShowModal(true);
             }}
-            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
+            className="flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors shadow-2xs text-xs font-bold"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 h-4" />
             <span>إضافة شركة جديدة</span>
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
         {stats.map((stat, index) => (
           <motion.div
             key={index}
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm"
+            transition={{ delay: index * 0.05 }}
+            className="bg-white p-2.5 px-3 rounded-lg border border-stone-200/90 shadow-2xs"
           >
-            <div className="flex items-center gap-4">
-              <div className={`p-3 rounded-lg ${stat.bg}`}>
-                <stat.icon className={`w-6 h-6 ${stat.color}`} />
+            <div className="flex items-center gap-2.5">
+              <div className={`p-2 rounded-lg ${stat.bg} shrink-0`}>
+                <stat.icon className={`w-4 h-4 ${stat.color}`} />
               </div>
-              <div>
-                <p className="text-sm text-stone-500">{stat.label}</p>
-                <p className="text-2xl font-bold text-stone-800">{stat.value}</p>
+              <div className="min-w-0">
+                <p className="text-[11px] text-stone-500 font-semibold truncate leading-tight">{stat.label}</p>
+                <p className="text-lg font-black text-stone-800 font-mono leading-none mt-0.5">{stat.value}</p>
               </div>
             </div>
           </motion.div>
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
-        <div className="border-b border-stone-200">
-          <div className="flex p-1 gap-1 overflow-x-auto">
+      <div className="bg-white rounded-xl border border-stone-200 shadow-2xs overflow-hidden">
+        <div className="border-b border-stone-200/80 bg-stone-50/40">
+          <div className="flex p-1 gap-1 overflow-x-auto custom-scrollbar">
             <button
               onClick={() => setActiveTab('super_admins')}
-              className={`flex-1 py-3 text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${
-                activeTab === 'super_admins' ? 'bg-purple-600 text-white shadow-sm' : 'text-stone-600 hover:bg-stone-100'
+              className={`flex-1 py-1.5 px-2.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                activeTab === 'super_admins' ? 'bg-purple-600 text-white shadow-2xs' : 'text-stone-600 hover:bg-stone-100'
               }`}
             >
-              <Shield className="w-4 h-4" />
+              <Shield className="w-3.5 h-3.5" />
               <span>السوبر أدمن</span>
             </button>
             <button
               onClick={() => setActiveTab('companies')}
-              className={`flex-1 py-3 text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${
-                activeTab === 'companies' ? 'bg-emerald-600 text-white shadow-sm' : 'text-stone-600 hover:bg-stone-100'
+              className={`flex-1 py-1.5 px-2.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                activeTab === 'companies' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-stone-600 hover:bg-stone-100'
               }`}
             >
-              <Building2 className="w-4 h-4" />
+              <Building2 className="w-3.5 h-3.5" />
               <span>الشركات</span>
             </button>
             <button
               onClick={() => setActiveTab('users')}
-              className={`flex-1 py-3 text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-2 whitespace-nowrap ${
-                activeTab === 'users' ? 'bg-blue-600 text-white shadow-sm' : 'text-stone-600 hover:bg-stone-100'
+              className={`flex-1 py-1.5 px-2.5 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                activeTab === 'users' ? 'bg-blue-600 text-white shadow-2xs' : 'text-stone-600 hover:bg-stone-100'
               }`}
             >
-              <Users className="w-4 h-4" />
+              <Users className="w-3.5 h-3.5" />
               <span>مستخدمين الشركات</span>
             </button>
             <button
                onClick={() => setActiveTab('system')}
-               className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
-                 activeTab === 'system' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+               className={`flex-1 py-1.5 px-2.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap ${
+                 activeTab === 'system' ? 'bg-stone-800 text-white shadow-2xs' : 'text-stone-600 hover:bg-stone-100'
                }`}
              >
                النظام (V2)
              </button>
              <button
                 onClick={() => setActiveTab('audit')}
-                className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
-                  activeTab === 'audit' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+                className={`flex-1 py-1.5 px-2.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap ${
+                  activeTab === 'audit' ? 'bg-stone-800 text-white shadow-2xs' : 'text-stone-600 hover:bg-stone-100'
                 }`}
               >
                 سجل الرقابة
               </button>
               <button
                 onClick={() => setActiveTab('subscriptions')}
-                className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
-                  activeTab === 'subscriptions' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+                className={`flex-1 py-1.5 px-2.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap ${
+                  activeTab === 'subscriptions' ? 'bg-stone-800 text-white shadow-2xs' : 'text-stone-600 hover:bg-stone-100'
                 }`}
               >
                 الاشتراكات
               </button>
               <button
                 onClick={() => setActiveTab('feature-manager')}
-                className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
-                  activeTab === 'feature-manager' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+                className={`flex-1 py-1.5 px-2.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap ${
+                  activeTab === 'feature-manager' ? 'bg-stone-800 text-white shadow-2xs' : 'text-stone-600 hover:bg-stone-100'
                 }`}
               >
                 الميزات
               </button>
               <button
                 onClick={() => setActiveTab('settings')}
-                className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
-                  activeTab === 'settings' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+                className={`flex-1 py-1.5 px-2.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap ${
+                  activeTab === 'settings' ? 'bg-stone-800 text-white shadow-2xs' : 'text-stone-600 hover:bg-stone-100'
                 }`}
               >
                 إعدادات النظام
               </button>
               <button
                 onClick={() => setActiveTab('monitoring')}
-                className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
-                  activeTab === 'monitoring' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+                className={`flex-1 py-1.5 px-2.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap ${
+                  activeTab === 'monitoring' ? 'bg-stone-800 text-white shadow-2xs' : 'text-stone-600 hover:bg-stone-100'
                 }`}
               >
                 المراقبة
               </button>
               <button
                 onClick={() => setActiveTab('reports')}
-                className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
-                  activeTab === 'reports' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+                className={`flex-1 py-1.5 px-2.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap ${
+                  activeTab === 'reports' ? 'bg-stone-800 text-white shadow-2xs' : 'text-stone-600 hover:bg-stone-100'
                 }`}
               >
                 التقارير الشاملة
@@ -974,8 +974,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
             {!simplifiedMode && (
               <button
                 onClick={() => setActiveTab('logs')}
-                className={`flex-1 py-3 text-sm font-medium rounded-lg transition-colors ${
-                  activeTab === 'logs' ? 'bg-stone-100 text-stone-900' : 'text-stone-500 hover:text-stone-700'
+                className={`flex-1 py-1.5 px-2.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap ${
+                  activeTab === 'logs' ? 'bg-stone-800 text-white shadow-2xs' : 'text-stone-600 hover:bg-stone-100'
                 }`}
               >
                 سجل العمليات
@@ -984,15 +984,15 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
           </div>
         </div>
 
-        <div className="p-4 border-b border-stone-200 bg-stone-50/50 flex justify-between items-center gap-4">
+        <div className="p-2 px-3 border-b border-stone-200/80 bg-stone-50/50 flex justify-between items-center gap-3">
           <div className="relative flex-1">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400" />
+            <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
             <input
               type="text"
               placeholder="بحث عن شركة، كود، أو بريد إلكتروني..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pr-10 pl-4 py-2 bg-white border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+              className="w-full pr-8 pl-3 py-1.5 text-xs bg-white border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
             />
           </div>
           {activeTab === 'users' && (
@@ -1009,20 +1009,20 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
         <div className="overflow-x-auto">
           {activeTab === 'companies' && (
             <table className="w-full text-right">
-              <thead className="bg-stone-50 border-b border-stone-200">
+              <thead className="bg-stone-50 border-b border-stone-200/80">
                 <tr>
-                  <th className="px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الشركة</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الكود</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الحالة</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">تاريخ الإنشاء</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">بداية الاشتراك</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">انتهاء الاشتراك</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">عدد المستخدمين</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">حجم البيانات المخزنة</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-left">الإجراءات</th>
+                  <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">الشركة</th>
+                  <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">الكود</th>
+                  <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">الحالة</th>
+                  <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">تاريخ الإنشاء</th>
+                  <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">بداية الاشتراك</th>
+                  <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">انتهاء الاشتراك</th>
+                  <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">عدد المستخدمين</th>
+                  <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">حجم البيانات المخزنة</th>
+                  <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider text-left">الإجراءات</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-stone-200">
+              <tbody className="divide-y divide-stone-100">
                 {filteredCompanies.map((company) => {
                   const createdAtStr = formatDateForInput(company.created_at) || 'تأسيسي';
                   const startDateStr = formatDateForInput(company.subscription_start || company.created_at) || '-';
@@ -1037,62 +1037,62 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                   );
 
                   return (
-                    <tr key={company.id} className="hover:bg-stone-50 transition-colors">
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-stone-100 rounded-lg flex items-center justify-center">
-                            <Building2 className="w-6 h-6 text-stone-400" />
+                    <tr key={company.id} className="hover:bg-stone-50/80 transition-colors">
+                      <td className="px-3 py-1.5 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 bg-stone-100 rounded-lg flex items-center justify-center shrink-0">
+                            <Building2 className="w-4 h-4 text-stone-500" />
                           </div>
                           <div>
-                            <p className="font-medium text-stone-900">{company.name}</p>
-                            <p className="text-xs text-stone-500">{company.email}</p>
+                            <p className="font-bold text-xs text-stone-900 leading-tight">{company.name}</p>
+                            <p className="text-[10px] text-stone-400 font-mono leading-none">{company.email}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm font-mono font-bold text-stone-600">{company.code}</td>
-                      <td className="px-4 py-4 whitespace-nowrap">
+                      <td className="px-3 py-1.5 whitespace-nowrap text-xs font-mono font-bold text-stone-600">{company.code}</td>
+                      <td className="px-3 py-1.5 whitespace-nowrap">
                         {(() => {
                           const status = getSubscriptionStatus(company);
                           const StatusIcon = status.icon;
                           return (
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${status.color}`}>
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${status.color}`}>
                               <StatusIcon className="w-3 h-3" />
                               <span>{status.label}</span>
                             </span>
                           );
                         })()}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-xs font-mono text-stone-600 font-medium">
+                      <td className="px-3 py-1.5 whitespace-nowrap text-[11px] font-mono text-stone-600 font-medium">
                         {createdAtStr}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-xs font-mono text-emerald-700 font-bold">
+                      <td className="px-3 py-1.5 whitespace-nowrap text-[11px] font-mono text-emerald-700 font-bold">
                         {startDateStr}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-xs font-mono text-amber-700 font-bold">
+                      <td className="px-3 py-1.5 whitespace-nowrap text-[11px] font-mono text-amber-700 font-bold">
                         {endDateStr}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-100 text-xs font-bold">
-                          <Users className="w-3.5 h-3.5 text-blue-500" />
+                      <td className="px-3 py-1.5 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-bold font-mono">
+                          <Users className="w-3 h-3 text-blue-500" />
                           <span>{activeUsersCount} / {usersLimit}</span>
                         </span>
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 border border-purple-100 text-xs font-bold">
-                          <Database className="w-3.5 h-3.5 text-purple-500" />
+                      <td className="px-3 py-1.5 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-100 text-[10px] font-bold font-mono">
+                          <Database className="w-3 h-3 text-purple-500" />
                           <span>{storageDisplay}</span>
                         </span>
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-left">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="px-3 py-1.5 whitespace-nowrap text-left">
+                        <div className="flex items-center justify-end gap-1">
                           <button 
                             onClick={() => toggleStatus(company)}
-                            className={`p-2 rounded-lg transition-colors ${
+                            className={`p-1 rounded transition-colors ${
                               company.company_status === 'active' ? 'text-amber-600 hover:bg-amber-50' : 'text-emerald-600 hover:bg-emerald-50'
                             }`}
                             title={company.company_status === 'active' ? 'إيقاف مؤقت' : 'تفعيل'}
                           >
-                            {company.company_status === 'active' ? <PauseCircle className="w-5 h-5" /> : <PlayCircle className="w-5 h-5" />}
+                            {company.company_status === 'active' ? <PauseCircle className="w-4 h-4" /> : <PlayCircle className="w-4 h-4" />}
                           </button>
                           <button 
                             onClick={() => {
@@ -1109,17 +1109,17 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                               });
                               setShowModal(true);
                             }}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
                             title="تعديل"
                           >
-                            <Edit2 className="w-5 h-5" />
+                            <Edit2 className="w-4 h-4" />
                           </button>
                           <button 
                             onClick={() => deleteCompany(company.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
                             title="حذف"
                           >
-                            <Trash2 className="w-5 h-5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -1132,82 +1132,82 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
 
           {activeTab === 'super_admins' && (
             <>
-              <div className="p-4 bg-purple-50/50 border-b border-stone-200 flex justify-between items-center">
+              <div className="px-3 py-1.5 bg-purple-50/50 border-b border-stone-200/70 flex justify-between items-center">
                 <div className="flex items-center gap-2">
-                  <Shield className="w-5 h-5 text-purple-600" />
-                  <h3 className="text-sm font-bold text-purple-900">إدارة المدير العام (Super Admins)</h3>
-                  <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 text-xs font-bold border border-purple-200">
+                  <Shield className="w-4 h-4 text-purple-600" />
+                  <h3 className="text-xs font-bold text-purple-900">إدارة المدير العام (Super Admins)</h3>
+                  <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-bold border border-purple-200">
                     {filteredSuperAdmins.length} مدير عام
                   </span>
                 </div>
               </div>
               <table className="w-full text-right">
-                <thead className="bg-stone-50 border-b border-stone-200">
+                <thead className="bg-stone-50 border-b border-stone-200/80">
                   <tr>
-                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">المدير العام</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الدور الوظيفي</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">كلمة المرور المؤقتة</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الحالة</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">تاريخ الانضمام</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-left">الإجراءات</th>
+                    <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">المدير العام</th>
+                    <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">الدور الوظيفي</th>
+                    <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">كلمة المرور المؤقتة</th>
+                    <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">الحالة</th>
+                    <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">تاريخ الانضمام</th>
+                    <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider text-left">الإجراءات</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stone-200">
+                <tbody className="divide-y divide-stone-100">
                   {filteredSuperAdmins.map((u) => (
-                    <tr key={u.id} className="hover:bg-purple-50/30 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center border border-purple-200">
-                            <Shield className="w-5 h-5 text-purple-600" />
+                    <tr key={u.id} className="hover:bg-purple-50/20 transition-colors">
+                      <td className="px-3 py-1.5 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 bg-purple-100 rounded-full flex items-center justify-center border border-purple-200 shrink-0">
+                            <Shield className="w-3.5 h-3.5 text-purple-600" />
                           </div>
                           <div>
-                            <p className="font-bold text-stone-900">{u.username}</p>
-                            <p className="text-xs text-stone-500 font-mono">{u.email}</p>
+                            <p className="font-bold text-xs text-stone-900 leading-tight">{u.username}</p>
+                            <p className="text-[10px] text-stone-400 font-mono leading-none">{u.email}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">
-                          <Shield className="w-3.5 h-3.5" />
+                      <td className="px-3 py-1.5 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                          <Shield className="w-3 h-3" />
                           <span>مدير عام النظام (Super Admin)</span>
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-1.5 whitespace-nowrap">
                         {u.temp_password ? (
-                          <code className="bg-amber-50 text-amber-700 px-2 py-1 rounded text-xs font-mono border border-amber-100 font-bold">
+                          <code className="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-mono border border-amber-100 font-bold">
                             {u.temp_password}
                           </code>
                         ) : (
-                          <span className="text-xs text-stone-400">تم التغيير</span>
+                          <span className="text-[10px] text-stone-400">تم التغيير</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                      <td className="px-3 py-1.5 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
                           u.status === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
                         }`}>
                           {u.status === 'active' ? 'نشط' : 'غير نشط'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-xs font-mono text-stone-600 font-medium">
+                      <td className="px-3 py-1.5 whitespace-nowrap text-[11px] font-mono text-stone-600 font-medium">
                         {u.created_at?.split('T')[0] || 'تأسيسي'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-left">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="px-3 py-1.5 whitespace-nowrap text-left">
+                        <div className="flex items-center justify-end gap-1">
                           {u.temp_password && (
                             <button 
                               onClick={() => handleResendEmail(u)}
-                              className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                              className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
                               title="إرسال بيانات الدخول"
                             >
-                              <Send className="w-5 h-5" />
+                              <Send className="w-4 h-4" />
                             </button>
                           )}
                           <button 
                             onClick={() => handleOpenResetPasswordModal(u)}
-                            className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                            className="p-1 text-amber-600 hover:bg-amber-50 rounded transition-colors"
                             title="إعادة تعيين كلمة المرور"
                           >
-                            <Key className="w-5 h-5" />
+                            <Key className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -1220,55 +1220,55 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
 
           {activeTab === 'users' && (
             <>
-              <div className="p-4 bg-stone-50 border-b border-stone-200 flex justify-between items-center">
+              <div className="px-3 py-1.5 bg-stone-50 border-b border-stone-200/70 flex justify-between items-center">
                 <div className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-blue-600" />
-                  <h3 className="text-sm font-bold text-stone-700">إدارة مستخدمي الشركات</h3>
-                  <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-bold border border-blue-200">
+                  <Users className="w-4 h-4 text-blue-600" />
+                  <h3 className="text-xs font-bold text-stone-700">إدارة مستخدمي الشركات</h3>
+                  <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold border border-blue-200">
                     {filteredCompanyUsers.length} مستخدم
                   </span>
                 </div>
                 <button
                   onClick={cleanupOrphanedUsers}
-                  className="flex items-center gap-2 text-xs font-bold text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-all border border-red-100"
+                  className="flex items-center gap-1 text-[11px] font-bold text-red-600 hover:bg-red-50 px-2 py-1 rounded transition-all border border-red-100"
                   title="حذف المستخدمين غير المرتبطين بشركة"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-3.5 h-3.5" />
                   <span>تنظيف المستخدمين اليتامى</span>
                 </button>
               </div>
 
               <table className="w-full text-right">
-                <thead className="bg-stone-50 border-b border-stone-200">
+                <thead className="bg-stone-50 border-b border-stone-200/80">
                   <tr>
-                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">المستخدم</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الشركة</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الدور</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">كلمة المرور المؤقتة</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">الحالة</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">تاريخ الانضمام</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-left">الإجراءات</th>
+                    <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">المستخدم</th>
+                    <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">الشركة</th>
+                    <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">الدور</th>
+                    <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">كلمة المرور المؤقتة</th>
+                    <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">الحالة</th>
+                    <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider">تاريخ الانضمام</th>
+                    <th className="px-3 py-2 text-[11px] font-bold text-stone-500 uppercase tracking-wider text-left">الإجراءات</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-stone-200">
+                <tbody className="divide-y divide-stone-100">
                   {filteredCompanyUsers.map((u) => (
-                    <tr key={u.id} className="hover:bg-stone-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-stone-100 rounded-full flex items-center justify-center">
-                            <Users className="w-6 h-6 text-stone-400" />
+                    <tr key={u.id} className="hover:bg-stone-50/80 transition-colors">
+                      <td className="px-3 py-1.5 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 bg-stone-100 rounded-full flex items-center justify-center shrink-0">
+                            <Users className="w-4 h-4 text-stone-400" />
                           </div>
                           <div>
-                            <p className="font-medium text-stone-900">{u.username}</p>
-                            <p className="text-xs text-stone-500 font-mono">{u.email}</p>
+                            <p className="font-bold text-xs text-stone-900 leading-tight">{u.username}</p>
+                            <p className="text-[10px] text-stone-400 font-mono leading-none">{u.email}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-stone-700">
+                      <td className="px-3 py-1.5 whitespace-nowrap text-xs font-bold text-stone-700">
                         {companies.find(c => c.id === u.company_id)?.name || 'N/A'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      <td className="px-3 py-1.5 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
                           u.role === 'admin' ? 'bg-blue-100 text-blue-800' :
                           u.role === 'manager' ? 'bg-amber-100 text-amber-800' :
                           'bg-stone-100 text-stone-800'
@@ -1276,57 +1276,57 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                           {u.role === 'admin' ? 'مدير شركة' : u.role === 'manager' ? 'مشرف' : 'مستخدم'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-1.5 whitespace-nowrap">
                         {u.temp_password ? (
-                          <code className="bg-amber-50 text-amber-700 px-2 py-1 rounded text-xs font-mono border border-amber-100 font-bold">
+                          <code className="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-mono border border-amber-100 font-bold">
                             {u.temp_password}
                           </code>
                         ) : (
-                          <span className="text-xs text-stone-400">تم التغيير</span>
+                          <span className="text-[10px] text-stone-400">تم التغيير</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      <td className="px-3 py-1.5 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
                           u.status === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
                         }`}>
                           {u.status === 'active' ? 'نشط' : 'غير نشط'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-xs font-mono text-stone-600 font-medium">{u.created_at?.split('T')[0] || 'N/A'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-left">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="px-3 py-1.5 whitespace-nowrap text-[11px] font-mono text-stone-600 font-medium">{u.created_at?.split('T')[0] || 'N/A'}</td>
+                      <td className="px-3 py-1.5 whitespace-nowrap text-left">
+                        <div className="flex items-center justify-end gap-1">
                           {u.temp_password && (
                             <button 
                               onClick={() => handleResendEmail(u)}
-                              className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                              className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
                               title="إرسال بيانات الدخول"
                             >
-                              <Send className="w-5 h-5" />
+                              <Send className="w-4 h-4" />
                             </button>
                           )}
                           <button 
                             onClick={() => handleOpenResetPasswordModal(u)}
-                            className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                            className="p-1 text-amber-600 hover:bg-amber-50 rounded transition-colors"
                             title="إعادة تعيين كلمة المرور"
                           >
-                            <Key className="w-5 h-5" />
+                            <Key className="w-4 h-4" />
                           </button>
                           <button 
                             onClick={() => {
                               setEditingUser(u);
                               setShowUserRoleModal(true);
                             }}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
                             title="تعديل الدور"
                           >
-                            <Edit2 className="w-5 h-5" />
+                            <Edit2 className="w-4 h-4" />
                           </button>
                           <button 
                             onClick={() => deleteUser(u.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
                             title="حذف"
                           >
-                            <Trash2 className="w-5 h-5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -1338,38 +1338,38 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
           )}
 
           {activeTab === 'logs' && (
-            <div className="divide-y divide-stone-200">
+            <div className="divide-y divide-stone-100">
               {logs.length === 0 ? (
-                <div className="p-12 text-center text-stone-400">
-                  <History className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                  <p>لا توجد عمليات مسجلة حالياً</p>
+                <div className="p-8 text-center text-stone-400">
+                  <History className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                  <p className="text-xs">لا توجد عمليات مسجلة حالياً</p>
                 </div>
               ) : (
                 logs.map((log) => (
-                  <div key={log.id} className="p-4 hover:bg-stone-50 transition-colors flex items-start gap-4">
-                    <div className={`p-2 rounded-lg ${
+                  <div key={log.id} className="p-2.5 px-3 hover:bg-stone-50/80 transition-colors flex items-start gap-2.5">
+                    <div className={`p-1.5 rounded-lg shrink-0 ${
                       log.action.includes('حذف') ? 'bg-red-50 text-red-500' : 
                       log.action.includes('إضافة') ? 'bg-emerald-50 text-emerald-500' : 
                       'bg-blue-50 text-blue-500'
                     }`}>
-                      <History className="w-5 h-5" />
+                      <History className="w-4 h-4" />
                     </div>
-                    <div className="flex-1">
-                      <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-2">
-                          <p className="font-bold text-stone-900">{log.action}</p>
-                          <span className="text-[10px] px-2 py-0.5 bg-stone-100 text-stone-600 rounded-full font-bold">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-bold text-xs text-stone-900">{log.action}</p>
+                          <span className="text-[9px] px-1.5 py-0.2 bg-stone-100 text-stone-600 rounded-full font-bold">
                             {companies.find(c => c.id === log.company_id)?.name || 'نظام'}
                           </span>
                         </div>
-                        <span className="text-xs text-stone-400">{new Date(log.created_at).toLocaleString('ar-EG')}</span>
+                        <span className="text-[10px] text-stone-400 font-mono shrink-0">{new Date(log.created_at).toLocaleString('ar-EG')}</span>
                       </div>
-                      <p className="text-sm text-stone-600 mt-1">{log.details}</p>
-                      <div className="flex items-center gap-4 mt-2">
-                        <span className="text-xs text-stone-400 flex items-center gap-1">
+                      <p className="text-xs text-stone-600 mt-0.5">{log.details}</p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-[10px] text-stone-400 flex items-center gap-1 font-mono">
                           <Users className="w-3 h-3" /> {log.username}
                         </span>
-                        <span className="text-xs text-stone-400 flex items-center gap-1">
+                        <span className="text-[10px] text-stone-400 flex items-center gap-1 font-mono">
                           <Hash className="w-3 h-3" /> {log.company_id}
                         </span>
                       </div>
@@ -1381,21 +1381,21 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
           )}
 
           {activeTab === 'system' && (
-             <div className="p-8 space-y-12">
-               <div className="bg-amber-50 border border-amber-200 p-8 rounded-[32px] space-y-6">
-                 <div className="flex items-center justify-between">
-                   <div className="flex items-center gap-4">
-                     <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${config?.maintenance_mode ? 'bg-red-500 text-white animate-pulse' : 'bg-emerald-500 text-white'}`}>
-                       <Hammer size={32} />
+             <div className="p-3 md:p-4 space-y-3">
+               <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl space-y-2">
+                 <div className="flex flex-wrap items-center justify-between gap-3">
+                   <div className="flex items-center gap-3">
+                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${config?.maintenance_mode ? 'bg-red-500 text-white animate-pulse' : 'bg-emerald-500 text-white'}`}>
+                       <Hammer size={18} />
                      </div>
                      <div>
-                       <h3 className="text-2xl font-black text-stone-900">وضع الصيانة الطارئ</h3>
-                       <p className="text-stone-500 font-bold">عند التفعيل، يتم منع جميع المستخدمين من الدخول عدا الـ Super Admin</p>
+                       <h3 className="text-sm font-black text-stone-900">وضع الصيانة الطارئ</h3>
+                       <p className="text-xs text-stone-500 font-semibold">عند التفعيل، يتم منع جميع المستخدمين من الدخول عدا الـ Super Admin</p>
                      </div>
                    </div>
                    <button 
                      onClick={handleMaintenanceToggle}
-                     className={`px-8 py-4 rounded-2xl font-black transition-all shadow-lg ${
+                     className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all shadow-2xs ${
                        config?.maintenance_mode 
                        ? 'bg-emerald-500 text-white hover:bg-emerald-600' 
                        : 'bg-red-500 text-white hover:bg-red-600'
@@ -1406,17 +1406,17 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                  </div>
                </div>
 
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="p-8 bg-zinc-900 rounded-[32px] text-white space-y-6">
-                    <div className="flex items-center gap-3 text-emerald-400">
-                      <ShieldCheck size={24} />
-                      <span className="font-black uppercase tracking-widest text-sm">V2 Security Cluster</span>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  <div className="p-3.5 bg-zinc-900 rounded-xl text-white space-y-2.5">
+                    <div className="flex items-center gap-2 text-emerald-400">
+                      <ShieldCheck size={16} />
+                      <span className="font-black uppercase tracking-wider text-[11px]">V2 Security Cluster</span>
                     </div>
-                    <h4 className="text-3xl font-black">أدوات النزاهة والتعافي</h4>
-                    <p className="text-zinc-400 leading-relaxed font-medium">
+                    <h4 className="text-sm font-black">أدوات النزاهة والتعافي</h4>
+                    <p className="text-xs text-zinc-400 leading-relaxed font-medium">
                       فحص شامل للمنظومة، كشف الاختلالات المحاسبية، وتصحيح القيود المزدوجة التالفة.
                     </p>
-                    <div className="pt-4 flex flex-col gap-4">
+                    <div className="pt-1 flex flex-col sm:flex-row gap-2">
                       <button 
                         onClick={async () => {
                           if (!window.confirm('بدء فحص النظام العميق؟')) return;
@@ -1430,9 +1430,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                             alert('فشل الفحص: ' + err.message);
                           }
                         }}
-                        className="flex-1 py-4 bg-zinc-800 border border-zinc-700 rounded-2xl font-black hover:bg-zinc-700 transition-all flex items-center justify-center gap-2"
+                        className="flex-1 py-1.5 px-3 bg-zinc-800 border border-zinc-700 rounded-lg text-xs font-bold hover:bg-zinc-700 transition-all flex items-center justify-center gap-1.5"
                       >
-                        <ShieldCheck size={20} />
+                        <ShieldCheck size={14} />
                         تشغيل فحص النظام
                       </button>
                       <button 
@@ -1450,31 +1450,29 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
                              alert('فشل الإصلاح: ' + err.message);
                            }
                          }}
-                         className="flex-1 py-4 bg-emerald-600/20 border border-emerald-600/30 text-emerald-400 rounded-2xl font-black hover:bg-emerald-600/30 transition-all flex items-center justify-center gap-2"
+                         className="flex-1 py-1.5 px-3 bg-emerald-600/20 border border-emerald-600/30 text-emerald-400 rounded-lg text-xs font-bold hover:bg-emerald-600/30 transition-all flex items-center justify-center gap-1.5"
                        >
-                         <Hammer size={20} />
+                         <Hammer size={14} />
                          إصلاح أخطاء النظام
                        </button>
                     </div>
                   </div>
 
-                  <div className="p-8 bg-zinc-50 border border-zinc-200 rounded-[32px] space-y-6">
-                    <div className="flex items-center gap-3 text-blue-500">
-                      <RefreshCw size={24} />
-                      <span className="font-black uppercase tracking-widest text-sm">System Backups</span>
+                  <div className="p-3.5 bg-zinc-50 border border-zinc-200 rounded-xl space-y-2.5">
+                    <div className="flex items-center gap-2 text-blue-500">
+                      <RefreshCw size={16} />
+                      <span className="font-black uppercase tracking-wider text-[11px]">System Backups</span>
                     </div>
-                    <h4 className="text-3xl font-black">النسخ الاحتياطي</h4>
-                    <p className="text-stone-500 leading-relaxed font-medium">
+                    <h4 className="text-sm font-black text-stone-900">النسخ الاحتياطي</h4>
+                    <p className="text-xs text-stone-500 leading-relaxed font-medium">
                       إدارة النسخ الاحتياطية للنظام بالكامل والقدرة على الاستعادة السريعة في حالات الكوارث.
                     </p>
                     <button 
                       onClick={() => {
-                        // Change active page to backup_restore if we can, or just redirect
-                        // Since this is SuperAdminDashboard, we might need NavigationContext
                         const navEvent = new CustomEvent('navigate-to', { detail: { page: 'backup_restore' } });
                         window.dispatchEvent(navEvent);
                       }}
-                      className="w-full py-4 bg-white border border-stone-200 rounded-2xl font-black hover:border-stone-400 transition-all text-stone-900 shadow-sm"
+                      className="w-full py-1.5 bg-white border border-stone-200 rounded-lg text-xs font-bold hover:border-stone-400 transition-all text-stone-900 shadow-2xs"
                     >
                       إدارة المستودع السحابي
                     </button>
@@ -1484,57 +1482,57 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
           )}
 
           {activeTab === 'audit' && (
-            <div className="p-4">
-              <div className="mb-6 flex justify-between items-center">
-                <h3 className="text-xl font-black text-stone-900 flex items-center gap-2">
-                  <Activity className="text-emerald-500" />
+            <div className="p-2.5">
+              <div className="mb-2 flex justify-between items-center">
+                <h3 className="text-xs font-black text-stone-900 flex items-center gap-1.5">
+                  <Activity size={16} className="text-emerald-500" />
                   سجل الرقابة الصارم (Audit Trail)
                 </h3>
-                <div className="flex gap-2">
-                   <button className="p-2 text-stone-400 hover:bg-stone-50 rounded-lg"><Filter size={20}/></button>
-                   <button onClick={fetchData} className="p-2 text-stone-400 hover:bg-stone-50 rounded-lg"><RefreshCw size={20}/></button>
+                <div className="flex gap-1.5">
+                   <button className="p-1 text-stone-400 hover:bg-stone-50 rounded"><Filter size={16}/></button>
+                   <button onClick={fetchData} className="p-1 text-stone-400 hover:bg-stone-50 rounded"><RefreshCw size={16}/></button>
                 </div>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {auditLogs.length === 0 ? (
-                  <div className="px-12 py-24 text-center">
-                    <div className="w-20 h-20 bg-stone-50 border border-dashed border-stone-200 rounded-full flex items-center justify-center mx-auto mb-4 text-stone-300">
-                      <Settings size={40} className="animate-spin-slow" />
+                  <div className="px-6 py-10 text-center">
+                    <div className="w-12 h-12 bg-stone-50 border border-dashed border-stone-200 rounded-full flex items-center justify-center mx-auto mb-2 text-stone-300">
+                      <Settings size={24} className="animate-spin-slow" />
                     </div>
-                    <p className="text-stone-400 font-bold">لا توجد سجلات رقابة حالياً لنسخة V2</p>
+                    <p className="text-stone-400 font-bold text-xs">لا توجد سجلات رقابة حالياً لنسخة V2</p>
                   </div>
                 ) : (
-                  <div className="border border-stone-100 rounded-2xl overflow-hidden">
-                    <table className="w-full text-right text-sm">
-                      <thead className="bg-stone-50 border-b border-stone-100">
+                  <div className="border border-stone-100 rounded-xl overflow-hidden">
+                    <table className="w-full text-right text-xs">
+                      <thead className="bg-stone-50 border-b border-stone-100 text-[11px]">
                         <tr>
-                          <th className="px-4 py-3 font-black text-stone-500 tracking-tighter">التوقيت</th>
-                          <th className="px-4 py-3 font-black text-stone-500 tracking-tighter">المستخدم</th>
-                          <th className="px-4 py-3 font-black text-stone-500 tracking-tighter">الإجراء</th>
-                          <th className="px-4 py-3 font-black text-stone-500 tracking-tighter">الخطورة</th>
+                          <th className="px-3 py-2 font-black text-stone-500 tracking-tighter">التوقيت</th>
+                          <th className="px-3 py-2 font-black text-stone-500 tracking-tighter">المستخدم</th>
+                          <th className="px-3 py-2 font-black text-stone-500 tracking-tighter">الإجراء</th>
+                          <th className="px-3 py-2 font-black text-stone-500 tracking-tighter">الخطورة</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-stone-50">
                         {auditLogs.map((alog) => (
                           <tr key={alog.id} className="hover:bg-amber-50/30 transition-colors">
-                            <td className="px-4 py-4 font-mono text-[11px] text-stone-400">
-                               <div className="flex items-center gap-2">
-                                 <Clock size={12} />
+                            <td className="px-3 py-1.5 font-mono text-[10px] text-stone-400">
+                               <div className="flex items-center gap-1.5">
+                                 <Clock size={11} />
                                  {new Date(alog.created_at).toLocaleString()}
                                </div>
                             </td>
-                            <td className="px-4 py-4">
-                               <div className="font-bold text-stone-900">{alog.user_email}</div>
-                               <div className="text-[10px] text-stone-400 font-mono">{alog.user_id}</div>
+                            <td className="px-3 py-1.5">
+                               <div className="font-bold text-xs text-stone-900">{alog.user_email}</div>
+                               <div className="text-[9px] text-stone-400 font-mono">{alog.user_id}</div>
                             </td>
-                            <td className="px-4 py-4">
-                               <span className="font-black text-zinc-900 bg-stone-100 px-2 py-1 rounded text-[10px] uppercase">
+                            <td className="px-3 py-1.5">
+                               <span className="font-bold text-zinc-900 bg-stone-100 px-1.5 py-0.5 rounded text-[10px] uppercase">
                                  {alog.action.replace(/_/g, ' ')}
                                </span>
                             </td>
-                            <td className="px-4 py-4">
-                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                            <td className="px-3 py-1.5">
+                               <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
                                  alog.severity === 'critical' ? 'bg-red-500 text-white' : 
                                  alog.severity === 'warning' ? 'bg-amber-500 text-white' : 
                                  'bg-blue-500 text-white'
@@ -1561,26 +1559,26 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
           )}
 
           {activeTab === 'settings' && (
-            <div className="p-12 text-center text-stone-500">
-              <Settings className="w-16 h-16 mx-auto mb-4 text-stone-300" />
-              <h3 className="text-xl font-bold mb-2">إعدادات النظام العامة</h3>
-              <p>يتم تحميل إعدادات النظام...</p>
+            <div className="p-6 text-center text-stone-500">
+              <Settings className="w-8 h-8 mx-auto mb-2 text-stone-300" />
+              <h3 className="text-sm font-bold mb-1">إعدادات النظام العامة</h3>
+              <p className="text-xs">يتم تحميل إعدادات النظام...</p>
             </div>
           )}
 
           {activeTab === 'monitoring' && (
-            <div className="p-12 text-center text-stone-500">
-              <Activity className="w-16 h-16 mx-auto mb-4 text-stone-300" />
-              <h3 className="text-xl font-bold mb-2">مراقبة أداء النظام</h3>
-              <p>يتم تحميل لوحة المراقبة...</p>
+            <div className="p-6 text-center text-stone-500">
+              <Activity className="w-8 h-8 mx-auto mb-2 text-stone-300" />
+              <h3 className="text-sm font-bold mb-1">مراقبة أداء النظام</h3>
+              <p className="text-xs">يتم تحميل لوحة المراقبة...</p>
             </div>
           )}
 
           {activeTab === 'reports' && (
-            <div className="p-12 text-center text-stone-500">
-              <Globe className="w-16 h-16 mx-auto mb-4 text-stone-300" />
-              <h3 className="text-xl font-bold mb-2">التقارير الشاملة</h3>
-              <p>يتم تحميل التقارير الشاملة...</p>
+            <div className="p-6 text-center text-stone-500">
+              <Globe className="w-8 h-8 mx-auto mb-2 text-stone-300" />
+              <h3 className="text-sm font-bold mb-1">التقارير الشاملة</h3>
+              <p className="text-xs">يتم تحميل التقارير الشاملة...</p>
             </div>
           )}
         </div>

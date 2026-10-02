@@ -203,69 +203,69 @@ export const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ companies })
   }
 
   return (
-    <div className="p-6 space-y-6" dir="rtl">
+    <div className="p-3 md:p-4 space-y-3" dir="rtl">
       
       {/* Header & KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-sm flex items-center justify-between">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+        <div className="bg-white p-2.5 px-3 rounded-xl border border-stone-200 shadow-2xs flex items-center justify-between">
           <div>
-            <p className="text-sm text-stone-500 font-bold">إجمالي الشركات</p>
-            <h4 className="text-2xl font-black text-stone-800">{kpis.total}</h4>
+            <p className="text-[11px] text-stone-500 font-bold">إجمالي الشركات</p>
+            <h4 className="text-base md:text-lg font-black text-stone-800">{kpis.total}</h4>
           </div>
-          <div className="w-12 h-12 bg-blue-50 text-blue-500 rounded-xl flex items-center justify-center">
-            <CreditCard />
+          <div className="w-8 h-8 bg-blue-50 text-blue-500 rounded-lg flex items-center justify-center">
+            <CreditCard size={16} />
           </div>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-emerald-200 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-2.5 px-3 rounded-xl border border-emerald-200 shadow-2xs flex items-center justify-between">
           <div>
-            <p className="text-sm text-emerald-600 font-bold">نشطة</p>
-            <h4 className="text-2xl font-black text-emerald-700">{kpis.active}</h4>
+            <p className="text-[11px] text-emerald-600 font-bold">نشطة</p>
+            <h4 className="text-base md:text-lg font-black text-emerald-700">{kpis.active}</h4>
           </div>
-          <div className="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-xl flex items-center justify-center">
-            <CheckCircle2 />
+          <div className="w-8 h-8 bg-emerald-50 text-emerald-500 rounded-lg flex items-center justify-center">
+            <CheckCircle2 size={16} />
           </div>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-amber-200 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-2.5 px-3 rounded-xl border border-amber-200 shadow-2xs flex items-center justify-between">
           <div>
-            <p className="text-sm text-amber-600 font-bold">تجريبية</p>
-            <h4 className="text-2xl font-black text-amber-700">{kpis.trial}</h4>
+            <p className="text-[11px] text-amber-600 font-bold">تجريبية</p>
+            <h4 className="text-base md:text-lg font-black text-amber-700">{kpis.trial}</h4>
           </div>
-          <div className="w-12 h-12 bg-amber-50 text-amber-500 rounded-xl flex items-center justify-center">
-            <Clock />
+          <div className="w-8 h-8 bg-amber-50 text-amber-500 rounded-lg flex items-center justify-center">
+            <Clock size={16} />
           </div>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-red-200 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-2.5 px-3 rounded-xl border border-red-200 shadow-2xs flex items-center justify-between">
           <div>
-            <p className="text-sm text-red-600 font-bold">منتهية</p>
-            <h4 className="text-2xl font-black text-red-700">{kpis.expired}</h4>
+            <p className="text-[11px] text-red-600 font-bold">منتهية</p>
+            <h4 className="text-base md:text-lg font-black text-red-700">{kpis.expired}</h4>
           </div>
-          <div className="w-12 h-12 bg-red-50 text-red-500 rounded-xl flex items-center justify-center">
-            <XCircle />
+          <div className="w-8 h-8 bg-red-50 text-red-500 rounded-lg flex items-center justify-center">
+            <XCircle size={16} />
           </div>
         </div>
-        <div className="bg-zinc-900 p-4 rounded-2xl shadow-sm flex items-center justify-between">
+        <div className="bg-zinc-900 p-2.5 px-3 rounded-xl shadow-2xs flex items-center justify-between col-span-2 md:col-span-1">
           <div>
-            <p className="text-sm text-zinc-400 font-bold">موقوفة</p>
-            <h4 className="text-2xl font-black text-white">{kpis.suspended}</h4>
+            <p className="text-[11px] text-zinc-400 font-bold">موقوفة</p>
+            <h4 className="text-base md:text-lg font-black text-white">{kpis.suspended}</h4>
           </div>
-          <div className="w-12 h-12 bg-zinc-800 text-zinc-400 rounded-xl flex items-center justify-center">
-            <PauseCircle />
+          <div className="w-8 h-8 bg-zinc-800 text-zinc-400 rounded-lg flex items-center justify-center">
+            <PauseCircle size={16} />
           </div>
         </div>
       </div>
 
       {/* Alerts */}
       {(kpis.expiringSoon > 0 || kpis.exceededLimits > 0) && (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
           {kpis.expiringSoon > 0 && (
-            <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl flex items-center gap-3">
-              <AlertTriangle className="text-amber-500" />
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 p-2.5 px-3 rounded-lg flex items-center gap-2 text-xs">
+              <AlertTriangle className="text-amber-500 shrink-0" size={16} />
               <div className="font-bold">يوجد {kpis.expiringSoon} شركات سينتهي اشتراكها خلال 30 يوماً أو أقل.</div>
             </div>
           )}
           {kpis.exceededLimits > 0 && (
-            <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-xl flex items-center gap-3">
-              <AlertCircle className="text-red-500" />
+            <div className="bg-red-50 border border-red-200 text-red-800 p-2.5 px-3 rounded-lg flex items-center gap-2 text-xs">
+              <AlertCircle className="text-red-500 shrink-0" size={16} />
               <div className="font-bold">انتباه: يوجد {kpis.exceededLimits} شركات تجاوزت الحدود القصوى للاستخدام (Limits).</div>
             </div>
           )}
@@ -273,20 +273,20 @@ export const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ companies })
       )}
 
       {/* Controls */}
-      <div className="bg-white p-4 rounded-2xl border border-stone-200 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400" size={18} />
+      <div className="bg-white p-2 px-3 rounded-xl border border-stone-200 flex flex-col md:flex-row gap-2 items-center justify-between shadow-2xs">
+        <div className="relative w-full md:w-80">
+          <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400" size={15} />
           <input 
             type="text" 
             placeholder="بحث باسم الشركة، الكود، البريد..." 
-            className="w-full bg-stone-50 border border-stone-200 rounded-xl pr-10 pl-4 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all text-sm font-bold"
+            className="w-full bg-stone-50 border border-stone-200 rounded-lg pr-8 pl-3 py-1.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100 transition-all text-xs font-bold"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <div className="flex gap-2 w-full md:w-auto">
+        <div className="flex gap-2 w-full md:w-auto items-center">
           <select 
-            className="bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 outline-none font-bold text-sm"
+            className="bg-stone-50 border border-stone-200 rounded-lg px-2.5 py-1.5 outline-none font-bold text-xs"
             value={planFilter}
             onChange={(e) => setPlanFilter(e.target.value)}
           >
@@ -296,7 +296,7 @@ export const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ companies })
             <option value="Enterprise">Enterprise</option>
           </select>
           <select 
-            className="bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 outline-none font-bold text-sm"
+            className="bg-stone-50 border border-stone-200 rounded-lg px-2.5 py-1.5 outline-none font-bold text-xs"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
@@ -306,82 +306,82 @@ export const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ companies })
             <option value="Expired">منتهي</option>
             <option value="Suspended">موقوف</option>
           </select>
-          <button onClick={fetchSubscriptions} className="w-11 h-11 flex items-center justify-center bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-xl transition-colors">
-            <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+          <button onClick={fetchSubscriptions} className="w-8 h-8 flex items-center justify-center bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-lg transition-colors shrink-0">
+            <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
           </button>
         </div>
       </div>
 
       {/* Data Grid */}
-      <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-stone-200 shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-right text-sm">
-            <thead className="bg-stone-50 border-b border-stone-100 text-stone-500 font-black">
+          <table className="w-full text-right text-xs">
+            <thead className="bg-stone-50 border-b border-stone-100 text-stone-500 font-black text-[11px]">
               <tr>
-                <th className="p-4 cursor-pointer hover:bg-stone-100" onClick={() => handleSort('company_name')}>الشركة</th>
-                <th className="p-4 cursor-pointer hover:bg-stone-100" onClick={() => handleSort('plan_type')}>الباقة</th>
-                <th className="p-4 cursor-pointer hover:bg-stone-100" onClick={() => handleSort('subscription_status')}>الحالة</th>
-                <th className="p-4 cursor-pointer hover:bg-stone-100" onClick={() => handleSort('end_date')}>النهاية (متبقي)</th>
-                <th className="p-4 text-center">المستخدمون</th>
-                <th className="p-4 text-center">الفروع</th>
-                <th className="p-4 text-center">أجهزة POS</th>
-                <th className="p-4"></th>
+                <th className="px-3 py-2 cursor-pointer hover:bg-stone-100" onClick={() => handleSort('company_name')}>الشركة</th>
+                <th className="px-3 py-2 cursor-pointer hover:bg-stone-100" onClick={() => handleSort('plan_type')}>الباقة</th>
+                <th className="px-3 py-2 cursor-pointer hover:bg-stone-100" onClick={() => handleSort('subscription_status')}>الحالة</th>
+                <th className="px-3 py-2 cursor-pointer hover:bg-stone-100" onClick={() => handleSort('end_date')}>النهاية (متبقي)</th>
+                <th className="px-3 py-2 text-center">المستخدمون</th>
+                <th className="px-3 py-2 text-center">الفروع</th>
+                <th className="px-3 py-2 text-center">أجهزة POS</th>
+                <th className="px-3 py-2"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-100">
+            <tbody className="divide-y divide-stone-50">
               {paginatedData.map(sub => (
                 <tr key={sub.id} className="hover:bg-blue-50/50 transition-colors cursor-pointer group" onClick={() => openDialog(sub)}>
-                  <td className="p-4">
-                    <div className="font-bold text-stone-800">{sub.company_name}</div>
-                    <div className="text-xs text-stone-400 font-mono">{sub.company_code}</div>
+                  <td className="px-3 py-1.5">
+                    <div className="font-bold text-xs text-stone-800">{sub.company_name}</div>
+                    <div className="text-[10px] text-stone-400 font-mono">{sub.company_code}</div>
                   </td>
-                  <td className="p-4">
-                    <span className="font-bold text-stone-700 bg-stone-100 px-2 py-1 rounded text-xs">
+                  <td className="px-3 py-1.5">
+                    <span className="font-bold text-stone-700 bg-stone-100 px-1.5 py-0.5 rounded text-[10px]">
                       {sub.plan_type}
                     </span>
                   </td>
-                  <td className="p-4">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-black border ${getStatusColor(sub.subscription_status)}`}>
+                  <td className="px-3 py-1.5">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${getStatusColor(sub.subscription_status)}`}>
                       {sub.subscription_status}
                     </span>
                   </td>
-                  <td className="p-4">
-                    <div className="font-bold text-stone-700">
+                  <td className="px-3 py-1.5">
+                    <div className="font-bold text-xs text-stone-700">
                       {sub.subscription_status === 'Trial' ? 
                         (sub.trial_until ? new Date(sub.trial_until).toLocaleDateString('ar-EG') : '-') : 
                         (sub.end_date ? new Date(sub.end_date).toLocaleDateString('ar-EG') : '-')}
                     </div>
                     {sub.remainingDays > 0 && (
-                      <div className={`text-xs font-bold ${sub.isExpiringSoon ? 'text-red-500' : 'text-stone-400'}`}>
+                      <div className={`text-[10px] font-bold ${sub.isExpiringSoon ? 'text-red-500' : 'text-stone-400'}`}>
                         متبقي {sub.remainingDays} يوم
                       </div>
                     )}
                   </td>
-                  <td className="p-4 text-center">
-                    <div className={`font-mono text-xs font-bold ${sub.current_users > sub.max_users ? 'text-red-500 bg-red-50 px-2 py-1 rounded' : 'text-stone-500'}`}>
+                  <td className="px-3 py-1.5 text-center">
+                    <div className={`font-mono text-[11px] font-bold ${sub.current_users > sub.max_users ? 'text-red-500 bg-red-50 px-1.5 py-0.5 rounded' : 'text-stone-500'}`}>
                       {sub.current_users} / {sub.max_users}
                     </div>
                   </td>
-                  <td className="p-4 text-center">
-                    <div className={`font-mono text-xs font-bold ${sub.current_branches > sub.max_branches ? 'text-red-500 bg-red-50 px-2 py-1 rounded' : 'text-stone-500'}`}>
+                  <td className="px-3 py-1.5 text-center">
+                    <div className={`font-mono text-[11px] font-bold ${sub.current_branches > sub.max_branches ? 'text-red-500 bg-red-50 px-1.5 py-0.5 rounded' : 'text-stone-500'}`}>
                       {sub.current_branches} / {sub.max_branches}
                     </div>
                   </td>
-                  <td className="p-4 text-center">
-                    <div className={`font-mono text-xs font-bold ${sub.current_devices > sub.max_devices ? 'text-red-500 bg-red-50 px-2 py-1 rounded' : 'text-stone-500'}`}>
+                  <td className="px-3 py-1.5 text-center">
+                    <div className={`font-mono text-[11px] font-bold ${sub.current_devices > sub.max_devices ? 'text-red-500 bg-red-50 px-1.5 py-0.5 rounded' : 'text-stone-500'}`}>
                       {sub.current_devices} / {sub.max_devices}
                     </div>
                   </td>
-                  <td className="p-4 text-left">
+                  <td className="px-3 py-1.5 text-left">
                     <button className="text-stone-400 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <MoreVertical size={18} />
+                      <MoreVertical size={15} />
                     </button>
                   </td>
                 </tr>
               ))}
               {paginatedData.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-stone-400 font-bold">
+                  <td colSpan={8} className="p-6 text-center text-stone-400 font-bold text-xs">
                     لا توجد اشتراكات مطابقة للبحث
                   </td>
                 </tr>
@@ -390,24 +390,24 @@ export const SubscriptionsTab: React.FC<SubscriptionsTabProps> = ({ companies })
           </table>
         </div>
         {totalPages > 1 && (
-          <div className="bg-stone-50 border-t border-stone-200 p-4 flex items-center justify-between">
-            <div className="text-sm font-bold text-stone-500">
+          <div className="bg-stone-50 border-t border-stone-200 px-3 py-2 flex items-center justify-between">
+            <div className="text-xs font-bold text-stone-500">
               صفحة {currentPage} من {totalPages}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-1.5">
               <button 
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage(p => p - 1)}
-                className="w-8 h-8 rounded bg-white border border-stone-200 flex items-center justify-center text-stone-600 disabled:opacity-50"
+                className="w-7 h-7 rounded bg-white border border-stone-200 flex items-center justify-center text-stone-600 disabled:opacity-50"
               >
-                <ChevronRight size={16} />
+                <ChevronRight size={14} />
               </button>
               <button 
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage(p => p + 1)}
-                className="w-8 h-8 rounded bg-white border border-stone-200 flex items-center justify-center text-stone-600 disabled:opacity-50"
+                className="w-7 h-7 rounded bg-white border border-stone-200 flex items-center justify-center text-stone-600 disabled:opacity-50"
               >
-                <ChevronLeft size={16} />
+                <ChevronLeft size={14} />
               </button>
             </div>
           </div>
