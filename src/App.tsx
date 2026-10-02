@@ -88,6 +88,7 @@ const FixedAssets = React.lazy(() => import('./pages/FixedAssets').then(m => ({ 
 const DocumentImport = React.lazy(() => import('./pages/DocumentImport').then(m => ({ default: m.DocumentImport })));
 const DataCountsValues = React.lazy(() => import('./pages/DataCountsValues').then(m => ({ default: m.DataCountsValues })));
 const AgingReport = React.lazy(() => import('./pages/AgingReport').then(m => ({ default: m.AgingReport })));
+const TransactionsSearch = React.lazy(() => import('./pages/TransactionsSearch').then(m => ({ default: m.TransactionsSearch })));
 
 import { useNavigation } from './contexts/NavigationContext';
 import { useLanguage } from './contexts/LanguageContext';
@@ -239,6 +240,7 @@ export default function App() {
       case 'suppliers': return <Suppliers />;
       case 'expenses': return <Expenses />;
       case 'payment_methods': return <PaymentMethods />;
+      case 'transactions_search': return <TransactionsSearch />;
       case 'invoices': return <Invoices />;// Invoices page
       case 'sales_orders': return <SalesOrders />;
       case 'purchase_invoices': return <PurchaseInvoices />;

@@ -1189,6 +1189,20 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
         </nav>
 
         <div className={`flex items-center gap-1 xl:gap-1.5 ${dir === 'rtl' ? 'mr-auto' : 'ml-auto'} shrink-0`}>
+          {/* Movement Search Engine Button (محرك بحث الحركات) */}
+          <button
+            type="button"
+            onClick={() => onNavigate('transactions_search')}
+            className={`flex items-center justify-center px-3.5 py-1 rounded-full border transition-all shadow-2xs active:scale-95 cursor-pointer ${
+              currentPage === 'transactions_search'
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                : 'bg-white hover:bg-slate-50 text-slate-600 hover:text-emerald-600 border-slate-300 hover:border-emerald-400'
+            }`}
+            title={language === 'ar' ? 'محرك بحث الحركات' : 'Movements Search Engine'}
+          >
+            <Search size={14} className="stroke-[2.2]" />
+          </button>
+
           {/* Desktop Language Switcher */}
           <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700 text-[11px] font-bold">
             <button
@@ -1385,6 +1399,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                   <X size={18} />
                 </button>
               )}
+              <button 
+                type="button"
+                onClick={() => onNavigate('transactions_search')}
+                className={`p-2 rounded-xl transition-all border ${
+                  currentPage === 'transactions_search'
+                    ? 'bg-emerald-600 text-white border-emerald-600'
+                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200'
+                }`}
+                title={language === 'ar' ? 'محرك بحث الحركات' : 'Movements Search Engine'}
+              >
+                <Search size={18} />
+              </button>
               <button 
                 onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
                 className="p-2.5 text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all"

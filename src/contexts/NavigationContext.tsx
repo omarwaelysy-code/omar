@@ -73,6 +73,7 @@ export const pageLabels: { [key: string]: string } = {
   'employees': 'الموظفين',
   'expenses': 'بنود المصروفات',
   'payment_methods': 'طرق السداد',
+  'transactions_search': 'محرك بحث الحركات',
   'invoices': 'فواتير مبيعات',
   'sales_orders': 'أوامر بيع',
   'purchase_invoices': 'فواتير مشتريات',
