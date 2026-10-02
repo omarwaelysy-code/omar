@@ -9,7 +9,6 @@ export const FixedBottomScrollBar: React.FC = () => {
   const [containerWidth, setContainerWidth] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
   const [targetDir, setTargetDir] = useState<'rtl' | 'ltr'>(dir || 'rtl');
-  const [position, setPosition] = useState<{ left: number; width: number }>({ left: 0, width: 0 });
   const isSyncing = useRef(false);
 
   const updateMetrics = useCallback(() => {
@@ -18,12 +17,6 @@ export const FixedBottomScrollBar: React.FC = () => {
       setIsVisible(false);
       return;
     }
-
-    const mainRect = mainEl.getBoundingClientRect();
-    setPosition({
-      left: mainRect.left,
-      width: mainRect.width,
-    });
 
     // Find active scrollable container inside main
     let target: HTMLElement | null = null;
@@ -146,10 +139,8 @@ export const FixedBottomScrollBar: React.FC = () => {
 
   return (
     <div
-      className="fixed-bottom-scroll-wrapper fixed bottom-0 z-40 bg-white/95 backdrop-blur-xs border-t border-slate-200/80 shadow-[0_-2px_10px_rgba(0,0,0,0.06)] print:hidden select-none"
+      className="fixed-bottom-scroll-wrapper fixed bottom-0 left-0 right-0 w-full z-40 bg-white/95 backdrop-blur-xs border-t border-slate-200/80 shadow-[0_-2px_10px_rgba(0,0,0,0.06)] print:hidden select-none"
       style={{
-        left: `${position.left}px`,
-        width: `${position.width}px`,
         height: '11px',
       }}
       dir={targetDir}
