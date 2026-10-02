@@ -55,6 +55,7 @@ export const ACCOUNT_USAGE_OPTIONS: AccountUsageOption[] = [
   { key: 'capital', ar: 'رأس المال', en: 'Capital' },
   { key: 'equity', ar: 'حقوق الملكية', en: 'Equity' },
   { key: 'retained_earnings', ar: 'أرباح محتجزة', en: 'Retained Earnings' },
+  { key: 'opening_balance', ar: 'رصيد افتتاحي', en: 'Opening Balance' },
   { key: 'drawings', ar: 'جاري شركاء', en: 'Partners Current Account' },
 
   // 4. قائمة الدخل - إيرادات
