@@ -3479,7 +3479,7 @@ export const PurchaseInvoices: React.FC = () => {
 
         // Load linked Goods Receipts
         try {
-          const linksRes = await apiRequest('GET', `/purchase_invoice_goods_receipts?purchase_invoice_id=${invoice.id}`);
+          const linksRes = await dbService.list<any>('purchase_invoice_goods_receipts', { purchase_invoice_id: invoice.id });
           if (linksRes && Array.isArray(linksRes)) {
             setSelectedGoodsReceiptIds(linksRes.map(l => l.goods_receipt_id));
           } else {

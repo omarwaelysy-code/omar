@@ -34,7 +34,8 @@ BEGIN
       ADD COLUMN IF NOT EXISTS "original_doc_number" VARCHAR(100) NULL,
       ADD COLUMN IF NOT EXISTS "original_entry_id" VARCHAR(100) NULL,
       ADD COLUMN IF NOT EXISTS "original_entry_number" VARCHAR(100) NULL,
-      ADD COLUMN IF NOT EXISTS "reversal_settlement_number" VARCHAR(100) NULL;
+      ADD COLUMN IF NOT EXISTS "reversal_settlement_number" VARCHAR(100) NULL,
+      ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
   END IF;
 
   -- 3. Sales Returns

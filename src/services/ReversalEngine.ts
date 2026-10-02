@@ -204,26 +204,33 @@ export class ReversalEngine {
       }
       reversalSettlementNumber = `${setPrefix}-${String(nextSeq).padStart(6, '0')}`;
 
-      // Update settlements array on original doc to close its open amount
-      const amount = Number(originalDoc.total_amount || originalDoc.amount || 0);
-      const originalSettlements = Array.isArray(originalDoc.settlements) ? [...originalDoc.settlements] : [];
-      originalSettlements.push({
-        settlement_number: reversalSettlementNumber,
-        target_id: reversalDocId,
-        target_number: reversalDocNumber,
-        settled_amount: amount,
-        date: reversalDate,
-        type: 'reversal_settlement',
-        notes: `تسوية عكس للفاتورة/السند رقم (${originalDocNumber})`
-      });
-
-      await client.query(
-        `UPDATE "${config.tableName}" 
-         SET "settlements" = $1::jsonb, 
-             "reversal_settlement_number" = $2 
-         WHERE "id" = $3`,
-        [JSON.stringify(originalSettlements), reversalSettlementNumber, docId]
+      // Update settlements array on original doc to close its open amount if settlements column exists
+      const { rows: origTableCols } = await client.query(
+        `SELECT column_name FROM information_schema.columns WHERE table_name = $1`,
+        [config.tableName]
       );
+      const origValidCols = new Set(origTableCols.map((r: any) => r.column_name));
+
+      if (origValidCols.has('settlements')) {
+        const amount = Number(originalDoc.total_amount || originalDoc.amount || 0);
+        const originalSettlements = Array.isArray(originalDoc.settlements) ? [...originalDoc.settlements] : [];
+        originalSettlements.push({
+          settlement_number: reversalSettlementNumber,
+          target_id: reversalDocId,
+          target_number: reversalDocNumber,
+          settled_amount: amount,
+          date: reversalDate,
+          type: 'reversal_settlement',
+          notes: `تسوية عكس للمستند رقم (${originalDocNumber})`
+        });
+
+        await client.query(
+          `UPDATE "${config.tableName}" 
+           SET "settlements" = $1::jsonb 
+           WHERE "id" = $2`,
+          [JSON.stringify(originalSettlements), docId]
+        );
+      }
     }
 
     // 6. Create the Reversal Document in the corresponding table
@@ -241,28 +248,48 @@ export class ReversalEngine {
       reversalSettlementNumber
     });
 
-    // 7. Update original document tracking columns
+    // 7. Update original document tracking columns dynamically based on existing columns
+    const { rows: docCols } = await client.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = $1`,
+      [config.tableName]
+    );
+    const validDocCols = new Set(docCols.map((r: any) => r.column_name));
+
+    const setClauses: string[] = [
+      `"is_reversed" = TRUE`,
+      `"reversed_at" = NOW()`,
+      `"reversal_reason" = $1`,
+      `"reversed_by_doc_id" = $2`,
+      `"reversed_by_doc_number" = $3`
+    ];
+    const updateParams: any[] = [
+      reason || '',
+      reversalDocId,
+      reversalDocNumber
+    ];
+
+    if (validDocCols.has('reversed_by_entry_id')) {
+      updateParams.push(reversalEntryId || null);
+      setClauses.push(`"reversed_by_entry_id" = $${updateParams.length}`);
+    }
+    if (validDocCols.has('reversed_by_entry_number')) {
+      updateParams.push(reversalEntryNumber || null);
+      setClauses.push(`"reversed_by_entry_number" = $${updateParams.length}`);
+    }
+    if (validDocCols.has('reversal_settlement_number')) {
+      updateParams.push(reversalSettlementNumber || null);
+      setClauses.push(`"reversal_settlement_number" = $${updateParams.length}`);
+    }
+    if (validDocCols.has('updated_at')) {
+      setClauses.push(`"updated_at" = NOW()`);
+    }
+
+    updateParams.push(docId);
     await client.query(
       `UPDATE "${config.tableName}" 
-       SET "is_reversed" = TRUE,
-           "reversed_at" = NOW(),
-           "reversal_reason" = $1,
-           "reversed_by_doc_id" = $2,
-           "reversed_by_doc_number" = $3,
-           "reversed_by_entry_id" = $4,
-           "reversed_by_entry_number" = $5,
-           "reversal_settlement_number" = $6,
-           "updated_at" = NOW()
-       WHERE "id" = $7`,
-      [
-        reason || '',
-        reversalDocId,
-        reversalDocNumber,
-        reversalEntryId || null,
-        reversalEntryNumber || null,
-        reversalSettlementNumber || null,
-        docId
-      ]
+       SET ${setClauses.join(', ')} 
+       WHERE "id" = $${updateParams.length}`,
+      updateParams
     );
 
     // 8. Log Activity
@@ -334,37 +361,80 @@ export class ReversalEngine {
       }
     ] : [];
 
-    // Clone original row but update ID, number, date, flags, and notes
-    const reversalDoc = { ...originalDoc };
+    // Query valid columns for the table to ensure we NEVER insert non-existent columns
+    const { rows: colRows } = await client.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = $1`,
+      [config.tableName]
+    );
+    const validColumns = new Set(colRows.map((r: any) => r.column_name));
+
+    // Clone original row filtering strictly by existing columns
+    const reversalDoc: any = {};
+    for (const key of Object.keys(originalDoc)) {
+      if (validColumns.has(key)) {
+        reversalDoc[key] = originalDoc[key];
+      }
+    }
     delete reversalDoc.id;
 
     reversalDoc.id = reversalDocId;
-    reversalDoc[config.numberColumn] = reversalDocNumber;
-    reversalDoc.date = reversalDate;
-    reversalDoc.is_reversal_doc = true;
-    reversalDoc.is_reversed = false; // The reversal doc itself is active unless reversed
-    reversalDoc.original_doc_id = originalDoc.id;
-    reversalDoc.original_doc_number = String(originalDoc[config.numberColumn]);
-    reversalDoc.original_entry_id = ctx.originalEntryNumber ? originalDoc.id : null;
-    reversalDoc.original_entry_number = ctx.originalEntryNumber || null;
-    reversalDoc.reversed_by_doc_id = null;
-    reversalDoc.reversed_by_doc_number = null;
-    reversalDoc.reversed_by_entry_id = null;
-    reversalDoc.reversed_by_entry_number = null;
-    reversalDoc.reversal_settlement_number = reversalSettlementNumber || null;
-    reversalDoc.reversal_reason = reason || '';
-    
-    // Notes description
-    const currentNotes = originalDoc.notes || originalDoc.description || '';
-    reversalDoc.notes = `مستند عكسي للمستند رقم (${originalDoc[config.numberColumn]})${reason ? ' - سبب: ' + reason : ''}. ${currentNotes}`;
-    reversalDoc.description = reversalDoc.notes;
-    
-    if (config.hasSettlement) {
+    if (validColumns.has(config.numberColumn)) {
+      reversalDoc[config.numberColumn] = reversalDocNumber;
+    }
+    if (validColumns.has('date')) {
+      reversalDoc.date = reversalDate;
+    }
+    if (validColumns.has('is_reversal_doc')) {
+      reversalDoc.is_reversal_doc = true;
+    }
+    if (validColumns.has('is_reversed')) {
+      reversalDoc.is_reversed = false;
+    }
+    if (validColumns.has('original_doc_id')) {
+      reversalDoc.original_doc_id = originalDoc.id;
+    }
+    if (validColumns.has('original_doc_number')) {
+      reversalDoc.original_doc_number = String(originalDoc[config.numberColumn] || originalDoc.id || '');
+    }
+    if (validColumns.has('original_entry_id')) {
+      reversalDoc.original_entry_id = ctx.originalEntryNumber ? originalDoc.id : null;
+    }
+    if (validColumns.has('original_entry_number')) {
+      reversalDoc.original_entry_number = ctx.originalEntryNumber || null;
+    }
+    if (validColumns.has('reversed_by_doc_id')) {
+      reversalDoc.reversed_by_doc_id = null;
+    }
+    if (validColumns.has('reversed_by_doc_number')) {
+      reversalDoc.reversed_by_doc_number = null;
+    }
+    if (validColumns.has('reversed_by_entry_id')) {
+      reversalDoc.reversed_by_entry_id = null;
+    }
+    if (validColumns.has('reversed_by_entry_number')) {
+      reversalDoc.reversed_by_entry_number = null;
+    }
+    if (validColumns.has('reversal_settlement_number')) {
+      reversalDoc.reversal_settlement_number = reversalSettlementNumber || null;
+    }
+    if (validColumns.has('reversal_reason')) {
+      reversalDoc.reversal_reason = reason || '';
+    }
+
+    const noteText = `مستند عكسي للمستند رقم (${originalDoc[config.numberColumn] || originalDoc.id || ''})${reason ? ' - سبب: ' + reason : ''}. ${originalDoc.notes || originalDoc.description || ''}`;
+    if (validColumns.has('notes')) {
+      reversalDoc.notes = noteText;
+    }
+    if (validColumns.has('description')) {
+      reversalDoc.description = noteText;
+    }
+
+    if (config.hasSettlement && validColumns.has('settlements')) {
       reversalDoc.settlements = JSON.stringify(reversalSettlements);
     }
 
-    // Build dynamic INSERT query based on existing columns in originalDoc
-    const keys = Object.keys(reversalDoc).filter(k => reversalDoc[k] !== undefined);
+    // Build dynamic INSERT query based strictly on validColumns
+    const keys = Object.keys(reversalDoc).filter(k => reversalDoc[k] !== undefined && validColumns.has(k));
     const columns = keys.map(k => `"${k}"`).join(', ');
     const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
     const values = keys.map(k => {
@@ -382,17 +452,28 @@ export class ReversalEngine {
 
     // Duplicate child items if this table has a dedicated items table
     if (config.itemsTable && config.itemFkColumn) {
+      const { rows: itemColRows } = await client.query(
+        `SELECT column_name FROM information_schema.columns WHERE table_name = $1`,
+        [config.itemsTable]
+      );
+      const validItemColumns = new Set(itemColRows.map((r: any) => r.column_name));
+
       const { rows: origItems } = await client.query(
         `SELECT * FROM "${config.itemsTable}" WHERE "${config.itemFkColumn}" = $1`,
         [originalDoc.id]
       );
 
       for (const item of origItems) {
-        const itemCopy = { ...item };
+        const itemCopy: any = {};
+        for (const k of Object.keys(item)) {
+          if (validItemColumns.has(k)) {
+            itemCopy[k] = item[k];
+          }
+        }
         itemCopy.id = uuidv4();
         itemCopy[config.itemFkColumn] = reversalDocId;
 
-        const itemKeys = Object.keys(itemCopy).filter(k => itemCopy[k] !== undefined);
+        const itemKeys = Object.keys(itemCopy).filter(k => itemCopy[k] !== undefined && validItemColumns.has(k));
         const itemCols = itemKeys.map(k => `"${k}"`).join(', ');
         const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
         const itemValues = itemKeys.map(k => {
