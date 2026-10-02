@@ -801,7 +801,7 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
           <p className="text-xs font-bold text-slate-500">جاري تحميل ميزات وتقارير الشركة...</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 items-start">
           {SYSTEM_FEATURE_CATEGORIES.map((category, catIndex) => {
             const allItems = [...category.modules, ...(category.reports || [])];
             const enabledCount = allItems.filter(f => featureMap[f.id] === true).length;
@@ -817,24 +817,22 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
             return (
               <div 
                 key={category.id} 
-                className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden transition-all"
+                className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden transition-all flex flex-col"
               >
                 {/* Category Header - Compact */}
-                <div className="px-3 py-2 bg-slate-50/80 border-b border-slate-200/70 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded bg-slate-200/80 text-slate-700 text-[10px] font-black flex items-center justify-center font-mono">
+                <div className="px-2.5 py-1.5 bg-slate-50/90 border-b border-slate-200/70 flex flex-wrap items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="w-4 h-4 rounded bg-slate-200/80 text-slate-700 text-[9px] font-black flex items-center justify-center font-mono shrink-0">
                       {catIndex + 1}
                     </span>
-                    <div className={`p-1.5 rounded-lg ${category.color.bg} ${category.color.text} border ${category.color.border}`}>
-                      <category.icon size={14} />
+                    <div className={`p-1 rounded-md ${category.color.bg} ${category.color.text} border ${category.color.border} shrink-0`}>
+                      <category.icon size={13} />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <h3 className="font-black text-xs text-slate-900">{category.nameAr}</h3>
-                        <span className="text-[9px] font-mono text-slate-400">{category.nameEn}</span>
-                      </div>
+                    <div className="flex items-center gap-1">
+                      <h3 className="font-black text-xs text-slate-900">{category.nameAr}</h3>
+                      <span className="text-[9px] font-mono text-slate-400 hidden xl:inline">{category.nameEn}</span>
                     </div>
-                    <div className="text-[10px] text-slate-500 font-semibold mr-2 bg-white px-2 py-0.5 rounded border border-slate-200">
+                    <div className="text-[9px] text-slate-500 font-semibold bg-white px-1.5 py-0.5 rounded border border-slate-200">
                       <span>المفعل: </span>
                       <span className="font-black font-mono text-slate-800">{enabledCount}</span>
                       <span> من </span>
@@ -848,7 +846,7 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
                       <button
                         type="button"
                         onClick={() => toggleCategoryReports(category)}
-                        className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-all cursor-pointer ${
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border transition-all cursor-pointer ${
                           enabledReportsCount === totalReportsCount
                             ? 'bg-sky-50 text-sky-800 border-sky-300'
                             : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
@@ -862,7 +860,7 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
                     <button
                       type="button"
                       onClick={() => toggleCategory(category)}
-                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border font-bold text-[11px] transition-all cursor-pointer shadow-2xs ${
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded-md border font-bold text-[10px] transition-all cursor-pointer shadow-2xs ${
                         isAllEnabled 
                           ? 'bg-emerald-600 text-white border-emerald-600' 
                           : isPartial 
@@ -870,36 +868,36 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
                             : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
                       }`}
                     >
-                      <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-all ${
+                      <div className={`w-3 h-3 rounded flex items-center justify-center border transition-all ${
                         isAllEnabled 
                           ? 'bg-white text-emerald-700 border-white' 
                           : isPartial 
                             ? 'bg-blue-600 text-white border-blue-600' 
                             : 'bg-white border-slate-400'
                       }`}>
-                        {isAllEnabled && <Check size={10} className="stroke-[3]" />}
-                        {isPartial && <Minus size={10} className="stroke-[3]" />}
+                        {isAllEnabled && <Check size={8} className="stroke-[3]" />}
+                        {isPartial && <Minus size={8} className="stroke-[3]" />}
                       </div>
                       <span>
-                        {isAllEnabled ? 'محددة بالكامل' : isPartial ? 'محددة جزئياً' : 'تحديد القائمة كاملة'}
+                        {isAllEnabled ? 'محددة بالكامل' : isPartial ? 'محددة جزئياً' : 'تحديد القائمة'}
                       </span>
                     </button>
                   </div>
                 </div>
 
                 {/* Modules & Reports Body - Ultra Compact Cells & Tight Gap */}
-                <div className="p-2.5 space-y-2.5 bg-white">
+                <div className="p-2 space-y-2 bg-white flex-1">
                   
                   {/* Operational Modules Grid */}
                   <div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                       {category.modules.map(feature => {
                         const isEnabled = featureMap[feature.id] === true;
                         return (
                           <div
                             key={feature.id}
                             onClick={() => toggleFeature(category, feature.id)}
-                            className={`px-2 py-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-2 select-none min-h-[38px] ${
+                            className={`px-2 py-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 select-none min-h-[36px] ${
                               isEnabled 
                                 ? 'bg-emerald-50/50 border-emerald-300/80 hover:border-emerald-400 shadow-2xs' 
                                 : 'bg-slate-50/50 border-slate-200/80 hover:border-slate-300 opacity-60 hover:opacity-100'
@@ -908,21 +906,21 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
                           >
                             {/* Custom Square Checkbox */}
                             <div 
-                              className={`w-4 h-4 rounded flex items-center justify-center shrink-0 transition-all border ${
+                              className={`w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 transition-all border ${
                                 isEnabled 
                                   ? 'bg-emerald-600 border-emerald-600 text-white shadow-2xs' 
                                   : 'bg-white border-slate-300 hover:border-slate-400'
                               }`}
                             >
-                              {isEnabled && <Check size={11} className="stroke-[3]" />}
+                              {isEnabled && <Check size={10} className="stroke-[3]" />}
                             </div>
 
                             {/* Feature Text */}
                             <div className="flex-1 min-w-0">
-                              <div className={`text-[11px] font-bold truncate leading-tight ${isEnabled ? 'text-slate-900' : 'text-slate-600'}`}>
+                              <div className={`text-[10.5px] font-bold truncate leading-tight ${isEnabled ? 'text-slate-900' : 'text-slate-600'}`}>
                                 {feature.nameAr}
                               </div>
-                              <div className="text-[8.5px] font-mono text-slate-400 truncate leading-none mt-0.5">
+                              <div className="text-[8px] font-mono text-slate-400 truncate leading-none mt-0.5">
                                 {feature.id}
                               </div>
                             </div>
@@ -937,25 +935,25 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
 
                   {/* Reports Sub-section within Category */}
                   {hasReports && (
-                    <div className="pt-2 border-t border-slate-100">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <span className="text-[10px] font-black text-sky-800 uppercase tracking-wider flex items-center gap-1 bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
-                          <FileSpreadsheet size={11} className="text-sky-600" />
+                    <div className="pt-1.5 border-t border-slate-100">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-[9px] font-black text-sky-800 uppercase tracking-wider flex items-center gap-1 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">
+                          <FileSpreadsheet size={10} className="text-sky-600" />
                           <span>تقارير {category.nameAr}</span>
                         </span>
-                        <span className="text-[9px] text-slate-400 font-bold">
-                          (يمكن تحديد كل تقرير أو استبعاده من القائمة)
+                        <span className="text-[8.5px] text-slate-400 font-bold truncate">
+                          (تحديد أو استبعاد من القائمة)
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                         {category.reports!.map(report => {
                           const isEnabled = featureMap[report.id] === true;
                           return (
                             <div
                               key={report.id}
                               onClick={() => toggleFeature(category, report.id)}
-                              className={`px-2 py-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-2 select-none min-h-[38px] ${
+                              className={`px-2 py-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 select-none min-h-[36px] ${
                                 isEnabled 
                                   ? 'bg-sky-50/60 border-sky-300 hover:border-sky-400 shadow-2xs' 
                                   : 'bg-slate-50/50 border-slate-200/80 hover:border-slate-300 opacity-60 hover:opacity-100'
@@ -964,21 +962,21 @@ export const FeatureManagerTab: React.FC<FeatureManagerTabProps> = ({ companies,
                             >
                               {/* Custom Square Checkbox */}
                               <div 
-                                className={`w-4 h-4 rounded flex items-center justify-center shrink-0 transition-all border ${
+                                className={`w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 transition-all border ${
                                   isEnabled 
                                     ? 'bg-sky-600 border-sky-600 text-white shadow-2xs' 
                                     : 'bg-white border-slate-300 hover:border-slate-400'
                                 }`}
                               >
-                                {isEnabled && <Check size={11} className="stroke-[3]" />}
+                                {isEnabled && <Check size={10} className="stroke-[3]" />}
                               </div>
 
                               {/* Report Text */}
                               <div className="flex-1 min-w-0">
-                                <div className={`text-[11px] font-bold truncate leading-tight ${isEnabled ? 'text-sky-950' : 'text-slate-600'}`}>
+                                <div className={`text-[10.5px] font-bold truncate leading-tight ${isEnabled ? 'text-sky-950' : 'text-slate-600'}`}>
                                   {report.nameAr}
                                 </div>
-                                <div className="text-[8.5px] font-mono text-slate-400 truncate leading-none mt-0.5">
+                                <div className="text-[8px] font-mono text-slate-400 truncate leading-none mt-0.5">
                                   {report.id}
                                 </div>
                               </div>
