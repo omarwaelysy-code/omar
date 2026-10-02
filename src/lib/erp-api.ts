@@ -15288,7 +15288,7 @@ router.post('/documents/reverse', authenticateToken, async (req: AuthRequest, re
     const result = await ReversalEngine.reverseDocument(client, {
       companyId,
       userId: req.user?.id || 'system',
-      userName: req.user?.username || req.user?.name || req.user?.email || 'مستخدم النظام',
+      userName: req.user?.username || (req.user as any)?.name || req.user?.email || 'مستخدم النظام',
       moduleName,
       docId,
       reversalDate,

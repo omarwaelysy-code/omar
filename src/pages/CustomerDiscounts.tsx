@@ -1143,7 +1143,7 @@ export const CustomerDiscounts: React.FC = () => {
           onClose={() => setReversingDiscount(null)}
           onSuccess={() => {
             setReversingDiscount(null);
-            fetchDiscounts();
+            window.dispatchEvent(new Event('db-change'));
           }}
           moduleName="customer_discounts"
           docId={reversingDiscount.id}

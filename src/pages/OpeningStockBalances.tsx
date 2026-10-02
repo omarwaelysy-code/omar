@@ -1340,7 +1340,7 @@ export const OpeningStockBalances: React.FC = () => {
           onClose={() => setReversingDoc(null)}
           onSuccess={() => {
             setReversingDoc(null);
-            fetchDocuments();
+            window.dispatchEvent(new Event('db-change'));
           }}
           moduleName="opening_stock_balances"
           docId={reversingDoc.id}

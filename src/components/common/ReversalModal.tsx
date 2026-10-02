@@ -15,7 +15,7 @@ export interface ReversalModalProps {
   docDate: string;
   docAmount?: number;
   entityName?: string;
-  entityType?: 'customer' | 'supplier' | null;
+  entityType?: 'customer' | 'supplier' | 'general' | null;
   moduleTitleAr: string;
 }
 
