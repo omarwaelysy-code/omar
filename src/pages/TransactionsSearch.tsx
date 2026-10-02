@@ -44,8 +44,12 @@ export interface UnifiedMovement {
 export const TransactionsSearch: React.FC = () => {
   const { t, dir, language } = useLanguage();
   const { user } = useAuth();
-  const { onNavigate, closeTab, setCurrentPage } = useNavigation();
+  const { openTab, closeTab, setCurrentPage } = useNavigation();
   const isAr = language === 'ar';
+
+  const navigateToPage = (page: string) => {
+    openTab(page);
+  };
 
   const tableRef = useRef<HTMLDivElement>(null);
 
@@ -1282,7 +1286,7 @@ export const TransactionsSearch: React.FC = () => {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onNavigate('journal_entries');
+                              navigateToPage('journal_entries');
                             }}
                             className="text-emerald-600 hover:text-emerald-800 hover:underline font-bold"
                           >
@@ -1301,7 +1305,7 @@ export const TransactionsSearch: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => {
-                            onNavigate(m.nav_page);
+                            navigateToPage(m.nav_page);
                           }}
                           className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
                           title={isAr ? `الانتقال لشاشة ${m.doc_type_label_ar}` : `Open ${m.doc_type_label_en}`}
