@@ -52,7 +52,9 @@ BEGIN
       ADD COLUMN IF NOT EXISTS "original_doc_number" VARCHAR(100) NULL,
       ADD COLUMN IF NOT EXISTS "original_entry_id" VARCHAR(100) NULL,
       ADD COLUMN IF NOT EXISTS "original_entry_number" VARCHAR(100) NULL,
-      ADD COLUMN IF NOT EXISTS "reversal_settlement_number" VARCHAR(100) NULL;
+      ADD COLUMN IF NOT EXISTS "reversal_settlement_number" VARCHAR(100) NULL,
+      ADD COLUMN IF NOT EXISTS "settlements" JSONB DEFAULT '[]'::jsonb,
+      ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
   END IF;
 
   -- 4. Purchase Returns
@@ -70,7 +72,9 @@ BEGIN
       ADD COLUMN IF NOT EXISTS "original_doc_number" VARCHAR(100) NULL,
       ADD COLUMN IF NOT EXISTS "original_entry_id" VARCHAR(100) NULL,
       ADD COLUMN IF NOT EXISTS "original_entry_number" VARCHAR(100) NULL,
-      ADD COLUMN IF NOT EXISTS "reversal_settlement_number" VARCHAR(100) NULL;
+      ADD COLUMN IF NOT EXISTS "reversal_settlement_number" VARCHAR(100) NULL,
+      ADD COLUMN IF NOT EXISTS "settlements" JSONB DEFAULT '[]'::jsonb,
+      ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
   END IF;
 
   -- 5. Receipt Vouchers
@@ -88,7 +92,8 @@ BEGIN
       ADD COLUMN IF NOT EXISTS "original_doc_number" VARCHAR(100) NULL,
       ADD COLUMN IF NOT EXISTS "original_entry_id" VARCHAR(100) NULL,
       ADD COLUMN IF NOT EXISTS "original_entry_number" VARCHAR(100) NULL,
-      ADD COLUMN IF NOT EXISTS "reversal_settlement_number" VARCHAR(100) NULL;
+      ADD COLUMN IF NOT EXISTS "reversal_settlement_number" VARCHAR(100) NULL,
+      ADD COLUMN IF NOT EXISTS "settlements" JSONB DEFAULT '[]'::jsonb;
   END IF;
 
   -- 6. Payment Vouchers
@@ -106,7 +111,8 @@ BEGIN
       ADD COLUMN IF NOT EXISTS "original_doc_number" VARCHAR(100) NULL,
       ADD COLUMN IF NOT EXISTS "original_entry_id" VARCHAR(100) NULL,
       ADD COLUMN IF NOT EXISTS "original_entry_number" VARCHAR(100) NULL,
-      ADD COLUMN IF NOT EXISTS "reversal_settlement_number" VARCHAR(100) NULL;
+      ADD COLUMN IF NOT EXISTS "reversal_settlement_number" VARCHAR(100) NULL,
+      ADD COLUMN IF NOT EXISTS "settlements" JSONB DEFAULT '[]'::jsonb;
   END IF;
 
   -- 7. Cash Transfers
@@ -141,7 +147,9 @@ BEGIN
       ADD COLUMN IF NOT EXISTS "original_doc_number" VARCHAR(100) NULL,
       ADD COLUMN IF NOT EXISTS "original_entry_id" VARCHAR(100) NULL,
       ADD COLUMN IF NOT EXISTS "original_entry_number" VARCHAR(100) NULL,
-      ADD COLUMN IF NOT EXISTS "reversal_settlement_number" VARCHAR(100) NULL;
+      ADD COLUMN IF NOT EXISTS "reversal_settlement_number" VARCHAR(100) NULL,
+      ADD COLUMN IF NOT EXISTS "settlements" JSONB DEFAULT '[]'::jsonb,
+      ADD COLUMN IF NOT EXISTS "number" VARCHAR(50) NULL;
   END IF;
 
   -- 9. Opening Stock Balances

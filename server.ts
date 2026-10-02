@@ -350,6 +350,14 @@ async function startServer() {
       'ALTER TABLE "customer_discounts" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
       'ALTER TABLE "cash_transfers" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
       'ALTER TABLE "opening_stock_balances" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+      'ALTER TABLE "returns" ADD COLUMN IF NOT EXISTS "settlements" JSONB DEFAULT \'[]\'::jsonb',
+      'ALTER TABLE "returns" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+      'ALTER TABLE "purchase_returns" ADD COLUMN IF NOT EXISTS "settlements" JSONB DEFAULT \'[]\'::jsonb',
+      'ALTER TABLE "purchase_returns" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+      'ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "settlements" JSONB DEFAULT \'[]\'::jsonb',
+      'ALTER TABLE "payment_vouchers" ADD COLUMN IF NOT EXISTS "settlements" JSONB DEFAULT \'[]\'::jsonb',
+      'ALTER TABLE "customer_discounts" ADD COLUMN IF NOT EXISTS "settlements" JSONB DEFAULT \'[]\'::jsonb',
+      'ALTER TABLE "customer_discounts" ADD COLUMN IF NOT EXISTS "number" VARCHAR(50) NULL',
 
       // Currency Rates
       'CREATE TABLE IF NOT EXISTS "currency_rates" ("id" VARCHAR(36) PRIMARY KEY, "currency_id" VARCHAR(36) REFERENCES "currencies"("id") ON DELETE CASCADE, "rate" DECIMAL(18, 6) NOT NULL, "rate_date" DATE NOT NULL, "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)',
