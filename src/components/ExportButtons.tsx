@@ -12,6 +12,7 @@ interface ExportButtonsProps {
   selectedCount?: number;
   className?: string;
   showPrint?: boolean;
+  size?: 'sm' | 'md';
 }
 
 export const ExportButtons: React.FC<ExportButtonsProps> = ({ 
@@ -23,7 +24,8 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
   onPrintSelected,
   selectedCount = 0,
   className = "",
-  showPrint = true
+  showPrint = true,
+  size = 'md'
 }) => {
   const { t, language } = useLanguage();
   const [showExcelMenu, setShowExcelMenu] = useState(false);
@@ -62,8 +64,15 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
     }
   };
 
+  const isSm = size === 'sm';
+  const iconSize = isSm ? 15 : 18;
+  const chevronSize = isSm ? 12 : 14;
+  const btnBaseClass = isSm 
+    ? "flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl font-bold transition-all active:scale-95 shadow-sm text-xs"
+    : "flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl font-bold transition-all active:scale-95 shadow-sm text-xs sm:text-sm";
+
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
+    <div className={`flex items-center gap-1.5 ${className}`}>
       {/* Excel Export */}
       <div className="relative" ref={excelRef}>
         <button 
@@ -74,12 +83,12 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
               onExportExcel();
             }
           }}
-          className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl font-bold hover:bg-emerald-100 transition-all active:scale-95 shadow-sm text-xs sm:text-sm"
+          className={`${btnBaseClass} bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100`}
           title={t('common.export_excel') || (isAr ? 'تصدير اكسيل' : 'Export Excel')}
         >
-          <Download size={18} className="text-emerald-600 shrink-0" />
+          <Download size={iconSize} className="text-emerald-600 shrink-0" />
           <span>Excel</span>
-          {selectedCount > 0 && <ChevronDown size={14} className="text-emerald-500" />}
+          {selectedCount > 0 && <ChevronDown size={chevronSize} className="text-emerald-500" />}
         </button>
 
         {showExcelMenu && selectedCount > 0 && (
@@ -110,12 +119,12 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
               onExportPDF();
             }
           }}
-          className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl font-bold hover:bg-rose-100 transition-all active:scale-95 shadow-sm text-xs sm:text-sm"
+          className={`${btnBaseClass} bg-rose-50 border border-rose-200 text-rose-800 hover:bg-rose-100`}
           title={t('common.export_pdf') || (isAr ? 'تصدير PDF' : 'Export PDF')}
         >
-          <FileText size={18} className="text-rose-600 shrink-0" />
+          <FileText size={iconSize} className="text-rose-600 shrink-0" />
           <span>PDF</span>
-          {selectedCount > 0 && <ChevronDown size={14} className="text-rose-500" />}
+          {selectedCount > 0 && <ChevronDown size={chevronSize} className="text-rose-500" />}
         </button>
 
         {showPdfMenu && selectedCount > 0 && (
@@ -141,12 +150,12 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
         <div className="relative" ref={printRef}>
           <button 
             onClick={handlePrintClick}
-            className="flex items-center justify-center gap-2 px-3.5 py-2.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl font-bold hover:bg-blue-100 transition-all active:scale-95 shadow-sm text-xs sm:text-sm"
+            className={`${btnBaseClass} bg-blue-50 border border-blue-200 text-blue-800 hover:bg-blue-100`}
             title={isAr ? 'طباعة مباشرة' : 'Direct Print'}
           >
-            <Printer size={18} className="text-blue-600 shrink-0" />
+            <Printer size={iconSize} className="text-blue-600 shrink-0" />
             <span>{isAr ? 'طباعة' : 'Print'}</span>
-            {selectedCount > 0 && onPrintSelected && <ChevronDown size={14} className="text-blue-500" />}
+            {selectedCount > 0 && onPrintSelected && <ChevronDown size={chevronSize} className="text-blue-500" />}
           </button>
 
           {showPrintMenu && selectedCount > 0 && onPrintSelected && (

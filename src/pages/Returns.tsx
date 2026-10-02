@@ -1928,47 +1928,48 @@ export const Returns: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-3 animate-in fade-in duration-500">
       {!isModalOpen ? (
         <>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('returns.title')}</h2>
-          <p className="text-zinc-500">{t('returns.subtitle')}</p>
+          <h2 className="text-xl font-bold tracking-tight text-zinc-900">{t('returns.title')}</h2>
+          <p className="text-xs text-zinc-500">{t('returns.subtitle')}</p>
           {serverSummary.total_amount !== undefined && (
-            <div className={`mt-2 flex items-center gap-4 text-sm ${dir === 'rtl' ? 'flex-row-reverse' : ''}`}>
-               <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
+            <div className={`mt-1.5 flex items-center gap-2 text-xs ${dir === 'rtl' ? 'flex-row-reverse' : ''}`}>
+               <span className="bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-lg border border-emerald-100 font-bold text-xs">
                  {t('returns.summary_total')}: {formatMoney(serverSummary.total_amount)} {t('returns.currency')}
                </span>
             </div>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <button 
             onClick={() => setIsActivityLogOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-zinc-600 border border-zinc-200 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm"
+            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white text-zinc-600 border border-zinc-200 rounded-xl text-xs font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm"
             title={t('common.activity_log')}
           >
-            <History size={20} />
+            <History size={16} />
             <span className="hidden md:inline">{t('common.activity_log')}</span>
           </button>
           <ExportButtons 
             onExportExcel={handleExportExcel} 
             onExportPDF={handleExportPDF} 
             onPrint={() => printElement(tableRef.current, 'مرتجعات المبيعات')}
+            size="sm"
           />
           <button 
             onClick={() => openModal()}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-sm shadow-emerald-200"
           >
-            <Plus size={20} />
+            <Plus size={16} />
             {t('returns.add')}
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-zinc-50 flex items-center justify-between gap-4">
+      <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
+        <div className="p-3 border-b border-zinc-50 flex items-center justify-between gap-3">
           <div className="relative flex-1">
             <Search className={`${dir === 'rtl' ? 'right-3' : 'left-3'} absolute top-3 text-zinc-400`} size={18} />
             <input
@@ -2002,7 +2003,7 @@ export const Returns: React.FC = () => {
             <table className={`w-full ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
               <thead>
                 <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                  <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('return_number')}>
+                  <th className={`px-2.5 py-1.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('return_number')}>
                     <div className="flex items-center gap-1">
                       {t('returns.column_number')}
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -2010,7 +2011,7 @@ export const Returns: React.FC = () => {
                       </span>
                     </div>
                   </th>
-                  <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('customer_name')}>
+                  <th className={`px-2.5 py-1.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('customer_name')}>
                     <div className="flex items-center gap-1">
                       {t('returns.column_customer')}
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -2018,7 +2019,7 @@ export const Returns: React.FC = () => {
                       </span>
                     </div>
                   </th>
-                  <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('date')}>
+                  <th className={`px-2.5 py-1.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('date')}>
                     <div className="flex items-center gap-1">
                       {t('returns.column_date')}
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -2026,7 +2027,7 @@ export const Returns: React.FC = () => {
                       </span>
                     </div>
                   </th>
-                  <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('payment_type')}>
+                  <th className={`px-2.5 py-1.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('payment_type')}>
                     <div className="flex items-center gap-1">
                       {t('returns.column_type')}
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -2034,7 +2035,7 @@ export const Returns: React.FC = () => {
                       </span>
                     </div>
                   </th>
-                  <th className={`px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('total_amount')}>
+                  <th className={`px-2.5 py-1.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('total_amount')}>
                     <div className="flex items-center gap-1">
                       {t('returns.column_total')}
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -2043,24 +2044,24 @@ export const Returns: React.FC = () => {
                     </div>
                   </th>
                   {isSalesWhtEnabled && (
-                    <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                    <th className={`px-2.5 py-1.5 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                       {language === 'ar' ? 'ض.خ.إ' : 'WHT'}
                     </th>
                   )}
-                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                  <th className={`px-2.5 py-1.5 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                     {language === 'ar' ? 'رقم القيد' : 'Journal Entry'}
                   </th>
                   {showEtaColumns && (
-                    <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                    <th className={`px-2.5 py-1.5 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                       {language === 'ar' ? 'المعرف الرقمي (UUID)' : 'UUID'}
                     </th>
                   )}
                   {showEtaColumns && (
-                    <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                    <th className={`px-2.5 py-1.5 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                       {language === 'ar' ? 'حالة المرتجع بالضرائب' : 'ETA Status'}
                     </th>
                   )}
-                  <th className={`px-6 py-4 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.actions')}</th>
+                  <th className={`px-2.5 py-1.5 font-bold ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-50">
@@ -2070,25 +2071,25 @@ export const Returns: React.FC = () => {
                     className="hover:bg-zinc-50/50 transition-colors group cursor-pointer"
                     onClick={() => openModal(ret)}
                   >
-                    <td className="px-6 py-4">
+                    <td className="px-2.5 py-1.5">
                       <span className="font-mono text-xs bg-zinc-100 px-2 py-1 rounded text-zinc-600">{ret.return_number}</span>
                     </td>
-                    <td className="px-6 py-4 font-bold text-zinc-900">{ret.customer_name}</td>
-                    <td className="px-6 py-4 text-zinc-500">{formatDate(ret.date)}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-2.5 py-1.5 font-bold text-zinc-900">{ret.customer_name}</td>
+                    <td className="px-2.5 py-1.5 text-zinc-500">{formatDate(ret.date)}</td>
+                    <td className="px-2.5 py-1.5">
                       <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${ret.payment_type === 'cash' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
                         {ret.payment_type === 'cash' ? t('returns.payment_cash') : t('returns.payment_credit')}
                       </span>
                     </td>
-                    <td className="px-6 py-4 font-bold text-emerald-600">
+                    <td className="px-2.5 py-1.5 font-bold text-emerald-600">
                       {formatNumber(ret.total_amount)} <span className="text-[10px] font-bold text-zinc-500">{ret.currency_id ? (companyCurrencies.find(c => c.id === ret.currency_id)?.code || '') : (company?.settings?.currency || 'EGP')}</span>
                     </td>
                     {isSalesWhtEnabled && (
-                      <td className="px-6 py-4 font-bold text-amber-600">
+                      <td className="px-2.5 py-1.5 font-bold text-amber-600">
                         {ret.withholding_tax_amount ? `${formatMoney(ret.withholding_tax_amount)}` : '-'}
                       </td>
                     )}
-                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                    <td className={`px-2.5 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                       {ret.entry_number ? (
                         <button
                           onClick={(e) => {
@@ -2105,16 +2106,16 @@ export const Returns: React.FC = () => {
                       )}
                     </td>
                     {showEtaColumns && (
-                      <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <td className={`px-2.5 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                         {renderEtaUuidCell(ret.eta_uuid)}
                       </td>
                     )}
                     {showEtaColumns && (
-                      <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <td className={`px-2.5 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                         {renderEtaStatusBadge(ret.eta_status, ret.eta_uuid)}
                       </td>
                     )}
-                    <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                    <td className={`px-2.5 py-1.5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
                       <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
                         <button 
                           onClick={(e) => {
