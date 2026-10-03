@@ -170,19 +170,17 @@ export function EtaSupplierMapping() {
         apiRequest<{ success: boolean; data: any[] }>(`/accounts?limit=2000${compParam}`).catch(() => ({ success: true, data: [] }))
       ]);
 
-      if (supRes && supRes.data) {
-        setAllErpSuppliers(supRes.data);
-      }
+      const rawSuppliers = Array.isArray(supRes) ? supRes : (supRes?.data || []);
+      setAllErpSuppliers(rawSuppliers);
 
-      if (accRes && accRes.data) {
-        const suppAccs = (accRes.data || []).filter((a: any) =>
-          a.account_usage === 'supplier' ||
-          a.account_usage === 'accounts_payable' ||
-          (a.code && a.code.startsWith('2101')) ||
-          (a.name && (a.name.includes('مورد') || a.name.includes('دائن')))
-        );
-        setSupplierAccounts(suppAccs);
-      }
+      const rawAccounts = Array.isArray(accRes) ? accRes : (accRes?.data || []);
+      const suppAccs = rawAccounts.filter((a: any) =>
+        a.account_usage === 'supplier' ||
+        a.account_usage === 'accounts_payable' ||
+        (a.code && a.code.startsWith('2101')) ||
+        (a.name && (a.name.includes('مورد') || a.name.includes('دائن')))
+      );
+      setSupplierAccounts(suppAccs);
     } catch (err) {
       console.warn('Could not load ERP suppliers or accounts list:', err);
     } finally {

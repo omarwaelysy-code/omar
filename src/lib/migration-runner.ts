@@ -148,7 +148,10 @@ export async function runMigrations() {
       { table: 'payment_methods', column: 'bank_code', type: 'VARCHAR(50)' },
       { table: 'payment_methods', column: 'bank_logo', type: 'TEXT' },
       { table: 'payment_methods', column: 'bank_website', type: 'TEXT' },
-      { table: 'payment_methods', column: 'bank_hotline', type: 'VARCHAR(50)' }
+      { table: 'payment_methods', column: 'bank_hotline', type: 'VARCHAR(50)' },
+      { table: 'issued_cheques', column: 'signatory_name', type: 'VARCHAR(255)' },
+      { table: 'issued_cheques', column: 'supplier_name', type: 'VARCHAR(255)' },
+      { table: 'issued_cheques', column: 'settlements', type: "JSONB DEFAULT '[]'" }
     ];
 
     for (const item of columnsToSync) {

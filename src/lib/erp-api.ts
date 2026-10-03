@@ -3194,8 +3194,15 @@ router.get('/db-health', async (req, res) => {
   }
 });
 
+// Meta-parameters that are query/pagination options, NOT database column names
+const META_PARAM_KEYS = new Set([
+  '_limit', '_sort', '_order', '_page', '_search', '_sortBy', '_sortOrder', '_offset',
+  'limit', 'page', 'offset', 'sort', 'order', 'sortBy', 'sortOrder', 'search', 'q',
+  'all_companies', 'all'
+]);
+
 // Helper for generic list
-const getList = async (table: string, filters: any) => {
+const getList = async (table: string, filters: any = {}) => {
   let sql;
   const journaledTables = [
     'invoices', 'purchase_invoices', 'receipt_vouchers', 'payment_vouchers',
@@ -3213,12 +3220,12 @@ const getList = async (table: string, filters: any) => {
   
   let paramIndex = 1;
   Object.keys(filters).forEach((key) => {
-    // ── Skip meta-params (_limit, _sort, _order, _page, _search, all_companies, etc.)
-    //    They are NOT column names. The paginated branch already guards these;
-    //    this guard was missing here, causing HTTP 500 on exchange_rates queries.
-    if (key.startsWith('_') || key === 'all_companies' || key === 'all') return;
+    // ── Skip meta-params (_limit, limit, _sort, sort, _page, page, _search, all_companies, etc.)
+    //    They are NOT column names.
+    if (key.startsWith('_') || META_PARAM_KEYS.has(key)) return;
 
     const value = filters[key];
+    if (value === undefined || value === null || value === '') return;
     
     if (key === 'date_from') {
       conditions.push(`date >= $${paramIndex++}`);
@@ -3238,6 +3245,8 @@ const getList = async (table: string, filters: any) => {
   
   // Default sorting for report tables
   const reportTables = ['journal_entries', 'invoices', 'receipt_vouchers', 'payment_vouchers', 'purchase_invoices', 'purchase_returns', 'returns', 'goods_receipts'];
+  const sortCol = filters._sort || filters.sort || filters._sortBy || filters.sortBy;
+  const sortOrd = filters._order || filters.order || filters._sortOrder || filters.sortOrder;
   if (reportTables.includes(table)) {
     let numField = 'id';
     if (table === 'goods_receipts') numField = 'receipt_number';
@@ -3247,17 +3256,25 @@ const getList = async (table: string, filters: any) => {
     else if (table === 'journal_entries') numField = 'entry_number';
 
     sql += ` ORDER BY date DESC, "${numField}" DESC`;
-  } else if (filters._sort) {
-    // Honour explicit _sort / _order meta-params when present (e.g. exchange_rates?_sort=rate_date&_order=desc)
-    const col   = String(filters._sort).replace(/[^a-zA-Z0-9_]/g, '');   // sanitise
-    const order = String(filters._order || 'asc').toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+  } else if (sortCol) {
+    // Honour explicit sort / order meta-params when present
+    const col   = String(sortCol).replace(/[^a-zA-Z0-9_]/g, '');   // sanitise
+    const order = String(sortOrd || 'asc').toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
     sql += ` ORDER BY "${col}" ${order}`;
   }
 
-  // Honour _limit meta-param
-  if (filters._limit) {
-    const lim = parseInt(String(filters._limit), 10);
+  // Honour _limit / limit meta-param
+  const limitVal = filters._limit ?? filters.limit;
+  if (limitVal !== undefined && limitVal !== null && limitVal !== '') {
+    const lim = parseInt(String(limitVal), 10);
     if (!isNaN(lim) && lim > 0) sql += ` LIMIT ${lim}`;
+  }
+
+  // Honour _offset / offset meta-param
+  const offsetVal = filters._offset ?? filters.offset;
+  if (offsetVal !== undefined && offsetVal !== null && offsetVal !== '') {
+    const off = parseInt(String(offsetVal), 10);
+    if (!isNaN(off) && off >= 0) sql += ` OFFSET ${off}`;
   }
   
   const { rows } = await pool.query(sql, values);
@@ -6643,18 +6660,19 @@ modules.forEach(moduleName => {
           let paramIndex = 1;
 
           Object.keys(queryFilters).forEach((key) => {
-            if (['company_id', 'date_from', 'date_to'].includes(key) || (!key.startsWith('_') && key !== 'company_id')) {
-              const value = queryFilters[key];
-              if (key === 'date_from') {
-                conditions.push(`date >= $${paramIndex++}`);
-                values.push(value);
-              } else if (key === 'date_to') {
-                conditions.push(`date <= $${paramIndex++}`);
-                values.push(value);
-              } else if (!key.startsWith('_')) {
-                conditions.push(`"${key}" = $${paramIndex++}`);
-                values.push(value);
-              }
+            if (key.startsWith('_') || META_PARAM_KEYS.has(key)) return;
+            const value = queryFilters[key];
+            if (value === undefined || value === null || value === '') return;
+
+            if (key === 'date_from') {
+              conditions.push(`date >= $${paramIndex++}`);
+              values.push(value);
+            } else if (key === 'date_to') {
+              conditions.push(`date <= $${paramIndex++}`);
+              values.push(value);
+            } else {
+              conditions.push(`"${key}" = $${paramIndex++}`);
+              values.push(value);
             }
           });
 

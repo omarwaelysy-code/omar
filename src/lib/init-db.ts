@@ -595,6 +595,9 @@ export async function initDatabase() {
         "description" TEXT,
         "notes" TEXT,
         "payee_name" VARCHAR(255),
+        "signatory_name" VARCHAR(255),
+        "supplier_name" VARCHAR(255),
+        "settlements" JSONB DEFAULT '[]',
         "payment_date" DATE,
         "return_date" DATE,
         "return_reason" TEXT,
@@ -624,6 +627,9 @@ export async function initDatabase() {
     await safeQuery(`ALTER TABLE "issued_cheques" ADD COLUMN IF NOT EXISTS "cheque_type" VARCHAR(50) DEFAULT 'supplier';`, 'add cheque_type to issued_cheques');
     await safeQuery(`ALTER TABLE "issued_cheques" ADD COLUMN IF NOT EXISTS "debit_account_id" VARCHAR(36) REFERENCES "accounts"("id");`, 'add debit_account_id to issued_cheques');
     await safeQuery(`ALTER TABLE "issued_cheques" ADD COLUMN IF NOT EXISTS "debit_account_name" VARCHAR(255);`, 'add debit_account_name to issued_cheques');
+    await safeQuery(`ALTER TABLE "issued_cheques" ADD COLUMN IF NOT EXISTS "signatory_name" VARCHAR(255);`, 'add signatory_name to issued_cheques');
+    await safeQuery(`ALTER TABLE "issued_cheques" ADD COLUMN IF NOT EXISTS "supplier_name" VARCHAR(255);`, 'add supplier_name to issued_cheques');
+    await safeQuery(`ALTER TABLE "issued_cheques" ADD COLUMN IF NOT EXISTS "settlements" JSONB DEFAULT '[]';`, 'add settlements to issued_cheques');
 
     await safeQuery(`CREATE INDEX IF NOT EXISTS "idx_issued_cheques_company_status" ON "issued_cheques"("company_id", "status");`, 'idx_issued_cheques_company_status');
     await safeQuery(`CREATE INDEX IF NOT EXISTS "idx_issued_cheques_due_date" ON "issued_cheques"("company_id", "due_date");`, 'idx_issued_cheques_due_date');
