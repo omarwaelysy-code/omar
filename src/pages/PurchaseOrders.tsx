@@ -15,7 +15,7 @@ import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { ExportButtons } from '../components/ExportButtons';
 import { PaginationControls } from '../components/PaginationControls';
 import { usePermissions } from '../hooks/usePermissions';
-import { formatMoney, formatDate } from '../utils/formatUtils';
+import { formatMoney, formatDate, formatNumber } from '../utils/formatUtils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
@@ -140,8 +140,6 @@ export const PurchaseOrders: React.FC = () => {
   const [isColumnSelectorOpen, setIsColumnSelectorOpen] = useState(false);
   const columnSelectorRef = useRef<HTMLDivElement>(null);
 
-  const isMultiCurrencyEnabled = companyData?.settings?.enable_multi_currency || (companyData as any)?.enable_multi_currency || false;
-
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
     const saved = localStorage.getItem(`purchase_orders_visible_columns_${user?.id}`);
     if (saved) {
@@ -207,6 +205,7 @@ export const PurchaseOrders: React.FC = () => {
   const [viewOrder, setViewOrder] = useState<PurchaseOrder | null>(null);
   const [view, setView] = useViewPreference('purchase_orders', 'table');
   const [companyData, setCompanyData] = useState<Company | null>(null);
+  const isMultiCurrencyEnabled = companyData?.settings?.enable_multi_currency || (companyData as any)?.enable_multi_currency || false;
 
   // Form State
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
@@ -1486,7 +1485,7 @@ export const PurchaseOrders: React.FC = () => {
                             <button 
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleViewOrder(ord);
+                                setViewOrder(ord);
                               }}
                               className="p-1.5 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
                               title="عرض"
