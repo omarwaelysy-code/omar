@@ -69,6 +69,7 @@ export const ReversalModal: React.FC<ReversalModalProps> = ({
         showNotification(
           `تم عكس المستند بنجاح! تم إنشاء المستند العكسي (${res.reversalDocNumber})${res.reversalEntryNumber ? ' والقيد (' + res.reversalEntryNumber + ')' : ''}`,
           'success'
+        );
         window.dispatchEvent(new CustomEvent('db-refresh', { detail: { collection: moduleName } }));
         window.dispatchEvent(new CustomEvent('db-refresh', { detail: { collection: 'journal_entries' } }));
         window.dispatchEvent(new CustomEvent('db-refresh', {}));
