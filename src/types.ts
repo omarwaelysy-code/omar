@@ -1120,6 +1120,8 @@ export interface SalesOrder {
   company_id: string;
   created_by?: string;
   created_at?: string;
+  updated_by?: string;
+  updated_at?: string;
   currency_id?: string | null;
   exchange_rate?: number;
   exchange_rate_type?: 'auto' | 'manual';
@@ -1168,6 +1170,8 @@ export interface PurchaseOrder {
   company_id: string;
   created_by?: string;
   created_at?: string;
+  updated_by?: string;
+  updated_at?: string;
   currency_id?: string | null;
   exchange_rate?: number;
   exchange_rate_type?: 'auto' | 'manual';

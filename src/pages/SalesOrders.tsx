@@ -1699,51 +1699,21 @@ export const SalesOrders: React.FC = () => {
                               </td>
                             )}
                             {visibleColumns.subtotal && (
-                        <th 
-                          style={{ width: columnWidths.subtotal || 100, minWidth: columnWidths.subtotal || 100 }}
-                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
-                          onClick={() => handleSort('subtotal')}
-                        >
-                          <div className="flex items-center gap-1">
-                            <span>{language === 'ar' ? 'قبل الضريبة' : 'Subtotal'}</span>
-                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                              {sortBy === 'subtotal' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                            </span>
-                          </div>
-                          {renderResizeHandles('subtotal')}
-                        </th>
-                      )}
-                      {visibleColumns.tax_amount && (
-                        <th 
-                          style={{ width: columnWidths.tax_amount || 85, minWidth: columnWidths.tax_amount || 85 }}
-                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
-                          onClick={() => handleSort('tax_amount')}
-                        >
-                          <div className="flex items-center gap-1">
-                            <span>{language === 'ar' ? 'الضريبة' : 'Tax'}</span>
-                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                              {sortBy === 'tax_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                            </span>
-                          </div>
-                          {renderResizeHandles('tax_amount')}
-                        </th>
-                      )}
-                      {visibleColumns.discount_amount && (
-                        <th 
-                          style={{ width: columnWidths.discount_amount || 85, minWidth: columnWidths.discount_amount || 85 }}
-                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
-                          onClick={() => handleSort('discount_amount')}
-                        >
-                          <div className="flex items-center gap-1">
-                            <span>{language === 'ar' ? 'الخصم' : 'Discount'}</span>
-                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                              {sortBy === 'discount_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                            </span>
-                          </div>
-                          {renderResizeHandles('discount_amount')}
-                        </th>
-                      )}
-                      {visibleColumns.total_amount && (
+                              <td style={{ width: columnWidths.subtotal || 100, minWidth: columnWidths.subtotal || 100 }} className={`px-2 py-0.5 font-medium text-slate-600 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {formatMoney(ord.subtotal || ord.total_amount)}
+                              </td>
+                            )}
+                            {visibleColumns.tax_amount && (
+                              <td style={{ width: columnWidths.tax_amount || 85, minWidth: columnWidths.tax_amount || 85 }} className={`px-2 py-0.5 font-bold text-slate-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {formatMoney(ord.tax_amount || 0)}
+                              </td>
+                            )}
+                            {visibleColumns.discount_amount && (
+                              <td style={{ width: columnWidths.discount_amount || 85, minWidth: columnWidths.discount_amount || 85 }} className={`px-2 py-0.5 font-bold text-rose-600 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {ord.discount_amount ? formatMoney(ord.discount_amount) : '-'}
+                              </td>
+                            )}
+                            {visibleColumns.total_amount && (
                               <td style={{ width: columnWidths.total_amount, minWidth: columnWidths.total_amount }} className={`px-2 py-0.5 font-bold text-slate-900 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                                 {formatMoney(ord.total_amount)} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || 'EGP').toUpperCase()}</span>
                               </td>
@@ -1774,6 +1744,16 @@ export const SalesOrders: React.FC = () => {
                             {visibleColumns.created_time && (
                               <td style={{ width: columnWidths.created_time, minWidth: columnWidths.created_time }} className={`px-2 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                                 {formatTimestampTime(ord.created_at)}
+                              </td>
+                            )}
+                            {visibleColumns.updated_date && (
+                              <td style={{ width: columnWidths.updated_date || 110, minWidth: columnWidths.updated_date || 110 }} className={`px-2 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {ord.updated_at ? formatDate(ord.updated_at.slice(0, 10)) : '-'}
+                              </td>
+                            )}
+                            {visibleColumns.updated_time && (
+                              <td style={{ width: columnWidths.updated_time || 90, minWidth: columnWidths.updated_time || 90 }} className={`px-2 py-0.5 text-slate-400 font-mono text-[11px] whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {ord.updated_at && ord.updated_at.length > 11 ? ord.updated_at.slice(11, 16) : '-'}
                               </td>
                             )}
                             <td className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
