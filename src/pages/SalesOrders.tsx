@@ -18,10 +18,12 @@ import { useViewPreference } from '../hooks/useViewPreference';
 import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
 import { useNavigation } from '../contexts/NavigationContext';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
-import { exportToExcel } from '../utils/excelUtils';
+import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { printDocument } from '../utils/printEngine';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { InlineActivityLog } from '../components/InlineActivityLog';
+import { PageActivityLog } from '../components/PageActivityLog';
+import { ExportButtons } from '../components/ExportButtons';
 import { AttachmentsManager, AttachmentItem } from '../components/common/AttachmentsManager';
 
 export const SalesOrders: React.FC = () => {
@@ -110,6 +112,55 @@ export const SalesOrders: React.FC = () => {
   const [viewOrder, setViewOrder] = useState<SalesOrder | null>(null);
   const [view, setView] = useViewPreference('sales_orders', 'table');
   const [companyData, setCompanyData] = useState<Company | null>(null);
+
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [isExportingPDFSelected, setIsExportingPDFSelected] = useState(false);
+  const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
+  const [activityLogDocumentId, setActivityLogDocumentId] = useState<string | undefined>(undefined);
+  const [isColumnSelectorOpen, setIsColumnSelectorOpen] = useState(false);
+  const columnSelectorRef = useRef<HTMLDivElement>(null);
+
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+    const saved = localStorage.getItem(`sales_orders_column_widths_${user?.id}`);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { }
+    }
+    return {
+      order_number: 140,
+      customer_name: 180,
+      date: 110,
+      delivery_date: 110,
+      description: 200,
+      total_amount: 130,
+      status: 120,
+      currency: 80,
+      foreign_amount: 140,
+      created_date: 110,
+      created_time: 90,
+    };
+  });
+
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
+    const saved = localStorage.getItem(`sales_orders_visible_columns_${user?.id}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return {
+      order_number: true,
+      customer_name: true,
+      date: true,
+      delivery_date: true,
+      description: true,
+      total_amount: true,
+      status: true,
+      currency: false,
+      foreign_amount: false,
+      created_date: false,
+      created_time: false,
+    };
+  });
 
   // Form State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
@@ -371,6 +422,170 @@ export const SalesOrders: React.FC = () => {
       setSortOrder('DESC');
     }
     setPage(1);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (columnSelectorRef.current && !columnSelectorRef.current.contains(event.target as Node)) {
+        setIsColumnSelectorOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleResizeStart = (e: React.MouseEvent, columnKey: string, side: 'left' | 'right') => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startWidth = columnWidths[columnKey] || 100;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      let widthChange = side === 'left' ? -deltaX : deltaX;
+      if (dir === 'rtl') {
+        widthChange = -widthChange;
+      }
+      
+      const newWidth = Math.max(50, startWidth + widthChange);
+      setColumnWidths((prev) => {
+        const updated = {
+          ...prev,
+          [columnKey]: newWidth,
+        };
+        if (user?.id) {
+          localStorage.setItem(`sales_orders_column_widths_${user.id}`, JSON.stringify(updated));
+        }
+        return updated;
+      });
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const renderResizeHandles = (columnKey: string) => {
+    return (
+      <>
+        {/* Left resize handle */}
+        <div
+          onMouseDown={(e) => handleResizeStart(e, columnKey, 'left')}
+          className="absolute top-0 left-0 bottom-0 w-3 cursor-col-resize group/resize z-10 flex items-center justify-center -ml-1.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="w-[2px] h-4 bg-slate-200 group-hover/resize:bg-emerald-500 group-hover/resize:h-full transition-all duration-150" />
+        </div>
+        {/* Right resize handle */}
+        <div
+          onMouseDown={(e) => handleResizeStart(e, columnKey, 'right')}
+          className="absolute top-0 right-0 bottom-0 w-3 cursor-col-resize group/resize z-10 flex items-center justify-center -mr-1.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="w-[2px] h-4 bg-slate-200 group-hover/resize:bg-emerald-500 group-hover/resize:h-full transition-all duration-150" />
+        </div>
+      </>
+    );
+  };
+
+  const formatTimestampDate = (dateStr?: string) => {
+    if (!dateStr) return '-';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return '-';
+      return formatDate(d.toISOString().slice(0, 10));
+    } catch {
+      return '-';
+    }
+  };
+
+  const formatTimestampTime = (dateStr?: string) => {
+    if (!dateStr) return '-';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return '-';
+      return d.toLocaleTimeString(language === 'ar' ? 'ar-EG' : 'en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch {
+      return '-';
+    }
+  };
+
+  const handleExportExcel = (onlySelected: boolean = false) => {
+    const listToExport = onlySelected
+      ? filteredOrders.filter(ord => selectedOrderIds.includes(ord.id))
+      : filteredOrders;
+
+    const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
+
+    const dataToExport = listToExport.map(ord => {
+      const currencyCode = (ord as any).currency_id 
+        ? (companyCurrencies.find(c => c.id === (ord as any).currency_id)?.code || '') 
+        : (companyData?.settings?.currency || 'EGP');
+      const isForeign = currencyCode.toLowerCase() !== baseCode;
+
+      return {
+        ...ord,
+        formatted_order_number: ord.order_number,
+        formatted_customer_name: ord.customer_name,
+        formatted_date: formatDate(ord.date),
+        formatted_delivery_date: ord.delivery_date ? formatDate(ord.delivery_date) : '-',
+        formatted_description: ord.description || '-',
+        formatted_total_amount: ord.total_amount,
+        formatted_status: ord.status === 'converted' ? `${ot('status_converted')} (${ord.invoice_number || ''})` : ot('status_pending'),
+        formatted_currency: currencyCode,
+        formatted_foreign_amount: isForeign ? ord.total_amount : '-',
+        formatted_created_date: formatTimestampDate(ord.created_at),
+        formatted_created_time: formatTimestampTime(ord.created_at),
+      };
+    });
+
+    const keyMap: Record<string, string> = {};
+    if (visibleColumns.order_number) keyMap['formatted_order_number'] = ot('column_number');
+    if (visibleColumns.customer_name) keyMap['formatted_customer_name'] = ot('column_customer');
+    if (visibleColumns.date) keyMap['formatted_date'] = ot('column_date');
+    if (visibleColumns.delivery_date) keyMap['formatted_delivery_date'] = ot('column_delivery_date');
+    if (visibleColumns.description) keyMap['formatted_description'] = language === 'ar' ? 'البيان' : 'Description';
+    if (visibleColumns.total_amount) keyMap['formatted_total_amount'] = ot('column_amount');
+    if (visibleColumns.status) keyMap['formatted_status'] = ot('column_status');
+    if (visibleColumns.currency && isMultiCurrencyEnabled) keyMap['formatted_currency'] = ot('currency');
+    if (visibleColumns.foreign_amount && isMultiCurrencyEnabled) keyMap['formatted_foreign_amount'] = language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount';
+    if (visibleColumns.created_date) keyMap['formatted_created_date'] = language === 'ar' ? 'تاريخ الإنشاء' : 'Created Date';
+    if (visibleColumns.created_time) keyMap['formatted_created_time'] = language === 'ar' ? 'وقت الإنشاء' : 'Created Time';
+
+    const formattedData = formatDataForExcel(dataToExport, keyMap);
+    exportToExcel(formattedData, { filename: 'Sales_Orders_Report', sheetName: 'أوامر البيع' });
+  };
+
+  const handleExportPDF = async (onlySelected: boolean = false) => {
+    if (onlySelected) {
+      setIsExportingPDFSelected(true);
+      setTimeout(async () => {
+        if (tableRef.current) {
+          await exportToPDFUtil(tableRef.current, { 
+            filename: 'Sales_Orders_Report_Selected', 
+            orientation: 'landscape',
+            reportTitle: 'قائمة أوامر البيع المحددة'
+          });
+        }
+        setIsExportingPDFSelected(false);
+      }, 100);
+    } else {
+      if (tableRef.current) {
+        await exportToPDFUtil(tableRef.current, { 
+          filename: 'Sales_Orders_Report', 
+          orientation: 'landscape',
+          reportTitle: 'قائمة أوامر البيع'
+        });
+      }
+    }
   };
 
   const generateOrderNumber = async (dateStr: string) => {
@@ -900,6 +1115,46 @@ export const SalesOrders: React.FC = () => {
     ? (companyCurrencies.find(c => c.id === selectedCurrencyId)?.code || '').toUpperCase()
     : (companyData?.settings?.currency || 'EGP').toUpperCase();
 
+  const columnLabels: Record<string, string> = {
+    order_number: ot('column_number'),
+    customer_name: ot('column_customer'),
+    date: ot('column_date'),
+    delivery_date: ot('column_delivery_date'),
+    description: language === 'ar' ? 'البيان' : 'Description',
+    total_amount: ot('column_amount'),
+    status: ot('column_status'),
+    currency: ot('currency'),
+    foreign_amount: language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount',
+    created_date: language === 'ar' ? 'تاريخ الإنشاء' : 'Created Date',
+    created_time: language === 'ar' ? 'وقت الإنشاء' : 'Created Time',
+  };
+
+  const totalOrdersAmount = Number(serverSummary.total_amount ?? orders.reduce((sum, ord) => sum + Number(ord.total_amount || 0), 0));
+  const totalDiscountAmount = Number(serverSummary.total_discount ?? orders.reduce((sum, ord) => sum + Number((ord as any).discount || (ord as any).discount_amount || 0), 0));
+  const totalNetAmount = totalOrdersAmount - totalDiscountAmount;
+  const pendingOrdersCount = orders.filter(ord => ord.status !== 'converted').length;
+  const convertedOrdersCount = orders.filter(ord => ord.status === 'converted').length;
+
+  const selectedTotals = useMemo(() => {
+    const selected = orders.filter(ord => selectedOrderIds.includes(ord.id));
+    const total_amount = selected.reduce((sum, ord) => sum + Number(ord.total_amount || 0), 0);
+    const discount = selected.reduce((sum, ord) => sum + Number((ord as any).discount || (ord as any).discount_amount || 0), 0);
+    return {
+      total_amount,
+      discount,
+      net_amount: total_amount - discount
+    };
+  }, [orders, selectedOrderIds]);
+
+  const isAllSelected = filteredOrders.length > 0 && filteredOrders.every(ord => selectedOrderIds.includes(ord.id));
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedOrderIds([]);
+    } else {
+      setSelectedOrderIds(filteredOrders.map(ord => ord.id));
+    }
+  };
+
   if (!canView) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] text-slate-500 gap-4">
@@ -912,42 +1167,96 @@ export const SalesOrders: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
+    <div className="space-y-3 animate-in fade-in duration-500" dir={dir}>
       {!isModalOpen ? (
         <>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-3xl font-bold tracking-tight text-slate-900 italic serif">{ot('title')}</h2>
-              <p className="text-slate-500">{ot('subtitle')}</p>
-              {serverSummary.total_amount !== undefined && (
-                <div className="mt-2 flex items-center gap-4 text-sm">
-                  <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
-                    {language === 'ar' ? 'إجمالي الأوامر:' : 'Total Orders:'} {formatMoney(serverSummary.total_amount)} {t('invoices.currency')}
-                  </span>
-                </div>
-              )}
+          {/* Header Line 1: Title & Actions in a single compact row */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-lg font-bold tracking-tight text-slate-900">{ot('title')}</h2>
+              <span className="text-xs text-slate-400 hidden md:inline">| {ot('subtitle')}</span>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+
+            <div className="flex items-center gap-1.5 flex-wrap">
               {canCreate && (
                 <button 
                   onClick={openModal}
-                  className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
+                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-sm shadow-emerald-500/20"
                 >
-                  <Plus size={20} />
-                  {ot('add_order')}
+                  <Plus size={15} />
+                  <span>{ot('add_order')}</span>
                 </button>
               )}
+              <ExportButtons 
+                onExportExcel={() => handleExportExcel(false)} 
+                onExportPDF={() => handleExportPDF(false)} 
+                onPrint={() => printElement(tableRef.current, 'قائمة أوامر البيع')}
+                onExportExcelSelected={() => handleExportExcel(true)}
+                onExportPDFSelected={() => handleExportPDF(true)}
+                onPrintSelected={() => printElement(tableRef.current, 'أوامر البيع المحددة')}
+                selectedCount={selectedOrderIds.length}
+                size="sm"
+              />
+              <button 
+                onClick={() => setIsActivityLogOpen(true)}
+                className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-white text-slate-600 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+                title={t('common.activity_log')}
+              >
+                <History size={15} />
+                <span className="hidden md:inline">{t('common.activity_log')}</span>
+              </button>
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-center gap-4">
+          {/* Header Line 2: Full-width compact summary strip */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-white border border-slate-200/80 rounded-xl shadow-xs text-xs">
+            <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-4 gap-y-1 text-xs">
+              <div className="flex items-center gap-1">
+                <span className="text-slate-500 text-xs font-medium">إجمالي الأوامر:</span>
+                <span className="font-bold text-emerald-700">{formatMoney(totalOrdersAmount)} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span></span>
+              </div>
+              <span className="text-slate-200 hidden sm:inline">|</span>
+              <div className="flex items-center gap-1">
+                <span className="text-slate-500 text-xs font-medium">إجمالي الخصومات:</span>
+                <span className="font-bold text-rose-600">{formatMoney(totalDiscountAmount)} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span></span>
+              </div>
+              <span className="text-slate-200 hidden sm:inline">|</span>
+              <div className="flex items-center gap-1">
+                <span className="text-slate-500 text-xs font-medium">الصافي:</span>
+                <span className="font-bold text-blue-700">{formatMoney(totalNetAmount)} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span></span>
+              </div>
+              <span className="text-slate-200 hidden sm:inline">|</span>
+              <div className="flex items-center gap-1">
+                <span className="text-slate-500 text-xs font-medium">معلق:</span>
+                <span className="font-bold text-amber-700">{pendingOrdersCount}</span>
+              </div>
+              <span className="text-slate-200 hidden sm:inline">|</span>
+              <div className="flex items-center gap-1">
+                <span className="text-slate-500 text-xs font-medium">تم التحويل:</span>
+                <span className="font-bold text-emerald-700">{convertedOrdersCount}</span>
+              </div>
+            </div>
+
+            {selectedOrderIds.length > 0 && (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 animate-in fade-in">
+                <span>مجموع المحدد ({selectedOrderIds.length}):</span>
+                <span className="text-emerald-700">{formatMoney(selectedTotals.total_amount)}</span>
+                <span className="text-slate-300">/</span>
+                <span className="text-rose-600">{formatMoney(selectedTotals.discount)}</span>
+                <span className="text-slate-300">/</span>
+                <span className="text-blue-700">{formatMoney(selectedTotals.net_amount)}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-3 border-b border-slate-100 flex items-center gap-3">
               <div className="relative flex-1">
                 <Search className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 text-slate-400`} size={18} />
                 <input
                   type="text"
                   placeholder={ot('search_placeholder')}
-                  className={`w-full ${dir === 'rtl' ? 'pl-10 pr-4' : 'pr-10 pl-4'} py-2 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all`}
+                  className={`w-full ${dir === 'rtl' ? 'pl-10 pr-4' : 'pr-10 pl-4'} py-2 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all text-xs`}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -956,148 +1265,479 @@ export const SalesOrders: React.FC = () => {
                 <button
                   onClick={() => setView('table')}
                   className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
                 >
                   <List size={18} />
                 </button>
                 <button
                   onClick={() => setView('card')}
                   className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
                 >
                   <LayoutGrid size={18} />
                 </button>
               </div>
+
+              {/* Column Selection Dropdown */}
+              {view === 'table' && (
+                <div className="relative" ref={columnSelectorRef}>
+                  <button
+                    onClick={() => setIsColumnSelectorOpen(!isColumnSelectorOpen)}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow-sm active:scale-95"
+                  >
+                    <Eye size={14} className="text-slate-400" />
+                    <span>{language === 'ar' ? 'أعمدة الجدول' : 'Table Columns'}</span>
+                    <ChevronDown size={14} className="text-slate-400" />
+                  </button>
+                  
+                  {isColumnSelectorOpen && (
+                    <div className="absolute top-full mt-1.5 right-0 bg-white border border-slate-200 rounded-xl shadow-xl p-3 z-50 min-w-[220px] max-h-[300px] overflow-y-auto space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest pb-1 border-b border-slate-100">
+                        {language === 'ar' ? 'تخصيص الأعمدة' : 'Customize Columns'}
+                      </div>
+                      {Object.keys(visibleColumns).filter(colKey => {
+                        if (colKey === 'currency' || colKey === 'foreign_amount') {
+                          return isMultiCurrencyEnabled;
+                        }
+                        return true;
+                      }).map((colKey) => (
+                        <label key={colKey} className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer hover:bg-slate-50 p-1.5 rounded-lg transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={visibleColumns[colKey]}
+                            onChange={() => {
+                              const newVal = !visibleColumns[colKey];
+                              const updated = {
+                                ...visibleColumns,
+                                [colKey]: newVal
+                              };
+                              setVisibleColumns(updated);
+                              if (user?.id) {
+                                localStorage.setItem(`sales_orders_visible_columns_${user.id}`, JSON.stringify(updated));
+                              }
+                            }}
+                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5"
+                          />
+                          <span>{columnLabels[colKey] || colKey}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
+            <PaginationControls 
+              page={page} 
+              limit={limit} 
+              total={totalRecords} 
+              onPageChange={setPage} 
+              onLimitChange={setLimit} 
+              className="border-b border-slate-100"
+            />
+
             {view === 'table' ? (
-              <div className="overflow-x-auto">
+              <div ref={tableRef} id="sales-orders-list-table" className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="bg-slate-50/50 text-slate-500 text-[10px] uppercase tracking-widest font-bold border-b border-slate-100">
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer`} onClick={() => handleSort('order_number')}>{ot('column_number')}</th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer`} onClick={() => handleSort('customer_name')}>{ot('column_customer')}</th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer`} onClick={() => handleSort('date')}>{ot('column_date')}</th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer`} onClick={() => handleSort('delivery_date')}>{ot('column_delivery_date')}</th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'البيان' : 'Description'}</th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer`} onClick={() => handleSort('total_amount')}>{ot('column_amount')}</th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{ot('column_status')}</th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
+                      <th className="px-2 py-0.5 text-center w-12 no-pdf whitespace-nowrap">
+                        <input 
+                          type="checkbox"
+                          checked={isAllSelected}
+                          onChange={handleSelectAll}
+                          className="rounded border-slate-350 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                        />
+                      </th>
+                      {visibleColumns.order_number && (
+                        <th 
+                          style={{ width: columnWidths.order_number, minWidth: columnWidths.order_number }}
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('order_number')}
+                        >
+                          <div className="flex items-center gap-1">
+                            {ot('column_number')}
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'order_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('order_number')}
+                        </th>
+                      )}
+                      {visibleColumns.customer_name && (
+                        <th 
+                          style={{ width: columnWidths.customer_name, minWidth: columnWidths.customer_name }}
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('customer_name')}
+                        >
+                          <div className="flex items-center gap-1">
+                            {ot('column_customer')}
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'customer_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('customer_name')}
+                        </th>
+                      )}
+                      {visibleColumns.date && (
+                        <th 
+                          style={{ width: columnWidths.date, minWidth: columnWidths.date }}
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('date')}
+                        >
+                          <div className="flex items-center gap-1">
+                            {ot('column_date')}
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('date')}
+                        </th>
+                      )}
+                      {visibleColumns.delivery_date && (
+                        <th 
+                          style={{ width: columnWidths.delivery_date, minWidth: columnWidths.delivery_date }}
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('delivery_date')}
+                        >
+                          <div className="flex items-center gap-1">
+                            {ot('column_delivery_date')}
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'delivery_date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('delivery_date')}
+                        </th>
+                      )}
+                      {visibleColumns.description && (
+                        <th 
+                          style={{ width: columnWidths.description, minWidth: columnWidths.description }}
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('description')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'البيان' : 'Description'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'description' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('description')}
+                        </th>
+                      )}
+                      {visibleColumns.currency && isMultiCurrencyEnabled && (
+                        <th 
+                          style={{ width: columnWidths.currency, minWidth: columnWidths.currency }}
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('currency')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{ot('currency')}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'currency' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('currency')}
+                        </th>
+                      )}
+                      {visibleColumns.foreign_amount && isMultiCurrencyEnabled && (
+                        <th 
+                          style={{ width: columnWidths.foreign_amount, minWidth: columnWidths.foreign_amount }}
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('foreign_amount')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'foreign_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('foreign_amount')}
+                        </th>
+                      )}
+                      {visibleColumns.total_amount && (
+                        <th 
+                          style={{ width: columnWidths.total_amount, minWidth: columnWidths.total_amount }}
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('total_amount')}
+                        >
+                          <div className="flex items-center gap-1">
+                            {ot('column_amount')}
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'total_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('total_amount')}
+                        </th>
+                      )}
+                      {visibleColumns.status && (
+                        <th 
+                          style={{ width: columnWidths.status, minWidth: columnWidths.status }}
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}
+                        >
+                          <div className="flex items-center gap-1">
+                            {ot('column_status')}
+                          </div>
+                          {renderResizeHandles('status')}
+                        </th>
+                      )}
+                      {visibleColumns.created_date && (
+                        <th 
+                          style={{ width: columnWidths.created_date, minWidth: columnWidths.created_date }}
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('created_at')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'تاريخ الإنشاء' : 'Created Date'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'created_at' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('created_date')}
+                        </th>
+                      )}
+                      {visibleColumns.created_time && (
+                        <th 
+                          style={{ width: columnWidths.created_time, minWidth: columnWidths.created_time }}
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('created_at')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'وقت الإنشاء' : 'Created Time'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'created_at' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('created_time')}
+                        </th>
+                      )}
+                      <th className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredOrders.map((ord) => (
-                      <tr 
-                        key={ord.id} 
-                        className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
-                        onClick={() => canEdit && openEditModal(ord)}
-                      >
-                        <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                          <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100">{ord.order_number}</span>
-                        </td>
-                        <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{ord.customer_name}</td>
-                        <td className={`px-6 py-4 text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(ord.date)}</td>
-                        <td className={`px-6 py-4 text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{ord.delivery_date ? formatDate(ord.delivery_date) : '-'}</td>
-                        <td className={`px-6 py-4 text-slate-500 max-w-[200px] truncate ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{ord.description || '-'}</td>
-                        <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                          {formatMoney(ord.total_amount)} {((ord as any).currency_id ? (companyCurrencies.find(c => c.id === (ord as any).currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP')).toUpperCase()}
-                        </td>
-                        <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                          {ord.status === 'converted' ? (
-                            <span className="inline-flex flex-col">
-                              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
-                                {ot('status_converted')}
-                              </span>
-                              <span className="text-[9px] text-emerald-600 font-mono mt-0.5">
-                                {ord.invoice_number}
-                              </span>
-                            </span>
-                          ) : (
-                            <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200">
-                                {ot('status_pending')}
-                            </span>
-                          )}
-                        </td>
-                        <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                          <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
-                            {ord.status !== 'converted' && (
-                              <button 
-                                onClick={(e) => handleConvertToInvoice(e, ord)}
-                                className="p-2 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-all"
-                                title={ot('convert_to_invoice')}
-                              >
-                                <ArrowUpRight size={18} />
-                              </button>
-                            )}
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setViewOrder(ord);
-                              }}
-                              className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
-                              title={language === 'ar' ? 'عرض' : 'View'}
-                            >
-                              <Eye size={18} />
-                            </button>
-                            {canEdit && ord.status !== 'converted' && (
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openEditModal(ord);
-                                }}
-                                className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-                              >
-                                <Pencil size={18} />
-                              </button>
-                            )}
-                            {canDelete && ord.status !== 'converted' && (
-                              <button 
-                                onClick={(e) => handleDeleteClick(e, ord)}
-                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                              >
-                                <Trash2 size={18} />
-                              </button>
-                            )}
-                          </div>
+                    {loading ? (
+                      Array.from({ length: 5 }).map((_, rowIndex) => (
+                        <tr key={rowIndex} className="animate-pulse">
+                          <td className="px-2 py-0.5 text-center no-pdf whitespace-nowrap">
+                            <div className="h-4 bg-slate-100 rounded w-4 mx-auto animate-pulse"></div>
+                          </td>
+                          {Object.keys(visibleColumns).map(colKey => {
+                            if (!visibleColumns[colKey]) return null;
+                            return (
+                              <td key={colKey} className="px-2 py-0.5 whitespace-nowrap">
+                                <div className="h-4 bg-slate-100 rounded w-2/3"></div>
+                              </td>
+                            );
+                          })}
+                          <td className="px-2 py-0.5 whitespace-nowrap">
+                            <div className="h-4 bg-slate-100 rounded w-12 ml-auto"></div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : filteredOrders.length === 0 ? (
+                      <tr>
+                        <td colSpan={Object.keys(visibleColumns).filter(k => visibleColumns[k]).length + 2} className="px-6 py-12 text-center text-slate-500 italic font-medium whitespace-nowrap">
+                          {t('common.no_data')}
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      (isExportingPDFSelected 
+                        ? filteredOrders.filter(ord => selectedOrderIds.includes(ord.id))
+                        : filteredOrders
+                      ).map((ord) => {
+                        const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
+                        const currencyCode = (ord as any).currency_id 
+                          ? (companyCurrencies.find(c => c.id === (ord as any).currency_id)?.code || '') 
+                          : (companyData?.settings?.currency || 'EGP');
+                        const isForeign = currencyCode.toLowerCase() !== baseCode;
+
+                        return (
+                          <tr 
+                            key={ord.id} 
+                            className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
+                            onClick={() => canEdit && ord.status !== 'converted' ? openEditModal(ord) : setViewOrder(ord)}
+                          >
+                            <td 
+                              className="px-2 py-0.5 text-center w-12 no-pdf whitespace-nowrap"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <input 
+                                type="checkbox"
+                                checked={selectedOrderIds.includes(ord.id)}
+                                onChange={(e) => {
+                                  setSelectedOrderIds(prev => 
+                                    prev.includes(ord.id) ? prev.filter(id => id !== ord.id) : [...prev, ord.id]
+                                  );
+                                }}
+                                className="rounded border-slate-350 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                              />
+                            </td>
+                            {visibleColumns.order_number && (
+                              <td style={{ width: columnWidths.order_number, minWidth: columnWidths.order_number }} className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>
+                                <span className="font-mono font-bold text-slate-950 text-xs select-all">
+                                  {ord.order_number}
+                                </span>
+                              </td>
+                            )}
+                            {visibleColumns.customer_name && (
+                              <td style={{ width: columnWidths.customer_name, minWidth: columnWidths.customer_name }} className={`px-2 py-0.5 font-bold text-slate-900 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>
+                                {ord.customer_name}
+                              </td>
+                            )}
+                            {visibleColumns.date && (
+                              <td style={{ width: columnWidths.date, minWidth: columnWidths.date }} className={`px-2 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {formatDate(ord.date)}
+                              </td>
+                            )}
+                            {visibleColumns.delivery_date && (
+                              <td style={{ width: columnWidths.delivery_date, minWidth: columnWidths.delivery_date }} className={`px-2 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {ord.delivery_date ? formatDate(ord.delivery_date) : '-'}
+                              </td>
+                            )}
+                            {visibleColumns.description && (
+                              <td style={{ width: columnWidths.description, minWidth: columnWidths.description }} className={`px-2 py-0.5 text-slate-500 max-w-[200px] truncate whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={ord.description}>
+                                {ord.description || '-'}
+                              </td>
+                            )}
+                            {visibleColumns.currency && isMultiCurrencyEnabled && (
+                              <td style={{ width: columnWidths.currency, minWidth: columnWidths.currency }} className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                <span className="font-bold text-slate-700 text-xs font-mono">{currencyCode.toUpperCase()}</span>
+                              </td>
+                            )}
+                            {visibleColumns.foreign_amount && isMultiCurrencyEnabled && (
+                              <td style={{ width: columnWidths.foreign_amount, minWidth: columnWidths.foreign_amount }} className={`px-2 py-0.5 font-bold text-slate-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {isForeign ? formatMoney(ord.total_amount) : '-'}
+                              </td>
+                            )}
+                            {visibleColumns.total_amount && (
+                              <td style={{ width: columnWidths.total_amount, minWidth: columnWidths.total_amount }} className={`px-2 py-0.5 font-bold text-slate-900 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {formatMoney(ord.total_amount)} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || 'EGP').toUpperCase()}</span>
+                              </td>
+                            )}
+                            {visibleColumns.status && (
+                              <td style={{ width: columnWidths.status, minWidth: columnWidths.status }} className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {ord.status === 'converted' ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100/50 whitespace-nowrap">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    {ot('status_converted')}
+                                    {ord.invoice_number && (
+                                      <span className="text-[10px] font-mono text-emerald-600 mr-1">({ord.invoice_number})</span>
+                                    )}
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100/50 whitespace-nowrap">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                    {ot('status_pending')}
+                                  </span>
+                                )}
+                              </td>
+                            )}
+                            {visibleColumns.created_date && (
+                              <td style={{ width: columnWidths.created_date, minWidth: columnWidths.created_date }} className={`px-2 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {formatTimestampDate(ord.created_at)}
+                              </td>
+                            )}
+                            {visibleColumns.created_time && (
+                              <td style={{ width: columnWidths.created_time, minWidth: columnWidths.created_time }} className={`px-2 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {formatTimestampTime(ord.created_at)}
+                              </td>
+                            )}
+                            <td className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                              <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                                {ord.status !== 'converted' && (
+                                  <button 
+                                    onClick={(e) => handleConvertToInvoice(e, ord)}
+                                    className="p-2 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
+                                    title={ot('convert_to_invoice')}
+                                  >
+                                    <ArrowUpRight size={18} />
+                                  </button>
+                                )}
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActivityLogDocumentId(ord.id);
+                                    setIsActivityLogOpen(true);
+                                  }}
+                                  className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
+                                  title={t('common.activity_log')}
+                                >
+                                  <History size={18} />
+                                </button>
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setViewOrder(ord);
+                                  }}
+                                  className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
+                                  title={language === 'ar' ? 'عرض' : 'View'}
+                                >
+                                  <Eye size={18} />
+                                </button>
+                                {canEdit && ord.status !== 'converted' && (
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openEditModal(ord);
+                                    }}
+                                    className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
+                                    title={t('common.edit')}
+                                  >
+                                    <Pencil size={18} />
+                                  </button>
+                                )}
+                                {canDelete && ord.status !== 'converted' && (
+                                  <button 
+                                    onClick={(e) => handleDeleteClick(e, ord)}
+                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
+                                    title={t('common.delete')}
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-3">
                 {filteredOrders.map((ord) => (
                   <div 
                     key={ord.id}
-                    onClick={() => canEdit && openEditModal(ord)}
-                    className="bg-slate-50 border border-slate-200 rounded-3xl p-6 hover:shadow-lg transition-all duration-300 hover:border-emerald-500/20 group cursor-pointer relative overflow-hidden"
+                    onClick={() => canEdit && ord.status !== 'converted' ? openEditModal(ord) : setViewOrder(ord)}
+                    className="bg-white border border-slate-200 rounded-xl p-3 hover:shadow-md transition-all hover:border-emerald-500/30 group cursor-pointer relative"
                   >
-                    <div className="flex justify-between items-start mb-4">
-                      <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-mono text-xs bg-emerald-50 px-2 py-0.5 rounded text-emerald-700 font-bold border border-emerald-100">
                         {ord.order_number}
                       </span>
                       {ord.status === 'converted' ? (
-                        <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+                        <span className="bg-emerald-50 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-100">
                           {ot('status_converted')} ({ord.invoice_number})
                         </span>
                       ) : (
-                        <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+                        <span className="bg-amber-50 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-100">
                           {ot('status_pending')}
                         </span>
                       )}
                     </div>
-                    <h4 className="font-bold text-slate-900 text-lg mb-2">{ord.customer_name}</h4>
-                    <p className="text-slate-500 text-sm mb-4 line-clamp-2">{ord.description || '-'}</p>
-                    <div className="flex justify-between items-center pt-4 border-t border-slate-200/60 text-xs text-slate-500">
+                    <h4 className="font-bold text-slate-900 text-sm mb-1">{ord.customer_name}</h4>
+                    <p className="text-slate-500 text-xs mb-3 line-clamp-1">{ord.description || '-'}</p>
+                    <div className="flex justify-between items-center pt-2 border-t border-slate-100 text-xs text-slate-500">
                       <span>{formatDate(ord.date)}</span>
-                      <span className="font-bold text-slate-950 text-sm">
+                      <span className="font-bold text-slate-950 text-xs">
                         {formatMoney(ord.total_amount)} {((ord as any).currency_id ? (companyCurrencies.find(c => c.id === (ord as any).currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP')).toUpperCase()}
                       </span>
                     </div>
-                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute top-2 left-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {ord.status !== 'converted' && (
                         <button 
                           onClick={(e) => handleConvertToInvoice(e, ord)}
-                          className="bg-white p-1.5 rounded-lg shadow-sm border border-slate-100 hover:bg-emerald-50 text-emerald-600"
+                          className="bg-white p-1 rounded-lg shadow-xs border border-slate-100 hover:bg-emerald-50 text-emerald-600"
                         >
                           <ArrowUpRight size={14} />
                         </button>
@@ -1105,7 +1745,7 @@ export const SalesOrders: React.FC = () => {
                       {canDelete && ord.status !== 'converted' && (
                         <button 
                           onClick={(e) => handleDeleteClick(e, ord)}
-                          className="bg-white p-1.5 rounded-lg shadow-sm border border-slate-100 hover:bg-red-50 text-red-500"
+                          className="bg-white p-1 rounded-lg shadow-xs border border-slate-100 hover:bg-red-50 text-red-500"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -1115,14 +1755,6 @@ export const SalesOrders: React.FC = () => {
                 ))}
               </div>
             )}
-            
-            <PaginationControls
-              page={page}
-              limit={limit}
-              total={totalRecords}
-              onPageChange={setPage}
-              onLimitChange={setLimit}
-            />
           </div>
         </>
       ) : (
@@ -2458,6 +3090,16 @@ export const SalesOrders: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      <PageActivityLog 
+        category="sales_orders" 
+        isOpen={isActivityLogOpen} 
+        onClose={() => {
+          setIsActivityLogOpen(false);
+          setActivityLogDocumentId(undefined);
+        }} 
+        documentId={activityLogDocumentId}
+      />
     </div>
   );
 };
