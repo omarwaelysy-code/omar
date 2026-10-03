@@ -345,17 +345,17 @@ export const WarehouseTransfers: React.FC = () => {
   };
 
   return (
-    <div className={`p-6 space-y-6 ${dir === 'rtl' ? 'rtl' : 'ltr'}`} dir={dir}>
+    <div className={`p-3 space-y-3 ${dir === 'rtl' ? 'rtl' : 'ltr'}`} dir={dir}>
       {/* Header Panel */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white/60 backdrop-blur-xl p-6 rounded-[2rem] border border-white/20 shadow-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200 shadow-sm">
         <div>
-          <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-            <ArrowLeftRight className="text-emerald-500" size={32} />
+          <h1 className="text-base md:text-lg font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+            <ArrowLeftRight className="text-emerald-500" size={18} />
             {t('warehouse_transfers.title')}
           </h1>
-          <p className="text-slate-500 font-bold mt-1 text-sm">{t('warehouse_transfers.subtitle')}</p>
+          <p className="text-slate-500 font-medium mt-0.5 text-[11px]">{t('warehouse_transfers.subtitle')}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5">
           <ExportButtons
             onExportExcel={handleExportExcel}
             onExportPDF={handleExportPDF}
@@ -363,23 +363,23 @@ export const WarehouseTransfers: React.FC = () => {
           />
           <button
             onClick={handleOpenCreateModal}
-            className="flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-[1.5rem] font-black text-base hover:shadow-lg hover:shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg font-bold text-xs shadow-sm hover:shadow hover:scale-[1.01] active:scale-[0.98] transition-all"
           >
-            <Plus size={20} />
+            <Plus size={15} />
             {t('warehouse_transfers.add')}
           </button>
         </div>
       </div>
 
       {/* Filter and search bar */}
-      <div className="bg-white/60 backdrop-blur-xl p-6 rounded-[2rem] border border-white/20 shadow-lg space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200 shadow-sm space-y-2">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
           <div className="relative col-span-1 md:col-span-2">
-            <Search className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-4 text-slate-400`} size={20} />
+            <Search className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={15} />
             <input
               type="text"
               placeholder={t('warehouse_transfers.search_placeholder')}
-              className={`w-full ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-slate-700 font-bold focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all`}
+              className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-bold text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all`}
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
             />
@@ -388,7 +388,7 @@ export const WarehouseTransfers: React.FC = () => {
           <div>
             <input
               type="date"
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-slate-700 font-bold focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all"
+              className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-bold text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
               value={dateFrom}
               onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
             />
@@ -397,15 +397,15 @@ export const WarehouseTransfers: React.FC = () => {
           <div>
             <input
               type="date"
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-slate-700 font-bold focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all"
+              className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-bold text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
               value={dateTo}
               onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
             />
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             <select
-              className="w-1/2 px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-slate-700 font-bold focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all"
+              className="w-1/2 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-bold text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
               value={filterFromWh}
               onChange={(e) => { setFilterFromWh(e.target.value); setPage(1); }}
             >
@@ -413,7 +413,7 @@ export const WarehouseTransfers: React.FC = () => {
               {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
             <select
-              className="w-1/2 px-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-slate-700 font-bold focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all"
+              className="w-1/2 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-bold text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
               value={filterToWh}
               onChange={(e) => { setFilterToWh(e.target.value); setPage(1); }}
             >
@@ -426,108 +426,108 @@ export const WarehouseTransfers: React.FC = () => {
 
       {/* Main Table / Grid representation */}
       {loading ? (
-        <div className="flex items-center justify-center h-64 bg-white/40 backdrop-blur-xl rounded-[2rem] border border-white/10 shadow-xl">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-slate-500 font-bold">{t('common.loading')}</p>
+        <div className="flex items-center justify-center h-40 bg-white rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-7 h-7 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-slate-500 font-bold text-xs">{t('common.loading')}</p>
           </div>
         </div>
       ) : transfers.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 bg-white/40 backdrop-blur-xl rounded-[2rem] border border-white/10 shadow-xl text-center space-y-4">
-          <div className="w-20 h-20 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center">
-            <ArrowLeftRight size={40} />
+        <div className="flex flex-col items-center justify-center py-10 bg-white rounded-xl border border-slate-200 shadow-sm text-center space-y-1.5">
+          <div className="w-10 h-10 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center">
+            <ArrowLeftRight size={20} />
           </div>
           <div>
-            <h3 className="text-xl font-black text-slate-700">{t('common.no_data')}</h3>
-            <p className="text-slate-400 font-bold mt-1 text-sm">
+            <h3 className="text-xs font-bold text-slate-700">{t('common.no_data')}</h3>
+            <p className="text-slate-400 text-[11px]">
               {language === 'ar' ? 'لم يتم العثور على أي عمليات تحويل مخزني مطابقة.' : 'No warehouse transfers found.'}
             </p>
           </div>
         </div>
       ) : (
-        <div className="bg-white/60 backdrop-blur-xl rounded-[2rem] border border-white/20 shadow-xl overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div ref={tableRef} className="overflow-x-auto">
-            <table className="w-full border-collapse text-right">
+            <table className="w-full border-collapse text-right text-xs">
               <thead>
-                <tr className="bg-slate-50/75 border-b border-slate-100">
+                <tr className="bg-slate-50/90 border-b border-slate-200">
                   <th 
                     onClick={() => handleSort('transfer_number')}
-                    className="px-6 py-5 text-sm font-black text-slate-600 uppercase cursor-pointer hover:text-emerald-600 transition-colors"
+                    className="px-2 py-1.5 font-bold text-slate-600 uppercase cursor-pointer hover:text-emerald-600 transition-colors text-[11px]"
                   >
                     {t('warehouse_transfers.column_number')}
                   </th>
                   <th 
                     onClick={() => handleSort('date')}
-                    className="px-6 py-5 text-sm font-black text-slate-600 uppercase cursor-pointer hover:text-emerald-600 transition-colors"
+                    className="px-2 py-1.5 font-bold text-slate-600 uppercase cursor-pointer hover:text-emerald-600 transition-colors text-[11px]"
                   >
                     {t('warehouse_transfers.column_date')}
                   </th>
-                  <th className="px-6 py-5 text-sm font-black text-slate-600 uppercase">
+                  <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-[11px]">
                     {t('warehouse_transfers.column_from_warehouse')}
                   </th>
-                  <th className="px-6 py-5 text-sm font-black text-slate-600 uppercase">
+                  <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-[11px]">
                     {t('warehouse_transfers.column_to_warehouse')}
                   </th>
-                  <th className="px-6 py-5 text-sm font-black text-slate-600 uppercase">
+                  <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-[11px]">
                     {t('warehouse_transfers.column_items_count')}
                   </th>
-                  <th className="px-6 py-5 text-sm font-black text-slate-600 uppercase">
+                  <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-[11px]">
                     {language === 'ar' ? 'رقم القيد' : 'Journal Entry'}
                   </th>
-                  <th className="px-6 py-5 text-sm font-black text-slate-600 uppercase">
+                  <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-[11px]">
                     {language === 'ar' ? 'البيان' : 'Description'}
                   </th>
-                  <th className="px-6 py-5 text-sm font-black text-slate-600 uppercase text-center w-36">
+                  <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-center w-24 text-[11px]">
                     {t('common.actions')}
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {transfers.map((tItem) => (
-                  <tr key={tItem.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-6 py-5 text-base font-black text-slate-800 tracking-wider">
+                  <tr key={tItem.id} className="hover:bg-slate-50/70 transition-colors group">
+                    <td className="px-2 py-1 font-mono font-bold text-slate-900 text-xs">
                       {tItem.transfer_number}
                     </td>
-                    <td className="px-6 py-5 text-sm font-bold text-slate-500">
+                    <td className="px-2 py-1 font-medium text-slate-500 whitespace-nowrap text-xs">
                       {formatDate(tItem.date)}
                     </td>
-                    <td className="px-6 py-5 text-base font-black text-rose-600">
+                    <td className="px-2 py-1 font-bold text-rose-600 whitespace-nowrap text-xs">
                       {tItem.from_warehouse_name}
                     </td>
-                    <td className="px-6 py-5 text-base font-black text-emerald-600">
+                    <td className="px-2 py-1 font-bold text-emerald-600 whitespace-nowrap text-xs">
                       {tItem.to_warehouse_name}
                     </td>
-                    <td className="px-6 py-5 text-sm font-black text-slate-700">
+                    <td className="px-2 py-1 font-bold text-slate-700 text-xs">
                       {(tItem as any).items_count || 1}
                     </td>
-                    <td className="px-6 py-5 text-sm font-black text-slate-400 font-mono text-xs">
+                    <td className="px-2 py-1 font-mono text-slate-400 text-xs">
                       -
                     </td>
-                    <td className="px-6 py-5 text-sm font-bold text-slate-500 max-w-[200px] truncate">
+                    <td className="px-2 py-1 font-normal text-slate-500 max-w-[180px] truncate text-xs" title={tItem.description}>
                       {tItem.description || '-'}
                     </td>
-                    <td className="px-6 py-5 text-center">
-                      <div className="flex items-center justify-center gap-2">
+                    <td className="px-2 py-1 text-center">
+                      <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => handleOpenViewModal(tItem)}
                           title={language === 'ar' ? 'عرض التفاصيل' : 'View details'}
-                          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                          className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
                         >
-                          <Eye size={18} />
+                          <Eye size={14} />
                         </button>
                         <button
                           onClick={() => handleOpenEditModal(tItem)}
                           title={language === 'ar' ? 'تعديل' : 'Edit'}
-                          className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                          className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
                         >
-                          <Pencil size={18} />
+                          <Pencil size={14} />
                         </button>
                         <button
                           onClick={() => handleOpenDeleteModal(tItem.id)}
                           title={language === 'ar' ? 'حذف' : 'Delete'}
-                          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
                         >
-                          <Trash2 size={18} />
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </td>
@@ -539,7 +539,7 @@ export const WarehouseTransfers: React.FC = () => {
           
           {/* Pagination Controls */}
           {totalRecords > limit && (
-            <div className="p-6 border-t border-slate-100">
+            <div className="p-3 border-t border-slate-100">
               <PaginationControls
                 page={page}
                 limit={limit}
@@ -560,41 +560,41 @@ export const WarehouseTransfers: React.FC = () => {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
+              className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
             >
               {/* Modal Header */}
-              <div className="flex items-center justify-between p-6 bg-slate-50 border-b border-slate-100">
+              <div className="flex items-center justify-between p-4 bg-slate-50 border-b border-slate-100">
                 <div>
-                  <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-                    <ArrowLeftRight className="text-emerald-500" size={24} />
+                  <h2 className="text-base md:text-lg font-black text-slate-800 flex items-center gap-2">
+                    <ArrowLeftRight className="text-emerald-500" size={18} />
                     {editingTransfer ? t('warehouse_transfers.edit') : t('warehouse_transfers.add')}
                   </h2>
-                  <p className="text-slate-400 font-bold text-xs mt-0.5">
+                  <p className="text-slate-400 font-medium text-xs mt-0.5">
                     {editingTransfer ? (language === 'ar' ? 'تعديل تفاصيل التحويل المخزني رقم ' + editingTransfer.transfer_number : 'Modify details of transfer #' + editingTransfer.transfer_number) : (language === 'ar' ? 'إنشاء عملية تحويل جديدة' : 'Create a new warehouse transfer')}
                   </p>
                 </div>
                 <button
                   onClick={() => setIsModalOpen(false)}
-                  className="p-3 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all"
+                  className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               </div>
 
               {/* Modal Body */}
-              <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {/* Date Input */}
-                  <div className="space-y-2">
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest px-1">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-slate-700 px-0.5">
                       {t('warehouse_transfers.form_date')} <span className="text-rose-500 font-bold">*</span>
                     </label>
                     <div className="relative group">
-                      <Calendar className="absolute right-4 top-3 text-slate-400" size={20} />
+                      <Calendar className="absolute right-3 top-2.5 text-slate-400" size={16} />
                       <input
                         required
                         type="date"
-                        className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-slate-800 font-bold focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all shadow-inner"
+                        className="w-full pr-9 pl-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-800 font-bold text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
                         value={formData.date}
                         onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                       />
@@ -602,15 +602,15 @@ export const WarehouseTransfers: React.FC = () => {
                   </div>
 
                   {/* From Warehouse */}
-                  <div className="space-y-2">
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest px-1">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-slate-700 px-0.5">
                       {t('warehouse_transfers.form_from_warehouse')} <span className="text-rose-500 font-bold">*</span>
                     </label>
                     <div className="relative group">
-                      <Home className="absolute right-4 top-3 text-rose-500" size={20} />
+                      <Home className="absolute right-3 top-2.5 text-rose-500" size={16} />
                       <select
                         required
-                        className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-slate-800 font-bold appearance-none focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all shadow-inner"
+                        className="w-full pr-9 pl-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-800 font-bold text-xs appearance-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
                         value={formData.from_warehouse_id}
                         onChange={(e) => setFormData({ ...formData, from_warehouse_id: e.target.value })}
                       >
@@ -621,15 +621,15 @@ export const WarehouseTransfers: React.FC = () => {
                   </div>
 
                   {/* To Warehouse */}
-                  <div className="space-y-2">
-                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest px-1">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-slate-700 px-0.5">
                       {t('warehouse_transfers.form_to_warehouse')} <span className="text-rose-500 font-bold">*</span>
                     </label>
                     <div className="relative group">
-                      <Home className="absolute right-4 top-3 text-emerald-500" size={20} />
+                      <Home className="absolute right-3 top-2.5 text-emerald-500" size={16} />
                       <select
                         required
-                        className="w-full pr-12 pl-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-slate-800 font-bold appearance-none focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all shadow-inner"
+                        className="w-full pr-9 pl-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-800 font-bold text-xs appearance-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
                         value={formData.to_warehouse_id}
                         onChange={(e) => setFormData({ ...formData, to_warehouse_id: e.target.value })}
                       >
@@ -641,13 +641,13 @@ export const WarehouseTransfers: React.FC = () => {
                 </div>
 
                 {/* Description input */}
-                <div className="space-y-2">
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-widest px-1">
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-slate-700 px-0.5">
                     {language === 'ar' ? 'ملاحظات / بيان' : 'Notes / Remarks'}
                   </label>
                   <textarea
                     rows={2}
-                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none text-slate-800 font-bold focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all shadow-inner"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-800 font-normal text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all resize-none"
                     placeholder={language === 'ar' ? 'اكتب أي ملاحظات إضافية هنا...' : 'Write any additional notes here...'}
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -655,38 +655,38 @@ export const WarehouseTransfers: React.FC = () => {
                 </div>
 
                 {/* Items Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <h3 className="text-lg font-black text-slate-700 flex items-center gap-2">
-                      <Layers size={18} className="text-emerald-500" />
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <h3 className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
+                      <Layers size={16} className="text-emerald-500" />
                       {t('warehouse_transfers.form_items')}
                     </h3>
                     <button
                       type="button"
                       onClick={handleAddItemRow}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 font-bold text-sm rounded-xl transition-all"
+                      className="flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 font-bold text-xs rounded-lg transition-all"
                     >
-                      <Plus size={16} />
+                      <Plus size={14} />
                       {language === 'ar' ? 'إضافة صنف' : 'Add Item'}
                     </button>
                   </div>
 
                   {items.length === 0 ? (
-                    <div className="text-center py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                      <p className="text-slate-400 font-bold text-sm">
+                    <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                      <p className="text-slate-400 text-xs">
                         {language === 'ar' ? 'لا يوجد أي أصناف مضافة. انقر فوق إضافة صنف للبدء.' : 'No items added. Click Add Item to start.'}
                       </p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {items.map((item, index) => {
                         const product = products.find(p => p.id === item.product_id);
                         return (
                           <div 
                             key={index}
-                            className="flex flex-col md:flex-row gap-3 p-4 bg-slate-50/75 rounded-2xl border border-slate-100 items-start md:items-center group"
+                            className="flex flex-col md:flex-row gap-2 p-2.5 bg-slate-50 rounded-xl border border-slate-200 items-start md:items-center group"
                           >
-                            <div className="w-8 h-8 rounded-full bg-slate-200 font-black text-slate-500 text-sm flex items-center justify-center shrink-0">
+                            <div className="w-6 h-6 rounded-full bg-slate-200 font-bold text-slate-600 text-xs flex items-center justify-center shrink-0">
                               {index + 1}
                             </div>
 
@@ -694,7 +694,7 @@ export const WarehouseTransfers: React.FC = () => {
                             <div className="flex-1 w-full">
                               <select
                                 required
-                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 transition-all appearance-none"
+                                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg outline-none font-bold text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500 transition-all appearance-none"
                                 value={item.product_id}
                                 onChange={(e) => handleItemChange(index, 'product_id', e.target.value)}
                               >
@@ -708,19 +708,19 @@ export const WarehouseTransfers: React.FC = () => {
                             </div>
 
                             {/* Quantity Input */}
-                            <div className="w-full md:w-36 flex items-center bg-white border border-slate-200 rounded-xl px-3 shrink-0">
+                            <div className="w-full md:w-32 flex items-center bg-white border border-slate-200 rounded-lg px-2.5 shrink-0">
                               <input
                                 required
                                 type="number"
                                 min={0.01}
                                 step="any"
                                 placeholder={language === 'ar' ? 'الكمية' : 'Qty'}
-                                className="w-full py-3 outline-none font-black text-slate-800"
+                                className="w-full py-1.5 outline-none font-bold text-xs text-slate-800"
                                 value={item.quantity || ''}
                                 onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value) || 0)}
                               />
                               {product?.unit && (
-                                <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md shrink-0">
+                                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
                                   {product.unit}
                                 </span>
                               )}
@@ -730,9 +730,9 @@ export const WarehouseTransfers: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleRemoveItemRow(index)}
-                              className="p-3 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all self-end md:self-auto"
+                              className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all self-end md:self-auto"
                             >
-                              <Trash2 size={18} />
+                              <Trash2 size={15} />
                             </button>
                           </div>
                         );
@@ -742,7 +742,7 @@ export const WarehouseTransfers: React.FC = () => {
                 </div>
 
                 {/* Attachments */}
-                <div className="pt-4 border-t border-slate-100">
+                <div className="pt-3 border-t border-slate-100">
                   <AttachmentsManager
                     attachments={attachments}
                     onChange={setAttachments}
@@ -752,19 +752,19 @@ export const WarehouseTransfers: React.FC = () => {
                 </div>
 
                 {/* Modal Footer Buttons */}
-                <div className="flex items-center justify-end gap-3 pt-6 border-t border-slate-100">
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black rounded-xl text-base transition-all"
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-xs transition-all"
                   >
                     {t('common.cancel')}
                   </button>
                   <button
                     type="submit"
-                    className="flex items-center justify-center gap-2 px-8 py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white font-black rounded-xl text-base transition-all shadow-md shadow-emerald-500/10"
+                    className="flex items-center justify-center gap-1.5 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-all shadow-sm"
                   >
-                    <Save size={18} />
+                    <Save size={15} />
                     {t('common.save')}
                   </button>
                 </div>
@@ -782,118 +782,118 @@ export const WarehouseTransfers: React.FC = () => {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl w-full max-w-3xl overflow-hidden"
+              className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-2xl overflow-hidden"
             >
               {/* Header */}
-              <div className="flex items-center justify-between p-6 bg-slate-50 border-b border-slate-100">
+              <div className="flex items-center justify-between p-3.5 bg-slate-50 border-b border-slate-100">
                 <div>
-                  <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full font-black text-xs uppercase tracking-wider">
+                  <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-bold text-[10px] uppercase">
                     {language === 'ar' ? 'سند تحويل مخزني' : 'Warehouse Transfer Document'}
                   </span>
-                  <h2 className="text-2xl font-black text-slate-800 mt-2 flex items-center gap-2">
-                    <ArrowLeftRight size={22} className="text-emerald-500" />
+                  <h2 className="text-lg font-black text-slate-900 mt-1 flex items-center gap-1.5">
+                    <ArrowLeftRight size={18} className="text-emerald-500" />
                     {viewTransfer.transfer_number}
                   </h2>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => exportToPDFUtil(tableRef.current || document.body, { filename: `Warehouse_Transfer_${viewTransfer.transfer_number}`, reportTitle: `سند تحويل مخزني ${viewTransfer.transfer_number}` })}
-                    className="p-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-2xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5 font-bold text-xs"
+                    className="p-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg transition-all shadow-sm active:scale-95 flex items-center gap-1 font-bold text-xs"
                     title={language === 'ar' ? 'طباعة' : 'Print'}
                   >
-                    <Printer size={18} />
+                    <Printer size={15} />
                   </button>
 
                   <button
                     onClick={() => handleCopyTransfer(viewTransfer)}
-                    className="px-3 py-2 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-2xl transition-all font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95"
+                    className="px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
                     title={language === 'ar' ? 'نسخ المستند كمسودة جديدة' : 'Copy Document'}
                   >
-                    <Copy size={16} />
+                    <Copy size={14} />
                     <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
                   </button>
 
                   <button
                     onClick={() => handleExportDocPDF(viewTransfer)}
-                    className="px-3 py-2 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 rounded-2xl transition-all font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95"
+                    className="px-2.5 py-1 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
                     title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
                   >
-                    <FileText size={16} />
+                    <FileText size={14} />
                     <span>{language === 'ar' ? 'تصدير PDF' : 'Export PDF'}</span>
                   </button>
 
                   <button
                     onClick={() => handleExportDocExcel(viewTransfer)}
-                    className="px-3 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 rounded-2xl transition-all font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95"
+                    className="px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
                     title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
                   >
-                    <FileSpreadsheet size={16} />
+                    <FileSpreadsheet size={14} />
                     <span>{language === 'ar' ? 'تصدير إكسيل' : 'Export Excel'}</span>
                   </button>
 
                   <button
                     onClick={() => setViewTransfer(null)}
-                    className="p-2.5 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 ml-1"
+                    className="p-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all active:scale-95"
                   >
-                    <X size={18} className="text-slate-500" />
+                    <X size={15} className="text-slate-500" />
                   </button>
                 </div>
               </div>
 
               {/* Document Details */}
-              <div className="p-6 space-y-6">
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-5 bg-slate-50 rounded-2xl">
+              <div className="p-4 space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-3 bg-slate-50 rounded-xl text-xs">
                   <div>
-                    <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('warehouse_transfers.column_date')}</span>
-                    <span className="text-slate-700 font-bold text-sm block mt-1">{formatDate(viewTransfer.date)}</span>
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase">{t('warehouse_transfers.column_date')}</span>
+                    <span className="text-slate-800 font-bold block mt-0.5">{formatDate(viewTransfer.date)}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('warehouse_transfers.column_from_warehouse')}</span>
-                    <span className="text-rose-600 font-black text-base block mt-1">{viewTransfer.from_warehouse_name}</span>
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase">{t('warehouse_transfers.column_from_warehouse')}</span>
+                    <span className="text-rose-600 font-bold block mt-0.5">{viewTransfer.from_warehouse_name}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{t('warehouse_transfers.column_to_warehouse')}</span>
-                    <span className="text-emerald-600 font-black text-base block mt-1">{viewTransfer.to_warehouse_name}</span>
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase">{t('warehouse_transfers.column_to_warehouse')}</span>
+                    <span className="text-emerald-600 font-bold block mt-0.5">{viewTransfer.to_warehouse_name}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{language === 'ar' ? 'رقم القيد' : 'Journal Entry'}</span>
-                    <span className="text-slate-400 font-mono text-xs block mt-1">-</span>
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase">{language === 'ar' ? 'رقم القيد' : 'Journal Entry'}</span>
+                    <span className="text-slate-400 font-mono block mt-0.5">-</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{language === 'ar' ? 'بواسطة' : 'Created By'}</span>
-                    <span className="text-slate-700 font-bold text-sm block mt-1">{viewTransfer.created_by || '-'}</span>
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase">{language === 'ar' ? 'بواسطة' : 'Created By'}</span>
+                    <span className="text-slate-800 font-bold block mt-0.5">{viewTransfer.created_by || '-'}</span>
                   </div>
                 </div>
 
                 {viewTransfer.description && (
-                  <div className="space-y-1">
-                    <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">{language === 'ar' ? 'ملاحظات / بيان' : 'Notes'}</span>
-                    <p className="text-slate-600 font-bold text-sm bg-slate-50/50 p-4 rounded-xl border border-slate-100">{viewTransfer.description}</p>
+                  <div className="space-y-0.5">
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase">{language === 'ar' ? 'ملاحظات / بيان' : 'Notes'}</span>
+                    <p className="text-slate-700 text-xs bg-slate-50/70 p-2.5 rounded-lg border border-slate-200">{viewTransfer.description}</p>
                   </div>
                 )}
 
                 {/* Items Grid */}
-                <div className="space-y-3">
-                  <h3 className="text-base font-black text-slate-700">{language === 'ar' ? 'تفاصيل الأصناف المحولة' : 'Transferred Items'}</h3>
-                  <div className="border border-slate-100 rounded-2xl overflow-hidden shadow-inner">
-                    <table className="w-full border-collapse text-right text-sm">
+                <div className="space-y-2">
+                  <h3 className="text-xs font-bold text-slate-700">{language === 'ar' ? 'تفاصيل الأصناف المحولة' : 'Transferred Items'}</h3>
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <table className="w-full border-collapse text-right text-xs">
                       <thead>
-                        <tr className="bg-slate-50 border-b border-slate-100">
-                          <th className="px-4 py-3 font-black text-slate-500 uppercase">{language === 'ar' ? 'كود الصنف' : 'Code'}</th>
-                          <th className="px-4 py-3 font-black text-slate-500 uppercase">{language === 'ar' ? 'اسم الصنف' : 'Product Name'}</th>
-                          <th className="px-4 py-3 font-black text-slate-500 uppercase text-center">{language === 'ar' ? 'الكمية' : 'Qty'}</th>
-                          <th className="px-4 py-3 font-black text-slate-500 uppercase">{language === 'ar' ? 'الوحدة' : 'Unit'}</th>
+                        <tr className="bg-slate-50 border-b border-slate-200">
+                          <th className="px-3 py-2 font-bold text-slate-600 uppercase">{language === 'ar' ? 'كود الصنف' : 'Code'}</th>
+                          <th className="px-3 py-2 font-bold text-slate-600 uppercase">{language === 'ar' ? 'اسم الصنف' : 'Product Name'}</th>
+                          <th className="px-3 py-2 font-bold text-slate-600 uppercase text-center">{language === 'ar' ? 'الكمية' : 'Qty'}</th>
+                          <th className="px-3 py-2 font-bold text-slate-600 uppercase">{language === 'ar' ? 'الوحدة' : 'Unit'}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {((viewTransfer as any).items || []).map((item: WarehouseTransferItem) => {
                           const prod = products.find(p => p.id === item.product_id);
                           return (
-                            <tr key={item.id} className="hover:bg-slate-50/20">
-                              <td className="px-4 py-3.5 font-mono font-bold text-slate-600">{item.product_code || '-'}</td>
-                              <td className="px-4 py-3.5 font-black text-slate-800">{item.product_name}</td>
-                              <td className="px-4 py-3.5 font-black text-slate-700 text-center">{formatNumber(item.quantity)}</td>
-                              <td className="px-4 py-3.5 font-bold text-slate-500">{prod?.unit || '-'}</td>
+                            <tr key={item.id} className="hover:bg-slate-50/50">
+                              <td className="px-3 py-2 font-mono font-bold text-slate-600">{item.product_code || '-'}</td>
+                              <td className="px-3 py-2 font-bold text-slate-800">{item.product_name}</td>
+                              <td className="px-3 py-2 font-bold text-slate-700 text-center">{formatNumber(item.quantity)}</td>
+                              <td className="px-3 py-2 font-medium text-slate-500">{prod?.unit || '-'}</td>
                             </tr>
                           );
                         })}
@@ -904,7 +904,7 @@ export const WarehouseTransfers: React.FC = () => {
 
                 {/* Attachments */}
                 {viewTransfer.attachments && viewTransfer.attachments.length > 0 && (
-                  <div className="p-6 border-t border-slate-100">
+                  <div className="p-3 border-t border-slate-100">
                     <AttachmentsManager
                       attachments={viewTransfer.attachments}
                       onChange={() => {}}
@@ -916,10 +916,10 @@ export const WarehouseTransfers: React.FC = () => {
               </div>
 
               {/* Footer */}
-              <div className="flex items-center justify-end p-6 border-t border-slate-100 bg-slate-50/50">
+              <div className="flex items-center justify-end p-3 border-t border-slate-100 bg-slate-50/50">
                 <button
                   onClick={() => setViewTransfer(null)}
-                  className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 font-black text-slate-700 rounded-xl transition-all"
+                  className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 font-bold text-slate-700 rounded-lg text-xs transition-all"
                 >
                   {t('common.close')}
                 </button>
@@ -937,27 +937,27 @@ export const WarehouseTransfers: React.FC = () => {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-3xl border border-slate-100 shadow-2xl p-6 w-full max-w-md text-center space-y-6"
+              className="bg-white rounded-2xl border border-slate-200 shadow-xl p-5 w-full max-w-sm text-center space-y-4"
             >
-              <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto shadow-inner">
-                <Trash2 size={28} />
+              <div className="w-12 h-12 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                <Trash2 size={22} />
               </div>
-              <div className="space-y-2">
-                <h3 className="text-xl font-black text-slate-800">{t('common.delete_confirm_title')}</h3>
-                <p className="text-slate-400 font-bold text-sm">
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-slate-800">{t('common.delete_confirm_title')}</h3>
+                <p className="text-slate-400 text-xs">
                   {t('common.delete_confirm_msg')}
                 </p>
               </div>
-              <div className="flex items-center justify-center gap-3">
+              <div className="flex items-center justify-center gap-2">
                 <button
                   onClick={() => setIsDeleteModalOpen(false)}
-                  className="w-1/2 py-3 bg-slate-100 hover:bg-slate-200 font-black text-slate-600 rounded-xl transition-all"
+                  className="w-1/2 py-2 bg-slate-100 hover:bg-slate-200 font-bold text-slate-600 rounded-xl text-xs transition-all"
                 >
                   {t('common.cancel')}
                 </button>
                 <button
                   onClick={handleDelete}
-                  className="w-1/2 py-3 bg-rose-500 hover:bg-rose-600 font-black text-white rounded-xl shadow-md shadow-rose-500/10 transition-all"
+                  className="w-1/2 py-2 bg-rose-500 hover:bg-rose-600 font-bold text-white rounded-xl text-xs shadow-sm transition-all"
                 >
                   {t('common.delete')}
                 </button>
