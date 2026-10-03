@@ -93,6 +93,92 @@ export const PurchaseReturns: React.FC = () => {
 
   const [editingReturn, setEditingReturn] = useState<any | null>(null);
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
+
+  const [selectedReturnIds, setSelectedReturnIds] = useState<string[]>([]);
+  const isAllSelected = purchaseReturns.length > 0 && selectedReturnIds.length === purchaseReturns.length;
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedReturnIds([]);
+    } else {
+      setSelectedReturnIds(purchaseReturns.map(r => r.id));
+    }
+  };
+
+  const selectedTotals = useMemo(() => {
+    const selected = purchaseReturns.filter(r => selectedReturnIds.includes(r.id));
+    const total_amount = selected.reduce((sum, r) => sum + (Number(r.total_amount) || 0), 0);
+    const total_discount = selected.reduce((sum, r) => sum + (Number(r.discount) || 0), 0);
+    const net_amount = total_amount - total_discount;
+    return { total_amount, total_discount, net_amount };
+  }, [purchaseReturns, selectedReturnIds]);
+
+  const [isColumnSelectorOpen, setIsColumnSelectorOpen] = useState(false);
+  const columnSelectorRef = useRef<HTMLDivElement>(null);
+
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
+    const saved = localStorage.getItem(`purchase_returns_visible_columns_${user?.id}`);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return {
+      return_number: true,
+      eta_invoice_number: true,
+      supplier_name: true,
+      date: true,
+      description: true,
+      payment_type: true,
+      status: true,
+      currency: true,
+      foreign_amount: true,
+      subtotal: true,
+      tax_amount: true,
+      withholding_tax_amount: true,
+      total_amount: true,
+      entry_number: true,
+      created_date: false,
+      created_time: false,
+      updated_date: false,
+      updated_time: false,
+    };
+  });
+
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+    const saved = localStorage.getItem(`purchase_returns_column_widths_${user?.id}`);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return {
+      return_number: 120,
+      eta_invoice_number: 115,
+      supplier_name: 150,
+      date: 95,
+      description: 130,
+      payment_type: 85,
+      status: 85,
+      currency: 70,
+      foreign_amount: 100,
+      subtotal: 100,
+      tax_amount: 85,
+      withholding_tax_amount: 90,
+      total_amount: 110,
+      entry_number: 100,
+      created_date: 95,
+      created_time: 80,
+      updated_date: 95,
+      updated_time: 80,
+    };
+  });
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (columnSelectorRef.current && !columnSelectorRef.current.contains(event.target as Node)) {
+        setIsColumnSelectorOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [returnToDelete, setReturnToDelete] = useState<string | null>(null);
   
@@ -2350,242 +2436,519 @@ export const PurchaseReturns: React.FC = () => {
 
           {/* Header Line 2: Full-width compact summary strip */}
           {serverSummary.total_amount !== undefined && (
-            <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-white border border-zinc-200/80 rounded-xl shadow-xs text-xs">
-              <div className="flex items-center gap-1.5">
-                <span className="text-zinc-500 text-xs font-medium">{language === 'ar' ? 'إجمالي المرتجعات:' : 'Total Returns:'}</span>
-                <span className="font-bold text-emerald-700">{formatMoney(serverSummary.total_amount)} <span className="text-[10px] text-zinc-400 font-mono">{t('common.currency')}</span></span>
+            <div className="flex items-center justify-between flex-wrap gap-2 px-3 py-1 bg-white border border-slate-200/80 rounded-xl shadow-xs text-xs">
+              <div className="flex items-center flex-wrap gap-2 text-xs">
+                <div className="flex items-center gap-1">
+                  <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'إجمالي المرتجعات:' : 'Total Returns:'}</span>
+                  <span className="font-bold text-emerald-700">{formatMoney(serverSummary.total_amount)} <span className="text-[10px] text-slate-400 font-mono">{(company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                </div>
+                <span className="text-slate-200 hidden sm:inline">|</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'إجمالي الخصومات:' : 'Total Discounts:'}</span>
+                  <span className="font-bold text-rose-600">{formatMoney(serverSummary.total_discount || 0)} <span className="text-[10px] text-slate-400 font-mono">{(company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                </div>
+                <span className="text-slate-200 hidden sm:inline">|</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'الصافي:' : 'Net:'}</span>
+                  <span className="font-bold text-blue-700">{formatMoney((serverSummary.total_amount || 0) - (serverSummary.total_discount || 0))} <span className="text-[10px] text-slate-400 font-mono">{(company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                </div>
               </div>
+
+              {selectedReturnIds.length > 0 && (
+                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 animate-in fade-in">
+                  <span>{language === 'ar' ? 'مجموع المحدد' : 'Selected Total'} ({selectedReturnIds.length}):</span>
+                  <span className="text-emerald-700">{formatMoney(selectedTotals.total_amount)}</span>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-rose-600">{formatMoney(selectedTotals.total_discount)}</span>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-blue-700">{formatMoney(selectedTotals.net_amount)}</span>
+                </div>
+              )}
             </div>
           )}
 
-          <div className="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
-            <div className="p-3 border-b border-zinc-50 flex items-center justify-between gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-3 text-zinc-400" size={18} />
-                <input
-                  type="text"
-                  placeholder={language === 'ar' ? 'البحث عن مرتجعات...' : 'Search returns...'}
-                  className="w-full pl-10 pr-4 py-2 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-550 transition-all"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/50 shadow-inner">
-                <button
-                  onClick={() => setView('table')}
-                  className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
-                  title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
-                >
-                  <List size={18} />
-                </button>
-                <button
-                  onClick={() => setView('card')}
-                  className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm border border-slate-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
-                  title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
-                >
-                  <LayoutGrid size={18} />
-                </button>
-              </div>
-            </div>
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-3 border-b border-slate-100 flex items-center gap-3">
+          <div className="relative flex-1">
+            <Search className={`${dir === 'rtl' ? 'left-3' : 'right-3'} absolute top-3 text-slate-400`} size={18} />
+            <input
+              type="text"
+              placeholder={language === 'ar' ? 'البحث عن مرتجعات...' : 'Search returns...'}
+              className={`w-full ${dir === 'rtl' ? 'pl-10 pr-4' : 'pr-10 pl-4'} py-2 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all text-xs font-semibold`}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex bg-slate-100 p-1 rounded-xl">
+            <button
+              onClick={() => setView('table')}
+              className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
+            >
+              <List size={18} />
+            </button>
+            <button
+              onClick={() => setView('card')}
+              className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
+            >
+              <LayoutGrid size={18} />
+            </button>
+          </div>
 
-            {view === 'table' ? (
-              <div ref={tableRef} id="purchase-returns-list-table" className="hidden md:block overflow-x-auto">
-                <table className="w-full text-right">
-                  <thead>
-                    <tr className="bg-zinc-50/50 text-zinc-500 text-xs uppercase tracking-wider">
-                      <th className="px-2.5 py-1.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('return_number')}>
-                        <div className="flex items-center gap-1">
-                          رقم المرتجع
-                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                            {sortBy === 'return_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                          </span>
-                        </div>
-                      </th>
-                      <th className="px-2.5 py-1.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('supplier_name')}>
-                        <div className="flex items-center gap-1">
-                          المورد
-                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                            {sortBy === 'supplier_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                          </span>
-                        </div>
-                      </th>
-                      <th className="px-2.5 py-1.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('date')}>
-                        <div className="flex items-center gap-1">
-                          التاريخ
-                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                            {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                          </span>
-                        </div>
-                      </th>
-                      <th className="px-2.5 py-1.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('payment_type')}>
-                        <div className="flex items-center gap-1">
-                          النوع
-                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                            {sortBy === 'payment_type' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                          </span>
-                        </div>
-                      </th>
-                      <th className="px-2.5 py-1.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('total_amount')}>
-                        <div className="flex items-center gap-1">
-                          المبلغ
-                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                            {sortBy === 'total_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                          </span>
-                        </div>
-                      </th>
-                      {isPurchaseWhtEnabled && (
-                        <th className={`px-2.5 py-1.5 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                          {language === 'ar' ? 'ض.خ.إ' : 'WHT'}
-                        </th>
-                      )}
-                      <th className={`px-2.5 py-1.5 font-bold ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                        {language === 'ar' ? 'رقم القيد' : 'Journal Entry'}
-                      </th>
-                      <th className="px-2.5 py-1.5 font-bold text-left">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-50">
-                    {filteredReturns.length === 0 ? (
-                      <tr>
-                        <td colSpan={isPurchaseWhtEnabled ? 8 : 7} className="px-6 py-12 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد مرتجعات مشتريات حالياً' : 'No purchase returns currently'}</td>
-                      </tr>
-                    ) : (
-                      filteredReturns.map((ret) => (
-                        <tr 
-                          key={ret.id} 
-                          className="hover:bg-zinc-50/50 transition-colors group cursor-pointer"
-                          onClick={() => handleEdit(ret)}
-                        >
-                          <td className="px-2.5 py-1.5">
-                            <div className="flex flex-col gap-1 items-start">
-                              <span className="font-mono text-xs bg-red-50 px-2 py-1 rounded text-red-700 font-bold">{ret.return_number}</span>
-                              {ret.eta_invoice_number && (
-                                <span className="font-mono text-[10px] bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-indigo-700 font-bold" title={ret.eta_uuid || ''}>
-                                  {language === 'ar' ? 'إلكترونية:' : 'ETA:'} {ret.eta_invoice_number}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-2.5 py-1.5 font-bold text-zinc-900">{ret.supplier_name}</td>
-                          <td className="px-2.5 py-1.5 text-zinc-500">{formatDate(ret.date)}</td>
-                          <td className="px-2.5 py-1.5">
-                            <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
-                              {ret.payment_type === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') : (language === 'ar' ? 'آجل' : 'Credit')}
-                            </span>
-                          </td>
-                          <td className="px-2.5 py-1.5 font-bold text-zinc-900">{formatNumber(ret.total_amount)} {t('common.currency')}</td>
-                          {isPurchaseWhtEnabled && (
-                            <td className="px-2.5 py-1.5 font-bold text-amber-600">
-                              {ret.withholding_tax_amount ? `${formatMoney(ret.withholding_tax_amount)}` : '-'}
-                            </td>
-                          )}
-                          <td className={`px-2.5 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                            {ret.entry_number ? (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setPendingViewDoc({ type: 'journal', idOrNumber: ret.entry_number! });
-                                  setCurrentPage('journal_entries');
-                                }}
-                                className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-2 py-1 rounded border border-emerald-100/50 transition-all active:scale-95 animate-in fade-in"
-                              >
-                                {ret.entry_number}
-                              </button>
-                            ) : (
-                              <span className="text-zinc-400 font-mono text-xs">-</span>
-                            )}
-                          </td>
-                          <td className="px-2.5 py-1.5 text-left">
-                            <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActivityLogDocumentId(ret.id);
-                                  setIsActivityLogOpen(true);
-                                }}
-                                className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all no-pdf"
-                                title="سجل النشاط"
-                              >
-                                <History size={18} />
-                              </button>
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleViewReturn(ret.id);
-                                }}
-                                className="p-2 text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all no-pdf"
-                              >
-                                <Eye size={18} />
-                              </button>
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEdit(ret);
-                                }}
-                                className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all no-pdf"
-                                title="تعديل"
-                              >
-                                <Edit size={18} />
-                              </button>
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  exportToPDF(ret);
-                                }}
-                                className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all no-pdf"
-                              >
-                                <Download size={18} />
-                              </button>
-                              {/* Reversal action */}
-                              {ret.is_reversed ? (
-                                <span
-                                  className="px-2 py-1 bg-amber-100/80 text-amber-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
-                                  title={language === 'ar' ? `تم عكس هذا المرتجع بالمستند: ${ret.reversed_by_doc_number || ''}` : `Reversed by: ${ret.reversed_by_doc_number || ''}`}
-                                >
-                                  <RotateCcw size={13} className="text-amber-700" />
-                                  <span>معكوس</span>
-                                </span>
-                              ) : ret.is_reversal_doc ? (
-                                <span
-                                  className="px-2 py-1 bg-indigo-100/80 text-indigo-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
-                                  title={language === 'ar' ? `مرتجع عكسي للمستند: ${ret.original_doc_number || ''}` : `Reversal of: ${ret.original_doc_number || ''}`}
-                                >
-                                  <RotateCcw size={13} className="text-indigo-700" />
-                                  <span>عكسي</span>
-                                </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setReversingReturn(ret);
-                                  }}
-                                  className="p-2 text-zinc-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all no-pdf"
-                                  title={language === 'ar' ? 'عكس المرتجع (Reverse)' : 'Reverse Return'}
-                                >
-                                  <RotateCcw size={18} />
-                                </button>
-                              )}
-                              {!ret.is_reversed && !ret.is_reversal_doc && (
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDelete(ret.id);
-                                  }}
-                                  className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all no-pdf"
-                                >
-                                  <Trash2 size={18} />
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+          {/* Column Selection Dropdown */}
+          {view === 'table' && (
+            <div className="relative" ref={columnSelectorRef}>
+              <button
+                onClick={() => setIsColumnSelectorOpen(!isColumnSelectorOpen)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow-sm active:scale-95"
+              >
+                <Eye size={14} className="text-slate-400" />
+                <span>{language === 'ar' ? 'أعمدة الجدول' : 'Table Columns'}</span>
+                <ChevronDown size={14} className="text-slate-400" />
+              </button>
+              
+              {isColumnSelectorOpen && (
+                <div className="absolute top-full mt-1.5 right-0 bg-white border border-slate-200 rounded-xl shadow-xl p-3 z-50 min-w-[220px] max-h-[300px] overflow-y-auto space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest pb-1 border-b border-slate-100">
+                    {language === 'ar' ? 'تخصيص الأعمدة' : 'Customize Columns'}
+                  </div>
+                  {Object.keys(visibleColumns).filter(colKey => {
+                    if (colKey === 'currency' || colKey === 'foreign_amount') {
+                      return isMultiCurrencyEnabled;
+                    }
+                    if (colKey === 'withholding_tax_amount') {
+                      return isPurchaseWhtEnabled;
+                    }
+                    return true;
+                  }).map((colKey) => {
+                    const labels: Record<string, string> = {
+                      return_number: language === 'ar' ? 'رقم المرتجع' : 'Return Number',
+                      eta_invoice_number: language === 'ar' ? 'رقم الوثيقة الإلكترونية' : 'Electronic Doc No.',
+                      supplier_name: language === 'ar' ? 'المورد' : 'Supplier',
+                      date: language === 'ar' ? 'التاريخ' : 'Date',
+                      description: language === 'ar' ? 'وصف المرتجع' : 'Description',
+                      payment_type: language === 'ar' ? 'طريقة الدفع' : 'Payment Type',
+                      status: language === 'ar' ? 'حالة المرتجع' : 'Status',
+                      currency: language === 'ar' ? 'العملة' : 'Currency',
+                      foreign_amount: language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount',
+                      subtotal: language === 'ar' ? 'قبل الضريبة' : 'Subtotal',
+                      tax_amount: language === 'ar' ? 'الضريبة' : 'Tax',
+                      withholding_tax_amount: language === 'ar' ? 'ض.خ.إ' : 'WHT',
+                      total_amount: language === 'ar' ? 'الإجمالي' : 'Total',
+                      entry_number: language === 'ar' ? 'رقم القيد' : 'Entry No.',
+                      created_date: language === 'ar' ? 'تاريخ الإنشاء' : 'Created Date',
+                      created_time: language === 'ar' ? 'وقت الإنشاء' : 'Created Time',
+                      updated_date: language === 'ar' ? 'تاريخ آخر تعديل' : 'Last Modified Date',
+                      updated_time: language === 'ar' ? 'وقت آخر تعديل' : 'Last Modified Time',
+                    };
+
+                    return (
+                      <label key={colKey} className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer hover:bg-slate-50 p-1.5 rounded-lg transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={visibleColumns[colKey]}
+                          onChange={() => {
+                            const newVal = !visibleColumns[colKey];
+                            const updated = {
+                              ...visibleColumns,
+                              [colKey]: newVal
+                            };
+                            setVisibleColumns(updated);
+                            if (user?.id) {
+                              localStorage.setItem(`purchase_returns_visible_columns_${user.id}`, JSON.stringify(updated));
+                            }
+                          }}
+                          className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5"
+                        />
+                        <span>{labels[colKey] || colKey}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <PaginationControls 
+          page={page} 
+          limit={limit} 
+          total={totalRecords} 
+          onPageChange={setPage} 
+          onLimitChange={setLimit} 
+          className="border-b border-slate-100"
+        />
+
+        {view === 'table' ? (
+          <div ref={tableRef} id="purchase-returns-list-table" className="overflow-x-auto hidden md:block">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-slate-50/50 text-slate-500 text-[10px] uppercase tracking-widest font-bold border-b border-slate-100">
+                  <th className="px-2 py-0.5 text-center w-12 no-pdf whitespace-nowrap">
+                    <input 
+                      type="checkbox"
+                      checked={isAllSelected}
+                      onChange={handleSelectAll}
+                      className="rounded border-slate-350 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                    />
+                  </th>
+                  {visibleColumns.return_number && (
+                    <th className={`px-2 py-0.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('return_number')}>
+                      <div className="flex items-center gap-1">
+                        <span>{language === 'ar' ? 'رقم المرتجع' : 'Return No.'}</span>
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          {sortBy === 'return_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                        </span>
+                      </div>
+                    </th>
+                  )}
+                  {visibleColumns.eta_invoice_number && (
+                    <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span>{language === 'ar' ? 'رقم الوثيقة الإلكترونية' : 'ETA Doc No.'}</span>
+                    </th>
+                  )}
+                  {visibleColumns.supplier_name && (
+                    <th className={`px-2 py-0.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('supplier_name')}>
+                      <div className="flex items-center gap-1">
+                        <span>{language === 'ar' ? 'المورد' : 'Supplier'}</span>
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          {sortBy === 'supplier_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                        </span>
+                      </div>
+                    </th>
+                  )}
+                  {visibleColumns.date && (
+                    <th className={`px-2 py-0.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('date')}>
+                      <div className="flex items-center gap-1">
+                        <span>{language === 'ar' ? 'التاريخ' : 'Date'}</span>
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                        </span>
+                      </div>
+                    </th>
+                  )}
+                  {visibleColumns.description && (
+                    <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span>{language === 'ar' ? 'وصف المرتجع' : 'Description'}</span>
+                    </th>
+                  )}
+                  {visibleColumns.payment_type && (
+                    <th className={`px-2 py-0.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('payment_type')}>
+                      <div className="flex items-center gap-1">
+                        <span>{language === 'ar' ? 'طريقة الدفع' : 'Payment Type'}</span>
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          {sortBy === 'payment_type' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                        </span>
+                      </div>
+                    </th>
+                  )}
+                  {visibleColumns.status && (
+                    <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span>{language === 'ar' ? 'حالة المرتجع' : 'Status'}</span>
+                    </th>
+                  )}
+                  {isMultiCurrencyEnabled && visibleColumns.currency && (
+                    <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span>{language === 'ar' ? 'العملة' : 'Currency'}</span>
+                    </th>
+                  )}
+                  {isMultiCurrencyEnabled && visibleColumns.foreign_amount && (
+                    <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span>{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</span>
+                    </th>
+                  )}
+                  {visibleColumns.subtotal && (
+                    <th className={`px-2 py-0.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('subtotal')}>
+                      <div className="flex items-center gap-1">
+                        <span>{language === 'ar' ? 'قبل الضريبة' : 'Subtotal'}</span>
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          {sortBy === 'subtotal' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                        </span>
+                      </div>
+                    </th>
+                  )}
+                  {visibleColumns.tax_amount && (
+                    <th className={`px-2 py-0.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('tax')}>
+                      <div className="flex items-center gap-1">
+                        <span>{language === 'ar' ? 'الضريبة' : 'Tax'}</span>
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          {sortBy === 'tax' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                        </span>
+                      </div>
+                    </th>
+                  )}
+                  {visibleColumns.withholding_tax_amount && isPurchaseWhtEnabled && (
+                    <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      {language === 'ar' ? 'ض.خ.إ' : 'WHT'}
+                    </th>
+                  )}
+                  {visibleColumns.total_amount && (
+                    <th className={`px-2 py-0.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('total_amount')}>
+                      <div className="flex items-center gap-1">
+                        <span>{language === 'ar' ? 'الإجمالي' : 'Total'}</span>
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          {sortBy === 'total_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                        </span>
+                      </div>
+                    </th>
+                  )}
+                  {visibleColumns.entry_number && (
+                    <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      {language === 'ar' ? 'رقم القيد' : 'Journal Entry'}
+                    </th>
+                  )}
+                  {visibleColumns.created_date && (
+                    <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span>{language === 'ar' ? 'تاريخ الإنشاء' : 'Created Date'}</span>
+                    </th>
+                  )}
+                  {visibleColumns.created_time && (
+                    <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span>{language === 'ar' ? 'وقت الإنشاء' : 'Created Time'}</span>
+                    </th>
+                  )}
+                  {visibleColumns.updated_date && (
+                    <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span>{language === 'ar' ? 'تاريخ التعديل' : 'Updated Date'}</span>
+                    </th>
+                  )}
+                  {visibleColumns.updated_time && (
+                    <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span>{language === 'ar' ? 'وقت التعديل' : 'Updated Time'}</span>
+                    </th>
+                  )}
+                  <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredReturns.map((ret: any) => (
+                  <tr 
+                    key={ret.id} 
+                    className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
+                    onClick={() => handleEdit(ret)}
+                  >
+                    <td 
+                      className="px-2 py-0.5 text-center w-12 no-pdf whitespace-nowrap"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input 
+                        type="checkbox" 
+                        checked={selectedReturnIds.includes(ret.id)}
+                        onChange={() => {
+                          setSelectedReturnIds(prev => 
+                            prev.includes(ret.id) ? prev.filter(id => id !== ret.id) : [...prev, ret.id]
+                          );
+                        }}
+                        className="rounded border-slate-350 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                      />
+                    </td>
+                    {visibleColumns.return_number && (
+                      <td className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        <span className="font-mono text-xs font-bold text-slate-950 bg-slate-100 px-2 py-0.5 rounded">{ret.return_number}</span>
+                      </td>
                     )}
-                  </tbody>
-                </table>
-                <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
-              </div>
+                    {visibleColumns.eta_invoice_number && (
+                      <td className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {ret.eta_invoice_number ? (
+                          <span className="font-mono text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded select-all inline-block shadow-sm">
+                            {ret.eta_invoice_number}
+                          </span>
+                        ) : (
+                          <span className="text-slate-350 text-xs font-mono">-</span>
+                        )}
+                      </td>
+                    )}
+                    {visibleColumns.supplier_name && (
+                      <td className={`px-2 py-0.5 font-bold text-slate-900 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{ret.supplier_name}</td>
+                    )}
+                    {visibleColumns.date && (
+                      <td className={`px-2 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(ret.date)}</td>
+                    )}
+                    {visibleColumns.description && (
+                      <td className={`px-2 py-0.5 text-slate-500 whitespace-nowrap max-w-[200px] truncate ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={ret.description || ret.notes || ''}>
+                        {ret.description || ret.notes || '-'}
+                      </td>
+                    )}
+                    {visibleColumns.payment_type && (
+                      <td className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${ret.payment_type === 'cash' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-blue-50 text-blue-700 border border-blue-100'}`}>
+                          {ret.payment_type === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') : (language === 'ar' ? 'آجل' : 'Credit')}
+                        </span>
+                      </td>
+                    )}
+                    {visibleColumns.status && (
+                      <td className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                          {language === 'ar' ? 'مكتمل' : 'Completed'}
+                        </span>
+                      </td>
+                    )}
+                    {isMultiCurrencyEnabled && visibleColumns.currency && (
+                      <td className={`px-2 py-0.5 font-bold text-slate-600 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {ret.currency_id ? (companyCurrencies.find(c => c.id === ret.currency_id)?.code || '') : (company?.settings?.currency || 'EGP')}
+                      </td>
+                    )}
+                    {isMultiCurrencyEnabled && visibleColumns.foreign_amount && (
+                      <td className={`px-2 py-0.5 font-bold text-slate-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {ret.currency_id && ret.currency_id !== (company?.settings?.currency || 'EGP') ? formatNumber(ret.total_amount) : '-'}
+                      </td>
+                    )}
+                    {visibleColumns.subtotal && (
+                      <td className={`px-2 py-0.5 font-medium text-slate-600 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {formatMoney(ret.subtotal || ret.total_amount)}
+                      </td>
+                    )}
+                    {visibleColumns.tax_amount && (
+                      <td className={`px-2 py-0.5 font-bold text-slate-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {formatMoney(ret.tax || ret.tax_amount || 0)}
+                      </td>
+                    )}
+                    {visibleColumns.withholding_tax_amount && isPurchaseWhtEnabled && (
+                      <td className={`px-2 py-0.5 font-bold text-amber-600 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {ret.withholding_tax_amount ? formatMoney(ret.withholding_tax_amount) : '-'}
+                      </td>
+                    )}
+                    {visibleColumns.total_amount && (
+                      <td className={`px-2 py-0.5 font-bold text-emerald-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {formatMoney(ret.total_amount)} <span className="text-[10px] text-slate-400 font-mono">{(company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase()}</span>
+                      </td>
+                    )}
+                    {visibleColumns.entry_number && (
+                      <td className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {ret.entry_number ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPendingViewDoc({ type: 'journal', idOrNumber: ret.entry_number! });
+                              setCurrentPage('journal_entries');
+                            }}
+                            className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50 transition-all active:scale-95"
+                          >
+                            {ret.entry_number}
+                          </button>
+                        ) : (
+                          <span className="text-slate-400 font-mono text-xs">-</span>
+                        )}
+                      </td>
+                    )}
+                    {visibleColumns.created_date && (
+                      <td className={`px-2 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {ret.created_at ? formatDate(ret.created_at.slice(0, 10)) : '-'}
+                      </td>
+                    )}
+                    {visibleColumns.created_time && (
+                      <td className={`px-2 py-0.5 text-slate-400 font-mono text-[11px] whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {ret.created_at && ret.created_at.length > 11 ? ret.created_at.slice(11, 16) : '-'}
+                      </td>
+                    )}
+                    {visibleColumns.updated_date && (
+                      <td className={`px-2 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {ret.updated_at ? formatDate(ret.updated_at.slice(0, 10)) : '-'}
+                      </td>
+                    )}
+                    {visibleColumns.updated_time && (
+                      <td className={`px-2 py-0.5 text-slate-400 font-mono text-[11px] whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {ret.updated_at && ret.updated_at.length > 11 ? ret.updated_at.slice(11, 16) : '-'}
+                      </td>
+                    )}
+                    <td className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                      <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActivityLogDocumentId(ret.id);
+                            setIsActivityLogOpen(true);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all no-pdf"
+                          title="سجل النشاط"
+                        >
+                          <History size={14} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewReturn(ret.id);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
+                          title="عرض"
+                        >
+                          <Eye size={14} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(ret);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
+                          title="تعديل"
+                        >
+                          <Edit size={14} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            exportToPDF(ret);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
+                          title="تحميل PDF"
+                        >
+                          <Download size={14} />
+                        </button>
+                        {/* Reversal action */}
+                        {ret.is_reversed ? (
+                          <span
+                            className="px-1.5 py-0.5 bg-amber-100/80 text-amber-800 rounded inline-flex items-center gap-1 text-[10px] font-black cursor-help"
+                            title={language === 'ar' ? `تم عكس هذا المرتجع بالمستند: ${ret.reversed_by_doc_number || ''}` : `Reversed by: ${ret.reversed_by_doc_number || ''}`}
+                          >
+                            <RotateCcw size={11} className="text-amber-700" />
+                            <span>معكوس</span>
+                          </span>
+                        ) : ret.is_reversal_doc ? (
+                          <span
+                            className="px-1.5 py-0.5 bg-indigo-100/80 text-indigo-800 rounded inline-flex items-center gap-1 text-[10px] font-black cursor-help"
+                            title={language === 'ar' ? `مرتجع عكسي للمستند: ${ret.original_doc_number || ''}` : `Reversal of: ${ret.original_doc_number || ''}`}
+                          >
+                            <RotateCcw size={11} className="text-indigo-700" />
+                            <span>عكسي</span>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setReversingReturn(ret);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all no-pdf"
+                            title={language === 'ar' ? 'عكس المرتجع (Reverse)' : 'Reverse Return'}
+                          >
+                            <RotateCcw size={14} />
+                          </button>
+                        )}
+                        {!ret.is_reversed && !ret.is_reversal_doc && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(ret.id);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
+                            title="حذف"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredReturns.length === 0 && !loading && (
+                  <tr>
+                    <td colSpan={25} className="px-6 py-12 text-center text-slate-500">{t('common.no_data')}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
             ) : (
               <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredReturns.map((ret) => (

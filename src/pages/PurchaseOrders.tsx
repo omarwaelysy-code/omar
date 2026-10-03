@@ -118,6 +118,90 @@ export const PurchaseOrders: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
+
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const isAllSelected = orders.length > 0 && selectedOrderIds.length === orders.length;
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedOrderIds([]);
+    } else {
+      setSelectedOrderIds(orders.map(o => o.id));
+    }
+  };
+
+  const selectedTotals = useMemo(() => {
+    const selected = orders.filter(o => selectedOrderIds.includes(o.id));
+    const total_amount = selected.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+    const discount = selected.reduce((sum, o) => sum + (Number(o.discount_amount) || 0), 0);
+    const net_amount = total_amount - discount;
+    return { total_amount, discount, net_amount };
+  }, [orders, selectedOrderIds]);
+
+  const [isColumnSelectorOpen, setIsColumnSelectorOpen] = useState(false);
+  const columnSelectorRef = useRef<HTMLDivElement>(null);
+
+  const isMultiCurrencyEnabled = companyData?.settings?.enable_multi_currency || (companyData as any)?.enable_multi_currency || false;
+
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
+    const saved = localStorage.getItem(`purchase_orders_visible_columns_${user?.id}`);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return {
+      order_number: true,
+      supplier_name: true,
+      date: true,
+      delivery_date: true,
+      description: true,
+      status: true,
+      currency: false,
+      foreign_amount: false,
+      subtotal: true,
+      tax_amount: true,
+      discount_amount: true,
+      total_amount: true,
+      created_date: false,
+      created_time: false,
+      updated_date: false,
+      updated_time: false,
+    };
+  });
+
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+    const saved = localStorage.getItem(`purchase_orders_column_widths_${user?.id}`);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return {
+      order_number: 120,
+      supplier_name: 150,
+      date: 95,
+      delivery_date: 95,
+      description: 130,
+      status: 85,
+      currency: 70,
+      foreign_amount: 100,
+      subtotal: 100,
+      tax_amount: 85,
+      discount_amount: 85,
+      total_amount: 110,
+      created_date: 95,
+      created_time: 80,
+      updated_date: 95,
+      updated_time: 80,
+    };
+  });
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (columnSelectorRef.current && !columnSelectorRef.current.contains(event.target as Node)) {
+        setIsColumnSelectorOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
   const [viewOrder, setViewOrder] = useState<PurchaseOrder | null>(null);
@@ -952,51 +1036,90 @@ export const PurchaseOrders: React.FC = () => {
     <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
       {!isModalOpen ? (
         <>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-3xl font-bold tracking-tight text-slate-900 italic serif">{ot('title')}</h2>
-              <p className="text-slate-500">{ot('subtitle')}</p>
-              {serverSummary.total_amount !== undefined && (
-                <div className="mt-2 flex items-center gap-4 text-sm">
-                  <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
-                    {language === 'ar' ? 'إجمالي الأوامر:' : 'Total Orders:'} {formatMoney(serverSummary.total_amount)} {t('invoices.currency')}
-                  </span>
-                </div>
-              )}
+          {/* Header Line 1: Compact Title & Actions */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-lg font-bold tracking-tight text-slate-800">{ot('title')}</h2>
+              <span className="text-xs text-slate-400 hidden md:inline">| {ot('subtitle')}</span>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button 
-                onClick={() => setIsActivityLogOpen(true)}
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
-                title={t('common.activity_log')}
-              >
-                <History size={20} />
-                <span className="hidden md:inline">{t('common.activity_log')}</span>
-              </button>
-              <ExportButtons 
-                onExportExcel={handleExportExcel} 
-                onExportPDF={handleExportPDF} 
-              />
+
+            <div className="flex items-center gap-1.5 flex-wrap">
               {canCreate && (
                 <button 
                   onClick={openModal}
-                  className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
+                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-sm shadow-emerald-500/20"
                 >
-                  <Plus size={20} />
-                  {ot('add_order')}
+                  <Plus size={15} />
+                  <span>{ot('add_order')}</span>
                 </button>
               )}
+              <ExportButtons 
+                onExportExcel={handleExportExcel} 
+                onExportPDF={handleExportPDF} 
+                size="sm"
+              />
+              <button 
+                onClick={() => setIsActivityLogOpen(true)}
+                className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-white text-slate-600 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all active:scale-95 shadow-sm"
+                title={t('common.activity_log')}
+              >
+                <History size={15} />
+                <span className="hidden md:inline">{t('common.activity_log')}</span>
+              </button>
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-center gap-4">
+          {/* Header Line 2: Full-width compact summary strip */}
+          {serverSummary.total_amount !== undefined && (
+            <div className="flex items-center justify-between flex-wrap gap-2 px-3 py-1 bg-white border border-slate-200/80 rounded-xl shadow-xs text-xs">
+              <div className="flex items-center flex-wrap gap-2 text-xs">
+                <div className="flex items-center gap-1">
+                  <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'إجمالي الأوامر:' : 'Total Orders:'}</span>
+                  <span className="font-bold text-emerald-700">{formatMoney(serverSummary.total_amount)} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                </div>
+                <span className="text-slate-200 hidden sm:inline">|</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'إجمالي الخصومات:' : 'Total Discounts:'}</span>
+                  <span className="font-bold text-rose-600">{formatMoney(serverSummary.total_discount || 0)} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                </div>
+                <span className="text-slate-200 hidden sm:inline">|</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'الصافي:' : 'Net:'}</span>
+                  <span className="font-bold text-blue-700">{formatMoney((serverSummary.total_amount || 0) - (serverSummary.total_discount || 0))} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                </div>
+                <span className="text-slate-200 hidden sm:inline">|</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-slate-500 text-xs font-medium">{ot('status_pending')}:</span>
+                  <span className="font-bold text-amber-700">{orders.filter(o => o.status !== 'converted').length}</span>
+                </div>
+                <span className="text-slate-200 hidden sm:inline">|</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-slate-500 text-xs font-medium">{ot('status_converted')}:</span>
+                  <span className="font-bold text-emerald-700">{orders.filter(o => o.status === 'converted').length}</span>
+                </div>
+              </div>
+
+              {selectedOrderIds.length > 0 && (
+                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 animate-in fade-in">
+                  <span>{language === 'ar' ? 'مجموع المحدد' : 'Selected Total'} ({selectedOrderIds.length}):</span>
+                  <span className="text-emerald-700">{formatMoney(selectedTotals.total_amount)}</span>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-rose-600">{formatMoney(selectedTotals.discount)}</span>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-blue-700">{formatMoney(selectedTotals.net_amount)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-3 border-b border-slate-100 flex items-center gap-3">
               <div className="relative flex-1">
                 <Search className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 text-slate-400`} size={18} />
                 <input
                   type="text"
                   placeholder={ot('search_placeholder')}
-                  className={`w-full ${dir === 'rtl' ? 'pl-10 pr-4' : 'pr-10 pl-4'} py-2 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all`}
+                  className={`w-full ${dir === 'rtl' ? 'pl-10 pr-4' : 'pr-10 pl-4'} py-2 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all text-xs font-semibold`}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -1005,86 +1128,370 @@ export const PurchaseOrders: React.FC = () => {
                 <button
                   onClick={() => setView('table')}
                   className={`p-2 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
                 >
                   <List size={18} />
                 </button>
                 <button
                   onClick={() => setView('card')}
                   className={`p-2 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
                 >
                   <LayoutGrid size={18} />
                 </button>
               </div>
+
+              {/* Column Selection Dropdown */}
+              {view === 'table' && (
+                <div className="relative" ref={columnSelectorRef}>
+                  <button
+                    onClick={() => setIsColumnSelectorOpen(!isColumnSelectorOpen)}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow-sm active:scale-95"
+                  >
+                    <Eye size={14} className="text-slate-400" />
+                    <span>{language === 'ar' ? 'أعمدة الجدول' : 'Table Columns'}</span>
+                    <ChevronDown size={14} className="text-slate-400" />
+                  </button>
+                  
+                  {isColumnSelectorOpen && (
+                    <div className="absolute top-full mt-1.5 right-0 bg-white border border-slate-200 rounded-xl shadow-xl p-3 z-50 min-w-[220px] max-h-[300px] overflow-y-auto space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest pb-1 border-b border-slate-100">
+                        {language === 'ar' ? 'تخصيص الأعمدة' : 'Customize Columns'}
+                      </div>
+                      {Object.keys(visibleColumns).filter(colKey => {
+                        if (colKey === 'currency' || colKey === 'foreign_amount') {
+                          return isMultiCurrencyEnabled;
+                        }
+                        return true;
+                      }).map((colKey) => {
+                        const labels: Record<string, string> = {
+                          order_number: language === 'ar' ? 'رقم الأمر' : 'Order No.',
+                          supplier_name: language === 'ar' ? 'المورد' : 'Supplier',
+                          date: language === 'ar' ? 'التاريخ' : 'Date',
+                          delivery_date: language === 'ar' ? 'تاريخ التسليم' : 'Delivery Date',
+                          description: language === 'ar' ? 'البيان / الوصف' : 'Description',
+                          status: language === 'ar' ? 'الحالة' : 'Status',
+                          currency: language === 'ar' ? 'العملة' : 'Currency',
+                          foreign_amount: language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount',
+                          subtotal: language === 'ar' ? 'قبل الضريبة' : 'Subtotal',
+                          tax_amount: language === 'ar' ? 'الضريبة' : 'Tax',
+                          discount_amount: language === 'ar' ? 'الخصم' : 'Discount',
+                          total_amount: language === 'ar' ? 'الإجمالي' : 'Total',
+                          created_date: language === 'ar' ? 'تاريخ الإنشاء' : 'Created Date',
+                          created_time: language === 'ar' ? 'وقت الإنشاء' : 'Created Time',
+                          updated_date: language === 'ar' ? 'تاريخ آخر تعديل' : 'Last Modified Date',
+                          updated_time: language === 'ar' ? 'وقت آخر تعديل' : 'Last Modified Time',
+                        };
+
+                        return (
+                          <label key={colKey} className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer hover:bg-slate-50 p-1.5 rounded-lg transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={visibleColumns[colKey]}
+                              onChange={() => {
+                                const newVal = !visibleColumns[colKey];
+                                const updated = {
+                                  ...visibleColumns,
+                                  [colKey]: newVal
+                                };
+                                setVisibleColumns(updated);
+                                if (user?.id) {
+                                  localStorage.setItem(`purchase_orders_visible_columns_${user.id}`, JSON.stringify(updated));
+                                }
+                              }}
+                              className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5"
+                            />
+                            <span>{labels[colKey] || colKey}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
+            <PaginationControls 
+              page={page} 
+              limit={limit} 
+              total={totalRecords} 
+              onPageChange={setPage} 
+              onLimitChange={setLimit} 
+              className="border-b border-slate-100"
+            />
+
             {view === 'table' ? (
-              <div ref={tableRef} className="overflow-x-auto">
+              <div ref={tableRef} id="purchase-orders-list-table" className="overflow-x-auto hidden md:block">
                 <table className="w-full">
                   <thead>
                     <tr className="bg-slate-50/50 text-slate-500 text-[10px] uppercase tracking-widest font-bold border-b border-slate-100">
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer`} onClick={() => handleSort('order_number')}>{ot('column_number')}</th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer`} onClick={() => handleSort('supplier_name')}>{ot('column_supplier')}</th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer`} onClick={() => handleSort('date')}>{ot('column_date')}</th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer`} onClick={() => handleSort('delivery_date')}>{ot('column_delivery_date')}</th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'البيان' : 'Description'}</th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer`} onClick={() => handleSort('total_amount')}>{ot('column_amount')}</th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{ot('column_status')}</th>
-                      <th className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
+                      <th className="px-2 py-0.5 text-center w-12 no-pdf whitespace-nowrap">
+                        <input 
+                          type="checkbox" 
+                          checked={isAllSelected}
+                          onChange={handleSelectAll}
+                          className="rounded border-slate-350 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                        />
+                      </th>
+                      {visibleColumns.order_number && (
+                        <th className={`px-2 py-0.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('order_number')}>
+                          <div className="flex items-center gap-1">
+                            <span>{ot('column_number')}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'order_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                        </th>
+                      )}
+                      {visibleColumns.supplier_name && (
+                        <th className={`px-2 py-0.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('supplier_name')}>
+                          <div className="flex items-center gap-1">
+                            <span>{ot('column_supplier')}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'supplier_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                        </th>
+                      )}
+                      {visibleColumns.date && (
+                        <th className={`px-2 py-0.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('date')}>
+                          <div className="flex items-center gap-1">
+                            <span>{ot('column_date')}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                        </th>
+                      )}
+                      {visibleColumns.delivery_date && (
+                        <th className={`px-2 py-0.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('delivery_date')}>
+                          <div className="flex items-center gap-1">
+                            <span>{ot('column_delivery_date')}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'delivery_date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                        </th>
+                      )}
+                      {visibleColumns.description && (
+                        <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                          <span>{language === 'ar' ? 'البيان' : 'Description'}</span>
+                        </th>
+                      )}
+                      {isMultiCurrencyEnabled && visibleColumns.currency && (
+                        <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                          <span>{language === 'ar' ? 'العملة' : 'Currency'}</span>
+                        </th>
+                      )}
+                      {isMultiCurrencyEnabled && visibleColumns.foreign_amount && (
+                        <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                          <span>{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</span>
+                        </th>
+                      )}
+                      {visibleColumns.subtotal && (
+                        <th className={`px-2 py-0.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('subtotal')}>
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'قبل الضريبة' : 'Subtotal'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'subtotal' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                        </th>
+                      )}
+                      {visibleColumns.tax_amount && (
+                        <th className={`px-2 py-0.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('tax_amount')}>
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'الضريبة' : 'Tax'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'tax_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                        </th>
+                      )}
+                      {visibleColumns.discount_amount && (
+                        <th className={`px-2 py-0.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('discount_amount')}>
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'الخصم' : 'Discount'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'discount_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                        </th>
+                      )}
+                      {visibleColumns.total_amount && (
+                        <th className={`px-2 py-0.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('total_amount')}>
+                          <div className="flex items-center gap-1">
+                            <span>{ot('column_amount')}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'total_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                        </th>
+                      )}
+                      {visibleColumns.status && (
+                        <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                          <span>{ot('column_status')}</span>
+                        </th>
+                      )}
+                      {visibleColumns.created_date && (
+                        <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                          <span>{language === 'ar' ? 'تاريخ الإنشاء' : 'Created Date'}</span>
+                        </th>
+                      )}
+                      {visibleColumns.created_time && (
+                        <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                          <span>{language === 'ar' ? 'وقت الإنشاء' : 'Created Time'}</span>
+                        </th>
+                      )}
+                      {visibleColumns.updated_date && (
+                        <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                          <span>{language === 'ar' ? 'تاريخ التعديل' : 'Updated Date'}</span>
+                        </th>
+                      )}
+                      {visibleColumns.updated_time && (
+                        <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                          <span>{language === 'ar' ? 'وقت التعديل' : 'Updated Time'}</span>
+                        </th>
+                      )}
+                      <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredOrders.map((ord) => (
+                    {filteredOrders.map((ord: any) => (
                       <tr 
                         key={ord.id} 
                         className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
                         onClick={() => canEdit && openEditModal(ord)}
                       >
-                        <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                          <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100">{ord.order_number}</span>
+                        <td 
+                          className="px-2 py-0.5 text-center w-12 no-pdf whitespace-nowrap"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input 
+                            type="checkbox" 
+                            checked={selectedOrderIds.includes(ord.id)}
+                            onChange={() => {
+                              setSelectedOrderIds(prev => 
+                                prev.includes(ord.id) ? prev.filter(id => id !== ord.id) : [...prev, ord.id]
+                              );
+                            }}
+                            className="rounded border-slate-350 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                          />
                         </td>
-                        <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{ord.supplier_name}</td>
-                        <td className={`px-6 py-4 text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(ord.date)}</td>
-                        <td className={`px-6 py-4 text-slate-500 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{ord.delivery_date ? formatDate(ord.delivery_date) : '-'}</td>
-                        <td className={`px-6 py-4 text-slate-500 max-w-[200px] truncate ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{ord.description || '-'}</td>
-                        <td className={`px-6 py-4 font-bold text-slate-900 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                          {formatMoney(ord.total_amount)} {t('invoices.currency')}
-                        </td>
-                        <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                          {ord.status === 'converted' ? (
-                            <span className="inline-flex flex-col">
-                              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
-                                {ot('status_converted')}
+                        {visibleColumns.order_number && (
+                          <td className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <span className="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">{ord.order_number}</span>
+                          </td>
+                        )}
+                        {visibleColumns.supplier_name && (
+                          <td className={`px-2 py-0.5 font-bold text-slate-900 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{ord.supplier_name}</td>
+                        )}
+                        {visibleColumns.date && (
+                          <td className={`px-2 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{formatDate(ord.date)}</td>
+                        )}
+                        {visibleColumns.delivery_date && (
+                          <td className={`px-2 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{ord.delivery_date ? formatDate(ord.delivery_date) : '-'}</td>
+                        )}
+                        {visibleColumns.description && (
+                          <td className={`px-2 py-0.5 text-slate-500 whitespace-nowrap max-w-[200px] truncate ${dir === 'rtl' ? 'text-right' : 'text-left'}`} title={ord.description || ord.notes || ''}>
+                            {ord.description || ord.notes || '-'}
+                          </td>
+                        )}
+                        {isMultiCurrencyEnabled && visibleColumns.currency && (
+                          <td className={`px-2 py-0.5 font-bold text-slate-600 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            {ord.currency_id ? (companyCurrencies.find(c => c.id === ord.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP')}
+                          </td>
+                        )}
+                        {isMultiCurrencyEnabled && visibleColumns.foreign_amount && (
+                          <td className={`px-2 py-0.5 font-bold text-slate-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            {ord.currency_id && ord.currency_id !== (companyData?.settings?.currency || 'EGP') ? formatNumber(ord.total_amount) : '-'}
+                          </td>
+                        )}
+                        {visibleColumns.subtotal && (
+                          <td className={`px-2 py-0.5 font-medium text-slate-600 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            {formatMoney(ord.subtotal || ord.total_amount)}
+                          </td>
+                        )}
+                        {visibleColumns.tax_amount && (
+                          <td className={`px-2 py-0.5 font-bold text-slate-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            {formatMoney(ord.tax_amount || 0)}
+                          </td>
+                        )}
+                        {visibleColumns.discount_amount && (
+                          <td className={`px-2 py-0.5 font-bold text-rose-600 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            {ord.discount_amount ? formatMoney(ord.discount_amount) : '-'}
+                          </td>
+                        )}
+                        {visibleColumns.total_amount && (
+                          <td className={`px-2 py-0.5 font-bold text-slate-900 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            {formatMoney(ord.total_amount)} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span>
+                          </td>
+                        )}
+                        {visibleColumns.status && (
+                          <td className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            {ord.status === 'converted' ? (
+                              <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                                <span>{ot('status_converted')}</span>
+                                {ord.invoice_number && <span className="font-mono text-[9px]">({ord.invoice_number})</span>}
                               </span>
-                              <span className="text-[9px] text-emerald-600 font-mono mt-0.5">
-                                {ord.invoice_number}
-                              </span>
-                            </span>
-                          ) : (
-                            <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200">
+                            ) : (
+                              <span className="bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200">
                                 {ot('status_pending')}
-                            </span>
-                          )}
-                        </td>
-                        <td className={`px-6 py-4 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                          <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                              </span>
+                            )}
+                          </td>
+                        )}
+                        {visibleColumns.created_date && (
+                          <td className={`px-2 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            {ord.created_at ? formatDate(ord.created_at.slice(0, 10)) : '-'}
+                          </td>
+                        )}
+                        {visibleColumns.created_time && (
+                          <td className={`px-2 py-0.5 text-slate-400 font-mono text-[11px] whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            {ord.created_at && ord.created_at.length > 11 ? ord.created_at.slice(11, 16) : '-'}
+                          </td>
+                        )}
+                        {visibleColumns.updated_date && (
+                          <td className={`px-2 py-0.5 text-slate-500 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            {ord.updated_at ? formatDate(ord.updated_at.slice(0, 10)) : '-'}
+                          </td>
+                        )}
+                        {visibleColumns.updated_time && (
+                          <td className={`px-2 py-0.5 text-slate-400 font-mono text-[11px] whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            {ord.updated_at && ord.updated_at.length > 11 ? ord.updated_at.slice(11, 16) : '-'}
+                          </td>
+                        )}
+                        <td className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                          <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}>
                             {ord.status !== 'converted' && (
                               <button 
                                 onClick={(e) => handleConvertToInvoice(e, ord)}
-                                className="p-2 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-all"
+                                className="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-all"
                                 title={ot('convert_to_invoice')}
                               >
-                                <ArrowUpRight size={18} />
+                                <ArrowUpRight size={14} />
                               </button>
                             )}
                             <button 
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setViewOrder(ord);
+                                setActivityLogDocumentId(ord.id);
+                                setIsActivityLogOpen(true);
                               }}
-                              className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
-                              title={language === 'ar' ? 'عرض' : 'View'}
+                              className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all no-pdf"
+                              title={t('common.activity_log')}
                             >
-                              <Eye size={18} />
+                              <History size={14} />
+                            </button>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewOrder(ord);
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all no-pdf"
+                              title="عرض"
+                            >
+                              <Eye size={14} />
                             </button>
                             {canEdit && ord.status !== 'converted' && (
                               <button 
@@ -1092,71 +1499,80 @@ export const PurchaseOrders: React.FC = () => {
                                   e.stopPropagation();
                                   openEditModal(ord);
                                 }}
-                                className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                                className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all no-pdf"
+                                title="تعديل"
                               >
-                                <Pencil size={18} />
+                                <Pencil size={14} />
                               </button>
                             )}
                             {canDelete && ord.status !== 'converted' && (
                               <button 
                                 onClick={(e) => handleDeleteClick(e, ord)}
-                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all no-pdf"
+                                title="حذف"
                               >
-                                <Trash2 size={18} />
+                                <Trash2 size={14} />
                               </button>
                             )}
                           </div>
                         </td>
                       </tr>
                     ))}
+                    {filteredOrders.length === 0 && !loading && (
+                      <tr>
+                        <td colSpan={25} className="px-6 py-12 text-center text-slate-500">{t('common.no_data')}</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
-                {filteredOrders.map((ord) => (
+              <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredOrders.map((ord: any) => (
                   <div 
-                    key={ord.id}
+                    key={ord.id} 
                     onClick={() => canEdit && openEditModal(ord)}
-                    className="bg-slate-50 border border-slate-200 rounded-3xl p-6 hover:shadow-lg transition-all duration-300 hover:border-emerald-500/20 group cursor-pointer relative overflow-hidden"
+                    className="p-4 bg-slate-50/50 rounded-2xl border border-slate-200/80 hover:border-emerald-500 hover:shadow-md transition-all group relative cursor-pointer flex flex-col justify-between"
                   >
-                    <div className="flex justify-between items-start mb-4">
-                      <span className="font-mono text-xs bg-emerald-50 px-2 py-1 rounded text-emerald-700 font-bold border border-emerald-100">
-                        {ord.order_number}
-                      </span>
-                      {ord.status === 'converted' ? (
-                        <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
-                          {ot('status_converted')} ({ord.invoice_number})
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                          {ord.order_number}
                         </span>
-                      ) : (
-                        <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
-                          {ot('status_pending')}
-                        </span>
-                      )}
+                        {ord.status === 'converted' ? (
+                          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                            {ot('status_converted')}
+                          </span>
+                        ) : (
+                          <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200">
+                            {ot('status_pending')}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-bold text-slate-900 text-sm mb-1">{ord.supplier_name}</h3>
+                      <p className="text-xs text-slate-500 line-clamp-2 mb-3">{ord.description || '-'}</p>
                     </div>
-                    <h4 className="font-bold text-slate-900 text-lg mb-2">{ord.supplier_name}</h4>
-                    <p className="text-slate-500 text-sm mb-4 line-clamp-2">{ord.description || '-'}</p>
-                    <div className="flex justify-between items-center pt-4 border-t border-slate-200/60 text-xs text-slate-500">
+                    <div className="pt-2 border-t border-slate-200/50 flex items-center justify-between text-xs text-slate-500">
                       <span>{formatDate(ord.date)}</span>
                       <span className="font-bold text-slate-950 text-sm">
-                        {formatMoney(ord.total_amount)} {t('invoices.currency')}
+                        {formatMoney(ord.total_amount)} {(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}
                       </span>
                     </div>
-                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute top-2 left-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       {ord.status !== 'converted' && (
                         <button 
                           onClick={(e) => handleConvertToInvoice(e, ord)}
-                          className="bg-white p-1.5 rounded-lg shadow-sm border border-slate-100 hover:bg-emerald-50 text-emerald-600"
+                          className="bg-white p-1 rounded-lg shadow-sm border border-slate-100 hover:bg-emerald-50 text-emerald-600"
                         >
-                          <ArrowUpRight size={14} />
+                          <ArrowUpRight size={13} />
                         </button>
                       )}
                       {canDelete && ord.status !== 'converted' && (
                         <button 
                           onClick={(e) => handleDeleteClick(e, ord)}
-                          className="bg-white p-1.5 rounded-lg shadow-sm border border-slate-100 hover:bg-red-50 text-red-500"
+                          className="bg-white p-1 rounded-lg shadow-sm border border-slate-100 hover:bg-red-50 text-red-500"
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={13} />
                         </button>
                       )}
                     </div>
@@ -1164,14 +1580,6 @@ export const PurchaseOrders: React.FC = () => {
                 ))}
               </div>
             )}
-            
-            <PaginationControls
-              page={page}
-              limit={limit}
-              total={totalRecords}
-              onPageChange={setPage}
-              onLimitChange={setLimit}
-            />
           </div>
         </>
       ) : (

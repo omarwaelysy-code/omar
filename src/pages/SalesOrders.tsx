@@ -135,8 +135,13 @@ export const SalesOrders: React.FC = () => {
       status: 120,
       currency: 80,
       foreign_amount: 140,
+      subtotal: 100,
+      tax_amount: 85,
+      discount_amount: 85,
       created_date: 110,
       created_time: 90,
+      updated_date: 110,
+      updated_time: 90,
     };
   });
 
@@ -154,11 +159,16 @@ export const SalesOrders: React.FC = () => {
       delivery_date: true,
       description: true,
       total_amount: true,
+      subtotal: true,
+      tax_amount: true,
+      discount_amount: true,
       status: true,
       currency: false,
       foreign_amount: false,
       created_date: false,
       created_time: false,
+      updated_date: false,
+      updated_time: false,
     };
   });
 
@@ -1125,8 +1135,13 @@ export const SalesOrders: React.FC = () => {
     status: ot('column_status'),
     currency: ot('currency'),
     foreign_amount: language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount',
+    subtotal: language === 'ar' ? 'قبل الضريبة' : 'Subtotal',
+    tax_amount: language === 'ar' ? 'الضريبة' : 'Tax',
+    discount_amount: language === 'ar' ? 'الخصم' : 'Discount',
     created_date: language === 'ar' ? 'تاريخ الإنشاء' : 'Created Date',
     created_time: language === 'ar' ? 'وقت الإنشاء' : 'Created Time',
+    updated_date: language === 'ar' ? 'تاريخ آخر تعديل' : 'Last Modified Date',
+    updated_time: language === 'ar' ? 'وقت آخر تعديل' : 'Last Modified Time',
   };
 
   const totalOrdersAmount = Number(serverSummary.total_amount ?? orders.reduce((sum, ord) => sum + Number(ord.total_amount || 0), 0));
@@ -1454,6 +1469,51 @@ export const SalesOrders: React.FC = () => {
                           {renderResizeHandles('foreign_amount')}
                         </th>
                       )}
+                      {visibleColumns.subtotal && (
+                        <th 
+                          style={{ width: columnWidths.subtotal || 100, minWidth: columnWidths.subtotal || 100 }}
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('subtotal')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'قبل الضريبة' : 'Subtotal'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'subtotal' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('subtotal')}
+                        </th>
+                      )}
+                      {visibleColumns.tax_amount && (
+                        <th 
+                          style={{ width: columnWidths.tax_amount || 85, minWidth: columnWidths.tax_amount || 85 }}
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('tax_amount')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'الضريبة' : 'Tax'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'tax_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('tax_amount')}
+                        </th>
+                      )}
+                      {visibleColumns.discount_amount && (
+                        <th 
+                          style={{ width: columnWidths.discount_amount || 85, minWidth: columnWidths.discount_amount || 85 }}
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('discount_amount')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'الخصم' : 'Discount'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'discount_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('discount_amount')}
+                        </th>
+                      )}
                       {visibleColumns.total_amount && (
                         <th 
                           style={{ width: columnWidths.total_amount, minWidth: columnWidths.total_amount }}
@@ -1508,6 +1568,36 @@ export const SalesOrders: React.FC = () => {
                             </span>
                           </div>
                           {renderResizeHandles('created_time')}
+                        </th>
+                      )}
+                      {visibleColumns.updated_date && (
+                        <th 
+                          style={{ width: columnWidths.updated_date || 110, minWidth: columnWidths.updated_date || 110 }}
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('updated_at')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'تاريخ التعديل' : 'Updated Date'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'updated_at' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('updated_date')}
+                        </th>
+                      )}
+                      {visibleColumns.updated_time && (
+                        <th 
+                          style={{ width: columnWidths.updated_time || 90, minWidth: columnWidths.updated_time || 90 }}
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('updated_at')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'وقت التعديل' : 'Updated Time'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'updated_at' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('updated_time')}
                         </th>
                       )}
                       <th className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
@@ -1608,7 +1698,52 @@ export const SalesOrders: React.FC = () => {
                                 {isForeign ? formatMoney(ord.total_amount) : '-'}
                               </td>
                             )}
-                            {visibleColumns.total_amount && (
+                            {visibleColumns.subtotal && (
+                        <th 
+                          style={{ width: columnWidths.subtotal || 100, minWidth: columnWidths.subtotal || 100 }}
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('subtotal')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'قبل الضريبة' : 'Subtotal'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'subtotal' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('subtotal')}
+                        </th>
+                      )}
+                      {visibleColumns.tax_amount && (
+                        <th 
+                          style={{ width: columnWidths.tax_amount || 85, minWidth: columnWidths.tax_amount || 85 }}
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('tax_amount')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'الضريبة' : 'Tax'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'tax_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('tax_amount')}
+                        </th>
+                      )}
+                      {visibleColumns.discount_amount && (
+                        <th 
+                          style={{ width: columnWidths.discount_amount || 85, minWidth: columnWidths.discount_amount || 85 }}
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`}
+                          onClick={() => handleSort('discount_amount')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'الخصم' : 'Discount'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'discount_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('discount_amount')}
+                        </th>
+                      )}
+                      {visibleColumns.total_amount && (
                               <td style={{ width: columnWidths.total_amount, minWidth: columnWidths.total_amount }} className={`px-2 py-0.5 font-bold text-slate-900 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                                 {formatMoney(ord.total_amount)} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || 'EGP').toUpperCase()}</span>
                               </td>
