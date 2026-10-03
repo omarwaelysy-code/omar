@@ -346,355 +346,313 @@ export const WarehouseTransfers: React.FC = () => {
 
   return (
     <div className={`p-3 space-y-3 ${dir === 'rtl' ? 'rtl' : 'ltr'}`} dir={dir}>
-      {/* Header Panel */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200 shadow-sm">
-        <div>
-          <h1 className="text-base md:text-lg font-black text-slate-900 tracking-tight flex items-center gap-1.5">
-            <ArrowLeftRight className="text-emerald-500" size={18} />
-            {t('warehouse_transfers.title')}
-          </h1>
-          <p className="text-slate-500 font-medium mt-0.5 text-[11px]">{t('warehouse_transfers.subtitle')}</p>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <ExportButtons
-            onExportExcel={handleExportExcel}
-            onExportPDF={handleExportPDF}
-            onPrint={() => printElement(tableRef.current, 'جدول تحويلات المخازن')}
-          />
-          <button
-            onClick={handleOpenCreateModal}
-            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg font-bold text-xs shadow-sm hover:shadow hover:scale-[1.01] active:scale-[0.98] transition-all"
-          >
-            <Plus size={15} />
-            {t('warehouse_transfers.add')}
-          </button>
-        </div>
-      </div>
+      {viewTransfer ? (
+        /* View Transfer Inline Screen */
+        <div className="space-y-3">
+          {/* Header Panel */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setViewTransfer(null)}
+                className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all"
+                title={language === 'ar' ? 'الرجوع للقائمة' : 'Back to list'}
+              >
+                {dir === 'rtl' ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+              </button>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full font-bold text-[10px] uppercase">
+                    {language === 'ar' ? 'سند تحويل مخزني' : 'Transfer Document'}
+                  </span>
+                  <h1 className="text-base font-black text-slate-900 tracking-tight flex items-center gap-1">
+                    <ArrowLeftRight className="text-emerald-500" size={16} />
+                    {viewTransfer.transfer_number}
+                  </h1>
+                </div>
+                <p className="text-slate-500 font-medium text-[11px] mt-0.5">
+                  {language === 'ar' ? 'تفاصيل ومعاينة عملية التحويل بين المخازن' : 'Warehouse transfer details'}
+                </p>
+              </div>
+            </div>
 
-      {/* Filter and search bar */}
-      <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200 shadow-sm space-y-2">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-          <div className="relative col-span-1 md:col-span-2">
-            <Search className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={15} />
-            <input
-              type="text"
-              placeholder={t('warehouse_transfers.search_placeholder')}
-              className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-bold text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all`}
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
-            />
-          </div>
-          
-          <div>
-            <input
-              type="date"
-              className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-bold text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
-              value={dateFrom}
-              onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
-            />
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                onClick={() => handleCopyTransfer(viewTransfer)}
+                className="px-2.5 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
+                title={language === 'ar' ? 'نسخ المستند كمسودة جديدة' : 'Copy Document'}
+              >
+                <Copy size={13} />
+                <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
+              </button>
+              <button
+                onClick={() => handleExportDocPDF(viewTransfer)}
+                className="px-2.5 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
+                title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
+              >
+                <FileText size={13} />
+                <span>{language === 'ar' ? 'تصدير PDF' : 'Export PDF'}</span>
+              </button>
+              <button
+                onClick={() => handleExportDocExcel(viewTransfer)}
+                className="px-2.5 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
+                title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
+              >
+                <FileSpreadsheet size={13} />
+                <span>{language === 'ar' ? 'تصدير إكسيل' : 'Export Excel'}</span>
+              </button>
+              <button
+                onClick={() => printElement(document.getElementById('view-transfer-content') || document.body, `سند تحويل مخزني ${viewTransfer.transfer_number}`)}
+                className="p-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg transition-all shadow-sm active:scale-95"
+                title={language === 'ar' ? 'طباعة' : 'Print'}
+              >
+                <Printer size={15} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewTransfer(null)}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition-all"
+              >
+                {t('common.close')}
+              </button>
+            </div>
           </div>
 
-          <div>
-            <input
-              type="date"
-              className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-bold text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
-              value={dateTo}
-              onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
-            />
+          {/* Details Content */}
+          <div id="view-transfer-content" className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm space-y-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 p-2.5 bg-slate-50 rounded-xl text-xs">
+              <div>
+                <span className="block text-[10px] font-bold text-slate-400 uppercase">{t('warehouse_transfers.column_date')}</span>
+                <span className="text-slate-800 font-bold block mt-0.5">{formatDate(viewTransfer.date)}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold text-slate-400 uppercase">{t('warehouse_transfers.column_from_warehouse')}</span>
+                <span className="text-rose-600 font-bold block mt-0.5">{viewTransfer.from_warehouse_name}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold text-slate-400 uppercase">{t('warehouse_transfers.column_to_warehouse')}</span>
+                <span className="text-emerald-600 font-bold block mt-0.5">{viewTransfer.to_warehouse_name}</span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold text-slate-400 uppercase">{language === 'ar' ? 'رقم القيد' : 'Journal Entry'}</span>
+                <span className="text-slate-400 font-mono block mt-0.5">-</span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold text-slate-400 uppercase">{language === 'ar' ? 'بواسطة' : 'Created By'}</span>
+                <span className="text-slate-800 font-bold block mt-0.5">{viewTransfer.created_by || '-'}</span>
+              </div>
+            </div>
+
+            {viewTransfer.description && (
+              <div className="space-y-0.5">
+                <span className="block text-[10px] font-bold text-slate-400 uppercase">{language === 'ar' ? 'ملاحظات / بيان' : 'Notes'}</span>
+                <p className="text-slate-700 text-xs bg-slate-50/70 p-2 rounded-lg border border-slate-200">{viewTransfer.description}</p>
+              </div>
+            )}
+
+            {/* Items Grid */}
+            <div className="space-y-1.5">
+              <h3 className="text-xs font-bold text-slate-700">{language === 'ar' ? 'تفاصيل الأصناف المحولة' : 'Transferred Items'}</h3>
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <table className="w-full border-collapse text-right text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-[11px]">
+                      <th className="px-2.5 py-1.5 font-bold text-slate-600 uppercase">{language === 'ar' ? 'كود الصنف' : 'Code'}</th>
+                      <th className="px-2.5 py-1.5 font-bold text-slate-600 uppercase">{language === 'ar' ? 'اسم الصنف' : 'Product Name'}</th>
+                      <th className="px-2.5 py-1.5 font-bold text-slate-600 uppercase text-center">{language === 'ar' ? 'الكمية' : 'Qty'}</th>
+                      <th className="px-2.5 py-1.5 font-bold text-slate-600 uppercase">{language === 'ar' ? 'الوحدة' : 'Unit'}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {((viewTransfer as any).items || []).map((item: WarehouseTransferItem) => {
+                      const prod = products.find(p => p.id === item.product_id);
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-50/50">
+                          <td className="px-2.5 py-1 font-mono font-bold text-slate-600">{item.product_code || '-'}</td>
+                          <td className="px-2.5 py-1 font-bold text-slate-800">{item.product_name}</td>
+                          <td className="px-2.5 py-1 font-bold text-slate-700 text-center">{formatNumber(item.quantity)}</td>
+                          <td className="px-2.5 py-1 font-medium text-slate-500">{prod?.unit || '-'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Attachments */}
+            {viewTransfer.attachments && viewTransfer.attachments.length > 0 && (
+              <div className="pt-2 border-t border-slate-100">
+                <AttachmentsManager
+                  attachments={viewTransfer.attachments}
+                  onChange={() => {}}
+                  readOnly={true}
+                  title={language === 'ar' ? 'المستندات والمرفقات' : 'Documents & Attachments'}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      ) : isModalOpen ? (
+        /* Create / Edit Inline Screen */
+        <div className="space-y-3">
+          {/* Header Panel */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { setIsModalOpen(false); setEditingTransfer(null); }}
+                className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all"
+                title={language === 'ar' ? 'الرجوع للقائمة' : 'Back to list'}
+              >
+                {dir === 'rtl' ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+              </button>
+              <div>
+                <h1 className="text-base md:text-lg font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+                  <ArrowLeftRight className="text-emerald-500" size={18} />
+                  {editingTransfer ? t('warehouse_transfers.edit') : t('warehouse_transfers.add')}
+                </h1>
+                <p className="text-slate-500 font-medium mt-0.5 text-[11px]">
+                  {editingTransfer 
+                    ? (language === 'ar' ? 'تعديل تفاصيل التحويل المخزني رقم ' + editingTransfer.transfer_number : 'Modify details of transfer #' + editingTransfer.transfer_number) 
+                    : (language === 'ar' ? 'إنشاء عملية تحويل جديدة' : 'Create a new warehouse transfer')}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { setIsModalOpen(false); setEditingTransfer(null); }}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-lg text-xs transition-all"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="submit"
+                form="warehouse-transfer-form"
+                className="flex items-center justify-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-lg text-xs transition-all shadow-sm"
+              >
+                <Save size={14} />
+                {t('common.save')}
+              </button>
+            </div>
           </div>
 
-          <div className="flex gap-1.5">
-            <select
-              className="w-1/2 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-bold text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
-              value={filterFromWh}
-              onChange={(e) => { setFilterFromWh(e.target.value); setPage(1); }}
-            >
-              <option value="">{language === 'ar' ? 'من مخزن...' : 'From warehouse...'}</option>
-              {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-            </select>
-            <select
-              className="w-1/2 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-bold text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
-              value={filterToWh}
-              onChange={(e) => { setFilterToWh(e.target.value); setPage(1); }}
-            >
-              <option value="">{language === 'ar' ? 'إلى مخزن...' : 'To warehouse...'}</option>
-              {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-            </select>
-          </div>
-        </div>
-      </div>
+          {/* Form Content */}
+          <form id="warehouse-transfer-form" onSubmit={handleSubmit} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm space-y-3">
+            {/* Top row fields */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-700 px-0.5">
+                  {t('warehouse_transfers.form_date')} <span className="text-rose-500 font-bold">*</span>
+                </label>
+                <div className="relative">
+                  <Calendar className="absolute right-2.5 top-2 text-slate-400" size={15} />
+                  <input
+                    required
+                    type="date"
+                    className="w-full pr-8 pl-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-bold text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                    value={formData.date}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  />
+                </div>
+              </div>
 
-      {/* Main Table / Grid representation */}
-      {loading ? (
-        <div className="flex items-center justify-center h-40 bg-white rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex flex-col items-center gap-2">
-            <div className="w-7 h-7 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-slate-500 font-bold text-xs">{t('common.loading')}</p>
-          </div>
-        </div>
-      ) : transfers.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-10 bg-white rounded-xl border border-slate-200 shadow-sm text-center space-y-1.5">
-          <div className="w-10 h-10 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center">
-            <ArrowLeftRight size={20} />
-          </div>
-          <div>
-            <h3 className="text-xs font-bold text-slate-700">{t('common.no_data')}</h3>
-            <p className="text-slate-400 text-[11px]">
-              {language === 'ar' ? 'لم يتم العثور على أي عمليات تحويل مخزني مطابقة.' : 'No warehouse transfers found.'}
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div ref={tableRef} className="overflow-x-auto">
-            <table className="w-full border-collapse text-right text-xs">
-              <thead>
-                <tr className="bg-slate-50/90 border-b border-slate-200">
-                  <th 
-                    onClick={() => handleSort('transfer_number')}
-                    className="px-2 py-1.5 font-bold text-slate-600 uppercase cursor-pointer hover:text-emerald-600 transition-colors text-[11px]"
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-700 px-0.5">
+                  {t('warehouse_transfers.form_from_warehouse')} <span className="text-rose-500 font-bold">*</span>
+                </label>
+                <div className="relative">
+                  <Home className="absolute right-2.5 top-2 text-rose-500" size={15} />
+                  <select
+                    required
+                    className="w-full pr-8 pl-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-bold text-xs appearance-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                    value={formData.from_warehouse_id}
+                    onChange={(e) => setFormData({ ...formData, from_warehouse_id: e.target.value })}
                   >
-                    {t('warehouse_transfers.column_number')}
-                  </th>
-                  <th 
-                    onClick={() => handleSort('date')}
-                    className="px-2 py-1.5 font-bold text-slate-600 uppercase cursor-pointer hover:text-emerald-600 transition-colors text-[11px]"
+                    <option value="">{t('common.select_category')}</option>
+                    {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-700 px-0.5">
+                  {t('warehouse_transfers.form_to_warehouse')} <span className="text-rose-500 font-bold">*</span>
+                </label>
+                <div className="relative">
+                  <Home className="absolute right-2.5 top-2 text-emerald-500" size={15} />
+                  <select
+                    required
+                    className="w-full pr-8 pl-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-bold text-xs appearance-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                    value={formData.to_warehouse_id}
+                    onChange={(e) => setFormData({ ...formData, to_warehouse_id: e.target.value })}
                   >
-                    {t('warehouse_transfers.column_date')}
-                  </th>
-                  <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-[11px]">
-                    {t('warehouse_transfers.column_from_warehouse')}
-                  </th>
-                  <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-[11px]">
-                    {t('warehouse_transfers.column_to_warehouse')}
-                  </th>
-                  <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-[11px]">
-                    {t('warehouse_transfers.column_items_count')}
-                  </th>
-                  <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-[11px]">
-                    {language === 'ar' ? 'رقم القيد' : 'Journal Entry'}
-                  </th>
-                  <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-[11px]">
-                    {language === 'ar' ? 'البيان' : 'Description'}
-                  </th>
-                  <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-center w-24 text-[11px]">
-                    {t('common.actions')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {transfers.map((tItem) => (
-                  <tr key={tItem.id} className="hover:bg-slate-50/70 transition-colors group">
-                    <td className="px-2 py-1 font-mono font-bold text-slate-900 text-xs">
-                      {tItem.transfer_number}
-                    </td>
-                    <td className="px-2 py-1 font-medium text-slate-500 whitespace-nowrap text-xs">
-                      {formatDate(tItem.date)}
-                    </td>
-                    <td className="px-2 py-1 font-bold text-rose-600 whitespace-nowrap text-xs">
-                      {tItem.from_warehouse_name}
-                    </td>
-                    <td className="px-2 py-1 font-bold text-emerald-600 whitespace-nowrap text-xs">
-                      {tItem.to_warehouse_name}
-                    </td>
-                    <td className="px-2 py-1 font-bold text-slate-700 text-xs">
-                      {(tItem as any).items_count || 1}
-                    </td>
-                    <td className="px-2 py-1 font-mono text-slate-400 text-xs">
-                      -
-                    </td>
-                    <td className="px-2 py-1 font-normal text-slate-500 max-w-[180px] truncate text-xs" title={tItem.description}>
-                      {tItem.description || '-'}
-                    </td>
-                    <td className="px-2 py-1 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => handleOpenViewModal(tItem)}
-                          title={language === 'ar' ? 'عرض التفاصيل' : 'View details'}
-                          className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
-                        >
-                          <Eye size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleOpenEditModal(tItem)}
-                          title={language === 'ar' ? 'تعديل' : 'Edit'}
-                          className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleOpenDeleteModal(tItem.id)}
-                          title={language === 'ar' ? 'حذف' : 'Delete'}
-                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          
-          {/* Pagination Controls */}
-          {totalRecords > limit && (
-            <div className="p-3 border-t border-slate-100">
-              <PaginationControls
-                page={page}
-                limit={limit}
-                total={totalRecords}
-                onPageChange={setPage}
-                onLimitChange={setLimit}
+                    <option value="">{t('common.select_category')}</option>
+                    {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div className="space-y-1">
+              <label className="block text-[11px] font-bold text-slate-700 px-0.5">
+                {language === 'ar' ? 'ملاحظات / بيان' : 'Notes / Remarks'}
+              </label>
+              <textarea
+                rows={2}
+                className="w-full px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-normal text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all resize-none"
+                placeholder={language === 'ar' ? 'اكتب أي ملاحظات إضافية هنا...' : 'Write any additional notes here...'}
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               />
             </div>
-          )}
-        </div>
-      )}
 
-      {/* Create / Edit Modal */}
-      <AnimatePresence>
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 bg-slate-900/60 backdrop-blur-md">
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
-            >
-              {/* Modal Header */}
-              <div className="flex items-center justify-between p-4 bg-slate-50 border-b border-slate-100">
-                <div>
-                  <h2 className="text-base md:text-lg font-black text-slate-800 flex items-center gap-2">
-                    <ArrowLeftRight className="text-emerald-500" size={18} />
-                    {editingTransfer ? t('warehouse_transfers.edit') : t('warehouse_transfers.add')}
-                  </h2>
-                  <p className="text-slate-400 font-medium text-xs mt-0.5">
-                    {editingTransfer ? (language === 'ar' ? 'تعديل تفاصيل التحويل المخزني رقم ' + editingTransfer.transfer_number : 'Modify details of transfer #' + editingTransfer.transfer_number) : (language === 'ar' ? 'إنشاء عملية تحويل جديدة' : 'Create a new warehouse transfer')}
-                  </p>
-                </div>
+            {/* Items Section */}
+            <div className="space-y-2 pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Layers size={14} className="text-emerald-500" />
+                  {t('warehouse_transfers.form_items')}
+                </h3>
                 <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
+                  type="button"
+                  onClick={handleAddItemRow}
+                  className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 font-bold text-xs rounded-lg transition-all"
                 >
-                  <X size={18} />
+                  <Plus size={13} />
+                  {language === 'ar' ? 'إضافة صنف' : 'Add Item'}
                 </button>
               </div>
 
-              {/* Modal Body */}
-              <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {/* Date Input */}
-                  <div className="space-y-1">
-                    <label className="block text-xs font-bold text-slate-700 px-0.5">
-                      {t('warehouse_transfers.form_date')} <span className="text-rose-500 font-bold">*</span>
-                    </label>
-                    <div className="relative group">
-                      <Calendar className="absolute right-3 top-2.5 text-slate-400" size={16} />
-                      <input
-                        required
-                        type="date"
-                        className="w-full pr-9 pl-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-800 font-bold text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
-                        value={formData.date}
-                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  {/* From Warehouse */}
-                  <div className="space-y-1">
-                    <label className="block text-xs font-bold text-slate-700 px-0.5">
-                      {t('warehouse_transfers.form_from_warehouse')} <span className="text-rose-500 font-bold">*</span>
-                    </label>
-                    <div className="relative group">
-                      <Home className="absolute right-3 top-2.5 text-rose-500" size={16} />
-                      <select
-                        required
-                        className="w-full pr-9 pl-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-800 font-bold text-xs appearance-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
-                        value={formData.from_warehouse_id}
-                        onChange={(e) => setFormData({ ...formData, from_warehouse_id: e.target.value })}
-                      >
-                        <option value="">{t('common.select_category')}</option>
-                        {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* To Warehouse */}
-                  <div className="space-y-1">
-                    <label className="block text-xs font-bold text-slate-700 px-0.5">
-                      {t('warehouse_transfers.form_to_warehouse')} <span className="text-rose-500 font-bold">*</span>
-                    </label>
-                    <div className="relative group">
-                      <Home className="absolute right-3 top-2.5 text-emerald-500" size={16} />
-                      <select
-                        required
-                        className="w-full pr-9 pl-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-800 font-bold text-xs appearance-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
-                        value={formData.to_warehouse_id}
-                        onChange={(e) => setFormData({ ...formData, to_warehouse_id: e.target.value })}
-                      >
-                        <option value="">{t('common.select_category')}</option>
-                        {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                      </select>
-                    </div>
-                  </div>
+              {items.length === 0 ? (
+                <div className="text-center py-5 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                  <p className="text-slate-400 text-xs">
+                    {language === 'ar' ? 'لا يوجد أي أصناف مضافة. انقر فوق إضافة صنف للبدء.' : 'No items added. Click Add Item to start.'}
+                  </p>
                 </div>
-
-                {/* Description input */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-slate-700 px-0.5">
-                    {language === 'ar' ? 'ملاحظات / بيان' : 'Notes / Remarks'}
-                  </label>
-                  <textarea
-                    rows={2}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-800 font-normal text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all resize-none"
-                    placeholder={language === 'ar' ? 'اكتب أي ملاحظات إضافية هنا...' : 'Write any additional notes here...'}
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  />
-                </div>
-
-                {/* Items Section */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                    <h3 className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
-                      <Layers size={16} className="text-emerald-500" />
-                      {t('warehouse_transfers.form_items')}
-                    </h3>
-                    <button
-                      type="button"
-                      onClick={handleAddItemRow}
-                      className="flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 font-bold text-xs rounded-lg transition-all"
-                    >
-                      <Plus size={14} />
-                      {language === 'ar' ? 'إضافة صنف' : 'Add Item'}
-                    </button>
-                  </div>
-
-                  {items.length === 0 ? (
-                    <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                      <p className="text-slate-400 text-xs">
-                        {language === 'ar' ? 'لا يوجد أي أصناف مضافة. انقر فوق إضافة صنف للبدء.' : 'No items added. Click Add Item to start.'}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
+              ) : (
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full border-collapse text-right text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600">
+                        <th className="px-2.5 py-1.5 w-10 text-center">#</th>
+                        <th className="px-2.5 py-1.5">{language === 'ar' ? 'الصنف' : 'Product'}</th>
+                        <th className="px-2.5 py-1.5 w-36">{language === 'ar' ? 'الكمية' : 'Quantity'}</th>
+                        <th className="px-2.5 py-1.5 w-12 text-center">{t('common.actions')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
                       {items.map((item, index) => {
                         const product = products.find(p => p.id === item.product_id);
                         return (
-                          <div 
-                            key={index}
-                            className="flex flex-col md:flex-row gap-2 p-2.5 bg-slate-50 rounded-xl border border-slate-200 items-start md:items-center group"
-                          >
-                            <div className="w-6 h-6 rounded-full bg-slate-200 font-bold text-slate-600 text-xs flex items-center justify-center shrink-0">
-                              {index + 1}
-                            </div>
-
-                            {/* Product Selector */}
-                            <div className="flex-1 w-full">
+                          <tr key={index} className="hover:bg-slate-50/50">
+                            <td className="px-2.5 py-1 text-center font-bold text-slate-400 text-xs">{index + 1}</td>
+                            <td className="px-2.5 py-1">
                               <select
                                 required
-                                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg outline-none font-bold text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500 transition-all appearance-none"
+                                className="w-full px-2 py-1 bg-white border border-slate-200 rounded-lg outline-none font-bold text-xs text-slate-800 focus:ring-1 focus:ring-emerald-500 transition-all appearance-none"
                                 value={item.product_id}
                                 onChange={(e) => handleItemChange(index, 'product_id', e.target.value)}
                               >
@@ -705,229 +663,283 @@ export const WarehouseTransfers: React.FC = () => {
                                   </option>
                                 ))}
                               </select>
-                            </div>
-
-                            {/* Quantity Input */}
-                            <div className="w-full md:w-32 flex items-center bg-white border border-slate-200 rounded-lg px-2.5 shrink-0">
-                              <input
-                                required
-                                type="number"
-                                min={0.01}
-                                step="any"
-                                placeholder={language === 'ar' ? 'الكمية' : 'Qty'}
-                                className="w-full py-1.5 outline-none font-bold text-xs text-slate-800"
-                                value={item.quantity || ''}
-                                onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value) || 0)}
-                              />
-                              {product?.unit && (
-                                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
-                                  {product.unit}
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Remove action */}
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveItemRow(index)}
-                              className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all self-end md:self-auto"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
+                            </td>
+                            <td className="px-2.5 py-1">
+                              <div className="flex items-center bg-white border border-slate-200 rounded-lg px-2">
+                                <input
+                                  required
+                                  type="number"
+                                  min={0.01}
+                                  step="any"
+                                  placeholder={language === 'ar' ? 'الكمية' : 'Qty'}
+                                  className="w-full py-1 outline-none font-bold text-xs text-slate-800"
+                                  value={item.quantity || ''}
+                                  onChange={(e) => handleItemChange(index, 'quantity', parseFloat(e.target.value) || 0)}
+                                />
+                                {product?.unit && (
+                                  <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1 py-0.5 rounded shrink-0">
+                                    {product.unit}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-2.5 py-1 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveItemRow(index)}
+                                className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded transition-all"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          </tr>
                         );
                       })}
-                    </div>
-                  )}
+                    </tbody>
+                  </table>
                 </div>
+              )}
+            </div>
 
-                {/* Attachments */}
-                <div className="pt-3 border-t border-slate-100">
-                  <AttachmentsManager
-                    attachments={attachments}
-                    onChange={setAttachments}
-                    title={language === 'ar' ? 'المستندات والمرفقات المؤيدة للتحويل المخزني' : 'Transfer Supporting Documents'}
-                    subtitle={language === 'ar' ? 'أذون الصرف/الاستلام، بوالص الشحن، أو ملفات PDF/أوفيس' : 'Waybills, delivery notes, or PDF/Office docs'}
+            {/* Attachments */}
+            <div className="pt-2 border-t border-slate-100">
+              <AttachmentsManager
+                attachments={attachments}
+                onChange={setAttachments}
+                title={language === 'ar' ? 'المستندات والمرفقات المؤيدة للتحويل المخزني' : 'Transfer Supporting Documents'}
+                subtitle={language === 'ar' ? 'أذون الصرف/الاستلام، بوالص الشحن، أو ملفات PDF/أوفيس' : 'Waybills, delivery notes, or PDF/Office docs'}
+              />
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => { setIsModalOpen(false); setEditingTransfer(null); }}
+                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-lg text-xs transition-all"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="submit"
+                className="flex items-center justify-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-lg text-xs transition-all shadow-sm"
+              >
+                <Save size={14} />
+                {t('common.save')}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : (
+        /* Main List / Table Screen */
+        <>
+          {/* Header Panel */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200 shadow-sm">
+            <div>
+              <h1 className="text-base md:text-lg font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+                <ArrowLeftRight className="text-emerald-500" size={18} />
+                {t('warehouse_transfers.title')}
+              </h1>
+              <p className="text-slate-500 font-medium mt-0.5 text-[11px]">{t('warehouse_transfers.subtitle')}</p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <ExportButtons
+                onExportExcel={handleExportExcel}
+                onExportPDF={handleExportPDF}
+                onPrint={() => printElement(tableRef.current, 'جدول تحويلات المخازن')}
+              />
+              <button
+                onClick={handleOpenCreateModal}
+                className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg font-bold text-xs shadow-sm hover:shadow hover:scale-[1.01] active:scale-[0.98] transition-all"
+              >
+                <Plus size={15} />
+                {t('warehouse_transfers.add')}
+              </button>
+            </div>
+          </div>
+
+          {/* Filter and search bar */}
+          <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200 shadow-sm space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+              <div className="relative col-span-1 md:col-span-2">
+                <Search className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={15} />
+                <input
+                  type="text"
+                  placeholder={t('warehouse_transfers.search_placeholder')}
+                  className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-bold text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all`}
+                  value={searchTerm}
+                  onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+                />
+              </div>
+              
+              <div>
+                <input
+                  type="date"
+                  className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-bold text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                  value={dateFrom}
+                  onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+                />
+              </div>
+
+              <div>
+                <input
+                  type="date"
+                  className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-bold text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                  value={dateTo}
+                  onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+                />
+              </div>
+
+              <div className="flex gap-1.5">
+                <select
+                  className="w-1/2 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-bold text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                  value={filterFromWh}
+                  onChange={(e) => { setFilterFromWh(e.target.value); setPage(1); }}
+                >
+                  <option value="">{language === 'ar' ? 'من مخزن...' : 'From warehouse...'}</option>
+                  {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+                <select
+                  className="w-1/2 px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-bold text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                  value={filterToWh}
+                  onChange={(e) => { setFilterToWh(e.target.value); setPage(1); }}
+                >
+                  <option value="">{language === 'ar' ? 'إلى مخزن...' : 'To warehouse...'}</option>
+                  {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Table / Grid representation */}
+          {loading ? (
+            <div className="flex items-center justify-center h-40 bg-white rounded-xl border border-slate-200 shadow-sm">
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-7 h-7 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-slate-500 font-bold text-xs">{t('common.loading')}</p>
+              </div>
+            </div>
+          ) : transfers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 bg-white rounded-xl border border-slate-200 shadow-sm text-center space-y-1.5">
+              <div className="w-10 h-10 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center">
+                <ArrowLeftRight size={20} />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-slate-700">{t('common.no_data')}</h3>
+                <p className="text-slate-400 text-[11px]">
+                  {language === 'ar' ? 'لم يتم العثور على أي عمليات تحويل مخزني مطابقة.' : 'No warehouse transfers found.'}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div ref={tableRef} className="overflow-x-auto">
+                <table className="w-full border-collapse text-right text-xs">
+                  <thead>
+                    <tr className="bg-slate-50/90 border-b border-slate-200">
+                      <th 
+                        onClick={() => handleSort('transfer_number')}
+                        className="px-2 py-1.5 font-bold text-slate-600 uppercase cursor-pointer hover:text-emerald-600 transition-colors text-[11px]"
+                      >
+                        {t('warehouse_transfers.column_number')}
+                      </th>
+                      <th 
+                        onClick={() => handleSort('date')}
+                        className="px-2 py-1.5 font-bold text-slate-600 uppercase cursor-pointer hover:text-emerald-600 transition-colors text-[11px]"
+                      >
+                        {t('warehouse_transfers.column_date')}
+                      </th>
+                      <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-[11px]">
+                        {t('warehouse_transfers.column_from_warehouse')}
+                      </th>
+                      <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-[11px]">
+                        {t('warehouse_transfers.column_to_warehouse')}
+                      </th>
+                      <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-[11px]">
+                        {t('warehouse_transfers.column_items_count')}
+                      </th>
+                      <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-[11px]">
+                        {language === 'ar' ? 'رقم القيد' : 'Journal Entry'}
+                      </th>
+                      <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-[11px]">
+                        {language === 'ar' ? 'البيان' : 'Description'}
+                      </th>
+                      <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-center w-24 text-[11px]">
+                        {t('common.actions')}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {transfers.map((tItem) => (
+                      <tr key={tItem.id} className="hover:bg-slate-50/70 transition-colors group">
+                        <td className="px-2 py-1 font-mono font-bold text-slate-900 text-xs">
+                          {tItem.transfer_number}
+                        </td>
+                        <td className="px-2 py-1 font-medium text-slate-500 whitespace-nowrap text-xs">
+                          {formatDate(tItem.date)}
+                        </td>
+                        <td className="px-2 py-1 font-bold text-rose-600 whitespace-nowrap text-xs">
+                          {tItem.from_warehouse_name}
+                        </td>
+                        <td className="px-2 py-1 font-bold text-emerald-600 whitespace-nowrap text-xs">
+                          {tItem.to_warehouse_name}
+                        </td>
+                        <td className="px-2 py-1 font-bold text-slate-700 text-xs">
+                          {(tItem as any).items_count || 1}
+                        </td>
+                        <td className="px-2 py-1 font-mono text-slate-400 text-xs">
+                          -
+                        </td>
+                        <td className="px-2 py-1 font-normal text-slate-500 max-w-[180px] truncate text-xs" title={tItem.description}>
+                          {tItem.description || '-'}
+                        </td>
+                        <td className="px-2 py-1 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => handleOpenViewModal(tItem)}
+                              title={language === 'ar' ? 'عرض التفاصيل' : 'View details'}
+                              className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                            >
+                              <Eye size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleOpenEditModal(tItem)}
+                              title={language === 'ar' ? 'تعديل' : 'Edit'}
+                              className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleOpenDeleteModal(tItem.id)}
+                              title={language === 'ar' ? 'حذف' : 'Delete'}
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Pagination Controls */}
+              {totalRecords > limit && (
+                <div className="p-3 border-t border-slate-100">
+                  <PaginationControls
+                    page={page}
+                    limit={limit}
+                    total={totalRecords}
+                    onPageChange={setPage}
+                    onLimitChange={setLimit}
                   />
                 </div>
-
-                {/* Modal Footer Buttons */}
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-xs transition-all"
-                  >
-                    {t('common.cancel')}
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex items-center justify-center gap-1.5 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-all shadow-sm"
-                  >
-                    <Save size={15} />
-                    {t('common.save')}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* View Modal */}
-      <AnimatePresence>
-        {viewTransfer && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 bg-slate-900/60 backdrop-blur-md">
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-2xl overflow-hidden"
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between p-3.5 bg-slate-50 border-b border-slate-100">
-                <div>
-                  <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-bold text-[10px] uppercase">
-                    {language === 'ar' ? 'سند تحويل مخزني' : 'Warehouse Transfer Document'}
-                  </span>
-                  <h2 className="text-lg font-black text-slate-900 mt-1 flex items-center gap-1.5">
-                    <ArrowLeftRight size={18} className="text-emerald-500" />
-                    {viewTransfer.transfer_number}
-                  </h2>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => exportToPDFUtil(tableRef.current || document.body, { filename: `Warehouse_Transfer_${viewTransfer.transfer_number}`, reportTitle: `سند تحويل مخزني ${viewTransfer.transfer_number}` })}
-                    className="p-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg transition-all shadow-sm active:scale-95 flex items-center gap-1 font-bold text-xs"
-                    title={language === 'ar' ? 'طباعة' : 'Print'}
-                  >
-                    <Printer size={15} />
-                  </button>
-
-                  <button
-                    onClick={() => handleCopyTransfer(viewTransfer)}
-                    className="px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
-                    title={language === 'ar' ? 'نسخ المستند كمسودة جديدة' : 'Copy Document'}
-                  >
-                    <Copy size={14} />
-                    <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleExportDocPDF(viewTransfer)}
-                    className="px-2.5 py-1 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
-                    title={language === 'ar' ? 'تصدير PDF' : 'Export PDF'}
-                  >
-                    <FileText size={14} />
-                    <span>{language === 'ar' ? 'تصدير PDF' : 'Export PDF'}</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleExportDocExcel(viewTransfer)}
-                    className="px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 rounded-lg transition-all font-bold text-xs flex items-center gap-1 shadow-sm active:scale-95"
-                    title={language === 'ar' ? 'تصدير Excel' : 'Export Excel'}
-                  >
-                    <FileSpreadsheet size={14} />
-                    <span>{language === 'ar' ? 'تصدير إكسيل' : 'Export Excel'}</span>
-                  </button>
-
-                  <button
-                    onClick={() => setViewTransfer(null)}
-                    className="p-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all active:scale-95"
-                  >
-                    <X size={15} className="text-slate-500" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Document Details */}
-              <div className="p-4 space-y-4">
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-3 bg-slate-50 rounded-xl text-xs">
-                  <div>
-                    <span className="block text-[10px] font-bold text-slate-400 uppercase">{t('warehouse_transfers.column_date')}</span>
-                    <span className="text-slate-800 font-bold block mt-0.5">{formatDate(viewTransfer.date)}</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-bold text-slate-400 uppercase">{t('warehouse_transfers.column_from_warehouse')}</span>
-                    <span className="text-rose-600 font-bold block mt-0.5">{viewTransfer.from_warehouse_name}</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-bold text-slate-400 uppercase">{t('warehouse_transfers.column_to_warehouse')}</span>
-                    <span className="text-emerald-600 font-bold block mt-0.5">{viewTransfer.to_warehouse_name}</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-bold text-slate-400 uppercase">{language === 'ar' ? 'رقم القيد' : 'Journal Entry'}</span>
-                    <span className="text-slate-400 font-mono block mt-0.5">-</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-bold text-slate-400 uppercase">{language === 'ar' ? 'بواسطة' : 'Created By'}</span>
-                    <span className="text-slate-800 font-bold block mt-0.5">{viewTransfer.created_by || '-'}</span>
-                  </div>
-                </div>
-
-                {viewTransfer.description && (
-                  <div className="space-y-0.5">
-                    <span className="block text-[10px] font-bold text-slate-400 uppercase">{language === 'ar' ? 'ملاحظات / بيان' : 'Notes'}</span>
-                    <p className="text-slate-700 text-xs bg-slate-50/70 p-2.5 rounded-lg border border-slate-200">{viewTransfer.description}</p>
-                  </div>
-                )}
-
-                {/* Items Grid */}
-                <div className="space-y-2">
-                  <h3 className="text-xs font-bold text-slate-700">{language === 'ar' ? 'تفاصيل الأصناف المحولة' : 'Transferred Items'}</h3>
-                  <div className="border border-slate-200 rounded-xl overflow-hidden">
-                    <table className="w-full border-collapse text-right text-xs">
-                      <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200">
-                          <th className="px-3 py-2 font-bold text-slate-600 uppercase">{language === 'ar' ? 'كود الصنف' : 'Code'}</th>
-                          <th className="px-3 py-2 font-bold text-slate-600 uppercase">{language === 'ar' ? 'اسم الصنف' : 'Product Name'}</th>
-                          <th className="px-3 py-2 font-bold text-slate-600 uppercase text-center">{language === 'ar' ? 'الكمية' : 'Qty'}</th>
-                          <th className="px-3 py-2 font-bold text-slate-600 uppercase">{language === 'ar' ? 'الوحدة' : 'Unit'}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {((viewTransfer as any).items || []).map((item: WarehouseTransferItem) => {
-                          const prod = products.find(p => p.id === item.product_id);
-                          return (
-                            <tr key={item.id} className="hover:bg-slate-50/50">
-                              <td className="px-3 py-2 font-mono font-bold text-slate-600">{item.product_code || '-'}</td>
-                              <td className="px-3 py-2 font-bold text-slate-800">{item.product_name}</td>
-                              <td className="px-3 py-2 font-bold text-slate-700 text-center">{formatNumber(item.quantity)}</td>
-                              <td className="px-3 py-2 font-medium text-slate-500">{prod?.unit || '-'}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Attachments */}
-                {viewTransfer.attachments && viewTransfer.attachments.length > 0 && (
-                  <div className="p-3 border-t border-slate-100">
-                    <AttachmentsManager
-                      attachments={viewTransfer.attachments}
-                      onChange={() => {}}
-                      readOnly={true}
-                      title={language === 'ar' ? 'المستندات والمرفقات' : 'Documents & Attachments'}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Footer */}
-              <div className="flex items-center justify-end p-3 border-t border-slate-100 bg-slate-50/50">
-                <button
-                  onClick={() => setViewTransfer(null)}
-                  className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 font-bold text-slate-700 rounded-lg text-xs transition-all"
-                >
-                  {t('common.close')}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+              )}
+            </div>
+          )}
+        </>
+      )}
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
