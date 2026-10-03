@@ -150,70 +150,67 @@ export function Warehouses() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="flex-1 flex flex-col space-y-8 overflow-hidden max-w-7xl mx-auto w-full p-4"
+            className="flex-1 flex flex-col space-y-5 overflow-hidden max-w-7xl mx-auto w-full p-4"
           >
-            <div className="flex flex-col md:flex-row items-center justify-between gap-8 pb-6 border-b border-slate-100">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
               <div className={dir === 'rtl' ? 'text-right' : 'text-left'}>
-                <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter mb-3 leading-none italic serif">
+                <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight mb-1">
                   {t('warehouses.title') || 'المخازن'}
                 </h1>
-                <p className="text-slate-400 font-bold uppercase tracking-[0.3em] text-xs">
+                <p className="text-slate-500 font-medium text-xs">
                   {t('warehouses.subtitle') || 'إدارة المخازن'}
                 </p>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 <button 
                   onClick={handleOpenCreate}
-                  className="group relative px-8 py-4 bg-zinc-900 text-white rounded-[1.5rem] shadow-xl overflow-hidden transition-all hover:bg-zinc-800 active:scale-95"
+                  className="px-4 py-2 bg-zinc-900 text-white rounded-xl shadow-md hover:bg-zinc-800 active:scale-95 transition-all text-xs font-bold flex items-center gap-2"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <div className="relative z-10 flex items-center gap-3 font-black uppercase tracking-widest text-sm">
-                    <Plus size={20} className="group-hover:rotate-90 transition-transform" />
-                    {t('warehouses.add') || 'إضافة مخزن'}
-                  </div>
+                  <Plus size={16} />
+                  <span>{t('warehouses.add') || 'إضافة مخزن'}</span>
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 bg-white rounded-[3.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden flex flex-col transition-all duration-500">
-              <div className="p-8 border-b border-slate-50 flex items-center gap-4 bg-slate-50/20">
+            <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col transition-all duration-300">
+              <div className="p-4 border-b border-slate-100 flex items-center gap-3 bg-slate-50/30">
                 <div className="relative flex-1 group">
-                  <Search className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors pointer-events-none`} size={24} />
+                  <Search className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-3 text-slate-400 group-focus-within:text-emerald-500 transition-colors pointer-events-none`} size={18} />
                   <input
                     type="text"
                     placeholder={t('warehouses.search_placeholder') || 'بحث بالاسم أو الكود...'}
-                    className={`w-full ${dir === 'rtl' ? 'pr-16 pl-6' : 'pl-16 pr-6'} py-4 bg-white border border-slate-100 rounded-[2rem] outline-none font-bold text-slate-900 placeholder:text-slate-300 focus:ring-8 focus:ring-emerald-500/5 focus:border-emerald-500/50 transition-all shadow-inner`}
+                    className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 bg-white border border-slate-200 rounded-xl outline-none font-bold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm`}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
 
-                <div className="flex bg-white p-1.5 rounded-2xl border border-slate-100 shadow-sm">
-                  <button onClick={() => setView('table')} className={`p-2.5 rounded-xl transition-all ${view === 'table' ? 'bg-zinc-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}><List size={22} /></button>
-                  <button onClick={() => setView('card')} className={`p-2.5 rounded-xl transition-all ${view === 'card' ? 'bg-zinc-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}><LayoutGrid size={22} /></button>
+                <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  <button onClick={() => setView('table')} className={`p-1.5 rounded-lg transition-all ${view === 'table' ? 'bg-white text-zinc-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><List size={18} /></button>
+                  <button onClick={() => setView('card')} className={`p-1.5 rounded-lg transition-all ${view === 'card' ? 'bg-white text-zinc-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><LayoutGrid size={18} /></button>
                 </div>
               </div>
 
               <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {view === 'table' ? (
-                  <div className="overflow-x-auto h-full p-8">
+                  <div className="overflow-x-auto h-full p-4">
                     <table ref={tableRef} className="w-full">
-                      <thead className="bg-slate-50/50 rounded-2xl">
-                        <tr className="text-slate-400 text-[10px] uppercase font-black tracking-[0.2em]">
-                          <th className={`px-8 py-6 rounded-s-2xl ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('warehouses.column_code') || 'الكود'}</th>
-                          <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('warehouses.column_name') || 'اسم المخزن'}</th>
-                          <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('warehouses.column_storekeeper') || 'أمين المخزن'}</th>
-                          <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('warehouses.column_address') || 'العنوان'}</th>
-                          <th className={`px-8 py-6 rounded-e-2xl ${dir === 'rtl' ? 'text-left' : 'text-right'}`}></th>
+                      <thead className="bg-slate-50 border-b border-slate-100">
+                        <tr className="text-slate-500 text-xs font-bold">
+                          <th className={`px-4 py-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('warehouses.column_code') || 'الكود'}</th>
+                          <th className={`px-4 py-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('warehouses.column_name') || 'اسم المخزن'}</th>
+                          <th className={`px-4 py-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('warehouses.column_storekeeper') || 'أمين المخزن'}</th>
+                          <th className={`px-4 py-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('warehouses.column_address') || 'العنوان'}</th>
+                          <th className={`px-4 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}></th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-50">
+                      <tbody className="divide-y divide-slate-100">
                         {loading ? (
-                          <tr><td colSpan={5} className="py-20 text-center"><div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>
+                          <tr><td colSpan={5} className="py-12 text-center"><div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>
                         ) : filteredWarehouses.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="py-20 text-center text-slate-400 font-bold">
-                              <Home className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+                            <td colSpan={5} className="py-12 text-center text-slate-400 font-bold text-sm">
+                              <Home className="w-10 h-10 text-slate-300 mx-auto mb-2" />
                               {language === 'ar' ? 'لم يتم العثور على مخازن' : 'No Warehouses Found'}
                             </td>
                           </tr>
@@ -222,19 +219,19 @@ export function Warehouses() {
                             <tr 
                               key={wh.id} 
                               onClick={() => handleOpenEdit(wh)}
-                              className="group cursor-pointer hover:bg-slate-50/50 transition-colors"
+                              className="group cursor-pointer hover:bg-slate-50 transition-colors"
                             >
-                              <td className="px-8 py-6">
-                                <div className="inline-block px-3 py-1.5 bg-slate-100 text-slate-600 rounded-xl font-mono text-xs font-bold border border-slate-200 shadow-sm">
+                              <td className="px-4 py-2.5">
+                                <div className="inline-block px-2 py-0.5 bg-slate-100 text-slate-600 rounded font-mono text-xs font-bold border border-slate-200">
                                   {wh.code}
                                 </div>
                               </td>
-                              <td className="px-8 py-6 font-bold text-slate-900">{wh.name}</td>
-                              <td className="px-8 py-6">
-                                <div className="flex items-center gap-2 text-slate-500 font-medium text-sm">
+                              <td className="px-4 py-2.5 font-bold text-sm text-slate-900">{wh.name}</td>
+                              <td className="px-4 py-2.5">
+                                <div className="flex items-center gap-1.5 text-slate-600 font-medium text-xs">
                                   {wh.storekeeper ? (
                                     <>
-                                      <User size={16} />
+                                      <User size={14} className="text-slate-400" />
                                       {wh.storekeeper}
                                     </>
                                   ) : (
@@ -242,11 +239,11 @@ export function Warehouses() {
                                   )}
                                 </div>
                               </td>
-                              <td className="px-8 py-6">
-                                <div className="flex items-center gap-2 text-slate-500 font-medium text-sm">
+                              <td className="px-4 py-2.5">
+                                <div className="flex items-center gap-1.5 text-slate-500 font-normal text-xs">
                                   {wh.address ? (
                                     <>
-                                      <MapPin size={16} />
+                                      <MapPin size={14} className="text-slate-400" />
                                       {wh.address.length > 30 ? wh.address.substring(0, 30) + '...' : wh.address}
                                     </>
                                   ) : (
@@ -254,13 +251,13 @@ export function Warehouses() {
                                   )}
                                 </div>
                               </td>
-                              <td className={`px-8 py-6 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                                <div className={`flex items-center gap-2 ${dir === 'rtl' ? 'justify-end' : 'justify-start'}`}>
-                                  <button onClick={(e) => { e.stopPropagation(); handleOpenEdit(wh); }} className="w-10 h-10 rounded-xl bg-white border border-slate-100 text-emerald-600 flex items-center justify-center hover:bg-emerald-50 hover:border-emerald-200 hover:shadow-md transition-all">
-                                    <Edit size={16} />
+                              <td className={`px-4 py-2.5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                                <div className={`flex items-center gap-1.5 ${dir === 'rtl' ? 'justify-end' : 'justify-start'}`}>
+                                  <button onClick={(e) => { e.stopPropagation(); handleOpenEdit(wh); }} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-emerald-600 flex items-center justify-center hover:bg-emerald-50 hover:border-emerald-300 transition-all">
+                                    <Edit size={14} />
                                   </button>
-                                  <button onClick={(e) => handleDelete(wh.id, e)} className="w-10 h-10 rounded-xl bg-white border border-slate-100 text-rose-500 flex items-center justify-center hover:bg-rose-50 hover:border-rose-200 hover:shadow-md transition-all">
-                                    <Trash2 size={16} />
+                                  <button onClick={(e) => handleDelete(wh.id, e)} className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-rose-500 flex items-center justify-center hover:bg-rose-50 hover:border-rose-300 transition-all">
+                                    <Trash2 size={14} />
                                   </button>
                                 </div>
                               </td>
@@ -271,12 +268,12 @@ export function Warehouses() {
                     </table>
                   </div>
                 ) : (
-                  <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                     {loading ? (
-                      <div className="col-span-full py-20 text-center"><div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div></div>
+                      <div className="col-span-full py-12 text-center"><div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div></div>
                     ) : filteredWarehouses.length === 0 ? (
-                      <div className="col-span-full py-20 text-center text-slate-400 font-bold">
-                        <Home className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+                      <div className="col-span-full py-12 text-center text-slate-400 font-bold text-sm">
+                        <Home className="w-10 h-10 text-slate-300 mx-auto mb-2" />
                         {language === 'ar' ? 'لم يتم العثور على مخازن' : 'No Warehouses Found'}
                       </div>
                     ) : (
@@ -284,33 +281,37 @@ export function Warehouses() {
                         <div 
                           key={wh.id}
                           onClick={() => handleOpenEdit(wh)}
-                          className="group relative bg-white border border-slate-100 rounded-3xl p-6 hover:shadow-2xl hover:shadow-emerald-900/5 hover:border-emerald-100 transition-all cursor-pointer flex flex-col min-h-[220px]"
+                          className="group relative bg-white border border-slate-200 rounded-2xl p-5 hover:shadow-md hover:border-emerald-300 transition-all cursor-pointer flex flex-col min-h-[190px]"
                         >
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="inline-block px-3 py-1.5 bg-slate-50 text-slate-500 rounded-xl font-mono text-xs font-bold border border-slate-200">
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="inline-block px-2.5 py-1 bg-slate-50 text-slate-500 rounded font-mono text-xs font-bold border border-slate-200">
                               {wh.code}
                             </div>
-                            <button onClick={(e) => handleDelete(wh.id, e)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
-                              <Trash2 size={18} />
+                            <button onClick={(e) => handleDelete(wh.id, e)} className="p-1 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
+                              <Trash2 size={16} />
                             </button>
                           </div>
                           
-                          <h3 className="text-xl font-black text-slate-900 mb-2 truncate">{wh.name}</h3>
+                          <h3 className="text-base font-bold text-slate-900 mb-1.5 truncate">{wh.name}</h3>
                           
                           {wh.description && (
-                            <p className="text-slate-500 text-sm font-medium line-clamp-2 mb-4 leading-relaxed flex-1">
+                            <p className="text-slate-500 text-xs font-normal line-clamp-2 mb-3 leading-relaxed flex-1">
                               {wh.description}
                             </p>
                           )}
                           
-                          <div className="mt-auto pt-4 border-t border-slate-50 flex items-center justify-between text-xs font-bold text-slate-400">
-                            {wh.storekeeper ? (
-                              <div className="flex items-center gap-1.5">
-                                <User size={14} className="text-emerald-500" />
-                                <span className="truncate max-w-[120px]">{wh.storekeeper}</span>
+                          <div className="space-y-1.5 pt-3 border-t border-slate-100 text-xs text-slate-500">
+                            {wh.storekeeper && (
+                              <div className="flex items-center gap-1.5 truncate">
+                                <User size={13} className="text-slate-400 shrink-0" />
+                                <span className="truncate">{wh.storekeeper}</span>
                               </div>
-                            ) : (
-                              <span></span>
+                            )}
+                            {wh.address && (
+                              <div className="flex items-center gap-1.5 truncate">
+                                <MapPin size={13} className="text-slate-400 shrink-0" />
+                                <span className="truncate">{wh.address}</span>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -327,22 +328,22 @@ export function Warehouses() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="flex-1 flex flex-col bg-white md:rounded-[3.5rem] border-0 md:border md:border-slate-100 shadow-2xl overflow-hidden max-w-5xl mx-auto w-full"
+            className="flex-1 flex flex-col bg-white md:rounded-2xl border-0 md:border md:border-slate-200 shadow-xl overflow-hidden max-w-4xl mx-auto w-full"
           >
             <form onSubmit={handleSubmit} className="flex flex-col h-full">
-              <div className="px-10 py-8 bg-zinc-900 flex justify-between items-center relative overflow-hidden shrink-0">
+              <div className="px-6 py-4 bg-zinc-900 flex justify-between items-center relative overflow-hidden shrink-0">
                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
                 <div className="absolute -right-20 -top-40 w-80 h-80 bg-emerald-500/20 blur-3xl rounded-full"></div>
                 
-                <div className="relative z-10 flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/10 shadow-inner">
-                    {editingWarehouse ? <Edit className="text-emerald-400" size={28} /> : <Home className="text-emerald-400" size={28} />}
+                <div className="relative z-10 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/10 shadow-inner">
+                    {editingWarehouse ? <Edit className="text-emerald-400" size={20} /> : <Home className="text-emerald-400" size={20} />}
                   </div>
                   <div>
-                    <h2 className="text-3xl font-black text-white italic tracking-tighter">
+                    <h2 className="text-lg md:text-xl font-black text-white tracking-tight">
                       {editingWarehouse ? t('warehouses.edit') : t('warehouses.add')}
                     </h2>
-                    <p className="text-zinc-400 font-bold uppercase tracking-widest text-xs mt-1">
+                    <p className="text-zinc-400 font-medium text-xs mt-0.5">
                       {editingWarehouse ? formData.name : (language === 'ar' ? 'إضافة مخزن جديد لنظام مبيعاتك' : 'Add a new warehouse')}
                     </p>
                   </div>
@@ -351,17 +352,17 @@ export function Warehouses() {
                 <button 
                   type="button" 
                   onClick={closeModal} 
-                  className="relative z-10 p-3 rounded-2xl hover:bg-white/10 text-zinc-400 hover:text-white transition-all group"
+                  className="relative z-10 p-2 rounded-xl hover:bg-white/10 text-zinc-400 hover:text-white transition-all group"
                 >
-                  <X size={24} className="group-hover:rotate-90 transition-transform duration-300" />
+                  <X size={18} className="group-hover:rotate-90 transition-transform duration-300" />
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-10 bg-slate-50/50 flex flex-col md:flex-row gap-10 custom-scrollbar">
-                <div className="w-full md:w-3/5 space-y-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-                    <div className="space-y-4">
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+              <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50 flex flex-col md:flex-row gap-5 custom-scrollbar">
+                <div className="w-full md:w-3/5 space-y-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-700 px-0.5">
                         {t('warehouses.form_code')} <span className="text-rose-500">*</span>
                       </label>
                       <input 
@@ -369,11 +370,11 @@ export function Warehouses() {
                         required 
                         readOnly
                         value={formData.code}
-                        className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-lg font-mono font-bold text-slate-500 cursor-not-allowed focus:outline-none" 
+                        className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-bold text-slate-500 cursor-not-allowed focus:outline-none" 
                       />
                     </div>
-                    <div className="space-y-4">
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-700 px-0.5">
                         {t('warehouses.form_name')} <span className="text-rose-500">*</span>
                       </label>
                       <input 
@@ -381,54 +382,54 @@ export function Warehouses() {
                         required 
                         value={formData.name} 
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
-                        className={`w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl text-lg font-bold text-slate-900 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`} 
+                        className={`w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all ${dir === 'rtl' ? 'text-right' : 'text-left'}`} 
                         placeholder={t('warehouses.form_name')}
                       />
                     </div>
                   </div>
 
-                  <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-2">
+                    <label className="block text-xs font-bold text-slate-700 px-0.5">
                       {t('warehouses.form_description')}
                     </label>
                     <textarea 
                       value={formData.description} 
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })} 
-                      className={`w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl text-base font-medium text-slate-900 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all min-h-[100px] resize-none ${dir === 'rtl' ? 'text-right' : 'text-left'}`} 
+                      className={`w-full px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-sm font-normal text-slate-900 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all min-h-[80px] resize-none ${dir === 'rtl' ? 'text-right' : 'text-left'}`} 
                       placeholder={t('warehouses.form_description')}
                     />
                   </div>
                 </div>
 
-                <div className="w-full md:w-2/5 space-y-6">
-                  <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
-                    <div className="space-y-4">
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                <div className="w-full md:w-2/5 space-y-4">
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-700 px-0.5">
                         {t('warehouses.form_address')}
                       </label>
                       <div className="relative">
-                        <MapPin size={18} className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 text-slate-400`} />
+                        <MapPin size={16} className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 text-slate-400`} />
                         <input 
                           type="text" 
                           value={formData.address} 
                           onChange={(e) => setFormData({ ...formData, address: e.target.value })} 
-                          className={`w-full py-4 ${dir === 'rtl' ? 'pr-12 pl-4 text-right' : 'pl-12 pr-4 text-left'} bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all`} 
+                          className={`w-full py-2 ${dir === 'rtl' ? 'pr-9 pl-3 text-right' : 'pl-9 pr-3 text-left'} bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all`} 
                           placeholder={t('warehouses.form_address')}
                         />
                       </div>
                     </div>
                     
-                    <div className="space-y-4">
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-700 px-0.5">
                         {t('warehouses.form_phone')}
                       </label>
                       <div className="relative">
-                        <Phone size={18} className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 text-slate-400`} />
+                        <Phone size={16} className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 text-slate-400`} />
                         <input 
                           type="text" 
                           value={formData.phone} 
                           onChange={(e) => setFormData({ ...formData, phone: e.target.value })} 
-                          className={`w-full py-4 ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all`} 
+                          className={`w-full py-2 ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all`} 
                           dir="ltr"
                           placeholder="e.g. 010..."
                         />
@@ -436,37 +437,37 @@ export function Warehouses() {
                     </div>
                   </div>
 
-                  <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-6">
-                    <h3 className="text-sm font-black text-slate-800 border-b border-slate-50 pb-4">
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                    <h3 className="text-xs font-bold text-slate-800 border-b border-slate-100 pb-2">
                       {language === 'ar' ? 'بيانات أمين المخزن' : 'Storekeeper Details'}
                     </h3>
-                    <div className="space-y-4">
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-700 px-0.5">
                         {t('warehouses.form_storekeeper')}
                       </label>
                       <div className="relative">
-                        <User size={18} className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 text-slate-400`} />
+                        <User size={16} className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 text-slate-400`} />
                         <input 
                           type="text" 
                           value={formData.storekeeper} 
                           onChange={(e) => setFormData({ ...formData, storekeeper: e.target.value })} 
-                          className={`w-full py-4 ${dir === 'rtl' ? 'pr-12 pl-4 text-right' : 'pl-12 pr-4 text-left'} bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all`} 
+                          className={`w-full py-2 ${dir === 'rtl' ? 'pr-9 pl-3 text-right' : 'pl-9 pr-3 text-left'} bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all`} 
                           placeholder={t('warehouses.form_storekeeper')}
                         />
                       </div>
                     </div>
 
-                    <div className="space-y-4">
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-700 px-0.5">
                         {t('warehouses.form_storekeeper_phone')}
                       </label>
                       <div className="relative">
-                        <Phone size={18} className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 text-slate-400`} />
+                        <Phone size={16} className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 text-slate-400`} />
                         <input 
                           type="text" 
                           value={formData.storekeeper_phone} 
                           onChange={(e) => setFormData({ ...formData, storekeeper_phone: e.target.value })} 
-                          className={`w-full py-4 ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all`} 
+                          className={`w-full py-2 ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all`} 
                           dir="ltr"
                         />
                       </div>
@@ -475,19 +476,19 @@ export function Warehouses() {
                 </div>
               </div>
 
-              <div className="px-10 py-6 bg-white border-t border-slate-100 flex items-center justify-end gap-4 shrink-0 rounded-b-[3.5rem]">
+              <div className="px-6 py-3.5 bg-white border-t border-slate-100 flex items-center justify-end gap-3 shrink-0 rounded-b-2xl">
                 <button 
                   type="button" 
                   onClick={closeModal} 
-                  className="px-8 py-4 text-slate-500 font-bold hover:bg-slate-50 rounded-[1.5rem] transition-colors uppercase tracking-widest text-xs"
+                  className="px-4 py-2 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-xs"
                 >
                   {language === 'ar' ? 'إلغاء' : 'Cancel'}
                 </button>
                 <button 
                   type="submit" 
-                  className="px-10 py-4 bg-emerald-500 text-white font-black rounded-[1.5rem] shadow-xl shadow-emerald-500/20 hover:bg-emerald-600 hover:shadow-emerald-600/30 active:scale-95 transition-all uppercase tracking-widest text-xs flex items-center gap-3"
+                  className="px-5 py-2 bg-emerald-600 text-white font-bold rounded-xl shadow-md hover:bg-emerald-700 active:scale-95 transition-all text-xs flex items-center gap-2"
                 >
-                  <Plus size={18} />
+                  <Plus size={16} />
                   {language === 'ar' ? 'حفظ البيانات' : 'Save Details'}
                 </button>
               </div>

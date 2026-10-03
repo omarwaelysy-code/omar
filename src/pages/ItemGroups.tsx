@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Plus, Trash2, X, Folder, Layers, Hash, 
-  ChevronRight, ChevronLeft, LayoutGrid, List, Lock, FileText, FileUp
+  ChevronRight, ChevronLeft, LayoutGrid, List, Lock, FileText, FileUp, ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNotification } from '../contexts/NotificationContext';
@@ -219,49 +219,46 @@ export function ItemGroups() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="flex-1 flex flex-col space-y-8 overflow-hidden max-w-7xl mx-auto w-full p-4"
+            className="flex-1 flex flex-col space-y-5 overflow-hidden max-w-7xl mx-auto w-full p-4"
           >
-            {/* Header - Styled like Products layout */}
-            <div className="flex flex-col md:flex-row items-center justify-between gap-8 pb-6 border-b border-slate-100">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
               <div className={dir === 'rtl' ? 'text-right' : 'text-left'}>
-                <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter mb-3 leading-none italic serif">
+                <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight mb-1">
                   {language === 'ar' ? 'مجموعات الأصناف' : 'Item Groups'}
                 </h1>
-                <p className="text-slate-400 font-bold uppercase tracking-[0.3em] text-xs">
+                <p className="text-slate-500 font-medium text-xs">
                   {language === 'ar' ? 'تصنيف وتعريف المجموعات بناءً على الأنواع الأساسية' : 'Classify and index groups by core types'}
                 </p>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 <button
                   onClick={() => setShowImportWizard(true)}
-                  className="flex items-center justify-center gap-2 px-5 py-3 bg-white text-emerald-700 border border-emerald-300 rounded-2xl font-bold hover:bg-emerald-50 transition-all active:scale-95 shadow-sm"
+                  className="flex items-center justify-center gap-2 px-3.5 py-2 bg-white text-emerald-700 border border-emerald-300 rounded-xl font-bold text-xs hover:bg-emerald-50 transition-all active:scale-95 shadow-sm"
                   title="استيراد من Excel"
                 >
-                  <FileUp size={18} />
+                  <FileUp size={16} />
                   <span className="hidden md:inline">استيراد Excel</span>
                 </button>
                 <button 
                   onClick={handleOpenCreate}
-                  className="group relative px-8 py-4 bg-zinc-900 text-white rounded-[1.5rem] shadow-xl overflow-hidden transition-all hover:bg-zinc-800 active:scale-95"
+                  className="px-4 py-2 bg-zinc-900 text-white rounded-xl shadow-md hover:bg-zinc-800 active:scale-95 transition-all text-xs font-bold flex items-center gap-2"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <div className="relative z-10 flex items-center gap-3 font-black uppercase tracking-widest text-sm">
-                    <Plus size={20} className="group-hover:rotate-90 transition-transform" />
-                    {language === 'ar' ? 'مجموعة جديدة' : 'New Group'}
-                  </div>
+                  <Plus size={16} />
+                  <span>{language === 'ar' ? 'مجموعة جديدة' : 'New Group'}</span>
                 </button>
               </div>
             </div>
 
             {/* List Controls and View Settings */}
-            <div className="flex-1 bg-white rounded-[3.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden flex flex-col transition-all duration-500">
-              <div className="p-8 border-b border-slate-50 flex items-center gap-4 bg-slate-50/20">
+            <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col transition-all duration-300">
+              <div className="p-4 border-b border-slate-100 flex items-center gap-3 bg-slate-50/30">
                 <div className="relative flex-1 group">
-                  <Search className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-4 text-slate-300 group-focus-within:text-emerald-500 transition-colors pointer-events-none`} size={24} />
+                  <Search className={`absolute ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'} top-3 text-slate-400 group-focus-within:text-emerald-500 transition-colors pointer-events-none`} size={18} />
                   <input
                     type="text"
                     placeholder={language === 'ar' ? 'بحث عن مجموعة أصناف...' : 'Search item groups...'}
-                    className={`w-full ${dir === 'rtl' ? 'pr-16 pl-6' : 'pl-16 pr-6'} py-4 bg-white border border-slate-100 rounded-[2rem] outline-none font-bold text-slate-900 placeholder:text-slate-300 focus:ring-8 focus:ring-emerald-500/5 focus:border-emerald-500/50 transition-all shadow-inner`}
+                    className={`w-full ${dir === 'rtl' ? 'pr-10 pl-4' : 'pl-10 pr-4'} py-2 bg-white border border-slate-200 rounded-xl outline-none font-bold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-sm`}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -271,7 +268,7 @@ export function ItemGroups() {
                   <select
                     value={typeFilter}
                     onChange={(e) => setTypeFilter(e.target.value)}
-                    className="px-6 py-4 border border-slate-100 bg-white rounded-[2rem] outline-none font-bold text-slate-900 focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-md text-sm"
+                    className="px-3.5 py-2 border border-slate-200 bg-white rounded-xl outline-none font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-xs shadow-sm"
                   >
                     <option value="all">{language === 'ar' ? 'كل الأنواع' : 'All Types'}</option>
                     <option value="finished_product">{language === 'ar' ? 'منتج تام (TAM)' : 'Finished Product'}</option>
@@ -281,32 +278,32 @@ export function ItemGroups() {
                   </select>
                 </div>
 
-                <div className="flex bg-white p-1.5 rounded-2xl border border-slate-100 shadow-sm">
-                  <button onClick={() => setView('table')} className={`p-2.5 rounded-xl transition-all ${view === 'table' ? 'bg-zinc-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}><List size={22} /></button>
-                  <button onClick={() => setView('card')} className={`p-2.5 rounded-xl transition-all ${view === 'card' ? 'bg-zinc-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}><LayoutGrid size={22} /></button>
+                <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  <button onClick={() => setView('table')} className={`p-1.5 rounded-lg transition-all ${view === 'table' ? 'bg-white text-zinc-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><List size={18} /></button>
+                  <button onClick={() => setView('card')} className={`p-1.5 rounded-lg transition-all ${view === 'card' ? 'bg-white text-zinc-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><LayoutGrid size={18} /></button>
                 </div>
               </div>
 
               <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {view === 'table' ? (
-                  <div className="overflow-x-auto h-full p-8">
+                  <div className="overflow-x-auto h-full p-4">
                     <table ref={tableRef} className="w-full">
-                      <thead className="bg-slate-50/50 rounded-2xl">
-                        <tr className="text-slate-400 text-[10px] uppercase font-black tracking-[0.2em]">
-                          <th className={`px-8 py-6 rounded-s-2xl ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'كود المجموعة المبرمج' : 'Autogen Code'}</th>
-                          <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'اسم المجموعة' : 'Group Name'}</th>
-                          <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'نوع الصنف' : 'Classification Type'}</th>
-                          <th className={`px-8 py-6 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'التوصيف' : 'Description'}</th>
-                          <th className={`px-8 py-6 rounded-e-2xl ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
+                      <thead className="bg-slate-50 border-b border-slate-100">
+                        <tr className="text-slate-500 text-xs font-bold">
+                          <th className={`px-4 py-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'كود المجموعة المبرمج' : 'Autogen Code'}</th>
+                          <th className={`px-4 py-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'اسم المجموعة' : 'Group Name'}</th>
+                          <th className={`px-4 py-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'نوع الصنف' : 'Classification Type'}</th>
+                          <th className={`px-4 py-3 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'التوصيف' : 'Description'}</th>
+                          <th className={`px-4 py-3 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-50">
+                      <tbody className="divide-y divide-slate-100">
                         {loading ? (
-                          <tr><td colSpan={5} className="py-20 text-center"><div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>
+                          <tr><td colSpan={5} className="py-12 text-center"><div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>
                         ) : filteredGroups.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="py-20 text-center text-slate-400 font-bold">
-                              <Folder className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+                            <td colSpan={5} className="py-12 text-center text-slate-400 font-bold text-sm">
+                              <Folder className="w-10 h-10 text-slate-300 mx-auto mb-2" />
                               {language === 'ar' ? 'لم يتم العثور على مجموعات أصناف' : 'No Item Groups Found'}
                             </td>
                           </tr>
@@ -314,33 +311,33 @@ export function ItemGroups() {
                           <tr 
                             key={group.id} 
                             onClick={() => handleOpenEdit(group)}
-                            className="hover:bg-slate-50 transition-all group cursor-pointer"
+                            className="hover:bg-slate-50 transition-colors group cursor-pointer"
                           >
-                            <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              <span className="font-mono text-xs bg-slate-100 px-3 py-1 rounded-lg text-slate-500 font-black border border-slate-200 group-hover:border-emerald-200 transition-all">{group.code}</span>
+                            <td className={`px-4 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              <span className="font-mono text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-bold border border-slate-200 group-hover:border-emerald-300 transition-all">{group.code}</span>
                             </td>
-                            <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              <span className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors">{group.name}</span>
+                            <td className={`px-4 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              <span className="font-bold text-sm text-slate-900 group-hover:text-emerald-700 transition-colors">{group.name}</span>
                             </td>
-                            <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-50 border border-slate-100 text-slate-600">
-                                <Layers size={14} className="text-slate-400" />
+                            <td className={`px-4 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-50 border border-slate-200 text-slate-600">
+                                <Layers size={13} className="text-slate-400" />
                                 <span>{getTypeLabel(group.type)}</span>
                               </span>
                             </td>
-                            <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-right' : 'text-left'} text-slate-400 font-medium max-w-sm truncate`} title={group.description}>
+                            <td className={`px-4 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} text-slate-500 text-xs font-normal max-w-sm truncate`} title={group.description}>
                               {group.description || '-'}
                             </td>
-                            <td className={`px-8 py-5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                              <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1 opacity-0 group-hover:opacity-100 transition-all`}>
+                            <td className={`px-4 py-2.5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                              <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}>
                                 <button 
                                   onClick={(e) => handleDelete(group.id, e)} 
-                                  className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                                 >
-                                  <Trash2 size={18} />
+                                  <Trash2 size={16} />
                                 </button>
-                                <div className="p-2 text-emerald-400 bg-white rounded-xl shadow-sm border border-slate-100">
-                                  {dir === 'rtl' ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+                                <div className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-lg">
+                                  {dir === 'rtl' ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
                                 </div>
                               </div>
                             </td>
@@ -350,40 +347,40 @@ export function ItemGroups() {
                     </table>
                   </div>
                 ) : (
-                  <div className="p-10 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                  <div className="p-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                     {filteredGroups.length === 0 ? (
-                      <div className="col-span-full py-20 text-center text-slate-400 font-bold">
-                        <Folder className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+                      <div className="col-span-full py-12 text-center text-slate-400 font-bold text-sm">
+                        <Folder className="w-10 h-10 text-slate-300 mx-auto mb-2" />
                         {language === 'ar' ? 'لم يتم العثور على مجموعات أصناف' : 'No Item Groups Found'}
                       </div>
                     ) : filteredGroups.map((group) => (
                       <motion.div 
-                        initial={{ opacity: 0, scale: 0.9 }}
+                        initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        whileHover={{ y: -5 }}
+                        whileHover={{ y: -3 }}
                         key={group.id} 
                         onClick={() => handleOpenEdit(group)} 
-                        className="p-8 space-y-6 rounded-[3rem] border bg-white border-slate-100 hover:border-emerald-200 hover:shadow-2xl transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between"
+                        className="p-5 space-y-4 rounded-2xl border bg-white border-slate-200 hover:border-emerald-300 hover:shadow-md transition-all cursor-pointer group relative overflow-hidden flex flex-col justify-between"
                       >
                         <div className="flex justify-between items-start">
-                          <div className="flex flex-col gap-2 text-right">
-                            <span className="font-mono text-xs bg-slate-50 px-3 py-1 rounded-lg text-slate-400 font-black w-fit border border-slate-100 uppercase tracking-widest">{group.code}</span>
-                            <h4 className="font-black text-slate-900 group-hover:text-emerald-700 transition-colors text-2xl tracking-tighter leading-none italic serif">{group.name}</h4>
-                            <span className="text-xs text-slate-400 font-bold uppercase tracking-widest leading-none mt-1">{getTypeLabel(group.type)}</span>
+                          <div className="flex flex-col gap-1 text-right">
+                            <span className="font-mono text-xs bg-slate-50 px-2 py-0.5 rounded text-slate-500 font-bold w-fit border border-slate-200 uppercase">{group.code}</span>
+                            <h4 className="font-bold text-slate-900 group-hover:text-emerald-700 transition-colors text-lg tracking-tight">{group.name}</h4>
+                            <span className="text-xs text-slate-500 font-medium">{getTypeLabel(group.type)}</span>
                           </div>
-                          <div className="w-16 h-16 rounded-[1.5rem] bg-slate-50 text-slate-300 flex items-center justify-center overflow-hidden border border-slate-100 group-hover:scale-105 transition-all shadow-inner">
-                            <Folder size={26} className="text-slate-400 group-hover:text-emerald-600 transition-colors" />
+                          <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center border border-slate-200 group-hover:text-emerald-600 transition-colors">
+                            <Folder size={18} />
                           </div>
                         </div>
                         {group.description && (
-                          <p className="text-sm text-slate-400 italic line-clamp-2 mt-2">{group.description}</p>
+                          <p className="text-xs text-slate-500 line-clamp-2">{group.description}</p>
                         )}
-                        <div className="pt-6 border-t border-slate-50 flex justify-between items-end mt-4">
-                          <span className="text-[10px] uppercase font-black tracking-widest text-slate-300">
+                        <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
+                          <span className="text-[11px] font-bold text-slate-400">
                             {language === 'ar' ? 'تعديل التفاصيل' : 'Edit details'}
                           </span>
-                          <div className="p-3 bg-slate-50 border border-slate-100 rounded-2xl text-slate-300 group-hover:bg-emerald-600 group-hover:text-white transition-all">
-                            {dir === 'rtl' ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+                          <div className="p-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-400 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                            {dir === 'rtl' ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
                           </div>
                         </div>
                       </motion.div>
@@ -392,7 +389,7 @@ export function ItemGroups() {
                 )}
               </div>
 
-              <div className="p-8 border-t border-slate-50 bg-white sticky bottom-0">
+              <div className="p-4 border-t border-slate-100 bg-white sticky bottom-0">
                 <PaginationControls page={1} limit={100} total={filteredGroups.length} onPageChange={() => {}} onLimitChange={() => {}} />
               </div>
             </div>
@@ -403,75 +400,74 @@ export function ItemGroups() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="flex-1 flex flex-col space-y-8 overflow-hidden max-w-7xl mx-auto w-full p-4"
+            className="flex-1 flex flex-col space-y-6 overflow-hidden max-w-4xl mx-auto w-full p-4"
           >
-            {/* The beautiful form layout replacing the screen, matching Products.tsx exactly */}
-            <div className="bg-white flex-1 rounded-[3.5rem] shadow-xl shadow-slate-200/40 flex flex-col overflow-hidden border border-slate-100 transition-all duration-500">
+            <div className="bg-white flex-1 rounded-2xl shadow-md flex flex-col overflow-hidden border border-slate-200 transition-all duration-300">
               <div className="flex-1 flex flex-col h-full overflow-hidden bg-white">
                 {/* Header panel */}
-                <div className="p-10 border-b border-slate-50 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-20">
-                  <div className={`flex items-center gap-6 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-                    <div className="w-16 h-16 bg-emerald-600 text-white rounded-[2rem] flex items-center justify-center shadow-xl shadow-emerald-500/20">
-                      <Folder size={32} />
+                <div className="p-5 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-md z-20">
+                  <div className={`flex items-center gap-3.5 ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+                    <div className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-md shadow-emerald-500/20">
+                      <Folder size={20} />
                     </div>
                     <div className={dir === 'rtl' ? 'text-right' : 'text-left'}>
-                      <h3 className="text-3xl font-black text-slate-900 tracking-tight leading-none mb-1 font-serif italic">
+                      <h3 className="text-lg md:text-xl font-black text-slate-900 tracking-tight leading-tight">
                         {editingGroup ? (language === 'ar' ? 'تعديل مجموعة الأصناف' : 'Edit Item Group') : (language === 'ar' ? 'إضافة مجموعة جديدة' : 'Add Item Group')}
                       </h3>
-                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em] leading-none">
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                         {editingGroup?.code || 'SYSTEM FLOW : NEW GROUP'}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <button type="submit" form="group-form" className="px-10 py-5 bg-zinc-900 text-white rounded-[1.5rem] font-black hover:bg-zinc-800 transition-all active:scale-95 shadow-xl">
+                  <div className="flex items-center gap-2">
+                    <button type="submit" form="group-form" className="px-5 py-2 bg-zinc-900 text-white rounded-xl font-bold hover:bg-zinc-800 transition-all active:scale-95 text-xs shadow-sm">
                       {editingGroup ? (language === 'ar' ? 'حفظ' : 'Save') : (language === 'ar' ? 'إضافة' : 'Add')}
                     </button>
-                    <button onClick={closeModal} className="w-14 h-14 flex items-center justify-center bg-slate-50 text-slate-400 rounded-[1.5rem] hover:bg-rose-50 hover:text-rose-500 transition-all">
-                      <X size={28} />
+                    <button onClick={closeModal} className="w-8 h-8 flex items-center justify-center bg-slate-100 text-slate-400 rounded-lg hover:bg-rose-50 hover:text-rose-500 transition-all">
+                      <X size={18} />
                     </button>
                   </div>
                 </div>
 
                 {/* Content form fields */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-10 md:p-14 mb-[4rem]">
-                  <form id="group-form" onSubmit={handleSubmit} className="space-y-16" dir={dir}>
-                    <div className="space-y-10">
-                      <div className="flex items-center gap-4 border-b border-slate-50 pb-8">
-                        <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shadow-inner">
-                          <Folder size={24} />
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-8">
+                  <form id="group-form" onSubmit={handleSubmit} className="space-y-6" dir={dir}>
+                    <div className="space-y-5">
+                      <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
+                        <div className="w-8 h-8 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center shadow-inner">
+                          <Folder size={16} />
                         </div>
-                        <h2 className="text-2xl font-black text-slate-900 leading-none tracking-tight uppercase">
+                        <h2 className="text-sm md:text-base font-bold text-slate-900">
                           {language === 'ar' ? 'المعلومات الأساسية للمجموعة' : 'Primary Group Information'}
                         </h2>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-right">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-right">
                         {/* Group Name input */}
-                        <div className="md:col-span-2 space-y-4">
-                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                        <div className="md:col-span-2 space-y-2">
+                          <label className="block text-xs font-bold text-slate-700">
                             {language === 'ar' ? 'اسم المجموعة *' : 'Group Name *'}
                           </label>
                           <input 
                             required 
                             type="text" 
                             placeholder={language === 'ar' ? 'مثال: قطع غيار المحركات' : 'e.g. Engine Spare Parts'} 
-                            className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black text-slate-900 outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 focus:border-emerald-500/50 transition-all shadow-inner" 
+                            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all" 
                             value={formData.name} 
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
                           />
                         </div>
 
                         {/* Commodity Type select */}
-                        <div className="md:col-span-2 space-y-4">
-                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                        <div className="md:col-span-2 space-y-2">
+                          <label className="block text-xs font-bold text-slate-700">
                             {language === 'ar' ? 'نوع الصنف للمجموعة *' : 'Group Commodity Classification *'}
                           </label>
                           <div className="relative group">
-                            <Layers className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-slate-300`} size={24} />
+                            <Layers className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-slate-400`} size={18} />
                             <select 
                               required 
-                              className="w-full pr-16 pl-6 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-xl font-black text-slate-900 appearance-none outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner" 
+                              className={`w-full ${dir === 'rtl' ? 'pr-9 pl-9' : 'pl-9 pr-9'} py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 appearance-none outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all`} 
                               value={formData.type} 
                               onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
                             >
@@ -480,38 +476,39 @@ export function ItemGroups() {
                               <option value="raw_material">{language === 'ar' ? 'مواد خام (RAW)' : 'Raw Material (RAW)'}</option>
                               <option value="commodity">{language === 'ar' ? 'سلعة (COM)' : 'Commodity (COM)'}</option>
                             </select>
+                            <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-3' : 'right-3'} top-3 text-slate-400 pointer-events-none`} size={18} />
                           </div>
                         </div>
 
                         {/* Automatic code (Read Only as requested) */}
-                        <div className="space-y-4 md:col-span-2">
-                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                        <div className="space-y-2 md:col-span-2">
+                          <label className="block text-xs font-bold text-slate-700">
                             {language === 'ar' ? 'كود المجموعة المبرمج (تلقائي لا يمكن تعديله)' : 'Autogenerated Group Code (Read-Only)'}
                           </label>
                           <div className="relative group flex items-center">
-                            <Lock className={`absolute ${dir === 'rtl' ? 'right-6' : 'left-6'} top-5 text-emerald-500`} size={24} />
+                            <Lock className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-3 text-emerald-500`} size={18} />
                             <input 
                               readOnly 
                               required
                               type="text" 
-                              className={`w-full ${dir === 'rtl' ? 'pr-16 pl-6' : 'pl-16 pr-6'} py-5 bg-slate-50 border border-emerald-200 rounded-[2rem] font-mono text-xl font-black text-emerald-600 outline-none shadow-sm cursor-not-allowed`} 
+                              className={`w-full ${dir === 'rtl' ? 'pr-9 pl-4' : 'pl-9 pr-4'} py-2.5 bg-slate-50 border border-emerald-200 rounded-xl font-mono text-sm font-bold text-emerald-600 outline-none cursor-not-allowed`} 
                               value={formData.code} 
                             />
                           </div>
-                          <span className="text-xs text-slate-400 font-bold tracking-tight block px-1 mt-1">
+                          <span className="text-[11px] text-slate-400 font-medium block px-1">
                             {language === 'ar' ? 'يتكون كود المجموعة تلقائياً في نفس اللحظة من: [أول 3 حروف من الاسم] - [نوع المجموعة المحاسبي] - [الترقيم التسلسلي]' : 'The group code is automatically compiled of: [First 3 Name Letters] - [Type Acronym] - [Sequential Number]'}
                           </span>
                         </div>
 
                         {/* Description input */}
-                        <div className="md:col-span-2 space-y-4">
-                          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
+                        <div className="md:col-span-2 space-y-2">
+                          <label className="block text-xs font-bold text-slate-700">
                             {language === 'ar' ? 'توصيف ووصف المجموعة' : 'Description & Scope'}
                           </label>
                           <textarea 
                             rows={3} 
                             placeholder="..."
-                            className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[2rem] text-lg font-bold text-slate-900 outline-none focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all shadow-inner" 
+                            className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-normal text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all resize-none" 
                             value={formData.description} 
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })} 
                           />
