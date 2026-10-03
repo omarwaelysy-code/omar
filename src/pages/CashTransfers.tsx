@@ -27,6 +27,62 @@ import { ReversalModal } from '../components/common/ReversalModal';
 import { ReversalBanner } from '../components/common/ReversalBanner';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { EGYPTIAN_BANKS_DATA, BankLogoBadge, EgyptianBank } from '../data/egyptianBanks';
+
+const findEgyptianBank = (methodOrBank: { bank_code?: string; name?: string; bank_name?: string; swift_code?: string } | null | undefined): EgyptianBank | null => {
+  if (!methodOrBank) return null;
+  if (methodOrBank.bank_code) {
+    const b = EGYPTIAN_BANKS_DATA.find(x => x.code.toUpperCase() === methodOrBank.bank_code?.toUpperCase());
+    if (b) return b;
+  }
+  if (methodOrBank.swift_code) {
+    const b = EGYPTIAN_BANKS_DATA.find(x => x.swift.toUpperCase() === methodOrBank.swift_code?.toUpperCase());
+    if (b) return b;
+  }
+  const nameToSearch = (methodOrBank.bank_name || methodOrBank.name || '').trim().toLowerCase();
+  if (nameToSearch) {
+    const b = EGYPTIAN_BANKS_DATA.find(x => 
+      x.nameAr.toLowerCase() === nameToSearch ||
+      nameToSearch.includes(x.nameAr.toLowerCase()) ||
+      x.nameAr.toLowerCase().includes(nameToSearch) ||
+      x.nameEn.toLowerCase() === nameToSearch ||
+      x.code.toLowerCase() === nameToSearch
+    );
+    if (b) return b;
+  }
+  return null;
+};
+
+const renderCurrencyBadge = (code: string) => {
+  const c = (code || 'EGP').toUpperCase();
+  if (c === 'USD') {
+    return (
+      <span className="inline-flex items-center gap-0.5 text-[11px] font-black px-2 py-0.5 rounded-lg border bg-amber-50 text-amber-800 border-amber-300 font-mono shadow-2xs">
+        <DollarSign size={11} className="text-amber-600 -mr-0.5" />
+        USD
+      </span>
+    );
+  }
+  if (c === 'EUR') {
+    return (
+      <span className="inline-flex items-center gap-0.5 text-[11px] font-black px-2 py-0.5 rounded-lg border bg-blue-50 text-blue-800 border-blue-300 font-mono shadow-2xs">
+        € EUR
+      </span>
+    );
+  }
+  if (c === 'SAR') {
+    return (
+      <span className="inline-flex items-center gap-0.5 text-[11px] font-black px-2 py-0.5 rounded-lg border bg-teal-50 text-teal-800 border-teal-300 font-mono shadow-2xs">
+        SAR
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-0.5 text-[11px] font-black px-2 py-0.5 rounded-lg border bg-emerald-50 text-emerald-800 border-emerald-300 font-mono shadow-2xs">
+      {c}
+    </span>
+  );
+};
 
 export const CashTransfers: React.FC = () => {
   const { user } = useAuth();
@@ -178,8 +234,21 @@ export const CashTransfers: React.FC = () => {
     setAttachments(Array.isArray(transfer.attachments) ? transfer.attachments : []);
     const fromCurr = getEffectiveFromCurrency(transfer);
     const toCurr = getEffectiveToCurrency(transfer);
+    const baseCurr = (companyData?.settings?.currency || 'EGP').toUpperCase();
     const rate = Number((transfer as any).exchange_rate) || 1;
-    const converted = Number((transfer as any).converted_amount) || Number(transfer.amount) || 0;
+    let converted = Number((transfer as any).converted_amount);
+
+    if (isNaN(converted) || converted === 0 || (transfer as any).converted_amount === undefined || (transfer as any).converted_amount === null || (converted === Number(transfer.amount) && fromCurr !== toCurr)) {
+      if (fromCurr === toCurr) {
+        converted = Number(transfer.amount) || 0;
+      } else if (fromCurr === baseCurr && toCurr !== baseCurr && rate > 0) {
+        converted = Number((Number(transfer.amount) / rate).toFixed(2));
+      } else if (rate > 0) {
+        converted = Number((Number(transfer.amount) * rate).toFixed(2));
+      } else {
+        converted = Number(transfer.amount) || 0;
+      }
+    }
 
     setFormData({
       date: transfer.date ? transfer.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
@@ -295,8 +364,8 @@ export const CashTransfers: React.FC = () => {
   }, [user, page, limit, sortBy, sortOrder, searchTerm]);
 
   const fetchSystemRate = async (fromCurr: string, toCurr: string, currentAmount?: number) => {
+    const amt = currentAmount !== undefined ? currentAmount : formData.amount;
     if (!user || !fromCurr || !toCurr || fromCurr === toCurr) {
-      const amt = currentAmount !== undefined ? currentAmount : formData.amount;
       setFormData(prev => ({
         ...prev,
         exchange_rate: 1,
@@ -308,18 +377,22 @@ export const CashTransfers: React.FC = () => {
     try {
       const baseCurr = (companyData?.settings?.currency || 'EGP').toUpperCase();
 
-      const getCurrencyRateVsBase = async (code: string) => {
+      const getCurrencyRateVsBase = async (code: string): Promise<number> => {
         if (code === baseCurr) return 1;
         const currObj = companyCurrencies.find(c => c.code?.toUpperCase() === code);
         const currId = currObj?.id;
 
         // Auto rates
         try {
-          const latestAuto = await apiRequest<Array<{ currency_id: string; rate: number | null }>>(
+          const latestAuto = await apiRequest<Array<{ currency_id: string; code?: string; currency_code?: string; rate: number | null }>>(
             `/currency-rates/latest?company_id=${user.company_id}`
           );
-          if (Array.isArray(latestAuto) && currId) {
-            const found = latestAuto.find(r => r.currency_id === currId);
+          if (Array.isArray(latestAuto)) {
+            const found = latestAuto.find(r => 
+              (currId && r.currency_id === currId) ||
+              r.code?.toUpperCase() === code ||
+              r.currency_code?.toUpperCase() === code
+            );
             if (found && found.rate && Number(found.rate) > 0) {
               return Number(found.rate);
             }
@@ -357,10 +430,23 @@ export const CashTransfers: React.FC = () => {
       const fromRateVsBase = await getCurrencyRateVsBase(fromCurr);
       const toRateVsBase = await getCurrencyRateVsBase(toCurr);
 
-      const rawRate = toRateVsBase > 0 ? (fromRateVsBase / toRateVsBase) : 1;
-      const calculatedRate = Number(rawRate.toFixed(4)) || 1;
-      const amt = currentAmount !== undefined ? currentAmount : formData.amount;
-      const convertedAmt = Number((amt * calculatedRate).toFixed(4));
+      let calculatedRate = 1;
+      let convertedAmt = amt;
+
+      if (fromCurr === baseCurr && toCurr !== baseCurr) {
+        // e.g. EGP to USD (1 USD = toRateVsBase EGP)
+        calculatedRate = toRateVsBase > 0 ? Number(toRateVsBase.toFixed(4)) : 1;
+        convertedAmt = calculatedRate > 0 ? Number((amt / calculatedRate).toFixed(2)) : 0;
+      } else if (fromCurr !== baseCurr && toCurr === baseCurr) {
+        // e.g. USD to EGP (1 USD = fromRateVsBase EGP)
+        calculatedRate = fromRateVsBase > 0 ? Number(fromRateVsBase.toFixed(4)) : 1;
+        convertedAmt = Number((amt * calculatedRate).toFixed(2));
+      } else {
+        // Foreign to Foreign
+        const cross = toRateVsBase > 0 ? (fromRateVsBase / toRateVsBase) : 1;
+        calculatedRate = Number(cross.toFixed(4)) || 1;
+        convertedAmt = Number((amt * calculatedRate).toFixed(2));
+      }
 
       setFormData(prev => ({
         ...prev,
@@ -370,8 +456,8 @@ export const CashTransfers: React.FC = () => {
       setExchangeRateType('auto');
       showNotification(
         language === 'ar' 
-          ? `تم جلب سعر الصرف من النظام: 1 ${fromCurr} = ${calculatedRate} ${toCurr}` 
-          : `Fetched system rate: 1 ${fromCurr} = ${calculatedRate} ${toCurr}`,
+          ? `تم جلب سعر الصرف من النظام: ${calculatedRate}` 
+          : `Fetched system rate: ${calculatedRate}`,
         'success'
       );
     } catch (e) {
@@ -422,27 +508,64 @@ export const CashTransfers: React.FC = () => {
   };
 
   const handleAmountChange = (newAmount: number) => {
+    const fromCurr = formData.from_currency || 'EGP';
+    const toCurr = formData.to_currency || 'EGP';
+    const baseCurr = (companyData?.settings?.currency || 'EGP').toUpperCase();
     const rate = Number(formData.exchange_rate) || 1;
-    const isMulti = (formData.from_currency || 'EGP') !== (formData.to_currency || 'EGP');
+    let converted = newAmount;
+
+    if (fromCurr !== toCurr) {
+      if (fromCurr === baseCurr && toCurr !== baseCurr) {
+        converted = rate > 0 ? Number((newAmount / rate).toFixed(2)) : 0;
+      } else {
+        converted = Number((newAmount * rate).toFixed(2));
+      }
+    }
+
     setFormData(prev => ({
       ...prev,
       amount: newAmount,
-      converted_amount: isMulti ? Number((newAmount * rate).toFixed(4)) : newAmount
+      converted_amount: converted
     }));
   };
 
   const handleRateChange = (newRate: number) => {
     setExchangeRateType('manual');
+    const fromCurr = formData.from_currency || 'EGP';
+    const toCurr = formData.to_currency || 'EGP';
+    const baseCurr = (companyData?.settings?.currency || 'EGP').toUpperCase();
+    let converted = formData.amount;
+
+    if (fromCurr !== toCurr) {
+      if (fromCurr === baseCurr && toCurr !== baseCurr) {
+        converted = newRate > 0 ? Number((formData.amount / newRate).toFixed(2)) : 0;
+      } else {
+        converted = Number((formData.amount * newRate).toFixed(2));
+      }
+    }
+
     setFormData(prev => ({
       ...prev,
       exchange_rate: newRate,
-      converted_amount: Number((prev.amount * newRate).toFixed(4))
+      converted_amount: converted
     }));
   };
 
   const handleConvertedAmountChange = (newConverted: number) => {
     setExchangeRateType('manual');
-    const newRate = formData.amount > 0 ? Number((newConverted / formData.amount).toFixed(4)) : 1;
+    const fromCurr = formData.from_currency || 'EGP';
+    const toCurr = formData.to_currency || 'EGP';
+    const baseCurr = (companyData?.settings?.currency || 'EGP').toUpperCase();
+    let newRate = 1;
+
+    if (fromCurr !== toCurr && formData.amount > 0) {
+      if (fromCurr === baseCurr && toCurr !== baseCurr) {
+        newRate = newConverted > 0 ? Number((formData.amount / newConverted).toFixed(4)) : 1;
+      } else {
+        newRate = Number((newConverted / formData.amount).toFixed(4));
+      }
+    }
+
     setFormData(prev => ({
       ...prev,
       converted_amount: newConverted,
@@ -779,6 +902,7 @@ export const CashTransfers: React.FC = () => {
 
     let totalSystemAmount = 0;
     const currencyTotals: Record<string, number> = {};
+    const baseCurr = (companyData?.settings?.currency || 'EGP').toUpperCase();
 
     targetList.forEach(t => {
       const fromCurr = getEffectiveFromCurrency(t);
@@ -786,12 +910,31 @@ export const CashTransfers: React.FC = () => {
       const amt = Number(t.amount) || 0;
       const isMulti = fromCurr !== toCurr;
       const rate = Number(t.exchange_rate) || 1;
-      const convertedAmt = t.converted_amount !== undefined && t.converted_amount !== null
-        ? Number(t.converted_amount)
-        : (isMulti ? amt * rate : amt);
+      
+      let depositedAmt = Number(t.converted_amount);
+      if (isNaN(depositedAmt) || depositedAmt === 0 || t.converted_amount === undefined || t.converted_amount === null) {
+        if (!isMulti) {
+          depositedAmt = amt;
+        } else if (fromCurr === baseCurr && toCurr !== baseCurr && rate > 0) {
+          depositedAmt = Number((amt / rate).toFixed(2));
+        } else if (rate > 0) {
+          depositedAmt = Number((amt * rate).toFixed(2));
+        } else {
+          depositedAmt = amt;
+        }
+      }
 
       currencyTotals[fromCurr] = (currencyTotals[fromCurr] || 0) + amt;
-      totalSystemAmount += convertedAmt;
+
+      let sysAmt = amt;
+      if (fromCurr === baseCurr) {
+        sysAmt = amt;
+      } else if (toCurr === baseCurr) {
+        sysAmt = depositedAmt;
+      } else {
+        sysAmt = amt * rate;
+      }
+      totalSystemAmount += sysAmt;
     });
 
     return {
@@ -843,7 +986,9 @@ export const CashTransfers: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-zinc-100">
+      {!isModalOpen ? (
+        <>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-zinc-100">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
             <ArrowLeftRight size={28} />
@@ -996,6 +1141,9 @@ export const CashTransfers: React.FC = () => {
                       </span>
                     </div>
                   </th>
+                  <th className="px-2.5 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter text-center">
+                    لوجو البنك
+                  </th>
                   <th className="px-3 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('from_payment_method_name')}>
                     <div className="flex items-center gap-1">
                       من بنك / خزينة
@@ -1023,6 +1171,9 @@ export const CashTransfers: React.FC = () => {
                       </span>
                     </div>
                   </th>
+                  <th className="px-3 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter text-center">
+                    رقم الخزنة / الحساب
+                  </th>
                   <th className="px-2.5 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter text-center">
                     عملة الوجهة
                   </th>
@@ -1030,7 +1181,7 @@ export const CashTransfers: React.FC = () => {
                     سعر الصرف
                   </th>
                   <th className="px-3 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter">
-                    المبلغ المودع / بعملة النظام
+                    المبلغ المودع (عملة الوجهة)
                   </th>
                   <th className="px-3 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter">{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</th>
                   <th className="px-3 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter">{t('common.description')}</th>
@@ -1043,9 +1194,27 @@ export const CashTransfers: React.FC = () => {
                   const toCurr = getEffectiveToCurrency(transfer);
                   const isMulti = fromCurr !== toCurr;
                   const rate = transfer.exchange_rate ? Number(transfer.exchange_rate) : (isMulti ? '-' : 1);
-                  const convertedAmt = transfer.converted_amount !== undefined && transfer.converted_amount !== null
-                    ? Number(transfer.converted_amount)
-                    : (isMulti && transfer.exchange_rate ? Number(transfer.amount) * Number(transfer.exchange_rate) : Number(transfer.amount));
+                  const baseCurr = (companyData?.settings?.currency || 'EGP').toUpperCase();
+
+                  const fromPM = paymentMethods.find(pm => pm.id === transfer.from_payment_method_id);
+                  const toPM = paymentMethods.find(pm => pm.id === transfer.to_payment_method_id);
+                  const fromBank = findEgyptianBank(fromPM);
+                  const toBank = findEgyptianBank(toPM);
+                  const displayedBank = fromBank || toBank;
+
+                  let depositedAmt = Number(transfer.converted_amount);
+                  if (isNaN(depositedAmt) || depositedAmt === 0 || transfer.converted_amount === undefined || transfer.converted_amount === null) {
+                    if (!isMulti) {
+                      depositedAmt = Number(transfer.amount) || 0;
+                    } else if (fromCurr === baseCurr && toCurr !== baseCurr && typeof rate === 'number' && rate > 0) {
+                      depositedAmt = Number((Number(transfer.amount) / rate).toFixed(2));
+                    } else if (typeof rate === 'number') {
+                      depositedAmt = Number((Number(transfer.amount) * rate).toFixed(2));
+                    } else {
+                      depositedAmt = Number(transfer.amount) || 0;
+                    }
+                  }
+
                   const isSelected = selectedTransferIds.includes(transfer.id);
 
                   return (
@@ -1071,6 +1240,16 @@ export const CashTransfers: React.FC = () => {
                           {transfer.transfer_number || '-'}
                         </span>
                       </td>
+                      {/* لوجو البنك */}
+                      <td className="px-2.5 py-2 text-center whitespace-nowrap">
+                        {displayedBank ? (
+                          <BankLogoBadge bank={displayedBank} size="sm" className="!w-7 !h-7 !p-0.5 rounded-lg border border-zinc-200 bg-white mx-auto shadow-2xs" />
+                        ) : fromPM?.bank_logo || toPM?.bank_logo ? (
+                          <img src={fromPM?.bank_logo || toPM?.bank_logo} alt="Bank" className="w-7 h-7 object-contain rounded-lg border border-zinc-200 bg-white p-0.5 mx-auto" />
+                        ) : (
+                          <span className="text-zinc-300">-</span>
+                        )}
+                      </td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1.5">
                           <div className="w-5 h-5 bg-red-50 text-red-600 rounded-md flex items-center justify-center shrink-0">
@@ -1080,13 +1259,7 @@ export const CashTransfers: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-2.5 py-2 text-center whitespace-nowrap">
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded border font-mono ${
-                          fromCurr === 'USD' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                          fromCurr === 'EUR' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                          'bg-zinc-100 text-zinc-700 border-zinc-200'
-                        }`}>
-                          {fromCurr}
-                        </span>
+                        {renderCurrencyBadge(fromCurr)}
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap font-mono font-bold text-xs text-zinc-900">
                         {formatNumber(transfer.amount)}
@@ -1099,18 +1272,18 @@ export const CashTransfers: React.FC = () => {
                           <span className="text-zinc-800 font-bold truncate max-w-[130px]">{transfer.to_payment_method_name}</span>
                         </div>
                       </td>
-                      <td className="px-2.5 py-2 text-center whitespace-nowrap">
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded border font-mono ${
-                          toCurr === 'USD' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                          toCurr === 'EUR' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                          'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        }`}>
-                          {toCurr}
+                      {/* رقم الخزنة / الحساب المحول إليها */}
+                      <td className="px-3 py-2 text-center whitespace-nowrap">
+                        <span className="font-mono text-xs font-bold text-zinc-700 bg-zinc-50 px-2 py-0.5 rounded border border-zinc-200">
+                          {toPM?.account_number || toPM?.code || '-'}
                         </span>
+                      </td>
+                      <td className="px-2.5 py-2 text-center whitespace-nowrap">
+                        {renderCurrencyBadge(toCurr)}
                       </td>
                       <td className="px-3 py-2 text-center whitespace-nowrap font-mono text-xs">
                         {isMulti ? (
-                          <span className="bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded font-bold border border-amber-200 text-[11px]">
+                          <span className="bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded font-black border border-amber-200 text-[11px]">
                             {typeof rate === 'number' ? rate.toFixed(4) : rate}
                           </span>
                         ) : (
@@ -1118,9 +1291,10 @@ export const CashTransfers: React.FC = () => {
                         )}
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">
-                        <span className="text-emerald-700 font-mono font-black text-xs">
-                          {formatNumber(convertedAmt)} <span className="text-[10px] font-normal text-zinc-500 font-sans">{toCurr}</span>
-                        </span>
+                        <div className="flex items-center gap-1 font-mono font-black text-xs text-emerald-700">
+                          <span>{formatNumber(depositedAmt)}</span>
+                          <span className="text-[10px] font-bold text-zinc-500 font-sans">{toCurr}</span>
+                        </div>
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">
                         {transfer.entry_number ? (
@@ -1328,13 +1502,11 @@ export const CashTransfers: React.FC = () => {
         )}
         <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
       </div>
-
-      {/* Add/Edit Transfer Modal */}
-      <AnimatePresence>
-        {isModalOpen && (
-          <div className="fixed inset-0 bg-zinc-100 dark:bg-zinc-900 z-[300] flex flex-col animate-in fade-in duration-200">
-            {/* Header Block */}
-            <div className="px-4 py-3 md:px-6 md:py-3.5 border-b border-zinc-200 flex items-center justify-between sticky top-0 bg-white z-[310] shadow-xs">
+      </>
+    ) : (
+      <div className="bg-white rounded-3xl border border-zinc-200 shadow-sm overflow-hidden animate-in fade-in duration-200 flex flex-col min-h-[75vh]">
+        {/* Header Block */}
+        <div className="px-4 py-3 md:px-6 md:py-3.5 border-b border-zinc-200 flex items-center justify-between sticky top-0 bg-white z-20 shadow-xs">
               <div className="flex items-center gap-3">
                 <button 
                   onClick={closeModal}
@@ -1694,7 +1866,13 @@ export const CashTransfers: React.FC = () => {
                           <label className="block text-[11px] font-bold text-amber-950">
                             {language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}
                             <span className="text-[10px] text-zinc-500 font-normal ms-1">
-                              (1 {formData.from_currency} = {formData.exchange_rate} {formData.to_currency})
+                              {(() => {
+                                const baseCurr = (companyData?.settings?.currency || 'EGP').toUpperCase();
+                                if (formData.from_currency === baseCurr && formData.to_currency !== baseCurr) {
+                                  return `(1 ${formData.to_currency} = ${formData.exchange_rate} ${formData.from_currency})`;
+                                }
+                                return `(1 ${formData.from_currency} = ${formData.exchange_rate} ${formData.to_currency})`;
+                              })()}
                             </span>
                           </label>
                           <div className="relative">
@@ -1758,31 +1936,11 @@ export const CashTransfers: React.FC = () => {
                       onChange={setAttachments}
                     />
                   </div>
-
-                  {/* Action Footer */}
-                  <div className="sticky bottom-0 bg-white/95 backdrop-blur-md border-t border-zinc-200 p-4 z-30 flex items-center justify-end gap-3 mt-4 -mx-4 md:-mx-6 -mb-4 md:-mb-6 px-4 md:px-6 shadow-sm">
-                    <button 
-                      type="button"
-                      onClick={closeModal}
-                      className="px-6 py-2.5 bg-white text-zinc-700 rounded-xl font-bold border border-zinc-200 hover:bg-zinc-100 transition-all active:scale-95 shadow-sm text-sm"
-                    >
-                      {t('common.cancel')}
-                    </button>
-                    <button 
-                      type="submit"
-                      disabled={formData.amount <= 0 || !formData.from_payment_method_id || !formData.to_payment_method_id}
-                      className="px-8 py-2.5 bg-emerald-600 text-white rounded-xl font-black hover:bg-emerald-700 transition-all shadow-md shadow-emerald-600/20 active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale text-sm"
-                    >
-                      <Save className="w-4 h-4" />
-                      <span>{editingTransfer ? t('common.save') : (language === 'ar' ? 'إبرام التحويل' : 'Execute Transfer')}</span>
-                    </button>
-                  </div>
                 </form>
               </div>
             </div>
           </div>
         )}
-      </AnimatePresence>
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
