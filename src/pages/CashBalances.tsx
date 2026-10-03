@@ -2,17 +2,52 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { PaymentMethod, JournalEntry, Account } from '../types';
-import { Calendar, Download, Printer, Wallet, ArrowLeftRight, BarChart3, RefreshCcw, Search, ArrowLeft, ArrowRight, ExternalLink } from 'lucide-react';
+import { 
+  Calendar, Download, Printer, Wallet, ArrowLeftRight, BarChart3, 
+  RefreshCcw, Search, ArrowLeft, ArrowRight, ExternalLink,
+  Landmark, Smartphone, BookOpen, Layers
+} from 'lucide-react';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { dbService } from '../services/dbService';
 import { formatNumber, formatDate } from '../utils/formatUtils';
 import { useNavigation } from '../contexts/NavigationContext';
+import { EGYPTIAN_BANKS_DATA, BankLogoBadge, EgyptianBank, BANK_LOGO_MAP } from '../data/egyptianBanks';
+
+const findEgyptianBank = (methodOrBank: { bank_code?: string; name?: string; bank_name?: string; swift_code?: string } | null | undefined): EgyptianBank | null => {
+  if (!methodOrBank) return null;
+  if (methodOrBank.bank_code) {
+    const b = EGYPTIAN_BANKS_DATA.find(x => x.code.toUpperCase() === methodOrBank.bank_code?.toUpperCase());
+    if (b) return b;
+  }
+  if (methodOrBank.swift_code) {
+    const b = EGYPTIAN_BANKS_DATA.find(x => x.swift.toUpperCase() === methodOrBank.swift_code?.toUpperCase());
+    if (b) return b;
+  }
+  const nameToSearch = (methodOrBank.bank_name || methodOrBank.name || '').trim().toLowerCase();
+  if (nameToSearch) {
+    const b = EGYPTIAN_BANKS_DATA.find(x => 
+      x.nameAr.toLowerCase() === nameToSearch ||
+      nameToSearch.includes(x.nameAr.toLowerCase()) ||
+      x.nameAr.toLowerCase().includes(nameToSearch) ||
+      x.nameEn.toLowerCase() === nameToSearch ||
+      x.code.toLowerCase() === nameToSearch
+    );
+    if (b) return b;
+  }
+  return null;
+};
 
 interface CashBalanceData {
   id: string;
   code: string;
   name: string;
+  type: 'cash' | 'bank' | 'wallet' | 'other';
+  typeLabelAr: string;
+  typeLabelEn: string;
+  bankLogo?: string;
+  bankObj?: EgyptianBank | null;
+  accountId?: string;
   accountName: string;
   openingBalance: number;
   
@@ -177,6 +212,7 @@ export const CashBalances: React.FC = () => {
   const [rawCashTransfers, setRawCashTransfers] = useState<any[]>([]);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [groupBy, setGroupBy] = useState<'none' | 'type' | 'account'>('none');
   const [hideEmptyColumns, setHideEmptyColumns] = useState(false);
   const [hideEmptyPaymentMethods, setHideEmptyPaymentMethods] = useState(false);
   const [isCompact, setIsCompact] = useState(true);
@@ -359,10 +395,30 @@ export const CashBalances: React.FC = () => {
 
           const linkedAccount = accountsData.find(a => a.id === method.account_id);
 
+          const methodType = (method.type || 'cash') as 'cash' | 'bank' | 'wallet';
+          let typeLabelAr = 'خزينة';
+          let typeLabelEn = 'Cash Safe';
+          if (methodType === 'bank') {
+            typeLabelAr = 'بنك';
+            typeLabelEn = 'Bank';
+          } else if (methodType === 'wallet') {
+            typeLabelAr = 'محفظة إلكترونية';
+            typeLabelEn = 'E-Wallet';
+          }
+
+          const matchedBank = methodType === 'bank' ? findEgyptianBank(method) : null;
+          const logoUrl = method.bank_logo || matchedBank?.logoUrl || (matchedBank && BANK_LOGO_MAP[matchedBank.code] ? BANK_LOGO_MAP[matchedBank.code] : undefined);
+
           return {
             id: method.id,
             code: method.code || '-',
             name: method.name,
+            type: methodType,
+            typeLabelAr,
+            typeLabelEn,
+            bankLogo: logoUrl,
+            bankObj: matchedBank,
+            accountId: method.account_id,
             accountName: linkedAccount ? `${linkedAccount.code} - ${linkedAccount.name}` : (method.account_name || '-'),
             openingBalance: beginningBalance,
             receiptVouchers: receiptVouchersAmount,
@@ -472,6 +528,12 @@ export const CashBalances: React.FC = () => {
               name: language === 'ar' 
                 ? `حركات وقيود عامة على ${data.account.name}` 
                 : `General Ledger Entries on ${data.account.name}`,
+              type: 'other',
+              typeLabelAr: 'قيد عام',
+              typeLabelEn: 'General Ledger',
+              bankLogo: undefined,
+              bankObj: null,
+              accountId: data.account.id,
               accountName: `${data.account.code} - ${data.account.name}`,
               openingBalance: beginningBalance,
               receiptVouchers: 0,
@@ -509,7 +571,10 @@ export const CashBalances: React.FC = () => {
   const filteredBalances = balances.filter(b => {
     // 1. Search term filter
     const matchesSearch = b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          b.code.toLowerCase().includes(searchTerm.toLowerCase());
+                          b.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          b.accountName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (b.typeLabelAr && b.typeLabelAr.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                          (b.typeLabelEn && b.typeLabelEn.toLowerCase().includes(searchTerm.toLowerCase()));
     if (!matchesSearch) return false;
 
     // 2. Hide empty payment methods filter
@@ -533,37 +598,132 @@ export const CashBalances: React.FC = () => {
     return true;
   });
 
-  const totals = filteredBalances.reduce((acc, b) => ({
-    openingBalance: acc.openingBalance + b.openingBalance,
-    receiptVouchers: acc.receiptVouchers + b.receiptVouchers,
-    salesInvoices: acc.salesInvoices + b.salesInvoices,
-    purchaseReturns: acc.purchaseReturns + b.purchaseReturns,
-    transferIn: acc.transferIn + b.transferIn,
-    otherIn: acc.otherIn + b.otherIn,
-    paymentVouchers: acc.paymentVouchers + b.paymentVouchers,
-    purchaseInvoices: acc.purchaseInvoices + b.purchaseInvoices,
-    salesReturns: acc.salesReturns + b.salesReturns,
-    transferOut: acc.transferOut + b.transferOut,
-    otherOut: acc.otherOut + b.otherOut,
-    balance: acc.balance + b.balance
-  }), {
-    openingBalance: 0,
-    receiptVouchers: 0,
-    salesInvoices: 0,
-    purchaseReturns: 0,
-    transferIn: 0,
-    otherIn: 0,
-    paymentVouchers: 0,
-    purchaseInvoices: 0,
-    salesReturns: 0,
-    transferOut: 0,
-    otherOut: 0,
-    balance: 0
+  const computeTotals = (items: CashBalanceData[]) => ({
+    openingBalance: items.reduce((sum, b) => sum + b.openingBalance, 0),
+    receiptVouchers: items.reduce((sum, b) => sum + b.receiptVouchers, 0),
+    salesInvoices: items.reduce((sum, b) => sum + b.salesInvoices, 0),
+    purchaseReturns: items.reduce((sum, b) => sum + b.purchaseReturns, 0),
+    transferIn: items.reduce((sum, b) => sum + b.transferIn, 0),
+    otherIn: items.reduce((sum, b) => sum + b.otherIn, 0),
+    paymentVouchers: items.reduce((sum, b) => sum + b.paymentVouchers, 0),
+    purchaseInvoices: items.reduce((sum, b) => sum + b.purchaseInvoices, 0),
+    salesReturns: items.reduce((sum, b) => sum + b.salesReturns, 0),
+    transferOut: items.reduce((sum, b) => sum + b.transferOut, 0),
+    otherOut: items.reduce((sum, b) => sum + b.otherOut, 0),
+    balance: items.reduce((sum, b) => sum + b.balance, 0)
   });
+
+  const totals = useMemo(() => computeTotals(filteredBalances), [filteredBalances]);
+
+  const groupedData = useMemo(() => {
+    if (groupBy === 'none') {
+      return [{
+        id: 'all',
+        titleAr: '',
+        titleEn: '',
+        icon: null,
+        colorClass: '',
+        items: filteredBalances,
+        totals
+      }];
+    }
+
+    if (groupBy === 'type') {
+      const typeOrder = ['bank', 'cash', 'wallet', 'other'] as const;
+      const typeMeta: Record<string, { titleAr: string; titleEn: string; icon: any; color: string }> = {
+        bank: {
+          titleAr: 'الحسابات البنكية (البنوك)',
+          titleEn: 'Bank Accounts',
+          icon: Landmark,
+          color: 'text-indigo-700 bg-indigo-50 border-indigo-200'
+        },
+        cash: {
+          titleAr: 'الخزائن والنقدية',
+          titleEn: 'Cash & Safes',
+          icon: Wallet,
+          color: 'text-emerald-700 bg-emerald-50 border-emerald-200'
+        },
+        wallet: {
+          titleAr: 'المحافظ الإلكترونية',
+          titleEn: 'E-Wallets',
+          icon: Smartphone,
+          color: 'text-violet-700 bg-violet-50 border-violet-200'
+        },
+        other: {
+          titleAr: 'حسابات وقيود الأستاذ العام',
+          titleEn: 'General Ledger Accounts',
+          icon: BookOpen,
+          color: 'text-slate-700 bg-slate-50 border-slate-200'
+        }
+      };
+
+      return typeOrder
+        .map(tKey => {
+          const items = filteredBalances.filter(b => b.type === tKey);
+          if (items.length === 0) return null;
+          return {
+            id: `type_${tKey}`,
+            titleAr: typeMeta[tKey].titleAr,
+            titleEn: typeMeta[tKey].titleEn,
+            icon: typeMeta[tKey].icon,
+            colorClass: typeMeta[tKey].color,
+            items,
+            totals: computeTotals(items)
+          };
+        })
+        .filter(Boolean) as {
+          id: string;
+          titleAr: string;
+          titleEn: string;
+          icon: any;
+          colorClass: string;
+          items: CashBalanceData[];
+          totals: ReturnType<typeof computeTotals>;
+        }[];
+    }
+
+    if (groupBy === 'account') {
+      const map = new Map<string, CashBalanceData[]>();
+      filteredBalances.forEach(b => {
+        const accKey = b.accountName || (language === 'ar' ? 'حساب غير محدد' : 'Unspecified Account');
+        if (!map.has(accKey)) {
+          map.set(accKey, []);
+        }
+        map.get(accKey)!.push(b);
+      });
+
+      const groups: {
+        id: string;
+        titleAr: string;
+        titleEn: string;
+        icon: any;
+        colorClass: string;
+        items: CashBalanceData[];
+        totals: ReturnType<typeof computeTotals>;
+      }[] = [];
+
+      map.forEach((items, accKey) => {
+        groups.push({
+          id: `acc_${accKey}`,
+          titleAr: `${language === 'ar' ? 'الحساب المحاسبي' : 'Account'}: ${accKey}`,
+          titleEn: `Account: ${accKey}`,
+          icon: BookOpen,
+          colorClass: 'text-sky-800 bg-sky-50 border-sky-200',
+          items,
+          totals: computeTotals(items)
+        });
+      });
+      return groups;
+    }
+
+    return [];
+  }, [groupBy, filteredBalances, totals, language]);
 
   const allColumns = [
     { id: 'code', labelAr: 'كود طريقة السداد', labelEn: 'Payment Method Code', type: 'meta' },
     { id: 'name', labelAr: 'اسم طريقة السداد', labelEn: 'Payment Method Name', type: 'meta' },
+    { id: 'type', labelAr: 'نوع طريقة السداد', labelEn: 'Payment Method Type', type: 'meta' },
+    { id: 'logo', labelAr: 'اللوجو', labelEn: 'Logo', type: 'meta' },
     { id: 'accountName', labelAr: 'اسم الحساب المحاسبي', labelEn: 'Linked Account Name', type: 'meta' },
     { id: 'openingBalance', labelAr: 'رصيد أول الفترة', labelEn: 'Beginning Balance', type: 'balance' },
     
@@ -586,6 +746,7 @@ export const CashBalances: React.FC = () => {
   ];
 
   const visibleColumns = allColumns.filter(col => {
+    if (col.id === 'logo' && !balances.some(b => b.type === 'bank')) return false;
     if (col.type === 'meta' || col.id === 'balance' || col.id === 'openingBalance') return true;
     if (hideEmptyColumns) {
       const colTotal = totals[col.id as keyof typeof totals] || 0;
@@ -780,14 +941,72 @@ export const CashBalances: React.FC = () => {
 
   const handleExportExcel = () => {
     if (viewMode === 'summary') {
-      const data = filteredBalances.map(b => {
-        const rowData: Record<string, any> = {};
-        visibleColumns.forEach(col => {
-          const colHeader = language === 'ar' ? col.labelAr : col.labelEn;
-          rowData[colHeader] = b[col.id as keyof typeof b];
+      const data: Record<string, any>[] = [];
+
+      if (groupBy === 'none') {
+        filteredBalances.forEach(b => {
+          const rowData: Record<string, any> = {};
+          visibleColumns.forEach(col => {
+            const colHeader = language === 'ar' ? col.labelAr : col.labelEn;
+            if (col.id === 'type') {
+              rowData[colHeader] = language === 'ar' ? b.typeLabelAr : b.typeLabelEn;
+            } else if (col.id === 'logo') {
+              rowData[colHeader] = b.bankObj?.nameAr || (b.type === 'bank' ? (language === 'ar' ? 'بنك' : 'Bank') : '-');
+            } else {
+              rowData[colHeader] = b[col.id as keyof typeof b];
+            }
+          });
+          data.push(rowData);
         });
-        return rowData;
+      } else {
+        groupedData.forEach(group => {
+          group.items.forEach(b => {
+            const rowData: Record<string, any> = {
+              [language === 'ar' ? 'المجموعة' : 'Group']: language === 'ar' ? group.titleAr : group.titleEn
+            };
+            visibleColumns.forEach(col => {
+              const colHeader = language === 'ar' ? col.labelAr : col.labelEn;
+              if (col.id === 'type') {
+                rowData[colHeader] = language === 'ar' ? b.typeLabelAr : b.typeLabelEn;
+              } else if (col.id === 'logo') {
+                rowData[colHeader] = b.bankObj?.nameAr || (b.type === 'bank' ? (language === 'ar' ? 'بنك' : 'Bank') : '-');
+              } else {
+                rowData[colHeader] = b[col.id as keyof typeof b];
+              }
+            });
+            data.push(rowData);
+          });
+
+          // Group Subtotal Row
+          const subtotalRow: Record<string, any> = {
+            [language === 'ar' ? 'المجموعة' : 'Group']: language === 'ar' ? `إجمالي: ${group.titleAr}` : `Total: ${group.titleEn}`
+          };
+          visibleColumns.forEach(col => {
+            const colHeader = language === 'ar' ? col.labelAr : col.labelEn;
+            if (col.type === 'meta') {
+              subtotalRow[colHeader] = '-';
+            } else {
+              subtotalRow[colHeader] = group.totals[col.id as keyof typeof group.totals] || 0;
+            }
+          });
+          data.push(subtotalRow);
+        });
+      }
+
+      // Grand Total Row
+      const grandTotalRow: Record<string, any> = {
+        ...(groupBy !== 'none' ? { [language === 'ar' ? 'المجموعة' : 'Group']: language === 'ar' ? 'الإجمالي العام' : 'Grand Total' } : {})
+      };
+      visibleColumns.forEach(col => {
+        const colHeader = language === 'ar' ? col.labelAr : col.labelEn;
+        if (col.type === 'meta') {
+          grandTotalRow[colHeader] = col.id === 'name' ? (language === 'ar' ? 'الإجمالي العام' : 'Grand Total') : '-';
+        } else {
+          grandTotalRow[colHeader] = totals[col.id as keyof typeof totals] || 0;
+        }
       });
+      data.push(grandTotalRow);
+
       exportToExcel(data, { filename: 'Cash_Balances_Report' });
     } else {
       const data = [
@@ -862,6 +1081,16 @@ export const CashBalances: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 flex-wrap">
+            {viewMode === 'statement' && selectedMethod?.type === 'bank' && (() => {
+              const matched = findEgyptianBank(selectedMethod);
+              if (matched) {
+                return <BankLogoBadge bank={matched} size="sm" className="!w-9 !h-9 !p-1 rounded-xl shadow-xs border border-zinc-200 bg-white shrink-0" />;
+              }
+              if (selectedMethod.bank_logo) {
+                return <img src={selectedMethod.bank_logo} alt={selectedMethod.name} className="w-9 h-9 object-contain rounded-xl border border-zinc-200 bg-white p-1 shrink-0" />;
+              }
+              return null;
+            })()}
             <h2 className="text-2xl font-black text-zinc-900">
               {viewMode === 'summary' 
                 ? (language === 'ar' ? 'تقرير النقدية (الخزائن والبنوك) خلال فترة' : 'Cash & Bank Report (Period)')
@@ -949,35 +1178,83 @@ export const CashBalances: React.FC = () => {
 
       {viewMode === 'summary' ? (
         <>
-          {/* Checkbox Options */}
-          <div className="flex flex-wrap items-center gap-6 bg-zinc-50 border border-zinc-200/80 px-4 py-2.5 rounded-2xl">
-            <label className="flex items-center gap-2.5 text-xs font-bold text-zinc-700 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 transition-all cursor-pointer"
-                checked={hideEmptyColumns}
-                onChange={(e) => setHideEmptyColumns(e.target.checked)}
-              />
-              {language === 'ar' ? 'إخفاء الأعمدة التي لا تحتوي على أي حركة' : 'Hide columns with no movement'}
-            </label>
-            <label className="flex items-center gap-2.5 text-xs font-bold text-zinc-700 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 transition-all cursor-pointer"
-                checked={hideEmptyPaymentMethods}
-                onChange={(e) => setHideEmptyPaymentMethods(e.target.checked)}
-              />
-              {language === 'ar' ? 'إخفاء طرق السداد التي لا تحتوي على أي حركة' : 'Hide payment methods with no movement'}
-            </label>
-            <label className="flex items-center gap-2.5 text-xs font-bold text-zinc-700 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 transition-all cursor-pointer"
-                checked={isCompact}
-                onChange={(e) => setIsCompact(e.target.checked)}
-              />
-              {language === 'ar' ? 'عرض مدمج ومصغر (تقليل حجم الخلايا والصفوف والأعمدة)' : 'Compact View (Slim rows & cells)'}
-            </label>
+          {/* Options & Grouping Bar */}
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-zinc-50 border border-zinc-200/80 px-4 py-3 rounded-2xl shadow-xs">
+            {/* Grouping Selector */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-zinc-600 flex items-center gap-1.5 shrink-0">
+                <Layers size={15} className="text-indigo-600" />
+                {language === 'ar' ? 'طريقة التجميع:' : 'Group By:'}
+              </span>
+              <div className="inline-flex items-center bg-zinc-200/70 p-1 rounded-xl gap-1">
+                <button
+                  type="button"
+                  onClick={() => setGroupBy('none')}
+                  className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all cursor-pointer ${
+                    groupBy === 'none'
+                      ? 'bg-white text-zinc-900 shadow-xs'
+                      : 'text-zinc-600 hover:text-zinc-900'
+                  }`}
+                >
+                  {language === 'ar' ? 'بدون تجميع' : 'No Grouping'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGroupBy('type')}
+                  className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                    groupBy === 'type'
+                      ? 'bg-white text-indigo-700 shadow-xs'
+                      : 'text-zinc-600 hover:text-zinc-900'
+                  }`}
+                >
+                  <Landmark size={13} />
+                  {language === 'ar' ? 'حسب النوع' : 'By Type'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGroupBy('account')}
+                  className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                    groupBy === 'account'
+                      ? 'bg-white text-emerald-700 shadow-xs'
+                      : 'text-zinc-600 hover:text-zinc-900'
+                  }`}
+                >
+                  <BookOpen size={13} />
+                  {language === 'ar' ? 'حسب الحساب' : 'By Account'}
+                </button>
+              </div>
+            </div>
+
+            {/* Checkbox Options */}
+            <div className="flex flex-wrap items-center gap-5">
+              <label className="flex items-center gap-2 text-xs font-bold text-zinc-700 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 transition-all cursor-pointer"
+                  checked={hideEmptyColumns}
+                  onChange={(e) => setHideEmptyColumns(e.target.checked)}
+                />
+                {language === 'ar' ? 'إخفاء الأعمدة التي لا تحتوي على أي حركة' : 'Hide columns with no movement'}
+              </label>
+              <label className="flex items-center gap-2 text-xs font-bold text-zinc-700 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 transition-all cursor-pointer"
+                  checked={hideEmptyPaymentMethods}
+                  onChange={(e) => setHideEmptyPaymentMethods(e.target.checked)}
+                />
+                {language === 'ar' ? 'إخفاء طرق السداد التي لا تحتوي على أي حركة' : 'Hide payment methods with no movement'}
+              </label>
+              <label className="flex items-center gap-2 text-xs font-bold text-zinc-700 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 transition-all cursor-pointer"
+                  checked={isCompact}
+                  onChange={(e) => setIsCompact(e.target.checked)}
+                />
+                {language === 'ar' ? 'عرض مدمج ومصغر (تقليل حجم الخلايا والصفوف والأعمدة)' : 'Compact View'}
+              </label>
+            </div>
           </div>
 
           {/* Summary Table */}
@@ -989,7 +1266,7 @@ export const CashBalances: React.FC = () => {
                     {visibleColumns.map(col => (
                       <th 
                         key={col.id} 
-                        className={`${isCompact ? 'px-2 py-1.5 text-xs' : 'px-3.5 py-2.5 text-sm'} font-bold text-zinc-700 border-l border-zinc-200 whitespace-nowrap ${col.type === 'meta' ? '' : 'text-center'}`}
+                        className={`${isCompact ? 'px-2 py-1.5 text-xs' : 'px-3.5 py-2.5 text-sm'} font-bold text-zinc-700 border-l border-zinc-200 whitespace-nowrap ${col.id === 'logo' ? 'text-center' : col.type === 'meta' ? '' : 'text-center'}`}
                       >
                         {language === 'ar' ? col.labelAr : col.labelEn}
                       </th>
@@ -998,51 +1275,186 @@ export const CashBalances: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
                   {filteredBalances.length > 0 ? (
-                    filteredBalances.map((b) => (
-                      <tr key={b.id} className="hover:bg-zinc-50/70 transition-colors">
-                        {visibleColumns.map(col => {
-                          const value = b[col.id as keyof typeof b];
-                          const isMeta = col.type === 'meta';
-                          const isBalance = col.type === 'balance';
-                          const isInflow = col.type === 'inflow';
-                          const isOutflow = col.type === 'outflow';
-
-                          const numVal = Number(value) || 0;
-
-                          let textColor = 'text-zinc-900';
-                          if (isInflow) textColor = 'text-emerald-600';
-                          if (isOutflow) textColor = 'text-rose-600';
-                          if (isBalance) {
-                            textColor = numVal >= 0 ? 'text-emerald-700 font-bold' : 'text-rose-600 font-bold';
-                          }
-
-                          return (
-                            <td 
-                              key={col.id} 
-                              className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm'} border-l border-zinc-100 whitespace-nowrap ${isMeta ? 'font-medium' : 'text-center font-bold font-mono tabular-nums'} ${textColor}`}
-                            >
-                              {col.id === 'name' ? (
-                                <button 
-                                  onClick={() => {
-                                    setSelectedMethodId(b.id);
-                                    setViewMode('statement');
-                                  }} 
-                                  className="text-indigo-600 hover:text-indigo-900 hover:underline font-bold text-right cursor-pointer truncate max-w-[180px] inline-block align-middle"
-                                  title={value as string}
-                                >
-                                  {value as string}
-                                </button>
-                              ) : isMeta ? (
-                                <span className="truncate max-w-[140px] inline-block align-middle" title={value as string}>
-                                  {value as string}
-                                </span>
-                              ) : (
-                                numVal > 0.001 || numVal < -0.001 ? formatNumber(numVal) : '-'
-                              )}
+                    groupedData.map((group) => (
+                      <React.Fragment key={group.id}>
+                        {/* Group Header Row */}
+                        {groupBy !== 'none' && (
+                          <tr className="bg-gradient-to-r from-zinc-100 via-zinc-50 to-zinc-100/60 border-y-2 border-zinc-300 font-bold text-zinc-900">
+                            <td colSpan={visibleColumns.length} className="px-4 py-2.5">
+                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                <div className="flex items-center gap-2.5">
+                                  {group.icon && (
+                                    <div className={`p-1.5 rounded-lg border shadow-2xs ${group.colorClass || 'bg-white text-zinc-700'}`}>
+                                      <group.icon size={16} />
+                                    </div>
+                                  )}
+                                  <span className="text-xs md:text-sm font-black text-zinc-800">
+                                    {language === 'ar' ? group.titleAr : group.titleEn}
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-zinc-200/80 text-zinc-700">
+                                    {group.items.length} {language === 'ar' ? 'طريقة سداد' : 'methods'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-3 text-xs font-mono">
+                                  <span className="text-zinc-500 font-bold">
+                                    {language === 'ar' ? 'صافي رصيد المجموعة:' : 'Group Balance:'}
+                                  </span>
+                                  <span className={`font-black font-mono tabular-nums px-2 py-0.5 rounded-md ${group.totals.balance >= 0 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
+                                    {formatNumber(group.totals.balance)}
+                                  </span>
+                                </div>
+                              </div>
                             </td>
-                          );
-                        })}
-                      </tr>
+                          </tr>
+                        )}
+
+                        {/* Group Items */}
+                        {group.items.map((b) => (
+                          <tr key={b.id} className="hover:bg-zinc-50/70 transition-colors">
+                            {visibleColumns.map(col => {
+                              const value = b[col.id as keyof typeof b];
+                              const isMeta = col.type === 'meta';
+                              const isBalance = col.type === 'balance';
+                              const isInflow = col.type === 'inflow';
+                              const isOutflow = col.type === 'outflow';
+
+                              const numVal = Number(value) || 0;
+
+                              let textColor = 'text-zinc-900';
+                              if (isInflow) textColor = 'text-emerald-600';
+                              if (isOutflow) textColor = 'text-rose-600';
+                              if (isBalance) {
+                                textColor = numVal >= 0 ? 'text-emerald-700 font-bold' : 'text-rose-600 font-bold';
+                              }
+
+                              // Column: Logo
+                              if (col.id === 'logo') {
+                                if (b.type === 'bank') {
+                                  return (
+                                    <td key={col.id} className={`${isCompact ? 'px-1 py-1' : 'px-2 py-1.5'} border-l border-zinc-100 text-center`}>
+                                      <div className="flex items-center justify-center">
+                                        {b.bankObj ? (
+                                          <BankLogoBadge bank={b.bankObj} size="sm" className="!w-6 !h-6 !p-0.5 rounded-md shadow-2xs border border-zinc-200/90 bg-white" />
+                                        ) : b.bankLogo ? (
+                                          <img src={b.bankLogo} alt={b.name} className="w-6 h-6 object-contain rounded-md border border-zinc-200 bg-white p-0.5" />
+                                        ) : (
+                                          <div className="w-6 h-6 rounded-md bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600" title={b.name}>
+                                            <Landmark size={13} />
+                                          </div>
+                                        )}
+                                      </div>
+                                    </td>
+                                  );
+                                }
+                                return (
+                                  <td key={col.id} className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm'} border-l border-zinc-100 text-center text-zinc-300 font-bold`}>
+                                    -
+                                  </td>
+                                );
+                              }
+
+                              // Column: Type
+                              if (col.id === 'type') {
+                                let badgeClass = 'bg-zinc-100 text-zinc-700 border-zinc-200';
+                                let IconComponent = Wallet;
+                                if (b.type === 'bank') {
+                                  badgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+                                  IconComponent = Landmark;
+                                } else if (b.type === 'cash') {
+                                  badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                                  IconComponent = Wallet;
+                                } else if (b.type === 'wallet') {
+                                  badgeClass = 'bg-violet-50 text-violet-700 border-violet-200';
+                                  IconComponent = Smartphone;
+                                } else if (b.type === 'other') {
+                                  badgeClass = 'bg-slate-100 text-slate-700 border-slate-200';
+                                  IconComponent = BookOpen;
+                                }
+
+                                return (
+                                  <td key={col.id} className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm'} border-l border-zinc-100 whitespace-nowrap`}>
+                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold border ${badgeClass}`}>
+                                      <IconComponent size={12} className="shrink-0" />
+                                      {language === 'ar' ? b.typeLabelAr : b.typeLabelEn}
+                                    </span>
+                                  </td>
+                                );
+                              }
+
+                              return (
+                                <td 
+                                  key={col.id} 
+                                  className={`${isCompact ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm'} border-l border-zinc-100 whitespace-nowrap ${isMeta ? 'font-medium' : 'text-center font-bold font-mono tabular-nums'} ${textColor}`}
+                                >
+                                  {col.id === 'name' ? (
+                                    <button 
+                                      onClick={() => {
+                                        setSelectedMethodId(b.id);
+                                        setViewMode('statement');
+                                      }} 
+                                      className="text-indigo-600 hover:text-indigo-900 hover:underline font-bold text-right cursor-pointer truncate max-w-[180px] inline-block align-middle"
+                                      title={value as string}
+                                    >
+                                      {value as string}
+                                    </button>
+                                  ) : isMeta ? (
+                                    <span className="truncate max-w-[140px] inline-block align-middle" title={value as string}>
+                                      {value as string}
+                                    </span>
+                                  ) : (
+                                    numVal > 0.001 || numVal < -0.001 ? formatNumber(numVal) : '-'
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+
+                        {/* Group Subtotal Row */}
+                        {groupBy !== 'none' && (
+                          <tr className="bg-zinc-100/80 font-bold text-xs border-b-2 border-zinc-200">
+                            {visibleColumns.map((col, idx) => {
+                              const isMeta = col.type === 'meta';
+                              if (isMeta) {
+                                if (idx === 0) {
+                                  const metaColsCount = visibleColumns.filter(c => c.type === 'meta').length;
+                                  return (
+                                    <td 
+                                      key={col.id} 
+                                      colSpan={metaColsCount} 
+                                      className={`${isCompact ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'} text-right border-l border-zinc-200 font-black text-zinc-800`}
+                                    >
+                                      {language === 'ar' ? `إجمالي: ${group.titleAr}` : `Total: ${group.titleEn}`}
+                                    </td>
+                                  );
+                                }
+                                return null;
+                              }
+
+                              const val = group.totals[col.id as keyof typeof group.totals] || 0;
+                              const isInflow = col.type === 'inflow';
+                              const isOutflow = col.type === 'outflow';
+                              const isBalance = col.type === 'balance';
+                              
+                              let textColor = 'text-zinc-800';
+                              if (isInflow) textColor = 'text-emerald-700 font-black';
+                              if (isOutflow) textColor = 'text-rose-700 font-black';
+                              if (isBalance) {
+                                textColor = val >= 0 ? 'text-emerald-800 font-black' : 'text-rose-700 font-black';
+                              }
+
+                              return (
+                                <td 
+                                  key={col.id} 
+                                  className={`${isCompact ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm'} text-center border-l border-zinc-200 font-mono tabular-nums ${textColor}`}
+                                >
+                                  {Math.abs(val) > 0.001 ? formatNumber(val) : '-'}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        )}
+                      </React.Fragment>
                     ))
                   ) : (
                     <tr>
@@ -1051,19 +1463,21 @@ export const CashBalances: React.FC = () => {
                       </td>
                     </tr>
                   )}
-                  {/* Totals Row */}
+
+                  {/* Grand Totals Row */}
                   <tr className="bg-zinc-900 text-white font-bold text-xs">
                     {visibleColumns.map((col, idx) => {
                       const isMeta = col.type === 'meta';
                       if (isMeta) {
                         if (idx === 0) {
+                          const metaColsCount = visibleColumns.filter(c => c.type === 'meta').length;
                           return (
                             <td 
                               key={col.id} 
-                              colSpan={3} 
-                              className={`${isCompact ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'} text-center border-l border-zinc-800 font-bold`}
+                              colSpan={metaColsCount} 
+                              className={`${isCompact ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'} text-center border-l border-zinc-800 font-black text-white`}
                             >
-                              {language === 'ar' ? 'الإجمالي' : 'Total'}
+                              {language === 'ar' ? 'الإجمالي العام' : 'Grand Total'}
                             </td>
                           );
                         }
