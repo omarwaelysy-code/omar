@@ -292,28 +292,6 @@ export class ReversalEngine {
       updateParams
     );
 
-    // 8. Log Activity
-    try {
-      await client.query(
-        `INSERT INTO "activity_logs" (
-          "id", "user_id", "user_name", "company_id", "action", "details", "entity_type", "created_at"
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, NOW()
-        )`,
-        [
-          uuidv4(),
-          userId,
-          userName || 'مستخدم النظام',
-          companyId,
-          `عكس مستند: ${config.labelAr}`,
-          `تم عكس المستند رقم (${originalDocNumber}) بموجب مستند العكس رقم (${reversalDocNumber}) والقيد (${reversalEntryNumber || 'بدون قيد'}) بتاريخ (${reversalDate})`,
-          config.tableName
-        ]
-      );
-    } catch (e: any) {
-      console.warn('[ReversalEngine] Failed to log activity:', e.message);
-    }
-
     return {
       success: true,
       message: `تم عكس المستند بنجاح بموجب المستند رقم (${reversalDocNumber})`,

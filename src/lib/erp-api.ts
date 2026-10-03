@@ -15295,6 +15295,25 @@ router.post('/documents/reverse', authenticateToken, async (req: AuthRequest, re
       reason: reason || ''
     });
     await client.query('COMMIT');
+
+    // Post-commit safe logging (does not affect transaction outcome)
+    try {
+      await pool.query(
+        `INSERT INTO activity_logs (company_id, user_id, username, action, details, entity, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+        [
+          companyId,
+          req.user?.id || 'system',
+          req.user?.username || (req.user as any)?.name || 'مستخدم النظام',
+          'عكس مستند',
+          `تم عكس المستند (${result.originalDocNumber}) بموجب مستند العكس (${result.reversalDocNumber}) والقيد (${result.reversalEntryNumber || 'بدون قيد'}) بتاريخ (${reversalDate})`,
+          moduleName
+        ]
+      );
+    } catch (logErr: any) {
+      console.warn('[ReversalAPI] Non-fatal activity log warning:', logErr.message);
+    }
+
     res.json(result);
   } catch (err: any) {
     await client.query('ROLLBACK');
