@@ -18,7 +18,6 @@ import { dbService, apiRequest } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
-import { SmartAIInput } from '../components/SmartAIInput';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { formatNumber, formatDate, formatMoney, parseNumber } from '../utils/formatUtils';
 import { ExportButtons } from '../components/ExportButtons';
@@ -1082,7 +1081,7 @@ export const CashTransfers: React.FC = () => {
       {/* Add/Edit Transfer Modal */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className={`fixed inset-0 bg-zinc-100 dark:bg-zinc-900 z-[100] flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-300 ${isFullScreen ? 'm-0 rounded-none' : 'md:m-4 md:rounded-[2.5rem] shadow-2xl border border-white/20'}`}>
+          <div className="fixed inset-0 bg-zinc-100 dark:bg-zinc-900 z-[100] flex flex-col animate-in fade-in duration-200">
             {/* Header Block */}
             <div className="p-4 md:p-6 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[90]">
               <div className="flex items-center gap-3">
@@ -1181,30 +1180,15 @@ export const CashTransfers: React.FC = () => {
               </AnimatePresence>
 
               <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col">
-                <form onSubmit={handleSubmit} className="space-y-4 max-w-4xl mx-auto w-full pb-32 md:pb-8">
-                  <SmartAIInput 
-                    onDataExtracted={(data) => {
-                      if (data.amount) handleAmountChange(data.amount!);
-                      if (data.date) setFormData(prev => ({ ...prev, date: data.date! }));
-                      if (data.description) setFormData(prev => ({ ...prev, description: data.description! }));
-                      if (data.fromAccount) {
-                        const pm = paymentMethods.find(p => p.name.includes(data.fromAccount!) || data.fromAccount!.includes(p.name));
-                        if (pm) handleFromPmChange(pm.id);
-                      }
-                      if (data.toAccount) {
-                        const pm = paymentMethods.find(p => p.name.includes(data.toAccount!) || data.toAccount!.includes(p.name));
-                        if (pm) handleToPmChange(pm.id);
-                      }
-                    }}
-                    transactionType="cash_transfer"
-                  />
-                  
+                <form onSubmit={handleSubmit} className="space-y-4 max-w-6xl mx-auto w-full pb-4">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* Basic Details Card */}
-                    <section className="bg-white p-4 md:p-5 rounded-2xl border border-zinc-100 shadow-sm space-y-4 relative pt-10 overflow-hidden">
-                      <div className="absolute top-3 right-4 flex items-center gap-1.5 text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
-                        <Calendar className="w-3.5 h-3.5" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">{language === 'ar' ? 'التفاصيل الأساسية' : 'Basic Details'}</span>
+                    <section className="bg-white p-4 md:p-5 rounded-2xl border border-zinc-200/80 shadow-sm space-y-4">
+                      <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
+                        <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
+                          <Calendar className="w-4 h-4 text-emerald-600" />
+                          <span className="text-xs font-black">{language === 'ar' ? 'التفاصيل الأساسية' : 'Basic Details'}</span>
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1300,34 +1284,34 @@ export const CashTransfers: React.FC = () => {
 
                     {/* Treasury / Bank Selection Cards */}
                     <div className="space-y-3">
-                      <section className="bg-white p-4 md:p-5 rounded-2xl border border-zinc-100 shadow-sm space-y-3 relative pt-10 overflow-hidden">
-                        <div className="absolute top-3 right-4 flex items-center gap-1.5 text-red-600 bg-red-50 px-2.5 py-0.5 rounded-full border border-red-100">
-                          <Wallet className="w-3.5 h-3.5" />
-                          <span className="text-[10px] font-black uppercase tracking-widest">{language === 'ar' ? 'من بنك / خزينة (المصدر)' : 'From Bank / Safe (Source)'}</span>
+                      <section className="bg-white p-4 md:p-5 rounded-2xl border border-zinc-200/80 shadow-sm space-y-3">
+                        <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
+                          <div className="flex items-center gap-2 text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-100">
+                            <Wallet className="w-4 h-4 text-rose-600" />
+                            <span className="text-xs font-black">{language === 'ar' ? 'من بنك / خزينة (المصدر)' : 'From Bank / Safe (Source)'}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-100">
+                              {formData.from_currency}
+                            </span>
+                            <button 
+                              type="button"
+                              onClick={() => setIsPaymentMethodModalOpen(true)}
+                              className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100/60 transition-colors"
+                            >
+                              <Plus size={12} />
+                              {language === 'ar' ? 'إضافة بنك / خزينة' : 'Add Bank / Safe'}
+                            </button>
+                          </div>
                         </div>
                         
                         <div className="space-y-1">
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="block text-[11px] font-bold text-zinc-500 uppercase px-1">{language === 'ar' ? 'اختر المصدر' : 'Select Source'}</label>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-100">
-                                {formData.from_currency}
-                              </span>
-                              <button 
-                                type="button"
-                                onClick={() => setIsPaymentMethodModalOpen(true)}
-                                className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-lg transition-colors"
-                              >
-                                <Plus size={12} />
-                                {language === 'ar' ? 'إضافة بنك / خزينة' : 'Add Bank / Safe'}
-                              </button>
-                            </div>
-                          </div>
+                          <label className="block text-[11px] font-bold text-zinc-500 uppercase px-1">{language === 'ar' ? 'اختر المصدر' : 'Select Source'}</label>
                           <div className="relative group">
-                            <Wallet className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none group-focus-within:text-red-500 transition-colors`} />
+                            <Wallet className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none group-focus-within:text-rose-500 transition-colors`} />
                             <select
                               required
-                              className="w-full ps-9 pe-8 h-9 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:bg-white focus:border-red-500 outline-none transition-all appearance-none font-bold text-zinc-800 text-xs"
+                              className="w-full ps-9 pe-8 h-9 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:bg-white focus:border-rose-500 outline-none transition-all appearance-none font-bold text-zinc-800 text-xs"
                               value={formData.from_payment_method_id}
                               onChange={(e) => handleFromPmChange(e.target.value)}
                             >
@@ -1343,19 +1327,19 @@ export const CashTransfers: React.FC = () => {
                         </div>
                       </section>
 
-                      <section className="bg-white p-4 md:p-5 rounded-2xl border border-zinc-100 shadow-sm space-y-3 relative pt-10 overflow-hidden">
-                        <div className="absolute top-3 right-4 flex items-center gap-1.5 text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
-                          <Wallet className="w-3.5 h-3.5" />
-                          <span className="text-[10px] font-black uppercase tracking-widest">{language === 'ar' ? 'إلى بنك / خزينة (الوجهة)' : 'To Bank / Safe (Destination)'}</span>
+                      <section className="bg-white p-4 md:p-5 rounded-2xl border border-zinc-200/80 shadow-sm space-y-3">
+                        <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
+                          <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
+                            <Wallet className="w-4 h-4 text-emerald-600" />
+                            <span className="text-xs font-black">{language === 'ar' ? 'إلى بنك / خزينة (الوجهة)' : 'To Bank / Safe (Destination)'}</span>
+                          </div>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
+                            {formData.to_currency}
+                          </span>
                         </div>
                         
                         <div className="space-y-1">
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="block text-[11px] font-bold text-zinc-500 uppercase px-1">{language === 'ar' ? 'اختر الوجهة' : 'Select Destination'}</label>
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
-                              {formData.to_currency}
-                            </span>
-                          </div>
+                          <label className="block text-[11px] font-bold text-zinc-500 uppercase px-1">{language === 'ar' ? 'اختر الوجهة' : 'Select Destination'}</label>
                           <div className="relative group">
                             <Wallet className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2.5 w-4 h-4 text-zinc-400 pointer-events-none group-focus-within:text-emerald-500 transition-colors`} />
                             <select
@@ -1455,7 +1439,7 @@ export const CashTransfers: React.FC = () => {
                   )}
 
                   {/* Attachments Section */}
-                  <div className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm max-w-4xl mx-auto w-full mt-6">
+                  <div className="bg-white p-5 rounded-2xl border border-zinc-200/80 shadow-sm w-full">
                     <AttachmentsManager
                       attachments={attachments}
                       onChange={setAttachments}
@@ -1463,20 +1447,20 @@ export const CashTransfers: React.FC = () => {
                   </div>
 
                   {/* Action Footer */}
-                  <div className="flex gap-4 p-6 bg-transparent border-t border-zinc-100 sticky bottom-4 z-[90] mt-auto max-w-4xl mx-auto w-full">
+                  <div className="sticky bottom-0 bg-white/95 backdrop-blur-md border-t border-zinc-200 p-4 z-30 flex items-center justify-end gap-3 mt-4 -mx-4 md:-mx-6 -mb-4 md:-mb-6 px-4 md:px-6 shadow-sm">
                     <button 
                       type="button"
                       onClick={closeModal}
-                      className="flex-1 py-4 bg-white text-zinc-600 rounded-[1.5rem] font-bold border border-zinc-200 hover:bg-zinc-100 transition-all active:scale-95 shadow-lg shadow-black/5"
+                      className="px-6 py-2.5 bg-white text-zinc-700 rounded-xl font-bold border border-zinc-200 hover:bg-zinc-100 transition-all active:scale-95 shadow-sm text-sm"
                     >
                       {t('common.cancel')}
                     </button>
                     <button 
                       type="submit"
                       disabled={formData.amount <= 0 || !formData.from_payment_method_id || !formData.to_payment_method_id}
-                      className="flex-[2] py-4 bg-emerald-500 text-white rounded-[1.5rem] font-black uppercase tracking-wider hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-500/30 active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 disabled:grayscale"
+                      className="px-8 py-2.5 bg-emerald-600 text-white rounded-xl font-black hover:bg-emerald-700 transition-all shadow-md shadow-emerald-600/20 active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale text-sm"
                     >
-                      <Save className="w-6 h-6 animate-pulse" />
+                      <Save className="w-4 h-4" />
                       <span>{editingTransfer ? t('common.save') : (language === 'ar' ? 'إبرام التحويل' : 'Execute Transfer')}</span>
                     </button>
                   </div>
