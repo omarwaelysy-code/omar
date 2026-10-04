@@ -483,6 +483,7 @@ export const CashAsOfBalances: React.FC = () => {
         });
       });
 
+      const linkedAccount = accounts.find(a => a.id === method.account_id);
       const baseOpeningForeign = Number(method.opening_balance || 0);
       let baseOpeningSystem = isBaseCurrency ? baseOpeningForeign : 0;
       if (!isBaseCurrency && baseOpeningForeign !== 0) {
@@ -497,7 +498,6 @@ export const CashAsOfBalances: React.FC = () => {
       const balanceForeign = baseOpeningForeign + netDebitForeign - netCreditForeign;
       const balanceSystem = baseOpeningSystem + netDebitSystem - netCreditSystem;
 
-      const linkedAccount = accounts.find(a => a.id === method.account_id);
       const methodType = (method.type || 'cash') as 'cash' | 'bank' | 'wallet' | 'other';
 
       let typeLabelAr = 'خزينة نقدية';
