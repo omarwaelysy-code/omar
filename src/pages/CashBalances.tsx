@@ -911,7 +911,7 @@ export const CashBalances: React.FC = () => {
             if (language === 'ar') {
               const startStr = dateRange.start ? ` من ${formatDate(dateRange.start)}` : '';
               const endStr = dateRange.end ? ` إلى ${formatDate(dateRange.end)}` : '';
-              return `تقرير النقدية الخزائن والبنوك${startStr}${endStr}`;
+              return `تقرير حركة النقدية الخزائن والبنوك${startStr}${endStr}`;
             } else {
               const startStr = dateRange.start ? ` from ${formatDate(dateRange.start)}` : '';
               const endStr = dateRange.end ? ` to ${formatDate(dateRange.end)}` : '';
@@ -1093,7 +1093,7 @@ export const CashBalances: React.FC = () => {
             })()}
             <h2 className="text-2xl font-black text-zinc-900">
               {viewMode === 'summary' 
-                ? (language === 'ar' ? 'تقرير النقدية (الخزائن والبنوك) خلال فترة' : 'Cash & Bank Report (Period)')
+                ? (language === 'ar' ? 'تقرير حركة النقدية (الخزائن والبنوك) خلال فترة' : 'Cash & Bank Movements Report (Period)')
                 : (language === 'ar' ? `كشف حركة: ${selectedMethod?.name || ''}` : `Statement: ${selectedMethod?.name || ''}`)}
             </h2>
             {viewMode === 'summary' && (

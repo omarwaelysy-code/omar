@@ -75,6 +75,7 @@ const TrialBalance = React.lazy(() => import('./pages/TrialBalance').then(m => (
 const IncomeStatement = React.lazy(() => import('./pages/IncomeStatement').then(m => ({ default: m.IncomeStatement })));
 const BalanceSheet = React.lazy(() => import('./pages/BalanceSheet').then(m => ({ default: m.BalanceSheet })));
 const CashFlowStatement = React.lazy(() => import('./pages/CashFlowStatement').then(m => ({ default: m.CashFlowStatement })));
+const CashAsOfBalances = React.lazy(() => import('./pages/CashAsOfBalances').then(m => ({ default: m.CashAsOfBalances })));
 const PosBranchLinking = React.lazy(() => import('./pages/PosBranchLinking').then(m => ({ default: m.PosBranchLinking })));
 const PosConnectedBranches = React.lazy(() => import('./pages/PosConnectedBranches').then(m => ({ default: m.PosConnectedBranches })));
 const EtaDashboard = React.lazy(() => import('./pages/EtaDashboard').then(m => ({ default: m.EtaDashboard })));
@@ -283,6 +284,7 @@ export default function App() {
       case 'sales_report': return <SalesReport />;
       case 'expenses_report': return <ExpensesReport />;
       // case 'cash_report': return <CashReport />;
+      case 'cash_as_of_balances': return <CashAsOfBalances />;
       case 'cash_balances': return <CashBalances />;
       case 'account_types': return <AccountTypes />;
       case 'accounts': return <Accounts />;

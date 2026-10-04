@@ -38,7 +38,7 @@ export function getDefaultRolePermissions(roleName: string): any {
       const isFin = [
         'account_types', 'accounts', 'chart_of_accounts', 'default_accounts_settings', 'ifrs_guide', 'create_journal_entry', 
         'journal_entries', 'detailed_journal_entries', 'receipts', 'payment_vouchers', 'supplier_payment_vouchers', 
-        'cash_transfers', 'cash_balances', 'issued_cheques', 'received_cheques', 'fixed_assets', 'asset_categories', 'asset_depreciation', 'customer_statement', 'supplier_statement', 
+        'cash_transfers', 'cash_balances', 'cash_as_of_balances', 'issued_cheques', 'received_cheques', 'fixed_assets', 'asset_categories', 'asset_depreciation', 'customer_statement', 'supplier_statement', 
         'customer_balances', 'supplier_balances', 'customer_aging_report', 'supplier_aging_report', 'sales_report', 'expenses_report', 
         'cash_report', 'general_ledger_report', 'trial_balance', 'income_statement', 
         'balance_sheet', 'cash_flow_statement'
@@ -62,11 +62,11 @@ export function getDefaultRolePermissions(roleName: string): any {
       const isAcc = [
         'account_types', 'accounts', 'chart_of_accounts', 'default_accounts_settings', 'ifrs_guide', 'create_journal_entry', 
         'journal_entries', 'detailed_journal_entries', 'receipts', 'payment_vouchers', 'supplier_payment_vouchers', 
-        'cash_transfers', 'cash_balances', 'issued_cheques', 'received_cheques', 'fixed_assets', 'asset_categories', 'asset_depreciation'
+        'cash_transfers', 'cash_balances', 'cash_as_of_balances', 'issued_cheques', 'received_cheques', 'fixed_assets', 'asset_categories', 'asset_depreciation'
       ].includes(modId);
       
       const isRep = modId.endsWith('_report') || [
-        'trial_balance', 'income_statement', 'balance_sheet', 'cash_flow_statement', 'customer_statement', 
+        'trial_balance', 'income_statement', 'balance_sheet', 'cash_flow_statement', 'cash_as_of_balances', 'customer_statement', 
         'supplier_statement', 'customer_balances', 'supplier_balances'
       ].includes(modId);
       

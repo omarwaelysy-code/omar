@@ -73,7 +73,7 @@ export function getInitialPermissionsState() {
     'detailed_journal_entries', 'customer_statement', 'supplier_statement',
     'customer_balances', 'supplier_balances', 'customer_aging_report', 'supplier_aging_report', 'sales_report', 'expenses_report',
     'cash_report', 'general_ledger_report', 'trial_balance', 'income_statement',
-    'balance_sheet', 'cash_flow_statement', 'stock_card_report', 'stock_balances_report', 'general_stock_movements_report',
+    'balance_sheet', 'cash_flow_statement', 'cash_as_of_balances', 'stock_card_report', 'stock_balances_report', 'general_stock_movements_report',
     'users', 'companies', 'activity_log', 'audit_logs', 'system_check', 'company_settings',
     'discount_settings', 'backup_restore', 'templates', 'create_template', 'operation_categories',
     'operation_fields', 'operations', 'period_closing', 'eta_dashboard', 'eta_received_invoices', 'eta_detailed_invoices', 'eta_supplier_mapping', 'eta_item_mapping', 'eta_sent_item_mapping'
@@ -133,7 +133,7 @@ export function getDefaultRolePermissions(roleName: string): any {
         'cash_transfers', 'cash_balances', 'issued_cheques', 'received_cheques', 'customer_statement', 'supplier_statement', 
         'customer_balances', 'supplier_balances', 'customer_aging_report', 'supplier_aging_report', 'sales_report', 'expenses_report', 
         'cash_report', 'general_ledger_report', 'trial_balance', 'income_statement', 
-        'balance_sheet', 'cash_flow_statement'
+        'balance_sheet', 'cash_flow_statement', 'cash_as_of_balances'
       ].includes(modId);
       
       if (isFin) {
@@ -152,11 +152,11 @@ export function getDefaultRolePermissions(roleName: string): any {
       const isAcc = [
         'account_types', 'accounts', 'chart_of_accounts', 'create_journal_entry', 
         'journal_entries', 'detailed_journal_entries', 'receipts', 'payment_vouchers', 
-        'cash_transfers', 'cash_balances', 'issued_cheques', 'received_cheques'
+        'cash_transfers', 'cash_balances', 'cash_as_of_balances', 'issued_cheques', 'received_cheques'
       ].includes(modId);
       
       const isRep = modId.endsWith('_report') || [
-        'trial_balance', 'income_statement', 'balance_sheet', 'cash_flow_statement', 'customer_statement', 
+        'trial_balance', 'income_statement', 'balance_sheet', 'cash_flow_statement', 'cash_as_of_balances', 'customer_statement', 
         'supplier_statement', 'customer_balances', 'supplier_balances'
       ].includes(modId);
       

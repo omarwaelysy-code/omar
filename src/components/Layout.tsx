@@ -190,6 +190,8 @@ const getTabIcon = (id: string) => {
     case 'sales_report':
     case 'supplier_balances':
     // case 'cash_report':
+    case 'cash_as_of_balances':
+      return <Wallet {...iconProps} />;
     case 'cash_balances':
     case 'expenses_report':
     case 'trial_balance':
@@ -681,6 +683,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'egyptian_banks', label: language === 'ar' ? 'دليل البنوك المصرية' : 'Egyptian Banks Directory', icon: Building2 },
           { id: 'div_cash_reports', isDivider: true },
           { id: 'h_cash_reports', label: language === 'ar' ? 'تقارير' : 'Reports', isHeader: true },
+          { id: 'cash_as_of_balances', label: t('nav.cash_as_of_balances') || (language === 'ar' ? 'أرصدة النقدية' : 'Cash Balances'), icon: Wallet },
           { id: 'cash_balances', label: t('nav.cash_balances'), icon: BarChart3 },
           { id: 'expenses_report', label: t('nav.expenses_report'), icon: BarChart3 }
         ]
@@ -776,6 +779,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'div_purchases', isDivider: true },
           { id: 'h_cash', label: language === 'ar' ? 'النقدية والمصروفات' : 'Cash & Expenses', isHeader: true },
           // { id: 'cash_report', label: t('nav.cash_report'), icon: BarChart3 },
+          { id: 'cash_as_of_balances', label: t('nav.cash_as_of_balances') || (language === 'ar' ? 'أرصدة النقدية' : 'Cash Balances'), icon: Wallet },
           { id: 'cash_balances', label: t('nav.cash_balances'), icon: BarChart3 },
           { id: 'expenses_report', label: t('nav.expenses_report'), icon: BarChart3 },
           { id: 'div_cash', isDivider: true },
@@ -924,6 +928,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       'payment_vouchers': 'payment_vouchers',
       'cash_transfers': 'cash_transfers',
       'egyptian_banks': 'egyptian_banks',
+      'cash_as_of_balances': 'cash_balances',
       'cash_balances': 'cash_balances',
       'expenses_report': 'expenses_report',
       

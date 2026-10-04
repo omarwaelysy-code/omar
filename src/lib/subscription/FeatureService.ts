@@ -92,7 +92,7 @@ export class FeatureService {
       'eta_integration', 'eta_received_invoices', 'eta_detailed_invoices', 'eta_mapping',
       // 7. Cash & Banks
       'cash', 'receipts', 'payment_vouchers', 'cash_transfers', 'egyptian_banks',
-      'cash_balances', 'expenses_report',
+      'cash_balances', 'cash_as_of_balances', 'expenses_report',
       // 8. Cheques
       'cheques', 'issued_cheques', 'received_cheques',
       // 9. Operations
