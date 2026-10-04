@@ -54,29 +54,61 @@ export const CustomerDiscounts: React.FC = () => {
   const [discountNumber, setDiscountNumber] = useState('');
   const [editingDiscount, setEditingDiscount] = useState<any | null>(null);
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const tableRef = useRef<HTMLTableElement>(null);
 
-  const handleExportExcel = () => {
-    const headers = {
-      'number': 'رقم الإذن',
-      'date': 'التاريخ',
-      'customer_name': 'العميل',
-      'amount': 'المبلغ',
-      'notes': 'البيان'
-    };
-    const formattedData = formatDataForExcel(discounts, headers);
-    exportToExcel(formattedData, { filename: 'Customer_Discounts', sheetName: 'خصم العملاء' });
-  };
-
-  const handleExportPDF = async () => {
-    if (tableRef.current) {
-      await exportToPDFUtil(tableRef.current, {
-        filename: 'Customer_Discounts',
-        reportTitle: 'إشعارات خصم العملاء'
-      });
+  const toggleSelectAll = () => {
+    if (filteredDiscounts.length > 0 && selectedIds.length === filteredDiscounts.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredDiscounts.map(d => d.id));
     }
   };
 
+  const toggleSelectRow = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedIds.length === 0 || !user) return;
+    if (!window.confirm(language === 'ar' ? `هل أنت متأكد من حذف ${selectedIds.length} خصم محدد؟` : `Delete ${selectedIds.length} selected discounts?`)) return;
+    try {
+      for (const id of selectedIds) {
+        await dbService.deleteJournalEntryByReference(id, user.company_id);
+        await dbService.delete('customer_discounts', id);
+      }
+      setSelectedIds([]);
+      showNotification(language === 'ar' ? 'تم حذف الخصومات المحددة بنجاح' : 'Selected discounts deleted successfully', 'success');
+    } catch (err: any) {
+      console.error(err);
+      showNotification(err.message || 'Error deleting discounts', 'error');
+    }
+  };
+
+  const handleExportExcel = (onlySelected = false) => {
+    const list = onlySelected ? discounts.filter(d => selectedIds.includes(d.id)) : discounts;
+    const formattedData = list.map(d => ({
+      'رقم المستند': d.number || '-',
+      'العميل': d.customer_name || '-',
+      'الحساب': accounts.find(a => a.id === d.account_id)?.name || d.account_name || '-',
+      'التاريخ': formatDate(d.date),
+      'المبلغ': d.amount,
+      'البيان': d.notes || '-'
+    }));
+    exportToExcel(formattedData, { filename: onlySelected ? 'Selected_Customer_Discounts' : 'Customer_Discounts', sheetName: 'خصم العملاء' });
+  };
+
+  const handleExportPDF = async (onlySelected = false) => {
+    if (tableRef.current) {
+      await exportToPDFUtil(tableRef.current, {
+        filename: onlySelected ? 'Selected_Customer_Discounts' : 'Customer_Discounts',
+        reportTitle: onlySelected ? 'إشعارات خصم العملاء المحددة' : 'إشعارات خصم العملاء'
+      });
+    }
+  };
 
   const generateDiscountNumber = async (selectedDate: string) => {
     return await dbService.getNextSequence('customer_discounts', selectedDate);
@@ -84,6 +116,7 @@ export const CustomerDiscounts: React.FC = () => {
 
   const closeModal = () => {
     setIsModalOpen(false);
+    setIsSubmitting(false);
     setEditingDiscount(null);
     setAttachments([]);
     setDiscountData({
@@ -305,7 +338,7 @@ export const CustomerDiscounts: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || isSubmitting) return;
     const customer = customers.find(c => c.id === discountData.customer_id);
     if (!customer?.account_id) {
       showNotification(`لا يمكن حفظ الخصم — العميل "${customer?.name || ''}" لا يملك حساباً محاسبياً مربوطاً. يرجى فتح بيانات العميل وتحديد الحساب المحاسبي.`, 'error');
@@ -316,16 +349,22 @@ export const CustomerDiscounts: React.FC = () => {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       const customer = customers.find(c => c.id === discountData.customer_id);
       const number = editingDiscount ? editingDiscount.number : discountNumber;
       
+      const discountAccount = accounts.find(a => a.id === discountData.account_id);
+      const debitAccountId = discountAccount?.id || '';
+      const debitAccountName = discountAccount?.name || 'حساب الخصم المسموح به';
+
       const data = {
         customer_id: discountData.customer_id,
         customer_name: customer?.name || '',
         amount: discountData.amount,
         date: discountData.date,
         account_id: discountData.account_id,
+        account_name: debitAccountName,
         notes: discountData.notes,
         attachments,
         number,
@@ -341,9 +380,6 @@ export const CustomerDiscounts: React.FC = () => {
       }
 
       const journalItems: any[] = [];
-      const discountAccount = accounts.find(a => a.id === discountData.account_id);
-      const debitAccountId = discountAccount?.id || '';
-      const debitAccountName = discountAccount?.name || 'حساب الخصم المسموح به';
 
       journalItems.push({
         account_id: debitAccountId,
@@ -405,6 +441,8 @@ export const CustomerDiscounts: React.FC = () => {
     } catch (e: any) {
       console.error('Save failed:', e);
       showNotification(e.message || t('discounts.toast_error'), 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -449,276 +487,346 @@ export const CustomerDiscounts: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
+    <div className="space-y-3 animate-in fade-in duration-500" dir={dir}>
       {!isModalOpen ? (
         <>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">{t('discounts.customer_title')}</h2>
-          <p className="text-zinc-500">{t('discounts.customer_subtitle')}</p>
-          {serverSummary.total_amount !== undefined && (
-            <div className="mt-2 flex items-center gap-4 text-sm">
-               <span className="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-100 font-bold">
-                 {t('discounts.total_discounts')}: {formatMoney(serverSummary.total_amount)} {t('common.currency')}
-               </span>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2.5 border-b border-slate-200/80">
+            <div>
+              <h1 className="text-base md:text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Tag className="w-5 h-5 text-emerald-600" />
+                <span>{t('discounts.customer_title')}</span>
+                {serverSummary.total_amount !== undefined && (
+                  <span className="bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-lg border border-emerald-100 text-xs font-bold">
+                    {t('discounts.total_discounts')}: {formatMoney(serverSummary.total_amount)} {t('common.currency')}
+                  </span>
+                )}
+              </h1>
+              <p className="text-slate-400 text-xs font-medium mt-0.5">{t('discounts.customer_subtitle')}</p>
             </div>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <button 
-            onClick={() => setIsActivityLogOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-zinc-200 text-zinc-700 rounded-2xl font-bold hover:bg-zinc-50 transition-all shadow-sm"
-          >
-            <History size={20} />
-            {t('common.activity_log')}
-          </button>
-          <ExportButtons 
-            onExportExcel={handleExportExcel} 
-            onExportPDF={handleExportPDF} 
-            onPrint={() => printElement(tableRef.current, 'إشعارات خصم العملاء')}
-          />
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-[rgba(16,185,129,0.2)]"
-          >
-            <Plus size={20} />
-            {t('discounts.add_customer')}
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-zinc-50 flex items-center justify-between gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-3 text-zinc-400" size={18} />
-            <input
-              type="text"
-              placeholder={t('discounts.search_placeholder')}
-              className="w-full pl-10 pr-4 py-2 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+            <div className="flex flex-wrap items-center gap-1.5 justify-end">
+              <button 
+                onClick={openAddModal}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-sm transition-all active:scale-95"
+              >
+                <Plus size={14} />
+                <span>{t('discounts.add_customer')}</span>
+              </button>
+              <ExportButtons 
+                size="sm"
+                onExportExcel={() => handleExportExcel(false)} 
+                onExportPDF={() => handleExportPDF(false)} 
+                onPrint={() => printElement(tableRef.current, 'إشعارات خصم العملاء')}
+                onExportExcelSelected={() => handleExportExcel(true)}
+                onExportPDFSelected={() => handleExportPDF(true)}
+                onPrintSelected={() => printElement(tableRef.current, 'إشعارات خصم العملاء المحددة')}
+                selectedCount={selectedIds.length}
+              />
+              <button 
+                onClick={() => setIsActivityLogOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl font-bold text-xs transition-all shadow-sm active:scale-95"
+              >
+                <History size={14} />
+                <span>{t('common.activity_log')}</span>
+              </button>
+            </div>
           </div>
-          <div className="flex bg-zinc-100 p-1 rounded-2xl border border-zinc-200/50 shadow-inner w-fit">
-            <button
-              onClick={() => setView('table')}
-              className={`p-2 px-3 rounded-xl transition-all flex items-center gap-2 font-bold text-sm ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm border border-zinc-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
-              title="عرض الجدول"
-            >
-              <List size={18} />
-              <span className="hidden md:inline">{t('discounts.tab_single')}</span>
-            </button>
-            <button
-              onClick={() => setView('card')}
-              className={`p-2 px-3 rounded-xl transition-all flex items-center gap-2 font-bold text-sm ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm border border-zinc-100/50' : 'text-zinc-500 hover:text-zinc-700'}`}
-              title="عرض الكروت"
-            >
-              <LayoutGrid size={18} />
-              <span className="hidden md:inline">{t('discounts.tab_cards')}</span>
-            </button>
-          </div>
-        </div>
 
-        {view === 'table' ? (
-          <div className="overflow-x-auto">
-            <table ref={tableRef} className="w-full text-right">
-              <thead>
-                <tr className="bg-[rgba(244,244,245,0.5)] text-zinc-500 text-xs uppercase tracking-wider">
-                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('customer_name')}>
-                    <div className="flex items-center gap-1">
-                      العميل
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        {sortBy === 'customer_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                      </span>
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('date')}>
-                    <div className="flex items-center gap-1">
-                      التاريخ
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                      </span>
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('amount')}>
-                    <div className="flex items-center gap-1">
-                      المبلغ
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        {sortBy === 'amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
-                      </span>
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 font-bold">{t('discounts.column_notes')}</th>
-                  <th className="px-6 py-4 font-bold text-left">{t('discounts.column_actions')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-50">
-                {filteredDiscounts.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-zinc-400 italic">لا توجد خصومات حالياً</td>
-                  </tr>
-                ) : filteredDiscounts.map((discount) => (
-                  <tr key={discount.id} className="hover:bg-[rgba(244,244,245,0.5)] transition-colors group">
-                    <td className="px-6 py-4 font-bold text-zinc-900">{discount.customer_name}</td>
-                    <td className="px-6 py-4 text-zinc-500">{formatDate(discount.date)}</td>
-                    <td className="px-6 py-4 font-bold text-emerald-600">{formatNumber(discount.amount)} ج.م</td>
-                    <td className="px-6 py-4 text-zinc-500 text-sm">{discount.notes || '-'}</td>
-                    <td className="px-6 py-4 text-left">
-                      <div className="flex items-center justify-start gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {/* Reversal action */}
-                        {discount.is_reversed ? (
-                          <span
-                            className="px-2 py-0.5 bg-amber-100/80 text-amber-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
-                            title={language === 'ar' ? `تم عكس هذا الخصم بالمستند: ${discount.reversed_by_doc_number || ''}` : `Reversed by: ${discount.reversed_by_doc_number || ''}`}
-                          >
-                            <RotateCcw size={13} className="text-amber-700" />
-                            <span>معكوس</span>
+          <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="p-2 sm:p-2.5 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2">
+              <div className="relative flex-1 w-full sm:max-w-md">
+                <input
+                  type="text"
+                  placeholder={t('discounts.search_placeholder')}
+                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:ring-1 focus:ring-emerald-500 transition-all outline-none"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                {selectedIds.length > 0 && (
+                  <button
+                    onClick={handleBatchDelete}
+                    className="flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg text-xs font-bold border border-rose-200 transition-all"
+                  >
+                    <Trash2 size={13} />
+                    <span>حذف المحدد ({selectedIds.length})</span>
+                  </button>
+                )}
+                <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/70 w-fit">
+                  <button
+                    onClick={() => setView('table')}
+                    className={`p-1.5 px-2.5 rounded-md transition-all flex items-center gap-1 font-bold text-xs ${view === 'table' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    title="عرض الجدول"
+                  >
+                    <List size={14} />
+                    <span className="hidden sm:inline">{t('discounts.tab_single')}</span>
+                  </button>
+                  <button
+                    onClick={() => setView('card')}
+                    className={`p-1.5 px-2.5 rounded-md transition-all flex items-center gap-1 font-bold text-xs ${view === 'card' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    title="عرض الكروت"
+                  >
+                    <LayoutGrid size={14} />
+                    <span className="hidden sm:inline">{t('discounts.tab_cards')}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {view === 'table' ? (
+              <div className="overflow-x-auto">
+                <table ref={tableRef} className="w-full text-right border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[11px] font-bold">
+                      <th className="w-10 px-3 py-1.5 text-center">
+                        <input
+                          type="checkbox"
+                          checked={filteredDiscounts.length > 0 && selectedIds.length === filteredDiscounts.length}
+                          onChange={toggleSelectAll}
+                          className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer align-middle"
+                          title="تحديد الكل"
+                        />
+                      </th>
+                      <th className="px-3 py-1.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('number')}>
+                        <div className="flex items-center gap-1">
+                          <span>رقم المستند</span>
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            {sortBy === 'number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                           </span>
-                        ) : discount.is_reversal_doc ? (
-                          <span
-                            className="px-2 py-0.5 bg-indigo-100/80 text-indigo-800 rounded-lg inline-flex items-center gap-1 text-[11px] font-black cursor-help"
-                            title={language === 'ar' ? `إشعار خصم عكسي للمستند: ${discount.original_doc_number || ''}` : `Reversal of: ${discount.original_doc_number || ''}`}
-                          >
-                            <RotateCcw size={13} className="text-indigo-700" />
-                            <span>عكسي</span>
+                        </div>
+                      </th>
+                      <th className="px-3 py-1.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('customer_name')}>
+                        <div className="flex items-center gap-1">
+                          <span>{t('discounts.column_customer')}</span>
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            {sortBy === 'customer_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                           </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setReversingDiscount(discount);
-                            }}
-                            className="p-2 text-zinc-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"
-                            title={language === 'ar' ? 'عكس الخصم (Reverse)' : 'Reverse Discount'}
-                          >
-                            <RotateCcw size={18} />
-                          </button>
-                        )}
-                        {!discount.is_reversed && !discount.is_reversal_doc && (
-                          <button 
-                            onClick={() => openEditModal(discount)}
-                            className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
-                            title="تعديل"
-                          >
-                            <Tag size={18} />
-                          </button>
-                        )}
+                        </div>
+                      </th>
+                      <th className="px-3 py-1.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('account_id')}>
+                        <div className="flex items-center gap-1">
+                          <span>الحساب</span>
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            {sortBy === 'account_id' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                      <th className="px-3 py-1.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('date')}>
+                        <div className="flex items-center gap-1">
+                          <span>{t('discounts.column_date')}</span>
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            {sortBy === 'date' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                      <th className="px-3 py-1.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('amount')}>
+                        <div className="flex items-center gap-1">
+                          <span>{t('discounts.column_amount')}</span>
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            {sortBy === 'amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                          </span>
+                        </div>
+                      </th>
+                      <th className="px-3 py-1.5 font-bold">{t('discounts.column_notes')}</th>
+                      <th className="px-3 py-1.5 font-bold text-center w-28">{t('discounts.column_actions')}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
+                    {filteredDiscounts.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="px-4 py-8 text-center text-slate-400 italic">لا توجد خصومات حالياً</td>
+                      </tr>
+                    ) : filteredDiscounts.map((discount) => (
+                      <tr key={discount.id} className="hover:bg-slate-50/70 transition-colors group cursor-pointer" onClick={() => openEditModal(discount)}>
+                        <td className="w-10 px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(discount.id)}
+                            onChange={() => toggleSelectRow(discount.id)}
+                            className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer align-middle"
+                          />
+                        </td>
+                        <td className="px-3 py-2 font-mono font-bold text-slate-900 text-xs">
+                          {discount.number || '-'}
+                        </td>
+                        <td className="px-3 py-2 font-bold text-slate-900 text-xs">
+                          {discount.customer_name}
+                        </td>
+                        <td className="px-3 py-2 text-slate-600 font-medium text-xs">
+                          {accounts.find(a => a.id === discount.account_id)?.name || discount.account_name || '-'}
+                        </td>
+                        <td className="px-3 py-2 text-slate-500 font-medium text-xs">
+                          {formatDate(discount.date)}
+                        </td>
+                        <td className="px-3 py-2 font-bold text-emerald-600 text-xs">
+                          {formatNumber(discount.amount)} ج.م
+                        </td>
+                        <td className="px-3 py-2 text-slate-500 text-xs truncate max-w-xs">
+                          {discount.notes || '-'}
+                        </td>
+                        <td className="px-3 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                            {/* Reversal action */}
+                            {discount.is_reversed ? (
+                              <span
+                                className="px-2 py-0.5 bg-amber-100/80 text-amber-800 rounded-md inline-flex items-center gap-1 text-[11px] font-bold cursor-help"
+                                title={language === 'ar' ? `تم عكس هذا الخصم بالمستند: ${discount.reversed_by_doc_number || ''}` : `Reversed by: ${discount.reversed_by_doc_number || ''}`}
+                              >
+                                <RotateCcw size={12} className="text-amber-700" />
+                                <span>معكوس</span>
+                              </span>
+                            ) : discount.is_reversal_doc ? (
+                              <span
+                                className="px-2 py-0.5 bg-indigo-100/80 text-indigo-800 rounded-md inline-flex items-center gap-1 text-[11px] font-bold cursor-help"
+                                title={language === 'ar' ? `إشعار خصم عكسي للمستند: ${discount.original_doc_number || ''}` : `Reversal of: ${discount.original_doc_number || ''}`}
+                              >
+                                <RotateCcw size={12} className="text-indigo-700" />
+                                <span>عكسي</span>
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setReversingDiscount(discount);
+                                }}
+                                className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                                title={language === 'ar' ? 'عكس الخصم (Reverse)' : 'Reverse Discount'}
+                              >
+                                <RotateCcw size={15} />
+                              </button>
+                            )}
+                            {!discount.is_reversed && !discount.is_reversal_doc && (
+                              <button 
+                                onClick={() => openEditModal(discount)}
+                                className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                title="تعديل"
+                              >
+                                <Tag size={15} />
+                              </button>
+                            )}
+                            <button 
+                              onClick={() => {
+                                setActivityLogDocumentId(discount.id);
+                                setIsActivityLogOpen(true);
+                              }}
+                              className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all"
+                              title="سجل النشاط"
+                            >
+                              <History size={15} />
+                            </button>
+                            {!discount.is_reversed && !discount.is_reversal_doc && (
+                              <button 
+                                onClick={() => handleDelete(discount.id)}
+                                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                title="حذف"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
+              </div>
+            ) : (
+              <div className="p-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {filteredDiscounts.map((discount) => (
+                  <div 
+                    key={discount.id} 
+                    className="p-3.5 bg-white rounded-xl border border-slate-200/80 hover:border-emerald-300 hover:shadow-md transition-all group relative overflow-hidden cursor-pointer flex flex-col justify-between space-y-2.5"
+                    onClick={() => openEditModal(discount)}
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(discount.id)}
+                          onChange={(e) => { e.stopPropagation(); toggleSelectRow(discount.id); }}
+                          className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer align-middle"
+                        />
+                        <span className="text-[11px] font-mono font-bold text-slate-800 bg-slate-100 rounded-md px-1.5 py-0.5">{discount.number || '-'}</span>
+                      </div>
+                      <span className="text-[11px] text-slate-400 font-medium">{formatDate(discount.date)}</span>
+                    </div>
+
+                    <div className="space-y-1 text-xs">
+                      <div className="flex items-center gap-2 justify-between">
+                        <span className="text-slate-400 text-[11px]">العميل:</span>
+                        <span className="font-bold text-slate-800">{discount.customer_name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 justify-between">
+                        <span className="text-slate-400 text-[11px]">الحساب:</span>
+                        <span className="text-slate-600 font-medium">{accounts.find(a => a.id === discount.account_id)?.name || discount.account_name || '-'}</span>
+                      </div>
+                      {discount.notes && (
+                        <p className="text-[11px] text-slate-500 truncate pt-1 border-t border-slate-50">{discount.notes}</p>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                      <div className="flex items-center gap-1">
                         <button 
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditModal(discount);
+                          }}
+                          className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                        >
+                          <Tag size={14} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setActivityLogDocumentId(discount.id);
                             setIsActivityLogOpen(true);
                           }}
-                          className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-xl transition-all"
-                          title="سجل النشاط"
+                          className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
                         >
-                          <History size={18} />
+                          <History size={14} />
                         </button>
-                        {!discount.is_reversed && !discount.is_reversal_doc && (
-                          <button 
-                            onClick={() => handleDelete(discount.id)}
-                            className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        )}
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(discount.id);
+                          }}
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
-                    </td>
-                  </tr>
+                      <span className="font-bold text-emerald-600 text-sm">
+                        {formatNumber(discount.amount)} ج.م
+                      </span>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-            <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
-          </div>
-        ) : (
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredDiscounts.map((discount) => (
-              <div 
-                key={discount.id} 
-                className="p-6 bg-zinc-50/50 rounded-3xl border border-zinc-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5 transition-all group relative overflow-hidden cursor-pointer flex flex-col justify-between"
-                onClick={() => openEditModal(discount)}
-              >
-                <div className="absolute top-4 left-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openEditModal(discount);
-                    }}
-                    className="p-2 bg-white text-emerald-500 rounded-xl border border-emerald-50 shadow-sm hover:bg-emerald-50 transition-all font-bold"
-                  >
-                    <Tag size={16} />
-                  </button>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActivityLogDocumentId(discount.id);
-                      setIsActivityLogOpen(true);
-                    }}
-                    className="p-2 bg-white text-blue-500 rounded-xl border border-blue-50 shadow-sm hover:bg-blue-50 transition-all font-bold"
-                  >
-                    <History size={16} />
-                  </button>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(discount.id);
-                    }}
-                    className="p-2 bg-white text-red-500 rounded-xl border border-red-50 shadow-sm hover:bg-red-50 transition-all font-bold"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-                
-                <div className="flex flex-col h-full justify-between">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between border-b border-zinc-100/60 pb-2">
-                      <span className="text-xs text-zinc-400 font-semibold">{formatDate(discount.date)}</span>
-                      <span className="text-xs font-bold text-zinc-900 bg-zinc-100 rounded-lg px-2 py-1">{discount.number || '-'}</span>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 justify-between">
-                        <span className="text-xs text-zinc-400">العميل:</span>
-                        <span className="text-xs font-semibold text-zinc-700">{discount.customer_name}</span>
-                      </div>
-                    </div>
-
-                    {discount.notes && (
-                      <p className="text-xs text-zinc-500 font-medium max-w-xs truncate border-t border-zinc-100/60 pt-2">{discount.notes}</p>
-                    )}
-                  </div>
-                  
-                  <div className="mt-4 pt-4 border-t border-zinc-100 flex items-center justify-between font-bold">
-                    <span className="text-zinc-500 text-xs">مبلغ الخصم</span>
-                    <span className="font-black text-emerald-600 text-lg">
-                      {formatNumber(discount.amount)} ج.م
-                    </span>
-                  </div>
-                </div>
+                {filteredDiscounts.length === 0 && (
+                  <div className="col-span-full py-8 text-center text-slate-400 italic">لا توجد خصومات حالياً</div>
+                )}
               </div>
-            ))}
-            {filteredDiscounts.length === 0 && (
-              <div className="col-span-full py-12 text-center text-zinc-400 italic">لا توجد خصومات حالياً</div>
             )}
           </div>
-        )}
-      </div>
-    </>
-  ) : (
-    <div className="bg-white rounded-3xl border border-zinc-200 shadow-md overflow-hidden animate-in slide-in-from-bottom-4 duration-300 flex flex-col min-h-[80vh] relative">
+        </>
+      ) : (
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden animate-in slide-in-from-bottom-2 duration-200 flex flex-col min-h-[80vh] relative">
           {/* Header Block */}
-          <div className="p-4 md:p-6 border-b border-zinc-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-[90]">
-            <div className="flex items-center gap-3">
+          <div className="p-2.5 sm:p-3 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white/90 backdrop-blur-md z-[90]">
+            <div className="flex items-center gap-2">
               <button 
                 onClick={closeModal}
-                className="p-3 hover:bg-zinc-100 rounded-2xl transition-all text-zinc-400 hover:text-zinc-900 group"
+                className="px-2.5 py-1.5 hover:bg-slate-100 rounded-xl transition-all text-slate-600 hover:text-slate-900 group font-bold text-xs"
               >
-                <div className="flex items-center gap-2">
-                   <RotateCcw className={`w-5 h-5 transition-transform group-hover:-rotate-45`} />
-                  <span className="text-sm font-bold">عودة</span>
+                <div className="flex items-center gap-1.5">
+                  <RotateCcw className={`w-4 h-4 transition-transform group-hover:-rotate-45`} />
+                  <span>عودة</span>
                 </div>
               </button>
-              <div className="w-px h-6 bg-zinc-200 mx-2" />
+              <div className="w-px h-5 bg-slate-200 mx-1" />
               {editingDiscount && !editingDiscount.is_reversed && !editingDiscount.is_reversal_doc && (
                 <button
                   type="button"
@@ -727,22 +835,22 @@ export const CustomerDiscounts: React.FC = () => {
                     closeModal();
                     setReversingDiscount(d);
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-black transition-all"
+                  className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-xs font-bold transition-all"
                 >
-                  <RotateCcw size={14} className="text-amber-700" />
+                  <RotateCcw size={13} className="text-amber-700" />
                   <span>{language === 'ar' ? 'عكس الإشعار' : 'Reverse'}</span>
                 </button>
               )}
               <button
                 type="button"
                 onClick={() => setShowSidePanel(!showSidePanel)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
                   showSidePanel 
-                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-sm' 
-                    : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200 border-transparent'
+                    ? 'bg-emerald-50 text-emerald-600 border-emerald-200 shadow-sm' 
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-transparent'
                 } border`}
               >
-                <History size={18} />
+                <History size={14} />
                 <span>قيد اليومية \\ سجل التعديلات</span>
               </button>
             </div>
@@ -954,22 +1062,22 @@ export const CustomerDiscounts: React.FC = () => {
               </div>
 
               {/* Form Footer */}
-              <div className="p-4 md:p-6 border-t border-slate-100 bg-white/80 backdrop-blur-md sticky bottom-0 z-[70] flex items-center justify-between gap-4 mt-auto">
+              <div className="p-3 md:p-4 border-t border-slate-200 bg-white/90 backdrop-blur-md sticky bottom-0 z-[70] flex items-center justify-between gap-3 mt-auto">
                 <button 
                   type="button"
                   onClick={closeModal}
-                  className="flex-1 max-w-[200px] py-4 rounded-2xl bg-zinc-100 text-zinc-600 font-black hover:bg-zinc-200 transition-all flex items-center justify-center gap-3 active:scale-95"
+                  className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-all flex items-center justify-center gap-2 active:scale-95 text-xs"
                 >
-                  <RotateCcw size={20} />
-                  {t('common.cancel')}
+                  <RotateCcw size={15} />
+                  <span>{t('common.cancel')}</span>
                 </button>
                 <button 
                   type="submit"
-                  disabled={discountData.amount <= 0 || !discountData.customer_id}
-                  className="flex-1 py-4 rounded-2xl bg-emerald-600 text-white font-black hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 shadow-xl shadow-emerald-600/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isSubmitting || discountData.amount <= 0 || !discountData.customer_id}
+                  className="flex-1 max-w-xs py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
                 >
-                  <Save size={20} />
-                  {editingDiscount ? t('common.save') : t('discounts.save_button')}
+                  <Save size={15} />
+                  <span>{isSubmitting ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...') : (editingDiscount ? t('common.save') : t('discounts.save_button'))}</span>
                 </button>
               </div>
             </form>
