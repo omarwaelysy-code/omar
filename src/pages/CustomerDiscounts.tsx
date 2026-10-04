@@ -1208,7 +1208,7 @@ export const CustomerDiscounts: React.FC = () => {
                           >
                             <option value="">-- اختر حساباً من دليل الحسابات --</option>
                             {accounts
-                              .filter(a => a.status !== 'inactive')
+                              .filter(a => a.is_active !== false)
                               .sort((a, b) => (a.code || '').localeCompare(b.code || ''))
                               .map(a => (
                                 <option key={a.id} value={a.id}>
