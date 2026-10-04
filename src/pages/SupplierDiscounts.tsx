@@ -536,8 +536,10 @@ export const SupplierDiscounts: React.FC = () => {
 
   return (
     <div className="space-y-3 animate-in fade-in duration-300" dir={dir}>
-      {/* Compact Top Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-1 border-b border-slate-200">
+      {!isModalOpen ? (
+        <>
+          {/* Compact Top Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-1 border-b border-slate-200">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-amber-50 text-amber-700 rounded-xl border border-amber-200/60 shadow-xs">
             <Truck size={20} />
@@ -856,14 +858,11 @@ export const SupplierDiscounts: React.FC = () => {
           </div>
         )}
       </div>
-
-      {/* Main Form Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-slate-50 w-full h-[95vh] max-w-6xl rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 relative">
-            
-            {/* Modal Header */}
-            <div className="p-3 sm:p-4 bg-white border-b border-slate-200 flex items-center justify-between gap-2 z-10 flex-wrap">
+    </>
+  ) : (
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden animate-in slide-in-from-bottom-2 duration-200 flex flex-col min-h-[80vh] relative">
+      {/* Form Header with Actions */}
+      <div className="p-2.5 sm:p-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 sticky top-0 bg-white/95 backdrop-blur-md z-[90]">
               <div className="flex items-center gap-2">
                 <button 
                   onClick={closeModal}
@@ -1274,7 +1273,6 @@ export const SupplierDiscounts: React.FC = () => {
               </form>
             </div>
           </div>
-        </div>
       )}
 
       {/* Add Supplier Modal */}
