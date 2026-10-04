@@ -1393,13 +1393,18 @@ export const SupplierDiscounts: React.FC = () => {
         <ReversalModal
           isOpen={!!reversingDiscount}
           onClose={() => setReversingDiscount(null)}
-          moduleName="supplier_discounts"
-          documentId={reversingDiscount.id}
-          documentNumber={reversingDiscount.number || ''}
           onSuccess={() => {
             setReversingDiscount(null);
-            closeModal();
+            window.dispatchEvent(new Event('db-change'));
           }}
+          moduleName="supplier_discounts"
+          docId={reversingDiscount.id}
+          docNumber={reversingDiscount.number || reversingDiscount.id}
+          docDate={reversingDiscount.date}
+          docAmount={reversingDiscount.amount}
+          entityName={reversingDiscount.supplier_name}
+          entityType="supplier"
+          moduleTitleAr="خصم مورد"
         />
       )}
 
