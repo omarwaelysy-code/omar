@@ -359,10 +359,17 @@ async function startServer() {
       'ALTER TABLE "customer_discounts" ADD COLUMN IF NOT EXISTS "number" VARCHAR(50) NULL',
       'ALTER TABLE "customer_discounts" ADD COLUMN IF NOT EXISTS "account_id" VARCHAR(36)',
       'ALTER TABLE "customer_discounts" ADD COLUMN IF NOT EXISTS "account_name" VARCHAR(255)',
+      'ALTER TABLE "customer_discounts" ADD COLUMN IF NOT EXISTS "notes" TEXT',
+      'ALTER TABLE "customer_discounts" ADD COLUMN IF NOT EXISTS "created_by" VARCHAR(36)',
+      'ALTER TABLE "customer_discounts" ADD COLUMN IF NOT EXISTS "updated_by" VARCHAR(36)',
       'ALTER TABLE "supplier_discounts" ADD COLUMN IF NOT EXISTS "settlements" JSONB DEFAULT \'[]\'::jsonb',
       'ALTER TABLE "supplier_discounts" ADD COLUMN IF NOT EXISTS "number" VARCHAR(50) NULL',
       'ALTER TABLE "supplier_discounts" ADD COLUMN IF NOT EXISTS "account_id" VARCHAR(36)',
       'ALTER TABLE "supplier_discounts" ADD COLUMN IF NOT EXISTS "account_name" VARCHAR(255)',
+      'ALTER TABLE "supplier_discounts" ADD COLUMN IF NOT EXISTS "notes" TEXT',
+      'ALTER TABLE "supplier_discounts" ADD COLUMN IF NOT EXISTS "created_by" VARCHAR(36)',
+      'ALTER TABLE "supplier_discounts" ADD COLUMN IF NOT EXISTS "updated_by" VARCHAR(36)',
+      'ALTER TABLE "supplier_discounts" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
       'ALTER TABLE "purchase_invoices" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
 
       // Currency Rates

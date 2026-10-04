@@ -7247,6 +7247,10 @@ modules.forEach(moduleName => {
             req.body.voucher_number = await ensureUniqueSequenceNumber(pool, companyId, 'receipt_vouchers', dateStr, req.body.voucher_number);
           } else if (moduleName === 'issued_cheques') {
             payloadToPersist.serial_number = await ensureUniqueSequenceNumber(pool, companyId, 'issued_cheques', dateStr, req.body.serial_number);
+          } else if (moduleName === 'customer_discounts') {
+            payloadToPersist.number = await ensureUniqueSequenceNumber(pool, companyId, 'customer_discounts', dateStr, req.body.number);
+          } else if (moduleName === 'supplier_discounts') {
+            payloadToPersist.number = await ensureUniqueSequenceNumber(pool, companyId, 'supplier_discounts', dateStr, req.body.number);
           }
 
           const sanitizedData = sanitizeData(moduleName, payloadToPersist);
@@ -7545,6 +7549,10 @@ modules.forEach(moduleName => {
             req.body.voucher_number = await ensureUniqueSequenceNumber(pool, companyId || '', 'receipt_vouchers', dateStr, req.body.voucher_number, id);
           } else if (moduleName === 'journal_entries' && req.body.entry_number) {
             req.body.entry_number = await ensureUniqueSequenceNumber(pool, companyId || '', 'journal_entries', dateStr, req.body.entry_number, id);
+          } else if (moduleName === 'customer_discounts' && req.body.number) {
+            payloadToPersist.number = await ensureUniqueSequenceNumber(pool, companyId || '', 'customer_discounts', dateStr, req.body.number, id);
+          } else if (moduleName === 'supplier_discounts' && req.body.number) {
+            payloadToPersist.number = await ensureUniqueSequenceNumber(pool, companyId || '', 'supplier_discounts', dateStr, req.body.number, id);
           }
 
           const sanitizedData = sanitizeData(moduleName, payloadToPersist);

@@ -150,7 +150,11 @@ export const CustomerDiscounts: React.FC = () => {
   const openEditModal = (discount: any) => {
     setEditingDiscount(discount);
     setIsAmountFocused(false);
-    const accId = discount.account_id || '';
+    let accId = discount.account_id || '';
+    if (!accId && discount.account_name) {
+      const matched = accounts.find(a => a.name === discount.account_name);
+      if (matched) accId = matched.id;
+    }
     const isDiscountAcc = accounts.some(a => a.id === accId && (a.account_usage === 'earned_discounts' || a.account_usage === 'sales_discount' || a.name?.includes('خصم')));
     
     if (accId) {
@@ -281,7 +285,7 @@ export const CustomerDiscounts: React.FC = () => {
       return;
     }
 
-    if (isModalOpen) {
+    if (isModalOpen && !editingDiscount) {
       const updateNum = async () => {
         const num = await generateDiscountNumber(discountData.date);
         setDiscountNumber(num);
@@ -394,7 +398,9 @@ export const CustomerDiscounts: React.FC = () => {
       showNotification(`لا يمكن حفظ الخصم — العميل "${customer?.name || ''}" لا يملك حساباً محاسبياً مربوطاً. يرجى فتح بيانات العميل وتحديد الحساب المحاسبي.`, 'error');
       return;
     }
-    if (!discountData.account_id) {
+    const selectedAccId = accountSource === 'discount' ? discountAccountId : customAccountId;
+    const effectiveAccountId = selectedAccId || discountData.account_id;
+    if (!effectiveAccountId) {
       showNotification('لا يمكن حفظ الخصم — يرجى اختيار حساب الخصم المحاسبي.', 'error');
       return;
     }
@@ -418,6 +424,7 @@ export const CustomerDiscounts: React.FC = () => {
         account_id: debitAccountId,
         account_name: debitAccountName,
         notes: discountData.notes,
+        description: discountData.notes || '',
         attachments,
         number,
         type: 'customer',

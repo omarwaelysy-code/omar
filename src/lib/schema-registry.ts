@@ -150,10 +150,18 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'cancel_journal_entry_id', 'created_by', 'updated_by', 'created_at', 'updated_at'
   ],
   customer_discounts: [
-    'id', 'company_id', 'customer_id', 'customer_name', 'date', 'amount', 'description', 'attachments'
+    'id', 'company_id', 'customer_id', 'customer_name', 'account_id', 'account_name',
+    'number', 'date', 'amount', 'notes', 'description', 'attachments', 'settlements',
+    'is_reversed', 'reversed_at', 'reversal_reason', 'reversed_by_doc_id', 'reversed_by_doc_number', 'is_reversal_doc',
+    'original_doc_id', 'original_doc_number', 'reversed_by_entry_id', 'reversed_by_entry_number', 'original_entry_id', 'original_entry_number',
+    'created_by', 'created_at', 'updated_by', 'updated_at'
   ],
   supplier_discounts: [
-    'id', 'company_id', 'supplier_id', 'supplier_name', 'date', 'amount', 'description', 'attachments'
+    'id', 'company_id', 'supplier_id', 'supplier_name', 'account_id', 'account_name',
+    'number', 'date', 'amount', 'notes', 'description', 'attachments', 'settlements',
+    'is_reversed', 'reversed_at', 'reversal_reason', 'reversed_by_doc_id', 'reversed_by_doc_number', 'is_reversal_doc',
+    'original_doc_id', 'original_doc_number', 'reversed_by_entry_id', 'reversed_by_entry_number', 'original_entry_id', 'original_entry_number',
+    'created_by', 'created_at', 'updated_by', 'updated_at'
   ],
   cash_transfers: [
     'id', 'company_id', 'date', 'amount', 'from_payment_method_id', 'to_payment_method_id', 
