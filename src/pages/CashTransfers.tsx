@@ -950,6 +950,7 @@ export const CashTransfers: React.FC = () => {
   };
 
   const handleExportExcel = () => {
+    const baseCurr = (companyData?.settings?.currency || 'EGP').toUpperCase();
     const headers = {
       'date': 'التاريخ',
       'transfer_number': 'رقم التحويل',
@@ -958,16 +959,54 @@ export const CashTransfers: React.FC = () => {
       'amount': 'المبلغ المصدر',
       'to_payment_method_name': 'إلى بنك / خزينة',
       'to_currency': 'عملة الوجهة',
+      'deposited_amount': 'المبلغ المودع (عملة الوجهة)',
       'exchange_rate': 'سعر الصرف',
-      'converted_amount': 'المبلغ المودع / بعملة النظام',
+      'system_amount': `مبلغ بعملة النظام (${baseCurr})`,
+      'to_account_number': 'رقم الخزنة / الحساب',
+      'entry_number': 'رقم القيد',
       'description': 'الوصف'
     };
-    const exportRows = filteredTransfers.map(t => ({
-      ...t,
-      from_currency: getEffectiveFromCurrency(t),
-      to_currency: getEffectiveToCurrency(t),
-      converted_amount: t.converted_amount || t.amount
-    }));
+    const exportRows = filteredTransfers.map(t => {
+      const fromCurr = getEffectiveFromCurrency(t);
+      const toCurr = getEffectiveToCurrency(t);
+      const isMulti = fromCurr !== toCurr;
+      const rate = t.exchange_rate ? Number(t.exchange_rate) : (isMulti ? '-' : 1);
+      const toPM = paymentMethods.find(pm => pm.id === t.to_payment_method_id);
+
+      let depositedAmt = Number(t.converted_amount);
+      if (isNaN(depositedAmt) || depositedAmt === 0 || t.converted_amount === undefined || t.converted_amount === null) {
+        if (!isMulti) {
+          depositedAmt = Number(t.amount) || 0;
+        } else if (fromCurr === baseCurr && toCurr !== baseCurr && typeof rate === 'number' && rate > 0) {
+          depositedAmt = Number((Number(t.amount) / rate).toFixed(2));
+        } else if (typeof rate === 'number') {
+          depositedAmt = Number((Number(t.amount) * rate).toFixed(2));
+        } else {
+          depositedAmt = Number(t.amount) || 0;
+        }
+      }
+
+      let sysAmt = Number(t.amount) || 0;
+      if (fromCurr === baseCurr) {
+        sysAmt = Number(t.amount) || 0;
+      } else if (toCurr === baseCurr) {
+        sysAmt = depositedAmt;
+      } else if (typeof rate === 'number') {
+        sysAmt = Number(((Number(t.amount) || 0) * rate).toFixed(2));
+      } else {
+        sysAmt = depositedAmt;
+      }
+
+      return {
+        ...t,
+        from_currency: fromCurr,
+        to_currency: toCurr,
+        deposited_amount: depositedAmt,
+        system_amount: sysAmt,
+        to_account_number: toPM?.account_number || toPM?.code || '-',
+        entry_number: t.entry_number || '-'
+      };
+    });
     const formattedData = formatDataForExcel(exportRows, headers);
     exportToExcel(formattedData, { filename: 'Bank_Cash_Transfers', sheetName: language === 'ar' ? 'التحويل بين البنوك والخزائن' : 'Transfers Between Banks & Safes' });
   };
@@ -981,6 +1020,8 @@ export const CashTransfers: React.FC = () => {
       });
     }
   };
+
+  const baseCurr = (companyData?.settings?.currency || 'EGP').toUpperCase();
 
   if (loading) return <div className="flex items-center justify-center h-full">جاري التحميل...</div>;
 
@@ -1142,46 +1183,52 @@ export const CashTransfers: React.FC = () => {
                     </div>
                   </th>
                   <th className="px-2.5 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter text-center">
-                    لوجو البنك
+                    {language === 'ar' ? 'لوجو البنك' : 'Bank Logo'}
                   </th>
                   <th className="px-3 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('from_payment_method_name')}>
                     <div className="flex items-center gap-1">
-                      من بنك / خزينة
+                      {language === 'ar' ? 'من بنك / خزينة' : 'From Bank/Safe'}
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                         {sortBy === 'from_payment_method_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                       </span>
                     </div>
                   </th>
                   <th className="px-2.5 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter text-center">
-                    عملة المصدر
+                    {language === 'ar' ? 'عملة المصدر' : 'Src Currency'}
                   </th>
                   <th className="px-3 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('amount')}>
                     <div className="flex items-center gap-1">
-                      المبلغ المصدر
+                      {language === 'ar' ? 'المبلغ المصدر' : 'Src Amount'}
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                         {sortBy === 'amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                       </span>
                     </div>
                   </th>
+                  <th className="px-2.5 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter text-center">
+                    {language === 'ar' ? 'لوجو البنك (الوجهة)' : 'Dest. Bank Logo'}
+                  </th>
                   <th className="px-3 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('to_payment_method_name')}>
                     <div className="flex items-center gap-1">
-                      إلى بنك / خزينة
+                      {language === 'ar' ? 'إلى بنك / خزينة' : 'To Bank/Safe'}
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                         {sortBy === 'to_payment_method_name' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                       </span>
                     </div>
                   </th>
-                  <th className="px-3 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter text-center">
-                    رقم الخزنة / الحساب
-                  </th>
                   <th className="px-2.5 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter text-center">
-                    عملة الوجهة
+                    {language === 'ar' ? 'عملة الوجهة' : 'Dest Currency'}
                   </th>
                   <th className="px-3 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter text-center">
-                    سعر الصرف
+                    {language === 'ar' ? 'المبلغ المودع (عملة الوجهة)' : 'Deposit Amount (Dest)'}
                   </th>
-                  <th className="px-3 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter">
-                    المبلغ المودع (عملة الوجهة)
+                  <th className="px-3 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter text-center">
+                    {language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}
+                  </th>
+                  <th className="px-3 py-2.5 text-xs font-bold text-emerald-800 uppercase tracking-tighter text-center bg-emerald-50/60">
+                    {language === 'ar' ? `مبلغ بعملة النظام (${baseCurr})` : `System Amount (${baseCurr})`}
+                  </th>
+                  <th className="px-3 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter text-center">
+                    {language === 'ar' ? 'رقم الخزنة / الحساب' : 'Account/Safe No.'}
                   </th>
                   <th className="px-3 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter">{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</th>
                   <th className="px-3 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter">{t('common.description')}</th>
@@ -1194,13 +1241,11 @@ export const CashTransfers: React.FC = () => {
                   const toCurr = getEffectiveToCurrency(transfer);
                   const isMulti = fromCurr !== toCurr;
                   const rate = transfer.exchange_rate ? Number(transfer.exchange_rate) : (isMulti ? '-' : 1);
-                  const baseCurr = (companyData?.settings?.currency || 'EGP').toUpperCase();
 
                   const fromPM = paymentMethods.find(pm => pm.id === transfer.from_payment_method_id);
                   const toPM = paymentMethods.find(pm => pm.id === transfer.to_payment_method_id);
                   const fromBank = findEgyptianBank(fromPM);
                   const toBank = findEgyptianBank(toPM);
-                  const displayedBank = fromBank || toBank;
 
                   let depositedAmt = Number(transfer.converted_amount);
                   if (isNaN(depositedAmt) || depositedAmt === 0 || transfer.converted_amount === undefined || transfer.converted_amount === null) {
@@ -1213,6 +1258,17 @@ export const CashTransfers: React.FC = () => {
                     } else {
                       depositedAmt = Number(transfer.amount) || 0;
                     }
+                  }
+
+                  let sysAmt = Number(transfer.amount) || 0;
+                  if (fromCurr === baseCurr) {
+                    sysAmt = Number(transfer.amount) || 0;
+                  } else if (toCurr === baseCurr) {
+                    sysAmt = depositedAmt;
+                  } else if (typeof rate === 'number') {
+                    sysAmt = Number(((Number(transfer.amount) || 0) * rate).toFixed(2));
+                  } else {
+                    sysAmt = depositedAmt;
                   }
 
                   const isSelected = selectedTransferIds.includes(transfer.id);
@@ -1240,16 +1296,17 @@ export const CashTransfers: React.FC = () => {
                           {transfer.transfer_number || '-'}
                         </span>
                       </td>
-                      {/* لوجو البنك */}
+                      {/* لوجو البنك (المصدر) - يظهر فقط إذا كان بنك */}
                       <td className="px-2.5 py-2 text-center whitespace-nowrap">
-                        {displayedBank ? (
-                          <BankLogoBadge bank={displayedBank} size="sm" className="!w-7 !h-7 !p-0.5 rounded-lg border border-zinc-200 bg-white mx-auto shadow-2xs" />
-                        ) : fromPM?.bank_logo || toPM?.bank_logo ? (
-                          <img src={fromPM?.bank_logo || toPM?.bank_logo} alt="Bank" className="w-7 h-7 object-contain rounded-lg border border-zinc-200 bg-white p-0.5 mx-auto" />
+                        {fromBank ? (
+                          <BankLogoBadge bank={fromBank} size="sm" className="!w-7 !h-7 !p-0.5 rounded-lg border border-zinc-200 bg-white mx-auto shadow-2xs" />
+                        ) : fromPM?.bank_logo ? (
+                          <img src={fromPM.bank_logo} alt="Bank" className="w-7 h-7 object-contain rounded-lg border border-zinc-200 bg-white p-0.5 mx-auto" />
                         ) : (
                           <span className="text-zinc-300">-</span>
                         )}
                       </td>
+                      {/* من بنك / خزينة */}
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1.5">
                           <div className="w-5 h-5 bg-red-50 text-red-600 rounded-md flex items-center justify-center shrink-0">
@@ -1258,12 +1315,25 @@ export const CashTransfers: React.FC = () => {
                           <span className="text-zinc-800 font-bold truncate max-w-[130px]">{transfer.from_payment_method_name}</span>
                         </div>
                       </td>
+                      {/* عملة المصدر */}
                       <td className="px-2.5 py-2 text-center whitespace-nowrap">
                         {renderCurrencyBadge(fromCurr)}
                       </td>
+                      {/* المبلغ المصدر */}
                       <td className="px-3 py-2 whitespace-nowrap font-mono font-bold text-xs text-zinc-900">
                         {formatNumber(transfer.amount)}
                       </td>
+                      {/* لوجو البنك (الوجهة) - يظهر فقط إذا كان بنك */}
+                      <td className="px-2.5 py-2 text-center whitespace-nowrap">
+                        {toBank ? (
+                          <BankLogoBadge bank={toBank} size="sm" className="!w-7 !h-7 !p-0.5 rounded-lg border border-zinc-200 bg-white mx-auto shadow-2xs" />
+                        ) : toPM?.bank_logo ? (
+                          <img src={toPM.bank_logo} alt="Bank" className="w-7 h-7 object-contain rounded-lg border border-zinc-200 bg-white p-0.5 mx-auto" />
+                        ) : (
+                          <span className="text-zinc-300">-</span>
+                        )}
+                      </td>
+                      {/* إلى بنك / خزينة */}
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1.5">
                           <div className="w-5 h-5 bg-emerald-50 text-emerald-600 rounded-md flex items-center justify-center shrink-0">
@@ -1272,15 +1342,18 @@ export const CashTransfers: React.FC = () => {
                           <span className="text-zinc-800 font-bold truncate max-w-[130px]">{transfer.to_payment_method_name}</span>
                         </div>
                       </td>
-                      {/* رقم الخزنة / الحساب المحول إليها */}
-                      <td className="px-3 py-2 text-center whitespace-nowrap">
-                        <span className="font-mono text-xs font-bold text-zinc-700 bg-zinc-50 px-2 py-0.5 rounded border border-zinc-200">
-                          {toPM?.account_number || toPM?.code || '-'}
-                        </span>
-                      </td>
+                      {/* عملة الوجهة */}
                       <td className="px-2.5 py-2 text-center whitespace-nowrap">
                         {renderCurrencyBadge(toCurr)}
                       </td>
+                      {/* المبلغ المودع (عملة الوجهة) */}
+                      <td className="px-3 py-2 whitespace-nowrap text-center">
+                        <div className="flex items-center justify-center gap-1 font-mono font-bold text-xs text-zinc-900">
+                          <span>{formatNumber(depositedAmt)}</span>
+                          <span className="text-[10px] font-bold text-zinc-500 font-sans">{toCurr}</span>
+                        </div>
+                      </td>
+                      {/* سعر الصرف */}
                       <td className="px-3 py-2 text-center whitespace-nowrap font-mono text-xs">
                         {isMulti ? (
                           <span className="bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded font-black border border-amber-200 text-[11px]">
@@ -1290,12 +1363,20 @@ export const CashTransfers: React.FC = () => {
                           <span className="text-zinc-400">-</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap">
-                        <div className="flex items-center gap-1 font-mono font-black text-xs text-emerald-700">
-                          <span>{formatNumber(depositedAmt)}</span>
-                          <span className="text-[10px] font-bold text-zinc-500 font-sans">{toCurr}</span>
+                      {/* مبلغ بعملة النظام */}
+                      <td className="px-3 py-2 whitespace-nowrap text-center bg-emerald-50/20">
+                        <div className="flex items-center justify-center gap-1 font-mono font-black text-xs text-emerald-700">
+                          <span>{formatNumber(sysAmt)}</span>
+                          <span className="text-[10px] font-bold text-emerald-600 font-sans">{baseCurr}</span>
                         </div>
                       </td>
+                      {/* رقم الخزنة / الحساب المحول إليها */}
+                      <td className="px-3 py-2 text-center whitespace-nowrap">
+                        <span className="font-mono text-xs font-bold text-zinc-700 bg-zinc-50 px-2 py-0.5 rounded border border-zinc-200">
+                          {toPM?.account_number || toPM?.code || '-'}
+                        </span>
+                      </td>
+                      {/* رقم القيد */}
                       <td className="px-3 py-2 whitespace-nowrap">
                         {transfer.entry_number ? (
                           <button
