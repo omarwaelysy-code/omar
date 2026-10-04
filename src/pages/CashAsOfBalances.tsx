@@ -231,7 +231,7 @@ export const CashAsOfBalances: React.FC = () => {
           pretData,
           ctData
         ] = await Promise.all([
-          dbService.getCompany(user.company_id),
+          dbService.get<any>('companies', user.company_id),
           dbService.list<PaymentMethod>('payment_methods', user.company_id),
           dbService.list<Account>('accounts', user.company_id),
           dbService.list<AccountType>('account_types', user.company_id),
@@ -611,7 +611,7 @@ export const CashAsOfBalances: React.FC = () => {
     if (!reportRef.current) return;
     const title = language === 'ar' ? `تقرير أرصدة النقدية في ${formatDate(asOfDate)}` : `Cash Balances Report As of ${formatDate(asOfDate)}`;
     exportToPDF(reportRef.current, {
-      title,
+      reportTitle: title,
       filename: `cash_balances_${asOfDate}.pdf`,
       orientation: 'landscape'
     });
