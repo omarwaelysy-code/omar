@@ -583,6 +583,19 @@ export class ReversalEngine {
           labelAr: 'خصم مسموح به للعميل'
         };
 
+      case 'supplier_discounts':
+        return {
+          moduleName: 'supplier_discounts',
+          tableName: 'supplier_discounts',
+          numberColumn: 'number',
+          itemsTable: null,
+          itemFkColumn: null,
+          inventoryDocType: null,
+          hasSettlement: true,
+          defaultRefType: 'supplier_discount',
+          labelAr: 'خصم مكتسب من المورد'
+        };
+
       case 'opening_stock_balances':
         return {
           moduleName: 'opening_stock_balances',
