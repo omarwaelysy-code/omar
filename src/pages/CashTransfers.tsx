@@ -1846,8 +1846,11 @@ export const CashTransfers: React.FC = () => {
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/60 pb-2.5">
                         <div className="flex items-center gap-2 text-amber-900">
                           <Coins className="w-4 h-4 text-amber-600" />
-                          <span className="text-xs font-black">
-                            {language === 'ar' ? 'تحويل بين عملات مختلفة' : 'Cross-Currency Transfer'}: ({formData.from_currency} ➔ {formData.to_currency})
+                          <span className="text-xs font-black flex items-center gap-1.5 flex-wrap">
+                            <span>{language === 'ar' ? 'تحويل بين عملات مختلفة:' : 'Cross-Currency Transfer:'}</span>
+                            <span dir="ltr" className="font-mono bg-amber-100/90 text-amber-950 px-2 py-0.5 rounded-md font-bold text-xs border border-amber-300">
+                              ({formData.from_currency} ➔ {formData.to_currency})
+                            </span>
                           </span>
                         </div>
                         <button
@@ -1864,15 +1867,17 @@ export const CashTransfers: React.FC = () => {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
                           <label className="block text-[11px] font-bold text-amber-950">
-                            {language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}
-                            <span className="text-[10px] text-zinc-500 font-normal ms-1">
-                              {(() => {
-                                const baseCurr = (companyData?.settings?.currency || 'EGP').toUpperCase();
-                                if (formData.from_currency === baseCurr && formData.to_currency !== baseCurr) {
-                                  return `(1 ${formData.to_currency} = ${formData.exchange_rate} ${formData.from_currency})`;
-                                }
-                                return `(1 ${formData.from_currency} = ${formData.exchange_rate} ${formData.to_currency})`;
-                              })()}
+                            <span>{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</span>
+                            <span className="text-[10px] text-zinc-600 font-bold ms-1" dir="ltr">
+                              <bdi>
+                                {(() => {
+                                  const baseCurr = (companyData?.settings?.currency || 'EGP').toUpperCase();
+                                  if (formData.from_currency === baseCurr && formData.to_currency !== baseCurr) {
+                                    return `(1 ${formData.to_currency} = ${formData.exchange_rate} ${formData.from_currency})`;
+                                  }
+                                  return `(1 ${formData.from_currency} = ${formData.exchange_rate} ${formData.to_currency})`;
+                                })()}
+                              </bdi>
                             </span>
                           </label>
                           <div className="relative">

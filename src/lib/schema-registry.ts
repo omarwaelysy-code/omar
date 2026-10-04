@@ -157,7 +157,11 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   cash_transfers: [
     'id', 'company_id', 'date', 'amount', 'from_payment_method_id', 'to_payment_method_id', 
-    'from_payment_method_name', 'to_payment_method_name', 'description', 'created_by', 'created_at', 'transfer_number', 'attachments'
+    'from_payment_method_name', 'to_payment_method_name', 'description', 'created_by', 'created_at', 'transfer_number', 'attachments',
+    'from_currency', 'to_currency', 'exchange_rate', 'converted_amount',
+    'is_reversed', 'reversed_at', 'reversal_reason', 'reversed_by_doc_id', 'reversed_by_doc_number', 'is_reversal_doc',
+    'original_doc_id', 'original_doc_number', 'reversed_by_entry_id', 'reversed_by_entry_number', 'original_entry_id', 'original_entry_number',
+    'updated_at'
   ],
   expense_categories: [
     'id', 'company_id', 'code', 'name', 'description', 'account_id', 'account_name'
