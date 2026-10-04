@@ -4001,7 +4001,9 @@ export const SEQUENCE_MODULE_CONFIG: Record<string, { table: string; field: stri
   'received_cheques': { table: 'received_cheques', field: 'serial_number', prefix: 'RCV', padLength: 6, periodType: 'month' },
   'fixed_assets': { table: 'fixed_assets', field: 'asset_number', prefix: 'AST', padLength: 6, periodType: 'month' },
   'sales_import_batches': { table: 'document_import_batches', field: 'batch_number', prefix: 'Batch-sal', padLength: 5, periodType: 'month' },
-  'purchases_import_batches': { table: 'document_import_batches', field: 'batch_number', prefix: 'Batch-pur', padLength: 5, periodType: 'month' }
+  'purchases_import_batches': { table: 'document_import_batches', field: 'batch_number', prefix: 'Batch-pur', padLength: 5, periodType: 'month' },
+  'customer_discounts': { table: 'customer_discounts', field: 'number', prefix: 'CDISC', padLength: 5, periodType: 'month' },
+  'supplier_discounts': { table: 'supplier_discounts', field: 'number', prefix: 'SDISC', padLength: 5, periodType: 'month' }
 };
 
 export async function getNextAtomicSequence(
@@ -4041,7 +4043,9 @@ export async function getNextAtomicSequence(
     'cash_transfers': { table: 'cash_transfers', field: 'transfer_number', prefix: 'CT' },
     'fixed_assets': { table: 'fixed_assets', field: 'asset_number', prefix: 'AST' },
     'sales_import_batches': { table: 'document_import_batches', field: 'batch_number', prefix: 'Batch-sal' },
-    'purchases_import_batches': { table: 'document_import_batches', field: 'batch_number', prefix: 'Batch-pur' }
+    'purchases_import_batches': { table: 'document_import_batches', field: 'batch_number', prefix: 'Batch-pur' },
+    'customer_discounts': { table: 'customer_discounts', field: 'number', prefix: 'CDISC' },
+    'supplier_discounts': { table: 'supplier_discounts', field: 'number', prefix: 'SDISC' }
   };
 
   const target = tableNames[module];
@@ -4186,6 +4190,8 @@ export async function generateNextSequence(client: any, companyId: string, modul
     case 'received_cheques': prefix = 'RCV'; break;
     case 'sales_import_batches': prefix = 'Batch-sal'; padLength = 5; break;
     case 'purchases_import_batches': prefix = 'Batch-pur'; padLength = 5; break;
+    case 'customer_discounts': prefix = 'CDISC'; padLength = 5; break;
+    case 'supplier_discounts': prefix = 'SDISC'; padLength = 5; break;
     default: prefix = 'DOC';
   }
 
@@ -4228,7 +4234,9 @@ export async function generateNextSequence(client: any, companyId: string, modul
       'employees': { table: 'employees', field: 'employee_code', prefix: 'EMP' },
       'cash_transfers': { table: 'cash_transfers', field: 'transfer_number', prefix: 'CT' },
       'sales_import_batches': { table: 'document_import_batches', field: 'batch_number', prefix: 'Batch-sal' },
-      'purchases_import_batches': { table: 'document_import_batches', field: 'batch_number', prefix: 'Batch-pur' }
+      'purchases_import_batches': { table: 'document_import_batches', field: 'batch_number', prefix: 'Batch-pur' },
+      'customer_discounts': { table: 'customer_discounts', field: 'number', prefix: 'CDISC' },
+      'supplier_discounts': { table: 'supplier_discounts', field: 'number', prefix: 'SDISC' }
     };
 
     const target = tableNames[moduleName];

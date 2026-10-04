@@ -1756,9 +1756,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             </nav>
           </div>
 
-          <div className="hidden md:block">
-            <AIAssistant onNavigate={onNavigate} />
-          </div>
+
 
           {/* Mobile Menu Drawer */}
           <AnimatePresence>

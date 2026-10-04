@@ -59,10 +59,11 @@ export const CustomerDiscounts: React.FC = () => {
   const [discountAccountId, setDiscountAccountId] = useState('');
   const [customAccountId, setCustomAccountId] = useState('');
   const [copiedDocNumber, setCopiedDocNumber] = useState(false);
+  const [isAmountFocused, setIsAmountFocused] = useState(false);
   const tableRef = useRef<HTMLTableElement>(null);
 
   const handleCopyDocNumber = () => {
-    const num = editingDiscount ? editingDiscount.number : discountNumber;
+    const num = editingDiscount?.number || discountNumber;
     if (num) {
       navigator.clipboard.writeText(num);
       setCopiedDocNumber(true);
@@ -132,6 +133,7 @@ export const CustomerDiscounts: React.FC = () => {
     setIsSubmitting(false);
     setEditingDiscount(null);
     setAttachments([]);
+    setIsAmountFocused(false);
     const defaultAcc = settings?.customer_discount_account_id || accounts.find(a => a.account_usage === 'sales_discount' || a.account_usage === 'earned_discounts')?.id || '';
     setAccountSource('discount');
     setDiscountAccountId(defaultAcc);
@@ -147,25 +149,44 @@ export const CustomerDiscounts: React.FC = () => {
 
   const openEditModal = (discount: any) => {
     setEditingDiscount(discount);
-    const isDiscountAcc = accounts.some(a => a.id === discount.account_id && (a.account_usage === 'earned_discounts' || a.account_usage === 'sales_discount' || a.name?.includes('خصم')));
-    if (isDiscountAcc || !discount.account_id) {
-      setAccountSource('discount');
-      setDiscountAccountId(discount.account_id || settings?.customer_discount_account_id || '');
-      setCustomAccountId('');
+    setIsAmountFocused(false);
+    const accId = discount.account_id || '';
+    const isDiscountAcc = accounts.some(a => a.id === accId && (a.account_usage === 'earned_discounts' || a.account_usage === 'sales_discount' || a.name?.includes('خصم')));
+    
+    if (accId) {
+      if (isDiscountAcc) {
+        setAccountSource('discount');
+        setDiscountAccountId(accId);
+        setCustomAccountId('');
+      } else {
+        setAccountSource('custom');
+        setCustomAccountId(accId);
+        setDiscountAccountId(settings?.customer_discount_account_id || accounts.find(a => a.account_usage === 'sales_discount' || a.account_usage === 'earned_discounts')?.id || '');
+      }
     } else {
-      setAccountSource('custom');
-      setCustomAccountId(discount.account_id || '');
-      setDiscountAccountId(settings?.customer_discount_account_id || accounts.find(a => a.account_usage === 'sales_discount' || a.account_usage === 'earned_discounts')?.id || '');
+      const defAcc = settings?.customer_discount_account_id || accounts.find(a => a.account_usage === 'sales_discount' || a.account_usage === 'earned_discounts')?.id || '';
+      setAccountSource('discount');
+      setDiscountAccountId(defAcc);
+      setCustomAccountId('');
     }
+
+    const docNum = discount.number || discount.discount_number || '';
+    setDiscountNumber(docNum);
+    if (!docNum && discount.date) {
+      generateDiscountNumber(discount.date).then(num => {
+        if (num) setDiscountNumber(num);
+      });
+    }
+
+    const numAmount = parseFloat(String(discount.amount || 0));
     setDiscountData({
       customer_id: discount.customer_id,
-      amount: discount.amount,
-      date: discount.date.slice(0, 10),
-      account_id: discount.account_id || '',
+      amount: numAmount,
+      date: discount.date ? discount.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+      account_id: accId || settings?.customer_discount_account_id || '',
       notes: discount.notes || ''
     });
     setAttachments(Array.isArray(discount.attachments) ? discount.attachments : []);
-    setDiscountNumber(discount.number || '');
     setIsModalOpen(true);
   };
 
@@ -381,18 +402,20 @@ export const CustomerDiscounts: React.FC = () => {
     setIsSubmitting(true);
     try {
       const customer = customers.find(c => c.id === discountData.customer_id);
-      const number = editingDiscount ? editingDiscount.number : discountNumber;
+      const number = editingDiscount?.number || discountNumber;
       
-      const discountAccount = accounts.find(a => a.id === discountData.account_id);
-      const debitAccountId = discountAccount?.id || '';
-      const debitAccountName = discountAccount?.name || 'حساب الخصم المسموح به';
+      const selectedAccId = accountSource === 'discount' ? discountAccountId : customAccountId;
+      const effectiveAccountId = selectedAccId || discountData.account_id;
+      const discountAccount = accounts.find(a => a.id === effectiveAccountId);
+      const debitAccountId = discountAccount?.id || effectiveAccountId;
+      const debitAccountName = discountAccount?.name || (accountSource === 'discount' ? 'حساب الخصم المسموح به' : 'حساب آخر');
 
       const data = {
         customer_id: discountData.customer_id,
         customer_name: customer?.name || '',
         amount: discountData.amount,
         date: discountData.date,
-        account_id: discountData.account_id,
+        account_id: debitAccountId,
         account_name: debitAccountName,
         notes: discountData.notes,
         attachments,
@@ -1000,7 +1023,7 @@ export const CustomerDiscounts: React.FC = () => {
                           readOnly
                           type="text"
                           className={`w-full ${dir === 'rtl' ? 'pr-8 pl-8' : 'pl-8 pr-8'} py-2 bg-zinc-100/80 border border-zinc-200 rounded-xl font-mono font-bold text-zinc-700 text-xs outline-none cursor-not-allowed`}
-                          value={editingDiscount ? editingDiscount.number : discountNumber}
+                          value={editingDiscount?.number || discountNumber || ''}
                         />
                         <button
                           type="button"
@@ -1059,19 +1082,34 @@ export const CustomerDiscounts: React.FC = () => {
 
                     {/* Amount */}
                     <div>
-                      <label className="block text-xs font-bold text-zinc-600 mb-1 px-1">
-                        {t('discounts.amount_label')}
-                      </label>
+                      <div className="flex items-center justify-between mb-1 px-1">
+                        <label className="block text-xs font-bold text-zinc-600">
+                          {t('discounts.amount_label')}
+                        </label>
+                        {discountData.amount > 0 && !isAmountFocused && (
+                          <span className="text-[10px] font-mono font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                            {formatNumber(discountData.amount)} ج.م
+                          </span>
+                        )}
+                      </div>
                       <div className="relative group">
                         <Wallet className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none`} />
                         <input 
                           required
-                          type="number" 
-                          step="0.01"
-                          className={`w-full ${dir === 'rtl' ? 'pr-8 pl-3' : 'pl-8 pr-3'} py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs`}
+                          type="text" 
+                          inputMode="decimal"
+                          className={`w-full ${dir === 'rtl' ? 'pr-8 pl-3' : 'pl-8 pr-3'} py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs font-mono`}
                           placeholder="0.00"
-                          value={discountData.amount || ''}
-                          onChange={(e) => setDiscountData({...discountData, amount: Number(e.target.value)})}
+                          value={isAmountFocused ? (discountData.amount > 0 ? String(discountData.amount) : '') : (discountData.amount > 0 ? formatNumber(discountData.amount) : '')}
+                          onFocus={() => setIsAmountFocused(true)}
+                          onChange={(e) => {
+                            const raw = e.target.value.replace(/,/g, '');
+                            if (raw === '' || /^\d*\.?\d*$/.test(raw)) {
+                              const num = parseFloat(raw) || 0;
+                              setDiscountData(prev => ({ ...prev, amount: num }));
+                            }
+                          }}
+                          onBlur={() => setIsAmountFocused(false)}
                         />
                       </div>
                     </div>
@@ -1243,25 +1281,7 @@ export const CustomerDiscounts: React.FC = () => {
                   />
                 </div>
 
-                {/* Form Footer Action */}
-                <div className="p-2 flex items-center justify-end gap-2 pt-2">
-                  <button 
-                    type="button"
-                    onClick={closeModal}
-                    className="px-3.5 py-1.5 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-all flex items-center gap-1.5 text-xs active:scale-95"
-                  >
-                    <X size={14} />
-                    <span>{t('common.cancel')}</span>
-                  </button>
-                  <button 
-                    type="submit"
-                    disabled={isSubmitting || discountData.amount <= 0 || !discountData.customer_id || !discountData.account_id}
-                    className="px-5 py-1.5 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
-                  >
-                    <Save size={14} />
-                    <span>{isSubmitting ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...') : (editingDiscount ? (language === 'ar' ? 'تحديث الخصم' : t('common.save')) : (language === 'ar' ? 'حفظ البيانات' : t('discounts.save_button')))}</span>
-                  </button>
-                </div>
+
               </div>
             </form>
           </div>

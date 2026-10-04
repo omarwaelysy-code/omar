@@ -166,13 +166,19 @@ export const DiscountSchema = BaseSchema.extend({
   date: z.string(),
   amount: z.coerce.number().positive(),
   customer_id: z.string().nullable().optional(),
+  customer_name: z.string().nullable().optional(),
   supplier_id: z.string().nullable().optional(),
+  supplier_name: z.string().nullable().optional(),
   account_id: z.string().nullable().optional(),
-  number: z.string().optional(),
+  account_name: z.string().nullable().optional(),
+  number: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
+  attachments: z.any().optional(),
   type: z.enum(['customer', 'supplier']),
-});
+  updated_at: z.string().optional(),
+  updated_by: z.string().optional(),
+}).passthrough();
 
 // Types exported for convenience
 export type JournalEntry = z.infer<typeof JournalEntrySchema>;
