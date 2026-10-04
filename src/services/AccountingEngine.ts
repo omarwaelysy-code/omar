@@ -772,4 +772,302 @@ export class AccountingEngine {
       }
     };
   }
+
+  /**
+   * Calculates the Statement of Cash Flows (قائمة التدفقات النقدية)
+   * compliant with IAS 7 / EAS 4 (International Accounting Standard 7 / Egyptian Accounting Standard 4).
+   * Supports both Indirect Method (الطريقة غير المباشرة) and Direct Method (الطريقة المباشرة),
+   * along with complete Cash and Cash Equivalents reconciliation.
+   */
+  static calculateCashFlowStatement(
+    accounts: Account[],
+    accountTypes: AccountType[],
+    entries: JournalEntry[],
+    startDate: string,
+    endDate: string,
+    fiscalYearEndSetting?: string
+  ) {
+    // 1. Calculate Trial Balance for the period (gives opening balance at startDate, movement in period, closing balance at endDate)
+    const periodTB = this.calculateTrialBalance(accounts, entries, startDate, endDate, fiscalYearEndSetting, accountTypes);
+
+    // Map each account with its classification info
+    const mappedAccounts = periodTB.map(a => {
+      const acc = accounts.find(account => account.id === a.id);
+      const typeInfo = this.resolveAccountClassification(acc, accountTypes);
+      const code = String(a.code || acc?.code || '').trim();
+      const name = String(a.name || acc?.name || '').trim().toLowerCase();
+      
+      const openingNet = (a.opening.debit - a.opening.credit);
+      const closingNet = (a.closing.debit - a.closing.credit);
+      const changeInBalance = closingNet - openingNet; // positive if debit increased, negative if credit increased
+
+      return {
+        ...a,
+        acc,
+        code,
+        name,
+        typeInfo,
+        openingNet,
+        closingNet,
+        changeInBalance
+      };
+    });
+
+    // Helper: Identify Cash and Cash Equivalent accounts (IAS 7.6)
+    const isCashEquivalent = (a: typeof mappedAccounts[0]) => {
+      if (a.typeInfo.classification === 'cash_and_equivalents') return true;
+      if (a.code.startsWith('1101') || a.code.startsWith('1102') || a.code.startsWith('1104')) return true;
+      if (a.name.includes('نقدية') || a.name.includes('صندوق') || a.name.includes('خزينة') || a.name.includes('بنك') || a.name.includes('عهدة') || a.name.includes('cash') || a.name.includes('bank')) return true;
+      return false;
+    };
+
+    // 2. Cash and Cash Equivalents pool
+    const cashAccounts = mappedAccounts.filter(isCashEquivalent);
+    const cashAccountIds = new Set(cashAccounts.map(a => a.id));
+
+    const beginningCash = cashAccounts.reduce((sum, a) => sum + a.openingNet, 0);
+    const endingCash = cashAccounts.reduce((sum, a) => sum + a.closingNet, 0);
+    const netActualCashChange = endingCash - beginningCash;
+
+    // 3. Operating Activities (الأنشطة التشغيلية)
+    // 3.1 Net Profit for the period from Income Statement
+    const incomeStatement = this.calculateIncomeStatement(accounts, accountTypes, entries, startDate, endDate);
+    const netProfit = incomeStatement.netProfit;
+
+    // 3.2 Non-cash adjustments (التسويات للبنود غير النقدية)
+    const depAccounts = mappedAccounts.filter(a => 
+      a.typeInfo.classification === 'depreciation' || 
+      a.code.startsWith('6108') || a.code.startsWith('1209') ||
+      a.name.includes('إهلاك') || a.name.includes('استهلاك') || a.name.includes('مجمع إهلاك')
+    );
+    const depreciationExpense = depAccounts.reduce((sum, a) => {
+      if (a.typeInfo.statement_type === 'income_statement' || a.code.startsWith('6') || a.code.startsWith('5')) {
+        return sum + Math.max(0, a.movement.debit - a.movement.credit);
+      }
+      return sum + Math.max(0, a.movement.credit - a.movement.debit);
+    }, 0);
+
+    const provAccounts = mappedAccounts.filter(a => 
+      a.name.includes('مخصص') || a.name.includes('اضمحلال') || a.name.includes('خسائر ائتمانية')
+    );
+    const provisionsExpense = provAccounts.reduce((sum, a) => {
+      if (a.typeInfo.statement_type === 'income_statement') {
+        return sum + Math.max(0, a.movement.debit - a.movement.credit);
+      }
+      return sum + Math.max(0, a.movement.credit - a.movement.debit);
+    }, 0);
+
+    const operatingProfitBeforeWC = netProfit + depreciationExpense + provisionsExpense;
+
+    // 3.3 Working Capital Changes (التغيرات في رأس المال العامل)
+    const recAccounts = mappedAccounts.filter(a => 
+      !isCashEquivalent(a) && (
+        a.typeInfo.classification === 'receivables' ||
+        a.code.startsWith('1103') ||
+        a.name.includes('عملاء') || a.name.includes('مدينون') || a.name.includes('أوراق قبض')
+      )
+    );
+    const receivablesChange = recAccounts.reduce((sum, a) => sum + a.changeInBalance, 0);
+    const cashFromReceivablesChange = -receivablesChange;
+
+    const invAccounts = mappedAccounts.filter(a => 
+      !isCashEquivalent(a) && (
+        a.code.startsWith('1105') ||
+        a.name.includes('مخزون') || a.name.includes('بضاعة')
+      )
+    );
+    const inventoryChange = invAccounts.reduce((sum, a) => sum + a.changeInBalance, 0);
+    const cashFromInventoryChange = -inventoryChange;
+
+    const payAccounts = mappedAccounts.filter(a => 
+      !isCashEquivalent(a) && (
+        a.typeInfo.classification === 'payables' ||
+        a.code.startsWith('2101') ||
+        a.name.includes('موردين') || a.name.includes('دائنون') || a.name.includes('أوراق دفع')
+      )
+    );
+    const payablesChange = payAccounts.reduce((sum, a) => sum + (-a.changeInBalance), 0);
+    const cashFromPayablesChange = payablesChange;
+
+    const otherWCAccounts = mappedAccounts.filter(a => 
+      !isCashEquivalent(a) &&
+      !recAccounts.some(r => r.id === a.id) &&
+      !invAccounts.some(i => i.id === a.id) &&
+      !payAccounts.some(p => p.id === a.id) &&
+      a.typeInfo.statement_type === 'balance_sheet' &&
+      (a.code.startsWith('11') || (a.code.startsWith('21') && !a.name.includes('قرض') && !a.name.includes('تسهيل')))
+    );
+
+    let otherCurrentAssetsChange = 0;
+    let otherCurrentLiabilitiesChange = 0;
+    otherWCAccounts.forEach(a => {
+      if (a.code.startsWith('1')) {
+        otherCurrentAssetsChange += a.changeInBalance;
+      } else {
+        otherCurrentLiabilitiesChange += (-a.changeInBalance);
+      }
+    });
+    const cashFromOtherWC = (-otherCurrentAssetsChange) + otherCurrentLiabilitiesChange;
+
+    const totalWorkingCapitalChanges = cashFromReceivablesChange + cashFromInventoryChange + cashFromPayablesChange + cashFromOtherWC;
+    const netCashOperatingIndirect = operatingProfitBeforeWC + totalWorkingCapitalChanges;
+
+    // 4. Direct Method Operating Cash Flows (الطريقة المباشرة)
+    let cashFromCustomersDirect = 0;
+    let cashPaidToSuppliersDirect = 0;
+    let cashPaidToEmployeesDirect = 0;
+    let cashPaidForExpensesDirect = 0;
+    let otherOperatingCashDirect = 0;
+
+    entries.forEach(entry => {
+      const entryDate = (entry.date || '').slice(0, 10);
+      if (startDate && entryDate < startDate) return;
+      if (endDate && entryDate > endDate) return;
+
+      const lines = (entry.items && Array.isArray(entry.items) && entry.items.length > 0)
+        ? entry.items 
+        : ((entry as any).lines || (entry as any).journal_entry_lines || []);
+
+      const hasCash = lines.some((l: any) => cashAccountIds.has(l.account_id));
+      if (!hasCash) return;
+
+      lines.forEach((line: any) => {
+        if (!cashAccountIds.has(line.account_id)) {
+          const acc = accounts.find(a => a.id === line.account_id);
+          const typeInfo = this.resolveAccountClassification(acc, accountTypes);
+          const name = (line.account_name || acc?.name || '').toLowerCase();
+          const code = (acc?.code || '').trim();
+
+          const debit = Number(line.debit) || 0;
+          const credit = Number(line.credit) || 0;
+
+          if (typeInfo.classification === 'revenue' || typeInfo.classification === 'receivables' || code.startsWith('1103') || name.includes('عملاء') || name.includes('مبيعات')) {
+            cashFromCustomersDirect += (credit - debit);
+          } else if (typeInfo.classification === 'payables' || code.startsWith('2101') || name.includes('موردين') || name.includes('مشتريات')) {
+            cashPaidToSuppliersDirect -= (debit - credit);
+          } else if (name.includes('رواتب') || name.includes('أجور') || name.includes('مرتبات') || code.startsWith('6101')) {
+            cashPaidToEmployeesDirect -= (debit - credit);
+          } else if (typeInfo.statement_type === 'income_statement' || code.startsWith('6') || code.startsWith('5')) {
+            cashPaidForExpensesDirect -= (debit - credit);
+          }
+        }
+      });
+    });
+
+    const netCashOperatingDirect = cashFromCustomersDirect + cashPaidToSuppliersDirect + cashPaidToEmployeesDirect + cashPaidForExpensesDirect + otherOperatingCashDirect;
+
+    // 5. Investing Activities (الأنشطة الاستثمارية)
+    const fixedAssetAccounts = mappedAccounts.filter(a => 
+      !isCashEquivalent(a) &&
+      !depAccounts.some(d => d.id === a.id) &&
+      (a.code.startsWith('12') || (a.typeInfo.classification === 'asset' && (a.name.includes('أصول ثابتة') || a.name.includes('سيارات') || a.name.includes('أجهزة') || a.name.includes('معدات') || a.name.includes('أثاث') || a.name.includes('مباني'))))
+    );
+
+    const fixedAssetNetChange = fixedAssetAccounts.reduce((sum, a) => sum + a.changeInBalance, 0);
+    const purchaseOfFixedAssets = fixedAssetNetChange > 0 ? -fixedAssetNetChange : 0;
+    const proceedsFromSaleOfAssets = fixedAssetNetChange < 0 ? Math.abs(fixedAssetNetChange) : 0;
+
+    const netCashInvesting = purchaseOfFixedAssets + proceedsFromSaleOfAssets;
+
+    // 6. Financing Activities (الأنشطة التمويلية)
+    const capitalAccounts = mappedAccounts.filter(a => 
+      a.code.startsWith('3101') || a.name.includes('رأس المال')
+    );
+    const capitalChange = capitalAccounts.reduce((sum, a) => sum + (-a.changeInBalance), 0);
+    const capitalContributions = capitalChange > 0 ? capitalChange : 0;
+
+    const loanAccounts = mappedAccounts.filter(a => 
+      a.code.startsWith('22') || (a.code.startsWith('2102')) || a.name.includes('قرض') || a.name.includes('قروض') || a.name.includes('تسهيلات ائتمانية')
+    );
+    const loansNetChange = loanAccounts.reduce((sum, a) => sum + (-a.changeInBalance), 0);
+
+    const drawingsAccounts = mappedAccounts.filter(a => 
+      a.code.startsWith('3104') || a.name.includes('مسحوبات') || a.name.includes('جاري الشريك') || a.name.includes('توزيعات')
+    );
+    const drawingsChange = drawingsAccounts.reduce((sum, a) => sum + a.changeInBalance, 0);
+    const dividendsAndDrawingsPaid = drawingsChange > 0 ? -drawingsChange : (drawingsChange < 0 ? Math.abs(drawingsChange) : 0);
+
+    const netCashFinancing = capitalContributions + loansNetChange + dividendsAndDrawingsPaid;
+
+    // 7. Total Net Cash Flow & Discrepancy Balancing
+    const totalCalculatedCashFlow = netCashOperatingIndirect + netCashInvesting + netCashFinancing;
+    const discrepancy = netActualCashChange - totalCalculatedCashFlow;
+
+    return {
+      beginningCash,
+      endingCash,
+      netActualCashChange,
+      
+      // Operating Activities (Indirect)
+      operating: {
+        netProfit,
+        adjustments: {
+          depreciation: depreciationExpense,
+          provisions: provisionsExpense,
+          totalAdjustments: depreciationExpense + provisionsExpense
+        },
+        operatingProfitBeforeWC,
+        workingCapital: {
+          receivablesChange: cashFromReceivablesChange,
+          inventoryChange: cashFromInventoryChange,
+          payablesChange: cashFromPayablesChange,
+          otherWCChange: cashFromOtherWC,
+          totalWCChange: totalWorkingCapitalChanges
+        },
+        netCashOperating: netCashOperatingIndirect
+      },
+
+      // Operating Activities (Direct)
+      directOperating: {
+        cashFromCustomers: cashFromCustomersDirect,
+        cashPaidToSuppliers: cashPaidToSuppliersDirect,
+        cashPaidToEmployees: cashPaidToEmployeesDirect,
+        cashPaidForExpenses: cashPaidForExpensesDirect,
+        otherCash: otherOperatingCashDirect,
+        netCashOperating: netCashOperatingDirect
+      },
+
+      // Investing Activities
+      investing: {
+        purchaseOfFixedAssets,
+        proceedsFromSaleOfAssets,
+        fixedAssetAccounts: fixedAssetAccounts.map(a => ({
+          id: a.id,
+          name: a.name,
+          code: a.code,
+          change: a.changeInBalance
+        })),
+        netCashInvesting
+      },
+
+      // Financing Activities
+      financing: {
+        capitalContributions,
+        loansNetChange,
+        dividendsAndDrawingsPaid,
+        financingAccounts: [...capitalAccounts, ...loanAccounts, ...drawingsAccounts].map(a => ({
+          id: a.id,
+          name: a.name,
+          code: a.code,
+          change: -a.changeInBalance
+        })),
+        netCashFinancing
+      },
+
+      // Cash Reconciliation breakdown
+      cashBreakdown: cashAccounts.map(a => ({
+        id: a.id,
+        name: a.name,
+        code: a.code,
+        currency: a.acc?.currency || 'EGP',
+        openingBalance: a.openingNet,
+        netMovement: a.closingNet - a.openingNet,
+        closingBalance: a.closingNet
+      })),
+
+      totalCalculatedCashFlow,
+      discrepancy,
+      isReconciled: Math.abs(discrepancy) < 0.01
+    };
+  }
 }

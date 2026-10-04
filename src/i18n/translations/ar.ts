@@ -256,6 +256,7 @@ export const ar = {
   'nav.trial_balance': 'ميزان المراجعة',
   'nav.income_statement': 'قائمة الدخل',
   'nav.balance_sheet': 'المركز المالي',
+  'nav.cash_flow_statement': 'قائمة التدفقات النقدية',
   'nav.reports': 'التقارير',
   'nav.customer_statement': 'كشف حساب العميل',
   'nav.supplier_statement': 'كشف حساب المورد',

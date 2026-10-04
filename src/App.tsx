@@ -74,6 +74,7 @@ const GeneralLedger = React.lazy(() => import('./pages/GeneralLedger').then(m =>
 const TrialBalance = React.lazy(() => import('./pages/TrialBalance').then(m => ({ default: m.TrialBalance })));
 const IncomeStatement = React.lazy(() => import('./pages/IncomeStatement').then(m => ({ default: m.IncomeStatement })));
 const BalanceSheet = React.lazy(() => import('./pages/BalanceSheet').then(m => ({ default: m.BalanceSheet })));
+const CashFlowStatement = React.lazy(() => import('./pages/CashFlowStatement').then(m => ({ default: m.CashFlowStatement })));
 const PosBranchLinking = React.lazy(() => import('./pages/PosBranchLinking').then(m => ({ default: m.PosBranchLinking })));
 const PosConnectedBranches = React.lazy(() => import('./pages/PosConnectedBranches').then(m => ({ default: m.PosConnectedBranches })));
 const EtaDashboard = React.lazy(() => import('./pages/EtaDashboard').then(m => ({ default: m.EtaDashboard })));
@@ -293,6 +294,7 @@ export default function App() {
       case 'trial_balance': return <TrialBalance />;
       case 'income_statement': return <IncomeStatement />;
       case 'balance_sheet': return <BalanceSheet />;
+      case 'cash_flow_statement': return <CashFlowStatement />;
       case 'discount_settings': return <DiscountSettings />;
       case 'default_accounts_settings': return <DefaultAccountsSettings />;
       case 'backup_restore': return <BackupRestore />;

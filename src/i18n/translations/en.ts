@@ -256,6 +256,7 @@ export const en = {
   'nav.trial_balance': 'Trial Balance',
   'nav.income_statement': 'Income Statement',
   'nav.balance_sheet': 'Balance Sheet',
+  'nav.cash_flow_statement': 'Cash Flow Statement',
   'nav.reports': 'Reports',
   'nav.customer_statement': 'Customer Statement',
   'nav.supplier_statement': 'Supplier Statement',

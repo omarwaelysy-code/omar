@@ -729,7 +729,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'general_ledger_report', label: t('nav.general_ledger_report'), icon: BookOpen },
           { id: 'trial_balance', label: t('nav.trial_balance'), icon: BarChart3 },
           { id: 'income_statement', label: t('nav.income_statement'), icon: BarChart3 },
-          { id: 'balance_sheet', label: t('nav.balance_sheet'), icon: Shield }
+          { id: 'balance_sheet', label: t('nav.balance_sheet'), icon: Shield },
+          { id: 'cash_flow_statement', label: t('nav.cash_flow_statement') || (language === 'ar' ? 'قائمة التدفقات النقدية' : 'Cash Flow Statement'), icon: ArrowLeftRight }
         ]
       },
       { 
@@ -782,7 +783,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'general_ledger_report', label: t('nav.general_ledger_report'), icon: BookOpen },
           { id: 'trial_balance', label: t('nav.trial_balance'), icon: BarChart3 },
           { id: 'income_statement', label: t('nav.income_statement'), icon: BarChart3 },
-          { id: 'balance_sheet', label: t('nav.balance_sheet'), icon: Shield }
+          { id: 'balance_sheet', label: t('nav.balance_sheet'), icon: Shield },
+          { id: 'cash_flow_statement', label: t('nav.cash_flow_statement') || (language === 'ar' ? 'قائمة التدفقات النقدية' : 'Cash Flow Statement'), icon: ArrowLeftRight }
         ]
       },
       ...(company?.pos_enabled === true || (company?.settings as any)?.pos_enabled === true ? [

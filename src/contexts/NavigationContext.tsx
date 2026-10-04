@@ -111,6 +111,7 @@ export const pageLabels: { [key: string]: string } = {
   'trial_balance': 'ميزان المراجعة',
   'income_statement': 'قائمة الدخل',
   'balance_sheet': 'المركز المالي',
+  'cash_flow_statement': 'قائمة التدفقات النقدية',
   'discount_settings': 'إعدادات الخصومات',
   'default_accounts_settings': 'إعدادات الحسابات الافتراضية',
   'activity_log': 'سجل النشاط',

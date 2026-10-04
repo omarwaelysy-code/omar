@@ -99,7 +99,7 @@ export class FeatureService {
       'flexible_operations', 'departments', 'cost_centers', 'operation_categories',
       // 10. General Ledger
       'accounting', 'chart_of_accounts', 'journal_entries', 'detailed_journal_entries', 'multi_currency', 'ifrs_guide',
-      'general_ledger_report', 'trial_balance', 'income_statement', 'balance_sheet',
+      'general_ledger_report', 'trial_balance', 'income_statement', 'balance_sheet', 'cash_flow_statement',
       // 11. Fixed Assets
       'fixed_assets', 'asset_categories', 'asset_depreciation', 'fixed_assets_reports',
       // 12. Templates

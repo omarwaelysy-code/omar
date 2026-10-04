@@ -41,7 +41,7 @@ export function getDefaultRolePermissions(roleName: string): any {
         'cash_transfers', 'cash_balances', 'issued_cheques', 'received_cheques', 'fixed_assets', 'asset_categories', 'asset_depreciation', 'customer_statement', 'supplier_statement', 
         'customer_balances', 'supplier_balances', 'customer_aging_report', 'supplier_aging_report', 'sales_report', 'expenses_report', 
         'cash_report', 'general_ledger_report', 'trial_balance', 'income_statement', 
-        'balance_sheet'
+        'balance_sheet', 'cash_flow_statement'
       ].includes(modId);
       
       if (isFin) {
@@ -66,7 +66,7 @@ export function getDefaultRolePermissions(roleName: string): any {
       ].includes(modId);
       
       const isRep = modId.endsWith('_report') || [
-        'trial_balance', 'income_statement', 'balance_sheet', 'customer_statement', 
+        'trial_balance', 'income_statement', 'balance_sheet', 'cash_flow_statement', 'customer_statement', 
         'supplier_statement', 'customer_balances', 'supplier_balances'
       ].includes(modId);
       
