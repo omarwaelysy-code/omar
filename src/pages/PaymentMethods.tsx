@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Search, Plus, Trash2, X, CreditCard, History, ChevronRight, ChevronLeft, 
   Wallet, Layers, Hash, Box, AlertCircle, Calendar, LayoutGrid, List, FileText, FileUp,
-  Building2, Landmark, Phone, User, Globe, ExternalLink, Copy, Check, ChevronDown
+  Building2, Landmark, Phone, User, Globe, ExternalLink, Copy, Check, ChevronDown, Coins
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { dbService } from '../services/dbService';
@@ -32,7 +32,8 @@ export const PaymentMethods: React.FC = () => {
   const [company, setCompany] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [view, setView] = useState<'card' | 'table'>('card');
+  const [view, setView] = useState<'card' | 'table'>('table');
+  const [groupBy, setGroupBy] = useState<'category' | 'currency'>('category');
   const [showImportWizard, setShowImportWizard] = useState(false);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -523,23 +524,6 @@ export const PaymentMethods: React.FC = () => {
     }));
   };
 
-  const collapseAllGroups = () => {
-    setCollapsedGroups({
-      bank: true,
-      cash: true,
-      wallet: true,
-      other: true
-    });
-  };
-
-  const expandAllGroups = () => {
-    setCollapsedGroups({});
-  };
-
-  const isAllCollapsed = useMemo(() => {
-    return ['bank', 'cash', 'wallet', 'other'].every(k => collapsedGroups[k]);
-  }, [collapsedGroups]);
-
   const PAYMENT_METHOD_GROUPS = useMemo(() => [
     {
       key: 'bank',
@@ -575,12 +559,117 @@ export const PaymentMethods: React.FC = () => {
     }
   ], []);
 
+  const getCurrencyMeta = (code: string) => {
+    const c = (code || 'EGP').toUpperCase();
+    const foundInOptions = currencyOptions.find(opt => opt.code === c);
+    
+    const PRESETS: Record<string, { nameAr: string; nameEn: string; color: string; badge: string }> = {
+      EGP: {
+        nameAr: 'الجنيه المصري',
+        nameEn: 'Egyptian Pound',
+        color: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+        badge: 'bg-emerald-50 text-emerald-700 border-emerald-200'
+      },
+      USD: {
+        nameAr: 'الدولار الأمريكي',
+        nameEn: 'US Dollar',
+        color: 'text-blue-700 bg-blue-50 border-blue-200',
+        badge: 'bg-blue-50 text-blue-700 border-blue-200'
+      },
+      EUR: {
+        nameAr: 'اليورو الأوروبي',
+        nameEn: 'Euro',
+        color: 'text-purple-700 bg-purple-50 border-purple-200',
+        badge: 'bg-purple-50 text-purple-700 border-purple-200'
+      },
+      SAR: {
+        nameAr: 'الريال السعودي',
+        nameEn: 'Saudi Riyal',
+        color: 'text-amber-700 bg-amber-50 border-amber-200',
+        badge: 'bg-amber-50 text-amber-700 border-amber-200'
+      },
+      AED: {
+        nameAr: 'الدرهم الإماراتي',
+        nameEn: 'UAE Dirham',
+        color: 'text-cyan-700 bg-cyan-50 border-cyan-200',
+        badge: 'bg-cyan-50 text-cyan-700 border-cyan-200'
+      },
+      KWD: {
+        nameAr: 'الدينار الكويتي',
+        nameEn: 'Kuwaiti Dinar',
+        color: 'text-teal-700 bg-teal-50 border-teal-200',
+        badge: 'bg-teal-50 text-teal-700 border-teal-200'
+      },
+      GBP: {
+        nameAr: 'الجنيه الإسترليني',
+        nameEn: 'British Pound',
+        color: 'text-indigo-700 bg-indigo-50 border-indigo-200',
+        badge: 'bg-indigo-50 text-indigo-700 border-indigo-200'
+      }
+    };
+
+    const preset = PRESETS[c];
+    if (preset) {
+      return {
+        titleAr: `${preset.nameAr} (${c})`,
+        titleEn: `${preset.nameEn} (${c})`,
+        colorClass: preset.color,
+        badgeClass: preset.badge
+      };
+    }
+
+    const optName = foundInOptions?.name || c;
+    return {
+      titleAr: `${optName}`,
+      titleEn: `${optName}`,
+      colorClass: 'text-indigo-700 bg-indigo-50 border-indigo-200',
+      badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200'
+    };
+  };
+
   const filteredMethods = methods.filter(m => 
     m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const groupedMethods = useMemo(() => {
+    if (groupBy === 'currency') {
+      const currencyMap: Record<string, PaymentMethod[]> = {};
+      
+      filteredMethods.forEach(method => {
+        const curr = (method.currency || 'EGP').toUpperCase();
+        if (!currencyMap[curr]) {
+          currencyMap[curr] = [];
+        }
+        currencyMap[curr].push(method);
+      });
+
+      const baseCurr = (company?.currency || company?.settings?.currency || 'EGP').toUpperCase();
+      const sortedCurrencyCodes = Object.keys(currencyMap).sort((a, b) => {
+        if (a === baseCurr) return -1;
+        if (b === baseCurr) return 1;
+        return a.localeCompare(b);
+      });
+
+      return sortedCurrencyCodes.map(code => {
+        const items = currencyMap[code] || [];
+        const meta = getCurrencyMeta(code);
+        const totalBalance = items.reduce((sum, m) => sum + getMethodCurrentBalance(m), 0);
+        return {
+          key: `curr_${code}`,
+          titleAr: meta.titleAr,
+          titleEn: meta.titleEn,
+          icon: Coins,
+          colorClass: meta.colorClass,
+          badgeClass: meta.badgeClass,
+          items,
+          totalBalance,
+          currencyTotals: { [code]: totalBalance }
+        };
+      });
+    }
+
+    // Default: Group by Category
     const groups: Record<string, PaymentMethod[]> = {
       bank: [],
       cash: [],
@@ -604,13 +693,37 @@ export const PaymentMethods: React.FC = () => {
     return PAYMENT_METHOD_GROUPS.map(g => {
       const items = groups[g.key] || [];
       const totalBalance = items.reduce((sum, m) => sum + getMethodCurrentBalance(m), 0);
+      const currencyTotals: Record<string, number> = {};
+      items.forEach(m => {
+        const curr = (m.currency || 'EGP').toUpperCase();
+        currencyTotals[curr] = (currencyTotals[curr] || 0) + getMethodCurrentBalance(m);
+      });
+
       return {
         ...g,
         items,
-        totalBalance
+        totalBalance,
+        currencyTotals
       };
     }).filter(g => g.items.length > 0 || !searchTerm);
-  }, [filteredMethods, PAYMENT_METHOD_GROUPS, searchTerm, journalEntries, receiptVouchers, paymentVouchers, cashTransfers]);
+  }, [groupBy, filteredMethods, PAYMENT_METHOD_GROUPS, searchTerm, company, currencyOptions, journalEntries, receiptVouchers, paymentVouchers, cashTransfers]);
+
+  const collapseAllGroups = () => {
+    const next: Record<string, boolean> = {};
+    groupedMethods.forEach(g => {
+      next[g.key] = true;
+    });
+    setCollapsedGroups(next);
+  };
+
+  const expandAllGroups = () => {
+    setCollapsedGroups({});
+  };
+
+  const isAllCollapsed = useMemo(() => {
+    if (groupedMethods.length === 0) return false;
+    return groupedMethods.every(g => collapsedGroups[g.key]);
+  }, [groupedMethods, collapsedGroups]);
 
   return (
     <div className="h-full flex flex-col space-y-2 animate-in fade-in duration-500 overflow-hidden w-full px-1 sm:px-3 py-1" dir={dir}>
@@ -684,7 +797,37 @@ export const PaymentMethods: React.FC = () => {
                   />
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {/* Group By Mode Switcher */}
+                  <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 shadow-inner w-fit">
+                    <button
+                      type="button"
+                      onClick={() => setGroupBy('category')}
+                      className={`p-1 px-2.5 rounded-md transition-all flex items-center gap-1 font-bold text-xs cursor-pointer ${
+                        groupBy === 'category' 
+                          ? 'bg-white text-indigo-600 shadow-xs border border-slate-100' 
+                          : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                      title={language === 'ar' ? 'تجميع حسب نوع وطبيعة الحساب (بنوك / خزائن / محافظ)' : 'Group by account category'}
+                    >
+                      <Layers size={13} />
+                      <span className="hidden sm:inline">{language === 'ar' ? 'حسب النوع' : 'By Type'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGroupBy('currency')}
+                      className={`p-1 px-2.5 rounded-md transition-all flex items-center gap-1 font-bold text-xs cursor-pointer ${
+                        groupBy === 'currency' 
+                          ? 'bg-white text-indigo-600 shadow-xs border border-slate-100' 
+                          : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                      title={language === 'ar' ? 'تجميع حسب العملة (EGP / USD / SAR ...)' : 'Group by currency'}
+                    >
+                      <Coins size={13} />
+                      <span className="hidden sm:inline">{language === 'ar' ? 'حسب العملة' : 'By Currency'}</span>
+                    </button>
+                  </div>
+
                   <button
                     type="button"
                     onClick={isAllCollapsed ? expandAllGroups : collapseAllGroups}
@@ -760,11 +903,27 @@ export const PaymentMethods: React.FC = () => {
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2 text-xs">
+                            <div className="flex items-center gap-1.5 flex-wrap text-xs">
                               <span className="text-[10px] font-bold text-slate-400">{language === 'ar' ? 'إجمالي الرصيد:' : 'Total:'}</span>
-                              <span className={`font-black font-mono ${group.totalBalance < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
-                                {formatNumber(group.totalBalance)} EGP
-                              </span>
+                              {Object.entries(group.currencyTotals).length === 0 ? (
+                                <span className="font-black font-mono text-slate-400">0.00</span>
+                              ) : (
+                                Object.entries(group.currencyTotals).map(([curr, total]) => (
+                                  <span 
+                                    key={curr} 
+                                    className={`inline-flex items-center gap-1 font-black font-mono px-2 py-0.5 rounded-lg border text-[11px] shadow-2xs ${
+                                      total < 0 
+                                        ? 'bg-rose-50 text-rose-700 border-rose-200' 
+                                        : total > 0 
+                                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                                          : 'bg-slate-50 text-slate-700 border-slate-200'
+                                    }`}
+                                  >
+                                    <span className="font-mono bg-white px-1 py-0.2 rounded text-[9px] text-slate-600 border border-slate-200/60 font-bold">{curr}</span>
+                                    <span>{formatNumber(total)}</span>
+                                  </span>
+                                ))
+                              )}
                             </div>
                           </div>
 
@@ -816,10 +975,16 @@ export const PaymentMethods: React.FC = () => {
                                           <span className="inline-block px-1.5 py-0.2 bg-emerald-50 text-emerald-700 rounded text-[9px] font-bold border border-emerald-200">
                                             {method.currency || 'EGP'}
                                           </span>
-                                          {method.type === 'bank' && (
+                                          {groupBy === 'currency' ? (
                                             <span className="inline-block px-1.5 py-0.2 bg-indigo-50 text-indigo-700 rounded text-[9px] font-bold border border-indigo-100">
-                                              {language === 'ar' ? 'بنك' : 'Bank'}
+                                              {method.type === 'bank' ? (language === 'ar' ? 'بنك' : 'Bank') : method.type === 'cash' ? (language === 'ar' ? 'خزينة' : 'Cash') : method.type === 'wallet' ? (language === 'ar' ? 'محفظة' : 'Wallet') : (language === 'ar' ? 'أخرى' : 'Other')}
                                             </span>
+                                          ) : (
+                                            method.type === 'bank' && (
+                                              <span className="inline-block px-1.5 py-0.2 bg-indigo-50 text-indigo-700 rounded text-[9px] font-bold border border-indigo-100">
+                                                {language === 'ar' ? 'بنك' : 'Bank'}
+                                              </span>
+                                            )
                                           )}
                                         </div>
                                         <div className="flex items-center gap-1 flex-wrap">
@@ -923,11 +1088,27 @@ export const PaymentMethods: React.FC = () => {
                                       </span>
                                     </div>
 
-                                    <div className="flex items-center gap-2 text-xs">
+                                    <div className="flex items-center gap-1.5 flex-wrap text-xs">
                                       <span className="text-[10px] font-bold text-slate-500">{language === 'ar' ? 'إجمالي الرصيد:' : 'Total:'}</span>
-                                      <span className={`font-black font-mono ${group.totalBalance < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
-                                        {formatNumber(group.totalBalance)} EGP
-                                      </span>
+                                      {Object.entries(group.currencyTotals).length === 0 ? (
+                                        <span className="font-black font-mono text-slate-400">0.00</span>
+                                      ) : (
+                                        Object.entries(group.currencyTotals).map(([curr, total]) => (
+                                          <span 
+                                            key={curr} 
+                                            className={`inline-flex items-center gap-1 font-black font-mono px-2 py-0.5 rounded-lg border text-[11px] shadow-2xs ${
+                                              total < 0 
+                                                ? 'bg-rose-50 text-rose-700 border-rose-200' 
+                                                : total > 0 
+                                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                                                  : 'bg-slate-50 text-slate-700 border-slate-200'
+                                            }`}
+                                          >
+                                            <span className="font-mono bg-white px-1 py-0.2 rounded text-[9px] text-slate-600 border border-slate-200/60 font-bold">{curr}</span>
+                                            <span>{formatNumber(total)}</span>
+                                          </span>
+                                        ))
+                                      )}
                                     </div>
                                   </div>
                                 </td>
@@ -961,7 +1142,14 @@ export const PaymentMethods: React.FC = () => {
                                               <BankLogoBadge bank={findEgyptianBank(method)!} size="sm" className="!w-6 !h-6 !p-0.5 rounded-md shrink-0 shadow-2xs" />
                                             )}
                                             <div>
-                                              <span className="font-bold text-slate-900">{method.name}</span>
+                                              <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="font-bold text-slate-900">{method.name}</span>
+                                                {groupBy === 'currency' && (
+                                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                                    {method.type === 'bank' ? (language === 'ar' ? 'بنك' : 'Bank') : method.type === 'cash' ? (language === 'ar' ? 'خزينة' : 'Cash') : method.type === 'wallet' ? (language === 'ar' ? 'محفظة' : 'Wallet') : (language === 'ar' ? 'أخرى' : 'Other')}
+                                                  </span>
+                                                )}
+                                              </div>
                                               {method.type === 'bank' && method.swift_code && (
                                                 <span className="block text-[10px] font-mono text-emerald-700 font-bold">
                                                   SWIFT: {method.swift_code}
