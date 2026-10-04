@@ -1059,7 +1059,7 @@ export class AccountingEngine {
         id: a.id,
         name: a.name,
         code: a.code,
-        currency: a.acc?.currency || 'EGP',
+        currency: (a.acc as any)?.currency || 'EGP',
         openingBalance: a.openingNet,
         netMovement: a.closingNet - a.openingNet,
         closingBalance: a.closingNet
