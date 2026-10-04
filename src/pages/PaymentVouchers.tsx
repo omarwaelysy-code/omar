@@ -2349,38 +2349,38 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
   });
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
+    <div className="space-y-3.5 animate-in fade-in duration-500" dir={dir}>
       {!isModalOpen ? (
         <>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200/80">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-900 italic serif">
+          <h2 className="text-base sm:text-lg font-bold tracking-tight text-zinc-900">
             {pageTitle || (isSupplierOnly ? (language === 'ar' ? 'سند صرف مورد' : 'Supplier Payment Voucher') : (language === 'ar' ? 'سند الصرف / صرف لمورد' : t('payments.title')))}
           </h2>
-          <p className="text-zinc-500">
+          <p className="text-[11px] text-zinc-400 mt-0.5">
             {isSupplierOnly ? (language === 'ar' ? 'إدارة وإنشاء سندات الصرف الخاصة بالموردين وتسوياتها' : 'Manage and create supplier payment vouchers') : (language === 'ar' ? 'إدارة وإنشاء سندات الصرف وسندات صرف الموردين ومتابعة تسوياتها' : t('payments.subtitle'))}
           </p>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-             <span className="text-xs font-bold text-zinc-500 self-center">{language === 'ar' ? 'إجمالي المدفوعات:' : 'Total Paid:'}</span>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+             <span className="text-[11px] font-bold text-zinc-500 self-center">{language === 'ar' ? 'إجمالي المدفوعات:' : 'Total Paid:'}</span>
              {Object.entries(calculateCurrencyTotals(filteredVouchers)).map(([curr, data]) => (
-                <span key={curr} className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-3 py-1 rounded-full border border-emerald-200 font-bold text-xs shadow-xs">
-                  <span className="font-mono bg-emerald-200/60 px-1.5 py-0.5 rounded text-[11px] text-emerald-900">{curr}</span>
+                <span key={curr} className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-lg border border-emerald-200 font-bold text-[11px] shadow-2xs">
+                  <span className="font-mono bg-emerald-200/60 px-1 py-0.2 rounded text-[10px] text-emerald-900">{curr}</span>
                   <span>{formatNumber(data.totalVoucher)}</span>
                 </span>
              ))}
              {selectedVoucherIds.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2 bg-blue-50 border border-blue-200 px-3 py-1 rounded-full text-xs font-bold text-blue-900 shadow-xs">
+                <div className="flex flex-wrap items-center gap-1 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-lg text-[11px] font-bold text-blue-900 shadow-2xs">
                    <span className="text-blue-700">{language === 'ar' ? 'المحدد' : 'Selected'} ({selectedVoucherIds.length}):</span>
                    {Object.entries(calculateCurrencyTotals(vouchers.filter(v => selectedVoucherIds.includes(v.id)))).map(([curr, data]) => (
-                      <span key={curr} className="inline-flex items-center gap-1 bg-white px-2 py-0.5 rounded-full border border-blue-200 font-mono text-blue-800">
-                        <span className="text-[10px] text-blue-500">{curr}</span>
+                      <span key={curr} className="inline-flex items-center gap-1 bg-white px-1.5 py-0.2 rounded border border-blue-200 font-mono text-[10px] text-blue-800">
+                        <span className="text-[9px] text-blue-500">{curr}</span>
                         <span>{formatNumber(data.totalVoucher)}</span>
                       </span>
                    ))}
                    <button 
                      type="button" 
                      onClick={() => setSelectedVoucherIds([])}
-                     className="text-[11px] text-blue-600 hover:text-blue-800 underline mr-1"
+                     className="text-[10px] text-blue-600 hover:text-blue-800 underline mr-1"
                    >
                      {language === 'ar' ? 'إلغاء التحديد' : 'Deselect'}
                    </button>
@@ -2388,33 +2388,34 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
              )}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <button 
-            onClick={() => setIsActivityLogOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-zinc-600 border border-zinc-200 rounded-2xl font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-sm"
-            title={t('common.activity_log')}
+            onClick={openNewGeneralVoucher}
+            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-xs text-xs"
           >
-            <History size={20} />
-            <span className="hidden md:inline">{t('common.activity_log')}</span>
+            <Plus size={14} />
+            <span>{language === 'ar' ? 'إضافة سند صرف' : 'Add Payment Voucher'}</span>
+          </button>
+          <button 
+            onClick={openNewSupplierVoucher}
+            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-xs text-xs"
+          >
+            <Plus size={14} />
+            <span>{language === 'ar' ? 'إضافة صرف لمورد' : 'Add Supplier Voucher'}</span>
           </button>
           <ExportButtons 
+            size="sm"
             onExportExcel={handleExportExcel} 
             onExportPDF={handleExportPDF} 
             onPrint={() => printElement(tableRef.current, 'سندات الصرف')}
           />
           <button 
-            onClick={openNewGeneralVoucher}
-            className="flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
+            onClick={() => setIsActivityLogOpen(true)}
+            className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-white text-zinc-600 border border-zinc-200 rounded-xl font-bold hover:bg-zinc-50 transition-all active:scale-95 shadow-xs text-xs"
+            title={t('common.activity_log')}
           >
-            <Plus size={20} />
-            <span>{language === 'ar' ? 'إضافة سند صرف' : 'Add Payment Voucher'}</span>
-          </button>
-          <button 
-            onClick={openNewSupplierVoucher}
-            className="flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-200"
-          >
-            <Plus size={20} />
-            <span>{language === 'ar' ? 'إضافة صرف لمورد' : 'Add Supplier Voucher'}</span>
+            <History size={14} />
+            <span className="hidden md:inline">{t('common.activity_log')}</span>
           </button>
         </div>
       </div>
