@@ -361,17 +361,119 @@ export const CashAsOfBalances: React.FC = () => {
             netCreditSystem += cSystem;
 
             // Foreign amount handling
-            let dForeign = dSystem;
-            let cForeign = cSystem;
+            let dForeign = 0;
+            let cForeign = 0;
 
-            if (!isBaseCurrency) {
+            if (isBaseCurrency) {
+              dForeign = dSystem;
+              cForeign = cSystem;
+            } else {
+              // 1. Direct from item.foreign_amount if present and > 0
               if (item.foreign_amount && Number(item.foreign_amount) > 0) {
                 const fVal = Number(item.foreign_amount);
                 dForeign = dSystem > 0 ? fVal : 0;
                 cForeign = cSystem > 0 ? fVal : 0;
-              } else if (item.exchange_rate && Number(item.exchange_rate) > 0) {
-                dForeign = dSystem / Number(item.exchange_rate);
-                cForeign = cSystem / Number(item.exchange_rate);
+              }
+              // 2. From cashTransfers if this line came from a cash transfer
+              else if ((refType === 'transfer' || refType === 'cash_transfer') && je.reference_id) {
+                const ct = cashTransfers.find(v => v.id === je.reference_id);
+                if (ct) {
+                  const fromCurr = (ct.from_currency || '').toUpperCase();
+                  const toCurr = (ct.to_currency || '').toUpperCase();
+                  const ctAmt = Number(ct.amount) || 0;
+                  const ctConv = Number(ct.converted_amount) || ctAmt;
+                  const ctRate = Number(ct.exchange_rate) || 1;
+
+                  if (dSystem > 0) {
+                    if (toCurr === methodCurrency) {
+                      dForeign = ctConv;
+                    } else if (fromCurr === methodCurrency) {
+                      dForeign = ctAmt;
+                    } else if (ctRate > 1) {
+                      dForeign = dSystem / ctRate;
+                    }
+                  }
+                  if (cSystem > 0) {
+                    if (fromCurr === methodCurrency) {
+                      cForeign = ctAmt;
+                    } else if (toCurr === methodCurrency) {
+                      cForeign = ctConv;
+                    } else if (ctRate > 1) {
+                      cForeign = cSystem / ctRate;
+                    }
+                  }
+                }
+              }
+              // 3. From receiptVouchers if this line came from a receipt voucher
+              else if (refType === 'receipt' && je.reference_id) {
+                const rv = receiptVouchers.find(v => v.id === je.reference_id);
+                if (rv) {
+                  if (rv.foreign_amount && Number(rv.foreign_amount) > 0) {
+                    dForeign = Number(rv.foreign_amount);
+                  } else if ((rv.currency || '').toUpperCase() === methodCurrency && Number(rv.amount) > 0) {
+                    dForeign = Number(rv.amount);
+                  } else if (Number(rv.exchange_rate) > 1) {
+                    dForeign = dSystem / Number(rv.exchange_rate);
+                  }
+                }
+              }
+              // 4. From paymentVouchers if this line came from a payment voucher
+              else if (refType === 'payment' && je.reference_id) {
+                const pv = paymentVouchers.find(v => v.id === je.reference_id);
+                if (pv) {
+                  if (pv.foreign_amount && Number(pv.foreign_amount) > 0) {
+                    cForeign = Number(pv.foreign_amount);
+                  } else if ((pv.currency || '').toUpperCase() === methodCurrency && Number(pv.amount) > 0) {
+                    cForeign = Number(pv.amount);
+                  } else if (Number(pv.exchange_rate) > 1) {
+                    cForeign = cSystem / Number(pv.exchange_rate);
+                  }
+                }
+              }
+
+              // 5. Check description for foreign currency amount mentions e.g. "(1000 USD ...)" or "(... 🠚 3825.2 USD)"
+              const desc = `${item.description || ''} ${je.description || ''}`;
+              if (dForeign === 0 && dSystem > 0) {
+                const m = desc.match(new RegExp(`([\\d,\\.]+)\\s*${methodCurrency}`, 'i')) || 
+                          desc.match(new RegExp(`${methodCurrency}\\s*([\\d,\\.]+)`, 'i'));
+                if (m && m[1]) {
+                  const parsed = parseFloat(m[1].replace(/,/g, ''));
+                  if (parsed > 0 && Math.abs(parsed - dSystem) > 0.01) {
+                    dForeign = parsed;
+                  }
+                }
+              }
+              if (cForeign === 0 && cSystem > 0) {
+                const m = desc.match(new RegExp(`([\\d,\\.]+)\\s*${methodCurrency}`, 'i')) || 
+                          desc.match(new RegExp(`${methodCurrency}\\s*([\\d,\\.]+)`, 'i'));
+                if (m && m[1]) {
+                  const parsed = parseFloat(m[1].replace(/,/g, ''));
+                  if (parsed > 0 && Math.abs(parsed - cSystem) > 0.01) {
+                    cForeign = parsed;
+                  }
+                }
+              }
+
+              // 6. Direct exchange rate on item
+              if (dForeign === 0 && dSystem > 0) {
+                if (item.exchange_rate && Number(item.exchange_rate) > 1) {
+                  dForeign = dSystem / Number(item.exchange_rate);
+                }
+              }
+              if (cForeign === 0 && cSystem > 0) {
+                if (item.exchange_rate && Number(item.exchange_rate) > 1) {
+                  cForeign = cSystem / Number(item.exchange_rate);
+                }
+              }
+
+              // 7. If still unresolved and > 0, fallback to standard exchange rate
+              if (dForeign === 0 && dSystem > 0) {
+                const approxRate = (methodCurrency === 'USD') ? 52.28 : (methodCurrency === 'EUR') ? 58.8 : (methodCurrency === 'SAR') ? 13.9 : 1;
+                dForeign = approxRate > 1 ? (dSystem / approxRate) : dSystem;
+              }
+              if (cForeign === 0 && cSystem > 0) {
+                const approxRate = (methodCurrency === 'USD') ? 52.28 : (methodCurrency === 'EUR') ? 58.8 : (methodCurrency === 'SAR') ? 13.9 : 1;
+                cForeign = approxRate > 1 ? (cSystem / approxRate) : cSystem;
               }
             }
 
@@ -382,9 +484,15 @@ export const CashAsOfBalances: React.FC = () => {
       });
 
       const baseOpeningForeign = Number(method.opening_balance || 0);
-      // For system currency: if base currency, it equals baseOpening. If foreign and not specifically converted,
-      // fallback to opening balance JE or 1:1 base opening
-      const baseOpeningSystem = isBaseCurrency ? baseOpeningForeign : baseOpeningForeign; 
+      let baseOpeningSystem = isBaseCurrency ? baseOpeningForeign : 0;
+      if (!isBaseCurrency && baseOpeningForeign !== 0) {
+        if (linkedAccount && Number(linkedAccount.opening_balance || 0) !== 0) {
+          baseOpeningSystem = Number(linkedAccount.opening_balance);
+        } else {
+          const approxRate = (methodCurrency === 'USD') ? 52.28 : (methodCurrency === 'EUR') ? 58.8 : (methodCurrency === 'SAR') ? 13.9 : 1;
+          baseOpeningSystem = baseOpeningForeign * approxRate;
+        }
+      } 
 
       const balanceForeign = baseOpeningForeign + netDebitForeign - netCreditForeign;
       const balanceSystem = baseOpeningSystem + netDebitSystem - netCreditSystem;
@@ -1172,8 +1280,7 @@ export const CashAsOfBalances: React.FC = () => {
                     <th className="py-3 px-3 text-start w-10">#</th>
                     <th className="py-3 px-3 text-start">{language === 'ar' ? 'نوع طريقة السداد' : 'Type'}</th>
                     <th className="py-3 px-3 text-start">{language === 'ar' ? 'كود الطريقة' : 'Code'}</th>
-                    <th className="py-3 px-3 text-start">{language === 'ar' ? 'طريقة السداد / الحساب' : 'Payment Method'}</th>
-                    <th className="py-3 px-3 text-start">{language === 'ar' ? 'لوجو البنك / التفاصيل' : 'Bank Logo & Info'}</th>
+                    <th className="py-3 px-3 text-start">{language === 'ar' ? 'طريقة السداد' : 'Payment Method'}</th>
                     <th className="py-3 px-3 text-center">{language === 'ar' ? 'العملة' : 'Currency'}</th>
                     <th className="py-3 px-3 text-start">{language === 'ar' ? 'الحساب المحاسبي' : 'GL Account'}</th>
                     <th className="py-3 px-3 text-end">{language === 'ar' ? 'المبلغ (بالعملة)' : 'Amount (Currency)'}</th>
@@ -1209,38 +1316,35 @@ export const CashAsOfBalances: React.FC = () => {
                         {item.code}
                       </td>
 
-                      {/* Payment Method Name */}
-                      <td className="py-2.5 px-3 font-bold text-slate-900">
-                        {item.name}
-                      </td>
-
-                      {/* Bank Logo & Info */}
+                      {/* Payment Method Name with Bank Logo directly before it */}
                       <td className="py-2.5 px-3">
-                        {item.type === 'bank' ? (
-                          <div className="flex items-center gap-2">
-                            {item.bankObj ? (
+                        <div className="flex items-center gap-2.5">
+                          {item.type === 'bank' ? (
+                            item.bankObj ? (
                               <BankLogoBadge bank={item.bankObj} size="sm" className="!w-7 !h-7 !p-0.5 rounded-lg border border-slate-200 shrink-0" />
                             ) : item.bankLogo ? (
-                              <img src={item.bankLogo} alt={item.bankName || ''} className="w-7 h-7 object-contain rounded-lg border border-slate-200 p-0.5 bg-white shrink-0" />
+                              <img src={item.bankLogo} alt={item.name} className="w-7 h-7 object-contain rounded-lg border border-slate-200 p-0.5 bg-white shrink-0" />
                             ) : (
-                              <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700 font-black text-[10px]">
+                              <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700 font-black text-[10px] shrink-0">
                                 {item.bankCode || 'BNK'}
                               </div>
-                            )}
-                            <div className="flex flex-col">
-                              <span className="text-xs font-bold text-slate-800 leading-tight">
-                                {item.bankName || (language === 'ar' ? 'حساب بنكي' : 'Bank')}
-                              </span>
-                              {item.bankAccountNum && (
-                                <span className="text-[10px] text-slate-400 font-mono">
-                                  {item.bankAccountNum}
-                                </span>
-                              )}
+                            )
+                          ) : item.type === 'cash' ? (
+                            <div className="w-7 h-7 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shrink-0">
+                              <Wallet className="w-3.5 h-3.5" />
                             </div>
+                          ) : (
+                            <div className="w-7 h-7 rounded-lg bg-purple-50 border border-purple-200 flex items-center justify-center text-purple-600 shrink-0">
+                              <Smartphone className="w-3.5 h-3.5" />
+                            </div>
+                          )}
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-900 leading-tight">{item.name}</span>
+                            {item.bankAccountNum && (
+                              <span className="text-[10px] text-slate-400 font-mono leading-tight">{item.bankAccountNum}</span>
+                            )}
                           </div>
-                        ) : (
-                          <span className="text-slate-400 text-xs">-</span>
-                        )}
+                        </div>
                       </td>
 
                       {/* Currency */}
@@ -1296,7 +1400,7 @@ export const CashAsOfBalances: React.FC = () => {
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2 border-slate-300 bg-slate-100/90 font-black text-xs text-slate-900">
-                    <td colSpan={7} className="py-3 px-3 text-start">
+                    <td colSpan={6} className="py-3 px-3 text-start">
                       <div className="flex items-center justify-between">
                         <span>{language === 'ar' ? 'الإجمالي العام لجميع الخزائن والبنوك' : 'Total All Cash & Bank Balances'}</span>
                         <span className="text-slate-500 font-normal text-[11px]">
@@ -1357,7 +1461,6 @@ export const CashAsOfBalances: React.FC = () => {
                           <th className="py-2.5 px-3 text-start">{language === 'ar' ? 'النوع' : 'Type'}</th>
                           <th className="py-2.5 px-3 text-start">{language === 'ar' ? 'الكود' : 'Code'}</th>
                           <th className="py-2.5 px-3 text-start">{language === 'ar' ? 'طريقة السداد' : 'Method'}</th>
-                          <th className="py-2.5 px-3 text-start">{language === 'ar' ? 'البنك' : 'Bank'}</th>
                           <th className="py-2.5 px-3 text-center">{language === 'ar' ? 'العملة' : 'Currency'}</th>
                           <th className="py-2.5 px-3 text-start">{language === 'ar' ? 'الحساب المحاسبي' : 'Account'}</th>
                           <th className="py-2.5 px-3 text-end">{language === 'ar' ? 'المبلغ بالعملة' : 'Foreign Amt'}</th>
@@ -1376,18 +1479,34 @@ export const CashAsOfBalances: React.FC = () => {
                               </span>
                             </td>
                             <td className="py-2 px-3 font-mono font-bold text-slate-700">{item.code}</td>
-                            <td className="py-2 px-3 font-bold text-slate-900">{item.name}</td>
                             <td className="py-2 px-3">
-                              {item.type === 'bank' ? (
-                                <div className="flex items-center gap-1.5">
-                                  {item.bankObj ? (
-                                    <BankLogoBadge bank={item.bankObj} size="sm" className="!w-6 !h-6 !p-0.5 rounded border border-slate-200" />
+                              <div className="flex items-center gap-2">
+                                {item.type === 'bank' ? (
+                                  item.bankObj ? (
+                                    <BankLogoBadge bank={item.bankObj} size="sm" className="!w-6 !h-6 !p-0.5 rounded border border-slate-200 shrink-0" />
+                                  ) : item.bankLogo ? (
+                                    <img src={item.bankLogo} alt={item.name} className="w-6 h-6 object-contain rounded border border-slate-200 p-0.5 bg-white shrink-0" />
                                   ) : (
-                                    <span className="text-xs font-bold text-blue-700">{item.bankName || 'بنك'}</span>
+                                    <div className="w-6 h-6 rounded bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700 font-black text-[9px] shrink-0">
+                                      {item.bankCode || 'BNK'}
+                                    </div>
+                                  )
+                                ) : item.type === 'cash' ? (
+                                  <div className="w-6 h-6 rounded bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shrink-0">
+                                    <Wallet className="w-3 h-3" />
+                                  </div>
+                                ) : (
+                                  <div className="w-6 h-6 rounded bg-purple-50 border border-purple-200 flex items-center justify-center text-purple-600 shrink-0">
+                                    <Smartphone className="w-3 h-3" />
+                                  </div>
+                                )}
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-slate-900 leading-tight">{item.name}</span>
+                                  {item.bankAccountNum && (
+                                    <span className="text-[10px] text-slate-400 font-mono leading-tight">{item.bankAccountNum}</span>
                                   )}
-                                  <span className="text-xs font-medium text-slate-700">{item.bankName}</span>
                                 </div>
-                              ) : '-'}
+                              </div>
                             </td>
                             <td className="py-2 px-3 text-center font-mono font-bold text-slate-700">{item.currency}</td>
                             <td className="py-2 px-3">
