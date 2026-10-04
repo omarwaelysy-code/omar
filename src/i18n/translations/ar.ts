@@ -1407,6 +1407,7 @@ export const ar = {
   'discounts.date_label': 'تاريخ الحركة',
   'discounts.notes_placeholder': 'اكتب أي ملاحظات إضافية هنا...',
   'discounts.save_button': 'حفظ البيانات',
+  'discounts.discount_number': 'رقم المستند',
   'discounts.toast_success': 'تم حفظ الخصم بنجاح',
   'discounts.toast_error': 'فشل حفظ الخصم',
   'discounts.delete_confirm': 'هل أنت متأكد من رغبتك في حذف هذا الخصم؟ لا يمكن التراجع عن هذا الإجراء.',

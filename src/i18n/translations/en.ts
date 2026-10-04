@@ -1408,6 +1408,7 @@ export const en = {
   'discounts.date_label': 'Transaction Date',
   'discounts.notes_placeholder': 'Write any additional notes here...',
   'discounts.save_button': 'Save Details',
+  'discounts.discount_number': 'Document No.',
   'discounts.toast_success': 'Discount saved successfully',
   'discounts.toast_error': 'Failed to save discount',
   'discounts.delete_confirm': 'Are you sure you want to delete this discount? This action cannot be undone.',

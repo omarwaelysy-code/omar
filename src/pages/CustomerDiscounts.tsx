@@ -2,13 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Customer, Account, JournalEntry, JournalEntryItem } from '../types';
-import { Search, Plus, Trash2, X, Tag, User, Calendar, Save, Wallet, CreditCard, History, BookOpen, Phone, Mail, MapPin, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, ChevronDown, LayoutGrid, List, Hash } from 'lucide-react';
+import { Search, Plus, Trash2, X, Tag, User, Calendar, Save, Wallet, CreditCard, History, BookOpen, Phone, Mail, MapPin, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, ChevronDown, LayoutGrid, List, Hash, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
-import { SmartAIInput } from '../components/SmartAIInput';
 import { TransactionManager } from '../services/TransactionManager';
 import { DiscountSchema, JournalEntrySchema } from '../lib/schemas';
 import { ActivityLog } from '../types';
@@ -56,7 +55,21 @@ export const CustomerDiscounts: React.FC = () => {
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [accountSource, setAccountSource] = useState<'discount' | 'custom'>('discount');
+  const [discountAccountId, setDiscountAccountId] = useState('');
+  const [customAccountId, setCustomAccountId] = useState('');
+  const [copiedDocNumber, setCopiedDocNumber] = useState(false);
   const tableRef = useRef<HTMLTableElement>(null);
+
+  const handleCopyDocNumber = () => {
+    const num = editingDiscount ? editingDiscount.number : discountNumber;
+    if (num) {
+      navigator.clipboard.writeText(num);
+      setCopiedDocNumber(true);
+      setTimeout(() => setCopiedDocNumber(false), 2000);
+      showNotification(language === 'ar' ? 'تم نسخ رقم المستند بنجاح' : 'Document number copied', 'success');
+    }
+  };
 
   const toggleSelectAll = () => {
     if (filteredDiscounts.length > 0 && selectedIds.length === filteredDiscounts.length) {
@@ -119,17 +132,31 @@ export const CustomerDiscounts: React.FC = () => {
     setIsSubmitting(false);
     setEditingDiscount(null);
     setAttachments([]);
+    const defaultAcc = settings?.customer_discount_account_id || accounts.find(a => a.account_usage === 'sales_discount' || a.account_usage === 'earned_discounts')?.id || '';
+    setAccountSource('discount');
+    setDiscountAccountId(defaultAcc);
+    setCustomAccountId('');
     setDiscountData({
       customer_id: '',
       amount: 0,
       date: new Date().toISOString().slice(0, 10),
-      account_id: settings?.customer_discount_account_id || '',
+      account_id: defaultAcc,
       notes: ''
     });
   };
 
   const openEditModal = (discount: any) => {
     setEditingDiscount(discount);
+    const isDiscountAcc = accounts.some(a => a.id === discount.account_id && (a.account_usage === 'earned_discounts' || a.account_usage === 'sales_discount' || a.name?.includes('خصم')));
+    if (isDiscountAcc || !discount.account_id) {
+      setAccountSource('discount');
+      setDiscountAccountId(discount.account_id || settings?.customer_discount_account_id || '');
+      setCustomAccountId('');
+    } else {
+      setAccountSource('custom');
+      setCustomAccountId(discount.account_id || '');
+      setDiscountAccountId(settings?.customer_discount_account_id || accounts.find(a => a.account_usage === 'sales_discount' || a.account_usage === 'earned_discounts')?.id || '');
+    }
     setDiscountData({
       customer_id: discount.customer_id,
       amount: discount.amount,
@@ -209,7 +236,9 @@ export const CustomerDiscounts: React.FC = () => {
         ]);
         if (docs.length > 0) {
           setSettings(docs[0]);
-          setDiscountData(prev => ({ ...prev, account_id: docs[0].customer_discount_account_id || '' }));
+          const defAccount = docs[0].customer_discount_account_id || '';
+          setDiscountAccountId(defAccount);
+          setDiscountData(prev => ({ ...prev, account_id: prev.account_id || defAccount }));
         }
       };
 
@@ -814,10 +843,11 @@ export const CustomerDiscounts: React.FC = () => {
         </>
       ) : (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden animate-in slide-in-from-bottom-2 duration-200 flex flex-col min-h-[80vh] relative">
-          {/* Header Block */}
-          <div className="p-2.5 sm:p-3 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white/90 backdrop-blur-md z-[90]">
+          {/* Header Block with Actions */}
+          <div className="p-2.5 sm:p-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 sticky top-0 bg-white/95 backdrop-blur-md z-[90]">
             <div className="flex items-center gap-2">
               <button 
+                type="button"
                 onClick={closeModal}
                 className="px-2.5 py-1.5 hover:bg-slate-100 rounded-xl transition-all text-slate-600 hover:text-slate-900 group font-bold text-xs"
               >
@@ -844,42 +874,67 @@ export const CustomerDiscounts: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowSidePanel(!showSidePanel)}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   showSidePanel 
                     ? 'bg-emerald-50 text-emerald-600 border-emerald-200 shadow-sm' 
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-transparent'
                 } border`}
               >
                 <History size={14} />
-                <span>قيد اليومية \\ سجل التعديلات</span>
+                <span>قيد اليومية \ سجل التعديلات</span>
               </button>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               {editingDiscount && (
-                <div className="hidden lg:flex items-center gap-2 bg-zinc-100 p-1.5 rounded-2xl">
+                <div className="hidden lg:flex items-center gap-1.5 bg-zinc-100 p-1 rounded-xl">
                   <button 
                     type="button"
                     onClick={handlePrevDiscount}
-                    className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
+                    className="flex items-center gap-1 px-2.5 py-1 hover:bg-white rounded-lg transition-all text-zinc-600 disabled:opacity-30 text-xs font-bold"
                     disabled={filteredDiscounts.findIndex(d => d.id === editingDiscount.id) === 0}
                   >
-                    <ChevronRight size={16} />
+                    <ChevronRight size={14} />
                     السابق
                   </button>
                   <button 
                     type="button"
                     onClick={handleNextDiscount}
-                    className="flex items-center gap-1 px-3 py-1.5 hover:bg-white rounded-xl transition-all text-zinc-600 disabled:opacity-30 text-xs font-black"
+                    className="flex items-center gap-1 px-2.5 py-1 hover:bg-white rounded-lg transition-all text-zinc-600 disabled:opacity-30 text-xs font-bold"
                     disabled={filteredDiscounts.findIndex(d => d.id === editingDiscount.id) === filteredDiscounts.length - 1}
                   >
                     التالي
-                    <ChevronLeft size={16} />
+                    <ChevronLeft size={14} />
                   </button>
                 </div>
               )}
-              <h3 className="text-xl md:text-2xl font-black text-zinc-900 tracking-tight">
-                {editingDiscount ? t('discounts.edit_title') : t('discounts.add_new_title')}
+
+              {/* Action Buttons Moved to Top (انقل الزيرار لفوق) */}
+              <div className="flex items-center gap-2">
+                <button 
+                  type="button"
+                  onClick={closeModal}
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-all flex items-center gap-1.5 text-xs active:scale-95"
+                >
+                  <X size={14} />
+                  <span>{t('common.cancel')}</span>
+                </button>
+                <button 
+                  type="submit"
+                  form="customer-discount-form"
+                  disabled={isSubmitting || discountData.amount <= 0 || !discountData.customer_id || !discountData.account_id}
+                  className="px-4 py-1.5 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+                >
+                  <Save size={14} />
+                  <span>{isSubmitting ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...') : (editingDiscount ? (language === 'ar' ? 'تحديث الخصم' : t('common.save')) : (language === 'ar' ? 'حفظ البيانات' : t('discounts.save_button')))}</span>
+                </button>
+              </div>
+
+              <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+
+              <h3 className="text-sm md:text-base font-bold text-zinc-900 tracking-tight flex items-center gap-1.5">
+                <Tag className="w-4 h-4 text-emerald-600" />
+                <span>{editingDiscount ? t('discounts.edit_title') : t('discounts.add_new_title')}</span>
               </h3>
             </div>
           </div>
@@ -915,7 +970,7 @@ export const CustomerDiscounts: React.FC = () => {
               )}
             </AnimatePresence>
 
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32 md:pb-8">
+            <form id="customer-discount-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-4">
               {editingDiscount && (
                 <ReversalBanner
                   isReversed={editingDiscount.is_reversed}
@@ -929,156 +984,284 @@ export const CustomerDiscounts: React.FC = () => {
                   originalEntryNumber={editingDiscount.original_entry_number}
                 />
               )}
-              <SmartAIInput 
-                onDataExtracted={(data) => {
-                  if (data.customerName) {
-                    const customer = customers.find(c => c.name.includes(data.customerName!) || data.customerName!.includes(c.name));
-                    if (customer) {
-                      setDiscountData(prev => ({ ...prev, customer_id: customer.id }));
-                    }
-                  }
-                  if (data.amount) setDiscountData(prev => ({ ...prev, amount: data.amount! }));
-                  if (data.date) setDiscountData(prev => ({ ...prev, date: data.date! }));
-                  if (data.description || data.notes) setDiscountData(prev => ({ ...prev, notes: data.description || data.notes || '' }));
-                }}
-                transactionType="discount"
-              />
-              
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-3 space-y-6">
-                  {/* Card: Basic Info */}
-                  <section className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm space-y-6 relative pt-12">
-                    <div className="absolute top-4 right-4 flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
-                      <Tag className="w-4 h-4" />
-                      <span className="text-xs font-bold">{t('discounts.add_new_title')}</span>
+
+              <div className="space-y-4">
+                {/* Card: Basic Info */}
+                <section className="bg-white p-4 sm:p-5 rounded-2xl border border-zinc-200/90 shadow-sm space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                    {/* Document Number with Copy Button */}
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-600 mb-1 px-1">
+                        {language === 'ar' ? 'رقم المستند' : t('discounts.discount_number')}
+                      </label>
+                      <div className="relative flex items-center">
+                        <Hash className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                        <input 
+                          readOnly
+                          type="text"
+                          className={`w-full ${dir === 'rtl' ? 'pr-8 pl-8' : 'pl-8 pr-8'} py-2 bg-zinc-100/80 border border-zinc-200 rounded-xl font-mono font-bold text-zinc-700 text-xs outline-none cursor-not-allowed`}
+                          value={editingDiscount ? editingDiscount.number : discountNumber}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleCopyDocNumber}
+                          className={`absolute ${dir === 'rtl' ? 'left-1.5' : 'right-1.5'} top-1/2 -translate-y-1/2 p-1 text-zinc-400 hover:text-emerald-600 hover:bg-white rounded-lg transition-all border border-transparent hover:border-zinc-200 shadow-sm`}
+                          title={language === 'ar' ? 'نسخ رقم المستند' : 'Copy'}
+                        >
+                          {copiedDocNumber ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                        </button>
+                      </div>
                     </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                      <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('discounts.discount_number')}</label>
-                        <div className="relative">
-                          <Hash className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
-                          <input 
-                            readOnly
-                            type="text"
-                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-100 border border-zinc-200 rounded-2xl font-bold text-zinc-500 text-sm outline-none cursor-not-allowed`}
-                            value={editingDiscount ? editingDiscount.number : discountNumber}
-                          />
+
+                    {/* Customer */}
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-600 mb-1 px-1">
+                        {t('discounts.column_customer')}
+                      </label>
+                      <div className="relative group">
+                        <User className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                        <select 
+                          required
+                          className={`w-full ${dir === 'rtl' ? 'pr-8 pl-7' : 'pl-8 pr-7'} py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-xs cursor-pointer`}
+                          value={discountData.customer_id}
+                          onChange={(e) => {
+                            if (e.target.value === 'new') {
+                              setIsCustomerModalOpen(true);
+                            } else {
+                              setDiscountData({...discountData, customer_id: e.target.value});
+                            }
+                          }}
+                        >
+                          <option value="">{t('common.select_customer')}</option>
+                          {customers.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
+                          <option value="new" className="font-bold text-emerald-600">+ إضافة عميل جديد...</option>
+                        </select>
+                        <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-2' : 'right-2'} top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                      </div>
+                    </div>
+
+                    {/* Date */}
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-600 mb-1 px-1">
+                        {t('discounts.date_label')}
+                      </label>
+                      <div className="relative group">
+                        <Calendar className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                        <input 
+                          required
+                          type="date" 
+                          className={`w-full ${dir === 'rtl' ? 'pr-8 pl-3' : 'pl-8 pr-3'} py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs`}
+                          value={discountData.date}
+                          onChange={(e) => setDiscountData({...discountData, date: e.target.value})}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Amount */}
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-600 mb-1 px-1">
+                        {t('discounts.amount_label')}
+                      </label>
+                      <div className="relative group">
+                        <Wallet className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                        <input 
+                          required
+                          type="number" 
+                          step="0.01"
+                          className={`w-full ${dir === 'rtl' ? 'pr-8 pl-3' : 'pl-8 pr-3'} py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs`}
+                          placeholder="0.00"
+                          value={discountData.amount || ''}
+                          onChange={(e) => setDiscountData({...discountData, amount: Number(e.target.value)})}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Alternating Account Selection (خصم العملاء مسموح به vs حساب آخر من دليل الحسابات) */}
+                  <div className="pt-3 border-t border-zinc-100">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-zinc-700">تحديد الحساب المدين:</span>
+                        <div className="flex items-center gap-1 bg-zinc-100 p-0.5 rounded-lg border border-zinc-200">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAccountSource('discount');
+                              setDiscountData(prev => ({ ...prev, account_id: discountAccountId }));
+                            }}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all flex items-center gap-1 ${
+                              accountSource === 'discount'
+                                ? 'bg-emerald-600 text-white shadow-sm'
+                                : 'text-zinc-600 hover:text-zinc-900'
+                            }`}
+                          >
+                            <span>خصم العملاء (مسموح به)</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAccountSource('custom');
+                              setDiscountData(prev => ({ ...prev, account_id: customAccountId }));
+                            }}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all flex items-center gap-1 ${
+                              accountSource === 'custom'
+                                ? 'bg-emerald-600 text-white shadow-sm'
+                                : 'text-zinc-600 hover:text-zinc-900'
+                            }`}
+                          >
+                            <span>حساب آخر من دليل الحسابات</span>
+                          </button>
                         </div>
                       </div>
+                      <span className="text-[11px] text-zinc-400 font-medium">خلية واحدة فقط مفعلة في المعاملة</span>
+                    </div>
 
-                      <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase">{t('discounts.column_customer')}</label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {/* Cell 1: خصم العملاء (مسموح به) */}
+                      <div 
+                        className={`p-3 rounded-xl border transition-all ${
+                          accountSource === 'discount' 
+                            ? 'border-emerald-400 bg-emerald-50/20 ring-1 ring-emerald-300' 
+                            : 'border-zinc-200 bg-zinc-50/70 opacity-60 hover:opacity-85 cursor-pointer'
+                        }`}
+                        onClick={() => {
+                          if (accountSource !== 'discount') {
+                            setAccountSource('discount');
+                            setDiscountData(prev => ({ ...prev, account_id: discountAccountId }));
+                          }
+                        }}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-xs font-bold text-zinc-700 flex items-center gap-1.5 cursor-pointer">
+                            <BookOpen className={`w-3.5 h-3.5 ${accountSource === 'discount' ? 'text-emerald-600' : 'text-zinc-400'}`} />
+                            <span>خصم العملاء (مسموح به)</span>
+                          </label>
+                          {accountSource === 'discount' ? (
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">✓ مفعّل</span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-zinc-400">انقر للتبديل له</span>
+                          )}
+                        </div>
+
                         <div className="relative group">
-                          <User className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
                           <select 
-                            required
-                            className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
-                            value={discountData.customer_id}
+                            disabled={accountSource !== 'discount'}
+                            required={accountSource === 'discount'}
+                            className={`w-full ${dir === 'rtl' ? 'pr-3 pl-7' : 'pl-3 pr-7'} py-2 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-xs ${
+                              accountSource !== 'discount' ? 'cursor-not-allowed bg-zinc-100/70 text-zinc-400' : 'cursor-pointer'
+                            }`}
+                            value={discountAccountId}
                             onChange={(e) => {
-                              if (e.target.value === 'new') {
-                                setIsCustomerModalOpen(true);
-                              } else {
-                                setDiscountData({...discountData, customer_id: e.target.value});
-                              }
+                              const val = e.target.value;
+                              setDiscountAccountId(val);
+                              setDiscountData(prev => ({ ...prev, account_id: val }));
                             }}
                           >
-                            <option value="">{t('common.select_customer')}</option>
-                            {customers.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
-                            <option value="new" className="font-bold text-emerald-600">+ إضافة عميل جديد...</option>
-                          </select>
-                          <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('discounts.date_label')}</label>
-                        <div className="relative group">
-                          <Calendar className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
-                          <input 
-                            required
-                            type="date" 
-                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
-                            value={discountData.date}
-                            onChange={(e) => setDiscountData({...discountData, date: e.target.value})}
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase tracking-tighter uppercase mb-2 px-2 uppercase">{t('discounts.amount_label')}</label>
-                        <div className="relative group">
-                          <Wallet className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
-                          <input 
-                            required
-                            type="number" 
-                            step="0.01"
-                            className={`w-full ${dir === 'rtl' ? 'ps-4 pe-12' : 'pe-4 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-sm`}
-                            placeholder="0.00"
-                            value={discountData.amount || ''}
-                            onChange={(e) => setDiscountData({...discountData, amount: Number(e.target.value)})}
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('discount_settings.customer_discount_label')}</label>
-                        <div className="relative group">
-                          <BookOpen className={`absolute ${dir === 'rtl' ? 'right-4' : 'left-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
-                          <select 
-                            required
-                            className={`w-full ${dir === 'rtl' ? 'ps-10 pe-12' : 'pe-10 ps-12'} py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-sm cursor-pointer`}
-                            value={discountData.account_id}
-                            onChange={(e) => setDiscountData({...discountData, account_id: e.target.value})}
-                          >
                             <option value="">{t('discount_settings.select_account')}</option>
-                             {accounts.filter(acc => acc.account_usage === 'earned_discounts' || acc.account_usage === 'sales_discount').map(a => <option key={a.id} value={a.id}>{a.name} ({a.code})</option>)}
+                            {accounts.filter(acc => acc.account_usage === 'earned_discounts' || acc.account_usage === 'sales_discount' || acc.name?.includes('خصم')).map(a => (
+                              <option key={a.id} value={a.id}>{a.name} ({a.code})</option>
+                            ))}
                           </select>
-                          <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-4' : 'right-4'} top-3.5 w-5 h-5 text-zinc-400 pointer-events-none`} />
+                          <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-2' : 'right-2'} top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                        </div>
+                      </div>
+
+                      {/* Cell 2: حساب آخر (دليل الحسابات) */}
+                      <div 
+                        className={`p-3 rounded-xl border transition-all ${
+                          accountSource === 'custom' 
+                            ? 'border-emerald-400 bg-emerald-50/20 ring-1 ring-emerald-300' 
+                            : 'border-zinc-200 bg-zinc-50/70 opacity-60 hover:opacity-85 cursor-pointer'
+                        }`}
+                        onClick={() => {
+                          if (accountSource !== 'custom') {
+                            setAccountSource('custom');
+                            setDiscountData(prev => ({ ...prev, account_id: customAccountId }));
+                          }
+                        }}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-xs font-bold text-zinc-700 flex items-center gap-1.5 cursor-pointer">
+                            <BookOpen className={`w-3.5 h-3.5 ${accountSource === 'custom' ? 'text-emerald-600' : 'text-zinc-400'}`} />
+                            <span>حساب آخر (دليل الحسابات)</span>
+                          </label>
+                          {accountSource === 'custom' ? (
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">✓ مفعّل</span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-zinc-400">انقر للتبديل له</span>
+                          )}
+                        </div>
+
+                        <div className="relative group">
+                          <select 
+                            disabled={accountSource !== 'custom'}
+                            required={accountSource === 'custom'}
+                            className={`w-full ${dir === 'rtl' ? 'pr-3 pl-7' : 'pl-3 pr-7'} py-2 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-xs ${
+                              accountSource !== 'custom' ? 'cursor-not-allowed bg-zinc-100/70 text-zinc-400' : 'cursor-pointer'
+                            }`}
+                            value={customAccountId}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCustomAccountId(val);
+                              setDiscountData(prev => ({ ...prev, account_id: val }));
+                            }}
+                          >
+                            <option value="">-- اختر حساباً من دليل الحسابات --</option>
+                            {accounts
+                              .filter(a => a.status !== 'inactive')
+                              .sort((a, b) => (a.code || '').localeCompare(b.code || ''))
+                              .map(a => (
+                                <option key={a.id} value={a.id}>
+                                  {a.code ? `${a.code} - ` : ''}{a.name}
+                                </option>
+                              ))}
+                          </select>
+                          <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-2' : 'right-2'} top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none`} />
                         </div>
                       </div>
                     </div>
+                  </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-zinc-400 tracking-tighter mb-2 px-2 uppercase">{t('discounts.column_notes')}</label>
-                      <textarea 
-                        rows={3}
-                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-3xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none font-bold text-sm text-zinc-800"
-                        placeholder={t('discounts.notes_placeholder')}
-                        value={discountData.notes}
-                        onChange={(e) => setDiscountData({...discountData, notes: e.target.value})}
-                      />
-                    </div>
-                  </section>
-
-                  {/* Attachments Section */}
-                  <div className="bg-white p-6 rounded-3xl border border-zinc-200 shadow-sm">
-                    <AttachmentsManager
-                      attachments={attachments}
-                      onChange={setAttachments}
+                  {/* Notes */}
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-600 mb-1 px-1">{t('discounts.column_notes')}</label>
+                    <textarea 
+                      rows={2}
+                      className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none font-bold text-xs text-zinc-800"
+                      placeholder={t('discounts.notes_placeholder')}
+                      value={discountData.notes}
+                      onChange={(e) => setDiscountData({...discountData, notes: e.target.value})}
                     />
                   </div>
-                </div>
-              </div>
+                </section>
 
-              {/* Form Footer */}
-              <div className="p-3 md:p-4 border-t border-slate-200 bg-white/90 backdrop-blur-md sticky bottom-0 z-[70] flex items-center justify-between gap-3 mt-auto">
-                <button 
-                  type="button"
-                  onClick={closeModal}
-                  className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-all flex items-center justify-center gap-2 active:scale-95 text-xs"
-                >
-                  <RotateCcw size={15} />
-                  <span>{t('common.cancel')}</span>
-                </button>
-                <button 
-                  type="submit"
-                  disabled={isSubmitting || discountData.amount <= 0 || !discountData.customer_id}
-                  className="flex-1 max-w-xs py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
-                >
-                  <Save size={15} />
-                  <span>{isSubmitting ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...') : (editingDiscount ? t('common.save') : t('discounts.save_button'))}</span>
-                </button>
+                {/* Attachments Section */}
+                <div className="bg-white p-4 sm:p-5 rounded-2xl border border-zinc-200/90 shadow-sm">
+                  <AttachmentsManager
+                    attachments={attachments}
+                    onChange={setAttachments}
+                  />
+                </div>
+
+                {/* Form Footer Action */}
+                <div className="p-2 flex items-center justify-end gap-2 pt-2">
+                  <button 
+                    type="button"
+                    onClick={closeModal}
+                    className="px-3.5 py-1.5 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-all flex items-center gap-1.5 text-xs active:scale-95"
+                  >
+                    <X size={14} />
+                    <span>{t('common.cancel')}</span>
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={isSubmitting || discountData.amount <= 0 || !discountData.customer_id || !discountData.account_id}
+                    className="px-5 py-1.5 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+                  >
+                    <Save size={14} />
+                    <span>{isSubmitting ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...') : (editingDiscount ? (language === 'ar' ? 'تحديث الخصم' : t('common.save')) : (language === 'ar' ? 'حفظ البيانات' : t('discounts.save_button')))}</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
