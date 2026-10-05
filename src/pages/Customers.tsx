@@ -125,6 +125,8 @@ export const Customers: React.FC = () => {
         unsubscribeDiscounts();
       };
     }
+  }, [user?.company_id]);
+
   // Enterprise Audit Trail Lock: check if customer has recorded transactions
   const isCustomerAccountLocked = useMemo(() => {
     if (!editingCustomer) return false;

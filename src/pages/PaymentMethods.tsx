@@ -135,6 +135,8 @@ export const PaymentMethods: React.FC = () => {
         unsubCurrencies();
       };
     }
+  }, [user?.company_id]);
+
   // Enterprise Audit Trail Lock: check if payment method has recorded transactions
   const isAccountLocked = useMemo(() => {
     if (!editingMethod) return false;
