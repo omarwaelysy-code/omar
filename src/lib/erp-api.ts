@@ -6923,6 +6923,35 @@ modules.forEach(moduleName => {
   });
 });
 
+  // Enterprise Audit Trail Lock: check if product has recorded transactions
+  if (moduleName === 'products') {
+    routeNames.forEach(rn => {
+      router.get(`/${rn}/:id/has-transactions`, authenticateToken, async (req: AuthRequest, res) => {
+        try {
+          const { id } = req.params;
+          const txCheck = await pool.query(`
+            SELECT (
+              (SELECT COUNT(*) FROM invoice_items WHERE product_id = $1) +
+              (SELECT COUNT(*) FROM purchase_invoice_items WHERE product_id = $1) +
+              (SELECT COUNT(*) FROM return_items WHERE product_id = $1) +
+              (SELECT COUNT(*) FROM purchase_return_items WHERE product_id = $1) +
+              (SELECT COUNT(*) FROM inventory_movement_lines WHERE product_id = $1) +
+              (SELECT COUNT(*) FROM stock_card WHERE product_id = $1) +
+              (SELECT COUNT(*) FROM opening_stock_items WHERE product_id = $1) +
+              (SELECT COUNT(*) FROM stock_adjustment_items WHERE product_id = $1) +
+              (SELECT COUNT(*) FROM journal_entry_lines WHERE sub_account_id = $1)
+            ) as total_count
+          `, [id]);
+          const count = parseInt(txCheck.rows[0]?.total_count || '0', 10);
+          return res.json({ hasTransactions: count > 0, count });
+        } catch (err: any) {
+          console.error('Error checking product transactions:', err);
+          return res.status(500).json({ error: err.message });
+        }
+      });
+    });
+  }
+
 // Get Single
   routeNames.forEach(rn => {
     router.get(`/${rn}/:id`, authenticateToken, async (req: AuthRequest, res) => {
@@ -7542,45 +7571,78 @@ modules.forEach(moduleName => {
               if (err) return sendError(res, 400, err);
 
               // Enterprise Audit Trail Lock: Prevent changing linked GL account if transactions exist
-              if (req.body.account_id && existingRecord.account_id && req.body.account_id !== existingRecord.account_id) {
-                if (moduleName === 'payment_methods') {
+              if (['payment_methods', 'customers', 'suppliers'].includes(moduleName)) {
+                if (req.body.account_id && existingRecord.account_id && req.body.account_id !== existingRecord.account_id) {
+                  if (moduleName === 'payment_methods') {
+                    const txCheck = await pool.query(`
+                      SELECT (
+                        (SELECT COUNT(*) FROM invoices WHERE payment_method_id = $1) +
+                        (SELECT COUNT(*) FROM purchase_invoices WHERE payment_method_id = $1) +
+                        (SELECT COUNT(*) FROM receipt_vouchers WHERE payment_method_id = $1) +
+                        (SELECT COUNT(*) FROM payment_vouchers WHERE payment_method_id = $1) +
+                        (SELECT COUNT(*) FROM cash_transfers WHERE from_payment_method_id = $1 OR to_payment_method_id = $1) +
+                        (SELECT COUNT(*) FROM journal_entry_lines WHERE sub_account_id = $1)
+                      ) as total_count
+                    `, [id]);
+                    const count = parseInt(txCheck.rows[0]?.total_count || '0', 10);
+                    if (count > 0) {
+                      return sendError(res, 400, 'لا يمكن تعديل الحساب المحاسبي لطريقة السداد لوجود معاملات مالية مسجلة بالفعل - حفاظاً على مسار التدقيق ونزاهة الدفاتر.');
+                    }
+                  } else if (moduleName === 'customers') {
+                    const txCheck = await pool.query(`
+                      SELECT (
+                        (SELECT COUNT(*) FROM invoices WHERE customer_id = $1) +
+                        (SELECT COUNT(*) FROM receipt_vouchers WHERE customer_id = $1) +
+                        (SELECT COUNT(*) FROM journal_entry_lines WHERE customer_id = $1 OR sub_account_id = $1)
+                      ) as total_count
+                    `, [id]);
+                    const count = parseInt(txCheck.rows[0]?.total_count || '0', 10);
+                    if (count > 0) {
+                      return sendError(res, 400, 'لا يمكن تعديل الحساب المحاسبي للعميل لوجود معاملات مالية مسجلة بالفعل - حفاظاً على مسار التدقيق المالي.');
+                    }
+                  } else if (moduleName === 'suppliers') {
+                    const txCheck = await pool.query(`
+                      SELECT (
+                        (SELECT COUNT(*) FROM purchase_invoices WHERE supplier_id = $1) +
+                        (SELECT COUNT(*) FROM payment_vouchers WHERE supplier_id = $1) +
+                        (SELECT COUNT(*) FROM journal_entry_lines WHERE supplier_id = $1 OR sub_account_id = $1)
+                      ) as total_count
+                    `, [id]);
+                    const count = parseInt(txCheck.rows[0]?.total_count || '0', 10);
+                    if (count > 0) {
+                      return sendError(res, 400, 'لا يمكن تعديل الحساب المحاسبي للمورد لوجود معاملات مالية مسجلة بالفعل - حفاظاً على مسار التدقيق المالي.');
+                    }
+                  }
+                }
+              } else if (moduleName === 'products') {
+                const prodAccountFields = [
+                  'inventory_account_id',
+                  'revenue_account_id',
+                  'cost_account_id',
+                  'sales_vat_account_id',
+                  'purchase_vat_account_id',
+                  'vat_account_id',
+                  'sales_withholding_tax_account_id',
+                  'purchase_withholding_tax_account_id'
+                ];
+                const isAnyAccountChanged = prodAccountFields.some(f => req.body[f] !== undefined && existingRecord[f] && req.body[f] !== existingRecord[f]);
+                if (isAnyAccountChanged) {
                   const txCheck = await pool.query(`
                     SELECT (
-                      (SELECT COUNT(*) FROM invoices WHERE payment_method_id = $1) +
-                      (SELECT COUNT(*) FROM purchase_invoices WHERE payment_method_id = $1) +
-                      (SELECT COUNT(*) FROM receipt_vouchers WHERE payment_method_id = $1) +
-                      (SELECT COUNT(*) FROM payment_vouchers WHERE payment_method_id = $1) +
-                      (SELECT COUNT(*) FROM cash_transfers WHERE from_payment_method_id = $1 OR to_payment_method_id = $1) +
+                      (SELECT COUNT(*) FROM invoice_items WHERE product_id = $1) +
+                      (SELECT COUNT(*) FROM purchase_invoice_items WHERE product_id = $1) +
+                      (SELECT COUNT(*) FROM return_items WHERE product_id = $1) +
+                      (SELECT COUNT(*) FROM purchase_return_items WHERE product_id = $1) +
+                      (SELECT COUNT(*) FROM inventory_movement_lines WHERE product_id = $1) +
+                      (SELECT COUNT(*) FROM stock_card WHERE product_id = $1) +
+                      (SELECT COUNT(*) FROM opening_stock_items WHERE product_id = $1) +
+                      (SELECT COUNT(*) FROM stock_adjustment_items WHERE product_id = $1) +
                       (SELECT COUNT(*) FROM journal_entry_lines WHERE sub_account_id = $1)
                     ) as total_count
                   `, [id]);
                   const count = parseInt(txCheck.rows[0]?.total_count || '0', 10);
                   if (count > 0) {
-                    return sendError(res, 400, 'لا يمكن تعديل الحساب المحاسبي لطريقة السداد لوجود معاملات مالية مسجلة بالفعل - حفاظاً على مسار التدقيق ونزاهة الدفاتر.');
-                  }
-                } else if (moduleName === 'customers') {
-                  const txCheck = await pool.query(`
-                    SELECT (
-                      (SELECT COUNT(*) FROM invoices WHERE customer_id = $1) +
-                      (SELECT COUNT(*) FROM receipt_vouchers WHERE customer_id = $1) +
-                      (SELECT COUNT(*) FROM journal_entry_lines WHERE customer_id = $1 OR sub_account_id = $1)
-                    ) as total_count
-                  `, [id]);
-                  const count = parseInt(txCheck.rows[0]?.total_count || '0', 10);
-                  if (count > 0) {
-                    return sendError(res, 400, 'لا يمكن تعديل الحساب المحاسبي للعميل لوجود معاملات مالية مسجلة بالفعل - حفاظاً على مسار التدقيق المالي.');
-                  }
-                } else if (moduleName === 'suppliers') {
-                  const txCheck = await pool.query(`
-                    SELECT (
-                      (SELECT COUNT(*) FROM purchase_invoices WHERE supplier_id = $1) +
-                      (SELECT COUNT(*) FROM payment_vouchers WHERE supplier_id = $1) +
-                      (SELECT COUNT(*) FROM journal_entry_lines WHERE supplier_id = $1 OR sub_account_id = $1)
-                    ) as total_count
-                  `, [id]);
-                  const count = parseInt(txCheck.rows[0]?.total_count || '0', 10);
-                  if (count > 0) {
-                    return sendError(res, 400, 'لا يمكن تعديل الحساب المحاسبي للمورد لوجود معاملات مالية مسجلة بالفعل - حفاظاً على مسار التدقيق المالي.');
+                    return sendError(res, 400, 'لا يمكن تعديل الحسابات المحاسبية للصنف لوجود معاملات مالية أو حركات مخزنية مسجلة بالفعل - حفاظاً على مسار التدقيق وتقييم المخزون.');
                   }
                 }
               }

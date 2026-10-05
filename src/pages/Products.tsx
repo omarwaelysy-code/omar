@@ -213,6 +213,7 @@ export const Products: React.FC = () => {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isProductAccountsLocked, setIsProductAccountsLocked] = useState(false);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [view, setView] = useViewPreference('products', 'table');
   const [showImportWizard, setShowImportWizard] = useState(false);
@@ -547,6 +548,30 @@ export const Products: React.FC = () => {
     }
   }, [user, reportProduct, editingProduct]);
 
+  // Enterprise Audit Trail Lock: Check if product has recorded transactions
+  useEffect(() => {
+    let isCancelled = false;
+    if (editingProduct && user) {
+      if (Number(editingProduct.current_stock || 0) !== 0) {
+        setIsProductAccountsLocked(true);
+      }
+      apiRequest<{ hasTransactions: boolean }>(`/products/${editingProduct.id}/has-transactions`, 'GET')
+        .then(res => {
+          if (!isCancelled && res) {
+            setIsProductAccountsLocked(Boolean(res.hasTransactions || Number(editingProduct.current_stock || 0) !== 0));
+          }
+        })
+        .catch(() => {
+          if (!isCancelled) {
+            setIsProductAccountsLocked(Number(editingProduct.current_stock || 0) !== 0);
+          }
+        });
+    } else {
+      setIsProductAccountsLocked(false);
+    }
+    return () => { isCancelled = true; };
+  }, [editingProduct, user]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -581,6 +606,27 @@ export const Products: React.FC = () => {
     if (!user) return;
 
     try {
+      if (editingProduct && isProductAccountsLocked) {
+        const isAccountChanged = 
+          (formData.revenue_account_id && formData.revenue_account_id !== editingProduct.revenue_account_id) ||
+          (formData.cost_account_id && formData.cost_account_id !== editingProduct.cost_account_id) ||
+          (formData.inventory_account_id && formData.inventory_account_id !== editingProduct.inventory_account_id) ||
+          (formData.sales_vat_account_id && formData.sales_vat_account_id !== (editingProduct.sales_vat_account_id || editingProduct.vat_account_id)) ||
+          (formData.purchase_vat_account_id && formData.purchase_vat_account_id !== (editingProduct.purchase_vat_account_id || editingProduct.vat_account_id)) ||
+          (formData.sales_withholding_tax_account_id && formData.sales_withholding_tax_account_id !== editingProduct.sales_withholding_tax_account_id) ||
+          (formData.purchase_withholding_tax_account_id && formData.purchase_withholding_tax_account_id !== editingProduct.purchase_withholding_tax_account_id);
+
+        if (isAccountChanged) {
+          showNotification(
+            language === 'ar'
+              ? 'لا يمكن تعديل الحسابات المحاسبية للصنف لوجود معاملات مالية أو حركات مخزنية مسجلة بالفعل - للحفاظ على مسار التدقيق وتقييم المخزون.'
+              : 'Cannot modify linked accounts because transactions or inventory movements are already recorded on this product.',
+            'error'
+          );
+          return;
+        }
+      }
+
       if (!formData.item_group_id) {
         showNotification(language === 'ar' ? 'الرجاء اختيار مجموعة للصنف' : 'Please select an item group for the product', 'error');
         return;
@@ -2525,22 +2571,38 @@ export const Products: React.FC = () => {
 
                              {/* Accounting Section */}
                              <div className="space-y-1.5 p-2 bg-slate-50/50 rounded-xl border border-slate-200/60">
-                                <div className="flex items-center gap-1.5 border-b border-slate-200/60 pb-1">
-                                   <div className="w-4 h-4 bg-slate-100 text-slate-600 rounded flex items-center justify-center">
-                                      <LayoutGrid size={11} />
+                                <div className="flex items-center justify-between border-b border-slate-200/60 pb-1">
+                                   <div className="flex items-center gap-1.5">
+                                      <div className="w-4 h-4 bg-slate-100 text-slate-600 rounded flex items-center justify-center">
+                                         <LayoutGrid size={11} />
+                                      </div>
+                                      <h2 className="text-[11px] font-bold text-slate-800 leading-none uppercase">
+                                         {language === 'ar' ? 'الإعدادات المحاسبية' : 'Accounting Setup'}
+                                      </h2>
                                    </div>
-                                   <h2 className="text-[11px] font-bold text-slate-800 leading-none uppercase">
-                                      {language === 'ar' ? 'الإعدادات المحاسبية' : 'Accounting Setup'}
-                                   </h2>
+                                   {isProductAccountsLocked && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                         <Lock size={9} />
+                                         <span>{language === 'ar' ? 'الحسابات مقفلة لوجود حركات مسجلة' : 'Accounts Locked'}</span>
+                                      </span>
+                                   )}
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-right">
                                    {/* حساب الإيرادات */}
                                    <div className="space-y-0.5">
-                                      <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_revenue_account')}</label>
+                                      <label className="block text-[10px] font-bold text-slate-500 px-0.5 flex items-center justify-between">
+                                         <span>{t('products.form_revenue_account')}</span>
+                                         {isProductAccountsLocked && <Lock size={10} className="text-amber-500" />}
+                                      </label>
                                       <select 
                                         required 
-                                        className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all" 
+                                        disabled={isProductAccountsLocked}
+                                        className={`w-full px-2 py-1 border rounded-md text-xs font-bold appearance-none outline-none transition-all ${
+                                          isProductAccountsLocked 
+                                            ? 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed font-medium' 
+                                            : 'bg-white border-slate-200 focus:ring-1 focus:ring-emerald-500'
+                                        }`} 
                                         value={formData.revenue_account_id} 
                                         onChange={(e) => setFormData({ ...formData, revenue_account_id: e.target.value })}
                                       >
@@ -2551,10 +2613,18 @@ export const Products: React.FC = () => {
 
                                    {/* حساب تكلفة المبيعات */}
                                    <div className="space-y-0.5">
-                                      <label className="block text-[10px] font-bold text-slate-500 px-0.5">{t('products.form_cost_account')}</label>
+                                      <label className="block text-[10px] font-bold text-slate-500 px-0.5 flex items-center justify-between">
+                                         <span>{t('products.form_cost_account')}</span>
+                                         {isProductAccountsLocked && <Lock size={10} className="text-amber-500" />}
+                                      </label>
                                       <select 
                                         required 
-                                        className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all" 
+                                        disabled={isProductAccountsLocked}
+                                        className={`w-full px-2 py-1 border rounded-md text-xs font-bold appearance-none outline-none transition-all ${
+                                          isProductAccountsLocked 
+                                            ? 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed font-medium' 
+                                            : 'bg-white border-slate-200 focus:ring-1 focus:ring-emerald-500'
+                                        }`} 
                                         value={formData.cost_account_id} 
                                         onChange={(e) => setFormData({ ...formData, cost_account_id: e.target.value })}
                                       >
@@ -2567,12 +2637,18 @@ export const Products: React.FC = () => {
                                    {['finished_good', 'raw_material', 'commodity', 'consumable'].includes(formData.type) && (
                                      <>
                                        <div className="space-y-0.5">
-                                         <label className="block text-[10px] font-bold text-slate-500 px-0.5">
-                                           {t('products.form_inventory_account')} <span className="text-rose-500 font-bold">*</span>
+                                         <label className="block text-[10px] font-bold text-slate-500 px-0.5 flex items-center justify-between">
+                                           <span>{t('products.form_inventory_account')} <span className="text-rose-500 font-bold">*</span></span>
+                                           {isProductAccountsLocked && <Lock size={10} className="text-amber-500" />}
                                          </label>
                                          <select 
                                            required
-                                           className="w-full px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all" 
+                                           disabled={isProductAccountsLocked}
+                                           className={`w-full px-2 py-1 border rounded-md text-xs font-bold appearance-none outline-none transition-all ${
+                                             isProductAccountsLocked 
+                                               ? 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed font-medium' 
+                                               : 'bg-white border-slate-200 focus:ring-1 focus:ring-emerald-500'
+                                           }`} 
                                            value={formData.inventory_account_id} 
                                            onChange={(e) => setFormData({ ...formData, inventory_account_id: e.target.value })}
                                          >
@@ -2610,12 +2686,20 @@ export const Products: React.FC = () => {
                                        {/* ضريبة مبيعات (مخرجات) مع النسبة */}
                                        <div className="space-y-0.5">
                                          <label className="block text-[10px] font-bold text-slate-600 px-0.5 flex items-center justify-between">
-                                           <span>{language === 'ar' ? 'ضريبة القيمة المضافة (مبيعات)' : 'Sales VAT Account'}</span>
+                                           <span className="flex items-center gap-1">
+                                             {isProductAccountsLocked && <Lock size={10} className="text-amber-500" />}
+                                             <span>{language === 'ar' ? 'ضريبة القيمة المضافة (مبيعات)' : 'Sales VAT Account'}</span>
+                                           </span>
                                            <span className="text-[8.5px] text-emerald-700 bg-emerald-100 px-1 py-0.2 rounded font-black">مخرجات</span>
                                          </label>
                                          <div className="flex items-center gap-1.5">
                                            <select 
-                                             className="flex-1 min-w-0 px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all truncate" 
+                                             disabled={isProductAccountsLocked}
+                                             className={`flex-1 min-w-0 px-2 py-1 border rounded-md text-xs font-bold appearance-none outline-none transition-all truncate ${
+                                               isProductAccountsLocked 
+                                                 ? 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed font-medium' 
+                                                 : 'bg-white border-slate-200 focus:ring-1 focus:ring-emerald-500'
+                                             }`} 
                                              value={formData.sales_vat_account_id || ''} 
                                              onChange={(e) => setFormData({ ...formData, sales_vat_account_id: e.target.value })}
                                            >
@@ -2644,118 +2728,150 @@ export const Products: React.FC = () => {
                                        </div>
 
                                        {/* ضريبة مشتريات (مدخلات) مع النسبة */}
-                                        <div className="space-y-0.5">
-                                          <label className="block text-[10px] font-bold text-slate-600 px-0.5 flex items-center justify-between">
-                                            <span>{language === 'ar' ? 'ضريبة القيمة المضافة (مشتريات)' : 'Purchase VAT Account'}</span>
-                                            <span className="text-[8.5px] text-blue-700 bg-blue-100 px-1 py-0.2 rounded font-black">مدخلات</span>
-                                          </label>
-                                          <div className="flex items-center gap-1.5">
-                                            <select 
-                                              className="flex-1 min-w-0 px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all truncate" 
-                                              value={formData.purchase_vat_account_id || ''} 
-                                              onChange={(e) => setFormData({ ...formData, purchase_vat_account_id: e.target.value })}
-                                            >
-                                              <option value="">{language === 'ar' ? '-- اختر حساب ضريبة المشتريات --' : '-- Select Purchase VAT Account --'}</option>
-                                              {(accounts.filter(a => a.id === formData.purchase_vat_account_id || ['vat', 'input_vat'].includes(a.account_usage || '') || a.name.includes('مشتريات') || a.name.includes('مدخلات') || a.code?.startsWith('118') || a.code?.startsWith('222')).length > 0
-                                                ? accounts.filter(a => a.id === formData.purchase_vat_account_id || ['vat', 'input_vat'].includes(a.account_usage || '') || a.name.includes('مشتريات') || a.name.includes('مدخلات') || a.code?.startsWith('118') || a.code?.startsWith('222'))
-                                                : accounts
-                                              ).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
-                                            </select>
-                                            <div className="relative w-16 shrink-0">
-                                              <input 
-                                                type="number" 
-                                                step="0.01" 
-                                                min="0" 
-                                                max="100" 
-                                                placeholder="14" 
-                                                className="w-full pl-1.5 pr-5 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500 transition-all text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-                                                value={formData.purchase_vat_rate !== undefined && formData.purchase_vat_rate !== null ? formData.purchase_vat_rate : ''} 
-                                                onChange={(e) => setFormData({ ...formData, purchase_vat_rate: parseFloat(e.target.value) || 0 })} 
-                                              />
-                                              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs select-none pointer-events-none">
-                                                %
-                                              </span>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </>
-                                    )}
+                                       <div className="space-y-0.5">
+                                         <label className="block text-[10px] font-bold text-slate-600 px-0.5 flex items-center justify-between">
+                                           <span className="flex items-center gap-1">
+                                             {isProductAccountsLocked && <Lock size={10} className="text-amber-500" />}
+                                             <span>{language === 'ar' ? 'ضريبة القيمة المضافة (مشتريات)' : 'Purchase VAT Account'}</span>
+                                           </span>
+                                           <span className="text-[8.5px] text-blue-700 bg-blue-100 px-1 py-0.2 rounded font-black">مدخلات</span>
+                                         </label>
+                                         <div className="flex items-center gap-1.5">
+                                           <select 
+                                             disabled={isProductAccountsLocked}
+                                             className={`flex-1 min-w-0 px-2 py-1 border rounded-md text-xs font-bold appearance-none outline-none transition-all truncate ${
+                                               isProductAccountsLocked 
+                                                 ? 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed font-medium' 
+                                                 : 'bg-white border-slate-200 focus:ring-1 focus:ring-emerald-500'
+                                             }`} 
+                                             value={formData.purchase_vat_account_id || ''} 
+                                             onChange={(e) => setFormData({ ...formData, purchase_vat_account_id: e.target.value })}
+                                           >
+                                             <option value="">{language === 'ar' ? '-- اختر حساب ضريبة المشتريات --' : '-- Select Purchase VAT Account --'}</option>
+                                             {(accounts.filter(a => a.id === formData.purchase_vat_account_id || ['vat', 'input_vat'].includes(a.account_usage || '') || a.name.includes('مشتريات') || a.name.includes('مدخلات') || a.code?.startsWith('118') || a.code?.startsWith('222')).length > 0
+                                               ? accounts.filter(a => a.id === formData.purchase_vat_account_id || ['vat', 'input_vat'].includes(a.account_usage || '') || a.name.includes('مشتريات') || a.name.includes('مدخلات') || a.code?.startsWith('118') || a.code?.startsWith('222'))
+                                               : accounts
+                                             ).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                           </select>
+                                           <div className="relative w-16 shrink-0">
+                                             <input 
+                                               type="number" 
+                                               step="0.01" 
+                                               min="0" 
+                                               max="100" 
+                                               placeholder="14" 
+                                               className="w-full pl-1.5 pr-5 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500 transition-all text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                                               value={formData.purchase_vat_rate !== undefined && formData.purchase_vat_rate !== null ? formData.purchase_vat_rate : ''} 
+                                               onChange={(e) => setFormData({ ...formData, purchase_vat_rate: parseFloat(e.target.value) || 0 })} 
+                                             />
+                                             <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs select-none pointer-events-none">
+                                               %
+                                             </span>
+                                           </div>
+                                         </div>
+                                       </div>
+                                     </>
+                                   )}
 
-                                    {/* ضرائب خصم من العملاء (مبيعات) مع النسبة */}
-                                    {isSalesWhtEnabled && (
-                                      <div className="space-y-0.5">
-                                        <label className="block text-[10px] font-bold text-slate-600 px-0.5 flex items-center justify-between">
-                                          <span>{language === 'ar' ? 'ضرائب خصم من العملاء' : 'Sales Withholding Tax'}</span>
-                                          <span className="text-[8.5px] text-amber-700 bg-amber-100 px-1 py-0.2 rounded font-black">خصم مبيعات</span>
-                                        </label>
-                                        <div className="flex items-center gap-1.5">
-                                          <select 
-                                            className="flex-1 min-w-0 px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all truncate" 
-                                            value={formData.sales_withholding_tax_account_id || ''} 
-                                            onChange={(e) => setFormData({ ...formData, sales_withholding_tax_account_id: e.target.value })}
-                                          >
-                                            <option value="">{language === 'ar' ? '-- اختر حساب خصم من العملاء --' : '-- Select Customer WHT Account --'}</option>
-                                            {(accounts.filter(a => a.id === formData.sales_withholding_tax_account_id || ['withholding_tax_customers', 'withholding_tax'].includes(a.account_usage || '') || a.name.includes('خصم من العملاء') || a.name.includes('خصم عملاء') || a.code?.startsWith('118')).length > 0
-                                              ? accounts.filter(a => a.id === formData.sales_withholding_tax_account_id || ['withholding_tax_customers', 'withholding_tax'].includes(a.account_usage || '') || a.name.includes('خصم من العملاء') || a.name.includes('خصم عملاء') || a.code?.startsWith('118'))
-                                              : accounts
-                                            ).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
-                                          </select>
-                                          <div className="relative w-16 shrink-0">
-                                            <input 
-                                              type="number" 
-                                              step="0.01" 
-                                              min="0" 
-                                              max="100" 
-                                              placeholder="1" 
-                                              className="w-full pl-1.5 pr-5 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500 transition-all text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-                                              value={formData.sales_withholding_tax_rate !== undefined && formData.sales_withholding_tax_rate !== null ? formData.sales_withholding_tax_rate : ''} 
-                                              onChange={(e) => setFormData({ ...formData, sales_withholding_tax_rate: parseFloat(e.target.value) || 0 })} 
-                                            />
-                                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs select-none pointer-events-none">
-                                              %
-                                            </span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    )}
+                                   {/* ضرائب خصم من العملاء (مبيعات) مع النسبة */}
+                                   {isSalesWhtEnabled && (
+                                     <div className="space-y-0.5">
+                                       <label className="block text-[10px] font-bold text-slate-600 px-0.5 flex items-center justify-between">
+                                         <span className="flex items-center gap-1">
+                                           {isProductAccountsLocked && <Lock size={10} className="text-amber-500" />}
+                                           <span>{language === 'ar' ? 'ضرائب خصم من العملاء' : 'Sales Withholding Tax'}</span>
+                                         </span>
+                                         <span className="text-[8.5px] text-amber-700 bg-amber-100 px-1 py-0.2 rounded font-black">خصم مبيعات</span>
+                                       </label>
+                                       <div className="flex items-center gap-1.5">
+                                         <select 
+                                           disabled={isProductAccountsLocked}
+                                           className={`flex-1 min-w-0 px-2 py-1 border rounded-md text-xs font-bold appearance-none outline-none transition-all truncate ${
+                                             isProductAccountsLocked 
+                                               ? 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed font-medium' 
+                                               : 'bg-white border-slate-200 focus:ring-1 focus:ring-emerald-500'
+                                           }`} 
+                                           value={formData.sales_withholding_tax_account_id || ''} 
+                                           onChange={(e) => setFormData({ ...formData, sales_withholding_tax_account_id: e.target.value })}
+                                         >
+                                           <option value="">{language === 'ar' ? '-- اختر حساب خصم من العملاء --' : '-- Select Customer WHT Account --'}</option>
+                                           {(accounts.filter(a => a.id === formData.sales_withholding_tax_account_id || ['withholding_tax_customers', 'withholding_tax'].includes(a.account_usage || '') || a.name.includes('خصم من العملاء') || a.name.includes('خصم عملاء') || a.code?.startsWith('118')).length > 0
+                                             ? accounts.filter(a => a.id === formData.sales_withholding_tax_account_id || ['withholding_tax_customers', 'withholding_tax'].includes(a.account_usage || '') || a.name.includes('خصم من العملاء') || a.name.includes('خصم عملاء') || a.code?.startsWith('118'))
+                                             : accounts
+                                           ).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                         </select>
+                                         <div className="relative w-16 shrink-0">
+                                           <input 
+                                             type="number" 
+                                             step="0.01" 
+                                             min="0" 
+                                             max="100" 
+                                             placeholder="1" 
+                                             className="w-full pl-1.5 pr-5 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500 transition-all text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                                             value={formData.sales_withholding_tax_rate !== undefined && formData.sales_withholding_tax_rate !== null ? formData.sales_withholding_tax_rate : ''} 
+                                             onChange={(e) => setFormData({ ...formData, sales_withholding_tax_rate: parseFloat(e.target.value) || 0 })} 
+                                           />
+                                           <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs select-none pointer-events-none">
+                                             %
+                                           </span>
+                                         </div>
+                                       </div>
+                                     </div>
+                                   )}
 
-                                    {/* ضرائب خصم على الموردين (مشتريات) مع النسبة */}
-                                    {isPurchaseWhtEnabled && (
-                                      <div className="space-y-0.5">
-                                        <label className="block text-[10px] font-bold text-slate-600 px-0.5 flex items-center justify-between">
-                                          <span>{language === 'ar' ? 'ضرائب خصم على الموردين' : 'Purchase Withholding Tax'}</span>
-                                          <span className="text-[8.5px] text-purple-700 bg-purple-100 px-1 py-0.2 rounded font-black">خصم مشتريات</span>
-                                        </label>
-                                        <div className="flex items-center gap-1.5">
-                                          <select 
-                                            className="flex-1 min-w-0 px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold appearance-none outline-none focus:ring-1 focus:ring-emerald-500 transition-all truncate" 
-                                            value={formData.purchase_withholding_tax_account_id || ''} 
-                                            onChange={(e) => setFormData({ ...formData, purchase_withholding_tax_account_id: e.target.value })}
-                                          >
-                                            <option value="">{language === 'ar' ? '-- اختر حساب خصم على الموردين --' : '-- Select Supplier WHT Account --'}</option>
-                                            {(accounts.filter(a => a.id === formData.purchase_withholding_tax_account_id || ['withholding_tax_suppliers', 'withholding_tax'].includes(a.account_usage || '') || a.name.includes('خصم على الموردين') || a.name.includes('خصم من الموردين') || a.name.includes('خصم موردين') || a.code?.startsWith('222')).length > 0
-                                              ? accounts.filter(a => a.id === formData.purchase_withholding_tax_account_id || ['withholding_tax_suppliers', 'withholding_tax'].includes(a.account_usage || '') || a.name.includes('خصم على الموردين') || a.name.includes('خصم من الموردين') || a.name.includes('خصم موردين') || a.code?.startsWith('222'))
-                                              : accounts
-                                            ).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
-                                          </select>
-                                          <div className="relative w-16 shrink-0">
-                                            <input 
-                                              type="number" 
-                                              step="0.01" 
-                                              min="0" 
-                                              max="100" 
-                                              placeholder="1" 
-                                              className="w-full pl-1.5 pr-5 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500 transition-all text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-                                              value={formData.purchase_withholding_tax_rate !== undefined && formData.purchase_withholding_tax_rate !== null ? formData.purchase_withholding_tax_rate : ''} 
-                                              onChange={(e) => setFormData({ ...formData, purchase_withholding_tax_rate: parseFloat(e.target.value) || 0 })} 
-                                            />
-                                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs select-none pointer-events-none">
-                                              %
-                                            </span>
-                                          </div>
-                                        </div>
+                                   {/* ضرائب خصم على الموردين (مشتريات) مع النسبة */}
+                                   {isPurchaseWhtEnabled && (
+                                     <div className="space-y-0.5">
+                                       <label className="block text-[10px] font-bold text-slate-600 px-0.5 flex items-center justify-between">
+                                         <span className="flex items-center gap-1">
+                                           {isProductAccountsLocked && <Lock size={10} className="text-amber-500" />}
+                                           <span>{language === 'ar' ? 'ضرائب خصم على الموردين' : 'Purchase Withholding Tax'}</span>
+                                         </span>
+                                         <span className="text-[8.5px] text-purple-700 bg-purple-100 px-1 py-0.2 rounded font-black">خصم مشتريات</span>
+                                       </label>
+                                       <div className="flex items-center gap-1.5">
+                                         <select 
+                                           disabled={isProductAccountsLocked}
+                                           className={`flex-1 min-w-0 px-2 py-1 border rounded-md text-xs font-bold appearance-none outline-none transition-all truncate ${
+                                             isProductAccountsLocked 
+                                               ? 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed font-medium' 
+                                               : 'bg-white border-slate-200 focus:ring-1 focus:ring-emerald-500'
+                                           }`} 
+                                           value={formData.purchase_withholding_tax_account_id || ''} 
+                                           onChange={(e) => setFormData({ ...formData, purchase_withholding_tax_account_id: e.target.value })}
+                                         >
+                                           <option value="">{language === 'ar' ? '-- اختر حساب خصم على الموردين --' : '-- Select Supplier WHT Account --'}</option>
+                                           {(accounts.filter(a => a.id === formData.purchase_withholding_tax_account_id || ['withholding_tax_suppliers', 'withholding_tax'].includes(a.account_usage || '') || a.name.includes('خصم على الموردين') || a.name.includes('خصم من الموردين') || a.name.includes('خصم موردين') || a.code?.startsWith('222')).length > 0
+                                             ? accounts.filter(a => a.id === formData.purchase_withholding_tax_account_id || ['withholding_tax_suppliers', 'withholding_tax'].includes(a.account_usage || '') || a.name.includes('خصم على الموردين') || a.name.includes('خصم من الموردين') || a.name.includes('خصم موردين') || a.code?.startsWith('222'))
+                                             : accounts
+                                           ).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                         </select>
+                                         <div className="relative w-16 shrink-0">
+                                           <input 
+                                             type="number" 
+                                             step="0.01" 
+                                             min="0" 
+                                             max="100" 
+                                             placeholder="1" 
+                                             className="w-full pl-1.5 pr-5 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500 transition-all text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                                             value={formData.purchase_withholding_tax_rate !== undefined && formData.purchase_withholding_tax_rate !== null ? formData.purchase_withholding_tax_rate : ''} 
+                                             onChange={(e) => setFormData({ ...formData, purchase_withholding_tax_rate: parseFloat(e.target.value) || 0 })} 
+                                           />
+                                           <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs select-none pointer-events-none">
+                                             %
+                                           </span>
+                                         </div>
+                                       </div>
+                                     </div>
+                                   )}
+
+                                   {/* Golden Lock Informative Alert */}
+                                   {isProductAccountsLocked && (
+                                      <div className="col-span-full mt-1.5 p-2 bg-amber-50/80 border border-amber-200/80 rounded-lg text-amber-800 text-[10px] font-medium flex items-center gap-2">
+                                         <Lock size={13} className="text-amber-600 shrink-0" />
+                                         <span>{language === 'ar' ? 'تم قفل الحسابات المحاسبية لهذا الصنف لوجود حركات مالية أو مخزنية مسجلة، وذلك لمنع تشتت الأرصدة وحفاظاً على نزاهة مسار التدقيق وتقييم المخزون.' : 'Linked accounts are locked because transactions exist, preserving the audit trail and inventory valuation.'}</span>
                                       </div>
-                                    )}
+                                   )}
                                 </div>
                              </div>
                           </div>
