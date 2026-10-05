@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Search, Plus, Trash2, X, CreditCard, History, ChevronRight, ChevronLeft, 
   Wallet, Layers, Hash, Box, AlertCircle, Calendar, LayoutGrid, List, FileText, FileUp,
-  Building2, Landmark, Phone, User, Globe, ExternalLink, Copy, Check, ChevronDown, Coins
+  Building2, Landmark, Phone, User, Globe, ExternalLink, Copy, Check, ChevronDown, Coins, Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { dbService } from '../services/dbService';
@@ -135,7 +135,16 @@ export const PaymentMethods: React.FC = () => {
         unsubCurrencies();
       };
     }
-  }, [user?.company_id]);
+  // Enterprise Audit Trail Lock: check if payment method has recorded transactions
+  const isAccountLocked = useMemo(() => {
+    if (!editingMethod) return false;
+    return Boolean(
+      receiptVouchers.some(v => v.payment_method_id === editingMethod.id) ||
+      paymentVouchers.some(v => v.payment_method_id === editingMethod.id) ||
+      cashTransfers.some(v => v.from_payment_method_id === editingMethod.id || v.to_payment_method_id === editingMethod.id) ||
+      journalEntries.some(je => je.items?.some((i: any) => i.sub_account_id === editingMethod.id || (i.account_id === editingMethod.account_id && je.reference_type !== 'opening_balance')))
+    );
+  }, [editingMethod, receiptVouchers, paymentVouchers, cashTransfers, journalEntries]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,6 +156,16 @@ export const PaymentMethods: React.FC = () => {
 
       if (!selectedAccount || !validCashUsages.includes(selectedAccount.account_usage || '')) {
         showNotification('خطأ: يجب أن يكون الحساب المحاسبي لطريقة السداد من قسم (النقدية والبنوك والوسائل المالية)', 'error');
+        return;
+      }
+
+      if (editingMethod && isAccountLocked && formData.account_id !== editingMethod.account_id) {
+        showNotification(
+          language === 'ar'
+            ? 'لا يمكن تعديل الحساب المحاسبي لطريقة السداد لوجود معاملات مالية مسجلة بالفعل - للحفاظ على مسار التدقيق ونزاهة الدفاتر.'
+            : 'Cannot modify linked account because transactions are already recorded on this payment method.',
+          'error'
+        );
         return;
       }
 
@@ -1411,10 +1430,35 @@ export const PaymentMethods: React.FC = () => {
                             </div>
                          </div>
                          <div className="sm:col-span-2 lg:col-span-5">
-                            <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">{language === 'ar' ? 'الحساب المحاسبي' : 'Linked Account'}</label>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                                {isAccountLocked && <Lock size={11} className="text-amber-500" />}
+                                <span>{language === 'ar' ? 'الحساب المحاسبي' : 'Linked Account'}</span>
+                              </label>
+                              {isAccountLocked && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                  <Lock size={9} />
+                                  <span>{language === 'ar' ? 'مقفل لوجود حركات مسجلة' : 'Locked (Has transactions)'}</span>
+                                </span>
+                              )}
+                            </div>
                             <div className="relative group">
-                              <Box className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={13} />
-                              <select required className="w-full pr-7 pl-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 appearance-none outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-xs" value={formData.account_id} onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}>
+                              {isAccountLocked ? (
+                                <Lock className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-amber-500 pointer-events-none`} size={13} />
+                              ) : (
+                                <Box className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={13} />
+                              )}
+                              <select 
+                                required 
+                                disabled={isAccountLocked}
+                                className={`w-full pr-7 pl-3 py-1.5 border rounded-lg text-xs font-bold appearance-none outline-none transition-all shadow-xs ${
+                                  isAccountLocked 
+                                    ? 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed font-medium' 
+                                    : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500'
+                                }`} 
+                                value={formData.account_id} 
+                                onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
+                              >
                                 <option value="">{language === 'ar' ? 'اختر الحساب المحاسبي...' : 'Select Account...'}</option>
                                 {accounts
                                   .filter(acc => {
@@ -1434,6 +1478,12 @@ export const PaymentMethods: React.FC = () => {
                                   ))}
                               </select>
                             </div>
+                            {isAccountLocked && (
+                              <p className="text-[10px] font-medium text-amber-700 mt-1 flex items-center gap-1">
+                                <span>🔒</span>
+                                <span>{language === 'ar' ? 'لا يمكن تعديل الحساب المحاسبي بعد تسجيل حركات مالية للحفاظ على مسار التدقيق ومطابقة الفترات السابقة.' : 'Linked account cannot be modified once transactions exist to preserve audit trail.'}</span>
+                              </p>
+                            )}
                          </div>
                      </div>
 

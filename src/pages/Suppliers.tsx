@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Supplier, Account, JournalEntry, AttachmentItem, SupplierBankAccount } from '../types';
 import { 
   Search, Plus, Trash2, Edit2, X, Truck, Phone, Mail, MapPin, 
-  Wallet, Calendar, History, FileText, User, Hash, Box,
+  Wallet, Calendar, History, FileText, User, Hash, Box, Lock,
   LayoutGrid, List, ChevronRight, ChevronLeft, CreditCard, FileUp,
   Link2, Sparkles, Loader2, Landmark, Building2, Star, Check, Paperclip
 } from 'lucide-react';
@@ -165,6 +165,17 @@ export const Suppliers: React.FC = () => {
     }
   }, [user?.company_id]);
 
+  // Enterprise Audit Trail Lock: check if supplier has recorded transactions
+  const isSupplierAccountLocked = useMemo(() => {
+    if (!editingSupplier) return false;
+    return Boolean(
+      invoices.some((inv: any) => inv.supplier_id === editingSupplier.id) ||
+      vouchers.some((v: any) => v.supplier_id === editingSupplier.id) ||
+      returns.some((ret: any) => ret.supplier_id === editingSupplier.id) ||
+      entries.some((je: any) => je.items?.some((i: any) => (i.supplier_id === editingSupplier.id || i.sub_account_id === editingSupplier.id) && je.reference_type !== 'opening_balance'))
+    );
+  }, [editingSupplier, invoices, vouchers, returns, entries]);
+
   // Handle incoming ETA Supplier creation
   useEffect(() => {
     if (pendingEtaSupplierForCreation && accounts.length > 0) {
@@ -231,6 +242,17 @@ export const Suppliers: React.FC = () => {
       if (!formData.account_id) {
         setIsSaving(false);
         showNotification('يجب اختيار الحساب المحاسبي للمورد', 'error');
+        return;
+      }
+
+      if (editingSupplier && isSupplierAccountLocked && formData.account_id !== editingSupplier.account_id) {
+        setIsSaving(false);
+        showNotification(
+          language === 'ar'
+            ? 'لا يمكن تعديل الحساب المحاسبي للمورد لوجود معاملات مالية مسجلة بالفعل - للحفاظ على مسار التدقيق ونزاهة الدفاتر.'
+            : 'Cannot modify linked account because transactions are already recorded on this supplier.',
+          'error'
+        );
         return;
       }
 
@@ -1340,12 +1362,32 @@ export const Suppliers: React.FC = () => {
                       </div>
 
                       <div className="sm:col-span-2">
-                        <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_account')}</label>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <label className={`text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            {isSupplierAccountLocked && <Lock size={11} className="text-amber-500" />}
+                            <span>{t('suppliers.form_account')}</span>
+                          </label>
+                          {isSupplierAccountLocked && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                              <Lock size={9} />
+                              <span>{language === 'ar' ? 'مقفل لوجود حركات مسجلة' : 'Locked (Has transactions)'}</span>
+                            </span>
+                          )}
+                        </div>
                         <div className="relative group">
-                          <Box className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={13} />
+                          {isSupplierAccountLocked ? (
+                            <Lock className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-amber-500 pointer-events-none`} size={13} />
+                          ) : (
+                            <Box className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={13} />
+                          )}
                           <select
                             required
-                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all ps-7 appearance-none"
+                            disabled={isSupplierAccountLocked}
+                            className={`w-full px-2.5 py-1.5 border rounded-lg text-xs font-bold appearance-none outline-none transition-all ps-7 ${
+                              isSupplierAccountLocked
+                                ? 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed font-medium'
+                                : 'bg-slate-50 border-slate-200 text-slate-900 shadow-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500'
+                            }`}
                             value={formData.account_id}
                             onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
                           >
@@ -1355,6 +1397,12 @@ export const Suppliers: React.FC = () => {
                             ))}
                           </select>
                         </div>
+                        {isSupplierAccountLocked && (
+                          <p className="text-[10px] font-medium text-amber-700 mt-1 flex items-center gap-1">
+                            <span>🔒</span>
+                            <span>{language === 'ar' ? 'لا يمكن تعديل الحساب المحاسبي بعد تسجيل فواتير أو سندات للمورد حفاظاً على مسار التدقيق.' : 'Linked account cannot be modified once transactions exist to preserve audit trail.'}</span>
+                          </p>
+                        )}
                       </div>
 
                       {/* Opening Balance Subsection */}

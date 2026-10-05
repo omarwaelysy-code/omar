@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -125,7 +125,16 @@ export const Customers: React.FC = () => {
         unsubscribeDiscounts();
       };
     }
-  }, [user?.company_id]);
+  // Enterprise Audit Trail Lock: check if customer has recorded transactions
+  const isCustomerAccountLocked = useMemo(() => {
+    if (!editingCustomer) return false;
+    return Boolean(
+      invoices.some((inv: any) => inv.customer_id === editingCustomer.id) ||
+      receipts.some((r: any) => r.customer_id === editingCustomer.id) ||
+      returns.some((ret: any) => ret.customer_id === editingCustomer.id) ||
+      entries.some((je: any) => je.items?.some((i: any) => (i.customer_id === editingCustomer.id || i.sub_account_id === editingCustomer.id) && je.reference_type !== 'opening_balance'))
+    );
+  }, [editingCustomer, invoices, receipts, returns, entries]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,6 +152,16 @@ export const Customers: React.FC = () => {
 
       if (!formData.account_id) {
         showNotification('يجب اختيار الحساب المحاسبي للعميل', 'error');
+        return;
+      }
+
+      if (editingCustomer && isCustomerAccountLocked && formData.account_id !== editingCustomer.account_id) {
+        showNotification(
+          language === 'ar'
+            ? 'لا يمكن تعديل الحساب المحاسبي للعميل لوجود معاملات مالية مسجلة بالفعل - للحفاظ على مسار التدقيق ونزاهة الدفاتر.'
+            : 'Cannot modify linked account because transactions are already recorded on this customer.',
+          'error'
+        );
         return;
       }
 
@@ -845,12 +864,32 @@ export const Customers: React.FC = () => {
                         </div>
 
                         <div className="sm:col-span-2 space-y-0.5">
-                          <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">{t('customers.form_account')}</label>
+                          <div className="flex items-center justify-between mb-0.5 px-0.5">
+                            <label className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
+                              {isCustomerAccountLocked && <Lock size={11} className="text-amber-500" />}
+                              <span>{t('customers.form_account')}</span>
+                            </label>
+                            {isCustomerAccountLocked && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                <Lock size={9} />
+                                <span>{language === 'ar' ? 'مقفل لوجود حركات مسجلة' : 'Locked (Has transactions)'}</span>
+                              </span>
+                            )}
+                          </div>
                           <div className="relative group">
-                            <Box className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
+                            {isCustomerAccountLocked ? (
+                              <Lock className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-amber-500 pointer-events-none`} size={14} />
+                            ) : (
+                              <Box className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={14} />
+                            )}
                             <select
                               required
-                              className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all appearance-none`}
+                              disabled={isCustomerAccountLocked}
+                              className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 border rounded-lg text-xs font-bold appearance-none outline-none transition-all ${
+                                isCustomerAccountLocked
+                                  ? 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed font-medium'
+                                  : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:ring-1 focus:ring-emerald-500'
+                              }`}
                               value={formData.account_id}
                               onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
                             >
@@ -860,6 +899,12 @@ export const Customers: React.FC = () => {
                               ))}
                             </select>
                           </div>
+                          {isCustomerAccountLocked && (
+                            <p className="text-[10px] font-medium text-amber-700 mt-1 flex items-center gap-1">
+                              <span>🔒</span>
+                              <span>{language === 'ar' ? 'لا يمكن تعديل الحساب المحاسبي بعد تسجيل معاملات مالية للعميل حفاظاً على مسار التدقيق.' : 'Linked account cannot be modified once transactions exist to preserve audit trail.'}</span>
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>

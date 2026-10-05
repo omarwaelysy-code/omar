@@ -7536,9 +7536,54 @@ modules.forEach(moduleName => {
           if (['products', 'customers', 'suppliers', 'payment_methods', 'operation_categories', 'expense_categories'].includes(moduleName)) {
             const existingRes = await pool.query(`SELECT * FROM "${moduleName}" WHERE id = $1`, [id]);
             if (existingRes.rows.length > 0) {
-              const merged = { ...existingRes.rows[0], ...req.body };
+              const existingRecord = existingRes.rows[0];
+              const merged = { ...existingRecord, ...req.body };
               const err = validateEntityAccountsData(moduleName, merged);
               if (err) return sendError(res, 400, err);
+
+              // Enterprise Audit Trail Lock: Prevent changing linked GL account if transactions exist
+              if (req.body.account_id && existingRecord.account_id && req.body.account_id !== existingRecord.account_id) {
+                if (moduleName === 'payment_methods') {
+                  const txCheck = await pool.query(`
+                    SELECT (
+                      (SELECT COUNT(*) FROM invoices WHERE payment_method_id = $1) +
+                      (SELECT COUNT(*) FROM purchase_invoices WHERE payment_method_id = $1) +
+                      (SELECT COUNT(*) FROM receipt_vouchers WHERE payment_method_id = $1) +
+                      (SELECT COUNT(*) FROM payment_vouchers WHERE payment_method_id = $1) +
+                      (SELECT COUNT(*) FROM cash_transfers WHERE from_payment_method_id = $1 OR to_payment_method_id = $1) +
+                      (SELECT COUNT(*) FROM journal_entry_lines WHERE sub_account_id = $1)
+                    ) as total_count
+                  `, [id]);
+                  const count = parseInt(txCheck.rows[0]?.total_count || '0', 10);
+                  if (count > 0) {
+                    return sendError(res, 400, 'لا يمكن تعديل الحساب المحاسبي لطريقة السداد لوجود معاملات مالية مسجلة بالفعل - حفاظاً على مسار التدقيق ونزاهة الدفاتر.');
+                  }
+                } else if (moduleName === 'customers') {
+                  const txCheck = await pool.query(`
+                    SELECT (
+                      (SELECT COUNT(*) FROM invoices WHERE customer_id = $1) +
+                      (SELECT COUNT(*) FROM receipt_vouchers WHERE customer_id = $1) +
+                      (SELECT COUNT(*) FROM journal_entry_lines WHERE customer_id = $1 OR sub_account_id = $1)
+                    ) as total_count
+                  `, [id]);
+                  const count = parseInt(txCheck.rows[0]?.total_count || '0', 10);
+                  if (count > 0) {
+                    return sendError(res, 400, 'لا يمكن تعديل الحساب المحاسبي للعميل لوجود معاملات مالية مسجلة بالفعل - حفاظاً على مسار التدقيق المالي.');
+                  }
+                } else if (moduleName === 'suppliers') {
+                  const txCheck = await pool.query(`
+                    SELECT (
+                      (SELECT COUNT(*) FROM purchase_invoices WHERE supplier_id = $1) +
+                      (SELECT COUNT(*) FROM payment_vouchers WHERE supplier_id = $1) +
+                      (SELECT COUNT(*) FROM journal_entry_lines WHERE supplier_id = $1 OR sub_account_id = $1)
+                    ) as total_count
+                  `, [id]);
+                  const count = parseInt(txCheck.rows[0]?.total_count || '0', 10);
+                  if (count > 0) {
+                    return sendError(res, 400, 'لا يمكن تعديل الحساب المحاسبي للمورد لوجود معاملات مالية مسجلة بالفعل - حفاظاً على مسار التدقيق المالي.');
+                  }
+                }
+              }
             }
           }
 
