@@ -319,7 +319,10 @@ export const CashAsOfBalances: React.FC = () => {
       return d <= targetDate;
     });
 
-    return paymentMethods.map(method => {
+    // Set to track journal lines resolved to specific payment methods
+    const resolvedLineKeys = new Set<string>();
+
+    const methodItems = paymentMethods.map(method => {
       let netDebitSystem = 0;
       let netCreditSystem = 0;
       let netDebitForeign = 0;
@@ -331,7 +334,7 @@ export const CashAsOfBalances: React.FC = () => {
       validEntries.forEach(je => {
         const refType = je.reference_type;
 
-        je.items?.forEach((item: any) => {
+        je.items?.forEach((item: any, idx: number) => {
           const resolvedMethod = resolvePaymentMethodForItem(
             item,
             je,
@@ -346,6 +349,7 @@ export const CashAsOfBalances: React.FC = () => {
           );
 
           if (resolvedMethod?.id === method.id) {
+            resolvedLineKeys.add(item.id || `${je.id}-${idx}`);
             // Check if opening balance JE and method already has base opening balance
             const isOpeningJE = refType === 'opening_balance' || 
               (je.description || '').includes('رصيد افتتاحي') || 
@@ -537,6 +541,61 @@ export const CashAsOfBalances: React.FC = () => {
         balanceSystem
       };
     });
+
+    // Detect unallocated journal entries on cash & bank accounts (e.g. manual entries like Initial Capital Seed)
+    const linkedAccountIds = new Set(paymentMethods.map(p => p.account_id).filter(Boolean));
+    const cashBankAccounts = accounts.filter(a => 
+      linkedAccountIds.has(a.id) || 
+      a.account_usage === 'bank' || 
+      a.account_usage === 'cash' || 
+      a.code === '1102' || 
+      a.code === '113' || 
+      a.code === '1101'
+    );
+
+    const unallocatedItems: CashBalanceItem[] = [];
+
+    cashBankAccounts.forEach(acc => {
+      let unallocDebit = 0;
+      let unallocCredit = 0;
+
+      validEntries.forEach(je => {
+        je.items?.forEach((item: any, idx: number) => {
+          if (item.account_id === acc.id) {
+            const key = item.id || `${je.id}-${idx}`;
+            if (!resolvedLineKeys.has(key)) {
+              unallocDebit += Number(item.debit || 0);
+              unallocCredit += Number(item.credit || 0);
+            }
+          }
+        });
+      });
+
+      const netUnalloc = unallocDebit - unallocCredit;
+      if (Math.abs(netUnalloc) > 0.001) {
+        const isBank = acc.account_usage === 'bank' || acc.code === '1102' || (acc.name || '').includes('بنك');
+        unallocatedItems.push({
+          id: `unallocated-${acc.id}`,
+          code: 'عام',
+          name: `قيود عامة غير مخصصة (${acc.name})`,
+          type: isBank ? 'bank' : 'cash',
+          typeLabelAr: isBank ? 'حساب بنكي' : 'خزينة نقدية',
+          typeLabelEn: isBank ? 'Bank Account' : 'Cash Safe',
+          currency: baseCurrency,
+          accountId: acc.id,
+          accountCode: acc.code || '-',
+          accountName: acc.name,
+          openingBalanceForeign: 0,
+          openingBalanceSystem: 0,
+          netDebitSystem: unallocDebit,
+          netCreditSystem: unallocCredit,
+          balanceForeign: netUnalloc,
+          balanceSystem: netUnalloc,
+        });
+      }
+    });
+
+    return [...methodItems, ...unallocatedItems];
   }, [paymentMethods, journalEntries, accounts, receiptVouchers, paymentVouchers, invoices, purchaseInvoices, returns, purchaseReturns, cashTransfers, asOfDate, todayStr, baseCurrency]);
 
   // General Ledger Cash & Bank total from Trial Balance for reconciliation check
