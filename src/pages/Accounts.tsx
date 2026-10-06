@@ -52,19 +52,6 @@ export const Accounts: React.FC = () => {
   const tableRef = useRef<HTMLTableElement>(null);
   const usageDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Enterprise Audit Trail Lock for Accounts
-  const isAccountLocked = useMemo(() => {
-    if (!editingAccount) return false;
-    const hasTx = entries.some(entry => {
-      const itemsList = (entry.items && Array.isArray(entry.items)) ? entry.items : ((entry as any).lines || []);
-      return itemsList.some((item: any) => item.account_id === editingAccount.id);
-    });
-    const bal = accountBalances[editingAccount.id];
-    const hasBalance = bal && (bal.debit !== 0 || bal.credit !== 0);
-    const hasChildren = accounts.some(a => a.parent_id === editingAccount.id);
-    return Boolean(hasTx || hasBalance || hasChildren);
-  }, [editingAccount, entries, accountBalances, accounts]);
-
   const getClassificationLabel = (classification?: string) => {
     if (!classification) return '';
     switch (classification) {
@@ -170,6 +157,19 @@ export const Accounts: React.FC = () => {
 
     return balances;
   }, [accounts, entries, types]);
+
+  // Enterprise Audit Trail Lock for Accounts
+  const isAccountLocked = useMemo(() => {
+    if (!editingAccount) return false;
+    const hasTx = entries.some(entry => {
+      const itemsList = (entry.items && Array.isArray(entry.items)) ? entry.items : ((entry as any).lines || []);
+      return itemsList.some((item: any) => item.account_id === editingAccount.id);
+    });
+    const bal = accountBalances[editingAccount.id];
+    const hasBalance = bal && (bal.debit !== 0 || bal.credit !== 0);
+    const hasChildren = accounts.some(a => a.parent_id === editingAccount.id);
+    return Boolean(hasTx || hasBalance || hasChildren);
+  }, [editingAccount, entries, accountBalances, accounts]);
 
   const handleExportExcel = () => {
     const headers = {
