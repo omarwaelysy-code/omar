@@ -302,6 +302,29 @@ fixedAssetsRouter.put(['/fixed-assets/categories/:id', '/fixed_assets/categories
       default_depreciation_method, default_useful_life, default_salvage_value, is_active
     } = req.body;
 
+    const { rows: existingCatRows } = await pool.query(
+      `SELECT * FROM asset_categories WHERE id = $1 AND company_id = $2`,
+      [id, companyId]
+    );
+    if (existingCatRows.length === 0) return sendError(res, 404, 'التصنيف غير موجود');
+    const existingCat = existingCatRows[0];
+
+    // Enterprise Audit Trail Lock for Asset Category
+    const isCategoryAccountChanged =
+      (asset_account_id !== undefined && existingCat.asset_account_id && asset_account_id !== existingCat.asset_account_id) ||
+      (accumulated_depreciation_account_id !== undefined && existingCat.accumulated_depreciation_account_id && accumulated_depreciation_account_id !== existingCat.accumulated_depreciation_account_id) ||
+      (depreciation_expense_account_id !== undefined && existingCat.depreciation_expense_account_id && depreciation_expense_account_id !== existingCat.depreciation_expense_account_id);
+
+    if (isCategoryAccountChanged) {
+      const activeAssetsCheck = await pool.query(`
+        SELECT COUNT(*) as count FROM fixed_assets 
+        WHERE category_id = $1 AND (status != 'DRAFT' OR accumulated_depreciation > 0)
+      `, [id]);
+      if (parseInt(activeAssetsCheck.rows[0]?.count || '0', 10) > 0) {
+        return sendError(res, 400, 'لا يمكن تعديل الحسابات المحاسبية لفئة الأصول لوجود أصول مفعلة أو مستهلكة تابعة لها - حفاظاً على مسار التدقيق المالي.');
+      }
+    }
+
     const { rows } = await pool.query(`
       UPDATE asset_categories SET
         parent_id = $1, code = $2, name = $3, name_en = $4, description = $5,
@@ -324,6 +347,22 @@ fixedAssetsRouter.put(['/fixed-assets/categories/:id', '/fixed_assets/categories
   } catch (error: any) {
     console.error('Error in PUT /fixed-assets/categories/:id:', error);
     sendError(res, 500, error.message);
+  }
+});
+
+// Check if asset category has active/depreciated assets (Enterprise Audit Trail Lock)
+fixedAssetsRouter.get(['/fixed-assets/categories/:id/has-transactions', '/fixed_assets/categories/:id/has-transactions'], authenticateToken, async (req: AuthRequest, res: any) => {
+  try {
+    const companyId = getAuthenticatedCompanyId(req);
+    const { id } = req.params;
+    const check = await pool.query(`
+      SELECT COUNT(*) as count FROM fixed_assets 
+      WHERE category_id = $1 AND (status != 'DRAFT' OR accumulated_depreciation > 0)
+    `, [id]);
+    const count = parseInt(check.rows[0]?.count || '0', 10);
+    res.json({ hasTransactions: count > 0, count });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
   }
 });
 
@@ -715,6 +754,35 @@ fixedAssetsRouter.put(['/fixed-assets/:id', '/fixed_assets/:id'], authenticateTo
       depreciation_expense_account_id, gain_account_id, loss_account_id,
       attachments, components
     } = req.body;
+
+    // Enterprise Audit Trail Lock for Fixed Asset Accounts
+    const isAccountChanged = 
+      (asset_account_id !== undefined && current.asset_account_id && asset_account_id !== current.asset_account_id) ||
+      (accumulated_depreciation_account_id !== undefined && current.accumulated_depreciation_account_id && accumulated_depreciation_account_id !== current.accumulated_depreciation_account_id) ||
+      (depreciation_expense_account_id !== undefined && current.depreciation_expense_account_id && depreciation_expense_account_id !== current.depreciation_expense_account_id) ||
+      (gain_account_id !== undefined && current.gain_account_id && gain_account_id !== current.gain_account_id) ||
+      (loss_account_id !== undefined && current.loss_account_id && loss_account_id !== current.loss_account_id);
+
+    if (isAccountChanged) {
+      const isLocked = current.status !== 'DRAFT' || Number(current.accumulated_depreciation || 0) > 0;
+      if (!isLocked) {
+        const txCheck = await client.query(`
+          SELECT (
+            (SELECT COUNT(*) FROM fixed_asset_transactions WHERE asset_id = $1) +
+            (SELECT COUNT(*) FROM journal_entries WHERE reference_id = $1)
+          ) as total_count
+        `, [id]);
+        if (parseInt(txCheck.rows[0]?.total_count || '0', 10) > 0) {
+          await client.query('ROLLBACK');
+          client.release();
+          return sendError(res, 400, 'لا يمكن تعديل الحسابات المحاسبية للأصل الثابت لوجود حركات مالية أو إهلاكات مسجلة - حفاظاً على نزاهة مسار التدقيق.');
+        }
+      } else {
+        await client.query('ROLLBACK');
+        client.release();
+        return sendError(res, 400, 'لا يمكن تعديل الحسابات المحاسبية للأصل الثابت بعد تفعيله أو بدء إهلاكه - حفاظاً على نزاهة مسار التدقيق.');
+      }
+    }
 
     const acqCost = acquisition_cost !== undefined ? Number(acquisition_cost) : Number(current.acquisition_cost);
     const addCost = additional_cost !== undefined ? Number(additional_cost) : Number(current.additional_cost);

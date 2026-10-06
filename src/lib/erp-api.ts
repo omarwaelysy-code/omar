@@ -6952,6 +6952,50 @@ modules.forEach(moduleName => {
     });
   }
 
+  // Enterprise Audit Trail Lock: check if account has recorded transactions or children
+  if (moduleName === 'accounts') {
+    routeNames.forEach(rn => {
+      router.get(`/${rn}/:id/has-transactions`, authenticateToken, async (req: AuthRequest, res) => {
+        try {
+          const { id } = req.params;
+          const txCheck = await pool.query(`
+            SELECT (
+              (SELECT COUNT(*) FROM journal_entry_lines WHERE account_id = $1) +
+              (SELECT COUNT(*) FROM accounts WHERE parent_id = $1)
+            ) as total_count
+          `, [id]);
+          const count = parseInt(txCheck.rows[0]?.total_count || '0', 10);
+          return res.json({ hasTransactions: count > 0, count });
+        } catch (err: any) {
+          console.error('Error checking account transactions:', err);
+          return res.status(500).json({ error: err.message });
+        }
+      });
+    });
+  }
+
+  // Enterprise Audit Trail Lock: check if expense category has recorded transactions
+  if (moduleName === 'expense_categories') {
+    routeNames.forEach(rn => {
+      router.get(`/${rn}/:id/has-transactions`, authenticateToken, async (req: AuthRequest, res) => {
+        try {
+          const { id } = req.params;
+          const txCheck = await pool.query(`
+            SELECT (
+              (SELECT COUNT(*) FROM payment_vouchers WHERE expense_category_id = $1) +
+              (SELECT COUNT(*) FROM journal_entry_lines WHERE sub_account_id = $1)
+            ) as total_count
+          `, [id]);
+          const count = parseInt(txCheck.rows[0]?.total_count || '0', 10);
+          return res.json({ hasTransactions: count > 0, count });
+        } catch (err: any) {
+          console.error('Error checking expense category transactions:', err);
+          return res.status(500).json({ error: err.message });
+        }
+      });
+    });
+  }
+
 // Get Single
   routeNames.forEach(rn => {
     router.get(`/${rn}/:id`, authenticateToken, async (req: AuthRequest, res) => {
@@ -7643,6 +7687,34 @@ modules.forEach(moduleName => {
                   const count = parseInt(txCheck.rows[0]?.total_count || '0', 10);
                   if (count > 0) {
                     return sendError(res, 400, 'لا يمكن تعديل الحسابات المحاسبية للصنف لوجود معاملات مالية أو حركات مخزنية مسجلة بالفعل - حفاظاً على مسار التدقيق وتقييم المخزون.');
+                  }
+                }
+              } else if (moduleName === 'accounts') {
+                const accStructuralFields = ['type_id', 'account_type_id', 'parent_id', 'account_usage', 'code', 'currency'];
+                const isStructureChanged = accStructuralFields.some(f => req.body[f] !== undefined && existingRecord[f] && String(req.body[f]) !== String(existingRecord[f]));
+                if (isStructureChanged) {
+                  const txCheck = await pool.query(`
+                    SELECT (
+                      (SELECT COUNT(*) FROM journal_entry_lines WHERE account_id = $1) +
+                      (SELECT COUNT(*) FROM accounts WHERE parent_id = $1)
+                    ) as total_count
+                  `, [id]);
+                  const count = parseInt(txCheck.rows[0]?.total_count || '0', 10);
+                  if (count > 0) {
+                    return sendError(res, 400, 'لا يمكن تعديل نوع الحساب، أو العملة، أو الحساب الرئيسي، أو استخدام الحساب، أو كود الحساب لوجود قيود محاسبية أو حسابات فرعية مسجلة عليه - حفاظاً على مسار التدقيق وتوازن القوائم المالية.');
+                  }
+                }
+              } else if (moduleName === 'expense_categories') {
+                if (req.body.account_id && existingRecord.account_id && req.body.account_id !== existingRecord.account_id) {
+                  const txCheck = await pool.query(`
+                    SELECT (
+                      (SELECT COUNT(*) FROM payment_vouchers WHERE expense_category_id = $1) +
+                      (SELECT COUNT(*) FROM journal_entry_lines WHERE sub_account_id = $1)
+                    ) as total_count
+                  `, [id]);
+                  const count = parseInt(txCheck.rows[0]?.total_count || '0', 10);
+                  if (count > 0) {
+                    return sendError(res, 400, 'لا يمكن تعديل الحساب المحاسبي لتصنيف المصروف لوجود سندات صرف أو قيود محاسبية مسجلة عليه بالفعل - حفاظاً على مسار التدقيق المالي.');
                   }
                 }
               }

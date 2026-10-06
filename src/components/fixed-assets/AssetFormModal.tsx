@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, Save, Calculator, Plus, Trash2, Paperclip, Building2, User, 
-  DollarSign, Calendar, FileText, CheckCircle2, AlertCircle, RefreshCw 
+  DollarSign, Calendar, FileText, CheckCircle2, AlertCircle, RefreshCw, Lock 
 } from 'lucide-react';
 import { FixedAsset, AssetCategory, DepreciationMethod, AssetComponent } from '../../types/fixedAssets';
 import { fixedAssetService } from '../../services/fixedAssetService';
@@ -42,6 +42,15 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
   const [activeTab, setActiveTab] = useState<'basic' | 'financial' | 'organization' | 'supplier' | 'accounting' | 'components' | 'attachments'>('basic');
   const [submitting, setSubmitting] = useState(false);
   const [generatingNumber, setGeneratingNumber] = useState(false);
+
+  // Enterprise Audit Trail Lock for Fixed Asset Accounts
+  const isAccountsLocked = Boolean(
+    assetToEdit && (
+      assetToEdit.status !== 'DRAFT' || 
+      Number(assetToEdit.accumulated_depreciation || 0) > 0 ||
+      Boolean(assetToEdit.capitalization_date)
+    )
+  );
 
   // Form State
   const [formData, setFormData] = useState<Partial<FixedAsset>>({
@@ -267,6 +276,20 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
       showError('العمر الإنتاجي يجب أن يكون أكبر من صفر');
       setActiveTab('financial');
       return;
+    }
+
+    if (assetToEdit && isAccountsLocked) {
+      const isAccountChanged = 
+        (formData.asset_account_id && assetToEdit.asset_account_id && formData.asset_account_id !== assetToEdit.asset_account_id) ||
+        (formData.accumulated_depreciation_account_id && assetToEdit.accumulated_depreciation_account_id && formData.accumulated_depreciation_account_id !== assetToEdit.accumulated_depreciation_account_id) ||
+        (formData.depreciation_expense_account_id && assetToEdit.depreciation_expense_account_id && formData.depreciation_expense_account_id !== assetToEdit.depreciation_expense_account_id) ||
+        (formData.gain_account_id && assetToEdit.gain_account_id && formData.gain_account_id !== assetToEdit.gain_account_id) ||
+        (formData.loss_account_id && assetToEdit.loss_account_id && formData.loss_account_id !== assetToEdit.loss_account_id);
+      if (isAccountChanged) {
+        showError('لا يمكن تعديل الحسابات المحاسبية للأصل الثابت بعد تفعيله أو بدء إهلاكه - حفاظاً على مسار التدقيق ونزاهة الدفاتر.');
+        setActiveTab('accounting');
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -731,12 +754,32 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
           {/* TAB 5: ACCOUNTING GL ACCOUNTS */}
           {activeTab === 'accounting' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Golden Lock Banner */}
+              {isAccountsLocked && (
+                <div className="col-span-full p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-xs flex items-center gap-2.5">
+                  <Lock size={16} className="text-amber-400 shrink-0" />
+                  <span>
+                    {language === 'ar' 
+                      ? 'تم قفل الحسابات المحاسبية للأصل الثابت بعد تفعيله أو بدء إهلاكه، وذلك لحماية مجمع الإهلاك ونزاهة القوائم المالية ومسار التدقيق.' 
+                      : 'Fixed asset GL accounts are locked because the asset is active or depreciated.'}
+                  </span>
+                </div>
+              )}
+
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">حساب الأصل الثابت (Fixed Asset Account)</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center justify-between">
+                  <span>حساب الأصل الثابت (Fixed Asset Account)</span>
+                  {isAccountsLocked && <Lock size={12} className="text-amber-400" />}
+                </label>
                 <select
+                  disabled={isAccountsLocked}
                   value={formData.asset_account_id || ''}
                   onChange={e => setFormData({ ...formData, asset_account_id: e.target.value })}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3.5 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+                  className={`w-full border rounded-lg px-3.5 py-2.5 text-sm focus:outline-none transition-all ${
+                    isAccountsLocked 
+                      ? 'bg-slate-800/60 border-slate-700/60 text-slate-400 cursor-not-allowed' 
+                      : 'bg-slate-800 border-slate-700 text-white focus:border-blue-500'
+                  }`}
                 >
                   <option value="">-- افتراضي من التصنيف --</option>
                   {accounts.map(a => (
@@ -746,11 +789,19 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">حساب مجمع الإهلاك (Accumulated Depreciation)</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center justify-between">
+                  <span>حساب مجمع الإهلاك (Accumulated Depreciation)</span>
+                  {isAccountsLocked && <Lock size={12} className="text-amber-400" />}
+                </label>
                 <select
+                  disabled={isAccountsLocked}
                   value={formData.accumulated_depreciation_account_id || ''}
                   onChange={e => setFormData({ ...formData, accumulated_depreciation_account_id: e.target.value })}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3.5 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+                  className={`w-full border rounded-lg px-3.5 py-2.5 text-sm focus:outline-none transition-all ${
+                    isAccountsLocked 
+                      ? 'bg-slate-800/60 border-slate-700/60 text-slate-400 cursor-not-allowed' 
+                      : 'bg-slate-800 border-slate-700 text-white focus:border-blue-500'
+                  }`}
                 >
                   <option value="">-- افتراضي من التصنيف --</option>
                   {accounts.map(a => (
@@ -760,11 +811,19 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">حساب مصروف الإهلاك (Depreciation Expense)</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center justify-between">
+                  <span>حساب مصروف الإهلاك (Depreciation Expense)</span>
+                  {isAccountsLocked && <Lock size={12} className="text-amber-400" />}
+                </label>
                 <select
+                  disabled={isAccountsLocked}
                   value={formData.depreciation_expense_account_id || ''}
                   onChange={e => setFormData({ ...formData, depreciation_expense_account_id: e.target.value })}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3.5 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+                  className={`w-full border rounded-lg px-3.5 py-2.5 text-sm focus:outline-none transition-all ${
+                    isAccountsLocked 
+                      ? 'bg-slate-800/60 border-slate-700/60 text-slate-400 cursor-not-allowed' 
+                      : 'bg-slate-800 border-slate-700 text-white focus:border-blue-500'
+                  }`}
                 >
                   <option value="">-- افتراضي من التصنيف --</option>
                   {accounts.map(a => (
@@ -774,11 +833,19 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">حساب أرباح الاستبعاد والبيع (Gain on Disposal)</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center justify-between">
+                  <span>حساب أرباح الاستبعاد والبيع (Gain on Disposal)</span>
+                  {isAccountsLocked && <Lock size={12} className="text-amber-400" />}
+                </label>
                 <select
+                  disabled={isAccountsLocked}
                   value={formData.gain_account_id || ''}
                   onChange={e => setFormData({ ...formData, gain_account_id: e.target.value })}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3.5 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+                  className={`w-full border rounded-lg px-3.5 py-2.5 text-sm focus:outline-none transition-all ${
+                    isAccountsLocked 
+                      ? 'bg-slate-800/60 border-slate-700/60 text-slate-400 cursor-not-allowed' 
+                      : 'bg-slate-800 border-slate-700 text-white focus:border-blue-500'
+                  }`}
                 >
                   <option value="">-- افتراضي من التصنيف --</option>
                   {accounts.map(a => (
@@ -788,11 +855,19 @@ export const AssetFormModal: React.FC<AssetFormModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">حساب خسائر الاستبعاد والبيع (Loss on Disposal)</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center justify-between">
+                  <span>حساب خسائر الاستبعاد والبيع (Loss on Disposal)</span>
+                  {isAccountsLocked && <Lock size={12} className="text-amber-400" />}
+                </label>
                 <select
+                  disabled={isAccountsLocked}
                   value={formData.loss_account_id || ''}
                   onChange={e => setFormData({ ...formData, loss_account_id: e.target.value })}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3.5 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+                  className={`w-full border rounded-lg px-3.5 py-2.5 text-sm focus:outline-none transition-all ${
+                    isAccountsLocked 
+                      ? 'bg-slate-800/60 border-slate-700/60 text-slate-400 cursor-not-allowed' 
+                      : 'bg-slate-800 border-slate-700 text-white focus:border-blue-500'
+                  }`}
                 >
                   <option value="">-- افتراضي من التصنيف --</option>
                   {accounts.map(a => (

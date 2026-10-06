@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -51,6 +51,19 @@ export const Accounts: React.FC = () => {
   const [defaultAccountMap, setDefaultAccountMap] = useState<Record<string, string>>({});
   const tableRef = useRef<HTMLTableElement>(null);
   const usageDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Enterprise Audit Trail Lock for Accounts
+  const isAccountLocked = useMemo(() => {
+    if (!editingAccount) return false;
+    const hasTx = entries.some(entry => {
+      const itemsList = (entry.items && Array.isArray(entry.items)) ? entry.items : ((entry as any).lines || []);
+      return itemsList.some((item: any) => item.account_id === editingAccount.id);
+    });
+    const bal = accountBalances[editingAccount.id];
+    const hasBalance = bal && (bal.debit !== 0 || bal.credit !== 0);
+    const hasChildren = accounts.some(a => a.parent_id === editingAccount.id);
+    return Boolean(hasTx || hasBalance || hasChildren);
+  }, [editingAccount, entries, accountBalances, accounts]);
 
   const getClassificationLabel = (classification?: string) => {
     if (!classification) return '';
@@ -292,6 +305,13 @@ export const Accounts: React.FC = () => {
     if (!formData.account_usage || formData.account_usage === 'other' || formData.account_usage === 'none') {
       showNotification(language === 'ar' ? 'يرجى اختيار استخدام الحساب من القائمة (إلزامي)' : 'Please select account usage from the list (required)', 'error');
       return;
+    }
+
+    if (editingAccount && isAccountLocked) {
+      if (formData.code !== editingAccount.code || formData.type_id !== editingAccount.type_id || formData.account_usage !== editingAccount.account_usage) {
+        showNotification(language === 'ar' ? 'لا يمكن تعديل كود أو نوع أو استخدام الحساب لوجود حركات وقيود مسجلة عليه - حفاظاً على توازن ميزان المراجعة.' : 'Cannot alter account code, type, or usage when transactions exist.', 'error');
+        return;
+      }
     }
 
     const selectedType = types.find(t => t.id === formData.type_id);
@@ -1006,13 +1026,21 @@ export const Accounts: React.FC = () => {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-black text-slate-500 mb-1.5 uppercase tracking-widest">{t('accounts.form_code')}</label>
+                    <label className="block text-[11px] font-black text-slate-500 mb-1.5 uppercase tracking-widest flex items-center justify-between">
+                      <span>{t('accounts.form_code')}</span>
+                      {isAccountLocked && <Lock size={12} className="text-amber-500" />}
+                    </label>
                     <div className="relative group">
                       <Hash className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors`} size={16} />
                       <input 
                         required
+                        disabled={isAccountLocked}
                         type="text" 
-                        className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all font-mono font-bold text-sm`}
+                        className={`w-full ${dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3'} py-2.5 rounded-xl outline-none transition-all font-mono font-bold text-sm ${
+                          isAccountLocked 
+                            ? 'bg-slate-100 text-slate-500 border border-slate-200 cursor-not-allowed' 
+                            : 'bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-emerald-500/20'
+                        }`}
                         placeholder="1101"
                         value={formData.code}
                         onChange={(e) => setFormData({...formData, code: e.target.value})}
@@ -1020,10 +1048,18 @@ export const Accounts: React.FC = () => {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-black text-slate-500 mb-1.5 uppercase tracking-widest">{t('accounts.form_type') || (language === 'ar' ? 'نوع الحساب' : 'Account Type')}</label>
+                    <label className="block text-[11px] font-black text-slate-500 mb-1.5 uppercase tracking-widest flex items-center justify-between">
+                      <span>{t('accounts.form_type') || (language === 'ar' ? 'نوع الحساب' : 'Account Type')}</span>
+                      {isAccountLocked && <Lock size={12} className="text-amber-500" />}
+                    </label>
                     <select 
                       required
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all appearance-none font-bold text-sm"
+                      disabled={isAccountLocked}
+                      className={`w-full px-3.5 py-2.5 rounded-xl outline-none transition-all appearance-none font-bold text-sm ${
+                        isAccountLocked 
+                          ? 'bg-slate-100 text-slate-500 border border-slate-200 cursor-not-allowed' 
+                          : 'bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-emerald-500/20'
+                      }`}
                       value={formData.type_id}
                       onChange={(e) => setFormData({...formData, type_id: e.target.value})}
                     >
@@ -1069,14 +1105,18 @@ export const Accounts: React.FC = () => {
                   </div>
 
                   <div className="relative" ref={usageDropdownRef}>
-                    <label className="block text-[11px] font-black text-slate-500 mb-1.5 uppercase tracking-widest">
-                      {language === 'ar' ? 'استخدام الحساب (إلزامي)' : 'Account Usage (Required)'}
+                    <label className="block text-[11px] font-black text-slate-500 mb-1.5 uppercase tracking-widest flex items-center justify-between">
+                      <span>{language === 'ar' ? 'استخدام الحساب (إلزامي)' : 'Account Usage (Required)'}</span>
+                      {isAccountLocked && <Lock size={12} className="text-amber-500" />}
                     </label>
                     <button
                       type="button"
-                      onClick={() => setIsUsageDropdownOpen(!isUsageDropdownOpen)}
-                      className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all flex items-center justify-between font-bold text-sm ${
-                        !formData.account_usage ? 'border-amber-300 text-amber-800' : 'border-slate-200 text-slate-900'
+                      disabled={isAccountLocked}
+                      onClick={() => !isAccountLocked && setIsUsageDropdownOpen(!isUsageDropdownOpen)}
+                      className={`w-full px-3.5 py-2.5 rounded-xl outline-none transition-all flex items-center justify-between font-bold text-sm ${
+                        isAccountLocked
+                          ? 'bg-slate-100 text-slate-500 border border-slate-200 cursor-not-allowed'
+                          : !formData.account_usage ? 'bg-slate-50 border-amber-300 text-amber-800' : 'bg-slate-50 border-slate-200 text-slate-900 focus:ring-2 focus:ring-emerald-500/20'
                       }`}
                     >
                       <span>
@@ -1084,6 +1124,18 @@ export const Accounts: React.FC = () => {
                       </span>
                       <ChevronDown size={18} className="text-slate-400" />
                     </button>
+
+                    {/* Golden Lock Informative Alert */}
+                    {isAccountLocked && (
+                      <div className="mt-2.5 p-2.5 bg-amber-50/90 border border-amber-200 rounded-xl text-amber-800 text-xs font-medium flex items-center gap-2">
+                        <Lock size={14} className="text-amber-600 shrink-0" />
+                        <span>
+                          {language === 'ar' 
+                            ? 'تم قفل كود الحساب ونوعه واستخدامه المحاسبي لوجود قيود مسجلة أو حسابات فرعية تابعة له، حفاظاً على مسار التدقيق وتوازن القوائم المالية.' 
+                            : 'Account code, type, and usage are locked due to recorded journal entries or child accounts.'}
+                        </span>
+                      </div>
+                    )}
                     
                     <AnimatePresence>
                       {isUsageDropdownOpen && (

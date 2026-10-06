@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Plus, Edit3, Trash2, Tag, Layers, CheckCircle2, XCircle, Search, X } from 'lucide-react';
+import { Plus, Edit3, Trash2, Tag, Layers, CheckCircle2, XCircle, Search, X, Lock } from 'lucide-react';
 import { AssetCategory } from '../../types/fixedAssets';
 import { fixedAssetService } from '../../services/fixedAssetService';
 import { useNotification } from '../../contexts/NotificationContext';
+import { apiRequest } from '../../services/dbService';
 
 interface AssetCategoriesTabProps {
   categories: AssetCategory[];
@@ -19,6 +20,7 @@ export const AssetCategoriesTab: React.FC<AssetCategoriesTabProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<AssetCategory | null>(null);
+  const [isAccountsLocked, setIsAccountsLocked] = useState(false);
 
   const [formData, setFormData] = useState<Partial<AssetCategory>>({
     code: '',
@@ -41,6 +43,7 @@ export const AssetCategoriesTab: React.FC<AssetCategoriesTabProps> = ({
 
   const handleOpenAdd = () => {
     setEditingCategory(null);
+    setIsAccountsLocked(false);
     setFormData({
       code: `CAT-${(categories.length + 1).toString().padStart(2, '0')}`,
       name: '',
@@ -63,6 +66,14 @@ export const AssetCategoriesTab: React.FC<AssetCategoriesTabProps> = ({
   const handleOpenEdit = (cat: AssetCategory) => {
     setEditingCategory(cat);
     setFormData({ ...cat });
+    setIsAccountsLocked(false);
+    apiRequest<{ hasTransactions: boolean }>(`/fixed-assets/categories/${cat.id}/has-transactions`, 'GET')
+      .then(res => {
+        if (res && res.hasTransactions) {
+          setIsAccountsLocked(true);
+        }
+      })
+      .catch(() => {});
     setIsModalOpen(true);
   };
 
@@ -83,6 +94,18 @@ export const AssetCategoriesTab: React.FC<AssetCategoriesTabProps> = ({
       showError('كود واسم التصنيف مطلوبان');
       return;
     }
+
+    if (editingCategory && isAccountsLocked) {
+      const isAccountChanged =
+        (formData.asset_account_id && editingCategory.asset_account_id && formData.asset_account_id !== editingCategory.asset_account_id) ||
+        (formData.accumulated_depreciation_account_id && editingCategory.accumulated_depreciation_account_id && formData.accumulated_depreciation_account_id !== editingCategory.accumulated_depreciation_account_id) ||
+        (formData.depreciation_expense_account_id && editingCategory.depreciation_expense_account_id && formData.depreciation_expense_account_id !== editingCategory.depreciation_expense_account_id);
+      if (isAccountChanged) {
+        showError('لا يمكن تعديل الحسابات المحاسبية لفئة الأصول لوجود أصول مفعلة أو مستهلكة تابعة لها.');
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       await fixedAssetService.saveCategory({
@@ -295,14 +318,38 @@ export const AssetCategoriesTab: React.FC<AssetCategoriesTabProps> = ({
 
               {/* Accounting Accounts defaults */}
               <div className="border-t border-slate-800 pt-3 space-y-3">
-                <h4 className="font-bold text-slate-300 text-xs">الحسابات الافتراضية التلقائية للأصول التابعة</h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-slate-300 text-xs">الحسابات الافتراضية التلقائية للأصول التابعة</h4>
+                  {isAccountsLocked && (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                      <Lock size={10} />
+                      <span>الحسابات مقفلة لوجود أصول مفعلة</span>
+                    </span>
+                  )}
+                </div>
+
+                {isAccountsLocked && (
+                  <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-300 text-[11px] flex items-center gap-2">
+                    <Lock size={13} className="text-amber-400 shrink-0" />
+                    <span>تم قفل الحسابات المحاسبية لتصنيف الأصول لوجود أصول مفعلة أو مستهلكة تابعة له، حفاظاً على نزاهة مسار التدقيق المالي.</span>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-slate-400 text-[11px] mb-1">حساب الأصل</label>
+                    <label className="block text-slate-400 text-[11px] mb-1 flex items-center justify-between">
+                      <span>حساب الأصل</span>
+                      {isAccountsLocked && <Lock size={10} className="text-amber-400" />}
+                    </label>
                     <select
+                      disabled={isAccountsLocked}
                       value={formData.asset_account_id || ''}
                       onChange={e => setFormData({ ...formData, asset_account_id: e.target.value })}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white text-xs"
+                      className={`w-full border rounded-lg p-2 text-xs transition-all ${
+                        isAccountsLocked 
+                          ? 'bg-slate-800/60 border-slate-700/60 text-slate-400 cursor-not-allowed' 
+                          : 'bg-slate-800 border-slate-700 text-white'
+                      }`}
                     >
                       <option value="">-- اختر الحساب --</option>
                       {accounts.map(a => (
@@ -312,11 +359,19 @@ export const AssetCategoriesTab: React.FC<AssetCategoriesTabProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-slate-400 text-[11px] mb-1">حساب مجمع الإهلاك</label>
+                    <label className="block text-slate-400 text-[11px] mb-1 flex items-center justify-between">
+                      <span>حساب مجمع الإهلاك</span>
+                      {isAccountsLocked && <Lock size={10} className="text-amber-400" />}
+                    </label>
                     <select
+                      disabled={isAccountsLocked}
                       value={formData.accumulated_depreciation_account_id || ''}
                       onChange={e => setFormData({ ...formData, accumulated_depreciation_account_id: e.target.value })}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white text-xs"
+                      className={`w-full border rounded-lg p-2 text-xs transition-all ${
+                        isAccountsLocked 
+                          ? 'bg-slate-800/60 border-slate-700/60 text-slate-400 cursor-not-allowed' 
+                          : 'bg-slate-800 border-slate-700 text-white'
+                      }`}
                     >
                       <option value="">-- اختر الحساب --</option>
                       {accounts.map(a => (
@@ -326,11 +381,19 @@ export const AssetCategoriesTab: React.FC<AssetCategoriesTabProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-slate-400 text-[11px] mb-1">حساب مصروف الإهلاك</label>
+                    <label className="block text-slate-400 text-[11px] mb-1 flex items-center justify-between">
+                      <span>حساب مصروف الإهلاك</span>
+                      {isAccountsLocked && <Lock size={10} className="text-amber-400" />}
+                    </label>
                     <select
+                      disabled={isAccountsLocked}
                       value={formData.depreciation_expense_account_id || ''}
                       onChange={e => setFormData({ ...formData, depreciation_expense_account_id: e.target.value })}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white text-xs"
+                      className={`w-full border rounded-lg p-2 text-xs transition-all ${
+                        isAccountsLocked 
+                          ? 'bg-slate-800/60 border-slate-700/60 text-slate-400 cursor-not-allowed' 
+                          : 'bg-slate-800 border-slate-700 text-white'
+                      }`}
                     >
                       <option value="">-- اختر الحساب --</option>
                       {accounts.map(a => (

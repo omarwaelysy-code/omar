@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Plus, Trash2, X, Wallet, History, ChevronRight, ChevronLeft, 
-  Layers, Hash, Box, AlertCircle, LayoutGrid, List, FileText
+  Layers, Hash, Box, AlertCircle, LayoutGrid, List, FileText, Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNotification } from '../contexts/NotificationContext';
-import { dbService } from '../services/dbService';
+import { dbService, apiRequest } from '../services/dbService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ExpenseCategory, Account } from '../types';
@@ -25,6 +25,7 @@ export const Expenses: React.FC = () => {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ExpenseCategory | null>(null);
+  const [isAccountLocked, setIsAccountLocked] = useState(false);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -53,6 +54,11 @@ export const Expenses: React.FC = () => {
     if (!user) return;
 
     try {
+      if (editingCategory && isAccountLocked && formData.account_id !== editingCategory.account_id) {
+        showNotification(language === 'ar' ? 'لا يمكن تعديل الحساب المحاسبي لتصنيف المصروف لوجود سندات صرف أو قيود مسجلة عليه.' : 'Cannot alter account for an expense category with existing vouchers.', 'error');
+        return;
+      }
+
       const selectedAccount = accounts.find(a => a.id === formData.account_id);
       const validExpenseUsages = ['operating_expense', 'administrative_expense', 'marketing_expense', 'selling_expense', 'financial_expense', 'depreciation_expense'];
 
@@ -100,7 +106,16 @@ export const Expenses: React.FC = () => {
         description: category.description || '',
         account_id: category.account_id || ''
       });
+      setIsAccountLocked(false);
+      apiRequest<{ hasTransactions: boolean }>(`/expense_categories/${category.id}/has-transactions`, 'GET')
+        .then(res => {
+          if (res && res.hasTransactions) {
+            setIsAccountLocked(true);
+          }
+        })
+        .catch(() => {});
     } else {
+      setIsAccountLocked(false);
       resetForm();
     }
     setIsModalOpen(true);
@@ -358,15 +373,41 @@ export const Expenses: React.FC = () => {
                            </div>
                         </div>
                         <div>
-                           <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">{language === 'ar' ? 'الحساب المحاسبي' : 'Linked Account'}</label>
+                           <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase flex items-center justify-between">
+                             <span>{language === 'ar' ? 'الحساب المحاسبي' : 'Linked Account'}</span>
+                             {isAccountLocked && <Lock size={11} className="text-amber-500" />}
+                           </label>
                            <div className="relative group">
                              <Box className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={13} />
-                             <select required className="w-full pr-7 pl-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 appearance-none outline-none focus:bg-white focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all shadow-xs" value={formData.account_id} onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}>
+                             <select 
+                               required 
+                               disabled={isAccountLocked}
+                               className={`w-full pr-7 pl-3 py-1.5 rounded-lg text-xs font-bold appearance-none outline-none transition-all shadow-xs ${
+                                 isAccountLocked
+                                   ? 'bg-slate-100 text-slate-500 border border-slate-200 cursor-not-allowed font-medium'
+                                   : 'bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500'
+                               }`} 
+                               value={formData.account_id} 
+                               onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
+                             >
                                <option value="">{language === 'ar' ? 'اختر الحساب...' : 'Select Account...'}</option>
                                {accounts.filter(a => ['operating_expense', 'administrative_expense', 'marketing_expense', 'selling_expense', 'financial_expense', 'depreciation_expense'].includes(a.account_usage || '')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                              </select>
                            </div>
                         </div>
+
+                        {/* Golden Lock Alert */}
+                        {isAccountLocked && (
+                          <div className="col-span-full p-2 bg-amber-50/90 border border-amber-200 rounded-lg text-amber-800 text-[11px] font-medium flex items-center gap-2">
+                            <Lock size={13} className="text-amber-600 shrink-0" />
+                            <span>
+                              {language === 'ar' 
+                                ? 'تم قفل الحساب المحاسبي لبند المصروف لوجود سندات صرف أو قيود يومية مسجلة عليه، حفاظاً على مسار التدقيق ونزاهة الدفاتر.' 
+                                : 'Linked account is locked because transactions exist for this expense item.'}
+                            </span>
+                          </div>
+                        )}
+
                         <div className="sm:col-span-2 lg:col-span-4">
                            <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">{language === 'ar' ? 'الوصف' : 'Description'}</label>
                            <textarea placeholder="وصف تفصيلي للبند..." className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all shadow-xs min-h-[60px]" rows={2} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
