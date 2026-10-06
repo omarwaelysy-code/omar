@@ -2709,21 +2709,25 @@ export const Products: React.FC = () => {
                                                : accounts
                                              ).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                                            </select>
-                                           <div className="relative w-16 shrink-0">
-                                             <input 
-                                               type="number" 
-                                               step="0.01" 
-                                               min="0" 
-                                               max="100" 
-                                               placeholder="14" 
-                                               className="w-full pl-1.5 pr-5 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500 transition-all text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-                                               value={formData.vat_rate !== undefined && formData.vat_rate !== null ? formData.vat_rate : ''} 
-                                               onChange={(e) => setFormData({ ...formData, vat_rate: parseFloat(e.target.value) || 0 })} 
-                                             />
-                                             <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs select-none pointer-events-none">
-                                               %
-                                             </span>
-                                           </div>
+                                            <select 
+                                              disabled={isProductAccountsLocked}
+                                              className={`w-28 shrink-0 px-1.5 py-1 border rounded-md text-xs font-bold appearance-none outline-none transition-all text-center cursor-pointer ${
+                                                isProductAccountsLocked 
+                                                  ? 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed font-medium' 
+                                                  : 'bg-white border-slate-200 focus:ring-1 focus:ring-emerald-500 text-slate-800'
+                                              }`} 
+                                              value={formData.vat_rate !== undefined && formData.vat_rate !== null ? Number(formData.vat_rate) : 14} 
+                                              onChange={(e) => setFormData({ ...formData, vat_rate: parseFloat(e.target.value) || 0 })} 
+                                            >
+                                              {![14, 5, 0, 8, 10].includes(Number(formData.vat_rate)) && formData.vat_rate !== undefined && formData.vat_rate !== null && (
+                                                <option value={Number(formData.vat_rate)}>{Number(formData.vat_rate)}% (مخصص)</option>
+                                              )}
+                                              <option value="14">14% (عام)</option>
+                                              <option value="5">5% (آلات)</option>
+                                              <option value="0">0% (صفر/معفى)</option>
+                                              <option value="8">8% (جدول)</option>
+                                              <option value="10">10% (مهن)</option>
+                                            </select>
                                          </div>
                                        </div>
 
@@ -2753,21 +2757,25 @@ export const Products: React.FC = () => {
                                                : accounts
                                              ).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                                            </select>
-                                           <div className="relative w-16 shrink-0">
-                                             <input 
-                                               type="number" 
-                                               step="0.01" 
-                                               min="0" 
-                                               max="100" 
-                                               placeholder="14" 
-                                               className="w-full pl-1.5 pr-5 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500 transition-all text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-                                               value={formData.purchase_vat_rate !== undefined && formData.purchase_vat_rate !== null ? formData.purchase_vat_rate : ''} 
-                                               onChange={(e) => setFormData({ ...formData, purchase_vat_rate: parseFloat(e.target.value) || 0 })} 
-                                             />
-                                             <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs select-none pointer-events-none">
-                                               %
-                                             </span>
-                                           </div>
+                                            <select 
+                                              disabled={isProductAccountsLocked}
+                                              className={`w-28 shrink-0 px-1.5 py-1 border rounded-md text-xs font-bold appearance-none outline-none transition-all text-center cursor-pointer ${
+                                                isProductAccountsLocked 
+                                                  ? 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed font-medium' 
+                                                  : 'bg-white border-slate-200 focus:ring-1 focus:ring-emerald-500 text-slate-800'
+                                              }`} 
+                                              value={formData.purchase_vat_rate !== undefined && formData.purchase_vat_rate !== null ? Number(formData.purchase_vat_rate) : 14} 
+                                              onChange={(e) => setFormData({ ...formData, purchase_vat_rate: parseFloat(e.target.value) || 0 })} 
+                                            >
+                                              {![14, 5, 0, 8, 10].includes(Number(formData.purchase_vat_rate)) && formData.purchase_vat_rate !== undefined && formData.purchase_vat_rate !== null && (
+                                                <option value={Number(formData.purchase_vat_rate)}>{Number(formData.purchase_vat_rate)}% (مخصص)</option>
+                                              )}
+                                              <option value="14">14% (عام)</option>
+                                              <option value="5">5% (آلات)</option>
+                                              <option value="0">0% (صفر/معفى)</option>
+                                              <option value="8">8% (جدول)</option>
+                                              <option value="10">10% (مهن)</option>
+                                            </select>
                                          </div>
                                        </div>
                                      </>
@@ -2800,21 +2808,24 @@ export const Products: React.FC = () => {
                                              : accounts
                                            ).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                                          </select>
-                                         <div className="relative w-16 shrink-0">
-                                           <input 
-                                             type="number" 
-                                             step="0.01" 
-                                             min="0" 
-                                             max="100" 
-                                             placeholder="1" 
-                                             className="w-full pl-1.5 pr-5 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500 transition-all text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-                                             value={formData.sales_withholding_tax_rate !== undefined && formData.sales_withholding_tax_rate !== null ? formData.sales_withholding_tax_rate : ''} 
-                                             onChange={(e) => setFormData({ ...formData, sales_withholding_tax_rate: parseFloat(e.target.value) || 0 })} 
-                                           />
-                                           <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs select-none pointer-events-none">
-                                             %
-                                           </span>
-                                         </div>
+                                          <select 
+                                            disabled={isProductAccountsLocked}
+                                            className={`w-28 shrink-0 px-1.5 py-1 border rounded-md text-xs font-bold appearance-none outline-none transition-all text-center cursor-pointer ${
+                                              isProductAccountsLocked 
+                                                ? 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed font-medium' 
+                                                : 'bg-white border-slate-200 focus:ring-1 focus:ring-emerald-500 text-slate-800'
+                                            }`} 
+                                            value={formData.sales_withholding_tax_rate !== undefined && formData.sales_withholding_tax_rate !== null ? Number(formData.sales_withholding_tax_rate) : 0} 
+                                            onChange={(e) => setFormData({ ...formData, sales_withholding_tax_rate: parseFloat(e.target.value) || 0 })} 
+                                          >
+                                            {![0, 1, 3, 5].includes(Number(formData.sales_withholding_tax_rate)) && formData.sales_withholding_tax_rate !== undefined && formData.sales_withholding_tax_rate !== null && (
+                                              <option value={Number(formData.sales_withholding_tax_rate)}>{Number(formData.sales_withholding_tax_rate)}% (مخصص)</option>
+                                            )}
+                                            <option value="0">0% (بدون خصم)</option>
+                                            <option value="1">1% (توريدات سلع)</option>
+                                            <option value="3">3% (خدمات)</option>
+                                            <option value="5">5% (مهن/عمولات)</option>
+                                          </select>
                                        </div>
                                      </div>
                                    )}
@@ -2846,21 +2857,24 @@ export const Products: React.FC = () => {
                                              : accounts
                                            ).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                                          </select>
-                                         <div className="relative w-16 shrink-0">
-                                           <input 
-                                             type="number" 
-                                             step="0.01" 
-                                             min="0" 
-                                             max="100" 
-                                             placeholder="1" 
-                                             className="w-full pl-1.5 pr-5 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold outline-none focus:ring-1 focus:ring-emerald-500 transition-all text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-                                             value={formData.purchase_withholding_tax_rate !== undefined && formData.purchase_withholding_tax_rate !== null ? formData.purchase_withholding_tax_rate : ''} 
-                                             onChange={(e) => setFormData({ ...formData, purchase_withholding_tax_rate: parseFloat(e.target.value) || 0 })} 
-                                           />
-                                           <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-rose-500 font-bold text-xs select-none pointer-events-none">
-                                             %
-                                           </span>
-                                         </div>
+                                          <select 
+                                            disabled={isProductAccountsLocked}
+                                            className={`w-28 shrink-0 px-1.5 py-1 border rounded-md text-xs font-bold appearance-none outline-none transition-all text-center cursor-pointer ${
+                                              isProductAccountsLocked 
+                                                ? 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed font-medium' 
+                                                : 'bg-white border-slate-200 focus:ring-1 focus:ring-emerald-500 text-slate-800'
+                                            }`} 
+                                            value={formData.purchase_withholding_tax_rate !== undefined && formData.purchase_withholding_tax_rate !== null ? Number(formData.purchase_withholding_tax_rate) : 1} 
+                                            onChange={(e) => setFormData({ ...formData, purchase_withholding_tax_rate: parseFloat(e.target.value) || 0 })} 
+                                          >
+                                            {![0, 1, 3, 5].includes(Number(formData.purchase_withholding_tax_rate)) && formData.purchase_withholding_tax_rate !== undefined && formData.purchase_withholding_tax_rate !== null && (
+                                              <option value={Number(formData.purchase_withholding_tax_rate)}>{Number(formData.purchase_withholding_tax_rate)}% (مخصص)</option>
+                                            )}
+                                            <option value="1">1% (توريدات سلع)</option>
+                                            <option value="0">0% (بدون خصم)</option>
+                                            <option value="3">3% (خدمات)</option>
+                                            <option value="5">5% (مهن/عمولات)</option>
+                                          </select>
                                        </div>
                                      </div>
                                    )}
