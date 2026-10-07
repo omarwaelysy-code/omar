@@ -438,6 +438,38 @@ export class AccountingEngine {
   ): { classification: string; statement_type: string } {
     if (!acc) return { classification: 'asset', statement_type: 'balance_sheet' };
 
+    // 0. Primary Sovereign Check: Immutable System Role / Account Usage
+    if (acc.account_usage) {
+      const usage = String(acc.account_usage).toLowerCase();
+      if (['receivable', 'customer', 'customers', 'accounts_receivable'].includes(usage)) {
+        return { classification: 'receivables', statement_type: 'balance_sheet' };
+      }
+      if (['payable', 'supplier', 'suppliers', 'accounts_payable'].includes(usage)) {
+        return { classification: 'payables', statement_type: 'balance_sheet' };
+      }
+      if (['cash', 'bank', 'petty_cash', 'main_cash'].includes(usage)) {
+        return { classification: 'cash_and_equivalents', statement_type: 'balance_sheet' };
+      }
+      if (['inventory', 'stock', 'finished_goods', 'fixed_asset', 'current_asset'].includes(usage)) {
+        return { classification: 'asset', statement_type: 'balance_sheet' };
+      }
+      if (['sales', 'revenue', 'sales_revenue', 'service_revenue', 'other_revenue', 'realized_forex_gain', 'unrealized_forex_gain'].includes(usage)) {
+        return { classification: 'revenue', statement_type: 'income_statement' };
+      }
+      if (['cost_of_sales', 'cost_of_goods_sold', 'purchases', 'purchase_returns', 'sales_returns'].includes(usage)) {
+        return { classification: 'cost', statement_type: 'income_statement' };
+      }
+      if (['expenses', 'expense', 'administrative_expense', 'marketing_expense', 'depreciation_expense', 'payroll', 'realized_forex_loss', 'unrealized_forex_loss', 'earned_discounts', 'granted_discounts'].includes(usage)) {
+        return { classification: 'expense', statement_type: 'income_statement' };
+      }
+      if (['equity', 'capital', 'retained_earnings', 'opening_balance', 'drawings'].includes(usage)) {
+        return { classification: 'equity', statement_type: 'balance_sheet' };
+      }
+      if (['liability', 'current_liability', 'long_term_liability', 'notes_payable', 'vat', 'output_vat', 'input_vat', 'loan', 'withholding_tax_suppliers', 'withholding_tax_customers'].includes(usage)) {
+        return { classification: 'liability', statement_type: 'balance_sheet' };
+      }
+    }
+
     // 1. Direct type_id match in accountTypes array
     if (acc.type_id && Array.isArray(accountTypes) && accountTypes.length > 0) {
       const type = accountTypes.find(t => t.id === acc.type_id);

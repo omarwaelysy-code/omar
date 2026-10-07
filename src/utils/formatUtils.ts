@@ -69,11 +69,19 @@ export const parseNumber = (value: any): number => {
 };
 
 export const isCustomerAccount = (accountId: string, customer: any, accountsList: any[]) => {
-  return customer?.account_id ? accountId === customer.account_id : false;
+  if (customer?.account_id && accountId === customer.account_id) return true;
+  if (!accountId || !Array.isArray(accountsList)) return false;
+  const acc = accountsList.find(a => a.id === accountId);
+  if (acc && ['receivable', 'customer', 'accounts_receivable'].includes(acc.account_usage)) return true;
+  return false;
 };
 
 export const isSupplierAccount = (accountId: string, supplier: any, accountsList: any[]) => {
-  return supplier?.account_id ? accountId === supplier.account_id : false;
+  if (supplier?.account_id && accountId === supplier.account_id) return true;
+  if (!accountId || !Array.isArray(accountsList)) return false;
+  const acc = accountsList.find(a => a.id === accountId);
+  if (acc && ['payable', 'supplier', 'accounts_payable'].includes(acc.account_usage)) return true;
+  return false;
 };
 
 /**

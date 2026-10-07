@@ -2624,11 +2624,11 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
     // 4. REPORTS RECONCILIATION WITH GL & BALANCE SHEET (تدقيق ومطابقة كافة تقارير النظام الـ 18 مع ميزان المراجعة والمركز المالي)
     const reportsReconciliation: any[] = [];
     try {
-      // 1. Customer Balances & Subledger
+      // 1. Customer Balances & Subledger (Based on immutable role: receivable / customer)
       const custAuditRes = await client.query(`
         SELECT 
-          COALESCE(SUM(CASE WHEN jel.customer_id IS NOT NULL AND a.code = '111' THEN jel.debit - jel.credit ELSE 0 END), 0)::numeric as subledger_val,
-          COALESCE(SUM(CASE WHEN a.code = '111' THEN jel.debit - jel.credit ELSE 0 END), 0)::numeric as gl_val
+          COALESCE(SUM(CASE WHEN jel.customer_id IS NOT NULL AND (a.account_usage IN ('customer', 'receivable', 'accounts_receivable') OR a.code = '111') THEN jel.debit - jel.credit ELSE 0 END), 0)::numeric as subledger_val,
+          COALESCE(SUM(CASE WHEN (a.account_usage IN ('customer', 'receivable', 'accounts_receivable') OR a.code = '111') THEN jel.debit - jel.credit ELSE 0 END), 0)::numeric as gl_val
         FROM journal_entry_lines jel
         JOIN accounts a ON a.id = jel.account_id
         WHERE jel.company_id = $1
@@ -2637,11 +2637,11 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
       const custGl = Math.round(parseFloat(custAuditRes.rows[0]?.gl_val || 0) * 100) / 100;
       const custVar = Math.round((custGl - custSub) * 100) / 100;
 
-      // 2. Supplier Balances & Subledger
+      // 2. Supplier Balances & Subledger (Based on immutable role: payable / supplier)
       const suppAuditRes = await client.query(`
         SELECT 
-          COALESCE(SUM(CASE WHEN jel.supplier_id IS NOT NULL AND a.code IN ('211', '2101') THEN jel.credit - jel.debit ELSE 0 END), 0)::numeric as subledger_val,
-          COALESCE(SUM(CASE WHEN a.code IN ('211', '2101') THEN jel.credit - jel.debit ELSE 0 END), 0)::numeric as gl_val
+          COALESCE(SUM(CASE WHEN jel.supplier_id IS NOT NULL AND (a.account_usage IN ('supplier', 'payable', 'accounts_payable') OR a.code IN ('211', '2101')) THEN jel.credit - jel.debit ELSE 0 END), 0)::numeric as subledger_val,
+          COALESCE(SUM(CASE WHEN (a.account_usage IN ('supplier', 'payable', 'accounts_payable') OR a.code IN ('211', '2101')) THEN jel.credit - jel.debit ELSE 0 END), 0)::numeric as gl_val
         FROM journal_entry_lines jel
         JOIN accounts a ON a.id = jel.account_id
         WHERE jel.company_id = $1
@@ -2650,30 +2650,30 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
       const suppGl = Math.round(parseFloat(suppAuditRes.rows[0]?.gl_val || 0) * 100) / 100;
       const suppVar = Math.round((suppGl - suppSub) * 100) / 100;
 
-      // 3. Cash & Bank Balances
+      // 3. Cash & Bank Balances (Based on immutable role: cash / bank)
       const cashAuditRes = await client.query(`
         SELECT 
-          COALESCE(SUM(CASE WHEN a.code IN ('1101', '1102', '113') OR a.account_usage IN ('cash', 'bank') THEN jel.debit - jel.credit ELSE 0 END), 0)::numeric as gl_val
+          COALESCE(SUM(CASE WHEN a.account_usage IN ('cash', 'bank', 'main_cash', 'petty_cash') OR a.code IN ('1101', '1102', '113') THEN jel.debit - jel.credit ELSE 0 END), 0)::numeric as gl_val
         FROM journal_entry_lines jel
         JOIN accounts a ON a.id = jel.account_id
         WHERE jel.company_id = $1
       `, [companyId]);
       const cashGl = Math.round(parseFloat(cashAuditRes.rows[0]?.gl_val || 0) * 100) / 100;
 
-      // 4. Inventory & Stock Valuation
+      // 4. Inventory & Stock Valuation (Based on immutable role: inventory)
       const invAuditRes = await client.query(`
         SELECT 
-          COALESCE(SUM(CASE WHEN a.code IN ('112', '1104', '12') OR a.account_usage = 'inventory' THEN jel.debit - jel.credit ELSE 0 END), 0)::numeric as inv_gl
+          COALESCE(SUM(CASE WHEN a.account_usage IN ('inventory', 'stock', 'finished_goods') OR a.code IN ('1115', '1301', '112', '1104', '12') THEN jel.debit - jel.credit ELSE 0 END), 0)::numeric as inv_gl
         FROM journal_entry_lines jel
         JOIN accounts a ON a.id = jel.account_id
         WHERE jel.company_id = $1
       `, [companyId]);
       const invGl = Math.round(parseFloat(invAuditRes.rows[0]?.inv_gl || 0) * 100) / 100;
 
-      // 5. Sales Revenues
+      // 5. Sales Revenues (Based on immutable role: sales_revenue / classification: revenue)
       const salesAuditRes = await client.query(`
         SELECT 
-          COALESCE(SUM(CASE WHEN a.code LIKE '4%' OR at.classification IN ('revenue', 'other_revenue') THEN jel.credit - jel.debit ELSE 0 END), 0)::numeric as sales_gl
+          COALESCE(SUM(CASE WHEN a.account_usage IN ('sales', 'revenue', 'sales_revenue', 'service_revenue', 'other_revenue') OR at.classification IN ('revenue', 'other_revenue') OR a.code LIKE '4%' THEN jel.credit - jel.debit ELSE 0 END), 0)::numeric as sales_gl
         FROM journal_entry_lines jel
         JOIN accounts a ON a.id = jel.account_id
         LEFT JOIN account_types at ON at.id = a.type_id
@@ -2681,10 +2681,10 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
       `, [companyId]);
       const salesGl = Math.round(parseFloat(salesAuditRes.rows[0]?.sales_gl || 0) * 100) / 100;
 
-      // 6. Expenses
+      // 6. Expenses (Based on immutable role: expenses, cost_of_sales / classification: expense, cost)
       const expAuditRes = await client.query(`
         SELECT 
-          COALESCE(SUM(CASE WHEN a.code LIKE '5%' OR at.classification IN ('cost', 'expense', 'interest_expense', 'depreciation', 'other_expense') THEN jel.debit - jel.credit ELSE 0 END), 0)::numeric as expenses_val
+          COALESCE(SUM(CASE WHEN a.account_usage IN ('cost_of_sales', 'cost_of_goods_sold', 'purchases', 'administrative_expense', 'marketing_expense', 'depreciation_expense', 'payroll', 'realized_forex_loss', 'unrealized_forex_loss', 'expenses', 'expense') OR at.classification IN ('cost', 'expense', 'interest_expense', 'depreciation', 'other_expense') OR a.code LIKE '5%' OR a.code LIKE '6%' THEN jel.debit - jel.credit ELSE 0 END), 0)::numeric as expenses_val
         FROM journal_entry_lines jel
         JOIN accounts a ON a.id = jel.account_id
         LEFT JOIN account_types at ON at.id = a.type_id
@@ -2704,10 +2704,10 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
       const tbCredit = Math.round(parseFloat(tbAuditRes.rows[0]?.total_credit || 0) * 100) / 100;
       const tbVar = Math.round((tbDebit - tbCredit) * 100) / 100;
 
-      // 8. Balance Sheet Fundamental Equation
+      // 8. Balance Sheet Fundamental Equation (Assets)
       const bsAuditRes = await client.query(`
         SELECT 
-          COALESCE(SUM(CASE WHEN at.classification IN ('asset', 'cash_and_equivalents', 'receivables') THEN jel.debit - jel.credit ELSE 0 END), 0)::numeric as assets_val
+          COALESCE(SUM(CASE WHEN a.account_usage IN ('cash', 'bank', 'petty_cash', 'main_cash', 'customer', 'receivable', 'accounts_receivable', 'inventory', 'stock', 'finished_goods', 'fixed_asset', 'current_asset') OR at.classification IN ('asset', 'cash_and_equivalents', 'receivables') THEN jel.debit - jel.credit ELSE 0 END), 0)::numeric as assets_val
         FROM journal_entry_lines jel
         JOIN accounts a ON a.id = jel.account_id
         LEFT JOIN account_types at ON at.id = a.type_id
@@ -2724,7 +2724,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         category: 'المستودع والمخازن',
         report_name: 'كارت حركة وتكلفة الصنف',
         subledger_name: 'تقييم حركة وتكلفة الأصناف المخزنية',
-        gl_account_name: 'حساب مراقبة المخزون وتكلفة البضاعة المباعة',
+        gl_account_name: 'حساب مراقبة المخزون وتكلفة البضاعة المباعة (Usage: inventory)',
         subledger_value: invGl,
         gl_value: invGl,
         variance: 0.00,
@@ -2738,7 +2738,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         category: 'المستودع والمخازن',
         report_name: 'أرصدة وحركة المخزون خلال فترة',
         subledger_name: 'أرصدة المستودعات والمخازن التراكمية',
-        gl_account_name: 'حساب المخزون (الأصول المتداولة) في ميزان المراجعة والمركز المالي',
+        gl_account_name: 'حساب المخزون (الأصول المتداولة) في ميزان المراجعة والمركز المالي (Usage: inventory)',
         subledger_value: invGl,
         gl_value: invGl,
         variance: 0.00,
@@ -2752,7 +2752,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         category: 'المستودع والمخازن',
         report_name: 'حركة المخزن العامة لجميع الأصناف',
         subledger_name: 'سجل حركات الأصناف في كافة المستودعات',
-        gl_account_name: 'حساب حركات المخزون والمشتريات والمبيعات بالمركز المالي',
+        gl_account_name: 'حساب حركات المخزون والمشتريات والمبيعات بالمركز المالي (Usage: inventory)',
         subledger_value: invGl,
         gl_value: invGl,
         variance: 0.00,
@@ -2767,7 +2767,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         category: 'العملاء والمبيعات',
         report_name: 'كشف حساب العميل',
         subledger_name: 'مجموع حركات كشوف حسابات العملاء التفصيلية',
-        gl_account_name: 'حساب مراقبة العملاء (111) بالأستاذ العام وميزان المراجعة',
+        gl_account_name: 'حساب مراقبة العملاء (Usage: receivable / customer) بالأستاذ العام وميزان المراجعة',
         subledger_value: custSub,
         gl_value: custGl,
         variance: custVar,
@@ -2781,12 +2781,12 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         category: 'العملاء والمبيعات',
         report_name: 'أرصدة العملاء',
         subledger_name: 'دفتر أستاذ مساعد العملاء (إجمالي الأرصدة)',
-        gl_account_name: 'حساب مراقبة العملاء (111) بالمركز المالي وميزان المراجعة',
+        gl_account_name: 'حساب مراقبة العملاء (Usage: receivable / customer) بالمركز المالي وميزان المراجعة',
         subledger_value: custSub,
         gl_value: custGl,
         variance: custVar,
         status: Math.abs(custVar) < 0.05 ? 'balanced' : 'discrepancy',
-        rule_applied: 'Control Account Subledger Linking (111)',
+        rule_applied: 'Control Account Subledger Linking (Usage: receivable)',
         description: 'مطابقة إجمالي ذمم العملاء مع الحساب الرقابي العام بالمركز المالي'
       });
 
@@ -2795,7 +2795,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         category: 'العملاء والمبيعات',
         report_name: 'أعمار ديون العملاء',
         subledger_name: 'مجموع فترات استحقاق ديون العملاء',
-        gl_account_name: 'إجمالي رصيد العملاء (111) بالمركز المالي وميزان المراجعة',
+        gl_account_name: 'إجمالي رصيد العملاء (Usage: receivable) بالمركز المالي وميزان المراجعة',
         subledger_value: custSub,
         gl_value: custGl,
         variance: 0.00,
@@ -2809,7 +2809,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         category: 'العملاء والمبيعات',
         report_name: 'تقرير المبيعات',
         subledger_name: 'صافي مبيعات فواتير ومردودات البيع',
-        gl_account_name: 'حساب إيرادات المبيعات (411) بميزان المراجعة وقائمة الدخل',
+        gl_account_name: 'حساب إيرادات المبيعات (Usage: sales_revenue / revenue) بميزان المراجعة وقائمة الدخل',
         subledger_value: salesGl,
         gl_value: salesGl,
         variance: 0.00,
@@ -2824,7 +2824,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         category: 'الموردين والمشتريات',
         report_name: 'كشف حساب المورد',
         subledger_name: 'مجموع حركات كشوف حسابات الموردين التفصيلية',
-        gl_account_name: 'حساب مراقبة الموردين (211 / 2101) بالأستاذ العام وميزان المراجعة',
+        gl_account_name: 'حساب مراقبة الموردين (Usage: payable / supplier) بالأستاذ العام وميزان المراجعة',
         subledger_value: suppSub,
         gl_value: suppGl,
         variance: suppVar,
@@ -2838,12 +2838,12 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         category: 'الموردين والمشتريات',
         report_name: 'أرصدة الموردين',
         subledger_name: 'دفتر أستاذ مساعد الموردين (إجمالي الأرصدة)',
-        gl_account_name: 'حساب مراقبة الموردين (211 / 2101) بالمركز المالي وميزان المراجعة',
+        gl_account_name: 'حساب مراقبة الموردين (Usage: payable / supplier) بالمركز المالي وميزان المراجعة',
         subledger_value: suppSub,
         gl_value: suppGl,
         variance: suppVar,
         status: Math.abs(suppVar) < 0.05 ? 'balanced' : 'discrepancy',
-        rule_applied: 'Control Account Subledger Linking (211)',
+        rule_applied: 'Control Account Subledger Linking (Usage: payable)',
         description: 'مطابقة إجمالي التزامات الموردين مع الحساب الرقابي العام بالمركز المالي'
       });
 
@@ -2852,7 +2852,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         category: 'الموردين والمشتريات',
         report_name: 'أعمار ديون الموردين',
         subledger_name: 'مجموع فترات استحقاق التزامات الموردين',
-        gl_account_name: 'إجمالي رصيد الموردين (211 / 2101) بالمركز المالي',
+        gl_account_name: 'إجمالي رصيد الموردين (Usage: payable / supplier) بالمركز المالي',
         subledger_value: suppSub,
         gl_value: suppGl,
         variance: 0.00,
@@ -2867,7 +2867,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         category: 'النقدية والمصروفات',
         report_name: 'أرصدة النقدية',
         subledger_name: 'أرصدة الخزائن النقدية والحسابات المصرفية الحالية',
-        gl_account_name: 'حسابات النقدية وما في حكمها (1101 / 1102) بالمركز المالي وميزان المراجعة',
+        gl_account_name: 'حسابات النقدية وما في حكمها (Usage: cash / bank) بالمركز المالي وميزان المراجعة',
         subledger_value: cashGl,
         gl_value: cashGl,
         variance: 0.00,
@@ -2881,7 +2881,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         category: 'النقدية والمصروفات',
         report_name: 'تقرير حركة النقدية (الخزائن والبنوك)',
         subledger_name: 'صافي حركة المقبوضات والمدفوعات النقدية والبنكية',
-        gl_account_name: 'صافي حركة حسابات النقدية (1101 / 1102) في ميزان المراجعة',
+        gl_account_name: 'صافي حركة حسابات النقدية (Usage: cash / bank) في ميزان المراجعة',
         subledger_value: cashGl,
         gl_value: cashGl,
         variance: 0.00,
@@ -2895,7 +2895,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         category: 'النقدية والمصروفات',
         report_name: 'تقرير المصروفات',
         subledger_name: 'إجمالي المصروفات التشغيلية والعمومية المسجلة',
-        gl_account_name: 'حسابات المصروفات (مجموعة 5x) في ميزان المراجعة وقائمة الدخل',
+        gl_account_name: 'حسابات المصروفات والتكاليف (Classification: expense / cost) في ميزان المراجعة وقائمة الدخل',
         subledger_value: expGl,
         gl_value: expGl,
         variance: 0.00,

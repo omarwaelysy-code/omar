@@ -83,7 +83,12 @@ export const ExpensesReport: React.FC = () => {
       
       const expenseAccountIds = new Set(
         accounts
-          .filter((a: any) => expenseTypeIds.includes(a.type_id))
+          .filter((a: any) => 
+            expenseTypeIds.includes(a.type_id) || 
+            ['expenses', 'expense', 'cost_of_sales', 'cost_of_goods_sold', 'purchases', 'administrative_expense', 'marketing_expense', 'depreciation_expense', 'payroll', 'realized_forex_loss', 'unrealized_forex_loss'].includes(String(a.account_usage || '').toLowerCase()) ||
+            String(a.code || '').startsWith('5') ||
+            String(a.code || '').startsWith('6')
+          )
           .map((a: any) => a.id)
       );
 
