@@ -822,7 +822,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
           { id: 'users', label: t('nav.users'), icon: UsersIcon },
           { id: 'period_closing', label: language === 'ar' ? 'إغلاق الفترات المحاسبية' : 'Period Closing', icon: Lock },
           { id: 'integrity_dashboard', label: t('nav.integrity_check') || 'Integrity Check', icon: ShieldCheck },
-          { id: 'data_counts_values', label: language === 'ar' ? 'شاشة العدد وقيم البيانات' : 'Data Counts & Values', icon: BarChart3 },
+          { id: 'data_counts_values', label: language === 'ar' ? 'التدقيق الشامل' : 'Comprehensive Audit', icon: BarChart3 },
           { id: 'backup_restore', label: t('nav.backup_restore'), icon: Database },
           { id: 'div_activity', isDivider: true },
           { id: 'h_activity', label: language === 'ar' ? 'سجلات الرقابة والنشاط' : 'Audit & Activity Logs', isHeader: true },

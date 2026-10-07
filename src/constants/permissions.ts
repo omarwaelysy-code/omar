@@ -365,7 +365,7 @@ export const MODULE_PERMISSIONS_META: { [moduleId: string]: { labelAr: string; l
   activity_log: { labelAr: 'سجل النشاط العام', labelEn: 'Activity Log', hasCrud: true },
   audit_logs: { labelAr: 'سجل الرقابة والأمن', labelEn: 'Audit Logs', hasCrud: true },
   system_check: { labelAr: 'فحص سلامة النظام', labelEn: 'System Check', hasCrud: true },
-  data_counts_values: { labelAr: 'شاشة العدد وقيم البيانات', labelEn: 'Data Counts & Values', hasCrud: true },
+  data_counts_values: { labelAr: 'التدقيق الشامل', labelEn: 'Comprehensive Audit', hasCrud: true },
   period_closing: { labelAr: 'إغلاق الفترات المحاسبية', labelEn: 'Period Closing', hasCrud: true, special: ['reopen', 'bulk_close', 'bypass'] },
   // Settings
   company_settings: { labelAr: 'إعدادات الشركة والمالية', labelEn: 'Company & Financial Settings', hasCrud: true, special: ['open_closed_period'] },
