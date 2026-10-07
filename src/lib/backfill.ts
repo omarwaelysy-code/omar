@@ -39,8 +39,11 @@ export async function backfillMissingJournalEntries(pool: any) {
       const invoiceId = invoice.id;
       const companyId = invoice.company_id;
       const invoiceNumber = invoice.invoice_number;
-      const totalAmount = parseFloat(invoice.total_amount || '0');
-      const discount = parseFloat(invoice.discount || '0');
+      const rate = parseFloat(invoice.exchange_rate || '1.0');
+      const foreignAmount = parseFloat(invoice.total_amount || '0');
+      const totalAmount = Math.round(foreignAmount * rate * 100) / 100;
+      const foreignDiscount = parseFloat(invoice.discount || '0');
+      const discount = Math.round(foreignDiscount * rate * 100) / 100;
       
       // Fetch supplier
       const supplierRes = await client.query('SELECT * FROM suppliers WHERE id = $1', [invoice.supplier_id]);
@@ -80,6 +83,9 @@ export async function backfillMissingJournalEntries(pool: any) {
         account_name: supplierAccountName,
         debit: 0,
         credit: totalAmount,
+        currency: invoice.currency_id,
+        exchange_rate: rate,
+        foreign_amount: foreignAmount,
         description: `فاتورة مشتريات رقم ${invoiceNumber} - ${supplier?.name || ''}`,
         supplier_id: invoice.supplier_id,
         supplier_name: supplier?.name,
@@ -242,8 +248,11 @@ export async function backfillMissingJournalEntries(pool: any) {
         const invoiceId = invoice.id;
         const companyId = invoice.company_id;
         const invoiceNumber = invoice.invoice_number;
-        const totalAmount = parseFloat(invoice.total_amount || '0');
-        const discount = parseFloat(invoice.discount_amount || invoice.discount || '0');
+        const rate = parseFloat(invoice.exchange_rate || '1.0');
+        const foreignAmount = parseFloat(invoice.total_amount || '0');
+        const totalAmount = Math.round(foreignAmount * rate * 100) / 100;
+        const foreignDiscount = parseFloat(invoice.discount_amount || invoice.discount || '0');
+        const discount = Math.round(foreignDiscount * rate * 100) / 100;
         const paymentType = invoice.payment_type || 'credit';
         const paymentMethodId = invoice.payment_method_id;
         
@@ -285,6 +294,9 @@ export async function backfillMissingJournalEntries(pool: any) {
           account_name: customerAccountName,
           debit: totalAmount,
           credit: 0,
+          currency: invoice.currency_id,
+          exchange_rate: rate,
+          foreign_amount: foreignAmount,
           description: `فاتورة مبيعات رقم ${invoiceNumber} - ${customer?.name || ''}`,
           customer_id: invoice.customer_id,
           customer_name: customer?.name,

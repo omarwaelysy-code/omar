@@ -2708,7 +2708,9 @@ router.post('/system/auto-fix-missing-accounts', authenticateToken, authorizeRol
       const custRes = await client.query('SELECT account_id, name FROM customers WHERE id = $1', [ret.customer_id]);
       const custAccId = custRes.rows[0]?.account_id || defCustomerAcc?.id;
       const custAccName = custRes.rows[0]?.name || 'حساب العملاء';
-      const retAmt = Math.round((Number(ret.total_amount) || 0) * 100) / 100;
+      const rate = Number(ret.exchange_rate) || 1.0;
+      const foreignAmt = Number(ret.total_amount) || 0;
+      const retAmt = Math.round(foreignAmt * rate * 100) / 100;
 
       if (custAccId && retAmt > 0) {
         const retDate = ret.date ? new Date(ret.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
@@ -2726,14 +2728,14 @@ router.post('/system/auto-fix-missing-accounts', authenticateToken, authorizeRol
         const revAccName = defRevenueAcc?.name || 'مردودات ومبيعات';
 
         await client.query(`
-          INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, company_id)
-          VALUES ($1, $2, $3, $4, $5, $6, 0, $7)
-        `, [uuidv4(), jeId, revAccId, revAccName, `مردود مبيعات رقم ${ret.return_number}`, retAmt, companyId]);
+          INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, company_id, currency, exchange_rate, foreign_amount)
+          VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, $9, $10)
+        `, [uuidv4(), jeId, revAccId, revAccName, `مردود مبيعات رقم ${ret.return_number}`, retAmt, companyId, ret.currency_id || null, rate, foreignAmt]);
 
         await client.query(`
-          INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, company_id, sub_account_id, sub_account_type)
-          VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, 'customer')
-        `, [uuidv4(), jeId, custAccId, custAccName, `مردود مبيعات رقم ${ret.return_number} - ${ret.customer_name || ''}`, retAmt, companyId, ret.customer_id]);
+          INSERT INTO journal_entry_lines (id, journal_entry_id, account_id, account_name, description, debit, credit, company_id, customer_id, customer_name, sub_account_id, sub_account_type, currency, exchange_rate, foreign_amount)
+          VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9, $8, 'customer', $10, $11, $12)
+        `, [uuidv4(), jeId, custAccId, custAccName, `مردود مبيعات رقم ${ret.return_number} - ${ret.customer_name || custAccName}`, retAmt, companyId, ret.customer_id, ret.customer_name || custAccName, ret.currency_id || null, rate, foreignAmt]);
 
         await syncCOGSForJournalEntry(client, companyId, jeId, ret.id, 'return');
         await balanceAndValidateJournalEntry(client, jeId);
@@ -5024,6 +5026,265 @@ async function createChequeJournalEntry(
         item.sub_account_id || null, item.sub_account_type || null
       ]
     );
+  }
+
+  return jeId;
+}
+
+// =========================================================================
+// UNIVERSAL ATOMIC ACCOUNTING PIPELINE (Enterprise Integrity Engine)
+// Enforces that every financial document and its journal entry are committed
+// atomically in ONE backend database transaction. Eliminates orphan documents.
+// =========================================================================
+export function getReferenceTypeForModule(moduleName: string): string {
+  const map: Record<string, string> = {
+    invoices: 'invoice',
+    returns: 'return',
+    purchase_invoices: 'purchase_invoice',
+    purchase_returns: 'purchase_return',
+    receipt_vouchers: 'receipt_voucher',
+    payment_vouchers: 'payment_voucher',
+    cash_transfers: 'cash_transfer',
+    customer_discounts: 'customer_discount',
+    supplier_discounts: 'supplier_discount',
+    opening_stock_balances: 'opening_stock_balance',
+    stock_adjustments: 'stock_adjustment',
+    customers: 'opening_balance',
+    suppliers: 'opening_balance'
+  };
+  return map[moduleName] || moduleName;
+}
+
+export async function buildDefaultReturnAccountingPayload(client: any, companyId: string, returnData: any, items: any[]): Promise<any> {
+  const custRes = await client.query('SELECT account_id, name FROM customers WHERE id = $1', [returnData.customer_id]);
+  const custAccId = custRes.rows[0]?.account_id;
+  const custAccName = custRes.rows[0]?.name || 'حساب العملاء';
+  
+  let revAccId = items?.[0]?.revenue_account_id;
+  let revAccName = 'مردودات مبيعات';
+  if (!revAccId) {
+    const accs = await client.query("SELECT id, name FROM accounts WHERE company_id = $1 AND (code LIKE '41%' OR name LIKE '%مبيعات%' OR name LIKE '%مردود%') ORDER BY code ASC LIMIT 1", [companyId]);
+    revAccId = accs.rows[0]?.id;
+    revAccName = accs.rows[0]?.name || revAccName;
+  }
+
+  const rate = Number(returnData.exchange_rate) || 1.0;
+  const foreignAmt = Number(returnData.total_amount) || 0;
+  const localAmt = Math.round(foreignAmt * rate * 100) / 100;
+
+  return {
+    date: returnData.date,
+    reference_type: 'return',
+    reference_number: returnData.return_number,
+    description: `قيد مردود مبيعات رقم ${returnData.return_number}`,
+    items: [
+      {
+        account_id: revAccId,
+        account_name: revAccName,
+        debit: localAmt,
+        credit: 0,
+        description: `مردود مبيعات رقم ${returnData.return_number}`,
+        currency: returnData.currency_id,
+        exchange_rate: rate,
+        foreign_amount: foreignAmt
+      },
+      {
+        account_id: custAccId,
+        account_name: custAccName,
+        debit: 0,
+        credit: localAmt,
+        description: `مردود مبيعات رقم ${returnData.return_number} - ${custAccName}`,
+        customer_id: returnData.customer_id,
+        currency: returnData.currency_id,
+        exchange_rate: rate,
+        foreign_amount: foreignAmt
+      }
+    ]
+  };
+}
+
+export async function processAtomicAccountingEntry(
+  client: any,
+  companyId: string,
+  docModule: string,
+  docId: string,
+  docData: any,
+  accountingPayload: any,
+  userId?: string
+): Promise<string | null> {
+  if (!accountingPayload) return null;
+
+  const rawItems = accountingPayload.items || accountingPayload.lines || [];
+  if (!Array.isArray(rawItems) || rawItems.length === 0) {
+    throw new Error('لا يمكن حفظ المستند: القيد المحاسبي المرفق لا يحتوي على بنود محاسبية صالحة.');
+  }
+
+  const rawDate = accountingPayload.date || docData.date || new Date().toISOString().slice(0, 10);
+  const dateStr = parseToStandardDateStr(rawDate) || new Date().toISOString().slice(0, 10);
+  const docExchangeRate = Number(docData.exchange_rate) || 1.0;
+  const docCurrency = docData.currency_id || docData.currency || 'EGP';
+
+  // 1. Check existing journal entry for this reference_id to maintain sequence & avoid duplicates
+  const existingJeRes = await client.query(
+    'SELECT id, entry_number FROM journal_entries WHERE company_id = $1 AND reference_id = $2 ORDER BY created_at ASC LIMIT 1',
+    [companyId, String(docId)]
+  );
+  let jeId = existingJeRes.rows[0]?.id;
+  let entryNumber = existingJeRes.rows[0]?.entry_number;
+
+  if (!entryNumber) {
+    entryNumber = await ensureUniqueSequenceNumber(pool, companyId, 'journal_entries', dateStr);
+  }
+
+  // Delete existing lines if updating
+  if (jeId) {
+    await client.query('DELETE FROM journal_entry_lines WHERE journal_entry_id = $1', [jeId]);
+  } else {
+    jeId = uuidv4();
+  }
+
+  // 2. Normalize and validate lines
+  let calculatedDebit = 0;
+  let calculatedCredit = 0;
+  const normalizedLines: any[] = [];
+
+  for (const item of rawItems) {
+    if (!item.account_id) {
+      throw new Error('لا يمكن حفظ المستند: يوجد طرف في القيد المحاسبي بدون تحديد حساب مالي صالح.');
+    }
+
+    const itemRate = Number(item.exchange_rate) || docExchangeRate;
+    const itemCurrency = item.currency || docCurrency;
+    const isForeign = itemCurrency !== 'EGP' && itemRate > 0 && itemRate !== 1.0;
+
+    let lineDebit = Number(item.debit) || 0;
+    let lineCredit = Number(item.credit) || 0;
+    let foreignAmt = Number(item.foreign_amount) || 0;
+
+    // Convert foreign currency to local currency strictly if not already converted
+    if (foreignAmt > 0) {
+      if (lineDebit > 0 && Math.abs(lineDebit - foreignAmt) < 0.001) {
+        lineDebit = Math.round(foreignAmt * itemRate * 100) / 100;
+      }
+      if (lineCredit > 0 && Math.abs(lineCredit - foreignAmt) < 0.001) {
+        lineCredit = Math.round(foreignAmt * itemRate * 100) / 100;
+      }
+    } else if (isForeign) {
+      if (lineDebit > 0) {
+        foreignAmt = lineDebit;
+        lineDebit = Math.round(lineDebit * itemRate * 100) / 100;
+      }
+      if (lineCredit > 0) {
+        foreignAmt = lineCredit;
+        lineCredit = Math.round(lineCredit * itemRate * 100) / 100;
+      }
+    }
+
+    lineDebit = Math.round(lineDebit * 100) / 100;
+    lineCredit = Math.round(lineCredit * 100) / 100;
+
+    // Control Account Protection: Link customer_id or supplier_id directly on control account lines
+    let customerId = item.customer_id || (item.sub_account_type === 'customer' ? item.sub_account_id : null);
+    let supplierId = item.supplier_id || (item.sub_account_type === 'supplier' ? item.sub_account_id : null);
+
+    if (!customerId && (String(item.account_code || '').startsWith('111') || (item.account_name && item.account_name.includes('عملاء')))) {
+      customerId = docData.customer_id || null;
+    }
+    if (!supplierId && (String(item.account_code || '').startsWith('211') || (item.account_name && item.account_name.includes('موردين')))) {
+      supplierId = docData.supplier_id || null;
+    }
+
+    calculatedDebit += lineDebit;
+    calculatedCredit += lineCredit;
+
+    normalizedLines.push({
+      id: item.id || uuidv4(),
+      account_id: item.account_id,
+      account_name: item.account_name || '',
+      description: item.description || accountingPayload.description || '',
+      debit: lineDebit,
+      credit: lineCredit,
+      currency: itemCurrency,
+      exchange_rate: itemRate,
+      foreign_amount: foreignAmt || null,
+      customer_id: customerId || null,
+      supplier_id: supplierId || null,
+      sub_account_id: item.sub_account_id || customerId || supplierId || null,
+      sub_account_type: item.sub_account_type || (customerId ? 'customer' : (supplierId ? 'supplier' : null)),
+      cost_center_id: item.cost_center_id || docData.cost_center_id || null,
+      department_id: item.department_id || docData.department_id || null
+    });
+  }
+
+  calculatedDebit = Math.round(calculatedDebit * 100) / 100;
+  calculatedCredit = Math.round(calculatedCredit * 100) / 100;
+
+  // Strict mathematical balancing
+  const diff = Math.round((calculatedDebit - calculatedCredit) * 100) / 100;
+  if (Math.abs(diff) > 0.05) {
+    throw new Error(`القيد المحاسبي غير متزن تقنياً: مجموع المدين (${calculatedDebit.toFixed(2)}) لا يساوي مجموع الدائن (${calculatedCredit.toFixed(2)})، الفرق: ${diff.toFixed(2)}`);
+  } else if (diff !== 0 && normalizedLines.length > 0) {
+    if (diff > 0) {
+      const creditLine = normalizedLines.find(l => l.credit > 0) || normalizedLines[0];
+      creditLine.credit = Math.round((creditLine.credit + diff) * 100) / 100;
+      calculatedCredit = calculatedDebit;
+    } else {
+      const debitLine = normalizedLines.find(l => l.debit > 0) || normalizedLines[0];
+      debitLine.debit = Math.round((debitLine.debit + Math.abs(diff)) * 100) / 100;
+      calculatedDebit = calculatedCredit;
+    }
+  }
+
+  const docNumber = docData.invoice_number || docData.return_number || docData.voucher_number || docData.transfer_number || docData.number || String(docId);
+  const description = accountingPayload.description || `قيد حركة ${docModule} رقم ${docNumber}`;
+  const refType = accountingPayload.reference_type || getReferenceTypeForModule(docModule);
+
+  // 3. Upsert journal_entries header
+  await client.query(`
+    INSERT INTO journal_entries (
+      id, company_id, entry_number, date, description,
+      reference_id, reference_type, reference_number,
+      total_debit, total_credit, status, created_by, created_at, updated_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'posted', $11, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    ON CONFLICT (id) DO UPDATE SET
+      date = EXCLUDED.date,
+      description = EXCLUDED.description,
+      reference_number = EXCLUDED.reference_number,
+      total_debit = EXCLUDED.total_debit,
+      total_credit = EXCLUDED.total_credit,
+      status = 'posted',
+      updated_at = CURRENT_TIMESTAMP
+  `, [
+    jeId, companyId, entryNumber, dateStr, description,
+    String(docId), refType, docNumber,
+    calculatedDebit, calculatedCredit, userId || 'system'
+  ]);
+
+  // 4. Insert journal_entry_lines
+  for (const line of normalizedLines) {
+    await client.query(`
+      INSERT INTO journal_entry_lines (
+        id, journal_entry_id, account_id, account_name, description,
+        debit, credit, company_id, currency, exchange_rate, foreign_amount,
+        customer_id, supplier_id, sub_account_id, sub_account_type,
+        cost_center_id, department_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+    `, [
+      line.id, jeId, line.account_id, line.account_name, line.description,
+      line.debit, line.credit, companyId, line.currency, line.exchange_rate, line.foreign_amount,
+      line.customer_id, line.supplier_id, line.sub_account_id, line.sub_account_type,
+      line.cost_center_id, line.department_id
+    ]);
+  }
+
+  // 5. If document is invoice/return, synchronize COGS entries if perpetual inventory
+  if (['invoice', 'return', 'sales_return'].includes(refType)) {
+    try {
+      await syncCOGSForJournalEntry(client, companyId, jeId, String(docId), refType);
+      await balanceAndValidateJournalEntry(client, jeId);
+    } catch (cogsErr) {
+      console.warn('[COGS_WARN] COGS sync notice:', cogsErr);
+    }
   }
 
   return jeId;
@@ -7424,6 +7685,19 @@ modules.forEach(moduleName => {
             }, req.user?.email || 'system', client);
           }
 
+          // Enterprise Atomic Accounting Integration (Zero Orphan Documents)
+          if (req.body._accounting_entry) {
+            await processAtomicAccountingEntry(
+              client,
+              companyId,
+              moduleName,
+              result.rows[0]?.id || data.id,
+              result.rows[0] || data,
+              req.body._accounting_entry,
+              req.user?.id
+            );
+          }
+
           await client.query('COMMIT');
 
           // Audit Log
@@ -7780,6 +8054,19 @@ modules.forEach(moduleName => {
 
           const result = await pool.query(query, params);
           if (result.rowCount === 0) return sendError(res, 404, 'Not found or permission denied');
+
+          // Enterprise Atomic Accounting Integration (Zero Orphan Documents)
+          if (req.body._accounting_entry) {
+            await processAtomicAccountingEntry(
+              pool,
+              companyId || '',
+              moduleName,
+              id,
+              sanitizedData,
+              req.body._accounting_entry,
+              req.user?.id
+            );
+          }
 
           // MED-02-B: If user password was updated, sync password_hash across all company records for this email and invalidate active sessions
           if (moduleName === 'users' && (sanitizedData as any).password_hash) {
@@ -8727,6 +9014,11 @@ router.post('/invoices', authenticateToken, TransactionsLimitMiddleware, async (
       }, movementLines, client);
     }
 
+    // Enterprise Atomic Accounting Integration (Zero Orphan Documents)
+    if (req.body._accounting_entry) {
+      await processAtomicAccountingEntry(client, companyId, 'invoices', invoiceId, invoiceData, req.body._accounting_entry, req.user?.id);
+    }
+
     await client.query('COMMIT');
 
     // Audit Log
@@ -9019,6 +9311,12 @@ router.put('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
         }, movementLines, client);
       }
     }
+
+    // Enterprise Atomic Accounting Integration (Zero Orphan Documents)
+    if (req.body._accounting_entry) {
+      await processAtomicAccountingEntry(client, companyId || '', 'invoices', invoiceId, invoiceData, req.body._accounting_entry, req.user?.id);
+    }
+
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
@@ -9173,6 +9471,10 @@ router.post('/returns', authenticateToken, async (req: AuthRequest, res) => {
       }, movementLines, client);
     }
 
+    // Enterprise Atomic Accounting Integration (Zero Orphan Documents)
+    const retAccountingPayload = req.body._accounting_entry || await buildDefaultReturnAccountingPayload(client, companyId, returnData, items || []);
+    await processAtomicAccountingEntry(client, companyId, 'returns', returnId, returnData, retAccountingPayload, req.user?.id);
+
     await client.query('COMMIT');
     res.status(201).json({ id: returnId, return_number: returnData.return_number });
   } catch (error: any) {
@@ -9320,7 +9622,12 @@ router.put('/returns/:id', authenticateToken, async (req: AuthRequest, res) => {
           }, movementLines, client);
         }
   }
-  await client.query('COMMIT');
+
+    // Enterprise Atomic Accounting Integration (Zero Orphan Documents)
+    const retAccountingPayload = req.body._accounting_entry || await buildDefaultReturnAccountingPayload(client, companyId || '', returnData, items || []);
+    await processAtomicAccountingEntry(client, companyId || '', 'returns', returnId, returnData, retAccountingPayload, req.user?.id);
+
+    await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
     if (client) await client.query('ROLLBACK');
@@ -9899,6 +10206,11 @@ await client.query(
       }
     }
 
+    // Enterprise Atomic Accounting Integration (Zero Orphan Documents)
+    if (req.body._accounting_entry) {
+      await processAtomicAccountingEntry(client, companyId, 'purchase_invoices', invoiceId, invoiceData, req.body._accounting_entry, req.user?.id);
+    }
+
     await client.query('COMMIT');
     res.status(201).json({ id: invoiceId, invoice_number: invoiceData.invoice_number });
   } catch (error: any) {
@@ -10265,7 +10577,13 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
           }
         }
   }
-  await client.query('COMMIT');
+
+    // Enterprise Atomic Accounting Integration (Zero Orphan Documents)
+    if (req.body._accounting_entry) {
+      await processAtomicAccountingEntry(client, companyId || '', 'purchase_invoices', invoiceId, invoiceData, req.body._accounting_entry, req.user?.id);
+    }
+
+    await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
     if (client) await client.query('ROLLBACK');
@@ -10406,6 +10724,11 @@ router.post('/purchase_returns', authenticateToken, async (req: AuthRequest, res
       }, movementLines, client);
     }
 
+    // Enterprise Atomic Accounting Integration (Zero Orphan Documents)
+    if (req.body._accounting_entry) {
+      await processAtomicAccountingEntry(client, companyId, 'purchase_returns', returnId, returnData, req.body._accounting_entry, req.user?.id);
+    }
+
     await client.query('COMMIT');
     res.status(201).json({ id: returnId, return_number: returnData.return_number });
   } catch (error: any) {
@@ -10539,7 +10862,13 @@ router.put('/purchase_returns/:id', authenticateToken, async (req: AuthRequest, 
           }, movementLines, client);
         }
   }
-  await client.query('COMMIT');
+
+    // Enterprise Atomic Accounting Integration (Zero Orphan Documents)
+    if (req.body._accounting_entry) {
+      await processAtomicAccountingEntry(client, companyId || '', 'purchase_returns', returnId, returnData, req.body._accounting_entry, req.user?.id);
+    }
+
+    await client.query('COMMIT');
     res.json({ success: true });
   } catch (error: any) {
     if (client) await client.query('ROLLBACK');
@@ -10592,12 +10921,18 @@ router.post('/journal_entries', authenticateToken, TransactionsLimitMiddleware, 
     let existingEntryNumber: string | null = null;
     if (entryData.reference_id && companyId) {
       const existingRes = await client.query(
-        'SELECT id, entry_number FROM journal_entries WHERE company_id = $1 AND reference_id = $2 LIMIT 1',
+        'SELECT id, entry_number, total_debit, total_credit FROM journal_entries WHERE company_id = $1 AND reference_id = $2 LIMIT 1',
         [companyId, entryData.reference_id]
       );
       if (existingRes.rows.length > 0) {
         existingEntryId = existingRes.rows[0].id;
         existingEntryNumber = existingRes.rows[0].entry_number;
+        const exDebit = Math.round(Number(existingRes.rows[0].total_debit) * 100) / 100;
+        // If entry was already posted in the same atomic transaction with matching debit, confirm idempotently
+        if (Math.abs(exDebit - roundedDebit) < 0.05 || (exDebit > 0 && roundedDebit === 0)) {
+          await client.query('COMMIT');
+          return res.status(200).json({ id: existingEntryId, entry_number: existingEntryNumber });
+        }
       }
     }
 
@@ -10634,6 +10969,14 @@ router.post('/journal_entries', authenticateToken, TransactionsLimitMiddleware, 
       const itemId = uuidv4();
       const itemData = { ...sanitizedItem, id: itemId, journal_entry_id: entryId };
       if (finalEntryData.company_id) itemData.company_id = finalEntryData.company_id;
+
+      // Control account protection: link customer_id or supplier_id
+      if (!itemData.customer_id && (itemData.sub_account_type === 'customer' || String(item.account_code || '').startsWith('111') || (item.account_name && item.account_name.includes('عملاء')))) {
+        itemData.customer_id = item.sub_account_id || item.customer_id || null;
+      }
+      if (!itemData.supplier_id && (itemData.sub_account_type === 'supplier' || String(item.account_code || '').startsWith('211') || (item.account_name && item.account_name.includes('موردين')))) {
+        itemData.supplier_id = item.sub_account_id || item.supplier_id || null;
+      }
 
       const itemKeys = Object.keys(itemData);
       const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');

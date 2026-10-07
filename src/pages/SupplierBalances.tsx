@@ -159,33 +159,11 @@ export const SupplierBalances: React.FC = () => {
 
           const sumDebit = Number(supplierItems.reduce((sum: number, item: any) => sum + (Number(item.debit) || 0), 0).toFixed(2));
           const sumCredit = Number(supplierItems.reduce((sum: number, item: any) => sum + (Number(item.credit) || 0), 0).toFixed(2));
-          const sumForeign = Number(supplierItems.reduce((sum: number, item: any) => sum + (Number(item.foreign_amount) || 0), 0).toFixed(2));
 
-          const isForeign = currencyCode !== 'EGP' && rate > 0 && rate !== 1;
-
-          let finalDebit = sumDebit;
-          let finalCredit = sumCredit;
-
-          if (isForeign) {
-            if (sumForeign > 0) {
-              finalDebit = sumDebit;
-              finalCredit = sumCredit;
-            } else {
-              const isDebitUnconverted = sumDebit > 0 && docTotal > 0 && Math.abs(sumDebit - docTotal) < 0.05;
-              const isCreditUnconverted = sumCredit > 0 && docTotal > 0 && Math.abs(sumCredit - docTotal) < 0.05;
-
-              if (isDebitUnconverted) {
-                finalDebit = Number((sumDebit * rate).toFixed(2));
-                finalCredit = 0;
-              } else if (isCreditUnconverted) {
-                finalCredit = Number((sumCredit * rate).toFixed(2));
-                finalDebit = 0;
-              } else {
-                finalDebit = sumDebit;
-                finalCredit = sumCredit;
-              }
-            }
-          }
+          // Enterprise standard: General Ledger is the Single Source of Truth
+          // Journal entry debits and credits are strictly in base currency (EGP)
+          const finalDebit = sumDebit;
+          const finalCredit = sumCredit;
 
           supplierLines.push({
             date: je.date,

@@ -88,11 +88,15 @@ export class TransactionManager {
       };
       journalSchema.parse(testJournalWithRef);
 
-      // 3. Perform main save
-      const mainId = await dbService.add(mainCollection, mainData);
+      // 3. Perform main save with embedded accounting entry for atomic backend transaction execution
+      const payloadWithAccounting = {
+        ...mainData,
+        _accounting_entry: testJournalWithRef
+      };
+      const mainId = await dbService.add(mainCollection, payloadWithAccounting);
       manager['createdIds'].push({ collection: mainCollection, id: mainId });
 
-      // 4. Inject real reference and perform journal save
+      // 4. Inject real reference and confirm journal entry (backend handles idempotently)
       const journalWithRef = {
         ...journalData,
         reference_id: mainId
@@ -137,10 +141,14 @@ export class TransactionManager {
          testJournalWithRef.entry_number = preserved.entry_number;
       }
 
-      // 3. Perform main update
-      await dbService.update(mainCollection, mainId, mainData);
+      // 3. Perform main update with embedded accounting entry for atomic backend execution
+      const payloadWithAccounting = {
+        ...mainData,
+        _accounting_entry: testJournalWithRef
+      };
+      await dbService.update(mainCollection, mainId, payloadWithAccounting);
 
-      // 4. Perform journal save
+      // 4. Confirm journal save (backend handles idempotently)
       const journalId = await dbService.add('journal_entries', testJournalWithRef);
       manager['createdIds'].push({ collection: 'journal_entries', id: journalId });
 
