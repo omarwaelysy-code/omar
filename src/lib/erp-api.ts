@@ -2431,6 +2431,19 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         partyAccCol: 'account_id'
       },
       {
+        key: 'supplier_discounts',
+        name: 'خصومات الموردين (الخصم المكتسب)',
+        table: 'supplier_discounts',
+        numCol: 'id',
+        dateCol: 'date',
+        amountCol: 'amount',
+        refTypes: ['supplier_discount'],
+        partyCol: 'supplier_name',
+        partyIdCol: 'supplier_id',
+        partyTable: 'suppliers',
+        partyAccCol: 'account_id'
+      },
+      {
         key: 'received_cheques',
         name: 'الشيكات الواردة',
         table: 'received_cheques',
