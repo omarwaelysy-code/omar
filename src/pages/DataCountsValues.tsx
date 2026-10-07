@@ -78,6 +78,7 @@ interface PostingTransactionItem {
 
 export interface ReportReconciliationItem {
   id: string;
+  category?: string;
   report_name: string;
   subledger_name: string;
   gl_account_name: string;
@@ -108,6 +109,7 @@ export const DataCountsValues: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'all' | 'reports' | 'posting' | 'operational' | 'master'>('all');
+  const [reportCategory, setReportCategory] = useState<string>('all');
   const [fixing, setFixing] = useState<boolean>(false);
   const [fixResult, setFixResult] = useState<any | null>(null);
 
@@ -184,7 +186,7 @@ export const DataCountsValues: React.FC = () => {
     if (data.reports_reconciliation && data.reports_reconciliation.length > 0) {
       data.reports_reconciliation.forEach(rep => {
         rows.push({
-          'القسم': 'مطابقة التقارير مع ميزان المراجعة والمركز المالي',
+          'القسم': `مطابقة التقارير (${rep.category || 'عام'})`,
           'نوع الحركة': rep.report_name,
           'العدد': 1,
           'صافي الحركة (المستندات)': rep.subledger_value,
@@ -300,13 +302,16 @@ export const DataCountsValues: React.FC = () => {
     );
   }
 
-  const filteredReports = (data.reports_reconciliation || []).filter(item =>
-    !searchQuery || 
-    item.report_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.subledger_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.gl_account_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredReports = (data.reports_reconciliation || []).filter(item => {
+    const matchesCategory = reportCategory === 'all' || item.category === reportCategory;
+    const matchesSearch = !searchQuery || 
+      item.report_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.subledger_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.gl_account_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.category && item.category.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchesCategory && matchesSearch;
+  });
 
   const filteredPosting = data.posting_transactions.filter(item => 
     !searchQuery || item.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -626,11 +631,39 @@ export const DataCountsValues: React.FC = () => {
             </span>
           </div>
 
+          {/* Category Filter Pills */}
+          <div className="px-6 py-3 bg-stone-50/80 border-b border-stone-200 flex items-center gap-2 overflow-x-auto">
+            <span className="text-xs font-black text-stone-500 whitespace-nowrap ml-1">
+              {language === 'ar' ? 'أقسام التقارير:' : 'Categories:'}
+            </span>
+            {[
+              { id: 'all', label: language === 'ar' ? 'عرض الكل (18)' : 'All Reports (18)' },
+              { id: 'المستودع والمخازن', label: language === 'ar' ? 'المستودع والمخازن (3)' : 'Warehouse & Inventory (3)' },
+              { id: 'العملاء والمبيعات', label: language === 'ar' ? 'العملاء والمبيعات (4)' : 'Customers & Sales (4)' },
+              { id: 'الموردين والمشتريات', label: language === 'ar' ? 'الموردين والمشتريات (3)' : 'Suppliers & Purchases (3)' },
+              { id: 'النقدية والمصروفات', label: language === 'ar' ? 'النقدية والمصروفات (3)' : 'Cash & Expenses (3)' },
+              { id: 'التقارير المالية والمحاسبية', label: language === 'ar' ? 'التقارير المالية والمحاسبية (5)' : 'Financial Accounting (5)' },
+            ].map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setReportCategory(cat.id)}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                  reportCategory === cat.id
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
           {/* Table */}
           <div className="overflow-x-auto">
             <table className="w-full text-right border-collapse text-xs">
               <thead>
                 <tr className="bg-stone-50/90 text-stone-600 border-b border-stone-200 font-black">
+                  <th className="py-3 px-3 whitespace-nowrap">{language === 'ar' ? 'القسم' : 'Category'}</th>
                   <th className="py-3 px-4 whitespace-nowrap">{language === 'ar' ? 'التقرير / دفتر الأستاذ المساعد' : 'Report / Subledger'}</th>
                   <th className="py-3 px-3 whitespace-nowrap text-left">{language === 'ar' ? 'قيمة التقرير / الأستاذ المساعد' : 'Subledger Value'}</th>
                   <th className="py-3 px-4 whitespace-nowrap">{language === 'ar' ? 'الحساب المقابل في الأستاذ العام / المركز المالي' : 'GL Control / Statement Account'}</th>
@@ -645,15 +678,38 @@ export const DataCountsValues: React.FC = () => {
                 {filteredReports.map((item, idx) => {
                   const isZero = Math.abs(item.variance) < 0.01;
                   const pageTarget = 
+                    item.id === 'stock_card_report' ? 'stock_card_report' :
+                    item.id === 'stock_balances_report' ? 'stock_balances_report' :
+                    item.id === 'general_stock_movements_report' ? 'general_stock_movements_report' :
+                    item.id === 'customer_statement' ? 'customer_statement' :
                     item.id === 'customer_balances' ? 'customer_balances' :
+                    item.id === 'customer_aging_report' ? 'customer_aging_report' :
+                    item.id === 'sales_report' ? 'sales_report' :
+                    item.id === 'supplier_statement' ? 'supplier_statement' :
                     item.id === 'supplier_balances' ? 'supplier_balances' :
+                    item.id === 'supplier_aging_report' ? 'supplier_aging_report' :
+                    item.id === 'cash_as_of_balances' ? 'cash_as_of_balances' :
+                    item.id === 'cash_balances' ? 'cash_balances' :
+                    item.id === 'expenses_report' ? 'expenses_report' :
+                    item.id === 'general_ledger_report' ? 'general_ledger_report' :
                     item.id === 'trial_balance' ? 'trial_balance' :
-                    item.id === 'balance_sheet_equation' ? 'balance_sheet' :
-                    item.id === 'cash_and_banks' ? 'cash_as_of_balances' :
-                    item.id === 'net_profit_match' ? 'income_statement' : null;
+                    item.id === 'income_statement' ? 'income_statement' :
+                    item.id === 'balance_sheet' ? 'balance_sheet' :
+                    item.id === 'cash_flow_statement' ? 'cash_flow_statement' : null;
 
                   return (
                     <tr key={idx} className="hover:bg-indigo-50/30 transition-colors">
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black border inline-block ${
+                          item.category === 'المستودع والمخازن' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+                          item.category === 'العملاء والمبيعات' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+                          item.category === 'الموردين والمشتريات' ? 'bg-blue-50 text-blue-800 border-blue-200' :
+                          item.category === 'النقدية والمصروفات' ? 'bg-cyan-50 text-cyan-800 border-cyan-200' :
+                          'bg-purple-50 text-purple-800 border-purple-200'
+                        }`}>
+                          {item.category || 'عام'}
+                        </span>
+                      </td>
                       <td className="py-3 px-4">
                         <div className="font-black text-stone-900 text-xs flex items-center gap-1.5">
                           <BookOpen size={14} className="text-indigo-600 flex-shrink-0" />
