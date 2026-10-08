@@ -4307,7 +4307,7 @@ async function updatePOBillingStatus(client: any, companyId: string, poId: strin
 function parseRow(table: string, row: any) {
   if (!row) return row;
   const jsonbFields = [
-    'entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata',
+    'entity', 'changes', 'items', 'settings', 'permissions', 'metadata',
     'features', 'options', 'settlements', 'filters', 'role_ids', 'attachments', 'bank_accounts',
     'to_users', 'cc_users', 'is_starred', 'read_by', 'archived_by', 'deleted_by'
   ];
@@ -4316,6 +4316,9 @@ function parseRow(table: string, row: any) {
   if (table === 'users') {
     delete parsed.password_hash;
     delete parsed.temp_password;
+  }
+  if (table === 'internal_messages' && typeof parsed.category === 'string') {
+    parsed.category = parsed.category.replace(/^"|"$/g, '').trim();
   }
   jsonbFields.forEach(field => {
     if (field in parsed && parsed[field] !== null && typeof parsed[field] === 'string') {
@@ -4341,7 +4344,7 @@ function sanitizeData(table: string, data: any) {
   
   const sanitized: any = {};
   const jsonbFields = [
-    'entity', 'category', 'changes', 'items', 'settings', 'permissions', 'metadata',
+    'entity', 'changes', 'items', 'settings', 'permissions', 'metadata',
     'features', 'value', 'options', 'settlements', 'filters', 'role_ids', 'attachments', 'bank_accounts',
     'to_users', 'cc_users', 'is_starred', 'read_by', 'archived_by', 'deleted_by'
   ];
@@ -7191,6 +7194,43 @@ router.use(fixedAssetsRouter);
 // INTERNAL MAIL & TECHNICAL SUPPORT SYSTEM
 // ==========================================
 
+// 0. Dedicated List endpoint for internal messages (Reliable multi-tenant & recipient delivery)
+router.get(['/internal_messages', '/internal-messages'], authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user?.id || '';
+    const userEmail = (req.user?.email || '').toLowerCase().trim();
+    const companyId = req.user?.company_id;
+    const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
+
+    const { rows } = await pool.query(`
+      SELECT * FROM internal_messages
+      WHERE (
+        sender_id = $1 
+        OR ($2 != '' AND LOWER(COALESCE(sender_email, '')) = $2)
+        OR to_users::text ILIKE '%"' || $1 || '"%'
+        OR cc_users::text ILIKE '%"' || $1 || '"%'
+        OR ($2 != '' AND (to_users::text ILIKE '%' || $2 || '%' OR cc_users::text ILIKE '%' || $2 || '%'))
+        OR ($3::varchar IS NOT NULL AND company_id = $3)
+        OR ($4 = true AND (category = 'support' OR category = '"support"'))
+      )
+      ORDER BY created_at DESC
+    `, [userId, userEmail, companyId || null, isSuperAdmin]);
+
+    const parsedRows = rows.map(r => {
+      const p = parseRow('internal_messages', r);
+      if (typeof p.category === 'string') {
+        p.category = p.category.replace(/^"|"$/g, '').trim();
+      }
+      return p;
+    });
+
+    res.json(parsedRows);
+  } catch (error: any) {
+    console.error('Error fetching internal messages:', error);
+    res.status(500).json({ error: 'Failed to fetch messages' });
+  }
+});
+
 // 1. Fetch mail contacts (Company users or support agents)
 router.get('/internal-messages/contacts', authenticateToken, async (req: AuthRequest, res) => {
   try {
@@ -7228,47 +7268,59 @@ router.get('/internal-messages/contacts', authenticateToken, async (req: AuthReq
 // 2. Fetch unread count for current user
 router.get('/internal-messages/unread-count', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const userId = req.user?.id;
-    const companyId = req.user?.company_id;
-    if (!userId) return res.json({ total: 0, company: 0, support: 0 });
+    const userId = req.user?.id || '';
+    const userEmail = (req.user?.email || '').toLowerCase().trim();
+    const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
+    if (!userId && !userEmail) return res.json({ total: 0, company: 0, support: 0 });
 
     // Count for company mail
     const companyQuery = `
       SELECT COUNT(*)::int AS count 
       FROM internal_messages 
-      WHERE category = 'company' 
-        AND company_id = $1
-        AND (to_users::text ILIKE '%"' || $2 || '"%' OR cc_users::text ILIKE '%"' || $2 || '"%')
-        AND NOT (read_by::text ILIKE '%"' || $2 || '"%')
-        AND NOT (deleted_by::text ILIKE '%"' || $2 || '"%')
-        AND NOT (archived_by::text ILIKE '%"' || $2 || '"%')
+      WHERE (category = 'company' OR category = '"company"')
+        AND (
+          to_users::text ILIKE '%"' || $1 || '"%' 
+          OR cc_users::text ILIKE '%"' || $1 || '"%'
+          OR ($2 != '' AND (to_users::text ILIKE '%' || $2 || '%' OR cc_users::text ILIKE '%' || $2 || '%'))
+        )
+        AND NOT (read_by::text ILIKE '%"' || $1 || '"%')
+        AND NOT (deleted_by::text ILIKE '%"' || $1 || '"%')
+        AND NOT (archived_by::text ILIKE '%"' || $1 || '"%')
+        AND sender_id != $1
+        AND ($2 = '' OR LOWER(COALESCE(sender_email, '')) != $2)
     `;
-    const compRes = companyId ? await pool.query(companyQuery, [companyId, userId]) : { rows: [{ count: 0 }] };
+    const compRes = await pool.query(companyQuery, [userId, userEmail]);
     const compCount = compRes.rows[0]?.count || 0;
 
     // Count for support mail
     let supportCount = 0;
-    if (req.user?.role === 'super_admin') {
+    if (isSuperAdmin) {
       const supRes = await pool.query(`
         SELECT COUNT(*)::int AS count
         FROM internal_messages
-        WHERE category = 'support'
+        WHERE (category = 'support' OR category = '"support"')
           AND NOT (read_by::text ILIKE '%"' || $1 || '"%')
           AND NOT (deleted_by::text ILIKE '%"' || $1 || '"%')
           AND sender_id != $1
-      `, [userId]);
+          AND ($2 = '' OR LOWER(COALESCE(sender_email, '')) != $2)
+      `, [userId, userEmail]);
       supportCount = supRes.rows[0]?.count || 0;
-    } else if (companyId) {
+    } else {
       const supRes = await pool.query(`
         SELECT COUNT(*)::int AS count
         FROM internal_messages
-        WHERE category = 'support'
-          AND company_id = $1
-          AND (to_users::text ILIKE '%"' || $2 || '"%' OR cc_users::text ILIKE '%"' || $2 || '"%' OR sender_id != $2)
-          AND NOT (read_by::text ILIKE '%"' || $2 || '"%')
-          AND NOT (deleted_by::text ILIKE '%"' || $2 || '"%')
-          AND NOT (archived_by::text ILIKE '%"' || $2 || '"%')
-      `, [companyId, userId]);
+        WHERE (category = 'support' OR category = '"support"')
+          AND (
+            to_users::text ILIKE '%"' || $1 || '"%' 
+            OR cc_users::text ILIKE '%"' || $1 || '"%'
+            OR ($2 != '' AND (to_users::text ILIKE '%' || $2 || '%' OR cc_users::text ILIKE '%' || $2 || '%'))
+          )
+          AND NOT (read_by::text ILIKE '%"' || $1 || '"%')
+          AND NOT (deleted_by::text ILIKE '%"' || $1 || '"%')
+          AND NOT (archived_by::text ILIKE '%"' || $1 || '"%')
+          AND sender_id != $1
+          AND ($2 = '' OR LOWER(COALESCE(sender_email, '')) != $2)
+      `, [userId, userEmail]);
       supportCount = supRes.rows[0]?.count || 0;
     }
 

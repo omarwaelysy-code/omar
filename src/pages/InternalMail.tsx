@@ -232,24 +232,51 @@ export const InternalMail: React.FC = () => {
   }, []);
 
   // Filter messages based on active Category, Folder, and Search Query
+  // Current user identifiers
   const currentUserId = user?.id || '';
+  const currentUserEmail = (user?.email || '').toLowerCase().trim();
+  const currentUserName = (user?.name || user?.username || '').toLowerCase().trim();
+
+  // Helper to test if a recipient user item represents the currently logged-in user
+  const checkIsUserMe = (u: any) => {
+    if (!u) return false;
+    if (currentUserId && u.id && u.id === currentUserId) return true;
+    const uEmail = (u.email || '').toLowerCase().trim();
+    const uName = (u.name || '').toLowerCase().trim();
+    const uUsername = (u.username || '').toLowerCase().trim();
+    if (currentUserEmail) {
+      if (uEmail && uEmail === currentUserEmail) return true;
+      if (uName && uName === currentUserEmail) return true;
+      if (uUsername && uUsername === currentUserEmail) return true;
+    }
+    if (currentUserName) {
+      if (uName && uName === currentUserName) return true;
+      if (uUsername && uUsername === currentUserName) return true;
+      if (uEmail && uEmail === currentUserName) return true;
+    }
+    return false;
+  };
+
   const filteredMessages = useMemo(() => {
     return messages.filter(msg => {
-      // 1. Filter by category ('company' or 'support')
-      if (msg.category !== activeCategory) return false;
+      // 1. Filter by category ('company' or 'support'), normalizing any quotes
+      const msgCat = (msg.category || '').toString().replace(/^"|"$/g, '').trim();
+      if (msgCat !== activeCategory) return false;
 
       // Check soft-deleted
       const isDeleted = Array.isArray(msg.deleted_by) && msg.deleted_by.includes(currentUserId);
       const isArchived = Array.isArray(msg.archived_by) && msg.archived_by.includes(currentUserId);
       const isStarred = Array.isArray(msg.is_starred) && msg.is_starred.includes(currentUserId);
-      const isSentByMe = msg.sender_id === currentUserId;
+      const isSentByMe = (currentUserId && msg.sender_id === currentUserId) ||
+        (currentUserEmail && (msg.sender_email || '').toLowerCase().trim() === currentUserEmail);
+
       // Addressed to me (either in To or CC)?
-      const isToMe = Array.isArray(msg.to_users) && msg.to_users.some(u => u.id === currentUserId);
-      const isCcMe = Array.isArray(msg.cc_users) && msg.cc_users.some(u => u.id === currentUserId);
+      const isToMe = Array.isArray(msg.to_users) && msg.to_users.some(checkIsUserMe);
+      const isCcMe = Array.isArray(msg.cc_users) && msg.cc_users.some(checkIsUserMe);
       const isAddressedToMe = isToMe || isCcMe;
 
       // Super admin can see all support messages
-      const isSuperAdminSupport = user?.role === 'super_admin' && msg.category === 'support';
+      const isSuperAdminSupport = user?.role === 'super_admin' && msgCat === 'support';
 
       // If viewing trash
       if (activeFolder === 'trash') {
@@ -288,7 +315,7 @@ export const InternalMail: React.FC = () => {
 
       return true;
     }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }, [messages, activeCategory, activeFolder, searchQuery, currentUserId, user?.role]);
+  }, [messages, activeCategory, activeFolder, searchQuery, currentUserId, currentUserEmail, currentUserName, user?.role]);
 
   // Folder Counts
   const folderCounts = useMemo(() => {
@@ -300,15 +327,17 @@ export const InternalMail: React.FC = () => {
     let trashTotal = 0;
 
     messages.forEach(msg => {
-      if (msg.category !== activeCategory) return;
+      const msgCat = (msg.category || '').toString().replace(/^"|"$/g, '').trim();
+      if (msgCat !== activeCategory) return;
       const isDeleted = Array.isArray(msg.deleted_by) && msg.deleted_by.includes(currentUserId);
       const isArchived = Array.isArray(msg.archived_by) && msg.archived_by.includes(currentUserId);
       const isStarred = Array.isArray(msg.is_starred) && msg.is_starred.includes(currentUserId);
-      const isSentByMe = msg.sender_id === currentUserId;
-      const isToMe = Array.isArray(msg.to_users) && msg.to_users.some(u => u.id === currentUserId);
-      const isCcMe = Array.isArray(msg.cc_users) && msg.cc_users.some(u => u.id === currentUserId);
+      const isSentByMe = (currentUserId && msg.sender_id === currentUserId) ||
+        (currentUserEmail && (msg.sender_email || '').toLowerCase().trim() === currentUserEmail);
+      const isToMe = Array.isArray(msg.to_users) && msg.to_users.some(checkIsUserMe);
+      const isCcMe = Array.isArray(msg.cc_users) && msg.cc_users.some(checkIsUserMe);
       const isAddressedToMe = isToMe || isCcMe;
-      const isSuperAdminSupport = user?.role === 'super_admin' && msg.category === 'support';
+      const isSuperAdminSupport = user?.role === 'super_admin' && msgCat === 'support';
       const isRead = Array.isArray(msg.read_by) && msg.read_by.includes(currentUserId);
 
       if (isDeleted) {
@@ -326,7 +355,7 @@ export const InternalMail: React.FC = () => {
     });
 
     return { inboxUnread, inboxTotal, sentTotal, starredTotal, archiveTotal, trashTotal };
-  }, [messages, activeCategory, currentUserId, user?.role]);
+  }, [messages, activeCategory, currentUserId, currentUserEmail, currentUserName, user?.role]);
 
   // Open Message and Mark Read
   const handleSelectMessage = async (msg: InternalMessage) => {
@@ -439,13 +468,20 @@ export const InternalMail: React.FC = () => {
     if (!text) return null;
 
     // Check if it matches an existing contact by email, username, or name
+    const qClean = text.toLowerCase().trim();
     const matched = companyUsers.find(
-      c => (c.email && c.email.toLowerCase() === text.toLowerCase()) ||
-           (c.username && c.username.toLowerCase() === text.toLowerCase()) ||
-           (c.name && c.name.toLowerCase() === text.toLowerCase())
+      c => (c.email && c.email.toLowerCase().trim() === qClean) ||
+           (c.username && c.username.toLowerCase().trim() === qClean) ||
+           (c.name && c.name.toLowerCase().trim() === qClean)
     );
 
-    const recipient: MailUser = matched || {
+    const recipient: MailUser = matched ? {
+      id: matched.id,
+      name: matched.name || matched.username || text,
+      email: matched.email || (text.includes('@') ? text : ''),
+      username: matched.username || '',
+      role: matched.role || 'user'
+    } : {
       id: `custom-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       name: text.includes('@') ? text.split('@')[0] : text,
       email: text.includes('@') ? text : '',
