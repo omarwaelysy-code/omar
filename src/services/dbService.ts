@@ -176,7 +176,7 @@ function showPasswordModal(closingDate: string): Promise<string | null> {
   });
 }
 
-export async function apiRequest<T>(path: string, method: string = 'GET', body?: any, timeoutMs: number = 30000): Promise<T> {
+export async function apiRequest<T>(path: string, method: string = 'GET', body?: any, timeoutMs: number = 60000): Promise<T> {
   const token = localStorage.getItem('auth_token');
   let activeCompanyId = localStorage.getItem('current_company_id') || '';
   if (!activeCompanyId) {

@@ -43,6 +43,8 @@ export interface InternalMessage {
   subject: string;
   body: string;
   attachments?: AttachmentItem[];
+  total_size?: number;
+  size_display?: string;
   parent_id?: string;
   is_starred?: string[];
   read_by?: string[];

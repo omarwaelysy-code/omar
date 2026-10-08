@@ -7221,6 +7221,36 @@ router.get(['/internal_messages', '/internal-messages'], authenticateToken, asyn
       if (typeof p.category === 'string') {
         p.category = p.category.replace(/^"|"$/g, '').trim();
       }
+
+      // Calculate total message size (body + attachments)
+      const bodyBytes = Buffer.byteLength(p.body || '', 'utf8');
+      let attBytes = 0;
+      if (Array.isArray(p.attachments)) {
+        attBytes = p.attachments.reduce((sum: number, a: any) => {
+          const s = Number(a.size) || (a.url ? Math.round(a.url.length * 0.75) : 0);
+          return sum + s;
+        }, 0);
+
+        // Strip heavy base64 url from the list response to keep payload ultra fast and lightweight
+        p.attachments = p.attachments.map((att: any) => ({
+          id: att.id,
+          name: att.name,
+          size: Number(att.size) || (att.url ? Math.round(att.url.length * 0.75) : 0),
+          type: att.type,
+          uploaded_at: att.uploaded_at
+        }));
+      }
+
+      const totalSize = bodyBytes + attBytes;
+      p.total_size = totalSize;
+      if (totalSize < 1024) {
+        p.size_display = `${totalSize} B`;
+      } else if (totalSize < 1024 * 1024) {
+        p.size_display = `${(totalSize / 1024).toFixed(1)} KB`;
+      } else {
+        p.size_display = `${(totalSize / (1024 * 1024)).toFixed(2)} MB`;
+      }
+
       return p;
     });
 
@@ -7228,6 +7258,40 @@ router.get(['/internal_messages', '/internal-messages'], authenticateToken, asyn
   } catch (error: any) {
     console.error('Error fetching internal messages:', error);
     res.status(500).json({ error: 'Failed to fetch messages' });
+  }
+});
+
+// Single message detail endpoint (includes full attachment data URLs when requested)
+router.get(['/internal_messages/:id', '/internal-messages/:id'], authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await pool.query('SELECT * FROM internal_messages WHERE id = $1', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Message not found' });
+    const p = parseRow('internal_messages', rows[0]);
+    if (typeof p.category === 'string') {
+      p.category = p.category.replace(/^"|"$/g, '').trim();
+    }
+    const bodyBytes = Buffer.byteLength(p.body || '', 'utf8');
+    let attBytes = 0;
+    if (Array.isArray(p.attachments)) {
+      attBytes = p.attachments.reduce((sum: number, a: any) => {
+        const s = Number(a.size) || (a.url ? Math.round(a.url.length * 0.75) : 0);
+        return sum + s;
+      }, 0);
+    }
+    const totalSize = bodyBytes + attBytes;
+    p.total_size = totalSize;
+    if (totalSize < 1024) {
+      p.size_display = `${totalSize} B`;
+    } else if (totalSize < 1024 * 1024) {
+      p.size_display = `${(totalSize / 1024).toFixed(1)} KB`;
+    } else {
+      p.size_display = `${(totalSize / (1024 * 1024)).toFixed(2)} MB`;
+    }
+    res.json(p);
+  } catch (error: any) {
+    console.error('Error fetching message details:', error);
+    res.status(500).json({ error: 'Failed to fetch message details' });
   }
 });
 

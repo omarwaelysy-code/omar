@@ -103,6 +103,15 @@ function formatMailDateTime(dateStr?: string, isAr = true) {
   }
 }
 
+// Format message total size
+function formatMessageSize(bytes?: number, display?: string): string {
+  if (display) return display;
+  if (!bytes || bytes <= 0) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
 export const InternalMail: React.FC = () => {
   const { user } = useAuth();
   const { language, dir } = useLanguage();
@@ -361,6 +370,19 @@ export const InternalMail: React.FC = () => {
   const handleSelectMessage = async (msg: InternalMessage) => {
     setSelectedMessage(msg);
     setIsComposeOpen(false);
+
+    // If message has attachments without full url data, fetch full message in background
+    if (Array.isArray(msg.attachments) && msg.attachments.length > 0 && msg.attachments.some(a => !a.url)) {
+      dbService.get<InternalMessage>('internal_messages', msg.id).then(fullMsg => {
+        if (fullMsg && Array.isArray(fullMsg.attachments)) {
+          setSelectedMessage(prev => prev && prev.id === msg.id ? { ...prev, attachments: fullMsg.attachments } : prev);
+          setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, attachments: fullMsg.attachments } : m));
+        }
+      }).catch(err => {
+        console.error('Failed to load message attachment data:', err);
+      });
+    }
+
     const isRead = Array.isArray(msg.read_by) && msg.read_by.includes(currentUserId);
     if (!isRead) {
       try {
@@ -570,6 +592,11 @@ export const InternalMail: React.FC = () => {
       };
 
       const newId = await dbService.create<InternalMessage>('internal_messages', payload);
+      const bodyBytes = new Blob([composeBody.trim()]).size;
+      const attBytes = (composeAttachments || []).reduce((acc, a) => acc + (Number(a.size) || (a.url ? Math.round(a.url.length * 0.75) : 0)), 0);
+      const totalSize = bodyBytes + attBytes;
+      const sizeDisplay = formatMessageSize(totalSize);
+
       const created: InternalMessage = {
         id: (typeof newId === 'string' && newId) ? newId : (payload.id || Date.now().toString()),
         company_id: user?.company_id,
@@ -582,6 +609,8 @@ export const InternalMail: React.FC = () => {
         subject: composeSubject.trim(),
         body: composeBody.trim(),
         attachments: composeAttachments,
+        total_size: totalSize,
+        size_display: sizeDisplay,
         is_starred: [],
         read_by: [user?.id || ''],
         archived_by: [],
@@ -1656,7 +1685,11 @@ export const InternalMail: React.FC = () => {
                     {filteredMessages.length} {isAr ? 'رسائل' : 'messages'}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4 sm:gap-6">
+                  <div className="hidden sm:flex items-center gap-4 text-[11px] font-bold text-slate-400">
+                    <span className="w-20 text-center">{isAr ? 'حجم الرسالة' : 'Size'}</span>
+                    <span className="w-28 text-left md:text-right">{isAr ? 'التاريخ والوقت' : 'Date & Time'}</span>
+                  </div>
                   <span className="text-[11px] text-slate-400">
                     {isAr ? 'يتم التحديث تلقائياً' : 'Auto refreshed'}
                   </span>
@@ -1729,15 +1762,25 @@ export const InternalMail: React.FC = () => {
                           </span>
                         </div>
 
+                        {/* Column: Message Size (حجم الرسالة) */}
+                        <div
+                          className="shrink-0 flex items-center justify-center w-16 md:w-20"
+                          title={isAr ? `حجم الرسالة الإجمالي: ${formatMessageSize(msg.total_size, msg.size_display)}` : `Message Size: ${formatMessageSize(msg.total_size, msg.size_display)}`}
+                        >
+                          <span className="px-2 py-0.5 rounded-md text-[10px] md:text-[11px] font-mono font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-2xs">
+                            {formatMessageSize(msg.total_size, msg.size_display)}
+                          </span>
+                        </div>
+
                         {/* Attachment indicator */}
                         {hasAttachments && (
-                          <div className="shrink-0 text-slate-400" title={isAr ? 'تحتوي على مرفقات' : 'Has attachments'}>
+                          <div className="shrink-0 text-slate-400" title={isAr ? `تحتوي على ${msg.attachments?.length} مرفق` : 'Has attachments'}>
                             <Paperclip size={14} className="text-emerald-600" />
                           </div>
                         )}
 
                         {/* Exact Day, Date, and Time display */}
-                        <div className="shrink-0 text-left md:text-right font-medium text-[11px] text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300">
+                        <div className="shrink-0 text-left md:text-right font-medium text-[11px] text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 w-28 md:w-36">
                           <span className="hidden md:inline">{dateFormatted.displayString}</span>
                           <span className="inline md:hidden">{dateFormatted.shortDisplay}</span>
                         </div>
