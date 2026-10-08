@@ -9,7 +9,7 @@ import { format } from 'date-fns';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { useNotification } from '../contexts/NotificationContext';
-import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
+import { formatNumber, formatMoney, formatDate, getDocumentTypeName } from '../utils/formatUtils';
 import { PaginationControls } from '../components/PaginationControls';
 import { printDocument } from '../utils/printEngine';
 import { useNavigation } from '../contexts/NavigationContext';
@@ -181,10 +181,11 @@ export const JournalEntries: React.FC = () => {
 
   const handleExportExcel = () => {
     const data = filteredEntries.map(entry => ({
-      [t('journal.column_date')]: entry.date,
+      [t('journal.column_date')]: formatDate(entry.date),
+      [language === 'ar' ? 'نوع الحركة / المستند' : 'Document Type']: getDocumentTypeName(entry.reference_type, entry.description, entry.reference_number, language),
+      [t('journal.column_entry_number')]: entry.entry_number || '-',
       [t('journal.column_description')]: entry.description,
       [t('journal.column_reference')]: entry.reference_number || '-',
-      [t('journal.type')]: entry.reference_type,
       [t('journal.column_debit')]: entry.total_debit,
       [t('journal.column_credit')]: entry.total_credit
     }));
@@ -288,6 +289,9 @@ export const JournalEntries: React.FC = () => {
                     </span>
                   </div>
                 </th>
+                <th className="px-6 py-4 text-sm font-bold text-zinc-700">
+                  {language === 'ar' ? 'نوع الحركة / المستند' : 'Document Type'}
+                </th>
                 <th className="px-6 py-4 text-sm font-bold text-zinc-700 cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('entry_number')}>
                   <div className="flex items-center gap-1">
                     {t('journal.column_entry_number')}
@@ -328,6 +332,11 @@ export const JournalEntries: React.FC = () => {
               {filteredEntries.map((entry) => (
                 <tr key={entry.id} className="hover:bg-zinc-50/50 transition-colors group">
                   <td className="px-6 py-4 text-sm font-bold text-zinc-900">{formatDate(entry.date)}</td>
+                  <td className="px-6 py-4">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-zinc-100 text-zinc-800 border border-zinc-200">
+                      {getDocumentTypeName(entry.reference_type, entry.description, entry.reference_number, language)}
+                    </span>
+                  </td>
                   <td className="px-6 py-4">
                     {entry.entry_number ? (
                       <span 
@@ -381,7 +390,7 @@ export const JournalEntries: React.FC = () => {
               ))}
               {filteredEntries.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-zinc-500 font-medium">
+                  <td colSpan={8} className="px-6 py-12 text-center text-zinc-500 font-medium">
                     {t('journal.no_entries')}
                   </td>
                 </tr>
@@ -390,7 +399,7 @@ export const JournalEntries: React.FC = () => {
             {entries.length > 0 && (
               <tfoot className="bg-zinc-900 text-white font-black">
                 <tr>
-                  <td colSpan={4} className="px-6 py-4 text-center border-l border-zinc-700">{t('journal.total')}</td>
+                  <td colSpan={5} className="px-6 py-4 text-center border-l border-zinc-700">{t('journal.total')}</td>
                   <td className="px-6 py-4 text-center border-l border-zinc-700">
                     {serverSummary.total_debit ? formatMoney(serverSummary.total_debit) : '0.00'}
                   </td>
@@ -454,8 +463,8 @@ export const JournalEntries: React.FC = () => {
                     <p className="text-sm font-bold text-zinc-900">{formatDate(selectedEntry.date)}</p>
                   </div>
                   <div className={`p-4 bg-zinc-50 rounded-2xl ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">{t('journal.type')}</p>
-                    <p className="text-sm font-bold text-zinc-900">{selectedEntry.reference_type}</p>
+                    <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">{language === 'ar' ? 'نوع الحركة / المستند' : t('journal.type')}</p>
+                    <p className="text-sm font-bold text-zinc-900">{getDocumentTypeName(selectedEntry.reference_type, selectedEntry.description, selectedEntry.reference_number, language)}</p>
                   </div>
                   <div className={`p-4 bg-emerald-50 rounded-2xl ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                     <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">{t('journal.column_debit')}</p>

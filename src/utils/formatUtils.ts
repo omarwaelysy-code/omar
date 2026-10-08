@@ -135,3 +135,104 @@ export const cleanDuplicatedPartnerName = (rawName: string | null | undefined): 
   return name.trim();
 };
 
+export const getDocumentTypeName = (
+  referenceType: string | null | undefined,
+  description?: string | null,
+  referenceNumber?: string | null,
+  lang: 'ar' | 'en' = 'ar'
+): string => {
+  let type = (referenceType || '').toLowerCase().trim();
+  const desc = description || '';
+  const ref = referenceNumber || '';
+
+  // If type is empty or manual, check if reference number prefix reveals the real type
+  if ((!type || type === 'manual') && ref) {
+    if (ref.startsWith('INV-')) type = 'invoice';
+    else if (ref.startsWith('PINV-')) type = 'purchase_invoice';
+    else if (ref.startsWith('RCT-')) type = 'receipt';
+    else if (ref.startsWith('PAY-')) type = 'payment_voucher';
+    else if (ref.startsWith('RET-')) type = 'return';
+    else if (ref.startsWith('PRET-')) type = 'purchase_return';
+    else if (ref.startsWith('CDISC-')) type = 'customer_discount';
+    else if (ref.startsWith('SDISC-')) type = 'supplier_discount';
+    else if (ref.startsWith('CHK-')) type = 'issued_cheque';
+    else if (ref.startsWith('RCHK-')) type = 'received_cheque';
+    else if (ref.startsWith('TRF-')) type = 'cash_transfer';
+    else if (ref.startsWith('ADJ-')) type = 'stock_adjustment';
+  }
+
+  if (type === 'invoice' || type === 'sales_invoice') {
+    return lang === 'ar' ? 'فواتير المبيعات' : 'Sales Invoice';
+  }
+  if (type === 'purchase_invoice' || type === 'bill') {
+    return lang === 'ar' ? 'فواتير المشتريات' : 'Purchase Invoice';
+  }
+  if (type === 'opening_stock' || type === 'opening_stock_balance') {
+    return lang === 'ar' ? 'أرصدة المخزون الافتتاحية' : 'Opening Stock Balance';
+  }
+  if (type === 'return' || type === 'sales_return') {
+    return lang === 'ar' ? 'مردودات المبيعات' : 'Sales Return';
+  }
+  if (type === 'receipt' || type === 'receipt_voucher') {
+    return lang === 'ar' ? 'سندات القبض' : 'Receipt Voucher';
+  }
+  if (type === 'payment' || type === 'payment_voucher' || type === 'voucher') {
+    return lang === 'ar' ? 'سندات الصرف' : 'Payment Voucher';
+  }
+  if (type === 'purchase_return') {
+    return lang === 'ar' ? 'مردودات المشتريات' : 'Purchase Return';
+  }
+  if (type === 'issued_cheque') {
+    return lang === 'ar' ? 'الشيكات الصادرة (إصدار شيك)' : 'Issued Cheque';
+  }
+  if (type === 'cheque_payment') {
+    return lang === 'ar' ? 'صرف الشيكات من البنك' : 'Cheque Payment';
+  }
+  if (type === 'cheque_cancellation' || type === 'cheque_return') {
+    return lang === 'ar' ? 'إلغاء الشيكات' : 'Cheque Cancellation';
+  }
+  if (type === 'cash_transfer' || type === 'transfer') {
+    return lang === 'ar' ? 'تحويلات النقدية والخزائن' : 'Cash Transfer';
+  }
+  if (type === 'stock_adjustment') {
+    return lang === 'ar' ? 'تسويات المخزون (أذون التسوية المقيدة)' : 'Stock Adjustment';
+  }
+  if (type === 'customer_discount') {
+    return lang === 'ar' ? 'خصومات العملاء (المسموح به)' : 'Customer Discount';
+  }
+  if (type === 'supplier_discount') {
+    return lang === 'ar' ? 'خصومات الموردين (الخصم المكتسب)' : 'Supplier Discount';
+  }
+  if (type === 'received_cheque') {
+    return lang === 'ar' ? 'الشيكات الواردة' : 'Received Cheque';
+  }
+  if (type === 'warehouse_transfer') {
+    return lang === 'ar' ? 'التحويلات المخزنية' : 'Warehouse Transfer';
+  }
+  if (type.includes('asset') || type.startsWith('fixed_asset')) {
+    return lang === 'ar' ? 'الأصول الثابتة' : 'Fixed Assets';
+  }
+  if (type === 'payroll') {
+    return lang === 'ar' ? 'المرتبات والأجور' : 'Payroll';
+  }
+  if (type.startsWith('pos_')) {
+    return lang === 'ar' ? 'نقاط البيع' : 'POS';
+  }
+  if (type === 'opening_balance') {
+    if (desc.includes('للعميل')) {
+      return lang === 'ar' ? 'الأرصدة الافتتاحية للعملاء (بطاقة العميل)' : 'Customer Opening Balance';
+    }
+    if (desc.includes('للمورد')) {
+      return lang === 'ar' ? 'الأرصدة الافتتاحية للموردين (بطاقة المورد)' : 'Supplier Opening Balance';
+    }
+    if (desc.includes('لطريقة') || desc.includes('خزينة') || desc.includes('خزنة') || desc.includes('بنك')) {
+      return lang === 'ar' ? 'الأرصدة الافتتاحية للبنوك والخزائن' : 'Bank/Safe Opening Balance';
+    }
+    return lang === 'ar' ? 'الأرصدة الافتتاحية لدليل الحسابات' : 'Chart of Accounts Opening Balance';
+  }
+  if (!type || type === 'manual' || type === 'journal_entry') {
+    return lang === 'ar' ? 'قيود اليومية العامة (إنشاء قيود من الحسابات العامة)' : 'General Journal Entry';
+  }
+  return type;
+};
+

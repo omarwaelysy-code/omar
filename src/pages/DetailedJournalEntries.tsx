@@ -4,7 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
 import { Search, Calendar, Eye, Download, Printer, RefreshCw, ChevronDown, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { formatNumber, formatMoney, formatDate } from '../utils/formatUtils';
+import { formatNumber, formatMoney, formatDate, getDocumentTypeName } from '../utils/formatUtils';
 import { PaginationControls } from '../components/PaginationControls';
 import { useNavigation } from '../contexts/NavigationContext';
 import { exportToExcel } from '../utils/excelUtils';
@@ -131,11 +131,11 @@ export const DetailedJournalEntries: React.FC = () => {
     { id: 'debit', labelAr: 'المدين', labelEn: 'Debit', visible: true },
     { id: 'credit', labelAr: 'الدائن', labelEn: 'Credit', visible: true },
     { id: 'date', labelAr: 'التاريخ', labelEn: 'Date', visible: true },
+    { id: 'reference_type', labelAr: 'نوع الحركة / المستند', labelEn: 'Doc Type', visible: true },
     { id: 'entry_number', labelAr: 'رقم القيد', labelEn: 'Entry No', visible: true },
     { id: 'account_name', labelAr: 'الحساب الرئيسي', labelEn: 'Main Account', visible: true },
     { id: 'account_code', labelAr: 'كود الحساب', labelEn: 'Account Code', visible: true },
     { id: 'account_type', labelAr: 'نوع الحساب', labelEn: 'Account Type', visible: true },
-    { id: 'reference_type', labelAr: 'نوع الحركة', labelEn: 'Doc Type', visible: true },
     { id: 'reference_number', labelAr: 'رقم الحركة', labelEn: 'Doc Number', visible: true },
     { id: 'sub_account', labelAr: 'الحساب الفرعي', labelEn: 'Sub Account', visible: true },
     { id: 'client_supplier', labelAr: 'عميل - مورد', labelEn: 'Customer - Supplier', visible: true },
@@ -410,29 +410,8 @@ export const DetailedJournalEntries: React.FC = () => {
     }
   };
 
-  const getDocTypeLabel = (type: string | null) => {
-    if (!type) return language === 'ar' ? 'قيد يدوي' : 'Manual Entry';
-    switch (type.toLowerCase()) {
-      case 'manual': return language === 'ar' ? 'قيد يدوي' : 'Manual Entry';
-      case 'opening_balance': return language === 'ar' ? 'رصيد أول المدة' : 'Opening Balance';
-      case 'opening_stock_balance': return language === 'ar' ? 'رصيد أول المدة للمخزون' : 'Opening Stock Balance';
-      case 'invoice': return language === 'ar' ? 'فاتورة مبيعات' : 'Sales Invoice';
-      case 'purchase_invoice': return language === 'ar' ? 'فاتورة مشتريات' : 'Purchase Invoice';
-      case 'receipt':
-      case 'receipt_voucher': return language === 'ar' ? 'سند قبض' : 'Receipt Voucher';
-      case 'payment':
-      case 'payment_voucher': return language === 'ar' ? 'سند صرف' : 'Payment Voucher';
-      case 'return': return language === 'ar' ? 'مرتجع مبيعات' : 'Sales Return';
-      case 'purchase_return': return language === 'ar' ? 'مرتجع مشتريات' : 'Purchase Return';
-      case 'transfer':
-      case 'cash_transfer': return language === 'ar' ? 'تحويل خزينة' : 'Cash Transfer';
-      case 'opening_stock': return language === 'ar' ? 'أول الميزانية مخزون' : 'Opening Stock';
-      case 'stock_adjustment': return language === 'ar' ? 'تسوية مخزنية' : 'Stock Adjustment';
-      case 'warehouse_transfer': return language === 'ar' ? 'تحويل مخزني' : 'Warehouse Transfer';
-      case 'issued_cheque': return language === 'ar' ? 'إصدار شيك' : 'Issued Cheque';
-      case 'cheque_payment': return language === 'ar' ? 'صرف شيك' : 'Cheque Payment';
-      default: return type;
-    }
+  const getDocTypeLabel = (type: string | null, desc?: string | null, ref?: string | null) => {
+    return getDocumentTypeName(type, desc, ref, language);
   };
 
   const handleExportExcel = () => {
@@ -450,7 +429,7 @@ export const DetailedJournalEntries: React.FC = () => {
         else if (col.id === 'account_name') entry[header] = row.parent_account_name || row.account_name;
         else if (col.id === 'account_code') entry[header] = row.account_code || '-';
         else if (col.id === 'account_type') entry[header] = row.account_type_name || '-';
-        else if (col.id === 'reference_type') entry[header] = getDocTypeLabel(row.reference_type);
+        else if (col.id === 'reference_type') entry[header] = getDocTypeLabel(row.reference_type, row.entry_description || row.line_description, row.reference_number);
         else if (col.id === 'reference_number') entry[header] = row.reference_number || '-';
         else if (col.id === 'sub_account') entry[header] = row.parent_account_name ? row.account_name : (row.supplier_name || row.customer_name || (row.sub_account_id && !row.sub_account_id.includes('-') ? row.sub_account_id : '-'));
         else if (col.id === 'client_supplier') entry[header] = row.customer_name || row.supplier_name || '-';
@@ -840,6 +819,21 @@ export const DetailedJournalEntries: React.FC = () => {
                         </td>
                       )}
 
+                      {/* Doc Type (نوع الحركة / المستند) */}
+                      {columns.find(c => c.id === 'reference_type')?.visible && (
+                        <td 
+                          style={{ 
+                            width: columnWidths['reference_type'] ? `${columnWidths['reference_type']}px` : 'auto',
+                            minWidth: columnWidths['reference_type'] ? `${columnWidths['reference_type']}px` : 'max-content'
+                          }}
+                          className="px-3 py-1.5 border-l border-zinc-300 dark:border-zinc-700 text-center font-sans font-medium"
+                        >
+                          <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 whitespace-nowrap">
+                            {getDocTypeLabel(row.reference_type, row.entry_description || row.line_description, row.reference_number)}
+                          </span>
+                        </td>
+                      )}
+
                       {/* Entry Number (رقم القيد) */}
                       {columns.find(c => c.id === 'entry_number')?.visible && (
                         <td 
@@ -894,19 +888,6 @@ export const DetailedJournalEntries: React.FC = () => {
                           className="px-3 py-1.5 border-l border-zinc-300 dark:border-zinc-700 text-center font-sans"
                         >
                           {row.account_type_name || '-'}
-                        </td>
-                      )}
-
-                      {/* Doc Type (نوع الحركة) */}
-                      {columns.find(c => c.id === 'reference_type')?.visible && (
-                        <td 
-                          style={{ 
-                            width: columnWidths['reference_type'] ? `${columnWidths['reference_type']}px` : 'auto',
-                            minWidth: columnWidths['reference_type'] ? `${columnWidths['reference_type']}px` : 'max-content'
-                          }}
-                          className="px-3 py-1.5 border-l border-zinc-300 dark:border-zinc-700 text-center font-sans"
-                        >
-                          {getDocTypeLabel(row.reference_type)}
                         </td>
                       )}
 
