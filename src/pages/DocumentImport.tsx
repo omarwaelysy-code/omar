@@ -239,6 +239,48 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     : (isAr ? 'استيراد مستندات شراء من إكسيل' : 'Import Purchase Documents from Excel');
   const sequenceModuleName = isSales ? 'sales_import_batches' : 'purchases_import_batches';
 
+  const getDocTypeDisplay = (dt: string) => {
+    if (isAr || !dt) return dt;
+    if (dt.includes('فاتورة بيع') || dt.toLowerCase() === 'sales invoice') return 'Sales Invoice';
+    if (dt.includes('أمر بيع') || dt.toLowerCase() === 'sales order') return 'Sales Order';
+    if (dt.includes('مرتجع بيع') || dt.toLowerCase() === 'sales return') return 'Sales Return';
+    if (dt.includes('فاتورة شراء') || dt.toLowerCase() === 'purchase invoice') return 'Purchase Invoice';
+    if (dt.includes('أمر شراء') || dt.toLowerCase() === 'purchase order') return 'Purchase Order';
+    if (dt.includes('مرتجع شراء') || dt.toLowerCase() === 'purchase return') return 'Purchase Return';
+    if (dt.includes('فاتورة')) return isSales ? 'Sales Invoice' : 'Purchase Invoice';
+    if (dt.includes('أمر')) return isSales ? 'Sales Order' : 'Purchase Order';
+    if (dt.includes('مرتجع')) return isSales ? 'Sales Return' : 'Purchase Return';
+    return dt;
+  };
+
+  const getFieldDisplay = (f: string) => {
+    if (isAr || !f) return f;
+    const fieldMap: Record<string, string> = {
+      'حساب الإيراد': 'Revenue Account',
+      'حساب ضريبة المبيعات': 'Sales VAT Account',
+      'حساب خصم من العملاء': 'Sales WHT Account',
+      'حساب تكلفة المبيعات': 'Cost of Sales Account',
+      'حساب المخزون': 'Inventory Account',
+      'حساب المشتريات/المخزون': 'Purchase/Inventory Account',
+      'حساب التكلفة/المخزون': 'Cost/Inventory Account',
+      'حساب ضريبة المشتريات': 'Purchase VAT Account',
+      'حساب خصم على الموردين': 'Purchase WHT Account',
+      'رصيد المخزون': 'Stock Balance',
+      'نوع المستند': 'Document Type',
+      'رقم المرجع (Ref)': 'Reference (Ref)',
+      'الصنف': 'Item',
+      'الكمية': 'Quantity',
+      'السعر': 'Price',
+      'الخصم': 'Discount',
+      'المخزن': 'Warehouse',
+      'العميل': 'Customer',
+      'المورد': 'Supplier',
+      'حساب العميل': 'Customer Account',
+      'حساب المورد': 'Supplier Account'
+    };
+    return fieldMap[f] || f;
+  };
+
   // Master data
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -385,7 +427,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         setCostCenters(ccs || []);
       } catch (err: any) {
         console.error('Failed to load master data:', err);
-        showNotification('فشل تحميل البيانات الأساسية للمطابقة: ' + err.message, 'error');
+        showNotification(isAr ? ('فشل تحميل البيانات الأساسية للمطابقة: ' + err.message) : ('Failed to load master data for matching: ' + err.message), 'error');
       } finally {
         setIsLoadingMasterData(false);
       }
@@ -592,22 +634,22 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
     if (doc.doc_type === 'فاتورة بيع') {
       setPendingViewDoc({ type: 'invoice', idOrNumber: docIdOrNum });
-      openTab('invoices', 'فواتير المبيعات');
+      openTab('invoices', isAr ? 'فواتير المبيعات' : 'Sales Invoices');
     } else if (doc.doc_type === 'أمر بيع') {
       setPendingViewDoc({ type: 'sales_order', idOrNumber: docIdOrNum });
-      openTab('sales_orders', 'أوامر البيع');
+      openTab('sales_orders', isAr ? 'أوامر البيع' : 'Sales Orders');
     } else if (doc.doc_type === 'مرتجع بيع') {
       setPendingViewDoc({ type: 'return', idOrNumber: docIdOrNum });
-      openTab('returns', 'مرتجعات المبيعات');
+      openTab('returns', isAr ? 'مرتجعات المبيعات' : 'Sales Returns');
     } else if (doc.doc_type === 'فاتورة شراء') {
       setPendingViewDoc({ type: 'purchase_invoice', idOrNumber: docIdOrNum });
-      openTab('purchase_invoices', 'فواتير المشتريات');
+      openTab('purchase_invoices', isAr ? 'فواتير المشتريات' : 'Purchase Invoices');
     } else if (doc.doc_type === 'أمر شراء') {
       setPendingViewDoc({ type: 'purchase_order', idOrNumber: docIdOrNum });
-      openTab('purchase_orders', 'أوامر الشراء');
+      openTab('purchase_orders', isAr ? 'أوامر الشراء' : 'Purchase Orders');
     } else if (doc.doc_type === 'مرتجع شراء') {
       setPendingViewDoc({ type: 'purchase_return', idOrNumber: docIdOrNum });
-      openTab('purchase_returns', 'مرتجعات المشتريات');
+      openTab('purchase_returns', isAr ? 'مرتجعات المشتريات' : 'Purchase Returns');
     }
   };
 
@@ -617,7 +659,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     if (!journalIdOrNum) return;
 
     setPendingViewDoc({ type: 'journal', idOrNumber: journalIdOrNum });
-    openTab('journal_entries', 'قيود اليومية');
+    openTab('journal_entries', isAr ? 'قيود اليومية' : 'Journal Entries');
   };
 
   // Recalculate document totals
@@ -671,19 +713,19 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       if (isSales) {
         if (prod?.revenue_account_id) {
           salesStatus = 'linked';
-          salesName = prod.revenue_account_name || accounts.find(a => a.id === prod.revenue_account_id)?.name || 'حساب الإيراد';
+          salesName = prod.revenue_account_name || accounts.find(a => a.id === prod.revenue_account_id)?.name || (isAr ? 'حساب الإيراد' : 'Revenue Account');
         } else {
           salesStatus = 'missing';
-          salesName = 'غير مسجل في بطاقة الصنف';
+          salesName = isAr ? 'غير مسجل في بطاقة الصنف' : 'Not set in item card';
         }
       } else {
         const purAccId = prod?.cost_account_id || prod?.inventory_account_id;
         if (purAccId) {
           salesStatus = 'linked';
-          salesName = prod?.cost_account_name || prod?.inventory_account_name || accounts.find(a => a.id === purAccId)?.name || 'حساب التكلفة/المخزون';
+          salesName = prod?.cost_account_name || prod?.inventory_account_name || accounts.find(a => a.id === purAccId)?.name || (isAr ? 'حساب التكلفة/المخزون' : 'Cost/Inventory Account');
         } else {
           salesStatus = 'missing';
-          salesName = 'غير مسجل في بطاقة الصنف';
+          salesName = isAr ? 'غير مسجل في بطاقة الصنف' : 'Not set in item card';
         }
       }
 
@@ -692,14 +734,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       let costStatus: 'linked' | 'missing' | 'exempt' = 'missing';
       if (isService) {
         costStatus = 'exempt';
-        costName = 'خدمي (معفى)';
+        costName = isAr ? 'خدمي (معفى)' : 'Service (Exempt)';
       } else {
         if (prod?.cost_account_id) {
           costStatus = 'linked';
-          costName = prod.cost_account_name || accounts.find(a => a.id === prod.cost_account_id)?.name || 'حساب تكلفة المبيعات';
+          costName = prod.cost_account_name || accounts.find(a => a.id === prod.cost_account_id)?.name || (isAr ? 'حساب تكلفة المبيعات' : 'Cost of Sales Account');
         } else {
           costStatus = 'missing';
-          costName = 'غير مسجل في بطاقة الصنف';
+          costName = isAr ? 'غير مسجل في بطاقة الصنف' : 'Not set in item card';
         }
       }
 
@@ -708,14 +750,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       let invStatus: 'linked' | 'missing' | 'exempt' = 'missing';
       if (isService) {
         invStatus = 'exempt';
-        invName = 'خدمي (معفى)';
+        invName = isAr ? 'خدمي (معفى)' : 'Service (Exempt)';
       } else {
         if (prod?.inventory_account_id) {
           invStatus = 'linked';
-          invName = prod.inventory_account_name || accounts.find(a => a.id === prod.inventory_account_id)?.name || 'حساب المخزون';
+          invName = prod.inventory_account_name || accounts.find(a => a.id === prod.inventory_account_id)?.name || (isAr ? 'حساب المخزون' : 'Inventory Account');
         } else {
           invStatus = 'missing';
-          invName = 'غير مسجل في بطاقة الصنف';
+          invName = isAr ? 'غير مسجل في بطاقة الصنف' : 'Not set in item card';
         }
       }
 
@@ -725,15 +767,15 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       const hasVatRate = isVatEnabled && (item.vat_rate > 0 || (isSales ? (prod?.vat_rate || 0) > 0 : (prod?.purchase_vat_rate || 0) > 0));
       if (!isVatEnabled || !hasVatRate) {
         vatStatus = 'exempt';
-        vatName = !isVatEnabled ? 'معطلة بالشركة' : 'معفى (0%)';
+        vatName = !isVatEnabled ? (isAr ? 'معطلة بالشركة' : 'Disabled') : (isAr ? 'معفى (0%)' : 'Exempt (0%)');
       } else {
         const vatAccId = isSales ? (prod?.sales_vat_account_id || prod?.vat_account_id) : (prod?.purchase_vat_account_id || prod?.vat_account_id);
         if (vatAccId) {
           vatStatus = 'linked';
-          vatName = (isSales ? (prod?.sales_vat_account_name || prod?.vat_account_name) : (prod?.purchase_vat_account_name || prod?.vat_account_name)) || accounts.find(a => a.id === vatAccId)?.name || 'حساب ضريبة القيمة المضافة';
+          vatName = (isSales ? (prod?.sales_vat_account_name || prod?.vat_account_name) : (prod?.purchase_vat_account_name || prod?.vat_account_name)) || accounts.find(a => a.id === vatAccId)?.name || (isAr ? 'حساب ضريبة القيمة المضافة' : 'VAT Account');
         } else {
           vatStatus = 'missing';
-          vatName = 'غير مسجل في بطاقة الصنف';
+          vatName = isAr ? 'غير مسجل في بطاقة الصنف' : 'Not set in item card';
         }
       }
 
@@ -743,15 +785,15 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       const hasWhtRate = isWhtEnabled && (item.withholding_tax_rate > 0 || (isSales ? (prod?.sales_withholding_tax_rate || 0) > 0 : (prod?.purchase_withholding_tax_rate || 0) > 0));
       if (!isWhtEnabled || !hasWhtRate) {
         whtStatus = 'exempt';
-        whtName = !isWhtEnabled ? 'معطلة بالشركة' : 'معفى (0%)';
+        whtName = !isWhtEnabled ? (isAr ? 'معطلة بالشركة' : 'Disabled') : (isAr ? 'معفى (0%)' : 'Exempt (0%)');
       } else {
         const whtAccId = isSales ? prod?.sales_withholding_tax_account_id : prod?.purchase_withholding_tax_account_id;
         if (whtAccId) {
           whtStatus = 'linked';
-          whtName = (isSales ? prod?.sales_withholding_tax_account_name : prod?.purchase_withholding_tax_account_name) || accounts.find(a => a.id === whtAccId)?.name || 'حساب ضريبة الخصم';
+          whtName = (isSales ? prod?.sales_withholding_tax_account_name : prod?.purchase_withholding_tax_account_name) || accounts.find(a => a.id === whtAccId)?.name || (isAr ? 'حساب ضريبة الخصم' : 'WHT Account');
         } else {
           whtStatus = 'missing';
-          whtName = 'غير مسجل في بطاقة الصنف';
+          whtName = isAr ? 'غير مسجل في بطاقة الصنف' : 'Not set in item card';
         }
       }
 
@@ -816,7 +858,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     const sampleWhtRate = isWhtEnabled ? 1 : 0;
 
     // Sheet 1: Explanation & Guidelines
-    const guideRows = [
+    const guideRows = isAr ? [
       ['دليل واستراتيجية استيراد مستندات ' + (isSales ? 'المبيعات' : 'المشتريات') + ' من الإكسيل'],
       ['يرجى قراءة الإرشادات التالية بدقة لتجنب أي أخطاء أثناء رفع الملف:'],
       [''],
@@ -834,26 +876,44 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       ['12. تكرار بيانات المستند:', 'يجب تكرار بيانات الفاتورة (رقم المرجع، النوع، التاريخ، ' + entityLabel + ') في كل سطر يحتوي على صنف لنفس الفاتورة.'],
       ['13. رقم العملية / الإدارة / مركز التكلفة:', 'حقول اختيارية تماماً (غير إلزامية). يمكن إدخال رقم العملية، واسم أو كود الإدارة، واسم أو كود مركز التكلفة لربط البند تلقائياً.'],
       ['']
+    ] : [
+      ['Excel Import Guide for ' + (isSales ? 'Sales' : 'Purchase') + ' Documents'],
+      ['Please read the following instructions carefully to ensure seamless importing:'],
+      [''],
+      ['1. Reference (Ref):', 'Unique document identifier (e.g. Ref-000001). Repeat the same Ref on multiple rows for multi-line documents.'],
+      ['2. Document Type:', isSales ? 'Must be one of: (Sales Invoice / Sales Order / Sales Return).' : 'Must be one of: (Purchase Invoice / Purchase Order / Purchase Return).'],
+      ['3. Date:', 'Document date in YYYY-MM-DD format (e.g. 2026-09-24).'],
+      ['4. ' + (isSales ? 'Customer' : 'Supplier') + ' Code/Name:', 'Must accurately match the registered code, name, or tax number.'],
+      ['5. Item Code or Barcode:', 'Must match the item code, barcode, or name in the system.'],
+      ['6. Item Name:', 'Optional guide field; the system automatically retrieves master details from the code.'],
+      ['7. Warehouse & Services:', 'Warehouse is required only for physical inventory items. Service items do not require a warehouse.'],
+      ['8. Quantity, Price & Discount:', 'Quantity must be > 0. Price is unit price before tax and discount. Discount is flat amount.'],
+      ['9. VAT %:', isVatEnabled ? 'VAT percentage like 14 or 0.' : 'VAT is currently disabled in company settings (set to 0).'],
+      ['10. WHT %:', isWhtEnabled ? 'Withholding tax percentage like 1 or 0.' : 'WHT is currently disabled in company settings (set to 0).'],
+      ['11. Payment Method:', 'Either "credit" or "cash".'],
+      ['12. Repeating Document Data:', 'Repeat document header info (Ref, Type, Date, Party) across all line items of the same invoice.'],
+      ['13. Operation / Dept / Cost Center:', 'Optional fields. Code or name will be matched automatically.'],
+      ['']
     ];
 
     const guideWs = XLSX.utils.aoa_to_sheet(guideRows);
     guideWs['!cols'] = [{ wch: 32 }, { wch: 90 }];
-    XLSX.utils.book_append_sheet(wb, guideWs, 'دليل التعليمات');
+    XLSX.utils.book_append_sheet(wb, guideWs, isAr ? 'دليل التعليمات' : 'Import Guide');
 
     // Sheet 2: Data Template with examples
     const sampleParty = isSales 
-      ? (customers[0]?.name || customers[0]?.code || 'عميل نقدي تجريبي')
-      : (suppliers[0]?.name || suppliers[0]?.code || 'شركة التوريدات العامة');
+      ? (customers[0]?.name || customers[0]?.code || (isAr ? 'عميل نقدي تجريبي' : 'Sample Cash Customer'))
+      : (suppliers[0]?.name || suppliers[0]?.code || (isAr ? 'شركة التوريدات العامة' : 'General Supplies Co'));
     const sampleProd1 = products[0]?.code || 'PRD-001';
-    const sampleProdName1 = products[0]?.name || 'صنف تجريبي رقم 1';
+    const sampleProdName1 = products[0]?.name || (isAr ? 'صنف تجريبي رقم 1' : 'Sample Product 1');
     const sampleProd2 = products[1]?.code || 'PRD-002';
-    const sampleProdName2 = products[1]?.name || 'صنف تجريبي رقم 2';
-    const sampleWarehouse = warehouses[0]?.name || warehouses[0]?.code || 'المخزن الرئيسي';
+    const sampleProdName2 = products[1]?.name || (isAr ? 'صنف تجريبي رقم 2' : 'Sample Product 2');
+    const sampleWarehouse = warehouses[0]?.name || warehouses[0]?.code || (isAr ? 'المخزن الرئيسي' : 'Main Warehouse');
     const sampleOp = operations[0]?.operation_number || '';
     const sampleDept = departments[0]?.name || '';
     const sampleCC = costCenters[0]?.name || '';
 
-    const headers = [
+    const headers = isAr ? [
       'Ref',
       'نوع المستند',
       'التاريخ',
@@ -871,19 +931,47 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       'رقم العملية',
       'الإدارة',
       'مركز التكلفة'
+    ] : [
+      'Ref',
+      'Document Type',
+      'Date',
+      isSales ? 'Customer Code / Name' : 'Supplier Code / Name',
+      'Item Code / Barcode',
+      'Item Name',
+      'Warehouse',
+      'Quantity',
+      'Price',
+      'Discount',
+      'VAT %',
+      'WHT %',
+      'Payment Method',
+      'Notes',
+      'Operation Number',
+      'Department',
+      'Cost Center'
     ];
 
-    const exampleRows = isSales ? [
+    const exampleRows = isSales ? (isAr ? [
       ['Ref-000001', 'فاتورة بيع', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 10, 150, 0, sampleVatRate, sampleWhtRate, 'آجل', 'فاتورة مبيعات بضاعة - صنف أول', sampleOp, sampleDept, sampleCC],
       ['Ref-000001', 'فاتورة بيع', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 5, 200, 20, sampleVatRate, sampleWhtRate, 'آجل', 'فاتورة مبيعات بضاعة - صنف ثانٍ لنفس الفاتورة', sampleOp, sampleDept, sampleCC],
       ['Ref-000002', 'أمر بيع', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 25, 145, 50, sampleVatRate, 0, 'آجل', 'أمر بيع معتمد للعميل', '', '', sampleCC],
       ['Ref-000003', 'مرتجع بيع', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 2, 200, 0, sampleVatRate, sampleWhtRate, 'نقدي', 'مرتجع مبيعات نقدي تالف', '', sampleDept, '']
     ] : [
+      ['Ref-000001', 'فاتورة بيع', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 10, 150, 0, sampleVatRate, sampleWhtRate, 'credit', 'Sales invoice line 1', sampleOp, sampleDept, sampleCC],
+      ['Ref-000001', 'فاتورة بيع', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 5, 200, 20, sampleVatRate, sampleWhtRate, 'credit', 'Sales invoice line 2', sampleOp, sampleDept, sampleCC],
+      ['Ref-000002', 'أمر بيع', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 25, 145, 50, sampleVatRate, 0, 'credit', 'Confirmed sales order', '', '', sampleCC],
+      ['Ref-000003', 'مرتجع بيع', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 2, 200, 0, sampleVatRate, sampleWhtRate, 'cash', 'Damaged goods return', '', sampleDept, '']
+    ]) : (isAr ? [
       ['Ref-000001', 'فاتورة شراء', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 50, 120, 100, sampleVatRate, sampleWhtRate, 'آجل', 'فاتورة توريد خامات - بند أول', sampleOp, sampleDept, sampleCC],
       ['Ref-000001', 'فاتورة شراء', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 30, 180, 0, sampleVatRate, sampleWhtRate, 'آجل', 'فاتورة توريد خامات - بند ثانٍ', sampleOp, sampleDept, sampleCC],
       ['Ref-000002', 'أمر شراء', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 100, 115, 0, sampleVatRate, 0, 'آجل', 'أمر شراء معتمد للمورد', '', '', sampleCC],
       ['Ref-000003', 'مرتجع شراء', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 5, 180, 0, sampleVatRate, sampleWhtRate, 'آجل', 'مرتجع مشتريات لعدم مطابقة المواصفات', '', sampleDept, '']
-    ];
+    ] : [
+      ['Ref-000001', 'فاتورة شراء', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 50, 120, 100, sampleVatRate, sampleWhtRate, 'credit', 'Raw materials purchase line 1', sampleOp, sampleDept, sampleCC],
+      ['Ref-000001', 'فاتورة شراء', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 30, 180, 0, sampleVatRate, sampleWhtRate, 'credit', 'Raw materials purchase line 2', sampleOp, sampleDept, sampleCC],
+      ['Ref-000002', 'أمر شراء', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 100, 115, 0, sampleVatRate, 0, 'credit', 'Purchase order', '', '', sampleCC],
+      ['Ref-000003', 'مرتجع شراء', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 5, 180, 0, sampleVatRate, sampleWhtRate, 'credit', 'Purchase return', '', sampleDept, '']
+    ]);
 
     const dataWs = XLSX.utils.aoa_to_sheet([headers, ...exampleRows]);
     dataWs['!cols'] = [
@@ -906,14 +994,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       { wch: 20 }  // Cost Center
     ];
 
-    XLSX.utils.book_append_sheet(wb, dataWs, 'بيانات المستندات');
+    XLSX.utils.book_append_sheet(wb, dataWs, isAr ? 'بيانات المستندات' : 'Document Data');
 
-    const downloadFileName = isSales 
-      ? `نموذج_استيراد_مستندات_البيع_${batchDate}.xlsx`
-      : `نموذج_استيراد_مستندات_الشراء_${batchDate}.xlsx`;
+    const downloadFileName = isAr
+      ? (isSales ? `نموذج_استيراد_مستندات_البيع_${batchDate}.xlsx` : `نموذج_استيراد_مستندات_الشراء_${batchDate}.xlsx`)
+      : (isSales ? `Import_Sales_Template_${batchDate}.xlsx` : `Import_Purchases_Template_${batchDate}.xlsx`);
 
     XLSX.writeFile(wb, downloadFileName);
-    showNotification('تم تنزيل نموذج الإكسيل التجريبي بنجاح', 'success');
+    showNotification(isAr ? 'تم تنزيل نموذج الإكسيل التجريبي بنجاح' : 'Excel template downloaded successfully', 'success');
   };
 
   // Helper to inspect accounts and warehouse requirements for any product (Zero Guessing Policy)
@@ -927,17 +1015,17 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     if (isSales) {
       if (prod.revenue_account_id) {
         salesAccOk = true;
-        salesAccName = prod.revenue_account_name || accounts.find(a => a.id === prod.revenue_account_id)?.name || 'حساب الإيراد';
+        salesAccName = prod.revenue_account_name || accounts.find(a => a.id === prod.revenue_account_id)?.name || (isAr ? 'حساب الإيراد' : 'Revenue Account');
       } else {
-        salesAccName = 'غير مسجل بكارت الصنف';
+        salesAccName = isAr ? 'غير مسجل بكارت الصنف' : 'Not set in item card';
       }
     } else {
       const purAccId = prod.cost_account_id || prod.inventory_account_id;
       if (purAccId) {
         salesAccOk = true;
-        salesAccName = prod.cost_account_name || prod.inventory_account_name || accounts.find(a => a.id === purAccId)?.name || 'حساب التكلفة/المخزون';
+        salesAccName = prod.cost_account_name || prod.inventory_account_name || accounts.find(a => a.id === purAccId)?.name || (isAr ? 'حساب التكلفة/المخزون' : 'Cost/Inventory Account');
       } else {
-        salesAccName = 'غير مسجل بكارت الصنف';
+        salesAccName = isAr ? 'غير مسجل بكارت الصنف' : 'Not set in item card';
       }
     }
 
@@ -947,13 +1035,13 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     let costExempt = false;
     if (isService) {
       costExempt = true;
-      costAccName = 'معفى (صنف خدمي)';
+      costAccName = isAr ? 'معفى (صنف خدمي)' : 'Exempt (Service)';
     } else {
       if (prod.cost_account_id) {
         costAccOk = true;
-        costAccName = prod.cost_account_name || accounts.find(a => a.id === prod.cost_account_id)?.name || 'حساب تكلفة المبيعات';
+        costAccName = prod.cost_account_name || accounts.find(a => a.id === prod.cost_account_id)?.name || (isAr ? 'حساب تكلفة المبيعات' : 'Cost of Sales Account');
       } else {
-        costAccName = 'غير مسجل بكارت الصنف';
+        costAccName = isAr ? 'غير مسجل بكارت الصنف' : 'Not set in item card';
       }
     }
 
@@ -963,13 +1051,13 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     let invExempt = false;
     if (isService) {
       invExempt = true;
-      invAccName = 'معفى (صنف خدمي)';
+      invAccName = isAr ? 'معفى (صنف خدمي)' : 'Exempt (Service)';
     } else {
       if (prod.inventory_account_id) {
         invAccOk = true;
-        invAccName = prod.inventory_account_name || accounts.find(a => a.id === prod.inventory_account_id)?.name || 'حساب المخزون';
+        invAccName = prod.inventory_account_name || accounts.find(a => a.id === prod.inventory_account_id)?.name || (isAr ? 'حساب المخزون' : 'Inventory Account');
       } else {
-        invAccName = 'غير مسجل بكارت الصنف';
+        invAccName = isAr ? 'غير مسجل بكارت الصنف' : 'Not set in item card';
       }
     }
 
@@ -979,16 +1067,16 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     let vatExempt = false;
     if (!isVatEnabled || targetVatRate === 0) {
       vatExempt = true;
-      vatAccName = !isVatEnabled ? 'الضريبة معطلة' : 'معفى (0%)';
+      vatAccName = !isVatEnabled ? (isAr ? 'الضريبة معطلة' : 'VAT Disabled') : (isAr ? 'معفى (0%)' : 'Exempt (0%)');
     } else {
       const vatAccId = isSales 
         ? (prod.sales_vat_account_id || prod.vat_account_id || companySettings?.sales_vat_account_id || companySettings?.vat_account_id)
         : (prod.purchase_vat_account_id || prod.vat_account_id || companySettings?.purchase_vat_account_id || companySettings?.vat_account_id);
       if (vatAccId) {
         vatAccOk = true;
-        vatAccName = (isSales ? (prod.sales_vat_account_name || prod.vat_account_name) : (prod.purchase_vat_account_name || prod.vat_account_name)) || accounts.find(a => a.id === vatAccId)?.name || 'حساب ض.ق.م';
+        vatAccName = (isSales ? (prod.sales_vat_account_name || prod.vat_account_name) : (prod.purchase_vat_account_name || prod.vat_account_name)) || accounts.find(a => a.id === vatAccId)?.name || (isAr ? 'حساب ض.ق.م' : 'VAT Account');
       } else {
-        vatAccName = 'غير مربوط بكارت الصنف أو الإعدادات';
+        vatAccName = isAr ? 'غير مربوط بكارت الصنف أو الإعدادات' : 'Not linked in item or settings';
       }
     }
 
@@ -998,25 +1086,25 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     let whtExempt = false;
     if (!isWhtEnabled || targetWhtRate === 0) {
       whtExempt = true;
-      whtAccName = !isWhtEnabled ? 'الخصم معطل' : 'معفى (0%)';
+      whtAccName = !isWhtEnabled ? (isAr ? 'الخصم معطل' : 'WHT Disabled') : (isAr ? 'معفى (0%)' : 'Exempt (0%)');
     } else {
       const whtAccId = isSales
         ? (prod.sales_withholding_tax_account_id || companySettings?.sales_withholding_tax_account_id)
         : (prod.purchase_withholding_tax_account_id || companySettings?.purchase_withholding_tax_account_id);
       if (whtAccId) {
         whtAccOk = true;
-        whtAccName = (isSales ? prod.sales_withholding_tax_account_name : prod.purchase_withholding_tax_account_name) || accounts.find(a => a.id === whtAccId)?.name || 'حساب ض.خ.أ';
+        whtAccName = (isSales ? prod.sales_withholding_tax_account_name : prod.purchase_withholding_tax_account_name) || accounts.find(a => a.id === whtAccId)?.name || (isAr ? 'حساب ض.خ.أ' : 'WHT Account');
       } else {
-        whtAccName = 'غير مربوط بكارت الصنف أو الإعدادات';
+        whtAccName = isAr ? 'غير مربوط بكارت الصنف أو الإعدادات' : 'Not linked in item or settings';
       }
     }
 
     const missingNames: string[] = [];
-    if (!salesAccOk) missingNames.push(isSales ? 'حساب الإيراد' : 'حساب التكلفة');
-    if (!costExempt && !costAccOk) missingNames.push('حساب تكلفة المبيعات');
-    if (!invExempt && !invAccOk) missingNames.push('حساب المخزون');
-    if (!vatExempt && !vatAccOk) missingNames.push('حساب ضريبة القيمة المضافة');
-    if (!whtExempt && !whtAccOk) missingNames.push('حساب ضريبة الخصم');
+    if (!salesAccOk) missingNames.push(isSales ? (isAr ? 'حساب الإيراد' : 'Revenue Account') : (isAr ? 'حساب التكلفة' : 'Cost Account'));
+    if (!costExempt && !costAccOk) missingNames.push(isAr ? 'حساب تكلفة المبيعات' : 'Cost of Sales Account');
+    if (!invExempt && !invAccOk) missingNames.push(isAr ? 'حساب المخزون' : 'Inventory Account');
+    if (!vatExempt && !vatAccOk) missingNames.push(isAr ? 'حساب ضريبة القيمة المضافة' : 'VAT Account');
+    if (!whtExempt && !whtAccOk) missingNames.push(isAr ? 'حساب ضريبة الخصم' : 'WHT Account');
 
     return {
       isService,
@@ -1080,12 +1168,16 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       let firstWarehouseErrorMsg = '';
       if (hasPhysicalItems && !doc.warehouse_id) {
         docHasWarehouseError = true;
-        firstWarehouseErrorMsg = `المستند (${doc.ref}) يحتوي على أصناف مخزنية ولكن لم يتم تحديد مخزن للمستند`;
+        firstWarehouseErrorMsg = isAr
+          ? `المستند (${doc.ref}) يحتوي على أصناف مخزنية ولكن لم يتم تحديد مخزن للمستند`
+          : `Document (${doc.ref}) contains physical items but no warehouse is selected`;
         newWarehouseErrors.push({
           rowNumber: doc.items[0]?.rowIndex || 1,
           ref: doc.ref,
           field: 'المخزن',
-          message: `المستند "${doc.ref}" يحتوي على أصناف مخزنية ولكن لم يتم تحديد المخزن. يرجى تعديل بيانات المستند الأساسية وتحديد المخزن لحفظ الحركات المحاسبية والمخزنية.`
+          message: isAr
+            ? `المستند "${doc.ref}" يحتوي على أصناف مخزنية ولكن لم يتم تحديد المخزن. يرجى تعديل بيانات المستند الأساسية وتحديد المخزن لحفظ الحركات المحاسبية والمخزنية.`
+            : `Document "${doc.ref}" contains physical items but no warehouse is specified. Please edit document header and select a warehouse.`
         });
       }
 
@@ -1120,12 +1212,16 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
         if (!partyAccId) {
           docHasAccountError = true;
-          firstAccountErrorMsg = `حساب ${entityLabel} غير مربوط في بطاقة "${doc.party_name}"`;
+          firstAccountErrorMsg = isAr
+            ? `حساب ${entityLabel} غير مربوط في بطاقة "${doc.party_name}"`
+            : `Account for ${entityLabel} is not linked in "${doc.party_name}" card`;
           newAccountErrors.push({
             rowNumber: doc.items[0]?.rowIndex || 1,
             ref: doc.ref,
             field: `حساب ${entityLabel}`,
-            message: `حساب ${entityLabel} غير محدد في بطاقة "${doc.party_name}". يرجى ربط حساب ${entityLabel} في شجرة الحسابات أولاً لاستكمال الترحيل المحاسبي.`
+            message: isAr
+              ? `حساب ${entityLabel} غير محدد في بطاقة "${doc.party_name}". يرجى ربط حساب ${entityLabel} في شجرة الحسابات أولاً لاستكمال الترحيل المحاسبي.`
+              : `Account for ${entityLabel} is not specified in "${doc.party_name}". Please link the account in chart of accounts first.`
           });
         }
       }
@@ -1155,18 +1251,24 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             if (!allowNegativeStock && item.quantity > available) {
               docHasStockError = true;
               if (!firstStockErrorMsg) {
-                firstStockErrorMsg = `عجز في رصيد الصنف "${item.product_name}" (المتاح: ${formatNumber(Math.max(0, available))}، المطلوب: ${formatNumber(item.quantity)})`;
+                firstStockErrorMsg = isAr
+                  ? `عجز في رصيد الصنف "${item.product_name}" (المتاح: ${formatNumber(Math.max(0, available))}، المطلوب: ${formatNumber(item.quantity)})`
+                  : `Stock shortage for "${item.product_name}" (Available: ${formatNumber(Math.max(0, available))}, Required: ${formatNumber(item.quantity)})`;
               }
               newStockErrors.push({
                 rowNumber: item.rowIndex,
                 ref: doc.ref,
                 field: 'رصيد المخزون',
-                message: `الكمية المطلوبة (${formatNumber(item.quantity)}) من الصنف "${item.product_name} (${item.product_code})" غير متوفرة في المخزن (الرصيد المتاح: ${formatNumber(Math.max(0, available))}). سياسة الشركة تمنع الصرف بالسالب.`
+                message: isAr
+                  ? `الكمية المطلوبة (${formatNumber(item.quantity)}) من الصنف "${item.product_name} (${item.product_code})" غير متوفرة في المخزن (الرصيد المتاح: ${formatNumber(Math.max(0, available))}). سياسة الشركة تمنع الصرف بالسالب.`
+                  : `Required quantity (${formatNumber(item.quantity)}) of item "${item.product_name} (${item.product_code})" is unavailable in warehouse (Available: ${formatNumber(Math.max(0, available))}). Company policy forbids negative stock.`
               });
               stockMap[item.product_id] = available - item.quantity;
               itemStockError = true;
               itemAvailable = Math.max(0, available);
-              itemStockWarning = `الرصيد المتاح: ${formatNumber(Math.max(0, available))} (عجز: ${formatNumber(item.quantity - available)})`;
+              itemStockWarning = isAr
+                ? `الرصيد المتاح: ${formatNumber(Math.max(0, available))} (عجز: ${formatNumber(item.quantity - available)})`
+                : `Available: ${formatNumber(Math.max(0, available))} (Shortage: ${formatNumber(item.quantity - available)})`;
             } else {
               stockMap[item.product_id] = available - item.quantity;
               itemAvailable = available;
@@ -1181,12 +1283,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           if (isSales) {
             // Revenue / Sales Account
             if (!prod.revenue_account_id) {
-              missingFields.push('حساب الإيراد/المبيعات');
+              missingFields.push(isAr ? 'حساب الإيراد/المبيعات' : 'Sales Revenue Account');
               newAccountErrors.push({
                 rowNumber: item.rowIndex,
                 ref: doc.ref,
                 field: 'حساب الإيراد',
-                message: `حساب الإيراد/المبيعات غير محدد في بطاقة الصنف "${prod.name}" (${prod.code}). يمنع النظام توقع الحسابات تلقائياً.`
+                message: isAr
+                  ? `حساب الإيراد/المبيعات غير محدد في بطاقة الصنف "${prod.name}" (${prod.code}). يمنع النظام توقع الحسابات تلقائياً.`
+                  : `Sales revenue account is not specified in product card "${prod.name}" (${prod.code}).`
               });
             }
 
@@ -1194,12 +1298,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             if (isVatEnabled && item.vat_rate > 0) {
               const vatAcc = prod.sales_vat_account_id || prod.vat_account_id;
               if (!vatAcc) {
-                missingFields.push('حساب ضريبة المبيعات');
+                missingFields.push(isAr ? 'حساب ضريبة المبيعات' : 'Sales VAT Account');
                 newAccountErrors.push({
                   rowNumber: item.rowIndex,
                   ref: doc.ref,
                   field: 'حساب ضريبة المبيعات',
-                  message: `حساب ضريبة القيمة المضافة (مبيعات) غير محدد في بطاقة الصنف "${prod.name}" (${prod.code}) بالرغم من خضوعه لضريبة ${item.vat_rate}%. يمنع النظام توقع الحسابات تلقائياً.`
+                  message: isAr
+                    ? `حساب ضريبة القيمة المضافة (مبيعات) غير محدد في بطاقة الصنف "${prod.name}" (${prod.code}) بالرغم من خضوعه لضريبة ${item.vat_rate}%. يمنع النظام توقع الحسابات تلقائياً.`
+                    : `Sales VAT account is not specified in product card "${prod.name}" (${prod.code}) despite having ${item.vat_rate}% tax.`
                 });
               }
             }
@@ -1208,12 +1314,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             if (isWhtEnabled && item.withholding_tax_rate > 0) {
               const whtAcc = prod.sales_withholding_tax_account_id;
               if (!whtAcc) {
-                missingFields.push('حساب خصم من العملاء');
+                missingFields.push(isAr ? 'حساب خصم من العملاء' : 'Sales WHT Account');
                 newAccountErrors.push({
                   rowNumber: item.rowIndex,
                   ref: doc.ref,
                   field: 'حساب خصم من العملاء',
-                  message: `حساب ضرائب الخصم من العملاء (أ.ت.ص) غير محدد في بطاقة الصنف "${prod.name}" (${prod.code}) بالرغم من وجود خصم ${item.withholding_tax_rate}%. يمنع النظام توقع الحسابات تلقائياً.`
+                  message: isAr
+                    ? `حساب ضرائب الخصم من العملاء (أ.ت.ص) غير محدد في بطاقة الصنف "${prod.name}" (${prod.code}) بالرغم من وجود خصم ${item.withholding_tax_rate}%. يمنع النظام توقع الحسابات تلقائياً.`
+                    : `Customer WHT account is not specified in product card "${prod.name}" (${prod.code}) despite having ${item.withholding_tax_rate}% tax.`
                 });
               }
             }
@@ -1221,33 +1329,39 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             // Physical Sales Item: Cost & Inventory Accounts
             if (!isService) {
               if (!prod.cost_account_id) {
-                missingFields.push('حساب تكلفة المبيعات');
+                missingFields.push(isAr ? 'حساب تكلفة المبيعات' : 'Cost of Sales Account');
                 newAccountErrors.push({
                   rowNumber: item.rowIndex,
                   ref: doc.ref,
                   field: 'حساب تكلفة المبيعات',
-                  message: `حساب تكلفة المبيعات غير محدد في بطاقة الصنف المخزني "${prod.name}" (${prod.code}).`
+                  message: isAr
+                    ? `حساب تكلفة المبيعات غير محدد في بطاقة الصنف المخزني "${prod.name}" (${prod.code}).`
+                    : `Cost of sales account is not specified in physical item card "${prod.name}" (${prod.code}).`
                 });
               }
               if (!prod.inventory_account_id) {
-                missingFields.push('حساب المخزون');
+                missingFields.push(isAr ? 'حساب المخزون' : 'Inventory Account');
                 newAccountErrors.push({
                   rowNumber: item.rowIndex,
                   ref: doc.ref,
                   field: 'حساب المخزون',
-                  message: `حساب المخزون غير محدد في بطاقة الصنف المخزني "${prod.name}" (${prod.code}).`
+                  message: isAr
+                    ? `حساب المخزون غير محدد في بطاقة الصنف المخزني "${prod.name}" (${prod.code}).`
+                    : `Inventory account is not specified in physical item card "${prod.name}" (${prod.code}).`
                 });
               }
             }
           } else {
             // Purchases
             if (!prod.cost_account_id && !prod.inventory_account_id) {
-              missingFields.push('حساب التكلفة/المخزون');
+              missingFields.push(isAr ? 'حساب التكلفة/المخزون' : 'Cost/Inventory Account');
               newAccountErrors.push({
                 rowNumber: item.rowIndex,
                 ref: doc.ref,
                 field: 'حساب المشتريات/المخزون',
-                message: `حساب التكلفة أو المخزون غير محدد في بطاقة الصنف "${prod.name}" (${prod.code}). يمنع النظام توقع الحسابات تلقائياً.`
+                message: isAr
+                  ? `حساب التكلفة أو المخزون غير محدد في بطاقة الصنف "${prod.name}" (${prod.code}). يمنع النظام توقع الحسابات تلقائياً.`
+                  : `Cost or inventory account is not specified in product card "${prod.name}" (${prod.code}).`
               });
             }
 
@@ -1255,12 +1369,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             if (isVatEnabled && item.vat_rate > 0) {
               const vatAcc = prod.purchase_vat_account_id || prod.vat_account_id;
               if (!vatAcc) {
-                missingFields.push('حساب ضريبة المشتريات');
+                missingFields.push(isAr ? 'حساب ضريبة المشتريات' : 'Purchase VAT Account');
                 newAccountErrors.push({
                   rowNumber: item.rowIndex,
                   ref: doc.ref,
                   field: 'حساب ضريبة المشتريات',
-                  message: `حساب ضريبة القيمة المضافة (مشتريات) غير محدد في بطاقة الصنف "${prod.name}" (${prod.code}) بالرغم من خضوعه لضريبة ${item.vat_rate}%. يمنع النظام توقع الحسابات تلقائياً.`
+                  message: isAr
+                    ? `حساب ضريبة القيمة المضافة (مشتريات) غير محدد في بطاقة الصنف "${prod.name}" (${prod.code}) بالرغم من خضوعه لضريبة ${item.vat_rate}%. يمنع النظام توقع الحسابات تلقائياً.`
+                    : `Purchase VAT account is not specified in product card "${prod.name}" (${prod.code}) despite having ${item.vat_rate}% tax.`
                 });
               }
             }
@@ -1269,34 +1385,42 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             if (isWhtEnabled && item.withholding_tax_rate > 0) {
               const whtAcc = prod.purchase_withholding_tax_account_id;
               if (!whtAcc) {
-                missingFields.push('حساب خصم على الموردين');
+                missingFields.push(isAr ? 'حساب خصم على الموردين' : 'Purchase WHT Account');
                 newAccountErrors.push({
                   rowNumber: item.rowIndex,
                   ref: doc.ref,
                   field: 'حساب خصم على الموردين',
-                  message: `حساب ضرائب الخصم على الموردين غير محدد في بطاقة الصنف "${prod.name}" (${prod.code}) بالرغم من وجود خصم ${item.withholding_tax_rate}%. يمنع النظام توقع الحسابات تلقائياً.`
+                  message: isAr
+                    ? `حساب ضرائب الخصم على الموردين غير محدد في بطاقة الصنف "${prod.name}" (${prod.code}) بالرغم من وجود خصم ${item.withholding_tax_rate}%. يمنع النظام توقع الحسابات تلقائياً.`
+                    : `Supplier WHT account is not specified in product card "${prod.name}" (${prod.code}) despite having ${item.withholding_tax_rate}% tax.`
                 });
               }
             }
 
             // Physical Purchase Item: Inventory Account
             if (!isService && !prod.inventory_account_id) {
-              missingFields.push('حساب المخزون');
+              missingFields.push(isAr ? 'حساب المخزون' : 'Inventory Account');
               newAccountErrors.push({
                 rowNumber: item.rowIndex,
                 ref: doc.ref,
                 field: 'حساب المخزون',
-                message: `حساب المخزون غير محدد في بطاقة الصنف المخزني "${prod.name}" (${prod.code}).`
+                message: isAr
+                  ? `حساب المخزون غير محدد في بطاقة الصنف المخزني "${prod.name}" (${prod.code}).`
+                  : `Inventory account is not specified in physical item card "${prod.name}" (${prod.code}).`
               });
             }
           }
 
           if (missingFields.length > 0) {
             itemAccountError = true;
-            itemAccountWarning = `حسابات غير مكتملة في بطاقة الصنف: (${missingFields.join('، ')})`;
+            itemAccountWarning = isAr
+              ? `حسابات غير مكتملة في بطاقة الصنف: (${missingFields.join('، ')})`
+              : `Incomplete accounts in item card: (${missingFields.join(', ')})`;
             docHasAccountError = true;
             if (!firstAccountErrorMsg) {
-              firstAccountErrorMsg = `نقص حسابات في الصنف "${prod.name}": (${missingFields.join('، ')})`;
+              firstAccountErrorMsg = isAr
+                ? `نقص حسابات في الصنف "${prod.name}": (${missingFields.join('، ')})`
+                : `Missing accounts for item "${prod.name}": (${missingFields.join(', ')})`;
             }
           }
         }
@@ -1373,11 +1497,11 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       }
 
       const ws = wb.Sheets[targetSheetName];
-      if (!ws) throw new Error('لم يتم العثور على ورقة عمل صالحة في ملف الإكسيل');
+      if (!ws) throw new Error(isAr ? 'لم يتم العثور على ورقة عمل صالحة في ملف الإكسيل' : 'No valid worksheet found in the Excel file');
 
       const rawRows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
       if (rawRows.length < 2) {
-        throw new Error('ملف الإكسيل فارغ أو لا يحتوي على صفوف بيانات بعد الهيدر');
+        throw new Error(isAr ? 'ملف الإكسيل فارغ أو لا يحتوي على صفوف بيانات بعد الهيدر' : 'Excel file is empty or contains no data rows after header');
       }
 
       const errors: ValidationError[] = [];
@@ -1499,9 +1623,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         if (!rawRef) {
           errors.push({
             rowNumber,
-            ref: rawRef || 'غير محدد',
+            ref: rawRef || (isAr ? 'غير محدد' : 'Unspecified'),
             field: 'رقم المرجع (Ref)',
-            message: 'رقم المرجع (Ref) إلزامي لربط بنود المستند'
+            message: isAr ? 'رقم المرجع (Ref) إلزامي لربط بنود المستند' : 'Reference (Ref) is required to group document items'
           });
         }
 
@@ -1511,14 +1635,16 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             rowNumber,
             ref: rawRef,
             field: 'نوع المستند',
-            message: 'نوع المستند إلزامي'
+            message: isAr ? 'نوع المستند إلزامي' : 'Document Type is required'
           });
         } else if (!expectedDocTypes.includes(rawDocType)) {
           errors.push({
             rowNumber,
             ref: rawRef,
             field: 'نوع المستند',
-            message: `نوع المستند "${rawDocType}" غير صالح. الأنواع المقبولة هي: (${expectedDocTypes.join(' - ')})`
+            message: isAr
+              ? `نوع المستند "${rawDocType}" غير صالح. الأنواع المقبولة هي: (${expectedDocTypes.join(' - ')})`
+              : `Document Type "${rawDocType}" is invalid. Allowed types: (${expectedDocTypes.map(getDocTypeDisplay).join(' - ')})`
           });
         }
 
@@ -1532,18 +1658,18 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             rowNumber,
             ref: rawRef,
             field: entityLabel,
-            message: `كود أو اسم ${entityLabel} إلزامي`
+            message: isAr ? `كود أو اسم ${entityLabel} إلزامي` : `Code or name for ${entityLabel} is required`
           });
         } else {
           if (isSales) {
             matchedParty = customers.find(c => 
-              (c.code && c.code.toLowerCase() === rawParty.toLowerCase()) ||
+              (c.code && c.code.toLowerCase() === rawParty.toLowerCase()) || 
               (c.name && c.name.trim().toLowerCase() === rawParty.toLowerCase()) ||
               (c.tax_number && c.tax_number === rawParty)
             );
           } else {
             matchedParty = suppliers.find(s => 
-              (s.code && s.code.toLowerCase() === rawParty.toLowerCase()) ||
+              (s.code && s.code.toLowerCase() === rawParty.toLowerCase()) || 
               (s.name && s.name.trim().toLowerCase() === rawParty.toLowerCase()) ||
               (s.tax_number && s.tax_number === rawParty)
             );
@@ -1554,14 +1680,18 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               rowNumber,
               ref: rawRef,
               field: entityLabel,
-              message: `${entityLabel} "${rawParty}" غير مسجل في دليل ${entityLabel}ين للنظام`
+              message: isAr
+                ? `${entityLabel} "${rawParty}" غير مسجل في دليل ${entityLabel}ين للنظام`
+                : `${entityLabel} "${rawParty}" is not registered in system directory`
             });
           } else if (!matchedParty.account_id && rawDocType !== 'أمر بيع' && rawDocType !== 'أمر شراء') {
             errors.push({
               rowNumber,
               ref: rawRef,
               field: `حساب ${entityLabel}`,
-              message: `حساب ${entityLabel} غير محدد في بطاقة "${matchedParty.name}". يرجى ربط حساب ${entityLabel} في شجرة الحسابات أولاً لاستكمال الترحيل المحاسبي.`
+              message: isAr
+                ? `حساب ${entityLabel} غير محدد في بطاقة "${matchedParty.name}". يرجى ربط حساب ${entityLabel} في شجرة الحسابات أولاً لاستكمال الترحيل المحاسبي.`
+                : `Account for ${entityLabel} is not specified in card for "${matchedParty.name}". Please link the account in chart of accounts first.`
             });
           }
         }
@@ -1573,7 +1703,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             rowNumber,
             ref: rawRef,
             field: 'الصنف',
-            message: 'كود الصنف أو الباركود أو اسم الصنف إلزامي'
+            message: isAr ? 'كود الصنف أو الباركود أو اسم الصنف إلزامي' : 'Item code, barcode, or item name is required'
           });
         } else {
           const rawCodeClean = rawProdCode.trim().toLowerCase();
@@ -1598,7 +1728,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               rowNumber,
               ref: rawRef,
               field: 'الصنف',
-              message: `الصنف كود: "${rawProdCode}" اسم: "${rawProdName}" غير مسجل في دليل الأصناف`
+              message: isAr
+                ? `الصنف كود: "${rawProdCode}" اسم: "${rawProdName}" غير مسجل في دليل الأصناف`
+                : `Item code: "${rawProdCode}" name: "${rawProdName}" is not registered in items directory`
             });
           }
         }
@@ -1621,7 +1753,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               rowNumber,
               ref: rawRef,
               field: 'المخزن',
-              message: `المخزن "${rawWarehouse}" غير مسجل في دليل المستودعات`
+              message: isAr ? `المخزن "${rawWarehouse}" غير مسجل في دليل المستودعات` : `Warehouse "${rawWarehouse}" is not registered in warehouses directory`
             });
           }
         } else if (!isServiceItem) {
@@ -1632,7 +1764,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               rowNumber,
               ref: rawRef,
               field: 'المخزن',
-              message: `المخزن إلزامي للصنف المخزني "${rawProdName || rawProdCode}"`
+              message: isAr ? `المخزن إلزامي للصنف المخزني "${rawProdName || rawProdCode}"` : `Warehouse is required for physical item "${rawProdName || rawProdCode}"`
             });
           }
         }
@@ -1644,7 +1776,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             rowNumber,
             ref: rawRef,
             field: 'الكمية',
-            message: `الكمية "${rawQty}" غير صحيحة. يجب أن تكون رقماً موجباً أكبر من صفر`
+            message: isAr ? `الكمية "${rawQty}" غير صحيحة. يجب أن تكون رقماً موجباً أكبر من صفر` : `Quantity "${rawQty}" is invalid. Must be a positive number greater than zero`
           });
         }
 
@@ -1654,7 +1786,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             rowNumber,
             ref: rawRef,
             field: 'السعر',
-            message: `السعر "${rawPrice}" غير صحيح. يجب أن يكون رقماً أكبر من أو يساوي صفر`
+            message: isAr ? `السعر "${rawPrice}" غير صحيح. يجب أن يكون رقماً أكبر من أو يساوي صفر` : `Price "${rawPrice}" is invalid. Must be a number greater than or equal to zero`
           });
         }
 
@@ -1664,7 +1796,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             rowNumber,
             ref: rawRef,
             field: 'الخصم',
-            message: `قيمة الخصم "${rawDiscount}" لا يمكن أن تكون سالبة`
+            message: isAr ? `قيمة الخصم "${rawDiscount}" لا يمكن أن تكون سالبة` : `Discount amount "${rawDiscount}" cannot be negative`
           });
         }
 
@@ -1692,7 +1824,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 rowNumber,
                 ref: rawRef,
                 field: 'حساب الإيراد',
-                message: `حساب الإيراد/المبيعات غير محدد في بطاقة الصنف "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}). يمنع النظام توقع الحسابات تلقائياً.`
+                message: isAr
+                  ? `حساب الإيراد/المبيعات غير محدد في بطاقة الصنف "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}). يمنع النظام توقع الحسابات تلقائياً.`
+                  : `Sales revenue account is not specified in product card "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}).`
               });
             }
 
@@ -1704,7 +1838,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   rowNumber,
                   ref: rawRef,
                   field: 'حساب ضريبة المبيعات',
-                  message: `حساب ضريبة القيمة المضافة (مبيعات) غير محدد في بطاقة الصنف "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}) بالرغم من خضوعه لضريبة ${vatRateNum}%. يمنع النظام توقع الحسابات تلقائياً.`
+                  message: isAr
+                    ? `حساب ضريبة القيمة المضافة (مبيعات) غير محدد في بطاقة الصنف "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}) بالرغم من خضوعه لضريبة ${vatRateNum}%. يمنع النظام توقع الحسابات تلقائياً.`
+                    : `Sales VAT account is not specified in product card "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}) despite having ${vatRateNum}% tax.`
                 });
               }
             }
@@ -1717,7 +1853,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   rowNumber,
                   ref: rawRef,
                   field: 'حساب خصم من العملاء',
-                  message: `حساب ضرائب الخصم من العملاء (أ.ت.ص) غير محدد في بطاقة الصنف "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}) بالرغم من وجود خصم ${whtRateNum}%. يمنع النظام توقع الحسابات تلقائياً.`
+                  message: isAr
+                    ? `حساب ضرائب الخصم من العملاء (أ.ت.ص) غير محدد في بطاقة الصنف "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}) بالرغم من وجود خصم ${whtRateNum}%. يمنع النظام توقع الحسابات تلقائياً.`
+                    : `Customer WHT account is not specified in product card "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}) despite having ${whtRateNum}% tax.`
                 });
               }
             }
@@ -1729,7 +1867,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   rowNumber,
                   ref: rawRef,
                   field: 'حساب تكلفة المبيعات',
-                  message: `حساب تكلفة المبيعات غير محدد في بطاقة الصنف المخزني "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}).`
+                  message: isAr
+                    ? `حساب تكلفة المبيعات غير محدد في بطاقة الصنف المخزني "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}).`
+                    : `Cost of sales account is not specified in physical item card "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}).`
                 });
               }
               if (!matchedProduct.inventory_account_id) {
@@ -1737,7 +1877,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   rowNumber,
                   ref: rawRef,
                   field: 'حساب المخزون',
-                  message: `حساب المخزون غير محدد في بطاقة الصنف المخزني "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}).`
+                  message: isAr
+                    ? `حساب المخزون غير محدد في بطاقة الصنف المخزني "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}).`
+                    : `Inventory account is not specified in physical item card "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}).`
                 });
               }
             }
@@ -1748,7 +1890,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 rowNumber,
                 ref: rawRef,
                 field: 'حساب المشتريات/المخزون',
-                message: `حساب التكلفة أو المخزون غير محدد في بطاقة الصنف "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}). يمنع النظام توقع الحسابات تلقائياً.`
+                message: isAr
+                  ? `حساب التكلفة أو المخزون غير محدد في بطاقة الصنف "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}). يمنع النظام توقع الحسابات تلقائياً.`
+                  : `Cost or inventory account is not specified in product card "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}).`
               });
             }
 
@@ -1760,7 +1904,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   rowNumber,
                   ref: rawRef,
                   field: 'حساب ضريبة المشتريات',
-                  message: `حساب ضريبة القيمة المضافة (مشتريات) غير محدد في بطاقة الصنف "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}) بالرغم من خضوعه لضريبة ${vatRateNum}%. يمنع النظام توقع الحسابات تلقائياً.`
+                  message: isAr
+                    ? `حساب ضريبة القيمة المضافة (مشتريات) غير محدد في بطاقة الصنف "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}) بالرغم من خضوعه لضريبة ${vatRateNum}%. يمنع النظام توقع الحسابات تلقائياً.`
+                    : `Purchase VAT account is not specified in product card "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}) despite having ${vatRateNum}% tax.`
                 });
               }
             }
@@ -1773,7 +1919,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   rowNumber,
                   ref: rawRef,
                   field: 'حساب خصم على الموردين',
-                  message: `حساب ضرائب الخصم على الموردين غير محدد في بطاقة الصنف "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}) بالرغم من وجود خصم ${whtRateNum}%. يمنع النظام توقع الحسابات تلقائياً.`
+                  message: isAr
+                    ? `حساب ضرائب الخصم على الموردين غير محدد في بطاقة الصنف "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}) بالرغم من وجود خصم ${whtRateNum}%. يمنع النظام توقع الحسابات تلقائياً.`
+                    : `Supplier WHT account is not specified in product card "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}) despite having ${whtRateNum}% tax.`
                 });
               }
             }
@@ -1784,7 +1932,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 rowNumber,
                 ref: rawRef,
                 field: 'حساب المخزون',
-                message: `حساب المخزون غير محدد في بطاقة الصنف المخزني "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}).`
+                message: isAr
+                  ? `حساب المخزون غير محدد في بطاقة الصنف المخزني "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}).`
+                  : `Inventory account is not specified in physical item card "${matchedProduct.name}" (${matchedProduct.code || rawProdCode}).`
               });
             }
           }
@@ -1833,7 +1983,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 rowNumber,
                 ref: rawRef,
                 field: 'نوع المستند',
-                message: `تعارض في نوع المستند للمرجع "${rawRef}": تم تحديد "${existingHeader.doc_type}" في سطر سابق و "${rawDocType}" في هذا السطر`
+                message: isAr
+                  ? `تعارض في نوع المستند للمرجع "${rawRef}": تم تحديد "${existingHeader.doc_type}" في سطر سابق و "${rawDocType}" في هذا السطر`
+                  : `Document type conflict for reference "${rawRef}": "${getDocTypeDisplay(existingHeader.doc_type)}" was set previously and "${getDocTypeDisplay(rawDocType)}" in this row`
               });
             }
             if (matchedParty && existingHeader.party_id && existingHeader.party_id !== matchedParty.id) {
@@ -1841,7 +1993,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 rowNumber,
                 ref: rawRef,
                 field: entityLabel,
-                message: `تعارض في اسم ${entityLabel} لنفس المرجع "${rawRef}": (${existingHeader.party_name} مقابل ${matchedParty.name})`
+                message: isAr
+                  ? `تعارض في اسم ${entityLabel} لنفس المرجع "${rawRef}": (${existingHeader.party_name} مقابل ${matchedParty.name})`
+                  : `Conflict in ${entityLabel} for reference "${rawRef}": (${existingHeader.party_name} vs ${matchedParty.name})`
               });
             }
           }
@@ -1883,7 +2037,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               product_id: matchedProduct.id,
               product_code: matchedProduct.code || rawProdCode,
               product_name: matchedProduct.name || rawProdName,
-              unit: matchedProduct.unit || 'قطعة',
+              unit: matchedProduct.unit || (isAr ? 'قطعة' : 'Pcs'),
               quantity: qtyNum,
               unit_price: priceNum,
               discount_amount: discountNum,
@@ -1919,7 +2073,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           party_name: g.header.party_name,
           party_code: g.header.party_code,
           warehouse_id: allServices ? null : (g.header.warehouse_id || defaultWh?.id || null),
-          warehouse_name: allServices ? 'خدمات (بدون مخزن)' : (g.header.warehouse_name || defaultWh?.name || ''),
+          warehouse_name: allServices ? (isAr ? 'خدمات (بدون مخزن)' : 'Services (No warehouse)') : (g.header.warehouse_name || defaultWh?.name || ''),
           payment_type: g.header.payment_type,
           payment_method_id: g.header.payment_method_id,
           notes: g.header.notes,
@@ -1941,20 +2095,35 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       updatedDocs.forEach(d => { initialExp[d.ref] = true; });
       setExpandedRefs(initialExp);
 
-      const stockErrorsCount = allErrors.filter(e => e.field === 'رصيد المخزون').length;
+      const stockErrorsCount = allErrors.filter(e => e.field === 'رصيد المخزون' || e.field === 'Stock Balance').length;
       if (allErrors.length > 0) {
         if (stockErrorsCount > 0) {
-          showNotification(`تم فحص الملف: تم العثور على ${allErrors.length} ملاحظة (منها ${stockErrorsCount} عجز مخزون يمنع الحفظ)`, 'error');
+          showNotification(
+            isAr
+              ? `تم فحص الملف: تم العثور على ${allErrors.length} ملاحظة (منها ${stockErrorsCount} عجز مخزون يمنع الحفظ)`
+              : `File checked: ${allErrors.length} issues found (${stockErrorsCount} stock shortages preventing save)`,
+            'error'
+          );
         } else {
-          showNotification(`تم فحص الملف: تم العثور على ${allErrors.length} خطأ بحاجة لمراجعة`, 'error');
+          showNotification(
+            isAr
+              ? `تم فحص الملف: تم العثور على ${allErrors.length} خطأ بحاجة لمراجعة`
+              : `File checked: ${allErrors.length} errors requiring review`,
+            'error'
+          );
         }
       } else {
-        showNotification(`تم فحص ومطابقة الملف بنجاح! تم استخراج ${updatedDocs.length} مستند صالح وجاهز للحفظ`, 'success');
+        showNotification(
+          isAr
+            ? `تم فحص ومطابقة الملف بنجاح! تم استخراج ${updatedDocs.length} مستند صالح وجاهز للحفظ`
+            : `File checked and matched successfully! Extracted ${updatedDocs.length} valid documents ready to save`,
+          'success'
+        );
       }
 
     } catch (err: any) {
       console.error('File parsing error:', err);
-      showNotification('فشل تحليل ملف الإكسيل: ' + err.message, 'error');
+      showNotification((isAr ? 'فشل تحليل ملف الإكسيل: ' : 'Failed to parse Excel file: ') + err.message, 'error');
     } finally {
       setIsParsing(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -1980,7 +2149,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     );
     setDocuments(updatedDocs);
     setValidationErrors(allErrors);
-    showNotification(`تم حذف المستند ${ref} من الدفعة وإعادة فحص المخزون`, 'info');
+    showNotification(isAr ? `تم حذف المستند ${ref} من الدفعة وإعادة فحص المخزون` : `Document ${ref} deleted from batch and stock rechecked`, 'info');
   };
 
   // Open Edit Document Header Modal (Requirement 2)
@@ -2030,7 +2199,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     setValidationErrors(allErrors);
     setIsBatchSaved(false);
     setEditingDoc(null);
-    showNotification('تم تحديث بيانات المستند الأساسية وإعادة الفحص بنجاح', 'success');
+    showNotification(isAr ? 'تم تحديث بيانات المستند الأساسية وإعادة الفحص بنجاح' : 'Document header updated and rechecked successfully', 'success');
   };
 
   // Delete item from document
@@ -2052,7 +2221,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     setDocuments(updatedDocs);
     setValidationErrors(allErrors);
     setIsBatchSaved(false);
-    showNotification('تم حذف البند وإعادة فحص رصيد المخزون', 'info');
+    showNotification(isAr ? 'تم حذف البند وإعادة فحص رصيد المخزون' : 'Item deleted and stock balance rechecked', 'info');
   };
 
   // Update item in document
@@ -2097,7 +2266,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     setIsBatchSaved(false);
 
     setEditingItem(null);
-    showNotification('تم تحديث بيانات الصنف وإعادة فحص رصيد المخزون بنجاح', 'success');
+    showNotification(isAr ? 'تم تحديث بيانات الصنف وإعادة فحص رصيد المخزون بنجاح' : 'Item data updated and stock balance rechecked successfully', 'success');
   };
 
   // Open Add Item Modal (Requirement 3: Check warehouse & accounts)
@@ -2162,11 +2331,11 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
     const matchedProduct = products.find(p => p.id === newItemForm.product_id);
     if (!matchedProduct) {
-      showNotification('يرجى اختيار صنف صحيح من القائمة', 'error');
+      showNotification(isAr ? 'يرجى اختيار صنف صحيح من القائمة' : 'Please select a valid item from the list', 'error');
       return;
     }
     if (!newItemForm.quantity || newItemForm.quantity <= 0) {
-      showNotification('يجب أن تكون الكمية أكبر من صفر', 'error');
+      showNotification(isAr ? 'يجب أن تكون الكمية أكبر من صفر' : 'Quantity must be greater than zero', 'error');
       return;
     }
 
@@ -2175,7 +2344,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
     // Check if item is physical and document lacks a warehouse
     if (isPhysicalItem && !targetDoc.warehouse_id && !addingItemWarehouseId) {
-      showNotification('يرجى اختيار مخزن للمستند، فالصنف المختار صنف مخزني يتطلب وجود مخزن محدد في المستند', 'error');
+      showNotification(isAr ? 'يرجى اختيار مخزن للمستند، فالصنف المختار صنف مخزني يتطلب وجود مخزن محدد في المستند' : 'Please select a warehouse for the document; physical items require a specified warehouse', 'error');
       return;
     }
 
@@ -2197,7 +2366,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       product_id: matchedProduct.id,
       product_code: matchedProduct.code || '',
       product_name: matchedProduct.name || '',
-      unit: matchedProduct.unit || 'قطعة',
+      unit: matchedProduct.unit || (isAr ? 'قطعة' : 'Pcs'),
       quantity: newItemForm.quantity,
       unit_price: newItemForm.unit_price,
       discount_amount: newItemForm.discount_amount,
@@ -2245,32 +2414,35 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     setIsBatchSaved(false);
     setExpandedRefs(prev => ({ ...prev, [addingItemDocRef]: true }));
     setAddingItemDocRef(null);
-    showNotification(`تمت إضافة الصنف "${matchedProduct.name}" إلى المستند ${addingItemDocRef} بنجاح`, 'success');
+    showNotification(isAr ? `تمت إضافة الصنف "${matchedProduct.name}" إلى المستند ${addingItemDocRef} بنجاح` : `Item "${matchedProduct.name}" added to document ${addingItemDocRef} successfully`, 'success');
   };
 
   // Save & Post batch
   const handleSaveAndPostBatch = async () => {
     if (documents.length === 0) {
-      showNotification('لا توجد مستندات صالحة للحفظ', 'error');
+      showNotification(isAr ? 'لا توجد مستندات صالحة للحفظ' : 'No valid documents to save', 'error');
       return;
     }
     if (validationErrors.length > 0) {
-      showNotification('يرجى معالجة الأخطاء الموضحة أدناه قبل الحفظ والترحيل', 'error');
+      showNotification(isAr ? 'يرجى معالجة الأخطاء الموضحة أدناه قبل الحفظ والترحيل' : 'Please resolve the errors shown below before saving and posting', 'error');
       return;
     }
 
     const unsavedDocs = documents.filter(d => d.status !== 'saved' || d.is_modified);
     if (unsavedDocs.length === 0) {
-      showNotification('جميع المستندات في هذه الدفعة محفوظة ومرحلة بالكامل بدون أي تعديلات معلقة', 'info');
+      showNotification(isAr ? 'جميع المستندات في هذه الدفعة محفوظة ومرحلة بالكامل بدون أي تعديلات معلقة' : 'All documents in this batch are already saved and posted with no pending edits', 'info');
       return;
     }
 
-    if (!confirm(`هل أنت متأكد من حفظ وترحيل عدد ${unsavedDocs.length} مستند بتشغيلة رقم ${batchNumber} إلى النظام المحاسبي؟`)) {
+    if (!confirm(isAr 
+      ? `هل أنت متأكد من حفظ وترحيل عدد ${unsavedDocs.length} مستند بتشغيلة رقم ${batchNumber} إلى النظام المحاسبي؟`
+      : `Are you sure you want to save and post ${unsavedDocs.length} documents for batch ${batchNumber} to the accounting system?`
+    )) {
       return;
     }
 
     setIsSavingBatch(true);
-    setSaveProgress({ current: 0, total: unsavedDocs.length, statusText: 'بدء الترحيل المحاسبي للدفعة...' });
+    setSaveProgress({ current: 0, total: unsavedDocs.length, statusText: isAr ? 'بدء الترحيل المحاسبي للدفعة...' : 'Starting batch accounting posting...' });
 
     const updatedDocuments = [...documents];
     let newlySavedCount = 0;
@@ -2287,7 +2459,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       setSaveProgress({ 
         current: newlySavedCount + failedCount + 1, 
         total: unsavedDocs.length, 
-        statusText: `جاري حفظ المستند (${doc.ref}) - ${doc.doc_type}...` 
+        statusText: isAr 
+          ? `جاري حفظ المستند (${doc.ref}) - ${doc.doc_type}...` 
+          : `Saving document (${doc.ref}) - ${getDocTypeDisplay(doc.doc_type)}...` 
       });
 
       try {
@@ -2389,7 +2563,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             payment_type: doc.payment_type,
             payment_method_id: doc.payment_type === 'cash' ? doc.payment_method_id : null,
             notes: doc.notes || '',
-            description: `استيراد مبيعات تشغيلة: ${batchNumber} - مرجع: ${doc.ref}`,
+            description: isAr ? `استيراد مبيعات تشغيلة: ${batchNumber} - مرجع: ${doc.ref}` : `Import Sales Batch: ${batchNumber} - Ref: ${doc.ref}`,
             batch_number: batchNumber,
             items: itemsPayload
           };
@@ -2522,7 +2696,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             payment_type: doc.payment_type,
             payment_method_id: doc.payment_type === 'cash' ? doc.payment_method_id : null,
             notes: doc.notes || '',
-            description: `استيراد مشتريات تشغيلة: ${batchNumber} - مرجع: ${doc.ref}`,
+            description: isAr ? `استيراد مشتريات تشغيلة: ${batchNumber} - مرجع: ${doc.ref}` : `Import Purchases Batch: ${batchNumber} - Ref: ${doc.ref}`,
             batch_number: batchNumber,
             items: itemsPayload
           };
@@ -2655,14 +2829,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
       } catch (err: any) {
         console.error(`Error saving document ${doc.ref}:`, err);
-        let errMsg = err.message || err.detail || 'خطأ أثناء الحفظ والترحيل';
+        let errMsg = err.message || err.detail || (isAr ? 'خطأ أثناء الحفظ والترحيل' : 'Error during save and posting');
         // Clean up common technical prefixes for clean UI
         errMsg = errMsg.replace(/^Failed to create (invoice|return|sales_order|purchase_invoice|purchase_order):\s*/i, '');
         errMsg = errMsg.replace(/^Error:\s*/i, '');
         if (errMsg.includes('Negative stock is not allowed') || errMsg.includes('الكمية المطلوبة غير متوفرة')) {
-          errMsg = 'الكمية المطلوبة غير متوفرة في المخزن (رصيد الصنف لا يكفي وسياسة الشركة تمنع الصرف بالسالب)';
+          errMsg = isAr ? 'الكمية المطلوبة غير متوفرة في المخزن (رصيد الصنف لا يكفي وسياسة الشركة تمنع الصرف بالسالب)' : 'Required quantity is not available in warehouse (insufficient stock and negative stock not allowed)';
         } else if (errMsg.includes('invalid input syntax for type date')) {
-          errMsg = 'صيغة تاريخ المستند غير متوافقة';
+          errMsg = isAr ? 'صيغة تاريخ المستند غير متوافقة' : 'Invalid document date format';
         }
 
         updatedDocuments[idx] = {
@@ -2733,10 +2907,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     // Only mark batch as completely saved if ALL documents succeeded!
     if (totalRemaining === 0) {
       setIsBatchSaved(true);
-      showNotification(`تم حفظ وترحيل كامل الدفعة بنجاح! تم إنشاء ${totalSaved} مستند والقيود التلقائية`, 'success');
+      showNotification(isAr ? `تم حفظ وترحيل كامل الدفعة بنجاح! تم إنشاء ${totalSaved} مستند والقيود التلقائية` : `Batch saved and posted successfully! Created ${totalSaved} documents with automated entries`, 'success');
     } else {
       setIsBatchSaved(false);
-      showNotification(`تم حفظ ${newlySavedCount} مستند، وتعذر حفظ ${failedCount} مستند (راجع الأسباب بالجدول ثم أعد المحاولة)`, 'warning');
+      showNotification(isAr ? `تم حفظ ${newlySavedCount} مستند، وتعذر حفظ ${failedCount} مستند (راجع الأسباب بالجدول ثم أعد المحاولة)` : `Saved ${newlySavedCount} documents, failed to save ${failedCount} (review reasons in table and retry)`, 'warning');
     }
   };
 
@@ -2746,7 +2920,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
     const wb = XLSX.utils.book_new();
 
-    const headers = [
+    const headers = isAr ? [
       'تاريخ التشغيلة',
       'رقم التشغيلة (Batch)',
       'رقم الفاتورة / المستند بالنظام',
@@ -2770,6 +2944,30 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       'طريقة الدفع',
       'حالة الحفظ والترحيل',
       'ملاحظات'
+    ] : [
+      'Batch Date',
+      'Batch Number',
+      'System Doc Number',
+      'Journal Entry Number',
+      'Original Ref',
+      'Document Type',
+      isSales ? 'Customer' : 'Supplier',
+      'Document Date',
+      'Warehouse',
+      'Item Code',
+      'Item Name',
+      'Quantity',
+      'Price',
+      'Discount',
+      'Subtotal',
+      'VAT %',
+      'VAT Amount',
+      'WHT %',
+      'WHT Amount',
+      'Line Total',
+      'Payment Method',
+      'Status',
+      'Notes'
     ];
 
     const exportRows: any[][] = [];
@@ -2779,10 +2977,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         exportRows.push([
           batchDate,
           batchNumber,
-          doc.created_document_number || (doc.status === 'failed' ? `لم يتم الحفظ: ${doc.error_message || 'خطأ'}` : 'لم يتم الحفظ'),
-          doc.created_journal_number || (doc.doc_type.includes('أمر') ? 'بدون قيد (أمر)' : '-'),
+          doc.created_document_number || (doc.status === 'failed' ? (isAr ? `لم يتم الحفظ: ${doc.error_message || 'خطأ'}` : `Not Saved: ${doc.error_message || 'Error'}`) : (isAr ? 'لم يتم الحفظ' : 'Not Saved')),
+          doc.created_journal_number || (doc.doc_type.includes('أمر') ? (isAr ? 'بدون قيد (أمر)' : 'No Entry (Order)') : '-'),
           doc.ref,
-          doc.doc_type,
+          isAr ? doc.doc_type : getDocTypeDisplay(doc.doc_type),
           doc.party_name,
           doc.date,
           doc.warehouse_name || '-',
@@ -2797,8 +2995,8 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           item.withholding_tax_rate,
           item.withholding_tax_amount,
           item.total,
-          doc.payment_type === 'cash' ? 'نقدي' : 'آجل',
-          doc.status === 'saved' ? 'تم الحفظ والترحيل' : `فشل: ${doc.error_message || 'لم يحفظ'}`,
+          doc.payment_type === 'cash' ? (isAr ? 'نقدي' : 'Cash') : (isAr ? 'آجل' : 'Credit'),
+          doc.status === 'saved' ? (isAr ? 'تم الحفظ والترحيل' : 'Saved & Posted') : (isAr ? `فشل: ${doc.error_message || 'لم يحفظ'}` : `Failed: ${doc.error_message || 'Not saved'}`),
           item.description || doc.notes || ''
         ]);
       });
@@ -2806,17 +3004,17 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
     const ws = XLSX.utils.aoa_to_sheet([headers, ...exportRows]);
     ws['!cols'] = headers.map(() => ({ wch: 18 }));
-    XLSX.utils.book_append_sheet(wb, ws, 'المستندات المرحلة');
+    XLSX.utils.book_append_sheet(wb, ws, isAr ? 'المستندات المرحلة' : 'Posted Documents');
 
-    const outFileName = `${batchNumber}_${isSales ? 'مبيعات' : 'مشتريات'}_المرحلة.xlsx`;
+    const outFileName = isAr ? `${batchNumber}_${isSales ? 'مبيعات' : 'مشتريات'}_المرحلة.xlsx` : `${batchNumber}_${isSales ? 'sales' : 'purchases'}_posted.xlsx`;
     XLSX.writeFile(wb, outFileName);
-    showNotification('تم تصدير ملف الإكسيل بنجاح', 'success');
+    showNotification(isAr ? 'تم تصدير ملف الإكسيل بنجاح' : 'Excel file exported successfully', 'success');
   };
 
   const handleExportPastBatch = (batch: any) => {
     if (!batch || !batch.details || batch.details.length === 0) return;
     const wb = XLSX.utils.book_new();
-    const headers = [
+    const headers = isAr ? [
       'تاريخ التشغيلة',
       'رقم التشغيلة (Batch)',
       'رقم الفاتورة / المستند بالنظام',
@@ -2828,25 +3026,37 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       'الصافي النهائي',
       'حالة الحفظ والترحيل',
       'ملاحظات / أسباب الفشل'
+    ] : [
+      'Batch Date',
+      'Batch Number',
+      'System Doc Number',
+      'Journal Entry Number',
+      'Reference (Ref)',
+      'Document Type',
+      'Party (Customer / Supplier)',
+      'Document Date',
+      'Net Total',
+      'Status',
+      'Notes / Failure Reasons'
     ];
     const dataRows = (batch.details || []).map((d: any) => [
       batch.batch_date,
       batch.batch_number,
       d.created_document_number || '-',
-      d.created_journal_number ? `قيد ${d.created_journal_number}` : '-',
+      d.created_journal_number ? (isAr ? `قيد ${d.created_journal_number}` : `Entry #${d.created_journal_number}`) : '-',
       d.ref,
-      d.doc_type,
+      isAr ? d.doc_type : getDocTypeDisplay(d.doc_type),
       d.party_name,
       d.date,
       d.total_amount,
-      d.status === 'saved' ? 'تم الحفظ والترحيل' : 'تعذر الحفظ',
+      d.status === 'saved' ? (isAr ? 'تم الحفظ والترحيل' : 'Saved & Posted') : (isAr ? 'تعذر الحفظ' : 'Failed to save'),
       d.error_message || '-'
     ]);
     const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
     ws['!cols'] = headers.map(() => ({ wch: 20 }));
-    XLSX.utils.book_append_sheet(wb, ws, 'تقرير التشغيلة');
-    XLSX.writeFile(wb, `تقرير_تشغيلة_${batch.batch_number}.xlsx`);
-    showNotification(`تم تصدير إكسيل التشغيلة ${batch.batch_number} بنجاح`, 'success');
+    XLSX.utils.book_append_sheet(wb, ws, isAr ? 'تقرير التشغيلة' : 'Batch Report');
+    XLSX.writeFile(wb, isAr ? `تقرير_تشغيلة_${batch.batch_number}.xlsx` : `Batch_Report_${batch.batch_number}.xlsx`);
+    showNotification(isAr ? `تم تصدير إكسيل التشغيلة ${batch.batch_number} بنجاح` : `Batch ${batch.batch_number} Excel exported successfully`, 'success');
   };
 
   return (
@@ -2864,7 +3074,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             }`}
           >
             <UploadCloud className="w-3.5 h-3.5" />
-            <span>استيراد تشغيلة جديدة</span>
+            <span>{isAr ? 'استيراد تشغيلة جديدة' : 'Import New Batch'}</span>
           </button>
 
           <button
@@ -2879,7 +3089,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>سجل التشغيلات السابقة ({batchesHistory.length})</span>
+            <span>{isAr ? `سجل التشغيلات السابقة (${batchesHistory.length})` : `Previous Batches (${batchesHistory.length})`}</span>
           </button>
         </div>
 
@@ -2889,7 +3099,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-emerald-600 transition-colors cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoadingBatches ? 'animate-spin' : ''}`} />
-            <span>تحديث السجل</span>
+            <span>{isAr ? 'تحديث السجل' : 'Refresh History'}</span>
           </button>
         )}
       </div>
@@ -2902,10 +3112,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               <div>
                 <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   <Layers className="w-4 h-4 text-emerald-600" />
-                  <span>سجل تشغيلات الاستيراد السابقة ({batchesHistory.length})</span>
+                  <span>{isAr ? `سجل تشغيلات الاستيراد السابقة (${batchesHistory.length})` : `Previous Import Batches (${batchesHistory.length})`}</span>
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  عرض جميع الدفعات التي تم استيرادها وترحيلها للنظام، مع إمكانية استعراض المستندات والقيود المرتبطة بكل تشغيلة
+                  {isAr ? 'عرض جميع الدفعات التي تم استيرادها وترحيلها للنظام، مع إمكانية استعراض المستندات والقيود المرتبطة بكل تشغيلة' : 'View all imported batches and their posted documents and journal entries'}
                 </p>
               </div>
 
@@ -2914,24 +3124,24 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 cursor-pointer"
               >
                 <UploadCloud className="w-3.5 h-3.5" />
-                <span>استيراد تشغيلة جديدة</span>
+                <span>{isAr ? 'استيراد تشغيلة جديدة' : 'Import New Batch'}</span>
               </button>
             </div>
 
             {isLoadingBatches ? (
               <div className="py-12 text-center text-slate-500">
                 <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-600" />
-                <span className="text-xs">جاري تحميل سجل التشغيلات...</span>
+                <span className="text-xs">{isAr ? 'جاري تحميل سجل التشغيلات...' : 'Loading batches history...'}</span>
               </div>
             ) : batchesHistory.length === 0 ? (
               <div className="py-12 text-center text-slate-500 space-y-3">
                 <Layers className="w-10 h-10 text-slate-300 mx-auto" />
-                <p className="text-xs font-semibold">لا توجد تشغيلات استيراد مسجلة حتى الآن</p>
+                <p className="text-xs font-semibold">{isAr ? 'لا توجد تشغيلات استيراد مسجلة حتى الآن' : 'No import batches recorded yet'}</p>
                 <button
                   onClick={() => setActiveMainTab('import')}
                   className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-sm cursor-pointer"
                 >
-                  بدء أول استيراد الآن
+                  {isAr ? 'بدء أول استيراد الآن' : 'Start First Import Now'}
                 </button>
               </div>
             ) : (
@@ -2939,14 +3149,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 <table className="w-full text-right text-xs">
                   <thead className="bg-slate-50 dark:bg-slate-800/70 border-b border-slate-200 dark:border-slate-800 font-bold text-slate-700 dark:text-slate-300">
                     <tr>
-                      <th className="py-2.5 px-3">رقم التشغيلة</th>
-                      <th className="py-2.5 px-3 text-center">التاريخ</th>
-                      <th className="py-2.5 px-3 text-center">نوع التشغيلة</th>
-                      <th className="py-2.5 px-3 text-center">عدد المستندات</th>
-                      <th className="py-2.5 px-3 text-center">إجمالي القيمة</th>
-                      <th className="py-2.5 px-3 text-center">الحالة</th>
-                      <th className="py-2.5 px-3 text-center">تاريخ وتوقيت الحفظ</th>
-                      <th className="py-2.5 px-3 text-center">إجراءات</th>
+                      <th className="py-2.5 px-3">{isAr ? 'رقم التشغيلة' : 'Batch #'}</th>
+                      <th className="py-2.5 px-3 text-center">{isAr ? 'التاريخ' : 'Date'}</th>
+                      <th className="py-2.5 px-3 text-center">{isAr ? 'نوع التشغيلة' : 'Batch Type'}</th>
+                      <th className="py-2.5 px-3 text-center">{isAr ? 'عدد المستندات' : 'Doc Count'}</th>
+                      <th className="py-2.5 px-3 text-center">{isAr ? 'إجمالي القيمة' : 'Total Amount'}</th>
+                      <th className="py-2.5 px-3 text-center">{isAr ? 'الحالة' : 'Status'}</th>
+                      <th className="py-2.5 px-3 text-center">{isAr ? 'تاريخ وتوقيت الحفظ' : 'Saved At'}</th>
+                      <th className="py-2.5 px-3 text-center">{isAr ? 'إجراءات' : 'Actions'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -2962,11 +3172,11 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                           </td>
                           <td className="py-2.5 px-3 text-center">
                             <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800">
-                              {batch.batch_type === 'sales' ? 'مبيعات' : 'مشتريات'}
+                              {batch.batch_type === 'sales' ? (isAr ? 'مبيعات' : 'Sales') : (isAr ? 'مشتريات' : 'Purchases')}
                             </span>
                           </td>
                           <td className="py-2.5 px-3 text-center font-mono font-bold">
-                            {batch.total_documents || 0} مستند
+                            {batch.total_documents || 0} {isAr ? 'مستند' : 'docs'}
                           </td>
                           <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-900 dark:text-white">
                             {formatMoney(Number(batch.total_amount) || 0)}
@@ -2977,11 +3187,11 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                                 : 'bg-amber-50 text-amber-700 border-amber-200'
                             }`}>
-                              {isComplete ? 'مكتملة بالكامل' : 'حفظ جزئي'}
+                              {isComplete ? (isAr ? 'مكتملة بالكامل' : 'Completed') : (isAr ? 'حفظ جزئي' : 'Partial')}
                             </span>
                           </td>
                           <td className="py-2.5 px-3 text-center text-slate-500 font-mono text-[11px]" dir="ltr">
-                            {batch.created_at ? new Date(batch.created_at).toLocaleString('ar-EG') : '-'}
+                            {batch.created_at ? new Date(batch.created_at).toLocaleString(isAr ? 'ar-EG' : 'en-US') : '-'}
                           </td>
                           <td className="py-2.5 px-3 text-center">
                             <div className="flex items-center justify-center gap-1.5">
@@ -3040,11 +3250,11 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                       {pageTitle}
                     </h1>
                     <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                      {isSales ? 'مبيعات' : 'مشتريات'}
+                      {isSales ? (isAr ? 'مبيعات' : 'Sales') : (isAr ? 'مشتريات' : 'Purchases')}
                     </span>
                   </div>
                   <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                    استيراد الفواتير والأوامر والمرتجعات مع توليد أرقام القيود التلقائية
+                    {isAr ? 'استيراد الفواتير والأوامر والمرتجعات مع توليد أرقام القيود التلقائية' : 'Import invoices, orders, and returns with automated journal entries'}
                   </p>
                 </div>
               </div>
@@ -3068,7 +3278,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                       ? 'border-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-200 hover:border-emerald-400'
                       : 'border-slate-300 dark:border-slate-700 hover:border-emerald-400 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300'
                 }`}
-                title="اضغط لاختيار ملف الإكسيل أو اسحبه وأفلته هنا"
+                title={isAr ? "اضغط لاختيار ملف الإكسيل أو اسحبه وأفلته هنا" : "Click to select Excel file or drag & drop here"}
               >
                 <input 
                   type="file" 
@@ -3085,7 +3295,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 {isParsing ? (
                   <span className="text-[11px] font-semibold flex items-center gap-1">
                     <RefreshCw className="w-3 h-3 animate-spin" />
-                    جاري الفحص...
+                    {isAr ? 'جاري الفحص...' : 'Validating...'}
                   </span>
                 ) : fileName ? (
                   <span className="text-[11px] font-semibold truncate max-w-[200px]" dir="ltr">
@@ -3093,7 +3303,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   </span>
                 ) : (
                   <span className="text-[11px] font-semibold">
-                    اضغط لاختيار ملف الإكسيل أو اسحبه هنا
+                    {isAr ? 'اضغط لاختيار ملف الإكسيل أو اسحبه هنا' : 'Click to select Excel file or drag it here'}
                   </span>
                 )}
               </div>
@@ -3103,7 +3313,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 {/* Date */}
                 <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800/60 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
                   <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
-                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">التاريخ:</span>
+                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">{isAr ? 'التاريخ:' : 'Date:'}</span>
                   <input 
                     type="date"
                     value={batchDate}
@@ -3116,9 +3326,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 {/* Batch Number */}
                 <div className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-800/60">
                   <Hash className="w-3 h-3 text-emerald-600 shrink-0" />
-                  <span className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-300">التشغيلة:</span>
+                  <span className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-300">{isAr ? 'التشغيلة:' : 'Batch:'}</span>
                   <span className="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-300 select-all">
-                    {isGeneratingBatchNumber ? 'جاري التوليد...' : batchNumber}
+                    {isGeneratingBatchNumber ? (isAr ? 'جاري التوليد...' : 'Generating...') : batchNumber}
                   </span>
                 </div>
 
@@ -3126,10 +3336,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 <button
                   onClick={handleDownloadTemplate}
                   className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-lg transition-colors shadow-xs cursor-pointer"
-                  title="تحميل نموذج الإكسيل النموذجي المشروح مع أمثلة عملية جاهزة"
+                  title={isAr ? "تحميل نموذج الإكسيل النموذجي المشروح مع أمثلة عملية جاهزة" : "Download structured Excel template with examples"}
                 >
                   <Download className="w-3 h-3" />
-                  <span>تحميل النموذج</span>
+                  <span>{isAr ? 'تحميل النموذج' : 'Download Template'}</span>
                 </button>
 
                 {/* 1. Save Changes Button at Top of Screen (Requirement 1) */}
@@ -3138,17 +3348,17 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                     onClick={handleSaveAndPostBatch}
                     disabled={isSavingBatch || validationErrors.length > 0}
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3.5 py-1 rounded-lg shadow-sm transition-all hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                    title={validationErrors.length > 0 ? 'يرجى تصحيح الأخطاء أولاً قبل الحفظ' : 'حفظ التعديلات والترحيل للنظام'}
+                    title={validationErrors.length > 0 ? (isAr ? 'يرجى تصحيح الأخطاء أولاً قبل الحفظ' : 'Please fix validation errors before saving') : (isAr ? 'حفظ التعديلات والترحيل للنظام' : 'Save changes and post to system')}
                   >
                     {isSavingBatch ? (
                       <>
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>جاري الحفظ...</span>
+                        <span>{isAr ? 'جاري الحفظ...' : 'Saving...'}</span>
                       </>
                     ) : (
                       <>
                         <Check className="w-3.5 h-3.5" />
-                        <span>حفظ التعديلات {documents.filter(d => d.status !== 'saved' || d.is_modified).length > 0 ? `(${documents.filter(d => d.status !== 'saved' || d.is_modified).length})` : ''}</span>
+                        <span>{isAr ? 'حفظ التعديلات' : 'Save Changes'} {documents.filter(d => d.status !== 'saved' || d.is_modified).length > 0 ? `(${documents.filter(d => d.status !== 'saved' || d.is_modified).length})` : ''}</span>
                       </>
                     )}
                   </button>
@@ -3170,10 +3380,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold text-xs">
                     <AlertTriangle className="w-4 h-4 text-amber-600" />
-                    <span>تنبيهات وأخطاء الفحص التفصيلي ({validationErrors.length} ملاحظة):</span>
+                    <span>{isAr ? `تنبيهات وأخطاء الفحص التفصيلي (${validationErrors.length} ملاحظة):` : `Validation Warnings & Errors (${validationErrors.length} notices):`}</span>
                   </div>
                   <span className="text-[10px] bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full font-semibold">
-                    يرجى تصحيح الأخطاء في الإكسيل أو التعديل بالجدول أدناه
+                    {isAr ? 'يرجى تصحيح الأخطاء في الإكسيل أو التعديل بالجدول أدناه' : 'Please fix errors in Excel or edit in the table below'}
                   </span>
                 </div>
 
@@ -3181,10 +3391,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   <table className="w-full text-right text-xs">
                     <thead className="bg-amber-100/60 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border-b border-amber-200 dark:border-amber-800 sticky top-0">
                       <tr>
-                        <th className="p-2 font-bold">رقم الصف بالإكسيل</th>
-                        <th className="p-2 font-bold">رقم المرجع (Ref)</th>
-                        <th className="p-2 font-bold">الحقل</th>
-                        <th className="p-2 font-bold">سبب الخطأ بالتفصيل</th>
+                        <th className="p-2 font-bold">{isAr ? 'رقم الصف بالإكسيل' : 'Excel Row'}</th>
+                        <th className="p-2 font-bold">{isAr ? 'رقم المرجع (Ref)' : 'Reference (Ref)'}</th>
+                        <th className="p-2 font-bold">{isAr ? 'الحقل' : 'Field'}</th>
+                        <th className="p-2 font-bold">{isAr ? 'سبب الخطأ بالتفصيل' : 'Error Description'}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-amber-100 dark:divide-slate-800">
@@ -3192,10 +3402,12 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                         const isStockErr = err.field === 'رصيد المخزون';
                         return (
                           <tr key={i} className={`hover:bg-amber-50/50 dark:hover:bg-slate-800/50 ${isStockErr ? 'bg-red-50/80 dark:bg-red-950/40 font-medium' : ''}`}>
-                            <td className="p-2 font-mono font-bold text-amber-700 dark:text-amber-400">الصف {err.rowNumber}</td>
+                            <td className="p-2 font-mono font-bold text-amber-700 dark:text-amber-400">
+                              {isAr ? `الصف ${err.rowNumber}` : `Row ${err.rowNumber}`}
+                            </td>
                             <td className="p-2 font-mono font-bold">{err.ref}</td>
                             <td className={`p-2 font-semibold ${isStockErr ? 'text-red-700 dark:text-red-300 font-bold' : ''}`}>
-                              {isStockErr ? '⚠️ ' + err.field : err.field}
+                              {isStockErr ? '⚠️ ' + (isAr ? err.field : 'Stock Balance') : (isAr ? err.field : getFieldDisplay(err.field))}
                             </td>
                             <td className="p-2 text-red-600 dark:text-red-400">{err.message}</td>
                           </tr>
@@ -3215,20 +3427,20 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 <table className="w-full text-right text-xs">
                   <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-bold">
                     <tr>
-                      <th className="py-2 px-3 whitespace-nowrap">نوع المستند</th>
-                      <th className="py-2 px-2 text-center whitespace-nowrap">عدد المستندات</th>
-                      <th className="py-2 px-2 text-center whitespace-nowrap">عدد البنود</th>
-                      <th className="py-2 px-2 text-center whitespace-nowrap">الإجمالي</th>
-                      <th className="py-2 px-2 text-center whitespace-nowrap">إجمالي الخصم</th>
-                      <th className="py-2 px-2 text-center whitespace-nowrap">الصافي قبل الضريبة</th>
+                      <th className="py-2 px-3 whitespace-nowrap">{isAr ? 'نوع المستند' : 'Document Type'}</th>
+                      <th className="py-2 px-2 text-center whitespace-nowrap">{isAr ? 'عدد المستندات' : 'Doc Count'}</th>
+                      <th className="py-2 px-2 text-center whitespace-nowrap">{isAr ? 'عدد البنود' : 'Items Count'}</th>
+                      <th className="py-2 px-2 text-center whitespace-nowrap">{isAr ? 'الإجمالي' : 'Gross'}</th>
+                      <th className="py-2 px-2 text-center whitespace-nowrap">{isAr ? 'إجمالي الخصم' : 'Total Discount'}</th>
+                      <th className="py-2 px-2 text-center whitespace-nowrap">{isAr ? 'الصافي قبل الضريبة' : 'Subtotal'}</th>
                       <th className="py-2 px-2 text-center whitespace-nowrap">
-                        ض.ق.م {isVatEnabled ? '(14%)' : '(معطلة)'}
+                        {isAr ? `ض.ق.م ${isVatEnabled ? '(14%)' : '(معطلة)'}` : `VAT ${isVatEnabled ? '(14%)' : '(Disabled)'}`}
                       </th>
                       <th className="py-2 px-2 text-center whitespace-nowrap">
-                        ض.خ.إ {isWhtEnabled ? '(1%)' : '(معطلة)'}
+                        {isAr ? `ض.خ.إ ${isWhtEnabled ? '(1%)' : '(معطلة)'}` : `WHT ${isWhtEnabled ? '(1%)' : '(Disabled)'}`}
                       </th>
                       <th className="py-2 px-3 text-center whitespace-nowrap font-extrabold text-emerald-700 dark:text-emerald-300">
-                        الصافي النهائي
+                        {isAr ? 'الصافي النهائي' : 'Net Total'}
                       </th>
                     </tr>
                   </thead>
@@ -3237,7 +3449,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                     <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                       <td className="py-1.5 px-3 font-sans font-bold whitespace-nowrap">
                         <span className="text-xs px-2.5 py-0.5 rounded-full border bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-800">
-                          {isSales ? 'فواتير بيع' : 'فواتير شراء'}
+                          {isSales ? (isAr ? 'فواتير بيع' : 'Sales Invoices') : (isAr ? 'فواتير شراء' : 'Purchase Invoices')}
                         </span>
                       </td>
                       <td className="py-1.5 px-2 text-center font-bold text-slate-800 dark:text-slate-200">{invoicesSummary.count}</td>
@@ -3254,7 +3466,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                     <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                       <td className="py-1.5 px-3 font-sans font-bold whitespace-nowrap">
                         <span className="text-xs px-2.5 py-0.5 rounded-full border bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-800">
-                          {isSales ? 'أوامر بيع' : 'أوامر شراء'}
+                          {isSales ? (isAr ? 'أوامر بيع' : 'Sales Orders') : (isAr ? 'أوامر شراء' : 'Purchase Orders')}
                         </span>
                       </td>
                       <td className="py-1.5 px-2 text-center font-bold text-slate-800 dark:text-slate-200">{ordersSummary.count}</td>
@@ -3271,7 +3483,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                     <tr className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                       <td className="py-1.5 px-3 font-sans font-bold whitespace-nowrap">
                         <span className="text-xs px-2.5 py-0.5 rounded-full border bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-800">
-                          {isSales ? 'مرتجعات بيع' : 'مرتجعات شراء'}
+                          {isSales ? (isAr ? 'مرتجعات بيع' : 'Sales Returns') : (isAr ? 'مرتجعات شراء' : 'Purchase Returns')}
                         </span>
                       </td>
                       <td className="py-1.5 px-2 text-center font-bold text-slate-800 dark:text-slate-200">{returnsSummary.count}</td>
@@ -3286,7 +3498,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   </tbody>
                   <tfoot className="bg-slate-100/70 dark:bg-slate-800/70 border-t-2 border-slate-200 dark:border-slate-700 font-mono font-bold text-slate-800 dark:text-slate-200">
                     <tr>
-                      <td className="py-1.5 px-3 font-sans font-extrabold whitespace-nowrap">الإجمالي العام</td>
+                      <td className="py-1.5 px-3 font-sans font-extrabold whitespace-nowrap">{isAr ? 'الإجمالي العام' : 'Grand Total'}</td>
                       <td className="py-1.5 px-2 text-center">{documents.length}</td>
                       <td className="py-1.5 px-2 text-center">{documents.reduce((sum, d) => sum + d.items.length, 0)}</td>
                       <td className="py-1.5 px-2 text-center">{formatMoney(documents.reduce((sum, d) => sum + d.gross_total, 0))}</td>
@@ -3309,7 +3521,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-emerald-600" />
                   <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                    فحص ومطابقة ربط الحسابات للقيود المحاسبية ({itemsAccountAudit.length} صنف مسجل بالإكسيل):
+                    {isAr ? `فحص ومطابقة ربط الحسابات للقيود المحاسبية (${itemsAccountAudit.length} صنف مسجل بالإكسيل):` : `Account Mapping Audit (${itemsAccountAudit.length} Excel products):`}
                   </span>
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
                     itemsAccountAudit.every(a => a.sales.status !== 'missing' && a.cost.status !== 'missing' && a.inventory.status !== 'missing' && a.vat.status !== 'missing' && a.wht.status !== 'missing')
@@ -3317,8 +3529,8 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                       : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-200 border border-rose-300 dark:border-rose-800 font-bold'
                   }`}>
                     {itemsAccountAudit.every(a => a.sales.status !== 'missing' && a.cost.status !== 'missing' && a.inventory.status !== 'missing' && a.vat.status !== 'missing' && a.wht.status !== 'missing')
-                      ? '✓ جميع الأصناف مكتملة الحسابات ومطابقة'
-                      : '⚠️ توجد أصناف تفتقد لحسابات لازمة للقيود (تمنع الحفظ)'}
+                      ? (isAr ? '✓ جميع الأصناف مكتملة الحسابات ومطابقة' : '✓ All products have valid linked accounts')
+                      : (isAr ? '⚠️ توجد أصناف تفتقد لحسابات لازمة للقيود (تمنع الحفظ)' : '⚠️ Missing required accounts (prevents posting)')}
                   </span>
                 </div>
 
@@ -3326,7 +3538,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   onClick={() => setShowAccountsAudit(!showAccountsAudit)}
                   className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
                 >
-                  <span>{showAccountsAudit ? 'إخفاء تفاصيل ربط الحسابات' : 'عرض تفاصيل ربط الحسابات (البيع / التكلفة / المخزون / الضرائب)'}</span>
+                  <span>{showAccountsAudit ? (isAr ? 'إخفاء تفاصيل ربط الحسابات' : 'Hide account mapping details') : (isAr ? 'عرض تفاصيل ربط الحسابات (البيع / التكلفة / المخزون / الضرائب)' : 'Show account mapping details (Sales / Cost / Stock / Taxes)')}</span>
                   {showAccountsAudit ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                 </button>
               </div>
@@ -3336,13 +3548,13 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   <table className="w-full text-right text-xs">
                     <thead className="bg-slate-50 dark:bg-slate-800/80 font-bold text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">
                       <tr>
-                        <th className="py-1.5 px-2.5">كود الصنف</th>
-                        <th className="py-1.5 px-2.5">اسم الصنف</th>
-                        <th className="py-1.5 px-2.5 text-center">{isSales ? 'حساب المبيعات / الإيراد' : 'حساب المشتريات / التكلفة'}</th>
-                        <th className="py-1.5 px-2.5 text-center">حساب تكلفة المبيعات</th>
-                        <th className="py-1.5 px-2.5 text-center">حساب المخزون</th>
-                        <th className="py-1.5 px-2.5 text-center">ضريبة القيمة المضافة (ق م)</th>
-                        <th className="py-1.5 px-2.5 text-center">ضريبة أ.ت.ص (خ إ)</th>
+                        <th className="py-1.5 px-2.5">{isAr ? 'كود الصنف' : 'Product Code'}</th>
+                        <th className="py-1.5 px-2.5">{isAr ? 'اسم الصنف' : 'Product Name'}</th>
+                        <th className="py-1.5 px-2.5 text-center">{isSales ? (isAr ? 'حساب المبيعات / الإيراد' : 'Sales / Revenue Account') : (isAr ? 'حساب المشتريات / التكلفة' : 'Purchases / Expense Account')}</th>
+                        <th className="py-1.5 px-2.5 text-center">{isAr ? 'حساب تكلفة المبيعات' : 'COGS Account'}</th>
+                        <th className="py-1.5 px-2.5 text-center">{isAr ? 'حساب المخزون' : 'Inventory Account'}</th>
+                        <th className="py-1.5 px-2.5 text-center">{isAr ? 'ضريبة القيمة المضافة (ق م)' : 'VAT Account'}</th>
+                        <th className="py-1.5 px-2.5 text-center">{isAr ? 'ضريبة أ.ت.ص (خ إ)' : 'WHT Account'}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono text-[11px]">
@@ -3367,7 +3579,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                                   ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
                                   : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200 border-rose-300 dark:border-rose-800'
                             }`}>
-                              {aud.cost.status === 'exempt' ? 'خدمي (معفى)' : (aud.cost.status === 'linked' ? '✓ ' : '✕ ') + aud.cost.name}
+                              {aud.cost.status === 'exempt' ? (isAr ? 'خدمي (معفى)' : 'Service (Exempt)') : (aud.cost.status === 'linked' ? '✓ ' : '✕ ') + aud.cost.name}
                             </span>
                           </td>
                           <td className="py-1.5 px-2.5 text-center">
@@ -3378,7 +3590,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                                   ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
                                   : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200 border-rose-300 dark:border-rose-800'
                             }`}>
-                              {aud.inventory.status === 'exempt' ? 'خدمي (معفى)' : (aud.inventory.status === 'linked' ? '✓ ' : '✕ ') + aud.inventory.name}
+                              {aud.inventory.status === 'exempt' ? (isAr ? 'خدمي (معفى)' : 'Service (Exempt)') : (aud.inventory.status === 'linked' ? '✓ ' : '✕ ') + aud.inventory.name}
                             </span>
                           </td>
                           <td className="py-1.5 px-2.5 text-center">
@@ -3417,17 +3629,17 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 shadow-xs">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                  إجمالي المستندات:
+                  {isAr ? 'إجمالي المستندات:' : 'Total Documents:'}
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-mono">
-                  {documents.length} مستند
+                  {documents.length} {isAr ? 'مستند' : 'docs'}
                 </span>
 
                 {/* If all saved */}
                 {isBatchSaved && (
                   <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>تم الحفظ والترحيل بالكامل ({documents.filter(d => d.status === 'saved').length} مستند)</span>
+                    <span>{isAr ? `تم الحفظ والترحيل بالكامل (${documents.filter(d => d.status === 'saved').length} مستند)` : `All posted successfully (${documents.filter(d => d.status === 'saved').length} docs)`}</span>
                   </span>
                 )}
 
@@ -3436,7 +3648,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-100 dark:bg-amber-950/80 px-2.5 py-0.5 rounded-full border border-amber-300 dark:border-amber-800">
                     <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
                     <span>
-                      تم حفظ {documents.filter(d => d.status === 'saved').length} مستند، وتعذر حفظ {documents.filter(d => d.status === 'failed').length} مستند
+                      {isAr ? `تم حفظ ${documents.filter(d => d.status === 'saved').length} مستند، وتعذر حفظ ${documents.filter(d => d.status === 'failed').length} مستند` : `Saved ${documents.filter(d => d.status === 'saved').length} docs, failed ${documents.filter(d => d.status === 'failed').length} docs`}
                     </span>
                   </span>
                 )}
@@ -3453,17 +3665,17 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                     {isSavingBatch ? (
                       <>
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>جاري الحفظ والترحيل...</span>
+                        <span>{isAr ? 'جاري الحفظ والترحيل...' : 'Saving & Posting...'}</span>
                       </>
                     ) : documents.some(d => d.status === 'saved') ? (
                       <>
                         <RotateCcw className="w-3.5 h-3.5" />
-                        <span>إعادة محاولة حفظ المستندات المتبقية ({documents.filter(d => d.status !== 'saved').length})</span>
+                        <span>{isAr ? `إعادة محاولة حفظ المستندات المتبقية (${documents.filter(d => d.status !== 'saved').length})` : `Retry remaining documents (${documents.filter(d => d.status !== 'saved').length})`}</span>
                       </>
                     ) : (
                       <>
                         <Check className="w-3.5 h-3.5" />
-                        <span>حفظ وترحيل المستندات</span>
+                        <span>{isAr ? 'حفظ وترحيل المستندات' : 'Save & Post Documents'}</span>
                       </>
                     )}
                   </button>
@@ -3476,7 +3688,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span>تصدير إكسيل النتائج (مع أرقام الفواتير والقيود)</span>
+                    <span>{isAr ? 'تصدير إكسيل النتائج (مع أرقام الفواتير والقيود)' : 'Export Results Excel (with Invoices & Entries)'}</span>
                   </button>
                 )}
               </div>
@@ -3505,7 +3717,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               <div className="flex items-center justify-between">
                 <h2 className="text-xs md:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                   <Layers className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>جدول المستندات ومطابقتها ({documents.length}):</span>
+                  <span>{isAr ? `جدول المستندات ومطابقتها (${documents.length}):` : `Validated Documents Table (${documents.length}):`}</span>
                 </h2>
                 <div className="flex items-center gap-2">
                   <button
@@ -3516,14 +3728,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                     }}
                     className="text-[11px] text-slate-600 dark:text-slate-400 hover:underline cursor-pointer"
                   >
-                    فتح الكل
+                    {isAr ? 'فتح الكل' : 'Expand All'}
                   </button>
                   <span className="text-slate-300">|</span>
                   <button
                     onClick={() => setExpandedRefs({})}
                     className="text-[11px] text-slate-600 dark:text-slate-400 hover:underline cursor-pointer"
                   >
-                    طي الكل
+                    {isAr ? 'طي الكل' : 'Collapse All'}
                   </button>
                 </div>
               </div>
@@ -3552,7 +3764,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                           <button
                             onClick={() => toggleDocExpand(doc.ref)}
                             className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors cursor-pointer"
-                            title={isExpanded ? 'طي الأصناف' : 'عرض الأصناف'}
+                            title={isExpanded ? (isAr ? 'طي الأصناف' : 'Collapse items') : (isAr ? 'عرض الأصناف' : 'Expand items')}
                           >
                             {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                           </button>
@@ -3563,7 +3775,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                               type="button"
                               onClick={() => handleNavigateToDocument(doc)}
                               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-mono font-bold shadow-xs transition-all cursor-pointer"
-                              title="انقر للانتقال مباشرة إلى المستند في تبويب جديد"
+                              title={isAr ? "انقر للانتقال مباشرة إلى المستند في تبويب جديد" : "Click to view document in new tab"}
                             >
                               <FileText className="w-3 h-3" />
                               <span>{doc.created_document_number}</span>
@@ -3577,10 +3789,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                               type="button"
                               onClick={() => handleNavigateToJournal(doc)}
                               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-mono font-bold shadow-xs transition-all cursor-pointer"
-                              title="انقر للانتقال مباشرة إلى القيد المحاسبي في تبويب جديد"
+                              title={isAr ? "انقر للانتقال مباشرة إلى القيد المحاسبي في تبويب جديد" : "Click to view journal entry in new tab"}
                             >
                               <Hash className="w-3 h-3" />
-                              <span>قيد: {doc.created_journal_number}</span>
+                              <span>{isAr ? 'قيد:' : 'Entry:'} {doc.created_journal_number}</span>
                               <ExternalLink className="w-2.5 h-2.5 opacity-80" />
                             </button>
                           )}
@@ -3592,7 +3804,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                               title={doc.stock_error_message}
                             >
                               <AlertTriangle className="w-3 h-3 text-red-600 shrink-0" />
-                              <span className="truncate max-w-[340px]">عجز مخزون: {doc.stock_error_message}</span>
+                              <span className="truncate max-w-[340px]">{isAr ? 'عجز مخزون:' : 'Stock shortage:'} {doc.stock_error_message}</span>
                             </div>
                           )}
 
@@ -3603,7 +3815,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                               title={doc.account_error_message}
                             >
                               <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />
-                              <span className="truncate max-w-[340px]">{doc.account_error_message || 'حسابات غير مكتملة في بطاقات الأصناف أو الأطراف'}</span>
+                              <span className="truncate max-w-[340px]">{doc.account_error_message || (isAr ? 'حسابات غير مكتملة في بطاقات الأصناف أو الأطراف' : 'Incomplete accounts on products or party')}</span>
                             </div>
                           )}
 
@@ -3614,7 +3826,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                               title={doc.warehouse_error_message}
                             >
                               <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
-                              <span className="truncate max-w-[340px]">{doc.warehouse_error_message || 'المستند يفتقد لتحديد المخزن'}</span>
+                              <span className="truncate max-w-[340px]">{doc.warehouse_error_message || (isAr ? 'المستند يفتقد لتحديد المخزن' : 'Missing warehouse for document')}</span>
                             </div>
                           )}
 
@@ -3625,7 +3837,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                               title={doc.error_message}
                             >
                               <AlertTriangle className="w-3 h-3 text-red-600 shrink-0" />
-                              <span className="truncate max-w-[340px]">فشل الحفظ: {doc.error_message || 'خطأ في الحفظ'}</span>
+                              <span className="truncate max-w-[340px]">{isAr ? 'فشل الحفظ:' : 'Save failed:'} {doc.error_message || (isAr ? 'خطأ في الحفظ' : 'Error saving')}</span>
                             </div>
                           )}
 
@@ -3636,7 +3848,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
                           {/* 5. Document Type Badge */}
                           <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold border ${docTypeBadgeColor}`}>
-                            {doc.doc_type}
+                            {getDocTypeDisplay(doc.doc_type)}
                           </span>
 
                           {/* 6. Party Name */}
@@ -3652,7 +3864,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                           {/* 8. Warehouse or Service Badge */}
                           {allServices ? (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-semibold border border-purple-200 dark:border-purple-800">
-                              خدمات (لا يلزم مخزن)
+                              {isAr ? 'خدمات (لا يلزم مخزن)' : 'Services (No warehouse)'}
                             </span>
                           ) : doc.warehouse_name ? (
                             <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
@@ -3662,15 +3874,15 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
                           {/* 9. Payment Type */}
                           <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                            {doc.payment_type === 'cash' ? 'نقدي' : 'آجل'}
+                            {doc.payment_type === 'cash' ? (isAr ? 'نقدي' : 'Cash') : (isAr ? 'آجل' : 'Credit')}
                           </span>
 
-                          {/* 10. Edit Document Header Button (Requirement 2 - Circled in User Screenshot) */}
+                          {/* 10. Edit Document Header Button */}
                           <button
                             type="button"
                             onClick={() => handleOpenEditDocModal(doc)}
                             className="p-1 rounded-full text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700 transition-colors shadow-2xs cursor-pointer"
-                            title="تعديل بيانات المستند الأساسية (النوع، التاريخ، الطرف، المخزن، طريقة الدفع، الملاحظات)"
+                            title={isAr ? "تعديل بيانات المستند الأساسية (النوع، التاريخ، الطرف، المخزن، طريقة الدفع، الملاحظات)" : "Edit document header (type, date, party, warehouse, payment, notes)"}
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
@@ -3682,21 +3894,21 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                             type="button"
                             onClick={() => handleOpenAddItemModal(doc.ref)}
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-xs transition-all cursor-pointer"
-                            title="إضافة صنف جديد لهذا المستند"
+                            title={isAr ? "إضافة صنف جديد لهذا المستند" : "Add new item to this document"}
                           >
                             <Plus className="w-3.5 h-3.5" />
-                            <span>+ إضافة صنف</span>
+                            <span>{isAr ? '+ إضافة صنف' : '+ Add Item'}</span>
                           </button>
 
                           <div className="flex items-center gap-1 text-xs font-mono bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-lg">
-                            <span className="text-emerald-700 dark:text-emerald-300 font-medium">الصافي:</span>
+                            <span className="text-emerald-700 dark:text-emerald-300 font-medium">{isAr ? 'الصافي:' : 'Net:'}</span>
                             <span className="text-emerald-900 dark:text-emerald-100 font-bold">{formatMoney(doc.total_amount)}</span>
                           </div>
 
                           <button
                             onClick={() => handleDeleteDocument(doc.ref)}
                             className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
-                            title={doc.status === 'saved' ? 'إزالة المستند من مساحة العمل' : 'حذف المستند بالكامل'}
+                            title={doc.status === 'saved' ? (isAr ? 'إزالة المستند من مساحة العمل' : 'Remove document from workspace') : (isAr ? 'حذف المستند بالكامل' : 'Delete document')}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -3717,21 +3929,21 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                               <thead className="bg-slate-100/70 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 font-bold">
                                 <tr>
                                   <th className="py-1 px-2 w-8 text-center text-[11px]">#</th>
-                                  <th className="py-1 px-2 text-[11px]">كود الصنف</th>
-                                  <th className="py-1 px-2 text-[11px]">اسم الصنف</th>
-                                  <th className="py-1 px-2 text-center text-[11px]">رقم عملية</th>
-                                  <th className="py-1 px-2 text-center text-[11px]">الإدارة</th>
-                                  <th className="py-1 px-2 text-center text-[11px]">مركز التكلفة</th>
-                                  <th className="py-1 px-2 text-center text-[11px]">الكمية</th>
-                                  <th className="py-1 px-2 text-center text-[11px]">السعر</th>
-                                  <th className="py-1 px-2 text-center text-[11px]">الخصم</th>
-                                  <th className="py-1 px-2 text-center text-[11px]">الصافي قبل الضريبة</th>
-                                  <th className="py-1 px-2 text-center text-[11px]">ض.ق.م (%)</th>
-                                  <th className="py-1 px-2 text-center text-[11px]">قيمة ض.ق.م</th>
-                                  <th className="py-1 px-2 text-center text-[11px]">ض.خ.أ (%)</th>
-                                  <th className="py-1 px-2 text-center text-[11px]">قيمة ض.خ.أ</th>
-                                  <th className="py-1 px-2 text-center font-extrabold text-slate-900 dark:text-white text-[11px]">الإجمالي</th>
-                                  <th className="py-1 px-2 text-center w-16 text-[11px]">إجراءات</th>
+                                  <th className="py-1 px-2 text-[11px]">{isAr ? 'كود الصنف' : 'Item Code'}</th>
+                                  <th className="py-1 px-2 text-[11px]">{isAr ? 'اسم الصنف' : 'Item Name'}</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">{isAr ? 'رقم عملية' : 'Op #'}</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">{isAr ? 'الإدارة' : 'Dept'}</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">{isAr ? 'مركز التكلفة' : 'Cost Center'}</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">{isAr ? 'الكمية' : 'Qty'}</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">{isAr ? 'السعر' : 'Price'}</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">{isAr ? 'الخصم' : 'Discount'}</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">{isAr ? 'الصافي قبل الضريبة' : 'Subtotal'}</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">{isAr ? 'ض.ق.م (%)' : 'VAT (%)'}</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">{isAr ? 'قيمة ض.ق.م' : 'VAT Amt'}</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">{isAr ? 'ض.خ.أ (%)' : 'WHT (%)'}</th>
+                                  <th className="py-1 px-2 text-center text-[11px]">{isAr ? 'قيمة ض.خ.أ' : 'WHT Amt'}</th>
+                                  <th className="py-1 px-2 text-center font-extrabold text-slate-900 dark:text-white text-[11px]">{isAr ? 'الإجمالي' : 'Total'}</th>
+                                  <th className="py-1 px-2 text-center w-16 text-[11px]">{isAr ? 'إجراءات' : 'Actions'}</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono text-xs">
@@ -3747,12 +3959,12 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                                           title={item.account_warning}
                                         >
                                           <AlertTriangle className="w-2.5 h-2.5 text-rose-600" />
-                                          <span>{item.account_warning || 'حسابات غير مكتملة بالصنف'}</span>
+                                          <span>{item.account_warning || (isAr ? 'حسابات غير مكتملة بالصنف' : 'Incomplete accounts on item')}</span>
                                         </span>
                                       )}
                                       {item.is_service && (
                                         <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300 font-semibold border border-purple-200 dark:border-purple-800">
-                                          خدمة
+                                          {isAr ? 'خدمة' : 'Service'}
                                         </span>
                                       )}
                                       {item.stock_error && (
@@ -3761,7 +3973,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                                           title={item.stock_warning}
                                         >
                                           <AlertTriangle className="w-2.5 h-2.5 text-red-600" />
-                                          <span>عجز مخزون (المتاح: {item.available_stock})</span>
+                                          <span>{isAr ? `عجز مخزون (المتاح: ${item.available_stock})` : `Stock shortage (Avail: ${item.available_stock})`}</span>
                                         </span>
                                       )}
                                     </td>
@@ -3794,14 +4006,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                                         <button
                                           onClick={() => setEditingItem({ docRef: doc.ref, item })}
                                           className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-emerald-600 cursor-pointer"
-                                          title="تعديل هذا البند"
+                                          title={isAr ? "تعديل هذا البند" : "Edit item"}
                                         >
                                           <Edit3 className="w-3 h-3" />
                                         </button>
                                         <button
                                           onClick={() => handleDeleteItem(doc.ref, item.id)}
                                           className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/40 text-slate-400 hover:text-red-600 cursor-pointer"
-                                          title="حذف هذا البند"
+                                          title={isAr ? "حذف هذا البند" : "Delete item"}
                                         >
                                           <Trash2 className="w-3 h-3" />
                                         </button>
@@ -3830,7 +4042,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                 <Edit3 className="w-4 h-4 text-emerald-600" />
-                <span>تعديل بيانات البند ({editingItem.item.product_name})</span>
+                <span>{isAr ? `تعديل بيانات البند (${editingItem.item.product_name})` : `Edit Item (${editingItem.item.product_name})`}</span>
               </h3>
               <button 
                 onClick={() => setEditingItem(null)}
@@ -3844,10 +4056,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="font-semibold text-slate-700 dark:text-slate-300">الكمية:</label>
+                    <label className="font-semibold text-slate-700 dark:text-slate-300">{isAr ? 'الكمية:' : 'Quantity:'}</label>
                     {editingItem.item.available_stock !== undefined && (
                       <span className="text-[11px] text-slate-500 font-mono">
-                        (المتاح: {editingItem.item.available_stock})
+                        ({isAr ? 'المتاح' : 'Available'}: {editingItem.item.available_stock})
                       </span>
                     )}
                   </div>
@@ -3864,7 +4076,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">السعر:</label>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'السعر:' : 'Price:'}</label>
                   <input 
                     type="number"
                     min="0"
@@ -3881,7 +4093,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">قيمة الخصم:</label>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'قيمة الخصم:' : 'Discount Amount:'}</label>
                   <input 
                     type="number"
                     min="0"
@@ -3895,7 +4107,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">ض.ق.م (%):</label>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'ض.ق.م (%):' : 'VAT (%):'}</label>
                   <input 
                     type="number"
                     min="0"
@@ -3910,7 +4122,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">ض.خ.إ (%):</label>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'ض.خ.إ (%):' : 'WHT (%):'}</label>
                   <input 
                     type="number"
                     min="0"
@@ -3928,7 +4140,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">رقم العملية (اختياري):</label>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'رقم العملية (اختياري):' : 'Operation # (opt):'}</label>
                   <select
                     value={editingItem.item.operation_id || ''}
                     onChange={(e) => {
@@ -3945,7 +4157,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                     }}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 text-xs"
                   >
-                    <option value="">— بدون عملية —</option>
+                    <option value="">{isAr ? '— بدون عملية —' : '— No Operation —'}</option>
                     {operations.map(op => (
                       <option key={op.id} value={op.id}>
                         {op.operation_number || op.id} {op.customer_name ? `(${op.customer_name})` : ''}
@@ -3954,7 +4166,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">الإدارة (اختياري):</label>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'الإدارة (اختياري):' : 'Department (opt):'}</label>
                   <select
                     value={editingItem.item.department_id || ''}
                     onChange={(e) => {
@@ -3971,7 +4183,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                     }}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 text-xs"
                   >
-                    <option value="">— بدون إدارة —</option>
+                    <option value="">{isAr ? '— بدون إدارة —' : '— No Department —'}</option>
                     {departments.map(dept => (
                       <option key={dept.id} value={dept.id}>
                         {dept.name} {dept.code ? `(${dept.code})` : ''}
@@ -3980,7 +4192,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">مركز التكلفة (اختياري):</label>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'مركز التكلفة (اختياري):' : 'Cost Center (opt):'}</label>
                   <select
                     value={editingItem.item.cost_center_id || ''}
                     onChange={(e) => {
@@ -3997,7 +4209,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                     }}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 text-xs"
                   >
-                    <option value="">— بدون مركز تكلفة —</option>
+                    <option value="">{isAr ? '— بدون مركز تكلفة —' : '— No Cost Center —'}</option>
                     {costCenters.map(cc => (
                       <option key={cc.id} value={cc.id}>
                         {cc.name} {cc.code ? `(${cc.code})` : ''}
@@ -4008,7 +4220,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">ملاحظات البند:</label>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'ملاحظات البند:' : 'Item Notes:'}</label>
                 <input 
                   type="text"
                   value={editingItem.item.description || ''}
@@ -4026,27 +4238,27 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 onClick={() => setEditingItem(null)}
                 className="px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
               >
-                إلغاء
+                {isAr ? 'إلغاء' : 'Cancel'}
               </button>
               <button
                 onClick={() => handleSaveItemEdit(editingItem.item)}
                 className="px-3.5 py-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs cursor-pointer"
               >
-                حفظ التعديلات
+                {isAr ? 'حفظ التعديلات' : 'Save Changes'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-            {/* Modal 1.25: Edit Document Header Modal (Requirement 2) */}
+      {/* Modal 1.25: Edit Document Header Modal */}
       {editingDoc && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-4 shadow-xl space-y-3">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                 <Edit3 className="w-4 h-4 text-emerald-600" />
-                <span>تعديل بيانات المستند الأساسية ({editingDoc.ref})</span>
+                <span>{isAr ? `تعديل بيانات المستند الأساسية (${editingDoc.ref})` : `Edit Document Header (${editingDoc.ref})`}</span>
               </h3>
               <button 
                 onClick={() => setEditingDoc(null)}
@@ -4060,7 +4272,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               {/* Document Type & Date */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">نوع المستند:</label>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'نوع المستند:' : 'Doc Type:'}</label>
                   <select
                     value={editDocForm.doc_type}
                     onChange={(e) => setEditDocForm(prev => ({ ...prev, doc_type: e.target.value }))}
@@ -4068,21 +4280,21 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   >
                     {isSales ? (
                       <>
-                        <option value="فاتورة بيع">فاتورة بيع</option>
-                        <option value="أمر بيع">أمر بيع</option>
-                        <option value="مرتجع بيع">مرتجع بيع</option>
+                        <option value="فاتورة بيع">{isAr ? 'فاتورة بيع' : 'Sales Invoice'}</option>
+                        <option value="أمر بيع">{isAr ? 'أمر بيع' : 'Sales Order'}</option>
+                        <option value="مرتجع بيع">{isAr ? 'مرتجع بيع' : 'Sales Return'}</option>
                       </>
                     ) : (
                       <>
-                        <option value="فاتورة شراء">فاتورة شراء</option>
-                        <option value="أمر شراء">أمر شراء</option>
-                        <option value="مرتجع شراء">مرتجع شراء</option>
+                        <option value="فاتورة شراء">{isAr ? 'فاتورة شراء' : 'Purchase Invoice'}</option>
+                        <option value="أمر شراء">{isAr ? 'أمر شراء' : 'Purchase Order'}</option>
+                        <option value="مرتجع شراء">{isAr ? 'مرتجع شراء' : 'Purchase Return'}</option>
                       </>
                     )}
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">التاريخ:</label>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'التاريخ:' : 'Date:'}</label>
                   <input 
                     type="date"
                     value={editDocForm.date}
@@ -4100,7 +4312,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   onChange={(e) => setEditDocForm(prev => ({ ...prev, party_id: e.target.value }))}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 font-medium"
                 >
-                  <option value="">— اختر {entityLabel} —</option>
+                  <option value="">{isAr ? `— اختر ${entityLabel} —` : `— Select ${entityLabel} —`}</option>
                   {(isSales ? customers : suppliers).map(p => (
                     <option key={p.id} value={p.id}>
                       {p.code ? `[${p.code}] ` : ''}{p.name}
@@ -4112,14 +4324,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               {/* Warehouse */}
               <div>
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  المخزن {editingDoc.items.some(it => !it.is_service) ? <span className="text-rose-500 font-bold">(إلزامي لوجود أصناف مخزنية)</span> : '(اختياري)'}:
+                  {isAr ? 'المخزن' : 'Warehouse'} {editingDoc.items.some(it => !it.is_service) ? <span className="text-rose-500 font-bold">{isAr ? '(إلزامي لوجود أصناف مخزنية)' : '(Required for physical items)'}</span> : (isAr ? '(اختياري)' : '(Optional)')}:
                 </label>
                 <select
                   value={editDocForm.warehouse_id}
                   onChange={(e) => setEditDocForm(prev => ({ ...prev, warehouse_id: e.target.value }))}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 font-medium"
                 >
-                  <option value="">— بدون مخزن (أصناف خدمية فقط) —</option>
+                  <option value="">{isAr ? '— بدون مخزن (أصناف خدمية فقط) —' : '— No Warehouse (Services only) —'}</option>
                   {warehouses.map(w => (
                     <option key={w.id} value={w.id}>
                       {w.name} {w.code ? `(${w.code})` : ''}
@@ -4131,25 +4343,25 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               {/* Payment Type & Method */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">طريقة الدفع:</label>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'طريقة الدفع:' : 'Payment Type:'}</label>
                   <select
                     value={editDocForm.payment_type}
                     onChange={(e) => setEditDocForm(prev => ({ ...prev, payment_type: e.target.value as any }))}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5"
                   >
-                    <option value="credit">آجل (Credit)</option>
-                    <option value="cash">نقدي (Cash)</option>
+                    <option value="credit">{isAr ? 'آجل (Credit)' : 'Credit'}</option>
+                    <option value="cash">{isAr ? 'نقدي (Cash)' : 'Cash'}</option>
                   </select>
                 </div>
                 {editDocForm.payment_type === 'cash' ? (
                   <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">الخزينة / طريقة السداد:</label>
+                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'الخزينة / طريقة السداد:' : 'Payment Method / Cashbox:'}</label>
                     <select
                       value={editDocForm.payment_method_id}
                       onChange={(e) => setEditDocForm(prev => ({ ...prev, payment_method_id: e.target.value }))}
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5"
                     >
-                      <option value="">— الخزينة الافتراضية —</option>
+                      <option value="">{isAr ? '— الخزينة الافتراضية —' : '— Default Cashbox —'}</option>
                       {paymentMethods.map(pm => (
                         <option key={pm.id} value={pm.id}>{pm.name}</option>
                       ))}
@@ -4157,10 +4369,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   </div>
                 ) : (
                   <div>
-                    <label className="block font-semibold text-slate-400 mb-1">الخزينة:</label>
+                    <label className="block font-semibold text-slate-400 mb-1">{isAr ? 'الخزينة:' : 'Cashbox:'}</label>
                     <input 
                       disabled 
-                      value="غير مطبق على الآجل" 
+                      value={isAr ? "غير مطبق على الآجل" : "Not applicable for Credit"} 
                       className="w-full bg-slate-100 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-lg p-1.5 text-slate-400"
                     />
                   </div>
@@ -4169,12 +4381,12 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
               {/* Notes */}
               <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">الملاحظات:</label>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'الملاحظات:' : 'Notes:'}</label>
                 <textarea 
                   rows={2}
                   value={editDocForm.notes}
                   onChange={(e) => setEditDocForm(prev => ({ ...prev, notes: e.target.value }))}
-                  placeholder="ملاحظات المستند..."
+                  placeholder={isAr ? "ملاحظات المستند..." : "Document notes..."}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5"
                 />
               </div>
@@ -4185,14 +4397,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 onClick={() => setEditingDoc(null)}
                 className="px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
               >
-                إلغاء
+                {isAr ? 'إلغاء' : 'Cancel'}
               </button>
               <button
                 onClick={handleSaveDocEdit}
                 className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs cursor-pointer flex items-center gap-1.5"
               >
                 <Check className="w-3.5 h-3.5" />
-                <span>حفظ التعديلات</span>
+                <span>{isAr ? 'حفظ التعديلات' : 'Save Changes'}</span>
               </button>
             </div>
           </div>
@@ -4206,7 +4418,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                 <Plus className="w-4 h-4 text-emerald-600" />
-                <span>إضافة صنف جديد للمستند ({addingItemDocRef})</span>
+                <span>{isAr ? `إضافة صنف جديد للمستند (${addingItemDocRef})` : `Add New Item to Document (${addingItemDocRef})`}</span>
               </h3>
               <button 
                 onClick={() => setAddingItemDocRef(null)}
@@ -4217,7 +4429,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             </div>
 
             <div className="space-y-2.5 text-xs">
-              {/* Product selector with live check (Requirement 3) */}
+              {/* Product selector with live check */}
               {(() => {
                 const selectedProd = products.find(p => p.id === newItemForm.product_id);
                 const targetDocForAdd = documents.find(d => d.ref === addingItemDocRef);
@@ -4228,16 +4440,16 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 return (
                   <div className="space-y-2">
                     <div>
-                      <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">الصنف المطلوب إضافته:</label>
+                      <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'الصنف المطلوب إضافته:' : 'Product to add:'}</label>
                       <select
                         value={newItemForm.product_id}
                         onChange={(e) => handleProductChangeInNewItem(e.target.value)}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 font-medium"
                       >
-                        <option value="">— اختر الصنف —</option>
+                        <option value="">{isAr ? '— اختر الصنف —' : '— Select Product —'}</option>
                         {products.map(p => (
                           <option key={p.id} value={p.id}>
-                            {p.code ? `[${p.code}] ` : ''}{p.name} {p.type === 'service' ? '(خدمة)' : `(رصيد: ${p.stock ?? 0})`}
+                            {p.code ? `[${p.code}] ` : ''}{p.name} {p.type === 'service' ? (isAr ? '(خدمة)' : '(Service)') : `(${isAr ? 'رصيد' : 'Stock'}: ${p.stock ?? 0})`}
                           </option>
                         ))}
                       </select>
@@ -4248,17 +4460,17 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                       <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl space-y-1.5">
                         <div className="flex items-center gap-1.5 text-amber-800 dark:text-amber-200 font-bold text-xs">
                           <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                          <span>تنبيه: المستند لا يحتوي على مخزن محدد والصنف المختار صنف مخزني!</span>
+                          <span>{isAr ? 'تنبيه: المستند لا يحتوي على مخزن محدد والصنف المختار صنف مخزني!' : 'Warning: Document has no warehouse and selected product is physical!'}</span>
                         </div>
                         <p className="text-[11px] text-amber-700 dark:text-amber-300">
-                          يرجى اختيار المخزن الذي سيتم تعيينه للمستند لصرف/استلام البند:
+                          {isAr ? 'يرجى اختيار المخزن الذي سيتم تعيينه للمستند لصرف/استلام البند:' : 'Please select a warehouse to assign to this document:'}
                         </p>
                         <select
                           value={addingItemWarehouseId}
                           onChange={(e) => setAddingItemWarehouseId(e.target.value)}
                           className="w-full bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 rounded-lg p-1.5 text-xs font-semibold"
                         >
-                          <option value="">— اختر المخزن للمستند —</option>
+                          <option value="">{isAr ? '— اختر المخزن للمستند —' : '— Select Warehouse —'}</option>
                           {warehouses.map(w => (
                             <option key={w.id} value={w.id}>{w.name} {w.code ? `(${w.code})` : ''}</option>
                           ))}
@@ -4266,21 +4478,21 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                       </div>
                     )}
 
-                    {/* Live Product Accounts & Warehouse Checklist (Requirement 3 - Zero Guessing Policy) */}
+                    {/* Live Product Accounts & Warehouse Checklist */}
                     {selectedProd && accountsCheck && (
                       <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1.5">
                         <div className="flex items-center justify-between text-xs font-bold">
                           <span className="text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>فحص الحسابات اللازمة للقيود المحاسبية:</span>
+                            <span>{isAr ? 'فحص الحسابات اللازمة للقيود المحاسبية:' : 'Journal Entry Accounts Check:'}</span>
                           </span>
                           {isProdPhysical ? (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                              📦 صنف مخزني (يحتاج مخزن)
+                              {isAr ? '📦 صنف مخزني (يحتاج مخزن)' : '📦 Physical Item (Requires Warehouse)'}
                             </span>
                           ) : (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                              ⚙️ صنف خدمي (لا يلزم مخزن)
+                              {isAr ? '⚙️ صنف خدمي (لا يلزم مخزن)' : '⚙️ Service Item (No Warehouse)'}
                             </span>
                           )}
                         </div>
@@ -4288,27 +4500,27 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
                           <div className={`p-1.5 rounded-lg border flex items-center gap-1 ${accountsCheck.sales.ok ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200 dark:border-rose-800'}`}>
                             {accountsCheck.sales.ok ? <Check className="w-3 h-3 text-emerald-600 shrink-0" /> : <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />}
-                            <span className="truncate" title={accountsCheck.sales.name}>{isSales ? 'الإيراد' : 'التكلفة'}: {accountsCheck.sales.ok ? 'مربوط' : 'مفقود'}</span>
+                            <span className="truncate" title={accountsCheck.sales.name}>{isSales ? (isAr ? 'الإيراد' : 'Revenue') : (isAr ? 'التكلفة' : 'Cost')}: {accountsCheck.sales.ok ? (isAr ? 'مربوط' : 'Linked') : (isAr ? 'مفقود' : 'Missing')}</span>
                           </div>
 
                           <div className={`p-1.5 rounded-lg border flex items-center gap-1 ${accountsCheck.cost.ok ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200 dark:border-rose-800'}`}>
                             {accountsCheck.cost.ok ? <Check className="w-3 h-3 text-emerald-600 shrink-0" /> : <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />}
-                            <span className="truncate" title={accountsCheck.cost.name}>تكلفة المبيعات: {accountsCheck.cost.exempt ? 'معفى' : (accountsCheck.cost.ok ? 'مربوط' : 'مفقود')}</span>
+                            <span className="truncate" title={accountsCheck.cost.name}>{isAr ? 'تكلفة المبيعات' : 'COGS'}: {accountsCheck.cost.exempt ? (isAr ? 'معفى' : 'Exempt') : (accountsCheck.cost.ok ? (isAr ? 'مربوط' : 'Linked') : (isAr ? 'مفقود' : 'Missing'))}</span>
                           </div>
 
                           <div className={`p-1.5 rounded-lg border flex items-center gap-1 ${accountsCheck.inventory.ok ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200 dark:border-rose-800'}`}>
                             {accountsCheck.inventory.ok ? <Check className="w-3 h-3 text-emerald-600 shrink-0" /> : <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />}
-                            <span className="truncate" title={accountsCheck.inventory.name}>المخزون: {accountsCheck.inventory.exempt ? 'معفى' : (accountsCheck.inventory.ok ? 'مربوط' : 'مفقود')}</span>
+                            <span className="truncate" title={accountsCheck.inventory.name}>{isAr ? 'المخزون' : 'Inventory'}: {accountsCheck.inventory.exempt ? (isAr ? 'معفى' : 'Exempt') : (accountsCheck.inventory.ok ? (isAr ? 'مربوط' : 'Linked') : (isAr ? 'مفقود' : 'Missing'))}</span>
                           </div>
 
                           <div className={`p-1.5 rounded-lg border flex items-center gap-1 ${accountsCheck.vat.ok ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200 dark:border-rose-800'}`}>
                             {accountsCheck.vat.ok ? <Check className="w-3 h-3 text-emerald-600 shrink-0" /> : <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />}
-                            <span className="truncate" title={accountsCheck.vat.name}>ض.ق.م: {accountsCheck.vat.exempt ? 'معفى' : (accountsCheck.vat.ok ? 'مربوط' : 'مفقود')}</span>
+                            <span className="truncate" title={accountsCheck.vat.name}>{isAr ? 'ض.ق.م' : 'VAT'}: {accountsCheck.vat.exempt ? (isAr ? 'معفى' : 'Exempt') : (accountsCheck.vat.ok ? (isAr ? 'مربوط' : 'Linked') : (isAr ? 'مفقود' : 'Missing'))}</span>
                           </div>
 
                           <div className={`p-1.5 rounded-lg border flex items-center gap-1 ${accountsCheck.wht.ok ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:text-rose-200 dark:border-rose-800'}`}>
                             {accountsCheck.wht.ok ? <Check className="w-3 h-3 text-emerald-600 shrink-0" /> : <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />}
-                            <span className="truncate" title={accountsCheck.wht.name}>ض.خ.أ: {accountsCheck.wht.exempt ? 'معفى' : (accountsCheck.wht.ok ? 'مربوط' : 'مفقود')}</span>
+                            <span className="truncate" title={accountsCheck.wht.name}>{isAr ? 'ض.خ.أ' : 'WHT'}: {accountsCheck.wht.exempt ? (isAr ? 'معفى' : 'Exempt') : (accountsCheck.wht.ok ? (isAr ? 'مربوط' : 'Linked') : (isAr ? 'مفقود' : 'Missing'))}</span>
                           </div>
                         </div>
 
@@ -4316,7 +4528,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                           <div className="p-1.5 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 rounded-lg text-rose-700 dark:text-rose-300 text-[11px] flex items-start gap-1">
                             <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
                             <span>
-                              <strong>تنبيه حسابات القيود:</strong> يفتقد الصنف ربط: ({accountsCheck.missingNames.join('، ')}). لن يتمكن النظام من ترحيل القيد المحاسبي حتى يتم استكمالها في بطاقة الصنف أو إعدادات الشركة.
+                              <strong>{isAr ? 'تنبيه حسابات القيود:' : 'Accounts Warning:'}</strong> {isAr ? `يفتقد الصنف ربط: (${accountsCheck.missingNames.join('، ')}). لن يتمكن النظام من ترحيل القيد المحاسبي حتى يتم استكمالها في بطاقة الصنف أو إعدادات الشركة.` : `Item is missing accounts: (${accountsCheck.missingNames.join(', ')}). The system cannot post the journal entry until linked.`}
                             </span>
                           </div>
                         )}
@@ -4329,7 +4541,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               {/* Quantity & Unit Price */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">الكمية:</label>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'الكمية:' : 'Quantity:'}</label>
                   <input 
                     type="number"
                     min="0.001"
@@ -4343,7 +4555,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">السعر (سعر الوحدة):</label>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'السعر (سعر الوحدة):' : 'Unit Price:'}</label>
                   <input 
                     type="number"
                     min="0"
@@ -4361,7 +4573,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               {/* Discount, VAT, WHT */}
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">قيمة الخصم:</label>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'قيمة الخصم:' : 'Discount Amount:'}</label>
                   <input 
                     type="number"
                     min="0"
@@ -4375,7 +4587,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">ض.ق.م (%):</label>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'ض.ق.م (%):' : 'VAT (%):'}</label>
                   <input 
                     type="number"
                     min="0"
@@ -4390,7 +4602,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">ض.خ.إ (%):</label>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'ض.خ.إ (%):' : 'WHT (%):'}</label>
                   <input 
                     type="number"
                     min="0"
@@ -4409,13 +4621,13 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               {/* Optional: Operation, Department, Cost Center */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">رقم العملية (اختياري):</label>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'رقم العملية (اختياري):' : 'Operation # (opt):'}</label>
                   <select
                     value={newItemForm.operation_id}
                     onChange={(e) => setNewItemForm(prev => ({ ...prev, operation_id: e.target.value }))}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 text-xs"
                   >
-                    <option value="">— بدون عملية —</option>
+                    <option value="">{isAr ? '— بدون عملية —' : '— No Operation —'}</option>
                     {operations.map(op => (
                       <option key={op.id} value={op.id}>
                         {op.operation_number || op.id} {op.customer_name ? `(${op.customer_name})` : ''}
@@ -4424,13 +4636,13 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">الإدارة (اختياري):</label>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'الإدارة (اختياري):' : 'Department (opt):'}</label>
                   <select
                     value={newItemForm.department_id}
                     onChange={(e) => setNewItemForm(prev => ({ ...prev, department_id: e.target.value }))}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 text-xs"
                   >
-                    <option value="">— بدون إدارة —</option>
+                    <option value="">{isAr ? '— بدون إدارة —' : '— No Department —'}</option>
                     {departments.map(dept => (
                       <option key={dept.id} value={dept.id}>
                         {dept.name} {dept.code ? `(${dept.code})` : ''}
@@ -4439,13 +4651,13 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">مركز التكلفة (اختياري):</label>
+                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'مركز التكلفة (اختياري):' : 'Cost Center (opt):'}</label>
                   <select
                     value={newItemForm.cost_center_id}
                     onChange={(e) => setNewItemForm(prev => ({ ...prev, cost_center_id: e.target.value }))}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5 text-xs"
                   >
-                    <option value="">— بدون مركز تكلفة —</option>
+                    <option value="">{isAr ? '— بدون مركز تكلفة —' : '— No Cost Center —'}</option>
                     {costCenters.map(cc => (
                       <option key={cc.id} value={cc.id}>
                         {cc.name} {cc.code ? `(${cc.code})` : ''}
@@ -4457,10 +4669,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
 
               {/* Description */}
               <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">ملاحظات / بيان البند:</label>
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">{isAr ? 'ملاحظات / بيان البند:' : 'Item Notes / Description:'}</label>
                 <input 
                   type="text"
-                  placeholder="وصف اختياري للبند..."
+                  placeholder={isAr ? "وصف اختياري للبند..." : "Optional item description..."}
                   value={newItemForm.description}
                   onChange={(e) => setNewItemForm(prev => ({ ...prev, description: e.target.value }))}
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-1.5"
@@ -4478,13 +4690,13 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 return (
                   <div className="p-2 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between text-xs font-mono">
                     <div className="flex items-center gap-3">
-                      <span>الإجمالي: <strong className="text-slate-800 dark:text-slate-200">{formatMoney(gross)}</strong></span>
-                      <span>الصافي قبل الضريبة: <strong className="text-blue-600">{formatMoney(sub)}</strong></span>
-                      {isVatEnabled && <span>ض.ق.م: <strong className="text-emerald-600">+{formatMoney(vat)}</strong></span>}
-                      {isWhtEnabled && wht > 0 && <span>ض.خ.إ: <strong className="text-purple-600">-{formatMoney(wht)}</strong></span>}
+                      <span>{isAr ? 'الإجمالي:' : 'Gross:'} <strong className="text-slate-800 dark:text-slate-200">{formatMoney(gross)}</strong></span>
+                      <span>{isAr ? 'الصافي قبل الضريبة:' : 'Subtotal:'} <strong className="text-blue-600">{formatMoney(sub)}</strong></span>
+                      {isVatEnabled && <span>{isAr ? 'ض.ق.م:' : 'VAT:'} <strong className="text-emerald-600">+{formatMoney(vat)}</strong></span>}
+                      {isWhtEnabled && wht > 0 && <span>{isAr ? 'ض.خ.إ:' : 'WHT:'} <strong className="text-purple-600">-{formatMoney(wht)}</strong></span>}
                     </div>
                     <div className="font-bold text-sm text-emerald-600">
-                      الصافي النهائي: {formatMoney(tot)}
+                      {isAr ? 'الصافي النهائي:' : 'Net Total:'} {formatMoney(tot)}
                     </div>
                   </div>
                 );
@@ -4496,14 +4708,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 onClick={() => setAddingItemDocRef(null)}
                 className="px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
               >
-                إلغاء
+                {isAr ? 'إلغاء' : 'Cancel'}
               </button>
               <button
                 onClick={handleSaveNewItem}
                 className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs cursor-pointer flex items-center gap-1.5"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>إضافة الصنف للمستند</span>
+                <span>{isAr ? 'إضافة الصنف للمستند' : 'Add Item to Document'}</span>
               </button>
             </div>
           </div>
@@ -4524,18 +4736,18 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white font-mono">
-                      تفاصيل تشغيلة: {selectedBatchDetails.batch_number}
+                      {isAr ? 'تفاصيل تشغيلة:' : 'Batch Details:'} {selectedBatchDetails.batch_number}
                     </h3>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                       selectedBatchDetails.status === 'posted' || selectedBatchDetails.status === 'completed'
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                         : 'bg-amber-50 text-amber-700 border-amber-200'
                     }`}>
-                      {selectedBatchDetails.status === 'posted' || selectedBatchDetails.status === 'completed' ? 'مكتملة بالكامل' : 'حفظ جزئي'}
+                      {selectedBatchDetails.status === 'posted' || selectedBatchDetails.status === 'completed' ? (isAr ? 'مكتملة بالكامل' : 'Completed') : (isAr ? 'حفظ جزئي' : 'Partial')}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 font-mono mt-0.5">
-                    تاريخ التشغيلة: {selectedBatchDetails.batch_date ? String(selectedBatchDetails.batch_date).slice(0, 10) : '-'} | الإجمالي: {formatMoney(Number(selectedBatchDetails.total_amount) || 0)}
+                    {isAr ? 'تاريخ التشغيلة:' : 'Batch Date:'} {selectedBatchDetails.batch_date ? String(selectedBatchDetails.batch_date).slice(0, 10) : '-'} | {isAr ? 'الإجمالي:' : 'Total:'} {formatMoney(Number(selectedBatchDetails.total_amount) || 0)}
                   </p>
                 </div>
               </div>
@@ -4573,14 +4785,14 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
               <table className="w-full text-right text-xs">
                 <thead className="bg-slate-50 dark:bg-slate-800/80 font-bold text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-800 sticky top-0">
                   <tr>
-                    <th className="py-2 px-3">رقم المرجع (Ref)</th>
-                    <th className="py-2 px-3">نوع المستند</th>
-                    <th className="py-2 px-3">الطرف</th>
-                    <th className="py-2 px-3 text-center">التاريخ</th>
-                    <th className="py-2 px-3 text-center">رقم المستند المنشأ</th>
-                    <th className="py-2 px-3 text-center">رقم القيد المنشأ</th>
-                    <th className="py-2 px-3 text-center font-bold">الصافي</th>
-                    <th className="py-2 px-3 text-center">الحالة</th>
+                    <th className="py-2 px-3">{isAr ? 'رقم المرجع (Ref)' : 'Reference (Ref)'}</th>
+                    <th className="py-2 px-3">{isAr ? 'نوع المستند' : 'Document Type'}</th>
+                    <th className="py-2 px-3">{isAr ? 'الطرف' : 'Party'}</th>
+                    <th className="py-2 px-3 text-center">{isAr ? 'التاريخ' : 'Date'}</th>
+                    <th className="py-2 px-3 text-center">{isAr ? 'رقم المستند المنشأ' : 'Created Doc #'}</th>
+                    <th className="py-2 px-3 text-center">{isAr ? 'رقم القيد المنشأ' : 'Created Journal #'}</th>
+                    <th className="py-2 px-3 text-center font-bold">{isAr ? 'الصافي' : 'Net Total'}</th>
+                    <th className="py-2 px-3 text-center">{isAr ? 'الحالة' : 'Status'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -4593,7 +4805,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                         </td>
                         <td className="py-2 px-3">
                           <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-slate-100 dark:bg-slate-800">
-                            {doc.doc_type}
+                            {getDocTypeDisplay(doc.doc_type)}
                           </span>
                         </td>
                         <td className="py-2 px-3 font-bold text-slate-900 dark:text-white">
@@ -4610,7 +4822,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                                 setSelectedBatchDetails(null);
                               }}
                               className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 cursor-pointer"
-                              title="فتح المستند في النظام"
+                              title={isAr ? "فتح المستند في النظام" : "Open document in system"}
                             >
                               <span>{doc.created_document_number}</span>
                               <ExternalLink className="w-2.5 h-2.5 opacity-70" />
@@ -4627,9 +4839,9 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                                 setSelectedBatchDetails(null);
                               }}
                               className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 cursor-pointer"
-                              title="فتح القيد المحاسبي في النظام"
+                              title={isAr ? "فتح القيد المحاسبي في النظام" : "Open journal entry in system"}
                             >
-                              <span>قيد: {doc.created_journal_number}</span>
+                              <span>{isAr ? 'قيد:' : 'Entry:'} {doc.created_journal_number}</span>
                               <ExternalLink className="w-2.5 h-2.5 opacity-70" />
                             </button>
                           ) : (
@@ -4643,7 +4855,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                           {isDocSaved ? (
                             <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                               <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                              <span>تم الحفظ</span>
+                              <span>{isAr ? 'تم الحفظ' : 'Saved'}</span>
                             </span>
                           ) : (
                             <span 
@@ -4651,7 +4863,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                               title={doc.error_message}
                             >
                               <AlertTriangle className="w-3 h-3 text-red-600" />
-                              <span className="truncate max-w-[140px]">{doc.error_message || 'تعذر الحفظ'}</span>
+                              <span className="truncate max-w-[140px]">{doc.error_message || (isAr ? 'تعذر الحفظ' : 'Save Failed')}</span>
                             </span>
                           )}
                         </td>
@@ -4668,7 +4880,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 onClick={() => setSelectedBatchDetails(null)}
                 className="px-4 py-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer"
               >
-                إغلاق النافذة
+                {isAr ? 'إغلاق النافذة' : 'Close'}
               </button>
             </div>
           </div>
