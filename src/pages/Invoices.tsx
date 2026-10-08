@@ -3570,8 +3570,8 @@ export const Invoices: React.FC = () => {
 
   const selectedTotals = React.useMemo(() => {
     const selectedInvoices = filteredInvoices.filter(inv => selectedInvoiceIds.includes(inv.id));
-    const total_amount = selectedInvoices.reduce((sum, inv) => sum + (Number(inv.total_amount) || 0), 0);
-    const total_discount = selectedInvoices.reduce((sum, inv) => sum + (Number(inv.discount_amount) || 0), 0);
+    const total_amount = selectedInvoices.reduce((sum, inv) => sum + ((Number(inv.total_amount) || 0) * (Number(inv.exchange_rate) || 1)), 0);
+    const total_discount = selectedInvoices.reduce((sum, inv) => sum + ((Number(inv.discount_amount) || 0) * (Number(inv.exchange_rate) || 1)), 0);
     const net_amount = total_amount - total_discount;
 
     const remaining_amount = selectedInvoices.reduce((sum, inv) => {

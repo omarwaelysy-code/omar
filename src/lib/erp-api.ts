@@ -2492,7 +2492,37 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
           whereJe += ` AND (${cfg.jeFilter})`;
         }
 
-        // 1. Direct query on journal_entries to match General Ledger & Excel 100%
+        // 1. Query source document table directly to audit source documents vs journal entries
+        let docCount = 0;
+        let docTotal = 0;
+        if (cfg.table && cfg.table !== 'journal_entries') {
+          try {
+            const hasRate = EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate');
+            const rateExpr = hasRate ? 'COALESCE("exchange_rate", 1)' : '1';
+            const docFilterSql = cfg.docFilter ? `AND ${cfg.docFilter}` : '';
+            const docAmtCol = (cfg.amountCol && cfg.amountCol !== '0')
+              ? `COALESCE(SUM(("${cfg.amountCol}") * ${rateExpr}), 0)`
+              : '0';
+            const docRes: any = await client.query(
+              `SELECT COUNT(*)::int as cnt, ${docAmtCol}::numeric as tot
+               FROM "${cfg.table}"
+               WHERE company_id = $1 ${docFilterSql}`,
+              [companyId]
+            );
+            docCount = docRes.rows[0]?.cnt || 0;
+            docTotal = parseFloat(docRes.rows[0]?.tot || 0);
+          } catch (e) {
+            console.warn(`[DATA-AUDIT] Could not query source table ${cfg.table}:`, e);
+          }
+        }
+
+        // 2. Query journal_entries corresponding to this document type
+        const placeholders = cfg.refTypes.map((_: any, i: number) => `$${i + 2}`).join(',');
+        let whereJe = `company_id = $1 AND (reference_type IN (${placeholders}) ${cfg.isManualJE ? 'OR reference_type IS NULL' : ''})`;
+        if (cfg.jeFilter) {
+          whereJe += ` AND (${cfg.jeFilter})`;
+        }
+
         const jeRes: any = await client.query(
           `SELECT 
              COUNT(*)::int as count, 
@@ -2503,45 +2533,18 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
           [companyId, ...cfg.refTypes]
         );
 
-        count = jeRes.rows[0]?.count || 0;
+        const jeCount = jeRes.rows[0]?.count || 0;
         journalValue = parseFloat(jeRes.rows[0]?.total_val || 0);
         totalValue = journalValue;
         unbalancedCount = jeRes.rows[0]?.unbal_cnt || 0;
 
-        // 2. Net Movement and Counter Sides breakdown
-        if (cfg.key === 'invoices') {
-          // Invoices: separate inventory cost (COGS) side from commercial revenue side
-          const cogsRes: any = await client.query(
-            `SELECT COALESCE(SUM(jel.debit), 0)::numeric as cogs_val
-             FROM journal_entry_lines jel
-             JOIN journal_entries je ON je.id = jel.journal_entry_id
-             WHERE je.company_id = $1 AND je.reference_type IN ('invoice', 'sales_invoice')
-               AND (jel.account_name LIKE '%مخزون%' OR jel.account_name LIKE '%تكلفة%')`,
-            [companyId]
-          );
-          counterValue = parseFloat(cogsRes.rows[0]?.cogs_val || 0);
-          netValue = parseFloat((totalValue - counterValue).toFixed(2));
-        } else if (cfg.key === 'purchase_invoices') {
-          // Purchase Invoices: separate tax, expenses and fees from base purchase
-          const taxRes: any = await client.query(
-            `SELECT COALESCE(SUM(jel.debit), 0)::numeric as tax_exp_val
-             FROM journal_entry_lines jel
-             JOIN journal_entries je ON je.id = jel.journal_entry_id
-             WHERE je.company_id = $1 AND je.reference_type IN ('purchase_invoice', 'bill')
-               AND (jel.account_name LIKE '%ضريب%' OR jel.account_name LIKE '%مصروف%' OR jel.account_name LIKE '%تكلفة%')`,
-            [companyId]
-          );
-          counterValue = parseFloat(taxRes.rows[0]?.tax_exp_val || 0);
-          netValue = parseFloat((totalValue - counterValue).toFixed(2));
-        } else if (cfg.key === 'returns') {
-          const retTaxRes: any = await client.query(
-            `SELECT COALESCE(SUM(withholding_tax_amount), 0)::numeric as tax_val
-             FROM returns WHERE company_id = $1`,
-            [companyId]
-          );
-          counterValue = parseFloat(retTaxRes.rows[0]?.tax_val || 0);
-          netValue = parseFloat((totalValue - counterValue).toFixed(2));
+        // Use source document count and total if available, otherwise fall back to journal entries
+        if (cfg.table && cfg.table !== 'journal_entries') {
+          count = docCount;
+          netValue = parseFloat(docTotal.toFixed(2));
+          counterValue = Math.max(0, parseFloat((journalValue - netValue).toFixed(2)));
         } else {
+          count = jeCount;
           netValue = totalValue;
           counterValue = 0;
         }
@@ -2549,12 +2552,16 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         // 3. Check for any unposted documents in the primary table (if applicable)
         if (cfg.table && cfg.numCol && cfg.table !== 'journal_entries') {
           try {
+            const hasRate = EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate');
+            const rateExpr = hasRate ? 'COALESCE(d."exchange_rate", 1)' : '1';
             const amountFilter = (cfg.amountCol && cfg.amountCol !== '0')
               ? `AND ABS(COALESCE(d."${cfg.amountCol}"::numeric, 0)) > 0.001`
               : '';
             const docFilter = cfg.docFilter ? `AND d.${cfg.docFilter}` : '';
             const unpostedRes: any = await client.query(
-              `SELECT d.id, d."${cfg.numCol}" as doc_num, d."${cfg.dateCol}" as doc_date, ${cfg.amountCol !== '0' ? `d."${cfg.amountCol}"` : '0'} as doc_amt, ${cfg.partyCol ? `d."${cfg.partyCol}"` : `''`} as party
+              `SELECT d.id, d."${cfg.numCol}" as doc_num, d."${cfg.dateCol}" as doc_date, 
+                      ${cfg.amountCol !== '0' ? `(d."${cfg.amountCol}" * ${rateExpr})` : '0'} as doc_amt, 
+                      ${cfg.partyCol ? `d."${cfg.partyCol}"` : `''`} as party
                FROM "${cfg.table}" d
                WHERE d.company_id = $1
                  ${amountFilter}
@@ -2586,6 +2593,14 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
           }
         }
 
+        // Calculate variance (true audit variance between source documents and journal)
+        let variance = 0;
+        if (unpostedCount > 0) {
+          variance = parseFloat(unpostedValue.toFixed(2));
+        } else {
+          variance = parseFloat((netValue + counterValue - journalValue).toFixed(2));
+        }
+
         postingTransactions.push({
           key: cfg.key,
           name: cfg.name,
@@ -2594,7 +2609,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
           net_value: netValue,
           counter_value: counterValue,
           journal_value: journalValue,
-          variance: 0,
+          variance,
           unposted_count: unpostedCount,
           unposted_value: unpostedValue,
           unbalanced_entries_count: unbalancedCount,
