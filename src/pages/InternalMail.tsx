@@ -167,7 +167,7 @@ export const InternalMail: React.FC = () => {
     if (showSpinner) setLoading(true);
     try {
       // Fetch all messages for current company/user
-      const allMsgs = await dbService.getAll<InternalMessage>('internal_messages');
+      const allMsgs = await dbService.listAll<InternalMessage>('internal_messages');
       setMessages(allMsgs || []);
       await fetchUnreadCounts();
     } catch (e: any) {
@@ -413,7 +413,12 @@ export const InternalMail: React.FC = () => {
         deleted_by: []
       };
 
-      const created = await dbService.create<InternalMessage>('internal_messages', payload);
+      const newId = await dbService.create<InternalMessage>('internal_messages', payload);
+      const created: InternalMessage = {
+        ...payload,
+        id: (typeof newId === 'string' && newId) ? newId : payload.id,
+        created_at: new Date().toISOString()
+      };
       setMessages(prev => [created, ...prev]);
       
       showNotification(isAr ? 'تم إرسال الرسالة بنجاح' : 'Message sent successfully', 'success');
@@ -466,7 +471,12 @@ export const InternalMail: React.FC = () => {
         deleted_by: []
       };
 
-      const created = await dbService.create<InternalMessage>('internal_messages', payload);
+      const newId = await dbService.create<InternalMessage>('internal_messages', payload);
+      const created: InternalMessage = {
+        ...payload,
+        id: (typeof newId === 'string' && newId) ? newId : payload.id,
+        created_at: new Date().toISOString()
+      };
       setMessages(prev => [created, ...prev]);
       setReplyBody('');
       setReplyAttachments([]);
@@ -1343,12 +1353,11 @@ export const InternalMail: React.FC = () => {
       </AnimatePresence>
 
       {/* Attachment Preview Modal */}
-      {previewAttachment && (
-        <AttachmentPreviewModal
-          attachment={previewAttachment}
-          onClose={() => setPreviewAttachment(null)}
-        />
-      )}
+      <AttachmentPreviewModal
+        isOpen={!!previewAttachment}
+        attachment={previewAttachment}
+        onClose={() => setPreviewAttachment(null)}
+      />
     </div>
   );
 };
