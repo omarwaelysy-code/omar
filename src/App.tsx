@@ -217,6 +217,7 @@ export default function App() {
 
     // Super Admin specific pages
     if (isSuperAdmin) {
+      if (id === 'internal_mail') return <InternalMail />;
       if (id === 'dashboard' || id === 'super_admin_dashboard') return <SuperAdminDashboard />;
       if (id === 'companies') return <SuperAdminDashboard initialTab="companies" />;
       if (id === 'users') return <SuperAdminDashboard initialTab="users" />;
