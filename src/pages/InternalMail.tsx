@@ -433,10 +433,73 @@ export const InternalMail: React.FC = () => {
     setComposeAttachments([]);
   };
 
+  // Helper to commit typed text into recipient chips (To or CC)
+  const commitRecipient = (type: 'to' | 'cc', rawText?: string): MailUser | null => {
+    const text = (rawText !== undefined ? rawText : (type === 'to' ? toSearchQuery : ccSearchQuery)).trim();
+    if (!text) return null;
+
+    // Check if it matches an existing contact by email, username, or name
+    const matched = companyUsers.find(
+      c => (c.email && c.email.toLowerCase() === text.toLowerCase()) ||
+           (c.username && c.username.toLowerCase() === text.toLowerCase()) ||
+           (c.name && c.name.toLowerCase() === text.toLowerCase())
+    );
+
+    const recipient: MailUser = matched || {
+      id: `custom-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      name: text.includes('@') ? text.split('@')[0] : text,
+      email: text.includes('@') ? text : '',
+      role: 'user'
+    };
+
+    if (type === 'to') {
+      setComposeTo(prev => {
+        const already = prev.some(u => 
+          (recipient.email && u.email && u.email.toLowerCase() === recipient.email.toLowerCase()) ||
+          u.id === recipient.id ||
+          u.name.toLowerCase() === recipient.name.toLowerCase()
+        );
+        return already ? prev : [...prev, recipient];
+      });
+      setToSearchQuery('');
+      setIsToDropdownOpen(false);
+    } else {
+      setComposeCc(prev => {
+        const already = prev.some(u => 
+          (recipient.email && u.email && u.email.toLowerCase() === recipient.email.toLowerCase()) ||
+          u.id === recipient.id ||
+          u.name.toLowerCase() === recipient.name.toLowerCase()
+        );
+        return already ? prev : [...prev, recipient];
+      });
+      setCcSearchQuery('');
+      setIsCcDropdownOpen(false);
+    }
+
+    return recipient;
+  };
+
   // Send New Message
   const handleSendMessage = async () => {
+    // Automatically commit any pending input text in "To" or "CC"
+    let effectiveTo = [...composeTo];
+    if (toSearchQuery.trim()) {
+      const added = commitRecipient('to', toSearchQuery.trim());
+      if (added && !effectiveTo.some(u => (added.email && u.email === added.email) || u.id === added.id)) {
+        effectiveTo.push(added);
+      }
+    }
+
+    let effectiveCc = [...composeCc];
+    if (ccSearchQuery.trim()) {
+      const added = commitRecipient('cc', ccSearchQuery.trim());
+      if (added && !effectiveCc.some(u => (added.email && u.email === added.email) || u.id === added.id)) {
+        effectiveCc.push(added);
+      }
+    }
+
     // In support mode, To is always locked to the fixed support recipient
-    const recipientsTo = activeCategory === 'support' ? [fixedSupportRecipient] : composeTo;
+    const recipientsTo = activeCategory === 'support' ? [fixedSupportRecipient] : effectiveTo;
 
     if (recipientsTo.length === 0) {
       showNotification(isAr ? 'يرجى تحديد مستلم واحد على الأقل (To)' : 'Please select at least one recipient (To)', 'error');
@@ -460,7 +523,7 @@ export const InternalMail: React.FC = () => {
         sender_name: user?.name || user?.username || 'المستخدم',
         sender_email: user?.email || '',
         to_users: recipientsTo,
-        cc_users: composeCc,
+        cc_users: effectiveCc,
         subject: composeSubject.trim(),
         body: composeBody.trim(),
         attachments: composeAttachments,
@@ -1041,13 +1104,16 @@ export const InternalMail: React.FC = () => {
                       {composeTo.map(u => (
                         <span
                           key={u.id}
-                          className="flex items-center gap-1.5 px-3 py-1 bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-200 rounded-lg text-xs font-medium border border-emerald-200 dark:border-emerald-800"
+                          className="flex items-center gap-1.5 px-3 py-1 bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-200 rounded-lg text-xs font-medium border border-emerald-200 dark:border-emerald-800 shadow-2xs"
                         >
-                          <span>{u.name}</span>
+                          <span className="font-bold">{u.name}</span>
+                          {u.email && u.email !== u.name && (
+                            <span className="text-[10px] opacity-75 dir-ltr font-mono">({u.email})</span>
+                          )}
                           <button
                             type="button"
                             onClick={() => setComposeTo(prev => prev.filter(item => item.id !== u.id))}
-                            className="hover:text-emerald-950 cursor-pointer"
+                            className="hover:text-rose-600 cursor-pointer p-0.5 rounded-full hover:bg-emerald-200 dark:hover:bg-emerald-900 transition-colors"
                           >
                             <X size={13} />
                           </button>
@@ -1061,15 +1127,40 @@ export const InternalMail: React.FC = () => {
                           setToSearchQuery(e.target.value);
                           setIsToDropdownOpen(true);
                         }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' || e.key === ',' || e.key === ';') {
+                            e.preventDefault();
+                            commitRecipient('to');
+                          }
+                        }}
+                        onBlur={() => {
+                          if (toSearchQuery.trim()) {
+                            commitRecipient('to');
+                          }
+                        }}
                         onFocus={() => setIsToDropdownOpen(true)}
-                        placeholder={composeTo.length === 0 ? (isAr ? 'اختر أو ابحث عن مستخدمين بالشركة...' : 'Select company recipients...') : ''}
-                        className="flex-1 min-w-[140px] bg-transparent text-xs p-1 focus:outline-none text-slate-850 dark:text-white"
+                        placeholder={composeTo.length === 0 ? (isAr ? 'اختر زميلاً أو اكتب بريداً واضغط Enter...' : 'Select user or type email & Enter...') : (isAr ? 'إضافة مستلم آخر...' : 'Add recipient...')}
+                        className="flex-1 min-w-[160px] bg-transparent text-xs p-1 focus:outline-none text-slate-850 dark:text-white"
                       />
                     </div>
 
                     {/* Dropdown list for To */}
                     {isToDropdownOpen && (
                       <div className="absolute z-30 top-full mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-h-52 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
+                        {toSearchQuery.trim() && (
+                          <div
+                            onClick={() => commitRecipient('to')}
+                            className="px-3.5 py-2.5 text-xs flex items-center justify-between bg-emerald-50/80 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 cursor-pointer font-semibold border-b border-emerald-100 dark:border-emerald-900 transition-colors"
+                          >
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span>➕ {isAr ? 'اعتماد المستلم/البريد:' : 'Add recipient:'}</span>
+                              <span className="font-mono text-emerald-900 dark:text-emerald-100 underline truncate">{toSearchQuery.trim()}</span>
+                            </div>
+                            <span className="text-[10px] bg-emerald-200 dark:bg-emerald-800 text-emerald-900 dark:text-emerald-100 px-2 py-0.5 rounded font-mono shrink-0">
+                              Enter ↵
+                            </span>
+                          </div>
+                        )}
                         {companyUsers
                           .filter(c => c.id !== user?.id && !composeTo.some(t => t.id === c.id))
                           .filter(c => !toSearchQuery || c.name.toLowerCase().includes(toSearchQuery.toLowerCase()) || (c.email && c.email.toLowerCase().includes(toSearchQuery.toLowerCase())))
@@ -1085,7 +1176,7 @@ export const InternalMail: React.FC = () => {
                             >
                               <div>
                                 <p className="font-bold text-slate-850 dark:text-white">{c.name}</p>
-                                <p className="text-[11px] text-slate-400">{c.email || ''}</p>
+                                <p className="text-[11px] text-slate-400 font-mono">{c.email || ''}</p>
                               </div>
                               <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded">
                                 {c.role || (isAr ? 'موظف' : 'User')}
@@ -1123,13 +1214,16 @@ export const InternalMail: React.FC = () => {
                       {composeCc.map(u => (
                         <span
                           key={u.id}
-                          className="flex items-center gap-1.5 px-3 py-1 bg-blue-100 dark:bg-blue-950/70 text-blue-800 dark:text-blue-200 rounded-lg text-xs font-medium border border-blue-200 dark:border-blue-800"
+                          className="flex items-center gap-1.5 px-3 py-1 bg-blue-100 dark:bg-blue-950/70 text-blue-800 dark:text-blue-200 rounded-lg text-xs font-medium border border-blue-200 dark:border-blue-800 shadow-2xs"
                         >
-                          <span>{u.name}</span>
+                          <span className="font-bold">{u.name}</span>
+                          {u.email && u.email !== u.name && (
+                            <span className="text-[10px] opacity-75 dir-ltr font-mono">({u.email})</span>
+                          )}
                           <button
                             type="button"
                             onClick={() => setComposeCc(prev => prev.filter(item => item.id !== u.id))}
-                            className="hover:text-blue-950 cursor-pointer"
+                            className="hover:text-rose-600 cursor-pointer p-0.5 rounded-full hover:bg-blue-200 dark:hover:bg-blue-900 transition-colors"
                           >
                             <X size={13} />
                           </button>
@@ -1143,14 +1237,39 @@ export const InternalMail: React.FC = () => {
                           setCcSearchQuery(e.target.value);
                           setIsCcDropdownOpen(true);
                         }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' || e.key === ',' || e.key === ';') {
+                            e.preventDefault();
+                            commitRecipient('cc');
+                          }
+                        }}
+                        onBlur={() => {
+                          if (ccSearchQuery.trim()) {
+                            commitRecipient('cc');
+                          }
+                        }}
                         onFocus={() => setIsCcDropdownOpen(true)}
-                        placeholder={composeCc.length === 0 ? (isAr ? 'اختر زميلاً من الشركة لإرسال نسخة له...' : 'Search company colleagues...') : ''}
-                        className="flex-1 min-w-[140px] bg-transparent text-xs p-1 focus:outline-none text-slate-850 dark:text-white"
+                        placeholder={composeCc.length === 0 ? (isAr ? 'اختر زميلاً أو اكتب بريداً واضغط Enter...' : 'Search company colleagues or enter email...') : (isAr ? 'إضافة نسخة أخرى...' : 'Add CC...')}
+                        className="flex-1 min-w-[160px] bg-transparent text-xs p-1 focus:outline-none text-slate-850 dark:text-white"
                       />
                     </div>
 
                     {isCcDropdownOpen && (
                       <div className="absolute z-30 top-full mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-h-52 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
+                        {ccSearchQuery.trim() && (
+                          <div
+                            onClick={() => commitRecipient('cc')}
+                            className="px-3.5 py-2.5 text-xs flex items-center justify-between bg-blue-50/80 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-800 dark:text-blue-200 cursor-pointer font-semibold border-b border-blue-100 dark:border-blue-900 transition-colors"
+                          >
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span>➕ {isAr ? 'اعتماد النسخة/البريد:' : 'Add CC:'}</span>
+                              <span className="font-mono text-blue-900 dark:text-blue-100 underline truncate">{ccSearchQuery.trim()}</span>
+                            </div>
+                            <span className="text-[10px] bg-blue-200 dark:bg-blue-800 text-blue-900 dark:text-blue-100 px-2 py-0.5 rounded font-mono shrink-0">
+                              Enter ↵
+                            </span>
+                          </div>
+                        )}
                         {companyUsers
                           .filter(c => c.id !== user?.id && !composeCc.some(item => item.id === c.id))
                           .filter(c => !ccSearchQuery || c.name.toLowerCase().includes(ccSearchQuery.toLowerCase()) || (c.email && c.email.toLowerCase().includes(ccSearchQuery.toLowerCase())))
@@ -1166,7 +1285,7 @@ export const InternalMail: React.FC = () => {
                             >
                               <div>
                                 <p className="font-bold text-slate-850 dark:text-white">{c.name}</p>
-                                <p className="text-[11px] text-slate-400">{c.email || ''}</p>
+                                <p className="text-[11px] text-slate-400 font-mono">{c.email || ''}</p>
                               </div>
                               <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 dark:bg-blue-950 px-2 py-0.5 rounded">
                                 {c.role || (isAr ? 'موظف' : 'User')}

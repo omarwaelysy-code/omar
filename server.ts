@@ -444,7 +444,12 @@ async function startServer() {
       'CREATE TABLE IF NOT EXISTS "eta_item_mappings" ("id" VARCHAR(36) PRIMARY KEY, "company_id" VARCHAR(36) NOT NULL, "eta_item_code" VARCHAR(100) NOT NULL, "eta_item_name" VARCHAR(255), "eta_item_type" VARCHAR(50) DEFAULT \'EGS\', "product_id" VARCHAR(36) NOT NULL, "notes" TEXT, "created_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "uq_eta_item_mappings_comp_code" UNIQUE ("company_id", "eta_item_code"))',
       'CREATE INDEX IF NOT EXISTS "idx_eta_item_mappings_comp_code" ON "eta_item_mappings"("company_id", "eta_item_code")',
       'CREATE INDEX IF NOT EXISTS "idx_eta_item_mappings_comp_prod" ON "eta_item_mappings"("company_id", "product_id")',
-      'CREATE TABLE IF NOT EXISTS "eta_partner_cache" ("tax_id" VARCHAR(50) PRIMARY KEY, "name" TEXT, "address" TEXT, "cached_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)'
+      'CREATE TABLE IF NOT EXISTS "eta_partner_cache" ("tax_id" VARCHAR(50) PRIMARY KEY, "name" TEXT, "address" TEXT, "cached_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)',
+      'CREATE TABLE IF NOT EXISTS "internal_messages" ("id" VARCHAR(36) PRIMARY KEY, "company_id" VARCHAR(36), "category" VARCHAR(20) NOT NULL DEFAULT \'company\', "sender_id" VARCHAR(36) NOT NULL, "sender_name" VARCHAR(255) NOT NULL, "sender_email" VARCHAR(255), "to_users" JSONB NOT NULL DEFAULT \'[]\'::jsonb, "cc_users" JSONB NOT NULL DEFAULT \'[]\'::jsonb, "subject" VARCHAR(255) NOT NULL, "body" TEXT NOT NULL, "attachments" JSONB NOT NULL DEFAULT \'[]\'::jsonb, "parent_id" VARCHAR(36), "is_starred" JSONB NOT NULL DEFAULT \'[]\'::jsonb, "read_by" JSONB NOT NULL DEFAULT \'[]\'::jsonb, "archived_by" JSONB NOT NULL DEFAULT \'[]\'::jsonb, "deleted_by" JSONB NOT NULL DEFAULT \'[]\'::jsonb, "created_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP)',
+      'CREATE INDEX IF NOT EXISTS "idx_internal_messages_company" ON "internal_messages"("company_id")',
+      'CREATE INDEX IF NOT EXISTS "idx_internal_messages_category" ON "internal_messages"("category")',
+      'CREATE INDEX IF NOT EXISTS "idx_internal_messages_sender" ON "internal_messages"("sender_id")',
+      'CREATE INDEX IF NOT EXISTS "idx_internal_messages_created_at" ON "internal_messages"("created_at" DESC)'
     ];
     
     for (const q of syncQueries) {

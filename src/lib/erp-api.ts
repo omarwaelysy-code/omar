@@ -7187,6 +7187,178 @@ router.post(['/received-cheques/:id/cancel', '/received_cheques/:id/cancel'], au
 // Mount Fixed Assets Module Router
 router.use(fixedAssetsRouter);
 
+// ==========================================
+// INTERNAL MAIL & TECHNICAL SUPPORT SYSTEM
+// ==========================================
+
+// 1. Fetch mail contacts (Company users or support agents)
+router.get('/internal-messages/contacts', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const companyId = req.user?.company_id;
+    const category = (req.query.category as string) || 'company';
+    
+    if (category === 'support') {
+      const { rows } = await pool.query(
+        `SELECT id, username, name, email, role FROM users WHERE role = 'super_admin' OR email LIKE '%support%' OR username = 'admin' ORDER BY COALESCE(NULLIF(name, ''), username)`
+      );
+      return res.json(rows);
+    }
+
+    if (!companyId) {
+      if (req.user?.role === 'super_admin') {
+        const { rows } = await pool.query(
+          `SELECT id, username, name, email, role FROM users WHERE (status = 'active' OR status IS NULL) ORDER BY COALESCE(NULLIF(name, ''), username)`
+        );
+        return res.json(rows);
+      }
+      return res.json([]);
+    }
+
+    const { rows } = await pool.query(
+      `SELECT id, username, name, email, role FROM users WHERE company_id = $1 AND (status = 'active' OR status IS NULL) ORDER BY COALESCE(NULLIF(name, ''), username)`,
+      [companyId]
+    );
+    res.json(rows);
+  } catch (error: any) {
+    console.error('Error fetching mail contacts:', error);
+    res.status(500).json({ error: 'Failed to fetch contacts.' });
+  }
+});
+
+// 2. Fetch unread count for current user
+router.get('/internal-messages/unread-count', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user?.id;
+    const companyId = req.user?.company_id;
+    if (!userId) return res.json({ total: 0, company: 0, support: 0 });
+
+    // Count for company mail
+    const companyQuery = `
+      SELECT COUNT(*)::int AS count 
+      FROM internal_messages 
+      WHERE category = 'company' 
+        AND company_id = $1
+        AND (to_users::text ILIKE '%"' || $2 || '"%' OR cc_users::text ILIKE '%"' || $2 || '"%')
+        AND NOT (read_by::text ILIKE '%"' || $2 || '"%')
+        AND NOT (deleted_by::text ILIKE '%"' || $2 || '"%')
+        AND NOT (archived_by::text ILIKE '%"' || $2 || '"%')
+    `;
+    const compRes = companyId ? await pool.query(companyQuery, [companyId, userId]) : { rows: [{ count: 0 }] };
+    const compCount = compRes.rows[0]?.count || 0;
+
+    // Count for support mail
+    let supportCount = 0;
+    if (req.user?.role === 'super_admin') {
+      const supRes = await pool.query(`
+        SELECT COUNT(*)::int AS count
+        FROM internal_messages
+        WHERE category = 'support'
+          AND NOT (read_by::text ILIKE '%"' || $1 || '"%')
+          AND NOT (deleted_by::text ILIKE '%"' || $1 || '"%')
+          AND sender_id != $1
+      `, [userId]);
+      supportCount = supRes.rows[0]?.count || 0;
+    } else if (companyId) {
+      const supRes = await pool.query(`
+        SELECT COUNT(*)::int AS count
+        FROM internal_messages
+        WHERE category = 'support'
+          AND company_id = $1
+          AND (to_users::text ILIKE '%"' || $2 || '"%' OR cc_users::text ILIKE '%"' || $2 || '"%' OR sender_id != $2)
+          AND NOT (read_by::text ILIKE '%"' || $2 || '"%')
+          AND NOT (deleted_by::text ILIKE '%"' || $2 || '"%')
+          AND NOT (archived_by::text ILIKE '%"' || $2 || '"%')
+      `, [companyId, userId]);
+      supportCount = supRes.rows[0]?.count || 0;
+    }
+
+    res.json({
+      company: compCount,
+      support: supportCount,
+      total: compCount + supportCount
+    });
+  } catch (error: any) {
+    console.error('Error fetching unread mail count:', error);
+    res.json({ total: 0, company: 0, support: 0 });
+  }
+});
+
+// 3. Mark message as read
+router.post('/internal-messages/:id/mark-read', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    await pool.query(`
+      UPDATE internal_messages
+      SET read_by = CASE 
+        WHEN read_by::text ILIKE '%"' || $1 || '"%' THEN read_by
+        ELSE COALESCE(read_by, '[]'::jsonb) || jsonb_build_array($1::text)
+      END,
+      updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+    `, [userId, id]);
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error marking message as read:', error);
+    res.status(500).json({ error: 'Failed to mark as read.' });
+  }
+});
+
+// 4. Toggle star
+router.post('/internal-messages/:id/toggle-star', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { rows } = await pool.query('SELECT is_starred FROM internal_messages WHERE id = $1', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Message not found' });
+
+    const stars: string[] = Array.isArray(rows[0].is_starred) ? rows[0].is_starred : [];
+    let updatedStars: string[];
+    if (stars.includes(userId)) {
+      updatedStars = stars.filter(s => s !== userId);
+    } else {
+      updatedStars = [...stars, userId];
+    }
+
+    await pool.query('UPDATE internal_messages SET is_starred = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [JSON.stringify(updatedStars), id]);
+    res.json({ success: true, is_starred: updatedStars.includes(userId) });
+  } catch (error: any) {
+    console.error('Error toggling star:', error);
+    res.status(500).json({ error: 'Failed to toggle star.' });
+  }
+});
+
+// 5. Toggle archive
+router.post('/internal-messages/:id/archive', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { rows } = await pool.query('SELECT archived_by FROM internal_messages WHERE id = $1', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Message not found' });
+
+    const archives: string[] = Array.isArray(rows[0].archived_by) ? rows[0].archived_by : [];
+    let updatedArchives: string[];
+    if (archives.includes(userId)) {
+      updatedArchives = archives.filter(s => s !== userId);
+    } else {
+      updatedArchives = [...archives, userId];
+    }
+
+    await pool.query('UPDATE internal_messages SET archived_by = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [JSON.stringify(updatedArchives), id]);
+    res.json({ success: true, is_archived: updatedArchives.includes(userId) });
+  } catch (error: any) {
+    console.error('Error toggling archive:', error);
+    res.status(500).json({ error: 'Failed to toggle archive.' });
+  }
+});
+
 modules.forEach(moduleName => {
   const hyphenName = moduleName.replace(/_/g, '-');
   const routeNames = [moduleName];
@@ -14797,171 +14969,6 @@ router.delete('/contact-messages/:id', authenticateToken, authorizeRoles('super_
   }
 });
 
-// ==========================================
-// INTERNAL MAIL & TECHNICAL SUPPORT SYSTEM
-// ==========================================
-
-// 1. Fetch mail contacts (Company users or support agents)
-router.get('/internal-messages/contacts', authenticateToken, async (req: AuthRequest, res) => {
-  try {
-    const companyId = req.user?.company_id;
-    const category = (req.query.category as string) || 'company';
-    
-    if (category === 'support') {
-      const { rows } = await pool.query(
-        `SELECT id, username, name, email, role FROM users WHERE role = 'super_admin' OR email LIKE '%support%' OR username = 'admin' ORDER BY COALESCE(NULLIF(name, ''), username)`
-      );
-      return res.json(rows);
-    }
-
-    if (!companyId) {
-      return res.json([]);
-    }
-
-    const { rows } = await pool.query(
-      `SELECT id, username, name, email, role FROM users WHERE company_id = $1 AND status = 'active' ORDER BY COALESCE(NULLIF(name, ''), username)`,
-      [companyId]
-    );
-    res.json(rows);
-  } catch (error: any) {
-    console.error('Error fetching mail contacts:', error);
-    res.status(500).json({ error: 'Failed to fetch contacts.' });
-  }
-});
-
-// 2. Fetch unread count for current user
-router.get('/internal-messages/unread-count', authenticateToken, async (req: AuthRequest, res) => {
-  try {
-    const userId = req.user?.id;
-    const companyId = req.user?.company_id;
-    if (!userId) return res.json({ total: 0, company: 0, support: 0 });
-
-    // Count for company mail
-    const companyQuery = `
-      SELECT COUNT(*)::int AS count 
-      FROM internal_messages 
-      WHERE category = 'company' 
-        AND company_id = $1
-        AND (to_users::text ILIKE '%"' || $2 || '"%' OR cc_users::text ILIKE '%"' || $2 || '"%')
-        AND NOT (read_by::text ILIKE '%"' || $2 || '"%')
-        AND NOT (deleted_by::text ILIKE '%"' || $2 || '"%')
-        AND NOT (archived_by::text ILIKE '%"' || $2 || '"%')
-    `;
-    const compRes = companyId ? await pool.query(companyQuery, [companyId, userId]) : { rows: [{ count: 0 }] };
-    const compCount = compRes.rows[0]?.count || 0;
-
-    // Count for support mail
-    let supportCount = 0;
-    if (req.user?.role === 'super_admin') {
-      const supRes = await pool.query(`
-        SELECT COUNT(*)::int AS count
-        FROM internal_messages
-        WHERE category = 'support'
-          AND NOT (read_by::text ILIKE '%"' || $1 || '"%')
-          AND NOT (deleted_by::text ILIKE '%"' || $1 || '"%')
-          AND sender_id != $1
-      `, [userId]);
-      supportCount = supRes.rows[0]?.count || 0;
-    } else if (companyId) {
-      const supRes = await pool.query(`
-        SELECT COUNT(*)::int AS count
-        FROM internal_messages
-        WHERE category = 'support'
-          AND company_id = $1
-          AND (to_users::text ILIKE '%"' || $2 || '"%' OR cc_users::text ILIKE '%"' || $2 || '"%' OR sender_id != $2)
-          AND NOT (read_by::text ILIKE '%"' || $2 || '"%')
-          AND NOT (deleted_by::text ILIKE '%"' || $2 || '"%')
-          AND NOT (archived_by::text ILIKE '%"' || $2 || '"%')
-      `, [companyId, userId]);
-      supportCount = supRes.rows[0]?.count || 0;
-    }
-
-    res.json({
-      company: compCount,
-      support: supportCount,
-      total: compCount + supportCount
-    });
-  } catch (error: any) {
-    console.error('Error fetching unread mail count:', error);
-    res.json({ total: 0, company: 0, support: 0 });
-  }
-});
-
-// 3. Mark message as read
-router.post('/internal-messages/:id/mark-read', authenticateToken, async (req: AuthRequest, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-
-    await pool.query(`
-      UPDATE internal_messages
-      SET read_by = CASE 
-        WHEN read_by::text ILIKE '%"' || $1 || '"%' THEN read_by
-        ELSE COALESCE(read_by, '[]'::jsonb) || jsonb_build_array($1::text)
-      END,
-      updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2
-    `, [userId, id]);
-
-    res.json({ success: true });
-  } catch (error: any) {
-    console.error('Error marking message as read:', error);
-    res.status(500).json({ error: 'Failed to mark as read.' });
-  }
-});
-
-// 4. Toggle star
-router.post('/internal-messages/:id/toggle-star', authenticateToken, async (req: AuthRequest, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-
-    const { rows } = await pool.query('SELECT is_starred FROM internal_messages WHERE id = $1', [id]);
-    if (rows.length === 0) return res.status(404).json({ error: 'Message not found' });
-
-    const stars: string[] = Array.isArray(rows[0].is_starred) ? rows[0].is_starred : [];
-    let updatedStars: string[];
-    if (stars.includes(userId)) {
-      updatedStars = stars.filter(s => s !== userId);
-    } else {
-      updatedStars = [...stars, userId];
-    }
-
-    await pool.query('UPDATE internal_messages SET is_starred = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [JSON.stringify(updatedStars), id]);
-    res.json({ success: true, is_starred: updatedStars.includes(userId) });
-  } catch (error: any) {
-    console.error('Error toggling star:', error);
-    res.status(500).json({ error: 'Failed to toggle star.' });
-  }
-});
-
-// 5. Toggle archive
-router.post('/internal-messages/:id/archive', authenticateToken, async (req: AuthRequest, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-
-    const { rows } = await pool.query('SELECT archived_by FROM internal_messages WHERE id = $1', [id]);
-    if (rows.length === 0) return res.status(404).json({ error: 'Message not found' });
-
-    const archives: string[] = Array.isArray(rows[0].archived_by) ? rows[0].archived_by : [];
-    let updatedArchives: string[];
-    if (archives.includes(userId)) {
-      updatedArchives = archives.filter(s => s !== userId);
-    } else {
-      updatedArchives = [...archives, userId];
-    }
-
-    await pool.query('UPDATE internal_messages SET archived_by = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [JSON.stringify(updatedArchives), id]);
-    res.json({ success: true, is_archived: updatedArchives.includes(userId) });
-  } catch (error: any) {
-    console.error('Error toggling archive:', error);
-    res.status(500).json({ error: 'Failed to toggle archive.' });
-  }
-});
 
 // ==========================================
 // POS Feature & Branch Linking Endpoints (Phase 1)
