@@ -415,8 +415,21 @@ export const InternalMail: React.FC = () => {
 
       const newId = await dbService.create<InternalMessage>('internal_messages', payload);
       const created: InternalMessage = {
-        ...payload,
-        id: (typeof newId === 'string' && newId) ? newId : payload.id,
+        id: (typeof newId === 'string' && newId) ? newId : (payload.id || Date.now().toString()),
+        company_id: user?.company_id,
+        category: activeCategory,
+        sender_id: user?.id || 'unknown',
+        sender_name: user?.name || user?.username || 'المستخدم',
+        sender_email: user?.email || '',
+        to_users: composeTo,
+        cc_users: composeCc,
+        subject: composeSubject.trim(),
+        body: composeBody.trim(),
+        attachments: composeAttachments,
+        is_starred: [],
+        read_by: [user?.id || ''],
+        archived_by: [],
+        deleted_by: [],
         created_at: new Date().toISOString()
       };
       setMessages(prev => [created, ...prev]);
@@ -473,8 +486,24 @@ export const InternalMail: React.FC = () => {
 
       const newId = await dbService.create<InternalMessage>('internal_messages', payload);
       const created: InternalMessage = {
-        ...payload,
-        id: (typeof newId === 'string' && newId) ? newId : payload.id,
+        id: (typeof newId === 'string' && newId) ? newId : (payload.id || Date.now().toString()),
+        company_id: user?.company_id,
+        category: selectedMessage.category,
+        parent_id: selectedMessage.id,
+        sender_id: user?.id || 'unknown',
+        sender_name: user?.name || user?.username || 'المستخدم',
+        sender_email: user?.email || '',
+        to_users: replyTo,
+        cc_users: selectedMessage.cc_users || [],
+        subject: selectedMessage.subject.startsWith('Re:') || selectedMessage.subject.startsWith('رد:')
+          ? selectedMessage.subject
+          : `رد: ${selectedMessage.subject}`,
+        body: replyBody.trim(),
+        attachments: replyAttachments,
+        is_starred: [],
+        read_by: [user?.id || ''],
+        archived_by: [],
+        deleted_by: [],
         created_at: new Date().toISOString()
       };
       setMessages(prev => [created, ...prev]);
