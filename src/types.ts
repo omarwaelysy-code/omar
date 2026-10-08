@@ -23,6 +23,34 @@ export interface ContactMessage {
   notes?: string;
 }
 
+export interface MailUser {
+  id: string;
+  name: string;
+  email?: string;
+  role?: string;
+}
+
+export interface InternalMessage {
+  id: string;
+  company_id?: string;
+  category: 'company' | 'support';
+  sender_id: string;
+  sender_name: string;
+  sender_email?: string;
+  to_users: MailUser[];
+  cc_users?: MailUser[];
+  subject: string;
+  body: string;
+  attachments?: AttachmentItem[];
+  parent_id?: string;
+  is_starred?: string[];
+  read_by?: string[];
+  archived_by?: string[];
+  deleted_by?: string[];
+  created_at: string;
+  updated_at?: string;
+}
+
 export interface User {
   id: string;
   username: string;

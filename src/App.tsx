@@ -91,6 +91,7 @@ const DocumentImport = React.lazy(() => import('./pages/DocumentImport').then(m 
 const DataCountsValues = React.lazy(() => import('./pages/DataCountsValues').then(m => ({ default: m.DataCountsValues })));
 const AgingReport = React.lazy(() => import('./pages/AgingReport').then(m => ({ default: m.AgingReport })));
 const TransactionsSearch = React.lazy(() => import('./pages/TransactionsSearch').then(m => ({ default: m.TransactionsSearch })));
+const InternalMail = React.lazy(() => import('./pages/InternalMail').then(m => ({ default: m.InternalMail })));
 
 import { useNavigation } from './contexts/NavigationContext';
 import { useLanguage } from './contexts/LanguageContext';
@@ -243,6 +244,7 @@ export default function App() {
       case 'expenses': return <Expenses />;
       case 'payment_methods': return <PaymentMethods />;
       case 'transactions_search': return <TransactionsSearch />;
+      case 'internal_mail': return <InternalMail />;
       case 'invoices': return <Invoices />;// Invoices page
       case 'sales_orders': return <SalesOrders />;
       case 'purchase_invoices': return <PurchaseInvoices />;

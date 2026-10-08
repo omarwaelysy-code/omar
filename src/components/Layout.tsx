@@ -89,6 +89,7 @@ const getTabIcon = (id: string) => {
   switch (id) {
     case 'super_admin_dashboard': return <Shield {...iconProps} />;
     case 'contact_messages': return <Mail {...iconProps} />;
+    case 'internal_mail': return <Mail {...iconProps} />;
     case 'dashboard': return <LayoutDashboard {...iconProps} />;
     case 'customers':
     case 'employees':
@@ -298,6 +299,42 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       window.removeEventListener('eta_settings_updated', handleEtaUpdated);
     };
   }, [user?.company_id]);
+
+  const [unreadMailCount, setUnreadMailCount] = React.useState<number>(0);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    const fetchMailCount = async () => {
+      if (!user?.id) return;
+      try {
+        const counts = await dbService.getInternalMailUnreadCount();
+        if (isMounted) {
+          setUnreadMailCount(counts?.total || 0);
+        }
+      } catch (e) {
+        // silent fail
+      }
+    };
+
+    fetchMailCount();
+    const interval = setInterval(fetchMailCount, 45000);
+
+    const handleMailUpdated = (e: any) => {
+      if (e?.detail?.total !== undefined) {
+        setUnreadMailCount(e.detail.total);
+      } else {
+        fetchMailCount();
+      }
+    };
+
+    window.addEventListener('internal_mail_updated', handleMailUpdated);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      window.removeEventListener('internal_mail_updated', handleMailUpdated);
+    };
+  }, [user?.id, user?.company_id]);
 
   React.useEffect(() => {
     if (user?.id) {
@@ -1383,6 +1420,25 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
             <Search size={14} className="stroke-[2.2]" />
           </button>
 
+          {/* Internal Mail & Support Button (البريد والمراسلات) */}
+          <button
+            type="button"
+            onClick={() => onNavigate('internal_mail')}
+            className={`relative flex items-center justify-center px-3.5 py-1 rounded-full border transition-all shadow-2xs active:scale-95 cursor-pointer ${
+              currentPage === 'internal_mail'
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                : 'bg-white hover:bg-slate-50 text-emerald-600 border-slate-300 hover:border-emerald-400'
+            }`}
+            title={language === 'ar' ? 'البريد والمراسلات الداخلية والدعم الفني' : 'Internal Mail & Support'}
+          >
+            <Mail size={14} className="stroke-[2.2]" />
+            {unreadMailCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-0.5 rounded-full bg-rose-600 text-white text-[9px] font-bold flex items-center justify-center shadow-xs">
+                {unreadMailCount > 99 ? '99+' : unreadMailCount}
+              </span>
+            )}
+          </button>
+
           {/* Desktop Language Switcher */}
           <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700 text-[11px] font-bold">
             <button
@@ -1590,6 +1646,23 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
                 title={language === 'ar' ? 'محرك بحث الحركات' : 'Movements Search Engine'}
               >
                 <Search size={18} />
+              </button>
+              <button 
+                type="button"
+                onClick={() => onNavigate('internal_mail')}
+                className={`relative p-2 rounded-xl transition-all border ${
+                  currentPage === 'internal_mail'
+                    ? 'bg-emerald-600 text-white border-emerald-600'
+                    : 'bg-slate-50 text-emerald-600 hover:bg-slate-100 border-slate-200'
+                }`}
+                title={language === 'ar' ? 'البريد والمراسلات' : 'Mail & Support'}
+              >
+                <Mail size={18} />
+                {unreadMailCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-rose-600 text-white text-[9px] font-bold flex items-center justify-center">
+                    {unreadMailCount > 99 ? '99+' : unreadMailCount}
+                  </span>
+                )}
               </button>
               <button 
                 onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}

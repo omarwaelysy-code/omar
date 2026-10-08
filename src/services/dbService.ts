@@ -736,5 +736,27 @@ export const dbService = {
 
   async deleteContactMessage(id: string): Promise<any> {
     return apiRequest<any>(`/contact-messages/${id}`, 'DELETE');
+  },
+
+  // Internal Mail & Support APIs
+  async getInternalMailContacts(category: 'company' | 'support' = 'company'): Promise<any[]> {
+    return apiRequest<any[]>(`/internal-messages/contacts?category=${category}`);
+  },
+
+  async getInternalMailUnreadCount(): Promise<{ total: number; company: number; support: number }> {
+    return apiRequest<{ total: number; company: number; support: number }>('/internal-messages/unread-count');
+  },
+
+  async markInternalMailRead(id: string): Promise<any> {
+    return apiRequest<any>(`/internal-messages/${id}/mark-read`, 'POST');
+  },
+
+  async toggleInternalMailStar(id: string): Promise<any> {
+    return apiRequest<any>(`/internal-messages/${id}/toggle-star`, 'POST');
+  },
+
+  async toggleInternalMailArchive(id: string): Promise<any> {
+    return apiRequest<any>(`/internal-messages/${id}/archive`, 'POST');
   }
 };
+

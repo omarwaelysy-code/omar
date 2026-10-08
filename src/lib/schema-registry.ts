@@ -391,6 +391,11 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   default_account_mappings: [
     'id', 'company_id', 'setting_key', 'account_id', 'account_code', 'account_name', 'created_at', 'updated_at'
+  ],
+  internal_messages: [
+    'id', 'company_id', 'category', 'sender_id', 'sender_name', 'sender_email',
+    'to_users', 'cc_users', 'subject', 'body', 'attachments', 'parent_id',
+    'is_starred', 'read_by', 'archived_by', 'deleted_by', 'created_at', 'updated_at'
   ]
 };
 
