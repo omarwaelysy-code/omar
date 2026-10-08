@@ -22,12 +22,12 @@ export const EXPECTED_SCHEMA: TableSchema = {
   ],
   customers: [
     'id', 'company_id', 'account_id', 'account_name', 'code', 'name', 'email', 'mobile', 'address', 
-    'tax_number', 'opening_balance', 'opening_balance_date', 'counter_account_id', 'created_at',
+    'tax_number', 'commercial_register', 'opening_balance', 'opening_balance_date', 'counter_account_id', 'created_at',
     'payment_method', 'credit_limit', 'payment_terms', 'payment_terms_days', 'advance_percentage', 'attachments'
   ],
   suppliers: [
     'id', 'company_id', 'account_id', 'account_name', 'name', 'code', 'email', 'mobile', 'address', 
-    'tax_number', 'opening_balance', 'opening_balance_date', 'counter_account_id', 'created_at',
+    'tax_number', 'commercial_register', 'opening_balance', 'opening_balance_date', 'counter_account_id', 'created_at',
     'payment_method', 'credit_limit', 'payment_terms', 'payment_terms_days', 'advance_percentage', 'attachments', 'bank_accounts'
   ],
   products: [

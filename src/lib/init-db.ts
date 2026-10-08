@@ -1417,6 +1417,9 @@ export async function initDatabase() {
     await safeQuery(`ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "items" JSONB DEFAULT '[]';`, 'add items to receipt_vouchers');
     await safeQuery(`ALTER TABLE "receipt_vouchers" ADD COLUMN IF NOT EXISTS "updated_at" TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`, 'add updated_at to receipt_vouchers');
 
+    await safeQuery(`ALTER TABLE "customers" ADD COLUMN IF NOT EXISTS "commercial_register" VARCHAR(50);`, 'add commercial_register to customers');
+    await safeQuery(`ALTER TABLE "suppliers" ADD COLUMN IF NOT EXISTS "commercial_register" VARCHAR(50);`, 'add commercial_register to suppliers');
+
     // Seeding
     await seedDatabase(client);
 

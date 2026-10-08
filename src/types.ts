@@ -208,6 +208,7 @@ export interface Customer {
   mobile: string;
   email?: string;
   tax_number?: string;
+  commercial_register?: string;
   address?: string;
   opening_balance: number;
   opening_balance_date?: string;
@@ -231,6 +232,7 @@ export interface Supplier {
   mobile: string;
   email?: string;
   tax_number?: string;
+  commercial_register?: string;
   address?: string;
   opening_balance: number;
   opening_balance_date?: string;

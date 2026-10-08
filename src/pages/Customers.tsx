@@ -6,7 +6,7 @@ import { Customer, Account, JournalEntry, AttachmentItem } from '../types';
 import { 
   Search, Plus, Edit2, Trash2, X, History, FileText, User, 
   Hash, Box, Wallet, Calendar, Phone, Mail, MapPin, Lock,
-  LayoutGrid, List, ChevronRight, ChevronLeft, AlertCircle, CreditCard, FileUp, Paperclip
+  LayoutGrid, List, ChevronRight, ChevronLeft, AlertCircle, CreditCard, FileUp, Paperclip, Building2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
@@ -71,6 +71,7 @@ export const Customers: React.FC = () => {
     mobile: '', 
     email: '', 
     tax_number: '',
+    commercial_register: '',
     address: '',
     opening_balance: 0,
     opening_balance_date: new Date().toISOString().slice(0, 10),
@@ -203,6 +204,8 @@ export const Customers: React.FC = () => {
           { field: 'name', label: 'اسم العميل' },
           { field: 'mobile', label: 'رقم الهاتف' },
           { field: 'email', label: 'البريد الإلكتروني' },
+          { field: 'tax_number', label: 'الرقم الضريبي' },
+          { field: 'commercial_register', label: 'السجل التجاري' },
           { field: 'address', label: 'العنوان' },
           { field: 'opening_balance', label: 'رصيد أول' },
           { field: 'opening_balance_date', label: 'تاريخ الرصيد' },
@@ -361,6 +364,7 @@ export const Customers: React.FC = () => {
           mobile: fullData.mobile,
           email: fullData.email || '',
           tax_number: fullData.tax_number || '',
+          commercial_register: fullData.commercial_register || '',
           address: fullData.address || '',
           opening_balance: fullData.opening_balance || 0,
           opening_balance_date: (fullData.opening_balance_date || new Date().toISOString()).slice(0, 10),
@@ -390,6 +394,7 @@ export const Customers: React.FC = () => {
         mobile: '', 
         email: '', 
         tax_number: '',
+        commercial_register: '',
         address: '',
         opening_balance: 0,
         opening_balance_date: new Date().toISOString().slice(0, 10),
@@ -543,6 +548,7 @@ export const Customers: React.FC = () => {
                         <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الهاتف' : 'Phone'}</th>
                         <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'طريقة السداد' : 'Payment Method'}</th>
                         <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الرقم الضريبي' : 'Tax Number'}</th>
+                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'السجل التجاري' : 'CR Number'}</th>
                         <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'حد الائتمان' : 'Credit Limit'}</th>
                         <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الحالة' : 'Status'}</th>
                         <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>الرصيد الحالي</th>
@@ -593,6 +599,15 @@ export const Customers: React.FC = () => {
                             {customer.tax_number ? (
                               <span className="text-[10px] font-bold px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200/20 dir-ltr font-mono">
                                 {customer.tax_number}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 text-xs font-mono">-</span>
+                            )}
+                          </td>
+                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                            {customer.commercial_register ? (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded border border-purple-200/30 dir-ltr font-mono">
+                                {customer.commercial_register}
                               </span>
                             ) : (
                               <span className="text-slate-300 text-xs font-mono">-</span>
@@ -762,421 +777,445 @@ export const Customers: React.FC = () => {
                 </div>
                 
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-4">
-                  <form id="customer-form" onSubmit={handleSubmit} className="space-y-3">
-                    {/* Basic Info Section */}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-1.5 border-b border-slate-100 pb-1">
-                        <div className="w-5 h-5 bg-emerald-50 text-emerald-600 rounded flex items-center justify-center">
-                          <User size={12} />
-                        </div>
-                        <h4 className="text-xs font-bold text-slate-800 leading-none uppercase">
-                          {language === 'ar' ? 'البيانات الأساسية' : 'Basic Information'}
-                        </h4>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                        {/* Name */}
-                        <div className="sm:col-span-2 space-y-0.5">
-                          <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">{t('customers.form_name')}</label>
-                          <input
-                            required
-                            type="text"
-                            placeholder="John Doe / شركة السلام"
-                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-none transition-all focus:ring-1 focus:ring-emerald-500 focus:bg-white outline-none placeholder:text-slate-400"
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                          />
+                  <form id="customer-form" onSubmit={handleSubmit} className="p-0.5">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-start">
+                      {/* Column 1: Basic Information */}
+                      <div className="p-3 bg-slate-50/60 rounded-xl border border-slate-200/60 space-y-2.5">
+                        <div className="flex items-center gap-1.5 border-b border-slate-200/60 pb-1.5">
+                          <div className="w-5 h-5 bg-emerald-50 text-emerald-600 rounded flex items-center justify-center">
+                            <User size={12} />
+                          </div>
+                          <h4 className="text-xs font-bold text-slate-800 leading-none uppercase">
+                            {language === 'ar' ? 'البيانات الأساسية' : 'Basic Information'}
+                          </h4>
                         </div>
 
-                        {editingCustomer && (
-                          <div className="space-y-0.5">
-                            <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">{t('customers.column_code')}</label>
-                            <div className="relative group">
-                              <Hash className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
-                              <input
-                                required
-                                readOnly
-                                type="text"
-                                className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-slate-100 border border-slate-200 rounded-lg font-mono text-xs font-bold text-slate-500 cursor-not-allowed tracking-wider`}
-                                value={editingCustomer.code}
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="space-y-0.5">
-                          <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">
-                            {t('customers.form_mobile')} <span className="text-[9px] text-slate-400 font-normal">({language === 'ar' ? 'اختياري' : 'Optional'})</span>
-                          </label>
-                          <div className="relative group">
-                            <Phone className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
-                            <input
-                              type="tel"
-                              maxLength={11}
-                              placeholder="01234567890"
-                              className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all font-mono`}
-                              value={formData.mobile}
-                              onChange={(e) => {
-                                const value = e.target.value.replace(/\D/g, '');
-                                setFormData({ ...formData, mobile: value });
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-0.5">
-                          <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">{t('customers.form_email')}</label>
-                          <div className="relative group">
-                            <Mail className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
-                            <input
-                              type="email"
-                              placeholder="customer@example.com"
-                              className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all`}
-                              value={formData.email}
-                              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-0.5">
-                          <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">{t('customers.form_tax_number')}</label>
-                          <div className="relative group">
-                            <FileText className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
-                            <input
-                              type="text"
-                              placeholder={language === 'ar' ? 'الرقم الضريبي' : 'Tax Number'}
-                              className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all font-mono dir-ltr`}
-                              value={formData.tax_number || ''}
-                              onChange={(e) => setFormData({ ...formData, tax_number: e.target.value })}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="sm:col-span-2 space-y-0.5">
-                          <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">{t('customers.form_address')}</label>
-                          <div className="relative group">
-                            <MapPin className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
-                            <input
-                              placeholder={language === 'ar' ? 'العنوان التفصيلي للعميل' : 'Full Address'}
-                              className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:bg-white focus:ring-1 focus:ring-emerald-500 transition-all`}
-                              value={formData.address}
-                              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="sm:col-span-2 space-y-0.5">
-                          <div className="flex items-center justify-between mb-0.5 px-0.5">
-                            <label className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
-                              {isCustomerAccountLocked && <Lock size={11} className="text-amber-500" />}
-                              <span>{t('customers.form_account')}</span>
-                            </label>
-                            {isCustomerAccountLocked && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                <Lock size={9} />
-                                <span>{language === 'ar' ? 'مقفل لوجود حركات مسجلة' : 'Locked (Has transactions)'}</span>
-                              </span>
-                            )}
-                          </div>
-                          <div className="relative group">
-                            {isCustomerAccountLocked ? (
-                              <Lock className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-amber-500 pointer-events-none`} size={14} />
-                            ) : (
-                              <Box className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={14} />
-                            )}
-                            <select
-                              required
-                              disabled={isCustomerAccountLocked}
-                              className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 border rounded-lg text-xs font-bold appearance-none outline-none transition-all ${
-                                isCustomerAccountLocked
-                                  ? 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed font-medium'
-                                  : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:ring-1 focus:ring-emerald-500'
-                              }`}
-                              value={formData.account_id}
-                              onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
-                            >
-                              <option value="">{language === 'ar' ? 'اختر الحساب المحاسبي...' : 'Select account...'}</option>
-                              {accounts.filter(a => a.account_usage === 'accounts_receivable' || a.account_usage === 'customer').map(account => (
-                                <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                          {isCustomerAccountLocked && (
-                            <p className="text-[10px] font-medium text-amber-700 mt-1 flex items-center gap-1">
-                              <span>🔒</span>
-                              <span>{language === 'ar' ? 'لا يمكن تعديل الحساب المحاسبي بعد تسجيل معاملات مالية للعميل حفاظاً على مسار التدقيق.' : 'Linked account cannot be modified once transactions exist to preserve audit trail.'}</span>
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Payment & Credit Settings Section */}
-                    <div className="p-2.5 bg-slate-50/60 rounded-xl border border-slate-200/60 space-y-2">
-                      <div className="flex items-center gap-1.5 border-b border-slate-200/50 pb-1">
-                        <div className="w-5 h-5 bg-emerald-600/10 text-emerald-700 rounded flex items-center justify-center">
-                          <CreditCard size={12} />
-                        </div>
-                        <h4 className="text-xs font-bold text-slate-800 leading-none">
-                          {language === 'ar' ? 'إعدادات السداد والائتمان' : 'Payment & Credit Settings'}
-                        </h4>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                        {/* Payment Method */}
-                        <div className="space-y-0.5">
-                          <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">
-                            {language === 'ar' ? 'طريقة السداد' : 'Payment Method'}
-                          </label>
-                          <div className="relative group">
-                            <Wallet className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={14} />
-                            <select
-                              className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 appearance-none outline-none focus:ring-1 focus:ring-emerald-500`}
-                              value={formData.payment_method || 'credit'}
-                              onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
-                            >
-                              <option value="cash">{language === 'ar' ? 'نقدي' : 'Cash'}</option>
-                              <option value="credit">{language === 'ar' ? 'آجل' : 'Credit'}</option>
-                              <option value="installments">{language === 'ar' ? 'دفعات' : 'Installments'}</option>
-                              <option value="other">{language === 'ar' ? 'أخرى' : 'Other'}</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        {/* Credit Limit */}
-                        <div className="space-y-0.5">
-                          <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">
-                            {language === 'ar' ? 'حد الائتمان' : 'Credit Limit'}
-                          </label>
-                          <div className="relative group">
-                            <FormattedNumberInput
-                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500"
-                              value={formData.credit_limit || 0}
-                              onChange={(val) => setFormData({ ...formData, credit_limit: val })}
-                              dir={dir === 'rtl' ? 'rtl' : 'ltr'}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Payment Terms */}
-                        <div className="sm:col-span-2 space-y-0.5">
-                          <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">
-                            {language === 'ar' ? 'شروط السداد' : 'Payment Terms'}
-                          </label>
-                          <div className="relative group">
-                            <Calendar className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={14} />
-                            <select
-                              className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 appearance-none outline-none focus:ring-1 focus:ring-emerald-500`}
-                              value={formData.payment_terms || 'due_on_receipt'}
-                              onChange={(e) => {
-                                const term = e.target.value;
-                                let days = 0;
-                                let pct = 0;
-                                if (term === 'net_7') days = 7;
-                                else if (term === 'net_15') days = 15;
-                                else if (term === 'net_30') days = 30;
-                                else if (term === 'net_45') days = 45;
-                                else if (term === 'net_60') days = 60;
-                                else if (term === 'net_90') days = 90;
-                                else if (term === 'net_180') days = 180;
-                                else if (term === 'advance_50_50') pct = 50;
-                                else if (term === 'advance') pct = 100;
-                                
-                                setFormData({ 
-                                  ...formData, 
-                                  payment_terms: term,
-                                  payment_terms_days: days,
-                                  advance_percentage: pct
-                                });
-                              }}
-                            >
-                              <option value="cash">{language === 'ar' ? 'نقدي عند التسليم (Cash)' : 'Cash'}</option>
-                              <option value="due_on_receipt">{language === 'ar' ? 'مستحق فور استلام الفاتورة' : 'Due on Receipt'}</option>
-                              <option value="net_7">{language === 'ar' ? 'خلال 7 أيام (Net 7)' : 'Net 7'}</option>
-                              <option value="net_15">{language === 'ar' ? 'خلال 15 يوماً (Net 15)' : 'Net 15'}</option>
-                              <option value="net_30">{language === 'ar' ? 'خلال 30 يوماً (Net 30)' : 'Net 30'}</option>
-                              <option value="net_45">{language === 'ar' ? 'خلال 45 يوماً (Net 45)' : 'Net 45'}</option>
-                              <option value="net_60">{language === 'ar' ? 'خلال 60 يوماً (Net 60)' : 'Net 60'}</option>
-                              <option value="net_90">{language === 'ar' ? 'خلال 90 يوماً (Net 90)' : 'Net 90'}</option>
-                              <option value="net_180">{language === 'ar' ? 'خلال 180 يوماً (Net 180)' : 'Net 180'}</option>
-                              <option value="eom">{language === 'ar' ? 'نهاية الشهر (EOM)' : 'EOM'}</option>
-                              <option value="eom_30">{language === 'ar' ? 'السداد بعد 30 يوم من نهاية الشهر' : '30 Days EOM'}</option>
-                              <option value="advance">{language === 'ar' ? 'دفعة مقدمة 100%' : 'Advance (100%)'}</option>
-                              <option value="advance_50_50">{language === 'ar' ? '50% مقدم والباقي عند التسليم' : '50% Advance'}</option>
-                              <option value="custom">{language === 'ar' ? 'مخصص (أيام / نسب مخصصة)' : 'Custom'}</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        {formData.payment_terms === 'custom' && (
-                          <>
-                            <div className="space-y-0.5">
-                              <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">
-                                {language === 'ar' ? 'فترة السداد بالأيام' : 'Days'}
-                              </label>
-                              <input
-                                type="number"
-                                min={0}
-                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500"
-                                value={formData.payment_terms_days || 0}
-                                onChange={(e) => setFormData({ ...formData, payment_terms_days: Number(e.target.value) })}
-                              />
-                            </div>
-                            <div className="space-y-0.5">
-                              <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">
-                                {language === 'ar' ? 'نسبة المقدم %' : 'Advance %'}
-                              </label>
-                              <input
-                                type="number"
-                                min={0}
-                                max={100}
-                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500"
-                                value={formData.advance_percentage || 0}
-                                onChange={(e) => setFormData({ ...formData, advance_percentage: Number(e.target.value) })}
-                              />
-                            </div>
-                          </>
-                        )}
-
-                      </div>
-                    </div>
-
-                    {/* Financial & Opening Balance Section */}
-                    <div className="p-2.5 bg-slate-50/60 rounded-xl border border-slate-200/60 space-y-2">
-                      {(() => {
-                        const linkedJe = entries.find(e => 
-                          (e.reference_id === editingCustomer?.id || e.reference_number === editingCustomer?.code || e.description?.includes(formData.name)) && 
-                          e.reference_type === 'opening_balance'
-                        );
-                        return (
-                          <div className="flex items-center justify-between border-b border-slate-200/50 pb-1 flex-wrap gap-2">
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-5 h-5 bg-emerald-600/10 text-emerald-700 rounded flex items-center justify-center">
-                                <Wallet size={12} />
-                              </div>
-                              <h4 className="text-xs font-bold text-slate-800 leading-none">
-                                {language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}
-                              </h4>
-                            </div>
-                            {linkedJe?.entry_number && (
-                              <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 border border-indigo-200 rounded-lg text-indigo-700 font-mono text-xs font-black shadow-xs">
-                                <FileText size={13} className="text-indigo-600" />
-                                <span>{language === 'ar' ? `رقم القيد: ${linkedJe.entry_number}` : `JE #: ${linkedJe.entry_number}`}</span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                        <div className="space-y-0.5">
-                          <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">{t('customers.form_opening_balance')}</label>
-                          <div className="relative group">
-                            <Wallet className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-emerald-500`} size={14} />
-                            <FormattedNumberInput
-                              required
-                              className="w-full px-2.5 py-1.5 bg-white border border-emerald-200 rounded-lg text-xs font-black text-emerald-700 outline-none focus:ring-1 focus:ring-emerald-500 ps-7"
-                              value={formData.opening_balance}
-                              onChange={(val) => setFormData({ ...formData, opening_balance: val })}
-                              dir={dir === 'rtl' ? 'rtl' : 'ltr'}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-0.5">
-                          <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">{t('customers.form_balance_date')}</label>
-                          <div className="relative group">
-                            <Calendar className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
-                            <input
-                              type="date"
-                              className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500`}
-                              value={formData.opening_balance_date}
-                              onChange={(e) => setFormData({ ...formData, opening_balance_date: e.target.value })}
-                            />
-                          </div>
-                        </div>
-
-                        {formData.opening_balance !== 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {/* Name */}
                           <div className="sm:col-span-2 space-y-0.5">
-                            <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">{t('customers.form_counter_account')}</label>
+                            <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">{t('customers.form_name')}</label>
+                            <input
+                              required
+                              type="text"
+                              placeholder="John Doe / شركة السلام"
+                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-none transition-all focus:ring-1 focus:ring-emerald-500 outline-none placeholder:text-slate-400"
+                              value={formData.name}
+                              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            />
+                          </div>
+
+                          {/* Code (if editing) */}
+                          {editingCustomer && (
+                            <div className="sm:col-span-2 space-y-0.5">
+                              <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">{t('customers.column_code')}</label>
+                              <div className="relative group">
+                                <Hash className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
+                                <input
+                                  required
+                                  readOnly
+                                  type="text"
+                                  className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-slate-100 border border-slate-200 rounded-lg font-mono text-xs font-bold text-slate-500 cursor-not-allowed tracking-wider`}
+                                  value={editingCustomer.code}
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Mobile */}
+                          <div className="space-y-0.5">
+                            <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">
+                              {t('customers.form_mobile')} <span className="text-[9px] text-slate-400 font-normal">({language === 'ar' ? 'اختياري' : 'Optional'})</span>
+                            </label>
                             <div className="relative group">
-                              <Plus className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
+                              <Phone className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
+                              <input
+                                type="tel"
+                                maxLength={11}
+                                placeholder="01234567890"
+                                className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500 transition-all font-mono`}
+                                value={formData.mobile}
+                                onChange={(e) => {
+                                  const value = e.target.value.replace(/\D/g, '');
+                                  setFormData({ ...formData, mobile: value });
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Email */}
+                          <div className="space-y-0.5">
+                            <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">{t('customers.form_email')}</label>
+                            <div className="relative group">
+                              <Mail className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
+                              <input
+                                type="email"
+                                placeholder="customer@example.com"
+                                className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500 transition-all`}
+                                value={formData.email}
+                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Tax Number */}
+                          <div className="space-y-0.5">
+                            <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">{t('customers.form_tax_number')}</label>
+                            <div className="relative group">
+                              <FileText className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
+                              <input
+                                type="text"
+                                placeholder={language === 'ar' ? 'الرقم الضريبي' : 'Tax Number'}
+                                className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500 transition-all font-mono dir-ltr`}
+                                value={formData.tax_number || ''}
+                                onChange={(e) => setFormData({ ...formData, tax_number: e.target.value })}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Commercial Register */}
+                          <div className="space-y-0.5">
+                            <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">{language === 'ar' ? 'رقم السجل التجاري' : 'CR Number'}</label>
+                            <div className="relative group">
+                              <Building2 className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
+                              <input
+                                type="text"
+                                placeholder={language === 'ar' ? 'رقم السجل التجاري' : 'Commercial Register'}
+                                className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500 transition-all font-mono dir-ltr`}
+                                value={formData.commercial_register || ''}
+                                onChange={(e) => setFormData({ ...formData, commercial_register: e.target.value })}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Address */}
+                          <div className="sm:col-span-2 space-y-0.5">
+                            <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">{t('customers.form_address')}</label>
+                            <div className="relative group">
+                              <MapPin className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
+                              <input
+                                placeholder={language === 'ar' ? 'العنوان التفصيلي للعميل' : 'Full Address'}
+                                className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500 transition-all`}
+                                value={formData.address}
+                                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                              />
+                            </div>
+                          </div>
+
+                          {/* GL Account */}
+                          <div className="sm:col-span-2 space-y-0.5">
+                            <div className="flex items-center justify-between mb-0.5 px-0.5">
+                              <label className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
+                                {isCustomerAccountLocked && <Lock size={11} className="text-amber-500" />}
+                                <span>{t('customers.form_account')}</span>
+                              </label>
+                              {isCustomerAccountLocked && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                  <Lock size={9} />
+                                  <span>{language === 'ar' ? 'مقفل لوجود حركات مسجلة' : 'Locked (Has transactions)'}</span>
+                                </span>
+                              )}
+                            </div>
+                            <div className="relative group">
+                              {isCustomerAccountLocked ? (
+                                <Lock className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-amber-500 pointer-events-none`} size={14} />
+                              ) : (
+                                <Box className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={14} />
+                              )}
                               <select
                                 required
-                                className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500 appearance-none`}
-                                value={formData.counter_account_id}
-                                onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}
+                                disabled={isCustomerAccountLocked}
+                                className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 border rounded-lg text-xs font-bold appearance-none outline-none transition-all ${
+                                  isCustomerAccountLocked
+                                    ? 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed font-medium'
+                                    : 'bg-white border-slate-200 text-slate-900 focus:ring-1 focus:ring-emerald-500'
+                                }`}
+                                value={formData.account_id}
+                                onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
                               >
-                                <option value="">{language === 'ar' ? 'اختر حساب الطرف الآخر...' : 'Select counter account...'}</option>
-                                {accounts.filter(a => ['opening_balance', 'capital', 'equity', 'retained_earnings', 'other'].includes(a.account_usage || '')).map(account => (
+                                <option value="">{language === 'ar' ? 'اختر الحساب المحاسبي...' : 'Select account...'}</option>
+                                {accounts.filter(a => a.account_usage === 'accounts_receivable' || a.account_usage === 'customer').map(account => (
                                   <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
                                 ))}
                               </select>
                             </div>
+                            {isCustomerAccountLocked && (
+                              <p className="text-[10px] font-medium text-amber-700 mt-1 flex items-center gap-1">
+                                <span>🔒</span>
+                                <span>{language === 'ar' ? 'لا يمكن تعديل الحساب المحاسبي بعد تسجيل معاملات مالية للعميل حفاظاً على مسار التدقيق.' : 'Linked account cannot be modified once transactions exist to preserve audit trail.'}</span>
+                              </p>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </div>
 
-                      {formData.opening_balance !== 0 && formData.counter_account_id && (() => {
-                        let finalAccountId = formData.account_id;
-                        let finalCounterAccountId = formData.counter_account_id;
-
-                        const account1 = accounts.find(a => a.id === finalAccountId);
-                        const account2 = accounts.find(a => a.id === finalCounterAccountId);
-
-                        const isAccountCustomer = (acc: any) => acc && (acc.name.includes('عملاء') || acc.name.includes('العملاء') || acc.code?.startsWith('12'));
-                        const isAccountOpening = (acc: any) => acc && (acc.name.includes('رصيد') || acc.name.includes('ميزانية') || acc.name.includes('رأس') || acc.name.includes('راس') || acc.code?.startsWith('3'));
-
-                        if (isAccountOpening(account1) && isAccountCustomer(account2)) {
-                          finalAccountId = formData.counter_account_id;
-                          finalCounterAccountId = formData.account_id;
-                        }
-
-                        const customerAccount = accounts.find(a => a.id === finalAccountId);
-                        const counterAccount = accounts.find(a => a.id === finalCounterAccountId);
-
-                        const linkedJe = entries.find(e => 
-                          (e.reference_id === editingCustomer?.id || e.reference_number === editingCustomer?.code || e.description?.includes(formData.name)) && 
-                          e.reference_type === 'opening_balance'
-                        );
-
-                        return (
-                          <div className="bg-slate-50/50 p-2.5 rounded-xl border border-slate-200 shadow-inner">
-                            <JournalEntryPreview 
-                              title={language === 'ar' ? 'معاينة قيد الرصيد' : 'Entry Preview'}
-                              entry_number={linkedJe?.entry_number}
-                              items={[
-                                {
-                                  account_code: customerAccount?.code || '',
-                                  account_name: customerAccount?.name || '',
-                                  debit: formData.opening_balance > 0 ? formData.opening_balance : 0,
-                                  credit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
-                                  description: language === 'ar' ? `رصيد أول: ${formData.name}` : `Opening: ${formData.name}`
-                                },
-                                {
-                                  account_code: counterAccount?.code || '',
-                                  account_name: counterAccount?.name || '',
-                                  debit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
-                                  credit: formData.opening_balance > 0 ? formData.opening_balance : 0,
-                                  description: language === 'ar' ? `الطرف المقابل: ${formData.name}` : `Counter: ${formData.name}`
-                                }
-                              ]}
-                            />
+                      {/* Column 2: Payment/Credit, Opening Balance, Attachments */}
+                      <div className="space-y-3">
+                        {/* Payment & Credit Settings Section */}
+                        <div className="p-3 bg-slate-50/60 rounded-xl border border-slate-200/60 space-y-2">
+                          <div className="flex items-center gap-1.5 border-b border-slate-200/50 pb-1.5">
+                            <div className="w-5 h-5 bg-emerald-600/10 text-emerald-700 rounded flex items-center justify-center">
+                              <CreditCard size={12} />
+                            </div>
+                            <h4 className="text-xs font-bold text-slate-800 leading-none">
+                              {language === 'ar' ? 'إعدادات السداد والائتمان' : 'Payment & Credit Settings'}
+                            </h4>
                           </div>
-                        );
-                      })()}
-                    </div>
 
-                    {/* Attachments Section */}
-                    <div className="p-2.5 bg-slate-50/60 rounded-xl border border-slate-200/60 space-y-2">
-                      <AttachmentsManager
-                        title={language === 'ar' ? 'المستندات والمرفقات' : 'Documents & Attachments'}
-                        subtitle={language === 'ar' ? 'يمكن إرفاق صورة السجل التجاري، البطاقة الضريبية أو أية مستندات' : 'Attach tax card, CR, or any documents'}
-                        attachments={formData.attachments}
-                        onChange={(attachments) => setFormData({ ...formData, attachments })}
-                      />
-                    </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {/* Payment Method */}
+                            <div className="space-y-0.5">
+                              <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">
+                                {language === 'ar' ? 'طريقة السداد' : 'Payment Method'}
+                              </label>
+                              <div className="relative group">
+                                <Wallet className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={14} />
+                                <select
+                                  className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 appearance-none outline-none focus:ring-1 focus:ring-emerald-500`}
+                                  value={formData.payment_method || 'credit'}
+                                  onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
+                                >
+                                  <option value="cash">{language === 'ar' ? 'نقدي' : 'Cash'}</option>
+                                  <option value="credit">{language === 'ar' ? 'آجل' : 'Credit'}</option>
+                                  <option value="installments">{language === 'ar' ? 'دفعات' : 'Installments'}</option>
+                                  <option value="other">{language === 'ar' ? 'أخرى' : 'Other'}</option>
+                                </select>
+                              </div>
+                            </div>
 
+                            {/* Credit Limit */}
+                            <div className="space-y-0.5">
+                              <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">
+                                {language === 'ar' ? 'حد الائتمان' : 'Credit Limit'}
+                              </label>
+                              <div className="relative group">
+                                <FormattedNumberInput
+                                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500"
+                                  value={formData.credit_limit || 0}
+                                  onChange={(val) => setFormData({ ...formData, credit_limit: val })}
+                                  dir={dir === 'rtl' ? 'rtl' : 'ltr'}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Payment Terms */}
+                            <div className="sm:col-span-2 space-y-0.5">
+                              <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">
+                                {language === 'ar' ? 'شروط السداد' : 'Payment Terms'}
+                              </label>
+                              <div className="relative group">
+                                <Calendar className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={14} />
+                                <select
+                                  className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 appearance-none outline-none focus:ring-1 focus:ring-emerald-500`}
+                                  value={formData.payment_terms || 'due_on_receipt'}
+                                  onChange={(e) => {
+                                    const term = e.target.value;
+                                    let days = 0;
+                                    let pct = 0;
+                                    if (term === 'net_7') days = 7;
+                                    else if (term === 'net_15') days = 15;
+                                    else if (term === 'net_30') days = 30;
+                                    else if (term === 'net_45') days = 45;
+                                    else if (term === 'net_60') days = 60;
+                                    else if (term === 'net_90') days = 90;
+                                    else if (term === 'net_180') days = 180;
+                                    else if (term === 'advance_50_50') pct = 50;
+                                    else if (term === 'advance') pct = 100;
+                                    
+                                    setFormData({ 
+                                      ...formData, 
+                                      payment_terms: term,
+                                      payment_terms_days: days,
+                                      advance_percentage: pct
+                                    });
+                                  }}
+                                >
+                                  <option value="cash">{language === 'ar' ? 'نقدي عند التسليم (Cash)' : 'Cash'}</option>
+                                  <option value="due_on_receipt">{language === 'ar' ? 'مستحق فور استلام الفاتورة' : 'Due on Receipt'}</option>
+                                  <option value="net_7">{language === 'ar' ? 'خلال 7 أيام (Net 7)' : 'Net 7'}</option>
+                                  <option value="net_15">{language === 'ar' ? 'خلال 15 يوماً (Net 15)' : 'Net 15'}</option>
+                                  <option value="net_30">{language === 'ar' ? 'خلال 30 يوماً (Net 30)' : 'Net 30'}</option>
+                                  <option value="net_45">{language === 'ar' ? 'خلال 45 يوماً (Net 45)' : 'Net 45'}</option>
+                                  <option value="net_60">{language === 'ar' ? 'خلال 60 يوماً (Net 60)' : 'Net 60'}</option>
+                                  <option value="net_90">{language === 'ar' ? 'خلال 90 يوماً (Net 90)' : 'Net 90'}</option>
+                                  <option value="net_180">{language === 'ar' ? 'خلال 180 يوماً (Net 180)' : 'Net 180'}</option>
+                                  <option value="eom">{language === 'ar' ? 'نهاية الشهر (EOM)' : 'EOM'}</option>
+                                  <option value="eom_30">{language === 'ar' ? 'السداد بعد 30 يوم من نهاية الشهر' : '30 Days EOM'}</option>
+                                  <option value="advance">{language === 'ar' ? 'دفعة مقدمة 100%' : 'Advance (100%)'}</option>
+                                  <option value="advance_50_50">{language === 'ar' ? '50% مقدم والباقي عند التسليم' : '50% Advance'}</option>
+                                  <option value="custom">{language === 'ar' ? 'مخصص (أيام / نسب مخصصة)' : 'Custom'}</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            {formData.payment_terms === 'custom' && (
+                              <>
+                                <div className="space-y-0.5">
+                                  <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">
+                                    {language === 'ar' ? 'فترة السداد بالأيام' : 'Days'}
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500"
+                                    value={formData.payment_terms_days || 0}
+                                    onChange={(e) => setFormData({ ...formData, payment_terms_days: Number(e.target.value) })}
+                                  />
+                                </div>
+                                <div className="space-y-0.5">
+                                  <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">
+                                    {language === 'ar' ? 'نسبة المقدم %' : 'Advance %'}
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500"
+                                    value={formData.advance_percentage || 0}
+                                    onChange={(e) => setFormData({ ...formData, advance_percentage: Number(e.target.value) })}
+                                  />
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Financial & Opening Balance Section */}
+                        <div className="p-3 bg-slate-50/60 rounded-xl border border-slate-200/60 space-y-2">
+                          {(() => {
+                            const linkedJe = editingCustomer?.id ? entries.find(e => 
+                              (e.reference_id === editingCustomer.id || (editingCustomer.code && e.reference_number === editingCustomer.code)) && 
+                              e.reference_type === 'opening_balance'
+                            ) : null;
+                            return (
+                              <div className="flex items-center justify-between border-b border-slate-200/50 pb-1.5 flex-wrap gap-2">
+                                <div className="flex items-center gap-1.5">
+                                  <div className="w-5 h-5 bg-emerald-600/10 text-emerald-700 rounded flex items-center justify-center">
+                                    <Wallet size={12} />
+                                  </div>
+                                  <h4 className="text-xs font-bold text-slate-800 leading-none">
+                                    {language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}
+                                  </h4>
+                                </div>
+                                {linkedJe?.entry_number && (
+                                  <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 border border-indigo-200 rounded-lg text-indigo-700 font-mono text-xs font-black shadow-xs">
+                                    <FileText size={13} className="text-indigo-600" />
+                                    <span>{language === 'ar' ? `رقم القيد: ${linkedJe.entry_number}` : `JE #: ${linkedJe.entry_number}`}</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div className="space-y-0.5">
+                              <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">{t('customers.form_opening_balance')}</label>
+                              <div className="relative group">
+                                <Wallet className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-emerald-500`} size={14} />
+                                <FormattedNumberInput
+                                  required
+                                  className="w-full px-2.5 py-1.5 bg-white border border-emerald-200 rounded-lg text-xs font-black text-emerald-700 outline-none focus:ring-1 focus:ring-emerald-500 ps-7"
+                                  value={formData.opening_balance}
+                                  onChange={(val) => setFormData({ ...formData, opening_balance: val })}
+                                  dir={dir === 'rtl' ? 'rtl' : 'ltr'}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-0.5">
+                              <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">{t('customers.form_balance_date')}</label>
+                              <div className="relative group">
+                                <Calendar className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
+                                <input
+                                  type="date"
+                                  className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500`}
+                                  value={formData.opening_balance_date}
+                                  onChange={(e) => setFormData({ ...formData, opening_balance_date: e.target.value })}
+                                />
+                              </div>
+                            </div>
+
+                            {formData.opening_balance !== 0 && (
+                              <div className="sm:col-span-2 space-y-0.5">
+                                <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">{t('customers.form_counter_account')}</label>
+                                <div className="relative group">
+                                  <Plus className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
+                                  <select
+                                    required
+                                    className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500 appearance-none`}
+                                    value={formData.counter_account_id}
+                                    onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}
+                                  >
+                                    <option value="">{language === 'ar' ? 'اختر حساب الطرف الآخر...' : 'Select counter account...'}</option>
+                                    {accounts.filter(a => ['opening_balance', 'capital', 'equity', 'retained_earnings', 'other'].includes(a.account_usage || '')).map(account => (
+                                      <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {formData.opening_balance !== 0 && formData.counter_account_id && (() => {
+                            let finalAccountId = formData.account_id;
+                            let finalCounterAccountId = formData.counter_account_id;
+
+                            const account1 = accounts.find(a => a.id === finalAccountId);
+                            const account2 = accounts.find(a => a.id === finalCounterAccountId);
+
+                            const isAccountCustomer = (acc: any) => acc && (acc.name.includes('عملاء') || acc.name.includes('العملاء') || acc.code?.startsWith('12'));
+                            const isAccountOpening = (acc: any) => acc && (acc.name.includes('رصيد') || acc.name.includes('ميزانية') || acc.name.includes('رأس') || acc.name.includes('راس') || acc.code?.startsWith('3'));
+
+                            if (isAccountOpening(account1) && isAccountCustomer(account2)) {
+                              finalAccountId = formData.counter_account_id;
+                              finalCounterAccountId = formData.account_id;
+                            }
+
+                            const customerAccount = accounts.find(a => a.id === finalAccountId);
+                            const counterAccount = accounts.find(a => a.id === finalCounterAccountId);
+
+                            const linkedJe = editingCustomer?.id ? entries.find(e => 
+                              (e.reference_id === editingCustomer.id || (editingCustomer.code && e.reference_number === editingCustomer.code)) && 
+                              e.reference_type === 'opening_balance'
+                            ) : null;
+
+                            return (
+                              <div className="bg-slate-50/50 p-2.5 rounded-xl border border-slate-200 shadow-inner">
+                                <JournalEntryPreview 
+                                  title={language === 'ar' ? 'معاينة قيد الرصيد' : 'Entry Preview'}
+                                  entry_number={linkedJe?.entry_number}
+                                  items={[
+                                    {
+                                      account_code: customerAccount?.code || '',
+                                      account_name: customerAccount?.name || '',
+                                      debit: formData.opening_balance > 0 ? formData.opening_balance : 0,
+                                      credit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
+                                      description: language === 'ar' ? `رصيد أول: ${formData.name}` : `Opening: ${formData.name}`
+                                    },
+                                    {
+                                      account_code: counterAccount?.code || '',
+                                      account_name: counterAccount?.name || '',
+                                      debit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
+                                      credit: formData.opening_balance > 0 ? formData.opening_balance : 0,
+                                      description: language === 'ar' ? `الطرف المقابل: ${formData.name}` : `Counter: ${formData.name}`
+                                    }
+                                  ]}
+                                />
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        {/* Attachments Section */}
+                        <div className="p-3 bg-slate-50/60 rounded-xl border border-slate-200/60 space-y-2">
+                          <AttachmentsManager
+                            title={language === 'ar' ? 'المستندات والمرفقات' : 'Documents & Attachments'}
+                            subtitle={language === 'ar' ? 'يمكن إرفاق صورة السجل التجاري، البطاقة الضريبية أو أية مستندات' : 'Attach tax card, CR, or any documents'}
+                            attachments={formData.attachments}
+                            onChange={(attachments) => setFormData({ ...formData, attachments })}
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </form>
                 </div>
               </div>

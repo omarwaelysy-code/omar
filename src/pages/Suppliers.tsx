@@ -108,6 +108,7 @@ export const Suppliers: React.FC = () => {
     mobile: '',
     email: '',
     tax_number: '',
+    commercial_register: '',
     address: '',
     opening_balance: 0,
     opening_balance_date: new Date().toISOString().slice(0, 10),
@@ -187,6 +188,7 @@ export const Suppliers: React.FC = () => {
         mobile: pendingEtaSupplierForCreation.phone || '',
         email: '',
         tax_number: pendingEtaSupplierForCreation.taxNumber || '',
+        commercial_register: '',
         address: pendingEtaSupplierForCreation.address || '',
         opening_balance: 0,
         opening_balance_date: new Date().toISOString().slice(0, 10),
@@ -293,6 +295,8 @@ export const Suppliers: React.FC = () => {
           { field: 'name', label: 'اسم المورد' },
           { field: 'mobile', label: 'رقم الهاتف' },
           { field: 'email', label: 'البريد الإلكتروني' },
+          { field: 'tax_number', label: 'الرقم الضريبي' },
+          { field: 'commercial_register', label: 'السجل التجاري' },
           { field: 'address', label: 'العنوان' },
           { field: 'opening_balance', label: 'الرصيد الافتتاحي' },
           { field: 'opening_balance_date', label: 'تاريخ الرصيد' },
@@ -478,6 +482,7 @@ export const Suppliers: React.FC = () => {
           mobile: fullData.mobile,
           email: fullData.email || '',
           tax_number: fullData.tax_number || '',
+          commercial_register: fullData.commercial_register || '',
           address: fullData.address || '',
           opening_balance: fullData.opening_balance,
           opening_balance_date: (fullData.opening_balance_date || new Date().toISOString()).slice(0, 10),
@@ -508,6 +513,7 @@ export const Suppliers: React.FC = () => {
         mobile: '',
         email: '',
         tax_number: pendingEtaSupplierForCreation ? pendingEtaSupplierForCreation.taxNumber : '',
+        commercial_register: '',
         address: pendingEtaSupplierForCreation?.address || '',
         opening_balance: 0,
         opening_balance_date: new Date().toISOString().slice(0, 10),
@@ -884,6 +890,7 @@ export const Suppliers: React.FC = () => {
                         <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الهاتف' : 'Phone'}</th>
                         <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'طريقة السداد' : 'Payment Method'}</th>
                         <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الرقم الضريبي' : 'Tax Number'}</th>
+                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'السجل التجاري' : 'CR Number'}</th>
                         <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'حد الائتمان' : 'Credit Limit'}</th>
                         <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الحالة' : 'Status'}</th>
                         <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>الرصيد الحالي</th>
@@ -950,6 +957,15 @@ export const Suppliers: React.FC = () => {
                             {supplier.tax_number ? (
                               <span className="text-[10px] font-bold px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200/20 dir-ltr font-mono">
                                 {supplier.tax_number}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 text-xs font-mono">-</span>
+                            )}
+                          </td>
+                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                            {supplier.commercial_register ? (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded border border-purple-200/30 dir-ltr font-mono">
+                                {supplier.commercial_register}
                               </span>
                             ) : (
                               <span className="text-slate-300 text-xs font-mono">-</span>
@@ -1270,394 +1286,439 @@ export const Suppliers: React.FC = () => {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                      <div className="sm:col-span-2">
-                        <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_name')}</label>
-                        <input
-                          required
-                          type="text"
-                          placeholder="اسم المورد / الشركة"
-                          className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
-                          value={formData.name}
-                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        />
-                      </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 items-start">
+                      {/* Column 1: Basic Information */}
+                      <div className="p-3 bg-slate-50/60 rounded-xl border border-slate-200/60 space-y-2.5">
+                        <div className="flex items-center gap-1.5 border-b border-slate-200/60 pb-1.5">
+                          <div className="w-5 h-5 bg-emerald-50 text-emerald-600 rounded flex items-center justify-center">
+                            <Truck size={12} />
+                          </div>
+                          <h4 className="text-xs font-bold text-slate-800 leading-none uppercase">
+                            {language === 'ar' ? 'البيانات الأساسية للمورد' : 'Basic Information'}
+                          </h4>
+                        </div>
 
-                      {editingSupplier && (
-                        <div>
-                          <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_code')}</label>
-                          <div className="relative group">
-                            <Hash className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={13} />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {/* Name */}
+                          <div className="sm:col-span-2 space-y-0.5">
+                            <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_name')}</label>
                             <input
                               required
-                              readOnly
                               type="text"
-                              className="w-full px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-lg font-mono text-xs font-bold text-slate-500 cursor-not-allowed ps-7"
-                              value={editingSupplier.code}
+                              placeholder="اسم المورد / الشركة"
+                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
+                              value={formData.name}
+                              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             />
                           </div>
-                        </div>
-                      )}
 
-                      <div>
-                        <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                          {t('suppliers.form_mobile')} <span className="text-[9px] text-slate-400 font-normal">({language === 'ar' ? 'اختياري' : 'Optional'})</span>
-                        </label>
-                        <div className="relative group">
-                          <Phone className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={13} />
-                          <input
-                            type="tel"
-                            maxLength={11}
-                            placeholder="01234567890"
-                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all ps-7"
-                            value={formData.mobile}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/\D/g, '');
-                              setFormData({ ...formData, mobile: value });
-                            }}
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_email')}</label>
-                        <div className="relative group">
-                          <Mail className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={13} />
-                          <input
-                            type="email"
-                            placeholder="supplier@example.com"
-                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all ps-7"
-                            value={formData.email}
-                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_tax_number')}</label>
-                        <div className="relative group">
-                          <FileText className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={13} />
-                          <input
-                            type="text"
-                            placeholder={language === 'ar' ? 'الرقم الضريبي' : 'Tax Number'}
-                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all ps-7 dir-ltr font-mono"
-                            value={formData.tax_number || ''}
-                            onChange={(e) => setFormData({ ...formData, tax_number: e.target.value })}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="sm:col-span-2">
-                        <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_address')}</label>
-                        <div className="relative group">
-                          <MapPin className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={13} />
-                          <textarea
-                            placeholder="العنوان التفصيلي للمورد"
-                            className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all ps-7 min-h-[50px]"
-                            rows={1}
-                            value={formData.address}
-                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="sm:col-span-2">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <label className={`text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                            {isSupplierAccountLocked && <Lock size={11} className="text-amber-500" />}
-                            <span>{t('suppliers.form_account')}</span>
-                          </label>
-                          {isSupplierAccountLocked && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                              <Lock size={9} />
-                              <span>{language === 'ar' ? 'مقفل لوجود حركات مسجلة' : 'Locked (Has transactions)'}</span>
-                            </span>
+                          {/* Code (if editing) */}
+                          {editingSupplier && (
+                            <div className="sm:col-span-2 space-y-0.5">
+                              <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_code')}</label>
+                              <div className="relative group">
+                                <Hash className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={13} />
+                                <input
+                                  required
+                                  readOnly
+                                  type="text"
+                                  className="w-full px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-lg font-mono text-xs font-bold text-slate-500 cursor-not-allowed ps-7"
+                                  value={editingSupplier.code}
+                                />
+                              </div>
+                            </div>
                           )}
+
+                          {/* Mobile */}
+                          <div className="space-y-0.5">
+                            <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {t('suppliers.form_mobile')} <span className="text-[9px] text-slate-400 font-normal">({language === 'ar' ? 'اختياري' : 'Optional'})</span>
+                            </label>
+                            <div className="relative group">
+                              <Phone className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={13} />
+                              <input
+                                type="tel"
+                                maxLength={11}
+                                placeholder="01234567890"
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-1 focus:ring-emerald-500 outline-none transition-all ps-7 font-mono"
+                                value={formData.mobile}
+                                onChange={(e) => {
+                                  const value = e.target.value.replace(/\D/g, '');
+                                  setFormData({ ...formData, mobile: value });
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Email */}
+                          <div className="space-y-0.5">
+                            <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_email')}</label>
+                            <div className="relative group">
+                              <Mail className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={13} />
+                              <input
+                                type="email"
+                                placeholder="supplier@example.com"
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-1 focus:ring-emerald-500 outline-none transition-all ps-7"
+                                value={formData.email}
+                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Tax Number */}
+                          <div className="space-y-0.5">
+                            <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_tax_number')}</label>
+                            <div className="relative group">
+                              <FileText className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={13} />
+                              <input
+                                type="text"
+                                placeholder={language === 'ar' ? 'الرقم الضريبي' : 'Tax Number'}
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-1 focus:ring-emerald-500 outline-none transition-all ps-7 dir-ltr font-mono"
+                                value={formData.tax_number || ''}
+                                onChange={(e) => setFormData({ ...formData, tax_number: e.target.value })}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Commercial Register */}
+                          <div className="space-y-0.5">
+                            <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'رقم السجل التجاري' : 'CR Number'}</label>
+                            <div className="relative group">
+                              <Building2 className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={13} />
+                              <input
+                                type="text"
+                                placeholder={language === 'ar' ? 'رقم السجل التجاري' : 'Commercial Register'}
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-1 focus:ring-emerald-500 outline-none transition-all ps-7 dir-ltr font-mono"
+                                value={formData.commercial_register || ''}
+                                onChange={(e) => setFormData({ ...formData, commercial_register: e.target.value })}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Address */}
+                          <div className="sm:col-span-2 space-y-0.5">
+                            <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_address')}</label>
+                            <div className="relative group">
+                              <MapPin className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={13} />
+                              <input
+                                placeholder="العنوان التفصيلي للمورد"
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-1 focus:ring-emerald-500 outline-none transition-all ps-7"
+                                value={formData.address}
+                                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Accounting Account */}
+                          <div className="sm:col-span-2 space-y-0.5">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <label className={`text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {isSupplierAccountLocked && <Lock size={11} className="text-amber-500" />}
+                                <span>{t('suppliers.form_account')}</span>
+                              </label>
+                              {isSupplierAccountLocked && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                  <Lock size={9} />
+                                  <span>{language === 'ar' ? 'مقفل لوجود حركات مسجلة' : 'Locked (Has transactions)'}</span>
+                                </span>
+                              )}
+                            </div>
+                            <div className="relative group">
+                              {isSupplierAccountLocked ? (
+                                <Lock className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-amber-500 pointer-events-none`} size={13} />
+                              ) : (
+                                <Box className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={13} />
+                              )}
+                              <select
+                                required
+                                disabled={isSupplierAccountLocked}
+                                className={`w-full px-2.5 py-1.5 border rounded-lg text-xs font-bold appearance-none outline-none transition-all ps-7 ${
+                                  isSupplierAccountLocked
+                                    ? 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed font-medium'
+                                    : 'bg-white border-slate-200 text-slate-900 shadow-xs focus:ring-1 focus:ring-emerald-500'
+                                }`}
+                                value={formData.account_id}
+                                onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
+                              >
+                                <option value="">{language === 'ar' ? 'اختر الحساب المحاسبي المرتبط...' : 'Select associated account...'}</option>
+                                {accounts.filter(a => a.account_usage === 'accounts_payable' || a.account_usage === 'supplier').map(account => (
+                                  <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                            {isSupplierAccountLocked && (
+                              <p className="text-[10px] font-medium text-amber-700 mt-1 flex items-center gap-1">
+                                <span>🔒</span>
+                                <span>{language === 'ar' ? 'لا يمكن تعديل الحساب المحاسبي بعد تسجيل فواتير أو سندات للمورد حفاظاً على مسار التدقيق.' : 'Linked account cannot be modified once transactions exist to preserve audit trail.'}</span>
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <div className="relative group">
-                          {isSupplierAccountLocked ? (
-                            <Lock className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-amber-500 pointer-events-none`} size={13} />
-                          ) : (
-                            <Box className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={13} />
-                          )}
-                          <select
-                            required
-                            disabled={isSupplierAccountLocked}
-                            className={`w-full px-2.5 py-1.5 border rounded-lg text-xs font-bold appearance-none outline-none transition-all ps-7 ${
-                              isSupplierAccountLocked
-                                ? 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed font-medium'
-                                : 'bg-slate-50 border-slate-200 text-slate-900 shadow-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500'
-                            }`}
-                            value={formData.account_id}
-                            onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
-                          >
-                            <option value="">{language === 'ar' ? 'اختر الحساب المحاسبي المرتبط...' : 'Select associated account...'}</option>
-                            {accounts.filter(a => a.account_usage === 'accounts_payable' || a.account_usage === 'supplier').map(account => (
-                              <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
-                            ))}
-                          </select>
-                        </div>
-                        {isSupplierAccountLocked && (
-                          <p className="text-[10px] font-medium text-amber-700 mt-1 flex items-center gap-1">
-                            <span>🔒</span>
-                            <span>{language === 'ar' ? 'لا يمكن تعديل الحساب المحاسبي بعد تسجيل فواتير أو سندات للمورد حفاظاً على مسار التدقيق.' : 'Linked account cannot be modified once transactions exist to preserve audit trail.'}</span>
-                          </p>
-                        )}
                       </div>
 
-                      {/* Opening Balance Subsection */}
-                      <div className="sm:col-span-2 lg:col-span-4 p-2.5 bg-slate-50/60 rounded-xl border border-slate-200/60 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <div>
-                          <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_opening_balance')}</label>
-                          <div className="relative group">
-                            <Wallet className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-emerald-500 pointer-events-none`} size={13} />
-                            <FormattedNumberInput
-                              className="w-full px-2.5 py-1.5 bg-white border border-emerald-200 rounded-lg text-xs font-black text-emerald-600 shadow-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none ps-7"
-                              value={formData.opening_balance}
-                              onChange={(val) => setFormData({ ...formData, opening_balance: val })}
-                            />
-                            <p className="text-[9px] font-medium text-slate-400 mt-0.5 px-1">
-                               {language === 'ar' 
-                                 ? 'الموجب (+) دائن للمورد بمال، والسالب (-) للمورد مال عندك.' 
-                                 : '(+) You credit supplier, (-) you owe supplier.'}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_balance_date')}</label>
-                          <div className="relative group">
-                            <Calendar className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={13} />
-                            <input
-                              type="date"
-                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 outline-none ps-7"
-                              value={formData.opening_balance_date}
-                              onChange={(e) => setFormData({ ...formData, opening_balance_date: e.target.value })}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Payment & Credit Settings Section */}
-                      <div className="sm:col-span-2 lg:col-span-4 p-2.5 bg-slate-50/60 rounded-xl border border-slate-200/60 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 bg-emerald-600/10 text-emerald-600 rounded-md flex items-center justify-center">
-                            <CreditCard size={13} />
-                          </div>
-                          <div>
-                            <h4 className="text-xs font-black text-slate-900 leading-none">
+                      {/* Column 2: Payment & Credit Settings, Opening Balance, Attachments */}
+                      <div className="space-y-3">
+                        {/* Payment & Credit Settings Section */}
+                        <div className="p-3 bg-slate-50/60 rounded-xl border border-slate-200/60 space-y-2">
+                          <div className="flex items-center gap-1.5 border-b border-slate-200/50 pb-1.5">
+                            <div className="w-5 h-5 bg-emerald-600/10 text-emerald-600 rounded flex items-center justify-center">
+                              <CreditCard size={12} />
+                            </div>
+                            <h4 className="text-xs font-bold text-slate-800 leading-none">
                               {language === 'ar' ? 'إعدادات السداد والائتمان' : 'Payment & Credit Settings'}
                             </h4>
                           </div>
-                        </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                          <div>
-                            <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              {language === 'ar' ? 'طريقة السداد الافتراضية' : 'Default Payment Method'}
-                            </label>
-                            <select
-                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
-                              value={formData.payment_method || 'credit'}
-                              onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
-                            >
-                              <option value="cash">{language === 'ar' ? 'نقدي' : 'Cash'}</option>
-                              <option value="credit">{language === 'ar' ? 'آجل' : 'Credit / Postpaid'}</option>
-                              <option value="installments">{language === 'ar' ? 'دفعات' : 'Installments'}</option>
-                              <option value="other">{language === 'ar' ? 'أخرى' : 'Other'}</option>
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              {language === 'ar' ? 'حد الائتمان' : 'Credit Limit'}
-                            </label>
-                            <FormattedNumberInput
-                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
-                              value={formData.credit_limit || 0}
-                              onChange={(val) => setFormData({ ...formData, credit_limit: val })}
-                            />
-                          </div>
-
-                          <div>
-                            <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              {language === 'ar' ? 'شروط السداد' : 'Payment Terms'}
-                            </label>
-                            <select
-                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
-                              value={formData.payment_terms || 'due_on_receipt'}
-                              onChange={(e) => {
-                                const term = e.target.value;
-                                let days = 0;
-                                let pct = 0;
-                                if (term === 'net_7') days = 7;
-                                else if (term === 'net_15') days = 15;
-                                else if (term === 'net_30') days = 30;
-                                else if (term === 'net_45') days = 45;
-                                else if (term === 'net_60') days = 60;
-                                else if (term === 'net_90') days = 90;
-                                else if (term === 'net_180') days = 180;
-                                else if (term === 'advance_50_50') pct = 50;
-                                else if (term === 'advance') pct = 100;
-
-                                setFormData({ 
-                                  ...formData, 
-                                  payment_terms: term,
-                                  payment_terms_days: days,
-                                  advance_percentage: pct
-                                });
-                              }}
-                            >
-                              <option value="cash">{language === 'ar' ? 'نقدي عند التسليم (Cash)' : 'Cash on Delivery'}</option>
-                              <option value="due_on_receipt">{language === 'ar' ? 'مستحق فور استلام الفاتورة' : 'Due on Receipt'}</option>
-                              <option value="net_7">{language === 'ar' ? 'خلال 7 أيام (Net 7)' : 'Net 7 Days'}</option>
-                              <option value="net_15">{language === 'ar' ? 'خلال 15 يوماً (Net 15)' : 'Net 15 Days'}</option>
-                              <option value="net_30">{language === 'ar' ? 'خلال 30 يوماً (Net 30)' : 'Net 30 Days'}</option>
-                              <option value="net_45">{language === 'ar' ? 'خلال 45 يوماً (Net 45)' : 'Net 45 Days'}</option>
-                              <option value="net_60">{language === 'ar' ? 'خلال 60 يوماً (Net 60)' : 'Net 60 Days'}</option>
-                              <option value="net_90">{language === 'ar' ? 'خلال 90 يوماً (Net 90)' : 'Net 90 Days'}</option>
-                              <option value="net_180">{language === 'ar' ? 'خلال 180 يوماً (Net 180)' : 'Net 180 Days'}</option>
-                              <option value="eom">{language === 'ar' ? 'نهاية الشهر (EOM)' : 'End of Month (EOM)'}</option>
-                              <option value="advance">{language === 'ar' ? 'دفعة مقدمة قبل التوريد' : 'Advance Payment'}</option>
-                              <option value="advance_50_50">{language === 'ar' ? '50% مقدم والباقي عند التسليم' : '50% Advance'}</option>
-                              <option value="custom">{language === 'ar' ? 'مخصص' : 'Custom'}</option>
-                            </select>
-                          </div>
-
-                          {formData.payment_terms === 'custom' && (
-                            <>
-                              <div>
-                                <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                  {language === 'ar' ? 'فترة السداد بالأيام' : 'Terms (Days)'}
-                                </label>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
-                                  value={formData.payment_terms_days || 0}
-                                  onChange={(e) => setFormData({ ...formData, payment_terms_days: Number(e.target.value) })}
-                                />
-                              </div>
-                              <div>
-                                <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                  {language === 'ar' ? 'نسبة الدفعة المقدمة %' : 'Advance %'}
-                                </label>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={100}
-                                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
-                                  value={formData.advance_percentage || 0}
-                                  onChange={(e) => setFormData({ ...formData, advance_percentage: Number(e.target.value) })}
-                                />
-                              </div>
-                            </>
-                          )}
-
-                        </div>
-                      </div>
-
-                      {formData.opening_balance !== 0 && (
-                        <div className="sm:col-span-2 lg:col-span-4 p-2.5 bg-slate-50/60 rounded-xl border border-slate-200/60 space-y-2 animate-in slide-in-from-bottom-2 duration-300">
-                           {(() => {
-                             const linkedJe = entries.find(e => 
-                               (e.reference_id === editingSupplier?.id || e.reference_number === editingSupplier?.code || e.description?.includes(formData.name)) && 
-                               e.reference_type === 'opening_balance'
-                             );
-                             return (
-                               <div className="flex items-center justify-between flex-wrap gap-2">
-                                 <div className="flex items-center gap-2">
-                                   <div className="w-6 h-6 bg-emerald-600 text-white rounded-md flex items-center justify-center shadow-xs">
-                                      <Wallet size={13} />
-                                   </div>
-                                   <h4 className="text-xs font-black text-slate-900">{language === 'ar' ? 'إعدادات الرصيد الافتتاحي' : 'Opening Balance Settings'}</h4>
-                                 </div>
-                                 {linkedJe?.entry_number && (
-                                   <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 border border-indigo-200 rounded-lg text-indigo-700 font-mono text-xs font-black shadow-xs">
-                                     <FileText size={13} className="text-indigo-600" />
-                                     <span>{language === 'ar' ? `رقم القيد: ${linkedJe.entry_number}` : `JE #: ${linkedJe.entry_number}`}</span>
-                                   </div>
-                                 )}
-                               </div>
-                             );
-                           })()}
-
-                           <div className="space-y-2">
-                              <div>
-                                <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_counter_account')}</label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                              <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {language === 'ar' ? 'طريقة السداد الافتراضية' : 'Default Payment Method'}
+                              </label>
+                              <div className="relative group">
+                                <Wallet className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={13} />
                                 <select
-                                  required
-                                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none"
-                                  value={formData.counter_account_id}
-                                  onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}
+                                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-1 focus:ring-emerald-500 outline-none ps-7"
+                                  value={formData.payment_method || 'credit'}
+                                  onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
                                 >
-                                  <option value="">{language === 'ar' ? 'اختر حساب الطرف الآخر...' : 'Select counter account...'}</option>
-                                  {accounts.filter(a => ['opening_balance', 'capital', 'equity', 'retained_earnings', 'other'].includes(a.account_usage || '')).map(account => (
-                                    <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
-                                  ))}
+                                  <option value="cash">{language === 'ar' ? 'نقدي' : 'Cash'}</option>
+                                  <option value="credit">{language === 'ar' ? 'آجل' : 'Credit / Postpaid'}</option>
+                                  <option value="installments">{language === 'ar' ? 'دفعات' : 'Installments'}</option>
+                                  <option value="other">{language === 'ar' ? 'أخرى' : 'Other'}</option>
                                 </select>
                               </div>
-                              {formData.counter_account_id && (() => {
-                                 let finalAccountId = formData.account_id;
-                                 let finalCounterAccountId = formData.counter_account_id;
+                            </div>
 
-                                 const account1 = accounts.find(a => a.id === finalAccountId);
-                                 const account2 = accounts.find(a => a.id === finalCounterAccountId);
+                            <div>
+                              <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {language === 'ar' ? 'حد الائتمان' : 'Credit Limit'}
+                              </label>
+                              <FormattedNumberInput
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-1 focus:ring-emerald-500 outline-none"
+                                value={formData.credit_limit || 0}
+                                onChange={(val) => setFormData({ ...formData, credit_limit: val })}
+                              />
+                            </div>
 
-                                 const isAccountSupplier = (acc: any) => acc && (acc.account_usage === 'accounts_payable' || acc.account_usage === 'supplier');
-                                 const isAccountOpening = (acc: any) => acc && (acc.name.includes('رصيد') || acc.name.includes('ميزانية') || acc.name.includes('رأس') || acc.name.includes('راس') || acc.code?.startsWith('3'));
+                            <div className="sm:col-span-2">
+                              <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                {language === 'ar' ? 'شروط السداد' : 'Payment Terms'}
+                              </label>
+                              <div className="relative group">
+                                <Calendar className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={13} />
+                                <select
+                                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-1 focus:ring-emerald-500 outline-none ps-7"
+                                  value={formData.payment_terms || 'due_on_receipt'}
+                                  onChange={(e) => {
+                                    const term = e.target.value;
+                                    let days = 0;
+                                    let pct = 0;
+                                    if (term === 'net_7') days = 7;
+                                    else if (term === 'net_15') days = 15;
+                                    else if (term === 'net_30') days = 30;
+                                    else if (term === 'net_45') days = 45;
+                                    else if (term === 'net_60') days = 60;
+                                    else if (term === 'net_90') days = 90;
+                                    else if (term === 'net_180') days = 180;
+                                    else if (term === 'advance_50_50') pct = 50;
+                                    else if (term === 'advance') pct = 100;
 
-                                 if (isAccountOpening(account1) && isAccountSupplier(account2)) {
-                                   finalAccountId = formData.counter_account_id;
-                                   finalCounterAccountId = formData.account_id;
-                                 }
+                                    setFormData({ 
+                                      ...formData, 
+                                      payment_terms: term,
+                                      payment_terms_days: days,
+                                      advance_percentage: pct
+                                    });
+                                  }}
+                                >
+                                  <option value="cash">{language === 'ar' ? 'نقدي عند التسليم (Cash)' : 'Cash on Delivery'}</option>
+                                  <option value="due_on_receipt">{language === 'ar' ? 'مستحق فور استلام الفاتورة' : 'Due on Receipt'}</option>
+                                  <option value="net_7">{language === 'ar' ? 'خلال 7 أيام (Net 7)' : 'Net 7 Days'}</option>
+                                  <option value="net_15">{language === 'ar' ? 'خلال 15 يوماً (Net 15)' : 'Net 15 Days'}</option>
+                                  <option value="net_30">{language === 'ar' ? 'خلال 30 يوماً (Net 30)' : 'Net 30 Days'}</option>
+                                  <option value="net_45">{language === 'ar' ? 'خلال 45 يوماً (Net 45)' : 'Net 45 Days'}</option>
+                                  <option value="net_60">{language === 'ar' ? 'خلال 60 يوماً (Net 60)' : 'Net 60 Days'}</option>
+                                  <option value="net_90">{language === 'ar' ? 'خلال 90 يوماً (Net 90)' : 'Net 90 Days'}</option>
+                                  <option value="net_180">{language === 'ar' ? 'خلال 180 يوماً (Net 180)' : 'Net 180 Days'}</option>
+                                  <option value="eom">{language === 'ar' ? 'نهاية الشهر (EOM)' : 'End of Month (EOM)'}</option>
+                                  <option value="advance">{language === 'ar' ? 'دفعة مقدمة قبل التوريد' : 'Advance Payment'}</option>
+                                  <option value="advance_50_50">{language === 'ar' ? '50% مقدم والباقي عند التسليم' : '50% Advance'}</option>
+                                  <option value="custom">{language === 'ar' ? 'مخصص' : 'Custom'}</option>
+                                </select>
+                              </div>
+                            </div>
 
-                                 const supplierAccount = accounts.find(a => a.id === finalAccountId);
-                                 const counterAccount = accounts.find(a => a.id === finalCounterAccountId);
-
-                                  const linkedJe = entries.find(e => 
-                                    (e.reference_id === editingSupplier?.id || e.reference_number === editingSupplier?.code || e.description?.includes(formData.name)) && 
-                                    e.reference_type === 'opening_balance'
-                                  );
-
-                                  return (
-                                    <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-xs">
-                                       <JournalEntryPreview 
-                                         title={language === 'ar' ? 'معاينة قيد الرصيد' : 'Entry Preview'}
-                                         entry_number={linkedJe?.entry_number}
-                                         items={[
-                                           {
-                                             account_code: supplierAccount?.code || '',
-                                             account_name: supplierAccount?.name || '',
-                                             debit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
-                                             credit: formData.opening_balance > 0 ? formData.opening_balance : 0,
-                                             description: language === 'ar' ? `رصيد أول: ${formData.name}` : `Opening: ${formData.name}`
-                                           },
-                                           {
-                                             account_code: counterAccount?.code || '',
-                                             account_name: counterAccount?.name || '',
-                                             debit: formData.opening_balance > 0 ? formData.opening_balance : 0,
-                                             credit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
-                                             description: language === 'ar' ? `الطرف المقابل: ${formData.name}` : `Counter: ${formData.name}`
-                                           }
-                                         ]}
-                                       />
-                                    </div>
-                                  );
-                              })()}
-                           </div>
+                            {formData.payment_terms === 'custom' && (
+                              <>
+                                <div>
+                                  <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                    {language === 'ar' ? 'فترة السداد بالأيام' : 'Terms (Days)'}
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-1 focus:ring-emerald-500 outline-none"
+                                    value={formData.payment_terms_days || 0}
+                                    onChange={(e) => setFormData({ ...formData, payment_terms_days: Number(e.target.value) })}
+                                  />
+                                </div>
+                                <div>
+                                  <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                    {language === 'ar' ? 'نسبة الدفعة المقدمة %' : 'Advance %'}
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-1 focus:ring-emerald-500 outline-none"
+                                    value={formData.advance_percentage || 0}
+                                    onChange={(e) => setFormData({ ...formData, advance_percentage: Number(e.target.value) })}
+                                  />
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </div>
-                      )}
-                    </div>
 
-                    {/* Supplier General Attachments Section */}
-                    <div className="p-2.5 bg-slate-50/60 rounded-xl border border-slate-200/60 space-y-2">
-                      <AttachmentsManager
-                        title={language === 'ar' ? 'المستندات والمرفقات العامة للمورد' : 'General Documents & Attachments'}
-                        subtitle={language === 'ar' ? 'يمكن إرفاق صورة السجل التجاري، البطاقة الضريبية، العقود أو أي مستند' : 'Attach CR, Tax Card, contracts, or any documents'}
-                        attachments={formData.attachments}
-                        onChange={(attachments) => setFormData({ ...formData, attachments })}
-                      />
+                        {/* Financial & Opening Balance Section */}
+                        <div className="p-3 bg-slate-50/60 rounded-xl border border-slate-200/60 space-y-2">
+                          {(() => {
+                            const linkedJe = editingSupplier?.id ? entries.find(e => 
+                              (e.reference_id === editingSupplier.id || (editingSupplier.code && e.reference_number === editingSupplier.code)) && 
+                              e.reference_type === 'opening_balance'
+                            ) : null;
+                            return (
+                              <div className="flex items-center justify-between border-b border-slate-200/50 pb-1.5 flex-wrap gap-2">
+                                <div className="flex items-center gap-1.5">
+                                  <div className="w-5 h-5 bg-emerald-600/10 text-emerald-700 rounded flex items-center justify-center">
+                                    <Wallet size={12} />
+                                  </div>
+                                  <h4 className="text-xs font-bold text-slate-800 leading-none">
+                                    {language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}
+                                  </h4>
+                                </div>
+                                {linkedJe?.entry_number && (
+                                  <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 border border-indigo-200 rounded-lg text-indigo-700 font-mono text-xs font-black shadow-xs">
+                                    <FileText size={13} className="text-indigo-600" />
+                                    <span>{language === 'ar' ? `رقم القيد: ${linkedJe.entry_number}` : `JE #: ${linkedJe.entry_number}`}</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                              <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_opening_balance')}</label>
+                              <div className="relative group">
+                                <Wallet className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-emerald-500 pointer-events-none`} size={13} />
+                                <FormattedNumberInput
+                                  className="w-full px-2.5 py-1.5 bg-white border border-emerald-200 rounded-lg text-xs font-black text-emerald-600 shadow-xs focus:ring-1 focus:ring-emerald-500 outline-none ps-7"
+                                  value={formData.opening_balance}
+                                  onChange={(val) => setFormData({ ...formData, opening_balance: val })}
+                                />
+                              </div>
+                              <p className="text-[9px] font-medium text-slate-400 mt-0.5 px-1">
+                                {language === 'ar' 
+                                  ? 'الموجب (+) دائن للمورد بمال، والسالب (-) للمورد مال عندك.' 
+                                  : '(+) You credit supplier, (-) you owe supplier.'}
+                              </p>
+                            </div>
+
+                            <div>
+                              <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_balance_date')}</label>
+                              <div className="relative group">
+                                <Calendar className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={13} />
+                                <input
+                                  type="date"
+                                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-1 focus:ring-slate-500 outline-none ps-7"
+                                  value={formData.opening_balance_date}
+                                  onChange={(e) => setFormData({ ...formData, opening_balance_date: e.target.value })}
+                                />
+                              </div>
+                            </div>
+
+                            {formData.opening_balance !== 0 && (
+                              <div className="sm:col-span-2 space-y-0.5">
+                                <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_counter_account')}</label>
+                                <div className="relative group">
+                                  <Plus className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 pointer-events-none`} size={13} />
+                                  <select
+                                    required
+                                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-1 focus:ring-emerald-500 outline-none ps-7"
+                                    value={formData.counter_account_id}
+                                    onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}
+                                  >
+                                    <option value="">{language === 'ar' ? 'اختر حساب الطرف الآخر...' : 'Select counter account...'}</option>
+                                    {accounts.filter(a => ['opening_balance', 'capital', 'equity', 'retained_earnings', 'other'].includes(a.account_usage || '')).map(account => (
+                                      <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {formData.opening_balance !== 0 && formData.counter_account_id && (() => {
+                            let finalAccountId = formData.account_id;
+                            let finalCounterAccountId = formData.counter_account_id;
+
+                            const account1 = accounts.find(a => a.id === finalAccountId);
+                            const account2 = accounts.find(a => a.id === finalCounterAccountId);
+
+                            const isAccountSupplier = (acc: any) => acc && (acc.account_usage === 'accounts_payable' || acc.account_usage === 'supplier');
+                            const isAccountOpening = (acc: any) => acc && (acc.name.includes('رصيد') || acc.name.includes('ميزانية') || acc.name.includes('رأس') || acc.name.includes('راس') || acc.code?.startsWith('3'));
+
+                            if (isAccountOpening(account1) && isAccountSupplier(account2)) {
+                              finalAccountId = formData.counter_account_id;
+                              finalCounterAccountId = formData.account_id;
+                            }
+
+                            const supplierAccount = accounts.find(a => a.id === finalAccountId);
+                            const counterAccount = accounts.find(a => a.id === finalCounterAccountId);
+
+                            const linkedJe = editingSupplier?.id ? entries.find(e => 
+                              (e.reference_id === editingSupplier.id || (editingSupplier.code && e.reference_number === editingSupplier.code)) && 
+                              e.reference_type === 'opening_balance'
+                            ) : null;
+
+                            return (
+                              <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-xs">
+                                <JournalEntryPreview 
+                                  title={language === 'ar' ? 'معاينة قيد الرصيد' : 'Entry Preview'}
+                                  entry_number={linkedJe?.entry_number}
+                                  items={[
+                                    {
+                                      account_code: supplierAccount?.code || '',
+                                      account_name: supplierAccount?.name || '',
+                                      debit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
+                                      credit: formData.opening_balance > 0 ? formData.opening_balance : 0,
+                                      description: language === 'ar' ? `رصيد أول: ${formData.name}` : `Opening: ${formData.name}`
+                                    },
+                                    {
+                                      account_code: counterAccount?.code || '',
+                                      account_name: counterAccount?.name || '',
+                                      debit: formData.opening_balance > 0 ? formData.opening_balance : 0,
+                                      credit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
+                                      description: language === 'ar' ? `الطرف المقابل: ${formData.name}` : `Counter: ${formData.name}`
+                                    }
+                                  ]}
+                                />
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        {/* Supplier General Attachments Section */}
+                        <div className="p-3 bg-slate-50/60 rounded-xl border border-slate-200/60 space-y-2">
+                          <AttachmentsManager
+                            title={language === 'ar' ? 'المستندات والمرفقات العامة للمورد' : 'General Documents & Attachments'}
+                            subtitle={language === 'ar' ? 'يمكن إرفاق صورة السجل التجاري، البطاقة الضريبية، العقود أو أي مستند' : 'Attach CR, Tax Card, contracts, or any documents'}
+                            attachments={formData.attachments}
+                            onChange={(attachments) => setFormData({ ...formData, attachments })}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
