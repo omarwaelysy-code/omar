@@ -73,6 +73,35 @@ export const Accounts: React.FC = () => {
     }
   };
 
+  const getAccountTypeDisplay = (name?: string) => {
+    if (!name || language === 'ar') return name || '';
+    const map: Record<string, string> = {
+      'الأصول': 'Assets',
+      'أصول': 'Assets',
+      'الالتزامات': 'Liabilities',
+      'التزامات': 'Liabilities',
+      'حقوق ملكية': 'Equity',
+      'حقوق الملكية': 'Equity',
+      'ايراد': 'Revenue',
+      'إيراد': 'Revenue',
+      'إيرادات': 'Revenues',
+      'ايرادات': 'Revenues',
+      'تكلفة': 'Cost of Sales',
+      'تكلفة المبيعات': 'Cost of Sales',
+      'مصروفات': 'Expenses',
+      'مصاريف': 'Expenses',
+      'أصول متداولة': 'Current Assets',
+      'الأصول المتداولة': 'Current Assets',
+      'أصول غير متداولة': 'Non-Current Assets',
+      'الأصول غير المتداولة': 'Non-Current Assets',
+      'الالتزامات المتداولة': 'Current Liabilities',
+      'التزامات متداولة': 'Current Liabilities',
+      'الالتزامات غير المتداولة': 'Non-Current Liabilities',
+      'التزامات غير متداولة': 'Non-Current Liabilities'
+    };
+    return map[name.trim()] || name;
+  };
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (usageDropdownRef.current && !usageDropdownRef.current.contains(event.target as Node)) {
@@ -266,7 +295,7 @@ export const Accounts: React.FC = () => {
           opening_balance: 0,
           opening_balance_date: new Date().toISOString().slice(0, 10),
           counter_account_id: '',
-          required_sub_account: result.name?.toLowerCase().includes('عملاء') || result.name?.toLowerCase().includes('موردين') || false,
+          required_sub_account: result.name?.toLowerCase().includes('عملاء') || result.name?.toLowerCase().includes('موردين') || result.name?.toLowerCase().includes('customer') || result.name?.toLowerCase().includes('supplier') || false,
           parent_id: '',
           is_active: true,
           account_usage: ''
@@ -325,28 +354,28 @@ export const Accounts: React.FC = () => {
       let id = '';
       if (editingAccount) {
         const fieldsToTrack = [
-          { field: 'code', label: 'الكود' },
-          { field: 'name', label: 'الاسم' },
-          { field: 'type_id', label: 'نوع الحساب' },
-          { field: 'required_sub_account', label: 'يلزم حساب فرعي' },
-          { field: 'is_active', label: 'نشط' },
-          { field: 'account_usage', label: 'استخدام الحساب' }
+          { field: 'code', label: language === 'ar' ? 'الكود' : 'Code' },
+          { field: 'name', label: language === 'ar' ? 'الاسم' : 'Name' },
+          { field: 'type_id', label: language === 'ar' ? 'نوع الحساب' : 'Account Type' },
+          { field: 'required_sub_account', label: language === 'ar' ? 'يلزم حساب فرعي' : 'Requires Sub-Account' },
+          { field: 'is_active', label: language === 'ar' ? 'نشط' : 'Active' },
+          { field: 'account_usage', label: language === 'ar' ? 'استخدام الحساب' : 'Account Usage' }
         ];
         await dbService.updateWithLog(
           'accounts',
           editingAccount.id,
           accountData,
           { id: user.id, username: user.username, company_id: user.company_id },
-          'تعديل حساب',
+          language === 'ar' ? 'تعديل حساب' : 'Edit Account',
           'accounts',
           fieldsToTrack
         );
         id = editingAccount.id;
-        showNotification('تم تحديث بيانات الحساب بنجاح', 'success');
+        showNotification(language === 'ar' ? 'تم تحديث بيانات الحساب بنجاح' : 'Account updated successfully', 'success');
       } else {
         id = await dbService.add('accounts', accountData);
-        await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة حساب', `إضافة حساب جديد: ${formData.name}`, 'accounts', id);
-        showNotification('تم إضافة الحساب بنجاح', 'success');
+        await dbService.logActivity(user.id, user.username, user.company_id, language === 'ar' ? 'إضافة حساب' : 'Add Account', `${language === 'ar' ? 'إضافة حساب جديد' : 'Added new account'}: ${formData.name}`, 'accounts', id);
+        showNotification(language === 'ar' ? 'تم إضافة الحساب بنجاح' : 'Account added successfully', 'success');
       }
 
       // Handle automatic opening balance journal entry
@@ -361,7 +390,7 @@ export const Accounts: React.FC = () => {
           await dbService.add('journal_entries', {
             company_id: user.company_id,
             date: formData.opening_balance_date || new Date().toISOString().slice(0, 10),
-            description: `رصيد افتتاحي لحساب: ${formData.name}`,
+            description: language === 'ar' ? `رصيد افتتاحي لحساب: ${formData.name}` : `Opening balance for account: ${formData.name}`,
             reference_id: id,
             reference_type: 'opening_balance',
             items: [
@@ -370,14 +399,14 @@ export const Accounts: React.FC = () => {
                 account_name: formData.name,
                 debit: isNegative ? 0 : absBalance,
                 credit: isNegative ? absBalance : 0,
-                description: `رصيد افتتاحي: ${formData.name}`
+                description: language === 'ar' ? `رصيد افتتاحي: ${formData.name}` : `Opening balance: ${formData.name}`
               },
               {
                 account_id: counterAcc.id,
                 account_name: counterAcc.name,
                 debit: isNegative ? absBalance : 0,
                 credit: isNegative ? 0 : absBalance,
-                description: `الطرف المقابل للرصيد الافتتاحي: ${formData.name}`
+                description: language === 'ar' ? `الطرف المقابل للرصيد الافتتاحي: ${formData.name}` : `Counter-entry for opening balance: ${formData.name}`
               }
             ],
             total_debit: absBalance,
@@ -393,7 +422,7 @@ export const Accounts: React.FC = () => {
       closeModal();
     } catch (e) {
       console.error(e);
-      showNotification('حدث خطأ أثناء حفظ البيانات', 'error');
+      showNotification(language === 'ar' ? 'حدث خطأ أثناء حفظ البيانات' : 'An error occurred while saving data', 'error');
     }
   };
 
@@ -413,7 +442,7 @@ export const Accounts: React.FC = () => {
     if (!account) return;
 
     if (isDefaultAccount(account)) {
-      showNotification('لا يمكن حذف هذا الحساب لأنه حساب افتراضي معتمد ومحمي من الحذف.', 'error');
+      showNotification(language === 'ar' ? 'لا يمكن حذف هذا الحساب لأنه حساب افتراضي معتمد ومحمي من الحذف.' : 'Cannot delete this account because it is a protected default system account.', 'error');
       return;
     }
 
@@ -469,13 +498,13 @@ export const Accounts: React.FC = () => {
       }
 
       await dbService.delete('accounts', accountToDelete);
-      await dbService.logActivity(user.id, user.username, user.company_id, 'حذف حساب', `حذف الحساب: ${account?.name}`, 'accounts', accountToDelete);
+      await dbService.logActivity(user.id, user.username, user.company_id, language === 'ar' ? 'حذف حساب' : 'Delete Account', `${language === 'ar' ? 'حذف الحساب' : 'Deleted account'}: ${account?.name}`, 'accounts', accountToDelete);
       setIsDeleteModalOpen(false);
       setAccountToDelete(null);
-      showNotification('تم حذف الحساب بنجاح', 'success');
+      showNotification(language === 'ar' ? 'تم حذف الحساب بنجاح' : 'Account deleted successfully', 'success');
     } catch (e: any) {
       console.error(e);
-      showNotification(e?.message || 'حدث خطأ أثناء الحذف', 'error');
+      showNotification(e?.message || (language === 'ar' ? 'حدث خطأ أثناء الحذف' : 'An error occurred during deletion'), 'error');
     }
   };
 
@@ -632,7 +661,7 @@ export const Accounts: React.FC = () => {
             type="button"
             onClick={() => setView('card')} 
             className={`p-1.5 rounded-lg transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-xs' : 'text-slate-400 hover:text-slate-700'}`}
-            title="عرض كروت"
+            title={language === 'ar' ? 'عرض كروت' : 'Card View'}
           >
             <LayoutGrid size={16} />
           </button>
@@ -640,7 +669,7 @@ export const Accounts: React.FC = () => {
             type="button"
             onClick={() => setView('table')} 
             className={`p-1.5 rounded-lg transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-xs' : 'text-slate-400 hover:text-slate-700'}`}
-            title="عرض جدول"
+            title={language === 'ar' ? 'عرض جدول' : 'Table View'}
           >
             <List size={16} />
           </button>
@@ -654,20 +683,20 @@ export const Accounts: React.FC = () => {
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold whitespace-nowrap">
                   <th className="py-1.5 px-1.5 w-7 text-center text-slate-400">#</th>
-                  <th className="py-1.5 px-1.5 w-20">كود الحساب</th>
-                  <th className="py-1.5 px-2 min-w-[130px]">اسم الحساب</th>
-                  <th className="py-1.5 px-1.5 w-16 text-center text-slate-800">كود النوع</th>
-                  <th className="py-1.5 px-1.5 min-w-[100px]">نوع الحساب</th>
-                  <th className="py-1.5 px-1.5 w-24 text-center">تابع لـ (القائمة)</th>
-                  <th className="py-1.5 px-1.5 w-20 text-center">التصنيف</th>
-                  <th className="py-1.5 px-1.5 min-w-[95px]">استخدام الحساب</th>
-                  <th className="py-1.5 px-1.5 min-w-[100px]">الحساب الأب</th>
-                  <th className="py-1.5 px-1.5 w-24 text-center">الرصيد الافتتاحي</th>
-                  <th className="py-1.5 px-1.5 w-20 text-center">تاريخ الرصيد</th>
-                  <th className="py-1.5 px-1.5 w-24 text-center">الرصيد الحالي</th>
-                  <th className="py-1.5 px-1 w-12 text-center">فرعي</th>
-                  <th className="py-1.5 px-1 w-12 text-center">الحالة</th>
-                  <th className="py-1.5 px-1 w-16 text-center no-pdf">الإجراءات</th>
+                  <th className="py-1.5 px-1.5 w-20">{language === 'ar' ? 'كود الحساب' : 'Account Code'}</th>
+                  <th className="py-1.5 px-2 min-w-[130px]">{language === 'ar' ? 'اسم الحساب' : 'Account Name'}</th>
+                  <th className="py-1.5 px-1.5 w-16 text-center text-slate-800">{language === 'ar' ? 'كود النوع' : 'Type Code'}</th>
+                  <th className="py-1.5 px-1.5 min-w-[100px]">{language === 'ar' ? 'نوع الحساب' : 'Account Type'}</th>
+                  <th className="py-1.5 px-1.5 w-24 text-center">{language === 'ar' ? 'تابع لـ (القائمة)' : 'Statement'}</th>
+                  <th className="py-1.5 px-1.5 w-20 text-center">{language === 'ar' ? 'التصنيف' : 'Classification'}</th>
+                  <th className="py-1.5 px-1.5 min-w-[95px]">{language === 'ar' ? 'استخدام الحساب' : 'Account Usage'}</th>
+                  <th className="py-1.5 px-1.5 min-w-[100px]">{language === 'ar' ? 'الحساب الأب' : 'Parent Account'}</th>
+                  <th className="py-1.5 px-1.5 w-24 text-center">{language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}</th>
+                  <th className="py-1.5 px-1.5 w-20 text-center">{language === 'ar' ? 'تاريخ الرصيد' : 'Opening Date'}</th>
+                  <th className="py-1.5 px-1.5 w-24 text-center">{language === 'ar' ? 'الرصيد الحالي' : 'Current Balance'}</th>
+                  <th className="py-1.5 px-1 w-12 text-center">{language === 'ar' ? 'فرعي' : 'Sub'}</th>
+                  <th className="py-1.5 px-1 w-12 text-center">{language === 'ar' ? 'الحالة' : 'Status'}</th>
+                  <th className="py-1.5 px-1 w-16 text-center no-pdf">{language === 'ar' ? 'الإجراءات' : 'Actions'}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
@@ -712,9 +741,9 @@ export const Accounts: React.FC = () => {
                           setCurrentPage('account_types');
                         }}
                         className="py-0.5 px-1.5 text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer font-bold whitespace-nowrap text-xs"
-                        title="انتقل إلى أنواع الحسابات"
+                        title={language === 'ar' ? 'انتقل إلى أنواع الحسابات' : 'Go to Account Types'}
                       >
-                        {type ? type.name : (account.type_name || '-')}
+                        {type ? getAccountTypeDisplay(type.name) : (getAccountTypeDisplay(account.type_name) || '-')}
                       </td>
 
                       {/* 5. Statement Type */}
@@ -725,7 +754,9 @@ export const Accounts: React.FC = () => {
                               ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
                               : 'bg-purple-50 text-purple-700 border border-purple-200/60'
                           }`}>
-                            {type.statement_type === 'balance_sheet' ? 'الميزانية العمومية' : 'قائمة الدخل'}
+                            {type.statement_type === 'balance_sheet' 
+                              ? (language === 'ar' ? 'الميزانية العمومية' : 'Balance Sheet') 
+                              : (language === 'ar' ? 'قائمة الدخل' : 'Income Statement')}
                           </span>
                         ) : (
                           <span className="text-slate-300">-</span>
@@ -772,7 +803,7 @@ export const Accounts: React.FC = () => {
                         </span>
                         {opening !== 0 && (
                           <span className="text-[8.5px] text-slate-400 mr-1">
-                            ({isOpeningDebit ? 'مدين' : 'دائن'})
+                            ({isOpeningDebit ? (language === 'ar' ? 'مدين' : 'Debit') : (language === 'ar' ? 'دائن' : 'Credit')})
                           </span>
                         )}
                       </td>
@@ -792,7 +823,9 @@ export const Accounts: React.FC = () => {
                       {/* 12. Required Sub Account */}
                       <td className="py-0.5 px-1 text-center whitespace-nowrap">
                         {account.required_sub_account ? (
-                          <span className="inline-flex px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-amber-50 text-amber-700 border border-amber-200/60">نعم</span>
+                          <span className="inline-flex px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-amber-50 text-amber-700 border border-amber-200/60">
+                            {language === 'ar' ? 'نعم' : 'Yes'}
+                          </span>
                         ) : (
                           <span className="text-slate-300">-</span>
                         )}
@@ -805,7 +838,7 @@ export const Accounts: React.FC = () => {
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60' 
                             : 'bg-slate-100 text-slate-500 border-slate-200'
                         }`}>
-                          {account.is_active !== false ? 'نشط' : 'معطل'}
+                          {account.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'معطل' : 'Disabled')}
                         </span>
                       </td>
 
@@ -834,7 +867,7 @@ export const Accounts: React.FC = () => {
                             <Edit2 size={14} />
                           </button>
                           {isDefaultAccount(account) ? (
-                            <span className="p-1 text-amber-500" title="حساب افتراضي محمي من الحذف">
+                            <span className="p-1 text-amber-500" title={language === 'ar' ? 'حساب افتراضي محمي من الحذف' : 'Default account protected from deletion'}>
                               <Lock size={14} />
                             </span>
                           ) : (
@@ -844,7 +877,7 @@ export const Accounts: React.FC = () => {
                                 handleDelete(account.id);
                               }}
                               className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                              title="حذف الحساب"
+                              title={language === 'ar' ? 'حذف الحساب' : 'Delete Account'}
                             >
                               <Trash2 size={14} />
                             </button>
@@ -883,7 +916,7 @@ export const Accounts: React.FC = () => {
                             }}
                             className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md uppercase tracking-wider cursor-pointer hover:bg-emerald-100 transition-colors"
                           >
-                            {type?.name || account.type_name || '-'}
+                            {type ? getAccountTypeDisplay(type.name) : (getAccountTypeDisplay(account.type_name) || '-')}
                           </span>
                       <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${account.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
                         {account.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
@@ -906,15 +939,15 @@ export const Accounts: React.FC = () => {
                 >
                   <History size={16} />
                 </button>
-                <button onClick={() => openModal(account)} className="p-2 text-slate-300 hover:text-sky-600 hover:bg-sky-50 rounded-xl transition-all">
+                <button onClick={() => openModal(account)} className="p-2 text-slate-300 hover:text-sky-600 hover:bg-sky-50 rounded-xl transition-all" title={language === 'ar' ? 'تعديل الحساب' : 'Edit Account'}>
                   <Edit2 size={16} />
                 </button>
                 {isDefaultAccount(account) ? (
-                  <span className="p-2 text-slate-300" title="حساب افتراضي محمي من الحذف">
+                  <span className="p-2 text-slate-300" title={language === 'ar' ? 'حساب افتراضي محمي من الحذف' : 'Default account protected from deletion'}>
                     <Lock size={16} />
                   </span>
                 ) : (
-                  <button onClick={() => handleDelete(account.id)} className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all" title="حذف الحساب">
+                  <button onClick={() => handleDelete(account.id)} className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all" title={language === 'ar' ? 'حذف الحساب' : 'Delete Account'}>
                     <Trash2 size={16} />
                   </button>
                 )}
@@ -1077,15 +1110,15 @@ export const Accounts: React.FC = () => {
                         <div className="mt-2.5 p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs animate-in fade-in duration-200">
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                             <div>
-                              <span className="text-[10px] font-bold text-slate-400 block">اسم النوع:</span>
-                              <span className="font-black text-slate-800 text-xs">{selectedType.name}</span>
+                              <span className="text-[10px] font-bold text-slate-400 block">{language === 'ar' ? 'اسم النوع:' : 'Type Name:'}</span>
+                              <span className="font-black text-slate-800 text-xs">{getAccountTypeDisplay(selectedType.name)}</span>
                             </div>
                             <div>
-                              <span className="text-[10px] font-bold text-slate-400 block">كود النوع:</span>
+                              <span className="text-[10px] font-bold text-slate-400 block">{language === 'ar' ? 'كود النوع:' : 'Type Code:'}</span>
                               <span className="font-mono font-black text-emerald-700 text-xs">{selectedType.code}</span>
                             </div>
                             <div>
-                              <span className="text-[10px] font-bold text-slate-400 block">تابع لـ:</span>
+                              <span className="text-[10px] font-bold text-slate-400 block">{language === 'ar' ? 'تابع لـ:' : 'Statement:'}</span>
                               <span className="font-black text-indigo-700 text-xs">
                                 {selectedType.statement_type === 'balance_sheet' 
                                   ? (language === 'ar' ? 'الميزانية العمومية' : 'Balance Sheet') 
@@ -1093,7 +1126,7 @@ export const Accounts: React.FC = () => {
                               </span>
                             </div>
                             <div>
-                              <span className="text-[10px] font-bold text-slate-400 block">التصنيف:</span>
+                              <span className="text-[10px] font-bold text-slate-400 block">{language === 'ar' ? 'التصنيف:' : 'Classification:'}</span>
                               <span className="font-black text-emerald-800 text-xs">
                                 {getClassificationLabel(selectedType.classification)}
                               </span>
@@ -1318,17 +1351,17 @@ export const Accounts: React.FC = () => {
                                 items={[
                                   {
                                     account_code: formData.code,
-                                    account_name: formData.name || 'هذا الحساب',
+                                    account_name: formData.name || (language === 'ar' ? 'هذا الحساب' : 'This Account'),
                                     debit: formData.opening_balance > 0 ? formData.opening_balance : 0,
                                     credit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
-                                    description: `رصيد افتتاحي: ${formData.name}`
+                                    description: language === 'ar' ? `رصيد افتتاحي: ${formData.name}` : `Opening balance: ${formData.name}`
                                   },
                                   {
                                     account_code: accCounter?.code || '',
                                     account_name: accCounter?.name || '',
                                     debit: formData.opening_balance < 0 ? Math.abs(formData.opening_balance) : 0,
                                     credit: formData.opening_balance > 0 ? formData.opening_balance : 0,
-                                    description: `الطرف المقابل: ${formData.name}`
+                                    description: language === 'ar' ? `الطرف المقابل: ${formData.name}` : `Counterparty: ${formData.name}`
                                   }
                                 ]}
                               />
