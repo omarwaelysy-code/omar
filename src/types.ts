@@ -26,6 +26,7 @@ export interface ContactMessage {
 export interface MailUser {
   id: string;
   name: string;
+  username?: string;
   email?: string;
   role?: string;
 }
