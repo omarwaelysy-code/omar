@@ -2492,12 +2492,23 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         let docTotal = 0;
         if (cfg.table && cfg.table !== 'journal_entries') {
           try {
-            const hasRate = EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate');
-            const rateExpr = hasRate ? 'COALESCE("exchange_rate", 1)' : '1';
+            let docAmtCol = '0';
+            if (cfg.amountCol && cfg.amountCol !== '0') {
+              if (cfg.table === 'cash_transfers') {
+                docAmtCol = `COALESCE(SUM(
+                  CASE 
+                    WHEN from_currency = 'EGP' THEN amount
+                    WHEN to_currency = 'EGP' THEN COALESCE(converted_amount, amount * COALESCE(exchange_rate, 1))
+                    ELSE amount * COALESCE(exchange_rate, 1)
+                  END
+                ), 0)`;
+              } else {
+                const hasRate = EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate');
+                const rateExpr = hasRate ? 'COALESCE("exchange_rate", 1)' : '1';
+                docAmtCol = `COALESCE(SUM(("${cfg.amountCol}") * ${rateExpr}), 0)`;
+              }
+            }
             const docFilterSql = cfg.docFilter ? `AND ${cfg.docFilter}` : '';
-            const docAmtCol = (cfg.amountCol && cfg.amountCol !== '0')
-              ? `COALESCE(SUM(("${cfg.amountCol}") * ${rateExpr}), 0)`
-              : '0';
             const docRes: any = await client.query(
               `SELECT COUNT(*)::int as cnt, ${docAmtCol}::numeric as tot
                FROM "${cfg.table}"
@@ -2547,15 +2558,29 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         // 3. Check for any unposted documents in the primary table (if applicable)
         if (cfg.table && cfg.numCol && cfg.table !== 'journal_entries') {
           try {
-            const hasRate = EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate');
-            const rateExpr = hasRate ? 'COALESCE(d."exchange_rate", 1)' : '1';
+            let docAmtExpr = '0';
+            if (cfg.amountCol !== '0') {
+              if (cfg.table === 'cash_transfers') {
+                docAmtExpr = `(
+                  CASE 
+                    WHEN d.from_currency = 'EGP' THEN d.amount
+                    WHEN d.to_currency = 'EGP' THEN COALESCE(d.converted_amount, d.amount * COALESCE(d.exchange_rate, 1))
+                    ELSE d.amount * COALESCE(d.exchange_rate, 1)
+                  END
+                )`;
+              } else {
+                const hasRate = EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate');
+                const rateExpr = hasRate ? 'COALESCE(d."exchange_rate", 1)' : '1';
+                docAmtExpr = `(d."${cfg.amountCol}" * ${rateExpr})`;
+              }
+            }
             const amountFilter = (cfg.amountCol && cfg.amountCol !== '0')
               ? `AND ABS(COALESCE(d."${cfg.amountCol}"::numeric, 0)) > 0.001`
               : '';
             const docFilter = cfg.docFilter ? `AND d.${cfg.docFilter}` : '';
             const unpostedRes: any = await client.query(
               `SELECT d.id, d."${cfg.numCol}" as doc_num, d."${cfg.dateCol}" as doc_date, 
-                      ${cfg.amountCol !== '0' ? `(d."${cfg.amountCol}" * ${rateExpr})` : '0'} as doc_amt, 
+                      ${docAmtExpr} as doc_amt, 
                       ${cfg.partyCol ? `d."${cfg.partyCol}"` : `''`} as party
                FROM "${cfg.table}" d
                WHERE d.company_id = $1
