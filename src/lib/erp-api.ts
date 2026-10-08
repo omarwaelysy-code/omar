@@ -2486,11 +2486,6 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         let missingAccountsCount = 0;
         const issues: any[] = [];
 
-        const placeholders = cfg.refTypes.map((_: any, i: number) => `$${i + 2}`).join(',');
-        let whereJe = `company_id = $1 AND (reference_type IN (${placeholders}) ${cfg.isManualJE ? 'OR reference_type IS NULL' : ''})`;
-        if (cfg.jeFilter) {
-          whereJe += ` AND (${cfg.jeFilter})`;
-        }
 
         // 1. Query source document table directly to audit source documents vs journal entries
         let docCount = 0;
