@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Plus, Trash2, X, Wallet, History, ChevronRight, ChevronLeft, 
-  Layers, Hash, Box, AlertCircle, LayoutGrid, List, FileText, Lock
+  Layers, Hash, Box, AlertCircle, LayoutGrid, List, FileText, Lock, FileUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNotification } from '../contexts/NotificationContext';
@@ -11,6 +11,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { ExpenseCategory, Account } from '../types';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
+import { ExportButtons } from '../components/ExportButtons';
+import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
+import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
+import { ExcelImportWizard } from '../components/ExcelImportWizard';
 
 export const Expenses: React.FC = () => {
   const { user } = useAuth();
@@ -22,6 +26,9 @@ export const Expenses: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [view, setView] = useState<'card' | 'table'>('card');
+  const [showImportWizard, setShowImportWizard] = useState(false);
+  const tableRef = useRef<HTMLTableElement>(null);
+  const hiddenTableRef = useRef<HTMLTableElement>(null);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ExpenseCategory | null>(null);
@@ -131,8 +138,69 @@ export const Expenses: React.FC = () => {
     c.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handleExportExcel = () => {
+    const headers = {
+      'code': language === 'ar' ? 'كود البند' : 'Code',
+      'name': language === 'ar' ? 'اسم البند' : 'Name',
+      'account_name': language === 'ar' ? 'الحساب المرتبط' : 'Linked Account',
+      'description': language === 'ar' ? 'الوصف' : 'Description'
+    };
+    const formattedData = filteredCategories.map(c => ({
+      code: c.code,
+      name: c.name,
+      account_name: c.account_name || '-',
+      description: c.description || '-'
+    }));
+    const excelData = formatDataForExcel(formattedData, headers);
+    exportToExcel(excelData, { filename: 'Expense_Categories', sheetName: t('expenses.title') || 'بنود المصروفات' });
+  };
+
+  const handleExportPDF = async () => {
+    const targetEl = hiddenTableRef.current || tableRef.current;
+    if (targetEl) {
+      await exportToPDFUtil(targetEl, { 
+        filename: 'Expense_Categories',
+        reportTitle: t('expenses.title') || (language === 'ar' ? 'قائمة بنود المصروفات' : 'Expense Categories List'),
+        orientation: 'landscape'
+      });
+    }
+  };
+
+  const handlePrint = () => {
+    const targetEl = hiddenTableRef.current || tableRef.current;
+    if (targetEl) {
+      printElement(targetEl, t('expenses.title') || (language === 'ar' ? 'قائمة بنود المصروفات' : 'Expense Categories List'));
+    } else {
+      window.print();
+    }
+  };
+
   return (
     <div className="h-full flex flex-col space-y-2 animate-in fade-in duration-500 overflow-hidden w-full px-1 sm:px-3 py-1" dir={dir}>
+      {/* Hidden complete table for clean PDF export & printing */}
+      <div className="hidden" aria-hidden="true">
+        <table ref={hiddenTableRef}>
+          <thead>
+            <tr>
+              <th>{language === 'ar' ? 'كود البند' : 'Code'}</th>
+              <th>{language === 'ar' ? 'اسم البند' : 'Name'}</th>
+              <th>{language === 'ar' ? 'الحساب المرتبط' : 'Linked Account'}</th>
+              <th>{language === 'ar' ? 'الوصف' : 'Description'}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredCategories.map((c) => (
+              <tr key={c.id}>
+                <td>{c.code}</td>
+                <td>{c.name}</td>
+                <td>{c.account_name || '-'}</td>
+                <td>{c.description || '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       <AnimatePresence mode="wait">
         {!isModalOpen ? (
           <motion.div 
@@ -161,11 +229,24 @@ export const Expenses: React.FC = () => {
               <div className="flex items-center gap-1.5">
                 <button 
                   onClick={() => setIsActivityLogOpen(true)} 
-                  className="flex items-center justify-center gap-1 px-2.5 py-1.5 bg-white text-slate-600 border border-slate-200 rounded-lg font-bold text-xs hover:bg-slate-50 transition-all active:scale-95 shadow-xs"
+                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white text-slate-600 border border-slate-200 rounded-lg font-bold text-xs hover:bg-slate-50 transition-all active:scale-95 shadow-xs"
                   title={language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
                 >
-                  <History size={14} />
-                  <span className="hidden sm:inline">{language === 'ar' ? 'سجل النشاط' : 'Activity Log'}</span>
+                  <History size={15} />
+                  <span className="hidden md:inline">{language === 'ar' ? 'سجل النشاط' : 'Activity Log'}</span>
+                </button>
+                <ExportButtons 
+                  onExportExcel={handleExportExcel} 
+                  onExportPDF={handleExportPDF} 
+                  onPrint={handlePrint}
+                />
+                <button
+                  onClick={() => setShowImportWizard(true)}
+                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white text-emerald-700 border border-emerald-300 rounded-lg font-bold text-xs hover:bg-emerald-50 transition-all active:scale-95 shadow-xs"
+                  title="استيراد من Excel"
+                >
+                  <FileUp size={15} />
+                  <span className="hidden md:inline">استيراد Excel</span>
                 </button>
                 <button 
                   onClick={() => openModal()}
@@ -266,7 +347,7 @@ export const Expenses: React.FC = () => {
                   </div>
                 ) : (
                   <div className="overflow-x-auto h-full">
-                    <table className="w-full text-right border-collapse">
+                    <table ref={tableRef} className="w-full text-right border-collapse">
                       <thead className="sticky top-0 bg-white/90 backdrop-blur-md z-10 border-b border-slate-100">
                         <tr className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">
                           <th className="px-4 py-2">{language === 'ar' ? 'كود البند' : 'Code'}</th>
@@ -437,6 +518,15 @@ export const Expenses: React.FC = () => {
       </AnimatePresence>
 
       <PageActivityLog category="expense_categories" isOpen={isActivityLogOpen} onClose={() => setIsActivityLogOpen(false)} />
+
+      {showImportWizard && (
+        <ExcelImportWizard
+          module="expense_categories"
+          moduleNameAr="بنود المصروفات"
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={() => setShowImportWizard(false)}
+        />
+      )}
     </div>
   );
 };

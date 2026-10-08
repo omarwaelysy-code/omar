@@ -16,6 +16,9 @@ import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { formatNumber } from '../utils/formatUtils';
 import { ExcelImportWizard } from '../components/ExcelImportWizard';
 import { EGYPTIAN_BANKS_DATA, BankLogoBadge, EgyptianBank } from '../data/egyptianBanks';
+import { ExportButtons } from '../components/ExportButtons';
+import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
+import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
 
 export const PaymentMethods: React.FC = () => {
   const { user } = useAuth();
@@ -49,6 +52,8 @@ export const PaymentMethods: React.FC = () => {
   const [isBankPickerOpen, setIsBankPickerOpen] = useState(false);
   const [copiedSwift, setCopiedSwift] = useState(false);
   const bankPickerRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
+  const hiddenTableRef = useRef<HTMLTableElement>(null);
   
   const linkedEntry = useMemo(() => {
     if (!editingMethod) return null;
@@ -746,8 +751,77 @@ export const PaymentMethods: React.FC = () => {
     return groupedMethods.every(g => collapsedGroups[g.key]);
   }, [groupedMethods, collapsedGroups]);
 
+  const handleExportExcel = () => {
+    const headers = {
+      'code': language === 'ar' ? 'كود طريقة السداد' : 'Code',
+      'name': language === 'ar' ? 'طريقة السداد' : 'Name',
+      'type': language === 'ar' ? 'النوع' : 'Type',
+      'currency': language === 'ar' ? 'العملة' : 'Currency',
+      'opening_balance': language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance',
+      'current_balance': language === 'ar' ? 'الرصيد الحالي' : 'Current Balance'
+    };
+    const formattedData = filteredMethods.map(m => ({
+      code: m.code,
+      name: m.name,
+      type: m.type === 'bank' ? (language === 'ar' ? 'بنك' : 'Bank') : m.type === 'cash' ? (language === 'ar' ? 'خزينة' : 'Cash') : m.type === 'wallet' ? (language === 'ar' ? 'محفظة' : 'Wallet') : (language === 'ar' ? 'أخرى' : 'Other'),
+      currency: m.currency || 'EGP',
+      opening_balance: m.opening_balance || 0,
+      current_balance: getMethodCurrentBalance(m)
+    }));
+    const excelData = formatDataForExcel(formattedData, headers);
+    exportToExcel(excelData, { filename: 'Payment_Methods', sheetName: language === 'ar' ? 'طرق السداد' : 'Payment Methods' });
+  };
+
+  const handleExportPDF = async () => {
+    const targetEl = hiddenTableRef.current || tableRef.current;
+    if (targetEl) {
+      await exportToPDFUtil(targetEl, { 
+        filename: 'Payment_Methods',
+        reportTitle: language === 'ar' ? 'قائمة طرق السداد' : 'Payment Methods List',
+        orientation: 'landscape'
+      });
+    }
+  };
+
+  const handlePrint = () => {
+    const targetEl = hiddenTableRef.current || tableRef.current;
+    if (targetEl) {
+      printElement(targetEl, language === 'ar' ? 'قائمة طرق السداد' : 'Payment Methods List');
+    } else {
+      window.print();
+    }
+  };
+
   return (
     <div className="h-full flex flex-col space-y-2 animate-in fade-in duration-500 overflow-hidden w-full px-1 sm:px-3 py-1" dir={dir}>
+      {/* Hidden complete table for clean PDF export & printing */}
+      <div className="hidden" aria-hidden="true">
+        <table ref={hiddenTableRef}>
+          <thead>
+            <tr>
+              <th>{language === 'ar' ? 'كود طريقة السداد' : 'Code'}</th>
+              <th>{language === 'ar' ? 'طريقة السداد' : 'Name'}</th>
+              <th>{language === 'ar' ? 'النوع' : 'Type'}</th>
+              <th>{language === 'ar' ? 'العملة' : 'Currency'}</th>
+              <th>{language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Balance'}</th>
+              <th>{language === 'ar' ? 'الرصيد الحالي' : 'Current Balance'}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredMethods.map((m) => (
+              <tr key={m.id}>
+                <td>{m.code}</td>
+                <td>{m.name}</td>
+                <td>{m.type === 'bank' ? (language === 'ar' ? 'بنك' : 'Bank') : m.type === 'cash' ? (language === 'ar' ? 'خزينة' : 'Cash') : m.type === 'wallet' ? (language === 'ar' ? 'محفظة' : 'Wallet') : (language === 'ar' ? 'أخرى' : 'Other')}</td>
+                <td>{m.currency || 'EGP'}</td>
+                <td>{formatNumber(m.opening_balance || 0)}</td>
+                <td>{formatNumber(getMethodCurrentBalance(m))}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       <AnimatePresence mode="wait">
         {!isModalOpen ? (
           <motion.div 
@@ -780,19 +854,24 @@ export const PaymentMethods: React.FC = () => {
               <div className="flex items-center gap-1.5">
                 <button 
                   onClick={() => setIsActivityLogOpen(true)} 
-                  className="flex items-center justify-center gap-1 px-2.5 py-1.5 bg-white text-slate-600 border border-slate-200 rounded-lg font-bold text-xs hover:bg-slate-50 transition-all active:scale-95 shadow-xs"
+                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white text-slate-600 border border-slate-200 rounded-lg font-bold text-xs hover:bg-slate-50 transition-all active:scale-95 shadow-xs"
                   title={language === 'ar' ? 'سجل النشاط' : 'Activity Log'}
                 >
-                  <History size={14} />
-                  <span className="hidden sm:inline">{language === 'ar' ? 'سجل النشاط' : 'Activity Log'}</span>
+                  <History size={15} />
+                  <span className="hidden md:inline">{language === 'ar' ? 'سجل النشاط' : 'Activity Log'}</span>
                 </button>
+                <ExportButtons 
+                  onExportExcel={handleExportExcel} 
+                  onExportPDF={handleExportPDF} 
+                  onPrint={handlePrint}
+                />
                 <button
                   onClick={() => setShowImportWizard(true)}
-                  className="flex items-center gap-1 px-2.5 py-1.5 bg-white text-emerald-700 border border-emerald-300 rounded-lg font-bold text-xs hover:bg-emerald-50 transition-all active:scale-95 shadow-xs"
+                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white text-emerald-700 border border-emerald-300 rounded-lg font-bold text-xs hover:bg-emerald-50 transition-all active:scale-95 shadow-xs"
                   title="استيراد من Excel"
                 >
-                  <FileUp size={14} />
-                  <span className="hidden sm:inline">استيراد Excel</span>
+                  <FileUp size={15} />
+                  <span className="hidden md:inline">استيراد Excel</span>
                 </button>
                 <button 
                   onClick={() => openModal()}
@@ -1072,7 +1151,7 @@ export const PaymentMethods: React.FC = () => {
                   </div>
                 ) : (
                   <div className="overflow-x-auto h-full">
-                    <table className="w-full text-right border-collapse">
+                    <table ref={tableRef} className="w-full text-right border-collapse">
                       <thead className="sticky top-0 bg-white/95 backdrop-blur-md z-10 border-b border-slate-200">
                         <tr className="text-slate-500 text-[10px] uppercase font-bold tracking-wider">
                           <th className="px-4 py-2.5">{language === 'ar' ? 'كود طريقة السداد' : 'Code'}</th>

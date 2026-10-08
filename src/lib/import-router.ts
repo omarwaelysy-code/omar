@@ -106,6 +106,19 @@ const IMPORT_CONFIGS: Record<string, {
     ]
   },
 
+  // ── بنود المصروفات ──────────────────────────────────────────────
+  expense_categories: {
+    nameAr: 'بنود المصروفات',
+    dbTable: 'expense_categories',
+    uniqueKey: 'code',
+    columns: [
+      { key: 'code',         label: 'كود البند *',           labelEn: 'Category Code (Required, unique)', required: true,  type: 'text',         example: 'EXP-001' },
+      { key: 'name',         label: 'اسم البند *',           labelEn: 'Category Name (Required)',         required: true,  type: 'text',         example: 'مصاريف إيجار' },
+      { key: 'account_code', label: 'كود الحساب المرتبط *', labelEn: 'Linked Account Code (Required)',    required: true,  type: 'account_code', example: '511', note: 'كود حساب المصروف في شجرة الحسابات' },
+      { key: 'description',  label: 'الوصف',                 labelEn: 'Description',                      required: false, type: 'text',         example: 'مصروفات الإيجار الشهري للمقر' },
+    ]
+  },
+
   // ── مجموعات الأصناف ─────────────────────────────────────────────
   item_groups: {
     nameAr: 'مجموعات الأصناف',

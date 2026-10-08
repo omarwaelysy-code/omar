@@ -17,7 +17,7 @@ import { InlineActivityLog } from '../components/InlineActivityLog';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { ExportButtons } from '../components/ExportButtons';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
-import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
+import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
 import { formatNumber, cleanDuplicatedPartnerName } from '../utils/formatUtils';
 import { useRef } from 'react';
 import { useViewPreference } from '../hooks/useViewPreference';
@@ -97,7 +97,8 @@ export const Suppliers: React.FC = () => {
     if (tableRef.current) {
       await exportToPDFUtil(tableRef.current, { 
         filename: 'Suppliers_List',
-        reportTitle: t('suppliers.list_title')
+        reportTitle: t('suppliers.list_title'),
+        orientation: 'landscape'
       });
     }
   };
@@ -788,6 +789,7 @@ export const Suppliers: React.FC = () => {
             <ExportButtons 
               onExportExcel={handleExportExcel} 
               onExportPDF={handleExportPDF} 
+              onPrint={() => printElement(tableRef.current, t('suppliers.list_title'))}
             />
             <button
               onClick={() => setShowImportWizard(true)}

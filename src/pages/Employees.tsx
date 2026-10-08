@@ -14,7 +14,7 @@ import { dbService } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { ExportButtons } from '../components/ExportButtons';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
-import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
+import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
 import { usePermissions } from '../hooks/usePermissions';
 import { useViewPreference } from '../hooks/useViewPreference';
 import { ExcelImportWizard } from '../components/ExcelImportWizard';
@@ -146,7 +146,8 @@ export const Employees: React.FC = () => {
     if (tableRef.current) {
       await exportToPDFUtil(tableRef.current, { 
         filename: 'Employees_List',
-        reportTitle: t('employees.title')
+        reportTitle: t('employees.title'),
+        orientation: 'landscape'
       });
     }
   };
@@ -514,6 +515,7 @@ export const Employees: React.FC = () => {
               <ExportButtons 
                 onExportExcel={handleExportExcel} 
                 onExportPDF={handleExportPDF} 
+                onPrint={() => printElement(tableRef.current, t('employees.title'))}
               />
               <button
                 onClick={() => setShowImportWizard(true)}

@@ -15,7 +15,7 @@ import { InlineActivityLog } from '../components/InlineActivityLog';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { ExportButtons } from '../components/ExportButtons';
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
-import { exportToPDF as exportToPDFUtil } from '../utils/pdfUtils';
+import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
 import { useRef } from 'react';
 import { usePermissions } from '../hooks/usePermissions';
 import { formatNumber } from '../utils/formatUtils';
@@ -62,7 +62,8 @@ export const Customers: React.FC = () => {
     if (tableRef.current) {
       await exportToPDFUtil(tableRef.current, { 
         filename: 'Customers_List',
-        reportTitle: t('customers.list_title')
+        reportTitle: t('customers.list_title'),
+        orientation: 'landscape'
       });
     }
   };
@@ -480,6 +481,7 @@ export const Customers: React.FC = () => {
             <ExportButtons 
               onExportExcel={handleExportExcel} 
               onExportPDF={handleExportPDF} 
+              onPrint={() => printElement(tableRef.current, t('customers.list_title'))}
             />
             {canCreate && (
               <button

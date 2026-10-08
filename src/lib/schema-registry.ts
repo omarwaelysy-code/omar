@@ -154,6 +154,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'number', 'date', 'amount', 'notes', 'description', 'attachments', 'settlements',
     'is_reversed', 'reversed_at', 'reversal_reason', 'reversed_by_doc_id', 'reversed_by_doc_number', 'is_reversal_doc',
     'original_doc_id', 'original_doc_number', 'reversed_by_entry_id', 'reversed_by_entry_number', 'original_entry_id', 'original_entry_number',
+    'currency', 'currency_id', 'exchange_rate', 'currency_amount',
     'created_by', 'created_at', 'updated_by', 'updated_at'
   ],
   supplier_discounts: [
@@ -161,6 +162,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'number', 'date', 'amount', 'notes', 'description', 'attachments', 'settlements',
     'is_reversed', 'reversed_at', 'reversal_reason', 'reversed_by_doc_id', 'reversed_by_doc_number', 'is_reversal_doc',
     'original_doc_id', 'original_doc_number', 'reversed_by_entry_id', 'reversed_by_entry_number', 'original_entry_id', 'original_entry_number',
+    'currency', 'currency_id', 'exchange_rate', 'currency_amount',
     'created_by', 'created_at', 'updated_by', 'updated_at'
   ],
   cash_transfers: [

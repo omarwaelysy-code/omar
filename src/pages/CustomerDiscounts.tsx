@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
-import { Customer, Account, JournalEntry, JournalEntryItem } from '../types';
-import { Search, Plus, Trash2, X, Tag, User, Calendar, Save, Wallet, CreditCard, History, BookOpen, Phone, Mail, MapPin, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, ChevronDown, LayoutGrid, List, Hash, Copy, Check } from 'lucide-react';
+import { Customer, Account, JournalEntry, JournalEntryItem, Currency } from '../types';
+import { Search, Plus, Trash2, X, Tag, User, Calendar, Save, Wallet, CreditCard, History, BookOpen, Phone, Mail, MapPin, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, ChevronDown, LayoutGrid, List, Hash, Copy, Check, Coins, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '../contexts/LanguageContext';
-import { dbService } from '../services/dbService';
+import { dbService, apiRequest } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { TransactionSidePanel } from '../components/TransactionSidePanel';
 import { TransactionManager } from '../services/TransactionManager';
@@ -31,6 +31,9 @@ export const CustomerDiscounts: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [discounts, setDiscounts] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>(null);
+  const [companyCurrencies, setCompanyCurrencies] = useState<Currency[]>([]);
+  const [companyData, setCompanyData] = useState<any>(null);
+  const [isAutoFetchingRate, setIsAutoFetchingRate] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -102,6 +105,142 @@ export const CustomerDiscounts: React.FC = () => {
     }
   };
 
+  const baseCurrencyCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase();
+  const isMultiCurrency = !!(
+    companyData?.settings?.enable_multi_currency ||
+    (companyCurrencies && companyCurrencies.length > 1)
+  );
+
+  const availableCurrencies = React.useMemo(() => {
+    const list = [...(companyCurrencies || [])];
+    if (!list.some(c => c.code?.toUpperCase() === baseCurrencyCode)) {
+      list.unshift({
+        id: 'base',
+        code: baseCurrencyCode,
+        name_ar: baseCurrencyCode === 'EGP' ? 'جنيه مصري (عملة النظام)' : `${baseCurrencyCode} (عملة النظام)`,
+        name_en: `${baseCurrencyCode} (Base)`,
+        symbol: baseCurrencyCode,
+        is_active: true,
+        company_id: user?.company_id || '',
+        created_at: ''
+      });
+    }
+    return list;
+  }, [companyCurrencies, baseCurrencyCode, user?.company_id]);
+
+  const fetchAutoRateForCurrency = async (currId: string, currCode?: string): Promise<number> => {
+    if (!user || !currId) return 1;
+    const targetCode = (currCode || companyCurrencies.find(c => c.id === currId)?.code || '').toUpperCase();
+    if (!targetCode || targetCode === baseCurrencyCode) return 1;
+
+    setIsAutoFetchingRate(true);
+    try {
+      // 1. Live system rates from /currency-rates/latest
+      try {
+        const latestAutoRates = await apiRequest<Array<{
+          currency_id: string;
+          code?: string;
+          currency_code?: string;
+          rate: number | null;
+          rate_date: string | null;
+        }>>(`/currency-rates/latest?company_id=${user.company_id}`);
+        
+        if (Array.isArray(latestAutoRates)) {
+          const rateObj = latestAutoRates.find(r => 
+            r.currency_id === currId || 
+            (targetCode && (r.code?.toUpperCase() === targetCode || (r as any).currency_code?.toUpperCase() === targetCode))
+          );
+          if (rateObj && rateObj.rate !== null && Number(rateObj.rate) > 0) {
+            return Number(Number(rateObj.rate).toFixed(6));
+          }
+        }
+      } catch (e) {
+        console.warn('Could not fetch from /currency-rates/latest', e);
+      }
+
+      // 2. Fallback: manual exchange_rates table
+      try {
+        const manualRates = await dbService.list<any>('exchange_rates', {
+          currency_id: currId,
+          company_id: user.company_id,
+          _limit: 1,
+          _sort: 'rate_date',
+          _order: 'desc'
+        });
+        if (manualRates && manualRates.length > 0 && Number(manualRates[0].exchange_rate) > 0) {
+          return Number(manualRates[0].exchange_rate);
+        }
+      } catch (e) {
+        console.warn('Could not fetch from exchange_rates table', e);
+      }
+
+      // 3. Fallback: currency master record rate
+      const targetCurr = companyCurrencies.find(c => c.id === currId);
+      if (targetCurr && (targetCurr as any).exchange_rate && Number((targetCurr as any).exchange_rate) > 0) {
+        return Number((targetCurr as any).exchange_rate);
+      }
+    } finally {
+      setIsAutoFetchingRate(false);
+    }
+    return 1;
+  };
+
+  const handleCurrencyChange = async (newCurrencyId: string) => {
+    if (!newCurrencyId || newCurrencyId === 'base') {
+      setDiscountData(prev => ({
+        ...prev,
+        currency_id: '',
+        currency: baseCurrencyCode,
+        exchange_rate: 1,
+        amount: prev.currency_amount > 0 ? prev.currency_amount : prev.amount
+      }));
+      return;
+    }
+
+    const targetCurr = companyCurrencies.find(c => c.id === newCurrencyId);
+    const targetCode = (targetCurr?.code || 'EGP').toUpperCase();
+
+    if (targetCode === baseCurrencyCode) {
+      setDiscountData(prev => ({
+        ...prev,
+        currency_id: newCurrencyId,
+        currency: targetCode,
+        exchange_rate: 1,
+        amount: prev.currency_amount > 0 ? prev.currency_amount : prev.amount
+      }));
+      return;
+    }
+
+    const rate = await fetchAutoRateForCurrency(newCurrencyId, targetCode);
+    setDiscountData(prev => {
+      const foreignAmt = prev.currency_amount > 0 ? prev.currency_amount : prev.amount;
+      const baseAmt = Number((foreignAmt * rate).toFixed(2));
+      return {
+        ...prev,
+        currency_id: newCurrencyId,
+        currency: targetCode,
+        exchange_rate: rate,
+        currency_amount: foreignAmt,
+        amount: baseAmt
+      };
+    });
+  };
+
+  const refreshRate = async () => {
+    if (!discountData.currency_id || discountData.currency === baseCurrencyCode) return;
+    const rate = await fetchAutoRateForCurrency(discountData.currency_id, discountData.currency);
+    setDiscountData(prev => {
+      const foreignAmt = prev.currency_amount || 0;
+      const baseAmt = Number((foreignAmt * rate).toFixed(2));
+      return {
+        ...prev,
+        exchange_rate: rate,
+        amount: baseAmt
+      };
+    });
+    showNotification(language === 'ar' ? `تم تحديث سعر الصرف (${rate})` : `Exchange rate updated (${rate})`, 'success');
+  };
+
   const handleExportExcel = (onlySelected = false) => {
     const list = onlySelected ? discounts.filter(d => selectedIds.includes(d.id)) : discounts;
     const formattedData = list.map(d => ({
@@ -109,7 +248,10 @@ export const CustomerDiscounts: React.FC = () => {
       'العميل': d.customer_name || '-',
       'الحساب': accounts.find(a => a.id === d.account_id)?.name || d.account_name || '-',
       'التاريخ': formatDate(d.date),
-      'المبلغ': d.amount,
+      'المبلغ بالعملة': d.currency_amount !== undefined && d.currency_amount !== null ? d.currency_amount : d.amount,
+      'العملة': d.currency || baseCurrencyCode,
+      'سعر الصرف': d.exchange_rate || 1,
+      'المبلغ المحلي': d.amount,
       'البيان': d.notes || '-'
     }));
     exportToExcel(formattedData, { filename: onlySelected ? 'Selected_Customer_Discounts' : 'Customer_Discounts', sheetName: 'خصم العملاء' });
@@ -141,6 +283,10 @@ export const CustomerDiscounts: React.FC = () => {
     setDiscountData({
       customer_id: '',
       amount: 0,
+      currency_amount: 0,
+      currency_id: '',
+      currency: baseCurrencyCode,
+      exchange_rate: 1,
       date: new Date().toISOString().slice(0, 10),
       account_id: defaultAcc,
       notes: ''
@@ -183,9 +329,21 @@ export const CustomerDiscounts: React.FC = () => {
     }
 
     const numAmount = parseFloat(String(discount.amount || 0));
+    const currAmount = discount.currency_amount !== undefined && discount.currency_amount !== null
+      ? parseFloat(String(discount.currency_amount))
+      : numAmount;
+    const discRate = discount.exchange_rate ? parseFloat(String(discount.exchange_rate)) : 1;
+    const discCurr = discount.currency || baseCurrencyCode;
+    const matchedCurr = companyCurrencies.find(c => c.code?.toUpperCase() === discCurr.toUpperCase());
+    const discCurrId = discount.currency_id || matchedCurr?.id || '';
+
     setDiscountData({
       customer_id: discount.customer_id,
       amount: numAmount,
+      currency_amount: currAmount,
+      currency_id: discCurrId,
+      currency: discCurr,
+      exchange_rate: discRate,
       date: discount.date ? discount.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
       account_id: accId || settings?.customer_discount_account_id || '',
       notes: discount.notes || ''
@@ -233,6 +391,10 @@ export const CustomerDiscounts: React.FC = () => {
   const [discountData, setDiscountData] = useState({
     customer_id: '',
     amount: 0,
+    currency_amount: 0,
+    currency_id: '',
+    currency: 'EGP',
+    exchange_rate: 1,
     date: new Date().toISOString().slice(0, 10),
     account_id: '',
     notes: ''
@@ -242,6 +404,7 @@ export const CustomerDiscounts: React.FC = () => {
     if (user) {
       const unsubCustomers = dbService.subscribe<Customer>('customers', user.company_id, setCustomers);
       const unsubAccounts = dbService.subscribe<Account>('accounts', user.company_id, setAccounts);
+      const unsubCurrencies = dbService.subscribe<Currency>('currencies', user.company_id, setCompanyCurrencies);
       const unsubDiscounts = dbService.subscribePaginated('customer_discounts', {
         company_id: user.company_id,
         _page: page,
@@ -267,11 +430,22 @@ export const CustomerDiscounts: React.FC = () => {
         }
       };
 
+      const fetchCompany = async () => {
+        try {
+          const comp = await dbService.get<any>('companies', user.company_id);
+          if (comp) setCompanyData(comp);
+        } catch (err) {
+          console.error('Failed to fetch company:', err);
+        }
+      };
+
       fetchSettings();
+      fetchCompany();
       setLoading(false);
       return () => {
         unsubCustomers();
         unsubAccounts();
+        unsubCurrencies();
         unsubDiscounts();
       };
     }
@@ -301,12 +475,15 @@ export const CustomerDiscounts: React.FC = () => {
       }
 
       const customer = customers.find(c => c.id === discountData.customer_id);
-      const discount_number = 'CDISC-PREVIEW';
+      const discount_number = editingDiscount?.number || discountNumber || 'CDISC-PREVIEW';
+      const isForeign = discountData.currency && discountData.currency !== baseCurrencyCode;
+      const foreignAmount = isForeign ? (discountData.currency_amount || discountData.amount) : undefined;
+      const exchangeRateVal = isForeign ? Number(discountData.exchange_rate || 1) : 1;
 
       // Preview Activity Log
       setPreviewActivityLog({
         action: 'إضافة خصم عميل',
-        details: `إضافة خصم جديد للعميل ${customer?.name || '...'} بمبلغ ${formatNumber(discountData.amount)}`,
+        details: `إضافة خصم جديد للعميل ${customer?.name || '...'} بمبلغ ${formatNumber(discountData.amount)} ${baseCurrencyCode}${isForeign ? ` (${formatNumber(foreignAmount || 0)} ${discountData.currency})` : ''}`,
         created_at: new Date().toISOString()
       });
 
@@ -323,7 +500,10 @@ export const CustomerDiscounts: React.FC = () => {
         account_name: debitAccountName,
         debit: discountData.amount,
         credit: 0,
-        description: `خصم مسموح به رقم ${discount_number} - ${customer?.name || '...'}`
+        description: `خصم مسموح به رقم ${discount_number} - ${customer?.name || '...'}${isForeign ? ` (${foreignAmount} ${discountData.currency})` : ''}`,
+        currency: discountData.currency || baseCurrencyCode,
+        exchange_rate: exchangeRateVal,
+        foreign_amount: foreignAmount
       });
 
       // Credit: Customer
@@ -335,7 +515,12 @@ export const CustomerDiscounts: React.FC = () => {
         account_name: creditAccountName,
         debit: 0,
         credit: discountData.amount,
-        description: `خصم مسموح به رقم ${discount_number} - ${customer?.name || '...'}`
+        description: `خصم مسموح به رقم ${discount_number} - ${customer?.name || '...'}${isForeign ? ` (${foreignAmount} ${discountData.currency})` : ''}`,
+        customer_id: discountData.customer_id,
+        customer_name: customer?.name,
+        currency: discountData.currency || baseCurrencyCode,
+        exchange_rate: exchangeRateVal,
+        foreign_amount: foreignAmount
       });
 
       setPreviewJournalEntry({
@@ -355,7 +540,7 @@ export const CustomerDiscounts: React.FC = () => {
     };
 
     generatePreview();
-  }, [isModalOpen, discountData, user, customers, accounts]);
+  }, [isModalOpen, discountData, user, customers, accounts, baseCurrencyCode, editingDiscount, discountNumber]);
 
   const handleAddCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -416,10 +601,18 @@ export const CustomerDiscounts: React.FC = () => {
       const debitAccountId = discountAccount?.id || effectiveAccountId;
       const debitAccountName = discountAccount?.name || (accountSource === 'discount' ? 'حساب الخصم المسموح به' : 'حساب آخر');
 
+      const isForeign = discountData.currency && discountData.currency !== baseCurrencyCode;
+      const foreignAmount = isForeign ? (discountData.currency_amount || discountData.amount) : undefined;
+      const exchangeRateVal = isForeign ? Number(discountData.exchange_rate || 1) : 1;
+
       const data = {
         customer_id: discountData.customer_id,
         customer_name: customer?.name || '',
         amount: discountData.amount,
+        currency_amount: discountData.currency_amount || discountData.amount,
+        currency: discountData.currency || baseCurrencyCode,
+        currency_id: discountData.currency_id || null,
+        exchange_rate: exchangeRateVal,
         date: discountData.date,
         account_id: debitAccountId,
         account_name: debitAccountName,
@@ -445,7 +638,10 @@ export const CustomerDiscounts: React.FC = () => {
         account_name: debitAccountName,
         debit: discountData.amount,
         credit: 0,
-        description: `خصم مسموح به للعميل: ${customer?.name} - رقم ${number}`
+        description: `خصم مسموح به للعميل: ${customer?.name} - رقم ${number}${isForeign ? ` (${foreignAmount} ${discountData.currency})` : ''}`,
+        currency: discountData.currency || baseCurrencyCode,
+        exchange_rate: exchangeRateVal,
+        foreign_amount: foreignAmount
       });
 
       let creditAccountId = customer?.account_id || '';
@@ -456,9 +652,12 @@ export const CustomerDiscounts: React.FC = () => {
         account_name: creditAccountName,
         debit: 0,
         credit: discountData.amount,
-        description: `خصم مسموح به رقم ${number}`,
+        description: `خصم مسموح به رقم ${number}${isForeign ? ` (${foreignAmount} ${discountData.currency})` : ''}`,
         customer_id: discountData.customer_id,
-        customer_name: customer?.name
+        customer_name: customer?.name,
+        currency: discountData.currency || baseCurrencyCode,
+        exchange_rate: exchangeRateVal,
+        foreign_amount: foreignAmount
       });
 
       const journalEntryData = {
@@ -496,7 +695,7 @@ export const CustomerDiscounts: React.FC = () => {
       }
 
       closeModal();
-      dbService.logActivity(user.id, user.username, user.company_id, editingDiscount ? 'تعديل خصم عميل' : 'إضافة خصم عميل', `${editingDiscount ? 'تعديل' : 'إضافة'} خصم للعميل: ${customer?.name} بمبلغ: ${discountData.amount}`, 'customer_discounts');
+      dbService.logActivity(user.id, user.username, user.company_id, editingDiscount ? 'تعديل خصم عميل' : 'إضافة خصم عميل', `${editingDiscount ? 'تعديل' : 'إضافة'} خصم للعميل: ${customer?.name} بمبلغ: ${discountData.currency_amount || discountData.amount} ${discountData.currency || baseCurrencyCode}`, 'customer_discounts');
     } catch (e: any) {
       console.error('Save failed:', e);
       showNotification(e.message || t('discounts.toast_error'), 'error');
@@ -515,6 +714,10 @@ export const CustomerDiscounts: React.FC = () => {
     setDiscountData({
       customer_id: '',
       amount: 0,
+      currency_amount: 0,
+      currency_id: '',
+      currency: baseCurrencyCode,
+      exchange_rate: 1,
       date: new Date().toISOString().slice(0, 10),
       account_id: settings?.customer_discount_account_id || '',
       notes: ''
@@ -551,12 +754,18 @@ export const CustomerDiscounts: React.FC = () => {
         <>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2.5 border-b border-slate-200/80">
             <div>
-              <h1 className="text-base md:text-lg font-bold text-slate-900 flex items-center gap-2">
+              <h1 className="text-base md:text-lg font-bold text-slate-900 flex items-center gap-2 flex-wrap">
                 <Tag className="w-5 h-5 text-emerald-600" />
                 <span>{t('discounts.customer_title')}</span>
                 {serverSummary.total_amount !== undefined && (
                   <span className="bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-lg border border-emerald-100 text-xs font-bold">
-                    {t('discounts.total_discounts')}: {formatMoney(serverSummary.total_amount)} {t('common.currency')}
+                    {t('discounts.total_discounts')}: {formatMoney(serverSummary.total_amount)} {baseCurrencyCode}
+                  </span>
+                )}
+                {selectedIds.length > 0 && (
+                  <span className="bg-amber-50 text-amber-800 px-2.5 py-0.5 rounded-lg border border-amber-200 text-xs font-bold animate-in fade-in flex items-center gap-1 shadow-xs">
+                    <span>مجموع المحدد ({selectedIds.length}):</span>
+                    <span className="font-mono">{formatMoney(discounts.filter(d => selectedIds.includes(d.id)).reduce((s, d) => s + Number(d.amount || 0), 0))} {baseCurrencyCode}</span>
                   </span>
                 )}
               </h1>
@@ -604,13 +813,21 @@ export const CustomerDiscounts: React.FC = () => {
               </div>
               <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                 {selectedIds.length > 0 && (
-                  <button
-                    onClick={handleBatchDelete}
-                    className="flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg text-xs font-bold border border-rose-200 transition-all"
-                  >
-                    <Trash2 size={13} />
-                    <span>حذف المحدد ({selectedIds.length})</span>
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <div className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs">
+                      <span>مجموع المحدد ({selectedIds.length}):</span>
+                      <span className="font-mono text-emerald-700">
+                        {formatMoney(discounts.filter(d => selectedIds.includes(d.id)).reduce((s, d) => s + Number(d.amount || 0), 0))} {baseCurrencyCode}
+                      </span>
+                    </div>
+                    <button
+                      onClick={handleBatchDelete}
+                      className="flex items-center gap-1 px-2.5 py-1 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg text-xs font-bold border border-rose-200 transition-all"
+                    >
+                      <Trash2 size={13} />
+                      <span>حذف المحدد ({selectedIds.length})</span>
+                    </button>
+                  </div>
                 )}
                 <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/70 w-fit">
                   <button
@@ -638,16 +855,16 @@ export const CustomerDiscounts: React.FC = () => {
                 <table ref={tableRef} className="w-full text-right border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[11px] font-bold">
-                      <th className="w-10 px-3 py-1.5 text-center">
+                      <th className="w-8 px-2 py-1 text-center">
                         <input
                           type="checkbox"
                           checked={filteredDiscounts.length > 0 && selectedIds.length === filteredDiscounts.length}
                           onChange={toggleSelectAll}
-                          className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer align-middle"
+                          className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer align-middle"
                           title="تحديد الكل"
                         />
                       </th>
-                      <th className="px-3 py-1.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('number')}>
+                      <th className="px-2 py-1 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('number')}>
                         <div className="flex items-center gap-1">
                           <span>رقم المستند</span>
                           <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -655,7 +872,7 @@ export const CustomerDiscounts: React.FC = () => {
                           </span>
                         </div>
                       </th>
-                      <th className="px-3 py-1.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('customer_name')}>
+                      <th className="px-2 py-1 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('customer_name')}>
                         <div className="flex items-center gap-1">
                           <span>{t('discounts.column_customer')}</span>
                           <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -663,7 +880,7 @@ export const CustomerDiscounts: React.FC = () => {
                           </span>
                         </div>
                       </th>
-                      <th className="px-3 py-1.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('account_id')}>
+                      <th className="px-2 py-1 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('account_id')}>
                         <div className="flex items-center gap-1">
                           <span>الحساب</span>
                           <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -671,7 +888,7 @@ export const CustomerDiscounts: React.FC = () => {
                           </span>
                         </div>
                       </th>
-                      <th className="px-3 py-1.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('date')}>
+                      <th className="px-2 py-1 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('date')}>
                         <div className="flex items-center gap-1">
                           <span>{t('discounts.column_date')}</span>
                           <span className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -679,52 +896,84 @@ export const CustomerDiscounts: React.FC = () => {
                           </span>
                         </div>
                       </th>
-                      <th className="px-3 py-1.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('amount')}>
+                      <th className="px-2 py-1 font-bold">
+                        <span>المبلغ بالعملة</span>
+                      </th>
+                      <th className="px-2 py-1 font-bold">
+                        <span>العملة</span>
+                      </th>
+                      <th className="px-2 py-1 font-bold">
+                        <span>سعر الصرف</span>
+                      </th>
+                      <th className="px-2 py-1 font-bold cursor-pointer hover:text-emerald-600 transition-colors group" onClick={() => handleSort('amount')}>
                         <div className="flex items-center gap-1">
-                          <span>{t('discounts.column_amount')}</span>
+                          <span>المبلغ ({baseCurrencyCode})</span>
                           <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                             {sortBy === 'amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                           </span>
                         </div>
                       </th>
-                      <th className="px-3 py-1.5 font-bold">{t('discounts.column_notes')}</th>
-                      <th className="px-3 py-1.5 font-bold text-center w-28">{t('discounts.column_actions')}</th>
+                      <th className="px-2 py-1 font-bold">{t('discounts.column_notes')}</th>
+                      <th className="px-2 py-1 font-bold text-center w-24">{t('discounts.column_actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
                     {filteredDiscounts.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-4 py-8 text-center text-slate-400 italic">لا توجد خصومات حالياً</td>
+                        <td colSpan={11} className="px-4 py-8 text-center text-slate-400 italic">لا توجد خصومات حالياً</td>
                       </tr>
-                    ) : filteredDiscounts.map((discount) => (
-                      <tr key={discount.id} className="hover:bg-slate-50/70 transition-colors group cursor-pointer" onClick={() => openEditModal(discount)}>
-                        <td className="w-10 px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.includes(discount.id)}
-                            onChange={() => toggleSelectRow(discount.id)}
-                            className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer align-middle"
-                          />
-                        </td>
-                        <td className="px-3 py-2 font-mono font-bold text-slate-900 text-xs">
-                          {discount.number || '-'}
-                        </td>
-                        <td className="px-3 py-2 font-bold text-slate-900 text-xs">
-                          {discount.customer_name}
-                        </td>
-                        <td className="px-3 py-2 text-slate-600 font-medium text-xs">
-                          {accounts.find(a => a.id === discount.account_id)?.name || discount.account_name || '-'}
-                        </td>
-                        <td className="px-3 py-2 text-slate-500 font-medium text-xs">
-                          {formatDate(discount.date)}
-                        </td>
-                        <td className="px-3 py-2 font-bold text-emerald-600 text-xs">
-                          {formatNumber(discount.amount)} ج.م
-                        </td>
-                        <td className="px-3 py-2 text-slate-500 text-xs truncate max-w-xs">
-                          {discount.notes || '-'}
-                        </td>
-                        <td className="px-3 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
+                    ) : filteredDiscounts.map((discount) => {
+                      const foreignAmount = discount.currency_amount !== undefined && discount.currency_amount !== null
+                        ? Number(discount.currency_amount)
+                        : Number(discount.amount || 0);
+                      const discountCurr = discount.currency || baseCurrencyCode;
+                      const rate = discount.exchange_rate ? Number(discount.exchange_rate) : 1;
+                      const isForeign = discountCurr !== baseCurrencyCode;
+
+                      return (
+                        <tr key={discount.id} className="hover:bg-slate-50/70 transition-colors group cursor-pointer" onClick={() => openEditModal(discount)}>
+                          <td className="w-8 px-2 py-1 text-center" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.includes(discount.id)}
+                              onChange={() => toggleSelectRow(discount.id)}
+                              className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer align-middle"
+                            />
+                          </td>
+                          <td className="px-2 py-1 font-mono font-bold text-slate-900 text-xs">
+                            {discount.number || '-'}
+                          </td>
+                          <td className="px-2 py-1 font-bold text-slate-900 text-xs">
+                            {discount.customer_name}
+                          </td>
+                          <td className="px-2 py-1 text-slate-600 font-medium text-xs">
+                            {accounts.find(a => a.id === discount.account_id)?.name || discount.account_name || '-'}
+                          </td>
+                          <td className="px-2 py-1 text-slate-500 font-medium text-xs">
+                            {formatDate(discount.date)}
+                          </td>
+                          <td className="px-2 py-1 font-mono font-bold text-slate-800 text-xs">
+                            {formatNumber(foreignAmount)}
+                          </td>
+                          <td className="px-2 py-1 text-xs">
+                            <span className={`px-1.5 py-0.5 rounded font-mono font-bold text-[10px] ${
+                              isForeign
+                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                : 'bg-slate-100 text-slate-700 border border-slate-200'
+                            }`}>
+                              {discountCurr}
+                            </span>
+                          </td>
+                          <td className="px-2 py-1 font-mono text-slate-600 text-xs">
+                            {isForeign ? Number(rate.toFixed(4)).toString() : '1.0000'}
+                          </td>
+                          <td className="px-2 py-1 font-bold text-emerald-600 text-xs font-mono">
+                            {formatNumber(discount.amount)} {baseCurrencyCode}
+                          </td>
+                          <td className="px-2 py-1 text-slate-500 text-xs truncate max-w-[140px]">
+                            {discount.notes || '-'}
+                          </td>
+                          <td className="px-2 py-1 text-center" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                             {/* Reversal action */}
                             {discount.is_reversed ? (
@@ -787,8 +1036,25 @@ export const CustomerDiscounts: React.FC = () => {
                           </div>
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
+                    );
+                  })}
+                </tbody>
+                  {selectedIds.length > 0 && (
+                    <tfoot>
+                      <tr className="bg-emerald-50/90 border-t-2 border-emerald-300 text-emerald-950 font-bold text-xs">
+                        <td colSpan={5} className="px-2 py-1.5 text-right font-bold">
+                          مجموع الخصومات المحددة ({selectedIds.length} عنصر):
+                        </td>
+                        <td colSpan={3} className="px-2 py-1.5 text-center font-mono text-[11px] text-emerald-700">
+                          المحسوب بالعملة المحلية
+                        </td>
+                        <td className="px-2 py-1.5 font-bold font-mono text-emerald-700 text-xs">
+                          {formatMoney(discounts.filter(d => selectedIds.includes(d.id)).reduce((s, d) => s + Number(d.amount || 0), 0))} {baseCurrencyCode}
+                        </td>
+                        <td colSpan={2} className="px-2 py-1.5"></td>
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
                 <PaginationControls page={page} limit={limit} total={totalRecords} onPageChange={setPage} onLimitChange={setLimit} />
               </div>
@@ -858,9 +1124,16 @@ export const CustomerDiscounts: React.FC = () => {
                           <Trash2 size={14} />
                         </button>
                       </div>
-                      <span className="font-bold text-emerald-600 text-sm">
-                        {formatNumber(discount.amount)} ج.م
-                      </span>
+                      <div className="text-left font-mono">
+                        {discount.currency && discount.currency !== baseCurrencyCode && (
+                          <div className="text-[10px] text-amber-700 font-bold">
+                            {formatNumber(discount.currency_amount !== undefined && discount.currency_amount !== null ? discount.currency_amount : discount.amount)} {discount.currency} (×{discount.exchange_rate || 1})
+                          </div>
+                        )}
+                        <span className="font-bold text-emerald-600 text-sm">
+                          {formatNumber(discount.amount)} {baseCurrencyCode}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1087,40 +1360,206 @@ export const CustomerDiscounts: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Amount */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1 px-1">
-                        <label className="block text-xs font-bold text-zinc-600">
-                          {t('discounts.amount_label')}
-                        </label>
-                        {discountData.amount > 0 && !isAmountFocused && (
-                          <span className="text-[10px] font-mono font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
-                            {formatNumber(discountData.amount)} ج.م
+                    {/* Currency Selection or Amount */}
+                    {isMultiCurrency ? (
+                      <div>
+                        <label className="block text-xs font-bold text-zinc-600 mb-1 px-1 flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            <Coins className="w-3.5 h-3.5 text-amber-600" />
+                            <span>العملة</span>
                           </span>
-                        )}
+                          <span className="text-[10px] text-zinc-400 font-mono">
+                            الأساسية: {baseCurrencyCode}
+                          </span>
+                        </label>
+                        <div className="relative group">
+                          <select
+                            className={`w-full ${dir === 'rtl' ? 'pr-3 pl-7' : 'pl-3 pr-7'} py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 appearance-none text-xs cursor-pointer`}
+                            value={discountData.currency_id || (discountData.currency === baseCurrencyCode ? 'base' : '')}
+                            onChange={(e) => handleCurrencyChange(e.target.value)}
+                          >
+                            {availableCurrencies.map(c => (
+                              <option key={c.id || c.code} value={c.id || c.code}>
+                                {c.code} - {c.name_ar || c.name_en} {c.code?.toUpperCase() === baseCurrencyCode ? '(عملة النظام)' : ''}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className={`absolute ${dir === 'rtl' ? 'left-2' : 'right-2'} top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                        </div>
                       </div>
-                      <div className="relative group">
-                        <Wallet className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none`} />
-                        <input 
-                          required
-                          type="text" 
-                          inputMode="decimal"
-                          className={`w-full ${dir === 'rtl' ? 'pr-8 pl-3' : 'pl-8 pr-3'} py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs font-mono`}
-                          placeholder="0.00"
-                          value={isAmountFocused ? (discountData.amount > 0 ? String(discountData.amount) : '') : (discountData.amount > 0 ? formatNumber(discountData.amount) : '')}
-                          onFocus={() => setIsAmountFocused(true)}
-                          onChange={(e) => {
-                            const raw = e.target.value.replace(/,/g, '');
-                            if (raw === '' || /^\d*\.?\d*$/.test(raw)) {
-                              const num = parseFloat(raw) || 0;
-                              setDiscountData(prev => ({ ...prev, amount: num }));
-                            }
-                          }}
-                          onBlur={() => setIsAmountFocused(false)}
-                        />
+                    ) : (
+                      <div>
+                        <div className="flex items-center justify-between mb-1 px-1">
+                          <label className="block text-xs font-bold text-zinc-600">
+                            {t('discounts.amount_label')}
+                          </label>
+                          {discountData.amount > 0 && !isAmountFocused && (
+                            <span className="text-[10px] font-mono font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                              {formatNumber(discountData.amount)} {baseCurrencyCode}
+                            </span>
+                          )}
+                        </div>
+                        <div className="relative group">
+                          <Wallet className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                          <input 
+                            required
+                            type="text" 
+                            inputMode="decimal"
+                            className={`w-full ${dir === 'rtl' ? 'pr-8 pl-3' : 'pl-8 pr-3'} py-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs font-mono`}
+                            placeholder="0.00"
+                            value={isAmountFocused ? (discountData.amount > 0 ? String(discountData.amount) : '') : (discountData.amount > 0 ? formatNumber(discountData.amount) : '')}
+                            onFocus={() => setIsAmountFocused(true)}
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(/,/g, '');
+                              if (raw === '' || /^\d*\.?\d*$/.test(raw)) {
+                                const num = parseFloat(raw) || 0;
+                                setDiscountData(prev => ({ ...prev, amount: num, currency_amount: num }));
+                              }
+                            }}
+                            onBlur={() => setIsAmountFocused(false)}
+                          />
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
+
+                  {/* Multi-currency amount & exchange rate row */}
+                  {isMultiCurrency && (
+                    discountData.currency !== baseCurrencyCode ? (
+                      <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200 space-y-2 animate-in fade-in">
+                        <div className="flex items-center justify-between text-xs text-amber-900 font-bold">
+                          <span className="flex items-center gap-1.5">
+                            <Coins size={14} className="text-amber-600" />
+                            <span>خصم بعملة أجنبية ({discountData.currency})</span>
+                          </span>
+                          <span className="text-[11px] text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-md font-medium">
+                            عملة النظام الأساسية: {baseCurrencyCode}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          {/* Foreign Amount */}
+                          <div>
+                            <label className="block text-xs font-bold text-zinc-700 mb-1 px-1">
+                              المبلغ بالعملة ({discountData.currency})
+                            </label>
+                            <div className="relative group">
+                              <input
+                                required
+                                type="text"
+                                inputMode="decimal"
+                                className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs font-mono"
+                                placeholder="0.00"
+                                value={isAmountFocused ? (discountData.currency_amount > 0 ? String(discountData.currency_amount) : '') : (discountData.currency_amount > 0 ? formatNumber(discountData.currency_amount) : '')}
+                                onFocus={() => setIsAmountFocused(true)}
+                                onChange={(e) => {
+                                  const raw = e.target.value.replace(/,/g, '');
+                                  if (raw === '' || /^\d*\.?\d*$/.test(raw)) {
+                                    const num = parseFloat(raw) || 0;
+                                    setDiscountData(prev => ({
+                                      ...prev,
+                                      currency_amount: num,
+                                      amount: Number((num * (prev.exchange_rate || 1)).toFixed(2))
+                                    }));
+                                  }
+                                }}
+                                onBlur={() => setIsAmountFocused(false)}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Exchange Rate */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1 px-1">
+                              <label className="block text-xs font-bold text-zinc-700">
+                                سعر الصرف
+                              </label>
+                              <button
+                                type="button"
+                                onClick={refreshRate}
+                                disabled={isAutoFetchingRate}
+                                className="text-[10px] text-emerald-700 hover:text-emerald-800 flex items-center gap-1 font-bold disabled:opacity-50 transition-colors"
+                                title="تحديث سعر الصرف من الجدولة"
+                              >
+                                <RefreshCw size={11} className={isAutoFetchingRate ? "animate-spin" : ""} />
+                                <span>تحديث تلقائي</span>
+                              </button>
+                            </div>
+                            <div className="relative group">
+                              <input
+                                required
+                                type="text"
+                                inputMode="decimal"
+                                className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs font-mono"
+                                placeholder="1.0000"
+                                value={discountData.exchange_rate || ''}
+                                onChange={(e) => {
+                                  const raw = e.target.value.replace(/,/g, '');
+                                  if (raw === '' || /^\d*\.?\d*$/.test(raw)) {
+                                    const rate = parseFloat(raw) || 0;
+                                    setDiscountData(prev => ({
+                                      ...prev,
+                                      exchange_rate: rate,
+                                      amount: Number(((prev.currency_amount || 0) * rate).toFixed(2))
+                                    }));
+                                  }
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Equivalent in Base Currency */}
+                          <div>
+                            <label className="block text-xs font-bold text-zinc-700 mb-1 px-1">
+                              المبلغ المعادل ({baseCurrencyCode})
+                            </label>
+                            <div className="relative group">
+                              <input
+                                type="text"
+                                readOnly
+                                className="w-full px-3 py-2 bg-zinc-100 border border-zinc-200 rounded-xl font-bold text-emerald-700 text-xs font-mono cursor-not-allowed"
+                                value={`${formatNumber(discountData.amount)} ${baseCurrencyCode}`}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200">
+                        <div className="max-w-md">
+                          <div className="flex items-center justify-between mb-1 px-1">
+                            <label className="block text-xs font-bold text-zinc-700">
+                              {t('discounts.amount_label')} ({baseCurrencyCode})
+                            </label>
+                            {discountData.amount > 0 && !isAmountFocused && (
+                              <span className="text-[10px] font-mono font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                                {formatNumber(discountData.amount)} {baseCurrencyCode}
+                              </span>
+                            )}
+                          </div>
+                          <div className="relative group">
+                            <Wallet className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none`} />
+                            <input 
+                              required
+                              type="text" 
+                              inputMode="decimal"
+                              className={`w-full ${dir === 'rtl' ? 'pr-8 pl-3' : 'pl-8 pr-3'} py-2 bg-white border border-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-bold text-zinc-800 text-xs font-mono`}
+                              placeholder="0.00"
+                              value={isAmountFocused ? (discountData.amount > 0 ? String(discountData.amount) : '') : (discountData.amount > 0 ? formatNumber(discountData.amount) : '')}
+                              onFocus={() => setIsAmountFocused(true)}
+                              onChange={(e) => {
+                                const raw = e.target.value.replace(/,/g, '');
+                                if (raw === '' || /^\d*\.?\d*$/.test(raw)) {
+                                  const num = parseFloat(raw) || 0;
+                                  setDiscountData(prev => ({ ...prev, amount: num, currency_amount: num }));
+                                }
+                              }}
+                              onBlur={() => setIsAmountFocused(false)}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  )}
 
                   {/* Alternating Account Selection (خصم العملاء مسموح به vs حساب آخر من دليل الحسابات) */}
                   <div className="pt-3 border-t border-zinc-100">

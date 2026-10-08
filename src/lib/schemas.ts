@@ -21,7 +21,10 @@ export const JournalEntryItemSchema = z.object({
   supplier_name: z.string().nullable().optional(),
   sub_account_id: z.string().nullable().optional(),
   sub_account_type: z.enum(['customer', 'supplier', 'payment_method', 'expense', 'other']).nullable().optional(),
-});
+  currency: z.string().optional().nullable(),
+  exchange_rate: z.coerce.number().optional().nullable(),
+  foreign_amount: z.coerce.number().optional().nullable(),
+}).passthrough();
 
 // Journal Entry (The Double Entry Core)
 export const JournalEntrySchema = BaseSchema.extend({
@@ -175,6 +178,10 @@ export const DiscountSchema = BaseSchema.extend({
   description: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   attachments: z.any().optional(),
+  currency: z.string().optional().nullable(),
+  currency_id: z.string().optional().nullable(),
+  exchange_rate: z.coerce.number().optional().nullable(),
+  currency_amount: z.coerce.number().optional().nullable(),
   type: z.enum(['customer', 'supplier']),
   updated_at: z.string().optional(),
   updated_by: z.string().optional(),
