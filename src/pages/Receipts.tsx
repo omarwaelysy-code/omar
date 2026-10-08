@@ -2617,7 +2617,18 @@ export const Receipts: React.FC = () => {
                   <div className="space-y-1 text-left">
                     <p className="text-zinc-400 text-[10px] uppercase font-black tracking-widest">المبلغ</p>
                     <p className="font-black text-2xl tracking-tighter text-emerald-600">
-                      {formatNumber(receipt.amount)} <span className="text-sm font-bold">{t('common.currency')}</span>
+                      {receipt.currency_id && receipt.currency_id !== (companyData?.settings?.currency || 'EGP') ? (
+                        <>
+                          {formatNumber((Number(receipt.amount) || 0) * (Number(receipt.exchange_rate) || 1))} <span className="text-sm font-bold">{(companyData?.settings?.currency || 'EGP').toUpperCase()}</span>
+                          <span className="block text-xs font-bold text-zinc-500 font-mono">
+                            {formatNumber(receipt.amount)} {(() => { const rc = companyCurrencies.find(c => c.id === receipt.currency_id); return (rc?.code || 'USD').toUpperCase(); })()}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          {formatNumber(receipt.amount)} <span className="text-sm font-bold">{t('common.currency')}</span>
+                        </>
+                      )}
                     </p>
                   </div>
                   <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-zinc-200/50 flex justify-between items-end">

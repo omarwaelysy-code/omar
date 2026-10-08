@@ -267,15 +267,25 @@ export const DOCUMENT_TYPE_OPTIONS: DocumentTypeOption[] = [
 ];
 
 export const matchesDocumentTypeFilter = (
-  filterKey: string,
+  filterKey: string | string[],
   referenceType: string | null | undefined,
   description?: string | null,
   referenceNumber?: string | null
 ): boolean => {
-  if (!filterKey || filterKey === 'all') return true;
+  if (!filterKey) return true;
+  if (Array.isArray(filterKey)) {
+    if (filterKey.length === 0 || filterKey.includes('all')) return true;
+    const label = getDocumentTypeName(referenceType, description, referenceNumber, 'ar');
+    return filterKey.some(k => {
+      const opt = DOCUMENT_TYPE_OPTIONS.find(o => o.key === k);
+      return opt && label === opt.labelAr;
+    });
+  }
+  if (filterKey === 'all') return true;
   const label = getDocumentTypeName(referenceType, description, referenceNumber, 'ar');
   const opt = DOCUMENT_TYPE_OPTIONS.find(o => o.key === filterKey);
   if (!opt) return true;
   return label === opt.labelAr;
 };
+
 

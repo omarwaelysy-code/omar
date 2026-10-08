@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
-import { JournalEntry, Account } from '../types';
-import { Search, Calendar, FileText, Eye, Download, Printer, Filter, ArrowLeftRight, Trash2, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Calendar, FileText, Eye, Download, Printer, Filter, ArrowLeftRight, Trash2, RotateCcw, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { exportToPDF } from '../utils/pdfUtils';
@@ -79,7 +78,20 @@ export const JournalEntries: React.FC = () => {
   const [serverSummary, setServerSummary] = useState<any>({});
   const [maxSeqGenerated, setMaxSeqGenerated] = useState<number>(0);
   const [preset, setPreset] = useState('this_month');
-  const [selectedDocType, setSelectedDocType] = useState('all');
+  const [selectedDocTypes, setSelectedDocTypes] = useState<string[]>([]);
+  const [showDocTypeDropdown, setShowDocTypeDropdown] = useState(false);
+  const docTypeDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (docTypeDropdownRef.current && !docTypeDropdownRef.current.contains(event.target as Node)) {
+        setShowDocTypeDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const [dateRange, setDateRange] = useState({
     start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
@@ -234,7 +246,7 @@ export const JournalEntries: React.FC = () => {
 
   const filteredEntries = React.useMemo(() => {
     let result = entries.filter(entry => {
-      const matchesDocType = matchesDocumentTypeFilter(selectedDocType, entry.reference_type, entry.description, entry.reference_number);
+      const matchesDocType = matchesDocumentTypeFilter(selectedDocTypes, entry.reference_type, entry.description, entry.reference_number);
       if (!matchesDocType) return false;
 
       const matchesSearch = 
@@ -263,7 +275,7 @@ export const JournalEntries: React.FC = () => {
     }
 
     return result;
-  }, [entries, selectedDocType, searchTerm, dateRange, accounts, sortBy, sortOrder, language]);
+  }, [entries, selectedDocTypes, searchTerm, dateRange, accounts, sortBy, sortOrder, language]);
 
   const totalPages = Math.ceil((totalRecords || 1) / (limit === 1000000 ? (totalRecords || 1) : limit)) || 1;
   const currentDebitTotal = filteredEntries.reduce((sum, item) => sum + (Number(item.total_debit) || 0), 0);
@@ -405,21 +417,96 @@ export const JournalEntries: React.FC = () => {
               </div>
 
               {/* Document Type Filter Dropdown */}
-              <div className="space-y-1.5 w-56">
-                <label className="block text-xs font-bold text-zinc-500 mr-1">
-                  {language === 'ar' ? 'نوع الحركة / المستند' : 'Document Type'}
-                </label>
-                <select
-                  value={selectedDocType}
-                  onChange={(e) => { setSelectedDocType(e.target.value); setPage(1); }}
-                  className="w-full px-3 py-2 border border-zinc-200 bg-zinc-50 text-zinc-800 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm font-semibold transition-all shadow-sm cursor-pointer"
+              <div className="space-y-1.5 w-64 relative" ref={docTypeDropdownRef}>
+                <div className="flex items-center justify-between mr-1">
+                  <label className="block text-xs font-bold text-zinc-500">
+                    {language === 'ar' ? 'نوع الحركة / المستند' : 'Document Type'}
+                  </label>
+                  {selectedDocTypes.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedDocTypes([]); setPage(1); }}
+                      className="text-[11px] text-rose-500 hover:underline font-semibold cursor-pointer"
+                    >
+                      {language === 'ar' ? 'مسح التحديد' : 'Clear'}
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDocTypeDropdown(prev => !prev)}
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2 border border-zinc-200 bg-zinc-50 hover:bg-white text-zinc-800 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-xs md:text-sm font-semibold transition-all shadow-sm cursor-pointer text-start"
                 >
-                  {DOCUMENT_TYPE_OPTIONS.map(opt => (
-                    <option key={opt.key} value={opt.key}>
-                      {language === 'ar' ? opt.labelAr : opt.labelEn}
-                    </option>
-                  ))}
-                </select>
+                  <span className="truncate">
+                    {selectedDocTypes.length === 0
+                      ? (language === 'ar' ? 'جميع أنواع الحركات / المستندات' : 'All Document Types')
+                      : selectedDocTypes.length === 1
+                      ? (() => {
+                          const opt = DOCUMENT_TYPE_OPTIONS.find(o => o.key === selectedDocTypes[0]);
+                          return language === 'ar' ? opt?.labelAr : opt?.labelEn;
+                        })()
+                      : (language === 'ar' ? `${selectedDocTypes.length} أنواع محددة` : `${selectedDocTypes.length} Types Selected`)}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform ${showDocTypeDropdown ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showDocTypeDropdown && (
+                  <div className="absolute top-full right-0 mt-1.5 w-80 bg-white rounded-2xl border border-zinc-200 shadow-2xl z-50 p-2 space-y-1 max-h-80 overflow-y-auto">
+                    {/* Select All Option */}
+                    <div className="pb-1.5 mb-1 border-b border-zinc-100 px-1">
+                      <label className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-emerald-50 cursor-pointer text-xs select-none transition-colors group">
+                        <input
+                          type="checkbox"
+                          checked={selectedDocTypes.length === 0 || selectedDocTypes.length === DOCUMENT_TYPE_OPTIONS.slice(1).length}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedDocTypes([]);
+                            } else {
+                              setSelectedDocTypes([]);
+                            }
+                            setPage(1);
+                          }}
+                          className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 cursor-pointer"
+                        />
+                        <span className="font-bold text-zinc-800 group-hover:text-emerald-700">
+                          {language === 'ar' ? 'جميع أنواع الحركات / المستندات (الكل)' : 'All Document Types (Select All)'}
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* Options with checkboxes */}
+                    {DOCUMENT_TYPE_OPTIONS.slice(1).map(opt => {
+                      const isChecked = selectedDocTypes.includes(opt.key);
+                      return (
+                        <label
+                          key={opt.key}
+                          className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl cursor-pointer text-xs select-none transition-colors ${
+                            isChecked ? 'bg-emerald-50/70 text-emerald-900' : 'hover:bg-zinc-50 text-zinc-700'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              let next: string[];
+                              if (e.target.checked) {
+                                next = [...selectedDocTypes, opt.key];
+                              } else {
+                                next = selectedDocTypes.filter(k => k !== opt.key);
+                              }
+                              setSelectedDocTypes(next);
+                              setPage(1);
+                            }}
+                            className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-zinc-300 cursor-pointer"
+                          />
+                          <span className={`font-semibold ${isChecked ? 'font-bold text-emerald-800' : ''}`}>
+                            {language === 'ar' ? opt.labelAr : opt.labelEn}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 

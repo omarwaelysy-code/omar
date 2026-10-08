@@ -2884,7 +2884,18 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                   <div className="space-y-1 text-left">
                     <p className="text-zinc-400 text-[10px] uppercase font-black tracking-widest">المبلغ</p>
                     <p className="font-black text-2xl tracking-tighter text-emerald-600">
-                      {formatNumber(voucher.amount)} <span className="text-sm font-bold">{t('common.currency')}</span>
+                      {voucher.currency_id && voucher.currency_id !== (companyData?.settings?.currency || 'EGP') ? (
+                        <>
+                          {formatNumber((Number(voucher.amount) || 0) * (Number(voucher.exchange_rate) || 1))} <span className="text-sm font-bold">{(companyData?.settings?.currency || 'EGP').toUpperCase()}</span>
+                          <span className="block text-xs font-bold text-zinc-500 font-mono">
+                            {formatNumber(voucher.amount)} {(() => { const vc = companyCurrencies.find(c => c.id === voucher.currency_id); return (vc?.code || 'USD').toUpperCase(); })()}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          {formatNumber(voucher.amount)} <span className="text-sm font-bold">{t('common.currency')}</span>
+                        </>
+                      )}
                     </p>
                   </div>
                   <div className="col-span-2 space-y-1 mt-1 pt-3 border-t border-zinc-200/50 flex justify-end">

@@ -7383,9 +7383,12 @@ modules.forEach(moduleName => {
              const sumRes = await pool.query(`SELECT sum("total_amount" * COALESCE("exchange_rate", 1)) as sum1, sum("discount_amount" * COALESCE("exchange_rate", 1)) as sum2 FROM (${sql}) t`, values);
              summary = { total_amount: Number(sumRes.rows[0].sum1 || 0), total_discount: Number(sumRes.rows[0].sum2 || 0) };
           } else if (moduleName === 'returns' || moduleName === 'purchase_returns') {
-             const sumRes = await pool.query(`SELECT sum(total_amount) as sum1 FROM (${sql}) t`, values);
+             const sumRes = await pool.query(`SELECT sum("total_amount" * COALESCE("exchange_rate", 1)) as sum1 FROM (${sql}) t`, values);
              summary = { total_amount: Number(sumRes.rows[0].sum1 || 0) };
-          } else if (moduleName === 'receipt_vouchers' || moduleName === 'payment_vouchers' || moduleName === 'customer_discounts' || moduleName === 'supplier_discounts') {
+          } else if (moduleName === 'receipt_vouchers' || moduleName === 'payment_vouchers') {
+             const sumRes = await pool.query(`SELECT sum("amount" * COALESCE("exchange_rate", 1)) as sum1 FROM (${sql}) t`, values);
+             summary = { total_amount: Number(sumRes.rows[0].sum1 || 0) };
+          } else if (moduleName === 'customer_discounts' || moduleName === 'supplier_discounts') {
              const sumRes = await pool.query(`SELECT sum(amount) as sum1 FROM (${sql}) t`, values);
              summary = { total_amount: Number(sumRes.rows[0].sum1 || 0) };
           } else if (moduleName === 'journal_entries') {
@@ -7394,12 +7397,12 @@ modules.forEach(moduleName => {
           }
 
           let sortField = `"${sortBy}"`;
-          if (moduleName === 'invoices' || moduleName === 'purchase_invoices') {
+          if (moduleName === 'invoices' || moduleName === 'purchase_invoices' || moduleName === 'returns' || moduleName === 'purchase_returns') {
             if (sortBy === 'currency') {
               sortField = `"currency_id"`;
             } else if (sortBy === 'foreign_amount') {
               sortField = `"total_amount"`;
-            } else if (sortBy === 'base_amount') {
+            } else if (sortBy === 'base_amount' || sortBy === 'total_amount') {
               sortField = `("total_amount" * COALESCE("exchange_rate", 1))`;
             } else if (sortBy === 'subtotal') {
               sortField = `("subtotal" * COALESCE("exchange_rate", 1))`;

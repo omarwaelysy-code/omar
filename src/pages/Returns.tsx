@@ -81,8 +81,8 @@ export const Returns: React.FC = () => {
 
   const selectedTotals = useMemo(() => {
     const selected = returns.filter(r => selectedReturnIds.includes(r.id));
-    const total_amount = selected.reduce((sum, r) => sum + (Number(r.total_amount) || 0), 0);
-    const total_discount = selected.reduce((sum, r) => sum + (Number(r.discount) || 0), 0);
+    const total_amount = selected.reduce((sum, r) => sum + ((Number(r.total_amount) || 0) * (Number(r.exchange_rate) || 1)), 0);
+    const total_discount = selected.reduce((sum, r) => sum + ((Number(r.discount) || 0) * (Number(r.exchange_rate) || 1)), 0);
     const net_amount = total_amount - total_discount;
     return { total_amount, total_discount, net_amount };
   }, [returns, selectedReturnIds]);
@@ -2458,22 +2458,22 @@ export const Returns: React.FC = () => {
                     )}
                     {visibleColumns.subtotal && (
                       <td className={`px-2 py-0.5 font-medium text-slate-600 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                        {formatMoney(ret.subtotal || ret.total_amount)}
+                        {formatMoney((Number(ret.subtotal) || Number(ret.total_amount) || 0) * (Number(ret.exchange_rate) || 1))}
                       </td>
                     )}
                     {visibleColumns.tax_amount && (
                       <td className={`px-2 py-0.5 font-bold text-slate-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                        {formatMoney(ret.tax || ret.tax_amount || 0)}
+                        {formatMoney((Number(ret.tax) || Number(ret.tax_amount) || 0) * (Number(ret.exchange_rate) || 1))}
                       </td>
                     )}
                     {visibleColumns.withholding_tax_amount && isSalesWhtEnabled && (
                       <td className={`px-2 py-0.5 font-bold text-amber-600 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                        {ret.withholding_tax_amount ? formatMoney(ret.withholding_tax_amount) : '-'}
+                        {ret.withholding_tax_amount ? formatMoney(Number(ret.withholding_tax_amount) * (Number(ret.exchange_rate) || 1)) : '-'}
                       </td>
                     )}
                     {visibleColumns.total_amount && (
                       <td className={`px-2 py-0.5 font-bold text-emerald-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                        {formatMoney(ret.total_amount)} <span className="text-[10px] text-slate-400 font-mono">{(company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase()}</span>
+                        {formatMoney((Number(ret.total_amount) || 0) * (Number(ret.exchange_rate) || 1))} <span className="text-[10px] text-slate-400 font-mono">{(company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase()}</span>
                       </td>
                     )}
                     {visibleColumns.entry_number && (
