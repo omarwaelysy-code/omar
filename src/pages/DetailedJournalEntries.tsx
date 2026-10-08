@@ -4,7 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
 import { Search, Calendar, Eye, Download, Printer, RefreshCw, ChevronDown, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { formatNumber, formatMoney, formatDate, getDocumentTypeName } from '../utils/formatUtils';
+import { formatNumber, formatMoney, formatDate, getDocumentTypeName, DOCUMENT_TYPE_OPTIONS, matchesDocumentTypeFilter } from '../utils/formatUtils';
 import { PaginationControls } from '../components/PaginationControls';
 import { useNavigation } from '../contexts/NavigationContext';
 import { exportToExcel } from '../utils/excelUtils';
@@ -117,9 +117,48 @@ export const DetailedJournalEntries: React.FC = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const [preset, setPreset] = useState('this_month');
+  const [selectedDocType, setSelectedDocType] = useState('all');
+  const [sortBy, setSortBy] = useState<string>('');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('ASC');
+
+  const handleSort = (colId: string) => {
+    if (sortBy === colId) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(colId);
+      setSortOrder('ASC');
+    }
+    setPage(1);
+  };
+
+  // Filter & sort rawLines
+  const filteredLines = React.useMemo(() => {
+    let result = rawLines;
+    if (selectedDocType && selectedDocType !== 'all') {
+      result = result.filter(row => matchesDocumentTypeFilter(selectedDocType, row.reference_type, row.entry_description || row.line_description, row.reference_number));
+    }
+    if (sortBy) {
+      result = [...result].sort((a, b) => {
+        let valA: any = (a as any)[sortBy];
+        let valB: any = (b as any)[sortBy];
+        if (sortBy === 'reference_type') {
+          valA = getDocumentTypeName(a.reference_type, a.entry_description || a.line_description, a.reference_number, language);
+          valB = getDocumentTypeName(b.reference_type, b.entry_description || b.line_description, b.reference_number, language);
+        } else if (sortBy === 'account_name') {
+          valA = a.parent_account_name || a.account_name || '';
+          valB = b.parent_account_name || b.account_name || '';
+        }
+        if (typeof valA === 'string') {
+          return sortOrder === 'ASC' ? valA.localeCompare(String(valB || '')) : String(valB || '').localeCompare(valA);
+        }
+        return sortOrder === 'ASC' ? (Number(valA || 0) - Number(valB || 0)) : (Number(valB || 0) - Number(valA || 0));
+      });
+    }
+    return result;
+  }, [rawLines, selectedDocType, sortBy, sortOrder, language]);
 
   // Build unsplit pages: Ensure no journal entry is broken across page boundaries
-  const pages = React.useMemo(() => buildUnsplitPages(rawLines, limit), [rawLines, limit]);
+  const pages = React.useMemo(() => buildUnsplitPages(filteredLines, limit), [filteredLines, limit]);
   const totalPages = pages.length || 1;
   const data = pages[page - 1] || [];
   const startRowIndex = React.useMemo(() => {
@@ -600,6 +639,24 @@ export const DetailedJournalEntries: React.FC = () => {
                   />
                 </div>
               </div>
+
+              {/* Document Type Filter Dropdown */}
+              <div className="space-y-1.5 w-56">
+                <label className="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mr-1">
+                  {language === 'ar' ? 'نوع الحركة / المستند' : 'Document Type'}
+                </label>
+                <select
+                  value={selectedDocType}
+                  onChange={(e) => { setSelectedDocType(e.target.value); setPage(1); }}
+                  className="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-850 text-zinc-800 dark:text-zinc-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm font-semibold transition-all shadow-sm cursor-pointer"
+                >
+                  {DOCUMENT_TYPE_OPTIONS.map(opt => (
+                    <option key={opt.key} value={opt.key}>
+                      {language === 'ar' ? opt.labelAr : opt.labelEn}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Top Pagination Controls */}
@@ -630,7 +687,7 @@ export const DetailedJournalEntries: React.FC = () => {
               {/* Items Per Page & Total Results Box */}
               <div className="flex items-center gap-3 bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2 shadow-sm text-sm font-bold text-zinc-700 dark:text-zinc-300">
                 <span className="text-zinc-500">
-                  {language === 'ar' ? `إجمالي النتائج: ${totalRecords}` : `Total: ${totalRecords}`}
+                  {language === 'ar' ? `إجمالي النتائج: ${filteredLines.length}` : `Total: ${filteredLines.length}`}
                 </span>
                 <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700" />
                 <label className="flex items-center gap-2">
@@ -722,10 +779,14 @@ export const DetailedJournalEntries: React.FC = () => {
                       width: columnWidths[col.id] ? `${columnWidths[col.id]}px` : 'auto', 
                       minWidth: columnWidths[col.id] ? `${columnWidths[col.id]}px` : 'max-content' 
                     }}
-                    className="relative px-3 py-2 border-l border-zinc-300 dark:border-zinc-700 font-semibold select-none text-center group/th"
+                    onClick={() => handleSort(col.id)}
+                    className="relative px-3 py-2 border-l border-zinc-300 dark:border-zinc-700 font-semibold select-none text-center group/th cursor-pointer hover:bg-zinc-200/60 dark:hover:bg-zinc-750 transition-colors"
                   >
                     <div className="flex items-center justify-center gap-1">
                       {language === 'ar' ? col.labelAr : col.labelEn}
+                      <span className="text-[10px] text-zinc-400 group-hover:text-emerald-500 transition-colors">
+                        {sortBy === col.id ? (sortOrder === 'ASC' ? '▲' : '▼') : '↕'}
+                      </span>
                     </div>
                     {/* Left Resize Handle */}
                     <div

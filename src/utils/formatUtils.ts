@@ -236,3 +236,46 @@ export const getDocumentTypeName = (
   return type;
 };
 
+export interface DocumentTypeOption {
+  key: string;
+  labelAr: string;
+  labelEn: string;
+}
+
+export const DOCUMENT_TYPE_OPTIONS: DocumentTypeOption[] = [
+  { key: 'all', labelAr: 'جميع أنواع الحركات / المستندات', labelEn: 'All Document Types' },
+  { key: 'sales_invoices', labelAr: 'فواتير المبيعات', labelEn: 'Sales Invoices' },
+  { key: 'purchase_invoices', labelAr: 'فواتير المشتريات', labelEn: 'Purchase Invoices' },
+  { key: 'opening_stock_balances', labelAr: 'أرصدة المخزون الافتتاحية', labelEn: 'Opening Stock Balances' },
+  { key: 'returns', labelAr: 'مردودات المبيعات', labelEn: 'Sales Returns' },
+  { key: 'receipt_vouchers', labelAr: 'سندات القبض', labelEn: 'Receipt Vouchers' },
+  { key: 'payment_methods_opening', labelAr: 'الأرصدة الافتتاحية للبنوك والخزائن', labelEn: 'Bank/Safe Opening Balances' },
+  { key: 'payment_vouchers', labelAr: 'سندات الصرف', labelEn: 'Payment Vouchers' },
+  { key: 'purchase_returns', labelAr: 'مردودات المشتريات', labelEn: 'Purchase Returns' },
+  { key: 'issued_cheques', labelAr: 'الشيكات الصادرة (إصدار شيك)', labelEn: 'Issued Cheques' },
+  { key: 'cheque_payments', labelAr: 'صرف الشيكات من البنك', labelEn: 'Cheque Payments' },
+  { key: 'manual_journal_entries', labelAr: 'قيود اليومية العامة (إنشاء قيود من الحسابات العامة)', labelEn: 'General Journal Entries' },
+  { key: 'cash_transfers', labelAr: 'تحويلات النقدية والخزائن', labelEn: 'Cash Transfers' },
+  { key: 'customer_opening_balances', labelAr: 'الأرصدة الافتتاحية للعملاء (بطاقة العميل)', labelEn: 'Customer Opening Balances' },
+  { key: 'cheque_cancellations', labelAr: 'إلغاء الشيكات', labelEn: 'Cheque Cancellations' },
+  { key: 'supplier_opening_balances', labelAr: 'الأرصدة الافتتاحية للموردين (بطاقة المورد)', labelEn: 'Supplier Opening Balances' },
+  { key: 'stock_adjustments', labelAr: 'تسويات المخزون (أذون التسوية المقيدة)', labelEn: 'Stock Adjustments' },
+  { key: 'customer_discounts', labelAr: 'خصومات العملاء (المسموح به)', labelEn: 'Customer Discounts' },
+  { key: 'supplier_discounts', labelAr: 'خصومات الموردين (الخصم المكتسب)', labelEn: 'Supplier Discounts' },
+  { key: 'received_cheques', labelAr: 'الشيكات الواردة', labelEn: 'Received Cheques' },
+  { key: 'account_opening_balances', labelAr: 'الأرصدة الافتتاحية لدليل الحسابات', labelEn: 'Chart of Accounts Opening Balances' },
+];
+
+export const matchesDocumentTypeFilter = (
+  filterKey: string,
+  referenceType: string | null | undefined,
+  description?: string | null,
+  referenceNumber?: string | null
+): boolean => {
+  if (!filterKey || filterKey === 'all') return true;
+  const label = getDocumentTypeName(referenceType, description, referenceNumber, 'ar');
+  const opt = DOCUMENT_TYPE_OPTIONS.find(o => o.key === filterKey);
+  if (!opt) return true;
+  return label === opt.labelAr;
+};
+
