@@ -638,6 +638,7 @@ export const CashTransfers: React.FC = () => {
         description: `قيد تحويل بين البنوك والخزائن${formData.description ? ': ' + formData.description : ''}`,
         reference_id: editingTransfer?.id || 'new',
         reference_type: 'cash_transfer',
+        reference_number: formData.transfer_number || editingTransfer?.transfer_number || '',
         items: journalItems,
         total_debit: baseAmount,
         total_credit: baseAmount,
@@ -700,6 +701,8 @@ export const CashTransfers: React.FC = () => {
       let transferNumber = formData.transfer_number;
       if (!transferNumber && !editingTransfer) {
         transferNumber = await generateTransferNumber(formData.date);
+      } else if (!transferNumber && editingTransfer) {
+        transferNumber = editingTransfer.transfer_number;
       }
 
       const data = {
@@ -746,6 +749,7 @@ export const CashTransfers: React.FC = () => {
         date: formData.date,
         description: `قيد تحويل بين البنوك والخزائن${formData.description ? ': ' + formData.description : ''}`,
         reference_type: 'cash_transfer',
+        reference_number: transferNumber || '',
         items: journalItems,
         total_debit: baseAmount,
         total_credit: baseAmount,

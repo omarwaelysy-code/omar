@@ -157,7 +157,7 @@ export const getDocumentTypeName = (
     else if (ref.startsWith('SDISC-')) type = 'supplier_discount';
     else if (ref.startsWith('CHK-')) type = 'issued_cheque';
     else if (ref.startsWith('RCHK-')) type = 'received_cheque';
-    else if (ref.startsWith('TRF-')) type = 'cash_transfer';
+    else if (ref.startsWith('TRF-') || ref.startsWith('CT-')) type = 'cash_transfer';
     else if (ref.startsWith('ADJ-')) type = 'stock_adjustment';
   }
 

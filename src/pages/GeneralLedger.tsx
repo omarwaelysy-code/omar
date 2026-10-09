@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
 import { AccountingEngine } from '../services/AccountingEngine';
-import { formatNumber, formatDate } from '../utils/formatUtils';
+import { formatNumber, formatDate, getDocumentTypeName } from '../utils/formatUtils';
 import { useNavigation } from '../contexts/NavigationContext';
 
 const isDefaultMethodForAccount = (method: any, sharingMethods: any[]) => {
@@ -166,6 +166,9 @@ export const GeneralLedger: React.FC = () => {
     } else if (normType === 'purchase_return') {
       setPendingViewDoc({ type: 'purchase_return', idOrNumber: reference });
       setCurrentPage('purchase_returns');
+    } else if (normType === 'cash_transfer' || normType === 'transfer' || reference.startsWith('CT-') || reference.startsWith('TRF-')) {
+      setPendingViewDoc({ type: 'cash_transfer', idOrNumber: reference });
+      setCurrentPage('cash_transfers');
     } else {
       setPendingViewDoc({ type: 'manual', idOrNumber: reference });
       setCurrentPage('journal_entries');
@@ -307,6 +310,8 @@ export const GeneralLedger: React.FC = () => {
         const typeLabel = typeInfo ? typeInfo.name : (account?.type_name || '-');
         const resolvedAccountName = item.account_name || account?.name || '';
 
+        const docTypeName = getDocumentTypeName(entry.reference_type, item.description || entry.description, entry.reference_number, language);
+
         const matchesSearch = 
           !detailedSearchTerm ||
           resolvedAccountName.toLowerCase().includes(detailedSearchTerm.toLowerCase()) ||
@@ -315,7 +320,8 @@ export const GeneralLedger: React.FC = () => {
           (entry.entry_number || '').toLowerCase().includes(detailedSearchTerm.toLowerCase()) ||
           (entry.reference_number || '').toLowerCase().includes(detailedSearchTerm.toLowerCase()) ||
           entityName.toLowerCase().includes(detailedSearchTerm.toLowerCase()) ||
-          subAccountOrProduct.toLowerCase().includes(detailedSearchTerm.toLowerCase());
+          subAccountOrProduct.toLowerCase().includes(detailedSearchTerm.toLowerCase()) ||
+          docTypeName.toLowerCase().includes(detailedSearchTerm.toLowerCase());
 
         if (!matchesSearch) return;
 
@@ -328,6 +334,7 @@ export const GeneralLedger: React.FC = () => {
           account_type: typeLabel,
           reference: entry.reference_number || '-',
           reference_type: entry.reference_type,
+          doc_type: docTypeName,
           entity_name: entityName || '-',
           sub_account_product: subAccountOrProduct,
           debit: Number(item.debit) || 0,
@@ -442,7 +449,7 @@ export const GeneralLedger: React.FC = () => {
         [t('accounts.column_name')]: line.account_name,
         [t('accounts.column_type')]: line.account_type,
         [t('journal.column_reference')]: line.reference,
-        [t('journal.type')]: line.reference_type,
+        [language === 'ar' ? 'نوع الحركة / المستند' : 'Document Type']: line.doc_type || getDocumentTypeName(line.reference_type, line.description, line.reference, language),
         [t('ledger.column_entity')]: line.entity_name,
         [language === 'ar' ? 'الحساب الفرعي/الصنف' : 'Sub-account/Product']: line.sub_account_product,
         [t('journal.column_debit')]: line.debit,
@@ -466,6 +473,7 @@ export const GeneralLedger: React.FC = () => {
           [language === 'ar' ? 'الحساب الفرعي/الصنف' : 'Sub-account/Product']: getSubAccountOrProductSingle(tx),
           [t('journal.column_description')]: tx.description,
           [t('journal.column_reference')]: tx.reference || '-',
+          [language === 'ar' ? 'نوع الحركة / المستند' : 'Document Type']: getDocumentTypeName(tx.reference_type, tx.description, tx.reference, language),
           [language === 'ar' ? 'رقم القيد' : 'Entry No.']: tx.entry_number || '-',
           [language === 'ar' ? 'العملة' : 'Currency']: tx.currency || 'EGP',
           [language === 'ar' ? 'المبلغ (±)' : 'Amount (±)']: signedAmt,
@@ -699,7 +707,7 @@ export const GeneralLedger: React.FC = () => {
                     <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('accounts.column_name')}</th>
                     <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('accounts.column_type')}</th>
                     <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_reference')}</th>
-                    <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.type')}</th>
+                    <th className="px-6 py-4 text-sm font-bold text-zinc-700">{language === 'ar' ? 'نوع الحركة / المستند' : 'Doc Type'}</th>
                     <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('ledger.column_entity')}</th>
                     <th className="px-6 py-4 text-sm font-bold text-zinc-700">{language === 'ar' ? 'الحساب الفرعي / الصنف' : 'Sub-account / Product'}</th>
                     <th className="px-6 py-4 text-sm font-bold text-zinc-700 text-center">{t('journal.column_debit')}</th>
@@ -744,9 +752,9 @@ export const GeneralLedger: React.FC = () => {
                           <span className="px-3 py-1 bg-zinc-100 text-zinc-400 rounded-lg text-xs font-bold font-mono">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm font-medium text-zinc-500">
-                        <span className="px-2 py-0.5 rounded text-xs bg-zinc-50 border border-zinc-200">
-                          {tx.reference_type || '-'}
+                      <td className="px-6 py-4 text-sm font-medium text-zinc-600">
+                        <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-zinc-100 text-zinc-700 border border-zinc-200 inline-block whitespace-nowrap">
+                          {tx.doc_type || getDocumentTypeName(tx.reference_type, tx.description, tx.reference, language)}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm font-bold text-emerald-600">{tx.entity_name}</td>
@@ -821,6 +829,7 @@ export const GeneralLedger: React.FC = () => {
                       <th className="px-6 py-4 text-sm font-bold text-zinc-700">{language === 'ar' ? 'الحساب الفرعي / الصنف' : 'Sub-account / Product'}</th>
                       <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_description')}</th>
                       <th className="px-6 py-4 text-sm font-bold text-zinc-700">{t('journal.column_reference')}</th>
+                      <th className="px-6 py-4 text-sm font-bold text-zinc-700">{language === 'ar' ? 'نوع الحركة / المستند' : 'Doc Type'}</th>
                       <th className="px-6 py-4 text-sm font-bold text-zinc-700">{language === 'ar' ? 'رقم القيد' : 'Entry No.'}</th>
                       <th className="px-4 py-4 text-sm font-bold text-zinc-700 text-center">{language === 'ar' ? 'العملة' : 'Currency'}</th>
                       <th className="px-4 py-4 text-sm font-bold text-zinc-700 text-center">{language === 'ar' ? 'المبلغ (±)' : 'Amount (±)'}</th>
@@ -837,6 +846,7 @@ export const GeneralLedger: React.FC = () => {
                       <td className="px-6 py-4 text-sm text-zinc-400">-</td>
                       <td className="px-6 py-4 text-sm text-zinc-400">-</td>
                       <td className="px-6 py-4 text-sm font-medium text-zinc-600">{t('ledger.opening_balance_row')}</td>
+                      <td className="px-6 py-4 text-sm text-zinc-400 text-center">-</td>
                       <td className="px-6 py-4 text-sm text-zinc-400 text-center">-</td>
                       <td className="px-6 py-4 text-sm text-zinc-400 text-center">-</td>
                       <td className="px-4 py-4 text-sm font-mono font-bold text-zinc-500 text-center">EGP</td>
@@ -874,7 +884,7 @@ export const GeneralLedger: React.FC = () => {
                             {tx.reference && tx.reference !== '-' ? (
                               <span 
                                 onClick={() => handleTransactionClick(tx.reference_type, tx.reference)}
-                                className="px-3 py-1 bg-zinc-100 text-emerald-600 hover:text-emerald-705 hover:bg-emerald-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 font-mono"
+                                className="px-3 py-1 bg-zinc-100 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 font-mono"
                               >
                                 {tx.reference}
                               </span>
@@ -884,6 +894,11 @@ export const GeneralLedger: React.FC = () => {
                               </span>
                             )}
                           </td>
+                          <td className="px-6 py-4 text-sm font-medium text-zinc-600">
+                            <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-zinc-100 text-zinc-700 border border-zinc-200 inline-block whitespace-nowrap">
+                              {getDocumentTypeName(tx.reference_type, tx.description, tx.reference, language)}
+                            </span>
+                          </td>
                           <td className="px-6 py-4">
                             {tx.entry_number ? (
                               <span 
@@ -891,7 +906,7 @@ export const GeneralLedger: React.FC = () => {
                                   setPendingViewDoc({ type: 'journal', idOrNumber: tx.entry_number! });
                                   setCurrentPage('journal_entries');
                                 }}
-                                className="px-3 py-1 bg-zinc-100 text-indigo-600 hover:text-indigo-707 hover:bg-indigo-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 font-mono"
+                                className="px-3 py-1 bg-zinc-100 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 font-mono"
                               >
                                 {tx.entry_number}
                               </span>
@@ -924,7 +939,7 @@ export const GeneralLedger: React.FC = () => {
                     })}
                     {ledgerData.length === 0 && (
                       <tr>
-                        <td colSpan={12} className="px-6 py-12 text-center text-zinc-500 font-medium">
+                        <td colSpan={13} className="px-6 py-12 text-center text-zinc-500 font-medium">
                           {t('ledger.no_transactions')}
                         </td>
                       </tr>

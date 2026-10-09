@@ -456,6 +456,9 @@ export const DetailedJournalEntries: React.FC = () => {
     } else if (normType === 'purchase_return') {
       setPendingViewDoc({ type: 'purchase_return', idOrNumber: reference });
       setCurrentPage('purchase_returns');
+    } else if (normType === 'cash_transfer' || normType === 'transfer' || reference.startsWith('CT-') || reference.startsWith('TRF-')) {
+      setPendingViewDoc({ type: 'cash_transfer', idOrNumber: reference });
+      setCurrentPage('cash_transfers');
     } else {
       setPendingViewDoc({ type: 'manual', idOrNumber: reference });
       setCurrentPage('journal_entries');

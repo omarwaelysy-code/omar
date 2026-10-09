@@ -8303,6 +8303,21 @@ modules.forEach(moduleName => {
 
           const sanitizedData = sanitizeData(moduleName, payloadToPersist);
           const data = { ...sanitizedData };
+          if (moduleName === 'journal_entries') {
+            if ((!data.reference_number || data.reference_number === '') && data.reference_id) {
+              if (data.reference_type === 'cash_transfer' || data.reference_type === 'transfer') {
+                const ctRes = await client.query('SELECT transfer_number FROM cash_transfers WHERE (id = $1 OR transfer_number = $1) AND company_id = $2 LIMIT 1', [data.reference_id, companyId]);
+                if (ctRes.rows.length > 0 && ctRes.rows[0].transfer_number) {
+                  data.reference_number = ctRes.rows[0].transfer_number;
+                }
+              } else if (data.reference_type === 'stock_adjustment') {
+                const saRes = await client.query('SELECT adjustment_number FROM stock_adjustments WHERE (id = $1 OR adjustment_number = $1) AND company_id = $2 LIMIT 1', [data.reference_id, companyId]);
+                if (saRes.rows.length > 0 && saRes.rows[0].adjustment_number) {
+                  data.reference_number = saRes.rows[0].adjustment_number;
+                }
+              }
+            }
+          }
           const isSuperAdmin = req.user?.role === 'super_admin' || (req.user as any)?.is_super_admin === true;
           if (EXPECTED_SCHEMA[moduleName]?.includes('company_id')) {
             const authorizedCompanies = (req.user as any)?.authorized_company_ids || (req.user?.company_id ? [req.user.company_id] : []);
@@ -8724,6 +8739,21 @@ modules.forEach(moduleName => {
 
           const sanitizedData = sanitizeData(moduleName, payloadToPersist);
           delete (sanitizedData as any).id;
+          if (moduleName === 'journal_entries') {
+            if ((!(sanitizedData as any).reference_number || (sanitizedData as any).reference_number === '') && (sanitizedData as any).reference_id) {
+              if ((sanitizedData as any).reference_type === 'cash_transfer' || (sanitizedData as any).reference_type === 'transfer') {
+                const ctRes = await pool.query('SELECT transfer_number FROM cash_transfers WHERE (id = $1 OR transfer_number = $1) AND company_id = $2 LIMIT 1', [(sanitizedData as any).reference_id, companyId]);
+                if (ctRes.rows.length > 0 && ctRes.rows[0].transfer_number) {
+                  (sanitizedData as any).reference_number = ctRes.rows[0].transfer_number;
+                }
+              } else if ((sanitizedData as any).reference_type === 'stock_adjustment') {
+                const saRes = await pool.query('SELECT adjustment_number FROM stock_adjustments WHERE (id = $1 OR adjustment_number = $1) AND company_id = $2 LIMIT 1', [(sanitizedData as any).reference_id, companyId]);
+                if (saRes.rows.length > 0 && saRes.rows[0].adjustment_number) {
+                  (sanitizedData as any).reference_number = saRes.rows[0].adjustment_number;
+                }
+              }
+            }
+          }
           if (moduleName !== 'companies') {
             if (moduleName === 'users') {
               const isCallerSuperAdmin = isSuperAdmin;
