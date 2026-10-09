@@ -2567,9 +2567,44 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         if (cfg.table && cfg.table !== 'journal_entries') {
           count = docCount;
           netValue = parseFloat(docTotal.toFixed(2));
-          // Counter value (e.g. COGS/taxes) only legitimately applies to dual-entry trade documents (invoices & returns)
-          const allowsCounterSide = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns'].includes(cfg.key);
-          counterValue = allowsCounterSide ? Math.max(0, parseFloat((journalValue - netValue).toFixed(2))) : 0;
+
+          // Actual calculation of legitimate secondary legs (COGS / restock / settlements)
+          // NEVER use mathematical plugs (journalValue - netValue) so genuine variances are exposed!
+          let actualCounter = 0;
+          if (cfg.key === 'invoices') {
+            // In sales invoices, legitimate secondary debits are Cost of Goods Sold (COGS) + direct cash/bank collections on cash invoices + withholding/discounts
+            const sideRes: any = await client.query(
+              `SELECT COALESCE(SUM(jel.debit), 0)::numeric as side_tot
+               FROM journal_entry_lines jel
+               JOIN journal_entries je ON je.id = jel.journal_entry_id
+               JOIN accounts a ON a.id = jel.account_id
+               WHERE je.company_id = $1 
+                 AND je.reference_type IN ('invoice', 'sales_invoice')
+                 AND (
+                   a.account_usage IN ('cost_of_sales', 'cost_of_goods_sold', 'cash', 'bank', 'withholding_tax_customers', 'earned_discounts')
+                   OR a.code LIKE '51%'
+                 )`,
+              [companyId]
+            );
+            actualCounter = parseFloat(sideRes.rows[0]?.side_tot || 0);
+          } else if (cfg.key === 'returns') {
+            // In sales returns, legitimate secondary debit is the Inventory Restock debit (cost of returned goods)
+            const sideRes: any = await client.query(
+              `SELECT COALESCE(SUM(jel.debit), 0)::numeric as side_tot
+               FROM journal_entry_lines jel
+               JOIN journal_entries je ON je.id = jel.journal_entry_id
+               JOIN accounts a ON a.id = jel.account_id
+               WHERE je.company_id = $1 
+                 AND je.reference_type IN ('return', 'sales_return')
+                 AND (a.account_usage = 'inventory' OR a.code LIKE '114%')`,
+              [companyId]
+            );
+            actualCounter = parseFloat(sideRes.rows[0]?.side_tot || 0);
+          } else {
+            // All other transactions have NO secondary debit legs; the document face value must equal the journal total!
+            actualCounter = 0;
+          }
+          counterValue = parseFloat(actualCounter.toFixed(2));
         } else {
           count = jeCount;
           netValue = totalValue;
@@ -2648,17 +2683,47 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
                 details: 'المستند مسجل في النظام لكن لم يتم إنشاء قيد محاسبي له في دفتر اليومية'
               });
             }
+
+            // Check for specific document-level variance issues between document amount and journal entry
+            if (cfg.table && cfg.numCol && !['invoices', 'returns'].includes(cfg.key)) {
+              const diffRes: any = await client.query(
+                `SELECT d.id, d."${cfg.numCol}" as doc_num, d."${cfg.dateCol}" as doc_date,
+                        ${docAmtExpr} as doc_amt,
+                        je.total_debit as je_amt,
+                        ${cfg.partyCol ? `d."${cfg.partyCol}"` : `''`} as party
+                 FROM "${cfg.table}" d
+                 JOIN journal_entries je ON (je.reference_id = d.id::text OR je.reference_number = d."${cfg.numCol}"::text)
+                 WHERE d.company_id = $1
+                   AND je.company_id = $1
+                   AND je.reference_type IN (${placeholders})
+                   AND ABS(ROUND(je.total_debit, 2) - ROUND(${docAmtExpr}, 2)) > 0.05
+                 LIMIT 10`,
+                [companyId, ...cfg.refTypes]
+              );
+
+              for (const df of diffRes.rows) {
+                issues.push({
+                  document_id: df.id,
+                  document_number: df.doc_num || df.id,
+                  date: df.doc_date,
+                  amount: parseFloat(df.doc_amt || 0),
+                  party_name: df.party || '',
+                  error_type: 'فارق في قيمة القيد المحاسبي',
+                  details: `قيمة المستند (${parseFloat(df.doc_amt).toLocaleString()} ج.م) لا تطابق قيمة القيد المحاسبي (${parseFloat(df.je_amt).toLocaleString()} ج.م) بفارق ${Math.abs(parseFloat(df.je_amt) - parseFloat(df.doc_amt)).toLocaleString()} ج.م`
+                });
+              }
+            }
           } catch (e) {
             // ignore unposted check error for custom tables
           }
         }
 
-        // Calculate variance (true audit variance between source documents and journal)
+        // Calculate variance (true audit variance between source documents + actual counter sides vs journal)
         let variance = 0;
         if (unpostedCount > 0) {
           variance = parseFloat(unpostedValue.toFixed(2));
         } else {
-          variance = parseFloat((netValue + counterValue - journalValue).toFixed(2));
+          variance = parseFloat(Math.abs(netValue + counterValue - journalValue).toFixed(2));
         }
 
         postingTransactions.push({
