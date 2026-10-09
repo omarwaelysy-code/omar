@@ -2161,6 +2161,8 @@ export const PurchaseReturns: React.FC = () => {
         // Re-calculate totals
         total_debit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0).toFixed(2)) || 0;
         total_credit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0).toFixed(2)) || 0;
+      }
+
       // Ensure all journal items have valid account_id
       const invalidAccountItem = journalItems.find(item => !item.account_id);
       if (invalidAccountItem) {
