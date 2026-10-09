@@ -399,6 +399,7 @@ export const PurchaseReturns: React.FC = () => {
   };
 
   const closeModal = () => {
+    setIsSubmitting(false);
     setIsModalOpen(false);
     setEtaLockData(null);
     setEditingReturn(null);
@@ -1348,8 +1349,10 @@ export const PurchaseReturns: React.FC = () => {
           const qty = Number(item.quantity) || 0;
           const price = Number(item.unit_price) || 0;
           const vat_rate = Number(item.vat_rate) || 0;
+          const wht_rate = Number(item.withholding_tax_rate) || 0;
           item.total = Number((qty * price).toFixed(4));
           item.vat_amount = isVatEnabled ? Number((item.total * (vat_rate / 100)).toFixed(4)) : 0;
+          item.withholding_tax_amount = Number((item.total * (wht_rate / 100)).toFixed(4));
         }
       }
       
@@ -1547,14 +1550,16 @@ export const PurchaseReturns: React.FC = () => {
     skipEtaLinkCheckRef.current = false;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
     if (!user || isSubmitting) return;
-    setIsSubmitting(true);
 
     const validItems = items.filter(item => item.product_id);
     if (!returnData.supplier_id || validItems.length === 0) {
       showNotification(language === 'ar' ? 'يرجى اختيار المورد وإضافة أصناف مكتملة للمرتجع' : 'Please select supplier and add complete items to return', 'error');
+      setIsSubmitting(false);
       return;
     }
 
@@ -1568,6 +1573,8 @@ export const PurchaseReturns: React.FC = () => {
       setIsSubmitting(false);
       return;
     }
+
+    setIsSubmitting(true);
 
     try {
       const supplier = suppliers.find(s => s.id === returnData.supplier_id);
@@ -1618,6 +1625,10 @@ export const PurchaseReturns: React.FC = () => {
         const rate = item.vat_rate !== undefined ? item.vat_rate : (product?.vat_rate || 0);
         const total = Number((Number(item.quantity) || 0) * (Number(item.unit_price) || 0)) || 0;
         const vat_amount = isVatEnabled ? Number((total * (rate / 100)).toFixed(2)) : 0;
+        const itemWhtRate = Number(item.withholding_tax_rate) || 0;
+        const itemWhtAmount = (item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null && Number(item.withholding_tax_amount) > 0)
+          ? Number(item.withholding_tax_amount)
+          : Number((total * (itemWhtRate / 100)).toFixed(2));
         return {
           product_id: item.product_id,
           product_name: product?.name || item.product_name || '',
@@ -1630,8 +1641,8 @@ export const PurchaseReturns: React.FC = () => {
           total: total,
           vat_rate: rate,
           vat_amount: vat_amount,
-          withholding_tax_rate: Number(item.withholding_tax_rate) || 0,
-          withholding_tax_amount: Number(item.withholding_tax_amount) || 0,
+          withholding_tax_rate: itemWhtRate,
+          withholding_tax_amount: itemWhtAmount,
           operation_id: item.operation_id || null,
           department_id: item.department_id || null,
           cost_center_id: item.cost_center_id || null,
@@ -1911,6 +1922,25 @@ export const PurchaseReturns: React.FC = () => {
           creditAccountName = product?.cost_account_name || 'حساب المشتريات';
         }
 
+        if (!creditAccountId) {
+          const invAcc = accounts.find(a => 
+            a.account_usage === 'inventory' || 
+            a.code === '1105' || 
+            a.code?.startsWith('1105') || 
+            a.name.includes('مخزون')
+          ) || accounts.find(a => 
+            a.account_usage === 'purchases' || 
+            a.account_usage === 'cost_of_sales' || 
+            a.code === '5101' || 
+            a.name.includes('مشتريات') || 
+            a.name.includes('تكلفة')
+          );
+          if (invAcc) {
+            creditAccountId = invAcc.id;
+            creditAccountName = invAcc.name;
+          }
+        }
+
         const creditAcc = accounts.find(a => a.id === creditAccountId);
         const creditAccountCode = creditAcc?.code || '';
 
@@ -1934,7 +1964,12 @@ export const PurchaseReturns: React.FC = () => {
           let vatAccountName = product?.vat_account_name || (language === 'ar' ? 'حساب ضريبة القيمة المضافة' : 'VAT Account');
           if (!vatAccountId) {
             const globalVatAccount = accounts.find(a => 
-              a.name.includes('ضريبة القيمة المضافة') || a.name.includes('قيمة مضافة') || a.name.includes('ضريبة مدخلات')
+              a.account_usage === 'vat' || 
+              a.account_usage === 'input_vat' || 
+              a.code === '110402' || 
+              a.name.includes('ضريبة القيمة المضافة') || 
+              a.name.includes('قيمة مضافة') || 
+              a.name.includes('ضريبة مدخلات')
             );
             vatAccountId = globalVatAccount?.id || '';
             vatAccountName = globalVatAccount?.name || vatAccountName;
@@ -1955,13 +1990,32 @@ export const PurchaseReturns: React.FC = () => {
 
         // 3. Debit Discount (reverse discount) if itemDiscount > 0
         if (itemDiscount > 0) {
-          const discountAccountId = settings?.supplier_discount_account_id || '';
+          let discountAccountId = settings?.supplier_discount_account_id || '';
+          let discountAccountName = 'حساب الخصم المكتسب';
+          if (!discountAccountId) {
+            const discAcc = accounts.find(a => 
+              a.account_usage === 'granted_discounts' ||
+              a.code === '5105' ||
+              a.code === '512' ||
+              a.name.includes('خصم مكتسب') ||
+              a.name.includes('الخصم المكتسب') ||
+              a.name.includes('خصم الموردين') ||
+              a.name.includes('خصم موردين')
+            );
+            if (discAcc) {
+              discountAccountId = discAcc.id;
+              discountAccountName = discAcc.name;
+            }
+          } else {
+            const dAcc = accounts.find(a => a.id === discountAccountId);
+            if (dAcc) discountAccountName = dAcc.name;
+          }
           const discountAccount = accounts.find(a => a.id === discountAccountId);
           const discountAccountCode = discountAccount?.code || '';
 
           journalItems.push({
             account_id: discountAccountId,
-            account_name: discountAccount?.name || 'حساب الخصم المكتسب',
+            account_name: discountAccountName,
             account_code: discountAccountCode,
             product_name: item.product_name,
             debit: itemDiscount,
@@ -1977,10 +2031,14 @@ export const PurchaseReturns: React.FC = () => {
           if (!whtAccountId) {
             const globalWhtAccount = accounts.find(a => 
               a.id === (settings as any)?.withholding_tax_suppliers_account_id ||
+              a.account_usage === 'withholding_tax_suppliers' ||
               (a.usage_type && a.usage_type === 'withholding_tax_suppliers') ||
+              a.code === '213' ||
+              a.code?.startsWith('213') ||
               a.name.includes('خصم من الموردين') ||
               a.name.includes('خصم على الموردين') ||
-              a.name.includes('ضرائب خصم')
+              a.name.includes('ضرائب خصم') ||
+              a.name.includes('أرباح تجارية')
             );
             whtAccountId = globalWhtAccount?.id || '';
             whtAccountName = globalWhtAccount?.name || whtAccountName;
@@ -2001,7 +2059,20 @@ export const PurchaseReturns: React.FC = () => {
 
         // Debit Accounts
         let supplierAccountId = supplier?.account_id || '';
-        let supplierAccountName = supplier?.account_name || 'حساب الموردين';
+        let supplierAccountName = supplier?.account_name || supplier?.name || 'حساب الموردين';
+        if (!supplierAccountId) {
+          const suppAcc = accounts.find(a => 
+            a.account_usage === 'supplier' || 
+            a.account_usage === 'accounts_payable' || 
+            a.code === '2101' || 
+            a.name.includes('موردين') || 
+            a.name.includes('الذمم الدائنة')
+          );
+          if (suppAcc) {
+            supplierAccountId = suppAcc.id;
+            supplierAccountName = suppAcc.name;
+          }
+        }
         const supplierAcc = accounts.find(a => a.id === supplierAccountId);
         const supplierAccountCode = supplierAcc?.code || '';
 
@@ -2090,6 +2161,17 @@ export const PurchaseReturns: React.FC = () => {
         // Re-calculate totals
         total_debit = Number(journalItems.reduce((sum, item) => sum + (Number(item.debit) || 0), 0).toFixed(2)) || 0;
         total_credit = Number(journalItems.reduce((sum, item) => sum + (Number(item.credit) || 0), 0).toFixed(2)) || 0;
+      // Ensure all journal items have valid account_id
+      const invalidAccountItem = journalItems.find(item => !item.account_id);
+      if (invalidAccountItem) {
+        showNotification(
+          language === 'ar'
+            ? `لا يمكن الحفظ: الحساب المالي لـ (${invalidAccountItem.description || invalidAccountItem.account_name}) غير محدد. يرجى مراجعة إعدادات الحسابات الشاملة.`
+            : `Cannot save: Financial account for (${invalidAccountItem.description || invalidAccountItem.account_name}) is missing.`,
+          'error'
+        );
+        setIsSubmitting(false);
+        return;
       }
 
       const journalEntryData = {
@@ -2244,11 +2326,12 @@ export const PurchaseReturns: React.FC = () => {
     setReturnNumber(num);
     setEditingReturn(null);
     setEtaLockData(null);
+    setIsSubmitting(false);
     setIsModalOpen(true);
   };
 
   const handleEdit = async (ret: any) => {
-
+    setIsSubmitting(false);
     try {
       const fullData = await dbService.get<any>('purchase_returns', ret.id);
 
@@ -3476,10 +3559,14 @@ export const PurchaseReturns: React.FC = () => {
               <button 
                 type="submit"
                 form="purchase-return-form"
-                onClick={handleSubmit}
-                className="w-20 py-1 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all flex items-center gap-1 justify-center active:scale-95 shadow-sm text-[11px] whitespace-nowrap font-sans"
+                disabled={isSubmitting}
+                className="w-20 py-1 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-1 justify-center active:scale-95 shadow-sm text-[11px] whitespace-nowrap font-sans"
               >
-                <Save size={12} />
+                {isSubmitting ? (
+                  <div className="w-3.5 h-3.5 border border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Save size={12} />
+                )}
                 <span>{language === 'ar' ? 'حفظ' : 'Save'}</span>
               </button>
             </div>
@@ -3580,7 +3667,7 @@ export const PurchaseReturns: React.FC = () => {
               <span>{language === 'ar' ? 'الإنشاء الذكي' : 'Smart AI'}</span>
             </button>
 
-            <form id="purchase-return-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 pb-32">
+            <form id="purchase-return-form" noValidate onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 pb-32">
               {editingReturn && (
                 <ReversalBanner
                   isReversed={editingReturn.is_reversed}
