@@ -2795,7 +2795,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
                         je.total_debit as je_amt,
                         ${cfg.partyCol ? `d."${cfg.partyCol}"` : `''`} as party
                  FROM "${cfg.table}" d
-                 JOIN journal_entries je ON (je.reference_id = d.id::text OR je.reference_number = d."${cfg.numCol}"::text)
+                 JOIN journal_entries je ON (je.reference_id = d.id::text OR ((je.reference_id IS NULL OR je.reference_id = '') AND je.reference_number = d."${cfg.numCol}"::text))
                  WHERE d.company_id = $1
                    AND je.company_id = $1
                    AND je.reference_type IN (${placeholders})
