@@ -20,7 +20,7 @@ export class InventoryPostingService {
       const totalCost = parseFloat(String(line.total_cost || (quantity * unitCost)));
 
       // 1. Calculate the product stock and WAC immediately before this transaction
-      const { beforeQty, beforeCost } = await this.getPreviousStockAndCost(
+      let { beforeQty, beforeCost } = await this.getPreviousStockAndCost(
         client,
         productId,
         movement.source_document_id || ''
