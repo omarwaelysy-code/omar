@@ -9821,6 +9821,12 @@ router.post('/invoices', authenticateToken, TransactionsLimitMiddleware, async (
     await ensureDefaultAccounts(client, companyId);
 
 
+    // Automatic line-item discount aggregation guard
+    const itemsDiscountSum = (items || []).reduce((sum: number, it: any) => sum + (parseFloat(it.discount_amount || it.discount || 0)), 0);
+    if ((!rawInvoiceData.discount_amount || Number(rawInvoiceData.discount_amount) === 0) && itemsDiscountSum > 0) {
+      rawInvoiceData.discount_amount = itemsDiscountSum;
+    }
+
     const invoiceData = sanitizeData('invoices', rawInvoiceData);
     
     // Ensure company_id
@@ -10118,6 +10124,12 @@ router.put('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
       );
     }
     rawInvoiceData.source_orders = sourceOrdersStr || null;
+
+    // Automatic line-item discount aggregation guard
+    const itemsDiscountSum = (items || []).reduce((sum: number, it: any) => sum + (parseFloat(it.discount_amount || it.discount || 0)), 0);
+    if ((!rawInvoiceData.discount_amount || Number(rawInvoiceData.discount_amount) === 0) && itemsDiscountSum > 0) {
+      rawInvoiceData.discount_amount = itemsDiscountSum;
+    }
 
     const invoiceData = sanitizeData('invoices', rawInvoiceData);
     
