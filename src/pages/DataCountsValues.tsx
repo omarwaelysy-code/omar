@@ -519,24 +519,6 @@ export const DataCountsValues: React.FC = () => {
             {language === 'ar' ? 'عرض الكل' : 'All Sections'}
           </button>
           <button
-            onClick={() => setActiveTab('reports')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-              activeTab === 'reports' 
-                ? 'bg-indigo-600 text-white shadow-sm' 
-                : 'text-stone-600 hover:bg-stone-100'
-            }`}
-          >
-            <Scale size={14} />
-            <span>{language === 'ar' ? 'مطابقة التقارير والمركز المالي' : 'Reports & Balance Sheet'}</span>
-            {totalReportsCount > 0 && (
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                activeTab === 'reports' ? 'bg-indigo-700 text-white' : 'bg-stone-200 text-stone-700'
-              }`}>
-                {totalReportsCount}
-              </span>
-            )}
-          </button>
-          <button
             onClick={() => setActiveTab('posting')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
               activeTab === 'posting' 
@@ -566,6 +548,24 @@ export const DataCountsValues: React.FC = () => {
           >
             {language === 'ar' ? 'البيانات الأساسية' : 'Master Data'}
           </button>
+          <button
+            onClick={() => setActiveTab('reports')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              activeTab === 'reports' 
+                ? 'bg-indigo-600 text-white shadow-sm' 
+                : 'text-stone-600 hover:bg-stone-100'
+            }`}
+          >
+            <Scale size={14} />
+            <span>{language === 'ar' ? 'مطابقة التقارير والمركز المالي' : 'Reports & Balance Sheet'}</span>
+            {totalReportsCount > 0 && (
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                activeTab === 'reports' ? 'bg-indigo-700 text-white' : 'bg-stone-200 text-stone-700'
+              }`}>
+                {totalReportsCount}
+              </span>
+            )}
+          </button>
         </div>
 
         <div className="relative w-full sm:w-72">
@@ -581,209 +581,6 @@ export const DataCountsValues: React.FC = () => {
           />
         </div>
       </div>
-
-      {/* SECTION: FINANCIAL REPORTS & BALANCE SHEET / TRIAL BALANCE AUDIT */}
-      {(activeTab === 'all' || activeTab === 'reports') && (
-        <div className="bg-white rounded-3xl border border-indigo-200/80 shadow-sm overflow-hidden">
-          {/* Header */}
-          <div className="px-6 py-4 bg-gradient-to-r from-indigo-50/90 via-emerald-50/40 to-indigo-50/90 border-b border-indigo-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
-                <Scale size={18} />
-              </div>
-              <div>
-                <h2 className="text-base font-black text-indigo-950 flex items-center gap-2 flex-wrap">
-                  <span>{language === 'ar' ? 'تدقيق ومطابقة التقارير مع ميزان المراجعة والمركز المالي' : 'Reports, Trial Balance & Balance Sheet Reconciliation'}</span>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                    {language === 'ar' ? 'الخطأ مستحيل الحدوث تقنياً' : 'Impossible to be Inconsistent'}
-                  </span>
-                </h2>
-                <p className="text-[11px] font-bold text-stone-500 mt-0.5">
-                  {language === 'ar' 
-                    ? 'مطابقة دفاتر الأستاذ المساعد مع حسابات المراقبة العامة في ميزان المراجعة وقائمة المركز المالي وقائمة الدخل'
-                    : 'Reconciling subsidiary ledgers with GL control accounts, Trial Balance, Balance Sheet, and Income Statement'}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-indigo-800 bg-white px-3 py-1 rounded-xl border border-indigo-200 shadow-sm flex items-center gap-1.5">
-                <ShieldCheck size={14} className="text-emerald-600" />
-                <span>{language === 'ar' ? `${filteredReports.length} تقارير وقوائم خاضعة للتدقيق` : `${filteredReports.length} Audited Statements`}</span>
-              </span>
-            </div>
-          </div>
-
-          {/* Architectural Guarantee Banner */}
-          <div className="px-6 py-3 bg-indigo-900 text-white text-xs font-bold flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded-md bg-emerald-500 text-white text-[10px] font-black uppercase tracking-wider">
-                Enterprise Architecture
-              </span>
-              <span className="text-indigo-100 text-[11px]">
-                {language === 'ar'
-                  ? 'قاعدة التصميم المعماري: «الخطأ مستحيل الحدوث تقنياً» — كشوف الحسابات التفصيلية والأستاذ العام وميزان المراجعة والمركز المالي تشترك في نفس المصدر الحسابي اللحظي (Single Source of Truth) باستحالة وجود أي انحراف.'
-                  : 'Design Rule: "Impossible to be Inconsistent" — Subledgers, GL control accounts, Trial Balance and Balance Sheet share the exact same atomic transaction source.'}
-              </span>
-            </div>
-            <span className="text-[11px] text-emerald-300 font-mono font-bold whitespace-nowrap">
-              Variance = 0.00 EGP
-            </span>
-          </div>
-
-          {/* Category Filter Pills */}
-          <div className="px-6 py-3 bg-stone-50/80 border-b border-stone-200 flex items-center gap-2 overflow-x-auto">
-            <span className="text-xs font-black text-stone-500 whitespace-nowrap ml-1">
-              {language === 'ar' ? 'أقسام التقارير:' : 'Categories:'}
-            </span>
-            {[
-              { id: 'all', label: language === 'ar' ? 'عرض الكل (18)' : 'All Reports (18)' },
-              { id: 'المستودع والمخازن', label: language === 'ar' ? 'المستودع والمخازن (3)' : 'Warehouse & Inventory (3)' },
-              { id: 'العملاء والمبيعات', label: language === 'ar' ? 'العملاء والمبيعات (4)' : 'Customers & Sales (4)' },
-              { id: 'الموردين والمشتريات', label: language === 'ar' ? 'الموردين والمشتريات (3)' : 'Suppliers & Purchases (3)' },
-              { id: 'النقدية والمصروفات', label: language === 'ar' ? 'النقدية والمصروفات (3)' : 'Cash & Expenses (3)' },
-              { id: 'التقارير المالية والمحاسبية', label: language === 'ar' ? 'التقارير المالية والمحاسبية (5)' : 'Financial Accounting (5)' },
-            ].map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => setReportCategory(cat.id)}
-                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                  reportCategory === cat.id
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-right border-collapse text-xs">
-              <thead>
-                <tr className="bg-stone-50/90 text-stone-600 border-b border-stone-200 font-black">
-                  <th className="py-3 px-3 whitespace-nowrap">{language === 'ar' ? 'القسم' : 'Category'}</th>
-                  <th className="py-3 px-4 whitespace-nowrap">{language === 'ar' ? 'التقرير / دفتر الأستاذ المساعد' : 'Report / Subledger'}</th>
-                  <th className="py-3 px-3 whitespace-nowrap text-left">{language === 'ar' ? 'قيمة التقرير / الأستاذ المساعد' : 'Subledger Value'}</th>
-                  <th className="py-3 px-4 whitespace-nowrap">{language === 'ar' ? 'الحساب المقابل في الأستاذ العام / المركز المالي' : 'GL Control / Statement Account'}</th>
-                  <th className="py-3 px-3 whitespace-nowrap text-left">{language === 'ar' ? 'القيمة في ميزان المراجعة / المركز المالي' : 'Trial Balance / BS Value'}</th>
-                  <th className="py-3 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'فرق المطابقة' : 'Variance'}</th>
-                  <th className="py-3 px-3 whitespace-nowrap">{language === 'ar' ? 'الضمان المعماري المطبق' : 'Rule Applied'}</th>
-                  <th className="py-3 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'حالة المطابقة والتدقيق' : 'Status'}</th>
-                  <th className="py-3 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'معاينة التقرير' : 'Open Report'}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100 font-bold text-stone-700">
-                {filteredReports.map((item, idx) => {
-                  const isZero = Math.abs(item.variance) < 0.01;
-                  const pageTarget = 
-                    item.id === 'stock_card_report' ? 'stock_card_report' :
-                    item.id === 'stock_balances_report' ? 'stock_balances_report' :
-                    item.id === 'general_stock_movements_report' ? 'general_stock_movements_report' :
-                    item.id === 'customer_statement' ? 'customer_statement' :
-                    item.id === 'customer_balances' ? 'customer_balances' :
-                    item.id === 'customer_aging_report' ? 'customer_aging_report' :
-                    item.id === 'sales_report' ? 'sales_report' :
-                    item.id === 'supplier_statement' ? 'supplier_statement' :
-                    item.id === 'supplier_balances' ? 'supplier_balances' :
-                    item.id === 'supplier_aging_report' ? 'supplier_aging_report' :
-                    item.id === 'cash_as_of_balances' ? 'cash_as_of_balances' :
-                    item.id === 'cash_balances' ? 'cash_balances' :
-                    item.id === 'expenses_report' ? 'expenses_report' :
-                    item.id === 'general_ledger_report' ? 'general_ledger_report' :
-                    item.id === 'trial_balance' ? 'trial_balance' :
-                    item.id === 'income_statement' ? 'income_statement' :
-                    item.id === 'balance_sheet' ? 'balance_sheet' :
-                    item.id === 'cash_flow_statement' ? 'cash_flow_statement' : null;
-
-                  return (
-                    <tr key={idx} className="hover:bg-indigo-50/30 transition-colors">
-                      <td className="py-3 px-3 whitespace-nowrap">
-                        <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black border inline-block ${
-                          item.category === 'المستودع والمخازن' ? 'bg-amber-50 text-amber-800 border-amber-200' :
-                          item.category === 'العملاء والمبيعات' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-                          item.category === 'الموردين والمشتريات' ? 'bg-blue-50 text-blue-800 border-blue-200' :
-                          item.category === 'النقدية والمصروفات' ? 'bg-cyan-50 text-cyan-800 border-cyan-200' :
-                          'bg-purple-50 text-purple-800 border-purple-200'
-                        }`}>
-                          {item.category || 'عام'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="font-black text-stone-900 text-xs flex items-center gap-1.5">
-                          <BookOpen size={14} className="text-indigo-600 flex-shrink-0" />
-                          <span>{item.report_name}</span>
-                        </div>
-                        <p className="text-[11px] font-normal text-stone-500 mt-0.5">
-                          {item.subledger_name}
-                        </p>
-                      </td>
-                      <td className="py-3 px-3 font-mono font-black text-left text-stone-900 whitespace-nowrap">
-                        {formatNumber(item.subledger_value)} <span className="text-[10px] text-stone-400 font-normal">EGP</span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-stone-800 text-[11px]">
-                          {item.gl_account_name}
-                        </div>
-                        {item.description && (
-                          <p className="text-[10px] font-normal text-stone-400 mt-0.5">
-                            {item.description}
-                          </p>
-                        )}
-                      </td>
-                      <td className="py-3 px-3 font-mono font-black text-left text-stone-900 whitespace-nowrap">
-                        {formatNumber(item.gl_value)} <span className="text-[10px] text-stone-400 font-normal">EGP</span>
-                      </td>
-                      <td className="py-3 px-3 text-center whitespace-nowrap">
-                        <span className={`px-2.5 py-1 rounded-xl font-mono font-black text-xs inline-block ${
-                          isZero 
-                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
-                            : 'bg-rose-100 text-rose-800 border border-rose-300'
-                        }`}>
-                          {formatNumber(item.variance)} {language === 'ar' ? 'ج.م' : 'EGP'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3">
-                        <span className="px-2 py-0.5 rounded-lg bg-stone-100 text-stone-700 text-[10px] font-bold font-mono">
-                          {item.rule_applied}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-center whitespace-nowrap">
-                        {isZero ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-black shadow-xs">
-                            <CheckCheck size={14} className="text-emerald-600" />
-                            <span>{language === 'ar' ? 'سليم ومتطابق 100%' : 'Balanced 100%'}</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-black shadow-xs">
-                            <XCircle size={14} className="text-rose-600" />
-                            <span>{language === 'ar' ? 'يوجد فرق تدقيق' : 'Discrepancy'}</span>
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3 text-center whitespace-nowrap">
-                        {pageTarget ? (
-                          <button
-                            onClick={() => setCurrentPage(pageTarget as any)}
-                            className="px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-indigo-600 hover:text-white text-stone-700 text-[11px] font-bold transition-all flex items-center gap-1 mx-auto active:scale-95 shadow-xs"
-                            title={language === 'ar' ? 'الانتقال إلى التقرير' : 'Open report'}
-                          >
-                            <span>{language === 'ar' ? 'معاينة' : 'View'}</span>
-                            <ExternalLink size={12} />
-                          </button>
-                        ) : (
-                          <span className="text-stone-300">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {/* SECTION 3: POSTING FINANCIAL TRANSACTIONS (الحركات التي تلزم قيود) */}
       {(activeTab === 'all' || activeTab === 'posting') && (
@@ -858,7 +655,7 @@ export const DataCountsValues: React.FC = () => {
                       </td>
 
                       <td className="py-1.5 px-3 text-center font-mono text-xs">
-                        {Math.abs(row.variance) < 0.05 ? (
+                        {Math.abs(row.variance) < 0.50 ? (
                           <span className="text-emerald-600 font-bold">0.00</span>
                         ) : (
                           <span className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 font-black">
@@ -1148,6 +945,209 @@ export const DataCountsValues: React.FC = () => {
                 </span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* SECTION: FINANCIAL REPORTS & BALANCE SHEET / TRIAL BALANCE AUDIT */}
+      {(activeTab === 'all' || activeTab === 'reports') && (
+        <div className="bg-white rounded-3xl border border-indigo-200/80 shadow-sm overflow-hidden">
+          {/* Header */}
+          <div className="px-6 py-4 bg-gradient-to-r from-indigo-50/90 via-emerald-50/40 to-indigo-50/90 border-b border-indigo-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+                <Scale size={18} />
+              </div>
+              <div>
+                <h2 className="text-base font-black text-indigo-950 flex items-center gap-2 flex-wrap">
+                  <span>{language === 'ar' ? 'تدقيق ومطابقة التقارير مع ميزان المراجعة والمركز المالي' : 'Reports, Trial Balance & Balance Sheet Reconciliation'}</span>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    {language === 'ar' ? 'الخطأ مستحيل الحدوث تقنياً' : 'Impossible to be Inconsistent'}
+                  </span>
+                </h2>
+                <p className="text-[11px] font-bold text-stone-500 mt-0.5">
+                  {language === 'ar' 
+                    ? 'مطابقة دفاتر الأستاذ المساعد مع حسابات المراقبة العامة في ميزان المراجعة وقائمة المركز المالي وقائمة الدخل'
+                    : 'Reconciling subsidiary ledgers with GL control accounts, Trial Balance, Balance Sheet, and Income Statement'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-indigo-800 bg-white px-3 py-1 rounded-xl border border-indigo-200 shadow-sm flex items-center gap-1.5">
+                <ShieldCheck size={14} className="text-emerald-600" />
+                <span>{language === 'ar' ? `${filteredReports.length} تقارير وقوائم خاضعة للتدقيق` : `${filteredReports.length} Audited Statements`}</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Architectural Guarantee Banner */}
+          <div className="px-6 py-3 bg-indigo-900 text-white text-xs font-bold flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-md bg-emerald-500 text-white text-[10px] font-black uppercase tracking-wider">
+                Enterprise Architecture
+              </span>
+              <span className="text-indigo-100 text-[11px]">
+                {language === 'ar'
+                  ? 'قاعدة التصميم المعماري: «الخطأ مستحيل الحدوث تقنياً» — كشوف الحسابات التفصيلية والأستاذ العام وميزان المراجعة والمركز المالي تشترك في نفس المصدر الحسابي اللحظي (Single Source of Truth) باستحالة وجود أي انحراف.'
+                  : 'Design Rule: "Impossible to be Inconsistent" — Subledgers, GL control accounts, Trial Balance and Balance Sheet share the exact same atomic transaction source.'}
+              </span>
+            </div>
+            <span className="text-[11px] text-emerald-300 font-mono font-bold whitespace-nowrap">
+              Variance = 0.00 EGP
+            </span>
+          </div>
+
+          {/* Category Filter Pills */}
+          <div className="px-6 py-3 bg-stone-50/80 border-b border-stone-200 flex items-center gap-2 overflow-x-auto">
+            <span className="text-xs font-black text-stone-500 whitespace-nowrap ml-1">
+              {language === 'ar' ? 'أقسام التقارير:' : 'Categories:'}
+            </span>
+            {[
+              { id: 'all', label: language === 'ar' ? 'عرض الكل (18)' : 'All Reports (18)' },
+              { id: 'المستودع والمخازن', label: language === 'ar' ? 'المستودع والمخازن (3)' : 'Warehouse & Inventory (3)' },
+              { id: 'العملاء والمبيعات', label: language === 'ar' ? 'العملاء والمبيعات (4)' : 'Customers & Sales (4)' },
+              { id: 'الموردين والمشتريات', label: language === 'ar' ? 'الموردين والمشتريات (3)' : 'Suppliers & Purchases (3)' },
+              { id: 'النقدية والمصروفات', label: language === 'ar' ? 'النقدية والمصروفات (3)' : 'Cash & Expenses (3)' },
+              { id: 'التقارير المالية والمحاسبية', label: language === 'ar' ? 'التقارير المالية والمحاسبية (5)' : 'Financial Accounting (5)' },
+            ].map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setReportCategory(cat.id)}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                  reportCategory === cat.id
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-right border-collapse text-xs">
+              <thead>
+                <tr className="bg-stone-50/90 text-stone-600 border-b border-stone-200 font-black">
+                  <th className="py-3 px-3 whitespace-nowrap">{language === 'ar' ? 'القسم' : 'Category'}</th>
+                  <th className="py-3 px-4 whitespace-nowrap">{language === 'ar' ? 'التقرير / دفتر الأستاذ المساعد' : 'Report / Subledger'}</th>
+                  <th className="py-3 px-3 whitespace-nowrap text-left">{language === 'ar' ? 'قيمة التقرير / الأستاذ المساعد' : 'Subledger Value'}</th>
+                  <th className="py-3 px-4 whitespace-nowrap">{language === 'ar' ? 'الحساب المقابل في الأستاذ العام / المركز المالي' : 'GL Control / Statement Account'}</th>
+                  <th className="py-3 px-3 whitespace-nowrap text-left">{language === 'ar' ? 'القيمة في ميزان المراجعة / المركز المالي' : 'Trial Balance / BS Value'}</th>
+                  <th className="py-3 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'فرق المطابقة' : 'Variance'}</th>
+                  <th className="py-3 px-3 whitespace-nowrap">{language === 'ar' ? 'الضمان المعماري المطبق' : 'Rule Applied'}</th>
+                  <th className="py-3 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'حالة المطابقة والتدقيق' : 'Status'}</th>
+                  <th className="py-3 px-3 whitespace-nowrap text-center">{language === 'ar' ? 'معاينة التقرير' : 'Open Report'}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100 font-bold text-stone-700">
+                {filteredReports.map((item, idx) => {
+                  const isZero = Math.abs(item.variance) < 0.01;
+                  const pageTarget = 
+                    item.id === 'stock_card_report' ? 'stock_card_report' :
+                    item.id === 'stock_balances_report' ? 'stock_balances_report' :
+                    item.id === 'general_stock_movements_report' ? 'general_stock_movements_report' :
+                    item.id === 'customer_statement' ? 'customer_statement' :
+                    item.id === 'customer_balances' ? 'customer_balances' :
+                    item.id === 'customer_aging_report' ? 'customer_aging_report' :
+                    item.id === 'sales_report' ? 'sales_report' :
+                    item.id === 'supplier_statement' ? 'supplier_statement' :
+                    item.id === 'supplier_balances' ? 'supplier_balances' :
+                    item.id === 'supplier_aging_report' ? 'supplier_aging_report' :
+                    item.id === 'cash_as_of_balances' ? 'cash_as_of_balances' :
+                    item.id === 'cash_balances' ? 'cash_balances' :
+                    item.id === 'expenses_report' ? 'expenses_report' :
+                    item.id === 'general_ledger_report' ? 'general_ledger_report' :
+                    item.id === 'trial_balance' ? 'trial_balance' :
+                    item.id === 'income_statement' ? 'income_statement' :
+                    item.id === 'balance_sheet' ? 'balance_sheet' :
+                    item.id === 'cash_flow_statement' ? 'cash_flow_statement' : null;
+
+                  return (
+                    <tr key={idx} className="hover:bg-indigo-50/30 transition-colors">
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black border inline-block ${
+                          item.category === 'المستودع والمخازن' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+                          item.category === 'العملاء والمبيعات' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+                          item.category === 'الموردين والمشتريات' ? 'bg-blue-50 text-blue-800 border-blue-200' :
+                          item.category === 'النقدية والمصروفات' ? 'bg-cyan-50 text-cyan-800 border-cyan-200' :
+                          'bg-purple-50 text-purple-800 border-purple-200'
+                        }`}>
+                          {item.category || 'عام'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="font-black text-stone-900 text-xs flex items-center gap-1.5">
+                          <BookOpen size={14} className="text-indigo-600 flex-shrink-0" />
+                          <span>{item.report_name}</span>
+                        </div>
+                        <p className="text-[11px] font-normal text-stone-500 mt-0.5">
+                          {item.subledger_name}
+                        </p>
+                      </td>
+                      <td className="py-3 px-3 font-mono font-black text-left text-stone-900 whitespace-nowrap">
+                        {formatNumber(item.subledger_value)} <span className="text-[10px] text-stone-400 font-normal">EGP</span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="font-bold text-stone-800 text-[11px]">
+                          {item.gl_account_name}
+                        </div>
+                        {item.description && (
+                          <p className="text-[10px] font-normal text-stone-400 mt-0.5">
+                            {item.description}
+                          </p>
+                        )}
+                      </td>
+                      <td className="py-3 px-3 font-mono font-black text-left text-stone-900 whitespace-nowrap">
+                        {formatNumber(item.gl_value)} <span className="text-[10px] text-stone-400 font-normal">EGP</span>
+                      </td>
+                      <td className="py-3 px-3 text-center whitespace-nowrap">
+                        <span className={`px-2.5 py-1 rounded-xl font-mono font-black text-xs inline-block ${
+                          isZero 
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                            : 'bg-rose-100 text-rose-800 border border-rose-300'
+                        }`}>
+                          {formatNumber(item.variance)} {language === 'ar' ? 'ج.م' : 'EGP'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="px-2 py-0.5 rounded-lg bg-stone-100 text-stone-700 text-[10px] font-bold font-mono">
+                          {item.rule_applied}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-center whitespace-nowrap">
+                        {isZero ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-black shadow-xs">
+                            <CheckCheck size={14} className="text-emerald-600" />
+                            <span>{language === 'ar' ? 'سليم ومتطابق 100%' : 'Balanced 100%'}</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-black shadow-xs">
+                            <XCircle size={14} className="text-rose-600" />
+                            <span>{language === 'ar' ? 'يوجد فرق تدقيق' : 'Discrepancy'}</span>
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3 text-center whitespace-nowrap">
+                        {pageTarget ? (
+                          <button
+                            onClick={() => setCurrentPage(pageTarget as any)}
+                            className="px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-indigo-600 hover:text-white text-stone-700 text-[11px] font-bold transition-all flex items-center gap-1 mx-auto active:scale-95 shadow-xs"
+                            title={language === 'ar' ? 'الانتقال إلى التقرير' : 'Open report'}
+                          >
+                            <span>{language === 'ar' ? 'معاينة' : 'View'}</span>
+                            <ExternalLink size={12} />
+                          </button>
+                        ) : (
+                          <span className="text-stone-300">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

@@ -28,7 +28,10 @@ export class PostingService {
       ((invoice as any).customer_code && c.code?.trim().toLowerCase() === (invoice as any).customer_code?.trim().toLowerCase())
     );
     const subtotal = Number(invoice.subtotal) || 0;
-    const discount = Number(invoice.discount_amount || invoice.discount) || 0;
+    let discount = Number(invoice.discount_amount || invoice.discount) || 0;
+    if (discount === 0 && invoice.items && invoice.items.length > 0) {
+      discount = invoice.items.reduce((sum, it) => sum + (Number((it as any).discount_amount || (it as any).discount || 0)), 0);
+    }
     const total_amount = Number(invoice.total_amount) || 0;
     const rate = Number(invoice.exchange_rate) || 1;
     const currencyCode = (invoice as any).currency_code || (invoice as any).currency || 'EGP';

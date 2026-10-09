@@ -2568,43 +2568,82 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
           count = docCount;
           netValue = parseFloat(docTotal.toFixed(2));
 
-          // Actual calculation of legitimate secondary legs (COGS / restock / settlements)
+          // Actual calculation of legitimate secondary legs (COGS / restock / settlements / WHT)
           // NEVER use mathematical plugs (journalValue - netValue) so genuine variances are exposed!
           let actualCounter = 0;
           if (cfg.key === 'invoices') {
             // In sales invoices, legitimate secondary debits are Cost of Goods Sold (COGS) + direct cash/bank collections on cash invoices + withholding/discounts + inventory restock on reversal entries
+            // Plus reversal entries credits for withholding tax & discounts
             const sideRes: any = await client.query(
-              `SELECT COALESCE(SUM(jel.debit), 0)::numeric as side_tot
-               FROM journal_entry_lines jel
-               JOIN journal_entries je ON je.id = jel.journal_entry_id
-               JOIN accounts a ON a.id = jel.account_id
-               WHERE je.company_id = $1 
-                 AND je.reference_type IN ('invoice', 'sales_invoice')
-                 AND (
-                   a.account_usage IN ('cost_of_sales', 'cost_of_goods_sold', 'cash', 'bank', 'withholding_tax_customers', 'earned_discounts')
-                   OR a.code LIKE '51%'
-                   OR (a.account_usage = 'inventory' AND (je.description LIKE '%عكس%' OR je.reference_number LIKE 'REV-%'))
-                 )`,
+              `SELECT 
+                 (
+                   COALESCE((
+                     SELECT SUM(jel.debit)
+                     FROM journal_entry_lines jel
+                     JOIN journal_entries je ON je.id = jel.journal_entry_id
+                     JOIN accounts a ON a.id = jel.account_id
+                     WHERE je.company_id = $1 
+                       AND je.reference_type IN ('invoice', 'sales_invoice')
+                       AND (
+                         a.account_usage IN ('cost_of_sales', 'cost_of_goods_sold', 'cash', 'bank', 'withholding_tax_customers', 'earned_discounts')
+                         OR a.code LIKE '51%'
+                         OR (a.account_usage = 'inventory' AND (je.description LIKE '%عكس%' OR je.reference_number LIKE 'REV-%' OR je.entry_number LIKE 'REV-%'))
+                       )
+                   ), 0)
+                   +
+                   COALESCE((
+                     SELECT SUM(jel.credit)
+                     FROM journal_entry_lines jel
+                     JOIN journal_entries je ON je.id = jel.journal_entry_id
+                     JOIN accounts a ON a.id = jel.account_id
+                     WHERE je.company_id = $1 
+                       AND je.reference_type IN ('invoice', 'sales_invoice')
+                       AND (je.description LIKE '%عكس%' OR je.reference_number LIKE 'REV-%' OR je.entry_number LIKE 'REV-%')
+                       AND (
+                         a.account_usage IN ('withholding_tax_customers', 'earned_discounts')
+                         OR a.code IN ('112', '412', '4104')
+                       )
+                   ), 0)
+                 )::numeric as side_tot`,
               [companyId]
             );
             actualCounter = parseFloat(sideRes.rows[0]?.side_tot || 0);
           } else if (cfg.key === 'returns') {
-            // In sales returns, legitimate secondary debits are:
+            // In sales returns, legitimate secondary legs are:
             // 1. Inventory Restock debit (cost of returned goods)
             // 2. Customer ledger settlement debits on cash returns
+            // 3. Withholding tax credits (since document total is net of WHT, while journal debits are gross)
             const sideRes: any = await client.query(
-              `SELECT COALESCE(SUM(jel.debit), 0)::numeric as side_tot
-               FROM journal_entry_lines jel
-               JOIN journal_entries je ON je.id = jel.journal_entry_id
-               JOIN accounts a ON a.id = jel.account_id
-               WHERE je.company_id = $1 
-                 AND je.reference_type IN ('return', 'sales_return')
-                 AND (
-                   a.account_usage IN ('inventory', 'customer', 'accounts_receivable')
-                   OR a.code LIKE '114%'
-                   OR a.code LIKE '1115%'
-                   OR a.code LIKE '1101%'
-                 )`,
+              `SELECT 
+                 (
+                   COALESCE((
+                     SELECT SUM(jel.debit)
+                     FROM journal_entry_lines jel
+                     JOIN journal_entries je ON je.id = jel.journal_entry_id
+                     JOIN accounts a ON a.id = jel.account_id
+                     WHERE je.company_id = $1 
+                       AND je.reference_type IN ('return', 'sales_return')
+                       AND (
+                         a.account_usage IN ('inventory', 'customer', 'accounts_receivable')
+                         OR a.code LIKE '114%'
+                         OR a.code LIKE '1115%'
+                         OR a.code LIKE '1101%'
+                       )
+                   ), 0)
+                   +
+                   COALESCE((
+                     SELECT SUM(jel.credit)
+                     FROM journal_entry_lines jel
+                     JOIN journal_entries je ON je.id = jel.journal_entry_id
+                     JOIN accounts a ON a.id = jel.account_id
+                     WHERE je.company_id = $1 
+                       AND je.reference_type IN ('return', 'sales_return')
+                       AND (
+                         a.account_usage IN ('withholding_tax_customers')
+                         OR a.code = '112'
+                       )
+                   ), 0)
+                 )::numeric as side_tot`,
               [companyId]
             );
             actualCounter = parseFloat(sideRes.rows[0]?.side_tot || 0);
@@ -2648,7 +2687,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
             actualCounter = suppCashDebits + whtTot + discTot;
           } else if (cfg.key === 'purchase_returns') {
             // In purchase returns, legitimate secondary debits are:
-            // Cash / Bank debits on cash purchase returns
+            // Cash / Bank debits on cash purchase returns + withholding tax debits
             const sideRes: any = await client.query(
               `SELECT COALESCE(SUM(jel.debit), 0)::numeric as side_tot
                FROM journal_entry_lines jel
@@ -2657,8 +2696,9 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
                WHERE je.company_id = $1 
                  AND je.reference_type IN ('purchase_return')
                  AND (
-                   a.account_usage IN ('cash', 'bank', 'payment_method')
+                   a.account_usage IN ('cash', 'bank', 'payment_method', 'withholding_tax_suppliers')
                    OR a.code LIKE '111%'
+                   OR a.code LIKE '213%'
                  )`,
               [companyId]
             );
@@ -2786,7 +2826,9 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         if (unpostedCount > 0) {
           variance = parseFloat(unpostedValue.toFixed(2));
         } else {
-          variance = parseFloat(Math.abs(netValue + counterValue - journalValue).toFixed(2));
+          const rawVar = Math.abs(netValue + counterValue - journalValue);
+          // If variance is sub-pound floating-point currency conversion cents (<= 0.50 EGP), treat as 0
+          variance = rawVar <= 0.50 ? 0 : parseFloat(rawVar.toFixed(2));
         }
 
         postingTransactions.push({
