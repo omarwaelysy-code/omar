@@ -113,7 +113,7 @@ export const PurchaseReturns: React.FC = () => {
     const withholding_tax_amount = selected.reduce((sum, r) => sum + ((Number(r.withholding_tax_amount) || 0) * (Number(r.exchange_rate) || 1)), 0);
     const total_amount = selected.reduce((sum, r) => sum + ((Number(r.total_amount) || 0) * (Number(r.exchange_rate) || 1)), 0);
     const cost_amount = selected.reduce((sum, r) => sum + ((Number(r.cost_amount || r.subtotal) || 0) * (Number(r.exchange_rate) || 1)), 0);
-    const journal_entry_amount = selected.reduce((sum, r) => sum + ((Number(r.journal_entry_amount) || 0) * (Number(r.exchange_rate) || 1)), 0);
+    const journal_entry_amount = selected.reduce((sum, r) => sum + (Number(r.journal_entry_amount) || 0), 0);
     return { subtotal, discount_amount, net_before_tax, tax_amount, withholding_tax_amount, total_amount, cost_amount, journal_entry_amount };
   }, [purchaseReturns, selectedReturnIds]);
 
@@ -182,6 +182,7 @@ export const PurchaseReturns: React.FC = () => {
       status: true,
       currency: true,
       foreign_amount: true,
+      exchange_rate: true,
       subtotal: true,
       discount_amount: true,
       net_before_tax: true,
@@ -213,6 +214,7 @@ export const PurchaseReturns: React.FC = () => {
       status: 85,
       currency: 70,
       foreign_amount: 100,
+      exchange_rate: 85,
       subtotal: 105,
       discount_amount: 90,
       net_before_tax: 110,
@@ -2684,6 +2686,7 @@ export const PurchaseReturns: React.FC = () => {
                       status: language === 'ar' ? 'حالة المرتجع' : 'Status',
                       currency: language === 'ar' ? 'العملة' : 'Currency',
                       foreign_amount: language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount',
+                      exchange_rate: language === 'ar' ? 'سعر الصرف' : 'Exchange Rate',
                       subtotal: language === 'ar' ? 'قبل الخصم' : 'Subtotal',
                       discount_amount: language === 'ar' ? 'الخصم' : 'Discount',
                       net_before_tax: language === 'ar' ? 'الصافي قبل الضريبة' : 'Net before Tax',
@@ -2812,6 +2815,16 @@ export const PurchaseReturns: React.FC = () => {
                   {isMultiCurrencyEnabled && visibleColumns.foreign_amount && (
                     <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                       <span>{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</span>
+                    </th>
+                  )}
+                  {isMultiCurrencyEnabled && visibleColumns.exchange_rate && (
+                    <th className={`px-2 py-0.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('exchange_rate')}>
+                      <div className="flex items-center gap-1">
+                        <span>{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</span>
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          {sortBy === 'exchange_rate' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                        </span>
+                      </div>
                     </th>
                   )}
                   {visibleColumns.subtotal && (
@@ -2970,6 +2983,11 @@ export const PurchaseReturns: React.FC = () => {
                         {ret.currency_id && ret.currency_id !== (company?.settings?.currency || 'EGP') ? formatNumber(ret.total_amount) : '-'}
                       </td>
                     )}
+                    {isMultiCurrencyEnabled && visibleColumns.exchange_rate && (
+                      <td className={`px-2 py-0.5 font-medium text-slate-600 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {Number(ret.exchange_rate) && Number(ret.exchange_rate) !== 1 ? formatNumber(ret.exchange_rate, 2) : '-'}
+                      </td>
+                    )}
                     {visibleColumns.subtotal && (
                       <td className={`px-2 py-0.5 font-medium text-slate-600 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                         {formatMoney((Number(ret.subtotal) || 0) * (Number(ret.exchange_rate) || 1))}
@@ -3007,7 +3025,7 @@ export const PurchaseReturns: React.FC = () => {
                     )}
                     {visibleColumns.journal_entry_amount && (
                       <td className={`px-2 py-0.5 font-bold text-purple-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                        {ret.journal_entry_amount ? formatMoney(Number(ret.journal_entry_amount) * (Number(ret.exchange_rate) || 1)) : '-'}
+                        {ret.journal_entry_amount ? formatMoney(Number(ret.journal_entry_amount)) : '-'}
                       </td>
                     )}
                     {visibleColumns.entry_number && (

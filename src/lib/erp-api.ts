@@ -7976,7 +7976,7 @@ modules.forEach(moduleName => {
                  sum(COALESCE("withholding_tax_amount", 0) * COALESCE("exchange_rate", 1)) as sum_wht,
                  sum(COALESCE("total_amount", 0) * COALESCE("exchange_rate", 1)) as sum_total,
                  sum(COALESCE("cost_amount", 0) * COALESCE("exchange_rate", 1)) as sum_cost,
-                 sum(COALESCE("journal_entry_amount", 0) * COALESCE("exchange_rate", 1)) as sum_journal
+                 sum(COALESCE("journal_entry_amount", 0)) as sum_journal
                FROM (${sql}) t
              `, values);
              const r = sumRes.rows[0] || {};

@@ -145,6 +145,7 @@ export const PurchaseInvoices: React.FC = () => {
       currency: true,
       foreign_amount: true,
       remaining_foreign: true,
+      exchange_rate: true,
       subtotal: true,
       discount_amount: true,
       net_before_tax: true,
@@ -181,6 +182,7 @@ export const PurchaseInvoices: React.FC = () => {
     currency: 70,
     foreign_amount: 100,
     remaining_foreign: 100,
+    exchange_rate: 85,
     subtotal: 100,
     discount_amount: 90,
     net_before_tax: 110,
@@ -3968,7 +3970,7 @@ export const PurchaseInvoices: React.FC = () => {
     const withholding_tax_amount = selectedInvoices.reduce((sum, inv) => sum + ((Number(inv.withholding_tax_amount) || 0) * (Number(inv.exchange_rate) || 1)), 0);
     const total_amount = selectedInvoices.reduce((sum, inv) => sum + ((Number(inv.total_amount) || 0) * (Number(inv.exchange_rate) || 1)), 0);
     const cost_amount = selectedInvoices.reduce((sum, inv) => sum + ((Number(inv.cost_amount || inv.subtotal) || 0) * (Number(inv.exchange_rate) || 1)), 0);
-    const journal_entry_amount = selectedInvoices.reduce((sum, inv) => sum + ((Number(inv.journal_entry_amount) || 0) * (Number(inv.exchange_rate) || 1)), 0);
+    const journal_entry_amount = selectedInvoices.reduce((sum, inv) => sum + (Number(inv.journal_entry_amount) || 0), 0);
 
     const remaining_amount = selectedInvoices.reduce((sum, inv) => {
       const settlements = (allReceipts.length > 0 || allPayments.length > 0 || entries.length > 0) ? getInvoiceSettlements(inv) : (inv.settlements || []);
@@ -4258,6 +4260,7 @@ export const PurchaseInvoices: React.FC = () => {
                           currency: language === 'ar' ? 'العملة' : 'Currency',
                           foreign_amount: language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Currency Amount',
                           remaining_foreign: language === 'ar' ? 'الباقي بالعملة الأجنبية' : 'Remaining in Foreign Currency',
+                          exchange_rate: language === 'ar' ? 'سعر الصرف' : 'Exchange Rate',
                           subtotal: language === 'ar' ? 'قبل الخصم' : 'Subtotal',
                           discount_amount: language === 'ar' ? 'الخصم' : 'Discount',
                           net_before_tax: language === 'ar' ? 'الصافي قبل الضريبة' : 'Net before Tax',
@@ -4472,6 +4475,21 @@ export const PurchaseInvoices: React.FC = () => {
                             </span>
                           </div>
                           {renderResizeHandles('remaining_foreign')}
+                        </th>
+                      )}
+                      {visibleColumns.exchange_rate && isMultiCurrencyEnabled && (
+                        <th 
+                          style={{ width: columnWidths.exchange_rate || 85, minWidth: columnWidths.exchange_rate || 85 }} 
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('exchange_rate')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'exchange_rate' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('exchange_rate')}
                         </th>
                       )}
                       {visibleColumns.subtotal && isVatEnabled && (
@@ -4861,6 +4879,11 @@ export const PurchaseInvoices: React.FC = () => {
                               })()}
                             </td>
                           )}
+                          {visibleColumns.exchange_rate && isMultiCurrencyEnabled && (
+                            <td style={{ width: columnWidths.exchange_rate || 85, minWidth: columnWidths.exchange_rate || 85 }} className={`px-2 py-0.5 font-medium text-slate-600 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {Number(inv.exchange_rate) && Number(inv.exchange_rate) !== 1 ? formatNumber(inv.exchange_rate, 2) : '-'}
+                            </td>
+                          )}
                           {visibleColumns.subtotal && isVatEnabled && (
                             <td style={{ width: columnWidths.subtotal, minWidth: columnWidths.subtotal }} className={`px-2 py-0.5 font-bold text-slate-900 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {formatMoney((Number(inv.subtotal) || Number(inv.total_amount) || 0) * (Number(inv.exchange_rate) || 1))}
@@ -4898,7 +4921,7 @@ export const PurchaseInvoices: React.FC = () => {
                           )}
                           {visibleColumns.journal_entry_amount && (
                             <td style={{ width: columnWidths.journal_entry_amount || 110, minWidth: columnWidths.journal_entry_amount || 110 }} className={`px-2 py-0.5 font-bold text-purple-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                              {inv.journal_entry_amount ? formatMoney(Number(inv.journal_entry_amount) * (Number(inv.exchange_rate) || 1)) : '-'}
+                              {inv.journal_entry_amount ? formatMoney(Number(inv.journal_entry_amount)) : '-'}
                             </td>
                           )}
                           {visibleColumns.remaining && (
