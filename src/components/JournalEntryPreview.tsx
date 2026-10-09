@@ -15,9 +15,10 @@ export interface JournalEntryPreviewProps {
   items: JournalEntryItem[];
   title?: string;
   entry_number?: string;
+  reference_number?: string;
 }
 
-export const JournalEntryPreview: React.FC<JournalEntryPreviewProps> = ({ items, title, entry_number }) => {
+export const JournalEntryPreview: React.FC<JournalEntryPreviewProps> = ({ items, title, entry_number, reference_number }) => {
   const { t, language } = useLanguage();
   const displayTitle = title || (language === 'ar' ? 'معاينة القيد المحاسبي' : 'Journal Entry Preview');
 
@@ -33,17 +34,25 @@ export const JournalEntryPreview: React.FC<JournalEntryPreviewProps> = ({ items,
 
   return (
     <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
-      <div className="px-3.5 py-2.5 bg-slate-100/70 border-b border-slate-200/80 flex items-center justify-between gap-2">
+      <div className="px-3.5 py-2.5 bg-slate-100/70 border-b border-slate-200/80 flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <FileText size={15} className="text-indigo-600" />
           <span className="text-xs font-black text-slate-800 tracking-wide">{displayTitle}</span>
         </div>
-        {entry_number && (
-          <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 font-mono text-xs font-black shadow-xs">
-            <Hash size={12} className="text-indigo-500" />
-            <span>{language === 'ar' ? `رقم القيد: ${entry_number}` : `Entry #: ${entry_number}`}</span>
-          </div>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {entry_number && (
+            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 font-mono text-xs font-black shadow-xs">
+              <Hash size={12} className="text-indigo-500" />
+              <span>{language === 'ar' ? `رقم القيد: ${entry_number}` : `Entry #: ${entry_number}`}</span>
+            </div>
+          )}
+          {reference_number && (
+            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-mono text-xs font-black shadow-xs">
+              <Hash size={12} className="text-emerald-500" />
+              <span>{language === 'ar' ? `رقم الحركة: ${reference_number}` : `Doc #: ${reference_number}`}</span>
+            </div>
+          )}
+        </div>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs text-right">

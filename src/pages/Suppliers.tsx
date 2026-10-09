@@ -386,12 +386,18 @@ export const Suppliers: React.FC = () => {
           const absBalance = Math.abs(formData.opening_balance);
           const isNegative = formData.opening_balance < 0;
 
+          const existingJe = editingSupplier?.id ? entries.find(e => 
+            (e.reference_id === editingSupplier.id || (editingSupplier.code && e.reference_number === editingSupplier.code)) && 
+            e.reference_type === 'opening_balance'
+          ) : null;
+
           await dbService.add('journal_entries', {
             company_id: user.company_id,
             date: formData.opening_balance_date,
             description: `رصيد افتتاحي للمورد: ${formData.name}`,
             reference_id: id,
             reference_type: 'opening_balance',
+            reference_number: existingJe?.reference_number || undefined,
             items: [
               {
                 account_id: finalAccountId,
@@ -1600,9 +1606,15 @@ export const Suppliers: React.FC = () => {
                                   </h4>
                                 </div>
                                 {linkedJe?.entry_number && (
-                                  <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 border border-indigo-200 rounded-lg text-indigo-700 font-mono text-xs font-black shadow-xs">
+                                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 border border-indigo-200 rounded-lg text-indigo-700 font-mono text-xs font-black shadow-xs">
                                     <FileText size={13} className="text-indigo-600" />
                                     <span>{language === 'ar' ? `رقم القيد: ${linkedJe.entry_number}` : `JE #: ${linkedJe.entry_number}`}</span>
+                                  </div>
+                                )}
+                                {linkedJe?.reference_number && (
+                                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 font-mono text-xs font-black shadow-xs">
+                                    <Hash size={13} className="text-emerald-600" />
+                                    <span>{language === 'ar' ? `رقم الحركة: ${linkedJe.reference_number}` : `Doc #: ${linkedJe.reference_number}`}</span>
                                   </div>
                                 )}
                               </div>
@@ -1689,6 +1701,7 @@ export const Suppliers: React.FC = () => {
                                 <JournalEntryPreview 
                                   title={language === 'ar' ? 'معاينة قيد الرصيد' : 'Entry Preview'}
                                   entry_number={linkedJe?.entry_number}
+                                  reference_number={linkedJe?.reference_number}
                                   items={[
                                     {
                                       account_code: supplierAccount?.code || '',

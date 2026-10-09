@@ -201,12 +201,17 @@ export const PaymentMethods: React.FC = () => {
         const isNegative = formData.opening_balance < 0;
         const counterAccount = accounts.find(a => a.id === formData.counter_account_id);
 
+        const existingJe = editingMethod?.id ? journalEntries.find(e => 
+          e.reference_id === editingMethod.id && e.reference_type === 'opening_balance'
+        ) : null;
+
         await dbService.add('journal_entries', {
           company_id: user.company_id,
           date: formData.opening_balance_date,
           description: `رصيد افتتاحي لطريقة السداد: ${formData.name}`,
           reference_id: id,
           reference_type: 'opening_balance',
+          reference_number: existingJe?.reference_number || undefined,
           items: [
             {
               account_id: formData.account_id,
@@ -1823,12 +1828,20 @@ export const PaymentMethods: React.FC = () => {
                               {language === 'ar' ? 'الرصيد الافتتاحي' : 'Opening Setup'}
                             </h4>
                           </div>
-                          {linkedEntry?.entry_number && (
-                            <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-100/90 border border-amber-300 rounded-lg text-amber-900 font-mono font-black text-xs shadow-xs">
-                              <Hash size={13} className="text-amber-700" />
-                              <span>{language === 'ar' ? `رقم القيد: ${linkedEntry.entry_number}` : `JE #: ${linkedEntry.entry_number}`}</span>
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {linkedEntry?.entry_number && (
+                              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-100/90 border border-amber-300 rounded-lg text-amber-900 font-mono font-black text-xs shadow-xs">
+                                <Hash size={13} className="text-amber-700" />
+                                <span>{language === 'ar' ? `رقم القيد: ${linkedEntry.entry_number}` : `JE #: ${linkedEntry.entry_number}`}</span>
+                              </div>
+                            )}
+                            {linkedEntry?.reference_number && (
+                              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100/90 border border-emerald-300 rounded-lg text-emerald-900 font-mono font-black text-xs shadow-xs">
+                                <Hash size={13} className="text-emerald-700" />
+                                <span>{language === 'ar' ? `رقم الحركة: ${linkedEntry.reference_number}` : `Doc #: ${linkedEntry.reference_number}`}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-right">
                            <div>
@@ -1881,6 +1894,7 @@ export const PaymentMethods: React.FC = () => {
                                        <JournalEntryPreview 
                                          title="معاينة قيد الافتتاح"
                                          entry_number={linkedEntry?.entry_number}
+                                         reference_number={linkedEntry?.reference_number}
                                          items={[
                                             {
                                                account_code: accounts.find(a => a.id === formData.account_id)?.code,

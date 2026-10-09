@@ -4431,7 +4431,9 @@ export const SEQUENCE_MODULE_CONFIG: Record<string, { table: string; field: stri
   'sales_import_batches': { table: 'document_import_batches', field: 'batch_number', prefix: 'Batch-sal', padLength: 5, periodType: 'month' },
   'purchases_import_batches': { table: 'document_import_batches', field: 'batch_number', prefix: 'Batch-pur', padLength: 5, periodType: 'month' },
   'customer_discounts': { table: 'customer_discounts', field: 'number', prefix: 'CDISC', padLength: 5, periodType: 'month' },
-  'supplier_discounts': { table: 'supplier_discounts', field: 'number', prefix: 'SDISC', padLength: 5, periodType: 'month' }
+  'supplier_discounts': { table: 'supplier_discounts', field: 'number', prefix: 'SDISC', padLength: 5, periodType: 'month' },
+  'opening_balances': { table: 'journal_entries', field: 'reference_number', prefix: 'OPB', padLength: 6, periodType: 'month' },
+  'opening_stock_balances': { table: 'opening_stock_balances', field: 'document_number', prefix: 'OPB', padLength: 6, periodType: 'month' }
 };
 
 export async function getNextAtomicSequence(
@@ -4473,7 +4475,9 @@ export async function getNextAtomicSequence(
     'sales_import_batches': { table: 'document_import_batches', field: 'batch_number', prefix: 'Batch-sal' },
     'purchases_import_batches': { table: 'document_import_batches', field: 'batch_number', prefix: 'Batch-pur' },
     'customer_discounts': { table: 'customer_discounts', field: 'number', prefix: 'CDISC' },
-    'supplier_discounts': { table: 'supplier_discounts', field: 'number', prefix: 'SDISC' }
+    'supplier_discounts': { table: 'supplier_discounts', field: 'number', prefix: 'SDISC' },
+    'opening_balances': { table: 'journal_entries', field: 'reference_number', prefix: 'OPB' },
+    'opening_stock_balances': { table: 'opening_stock_balances', field: 'document_number', prefix: 'OPB' }
   };
 
   const target = tableNames[module];
@@ -11673,25 +11677,44 @@ router.post('/journal_entries', authenticateToken, TransactionsLimitMiddleware, 
     // If a journal entry already exists for this reference_id in the same company, preserve its number and clean it up safely
     let existingEntryId: string | null = null;
     let existingEntryNumber: string | null = null;
+    let existingReferenceNumber: string | null = null;
     if (entryData.reference_id && companyId) {
       const existingRes = await client.query(
-        'SELECT id, entry_number, total_debit, total_credit FROM journal_entries WHERE company_id = $1 AND reference_id = $2 LIMIT 1',
+        'SELECT id, entry_number, reference_number, total_debit, total_credit FROM journal_entries WHERE company_id = $1 AND reference_id = $2 LIMIT 1',
         [companyId, entryData.reference_id]
       );
       if (existingRes.rows.length > 0) {
         existingEntryId = existingRes.rows[0].id;
         existingEntryNumber = existingRes.rows[0].entry_number;
+        existingReferenceNumber = existingRes.rows[0].reference_number;
         const exDebit = Math.round(Number(existingRes.rows[0].total_debit) * 100) / 100;
         // If entry was already posted in the same atomic transaction with matching debit, confirm idempotently
         if (Math.abs(exDebit - roundedDebit) < 0.05 || (exDebit > 0 && roundedDebit === 0)) {
           await client.query('COMMIT');
-          return res.status(200).json({ id: existingEntryId, entry_number: existingEntryNumber });
+          return res.status(200).json({ id: existingEntryId, entry_number: existingEntryNumber, reference_number: existingReferenceNumber });
         }
       }
     }
 
     if (!entryData.entry_number && existingEntryNumber) {
       entryData.entry_number = existingEntryNumber;
+    }
+
+    if (!entryData.reference_number && existingReferenceNumber) {
+      entryData.reference_number = existingReferenceNumber;
+    }
+
+    // Auto-generate unique OPB-YYYY-MM-XXXXXX number for opening balances if missing
+    if (
+      (entryData.reference_type === 'opening_balance' || entryData.reference_type?.startsWith('opening_')) &&
+      (!entryData.reference_number || String(entryData.reference_number).trim() === '')
+    ) {
+      entryData.reference_number = await ensureUniqueSequenceNumber(
+        client,
+        companyId,
+        'opening_balances',
+        entryData.date as string
+      );
     }
 
     const entryId = entryData.id || uuidv4();

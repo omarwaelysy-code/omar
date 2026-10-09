@@ -424,7 +424,7 @@ export const DetailedJournalEntries: React.FC = () => {
     fetchData();
   }, [user, searchTerm, dateRange]);
 
-  const handleTransactionClick = (type: string | null | undefined, reference: string | null | undefined) => {
+  const handleTransactionClick = (type: string | null | undefined, reference: string | null | undefined, row?: DetailedLine) => {
     if (!reference || reference === '-' || reference === '') return;
     
     let normType = type;
@@ -462,9 +462,32 @@ export const DetailedJournalEntries: React.FC = () => {
     } else if (normType === 'stock_adjustment' || normType === 'adjustment' || reference.startsWith('ADJ-')) {
       setPendingViewDoc({ type: 'stock_adjustment', idOrNumber: reference });
       setCurrentPage('stock_adjustments');
-    } else if (normType === 'opening_stock_balance' || normType === 'opening_stock' || reference.startsWith('OPB-')) {
+    } else if (normType === 'opening_stock_balance' || normType === 'opening_stock') {
       setPendingViewDoc({ type: 'opening_stock_balance', idOrNumber: reference });
       setCurrentPage('opening_stock_balances');
+    } else if (normType === 'opening_balance') {
+      const desc = (row?.entry_description || row?.line_description || '').toLowerCase();
+      if (row?.customer_id || desc.includes('عميل')) {
+        setCurrentPage('customers');
+      } else if (row?.supplier_id || desc.includes('مورد')) {
+        setCurrentPage('suppliers');
+      } else if (row?.sub_account_type === 'payment_method' || desc.includes('طريقة') || desc.includes('بنك') || desc.includes('خزين') || desc.includes('خزن')) {
+        setCurrentPage('payment_methods');
+      } else {
+        setCurrentPage('accounts');
+      }
+    } else if (reference.startsWith('OPB-')) {
+      const desc = (row?.entry_description || row?.line_description || '').toLowerCase();
+      if (row?.customer_id || desc.includes('عميل')) {
+        setCurrentPage('customers');
+      } else if (row?.supplier_id || desc.includes('مورد')) {
+        setCurrentPage('suppliers');
+      } else if (row?.sub_account_type === 'payment_method' || desc.includes('طريقة') || desc.includes('بنك') || desc.includes('خزين')) {
+        setCurrentPage('payment_methods');
+      } else {
+        setPendingViewDoc({ type: 'opening_stock_balance', idOrNumber: reference });
+        setCurrentPage('opening_stock_balances');
+      }
     } else {
       setPendingViewDoc({ type: 'manual', idOrNumber: reference });
       setCurrentPage('journal_entries');
@@ -1060,7 +1083,7 @@ export const DetailedJournalEntries: React.FC = () => {
                         >
                           {row.reference_number ? (
                             <span 
-                              onClick={() => handleTransactionClick(row.reference_type, row.reference_number)}
+                              onClick={() => handleTransactionClick(row.reference_type, row.reference_number, row)}
                               className="cursor-pointer text-emerald-600 dark:text-emerald-400 hover:underline font-semibold"
                             >
                               {row.reference_number}
