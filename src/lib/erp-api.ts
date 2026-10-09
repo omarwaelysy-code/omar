@@ -3843,9 +3843,6 @@ function buildSelectSql(table: string): string {
   }
   if (table === 'returns') {
     return `SELECT t.*, 
-      COALESCE(t.subtotal, (SELECT SUM(total) FROM return_items ri WHERE ri.return_id = t.id), t.total_amount) AS subtotal,
-      COALESCE(t.tax_amount, (SELECT SUM(debit) FROM journal_entries je JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id JOIN accounts a ON a.id = jel.account_id WHERE je.reference_id = t.id AND (a.code LIKE '222%' OR a.name ILIKE '%قيمة مضافة%')), 0) AS tax_amount,
-      COALESCE(t.discount_amount, (SELECT SUM(credit) FROM journal_entries je JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id JOIN accounts a ON a.id = jel.account_id WHERE je.reference_id = t.id AND (a.code = '412' OR a.name ILIKE '%خصم%')), 0) AS discount_amount,
       (SELECT entry_number FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS entry_number,
       (SELECT id FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS journal_entry_id,
       (SELECT total_debit FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS journal_entry_amount,
@@ -3854,9 +3851,6 @@ function buildSelectSql(table: string): string {
   }
   if (table === 'purchase_returns') {
     return `SELECT t.*, 
-      COALESCE(t.subtotal, (SELECT SUM(total) FROM purchase_return_items pri WHERE pri.return_id = t.id), t.total_amount) AS subtotal,
-      COALESCE(t.tax_amount, (SELECT SUM(credit) FROM journal_entries je JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id JOIN accounts a ON a.id = jel.account_id WHERE je.reference_id = t.id AND (a.code LIKE '222%' OR a.name ILIKE '%قيمة مضافة%')), 0) AS tax_amount,
-      COALESCE(t.discount_amount, (SELECT SUM(debit) FROM journal_entries je JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id JOIN accounts a ON a.id = jel.account_id WHERE je.reference_id = t.id AND (a.code = '512' OR a.name ILIKE '%خصم%')), 0) AS discount_amount,
       (SELECT entry_number FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS entry_number,
       (SELECT id FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS journal_entry_id,
       (SELECT total_debit FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS journal_entry_amount,
