@@ -1081,14 +1081,18 @@ export const DetailedJournalEntries: React.FC = () => {
                           }}
                           className="px-3 py-1.5 border-l border-zinc-300 dark:border-zinc-700 text-center"
                         >
-                          {row.reference_number ? (
-                            <span 
-                              onClick={() => handleTransactionClick(row.reference_type, row.reference_number, row)}
-                              className="cursor-pointer text-emerald-600 dark:text-emerald-400 hover:underline font-semibold"
-                            >
-                              {row.reference_number}
-                            </span>
-                          ) : '-'}
+                          {(() => {
+                            const isGeneralJe = !row.reference_type || row.reference_type === 'manual' || row.reference_type === 'journal_entry' || row.reference_type === 'create_journal_entry';
+                            const effectiveRefNum = row.reference_number || (isGeneralJe ? row.entry_number : null);
+                            return effectiveRefNum ? (
+                              <span 
+                                onClick={() => handleTransactionClick(row.reference_type || 'manual', effectiveRefNum, row)}
+                                className="cursor-pointer text-emerald-600 dark:text-emerald-400 hover:underline font-semibold"
+                              >
+                                {effectiveRefNum}
+                              </span>
+                            ) : '-';
+                          })()}
                         </td>
                       )}
 

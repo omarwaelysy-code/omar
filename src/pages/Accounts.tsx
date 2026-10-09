@@ -1264,7 +1264,9 @@ export const Accounts: React.FC = () => {
                 <div className="p-3 bg-slate-50/70 rounded-2xl border border-slate-200/70 space-y-3">
                   {(() => {
                     const linkedJe = entries.find(e => 
-                      (e.reference_id === editingAccount?.id || e.reference_number === editingAccount?.code || e.description?.includes(formData.name)) && 
+                      (e.reference_id === editingAccount?.id || 
+                       (editingAccount?.code && (e.reference_number === editingAccount.code || e.description?.includes(editingAccount.code))) || 
+                       (formData.name && e.description?.includes(formData.name))) && 
                       e.reference_type === 'opening_balance'
                     );
                     return (
@@ -1353,7 +1355,9 @@ export const Accounts: React.FC = () => {
                         {formData.counter_account_id && (() => {
                           const accCounter = accounts.find(a => a.id === formData.counter_account_id);
                           const linkedJe = entries.find(e => 
-                            (e.reference_id === editingAccount?.id || e.reference_number === editingAccount?.code || e.description?.includes(formData.name)) && 
+                            (e.reference_id === editingAccount?.id || 
+                             (editingAccount?.code && (e.reference_number === editingAccount.code || e.description?.includes(editingAccount.code))) || 
+                             (formData.name && e.description?.includes(formData.name))) && 
                             e.reference_type === 'opening_balance'
                           );
 

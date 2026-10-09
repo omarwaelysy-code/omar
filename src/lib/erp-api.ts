@@ -5099,7 +5099,12 @@ router.get('/detailed-journal-entries', authenticateToken, async (req: AuthReque
           ct.transfer_number,
           sa.adjustment_number,
           inv.invoice_number,
-          pinv.invoice_number
+          pinv.invoice_number,
+          CASE 
+            WHEN je.reference_type IN ('manual', 'journal_entry', 'create_journal_entry') OR je.reference_type IS NULL OR je.reference_type = '' 
+            THEN je.entry_number 
+            ELSE NULL 
+          END
         ) as reference_number,
         je.reference_id,
         
@@ -11728,6 +11733,12 @@ router.post('/journal_entries', authenticateToken, TransactionsLimitMiddleware, 
       entryData.entry_number,
       existingEntryId || undefined
     );
+
+    // For general / manual journal entries, if reference_number is not explicitly provided, default to entry_number
+    const isGeneralJe = !entryData.reference_type || entryData.reference_type === 'manual' || entryData.reference_type === 'journal_entry' || entryData.reference_type === 'create_journal_entry';
+    if (isGeneralJe && (!entryData.reference_number || String(entryData.reference_number).trim() === '')) {
+      entryData.reference_number = entryData.entry_number;
+    }
 
     if (existingEntryId) {
       await client.query('DELETE FROM journal_entries WHERE id = $1', [existingEntryId]);
