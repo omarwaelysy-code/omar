@@ -3823,20 +3823,61 @@ const META_PARAM_KEYS = new Set([
   'all_companies', 'all'
 ]);
 
-// Helper for generic list
-const getList = async (table: string, filters: any = {}) => {
-  let sql;
+// Helper to build enriched SQL for invoices, purchase_invoices, returns, purchase_returns
+function buildSelectSql(table: string): string {
+  if (table === 'invoices') {
+    return `SELECT t.*, 
+      (SELECT entry_number FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS entry_number,
+      (SELECT id FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS journal_entry_id,
+      (SELECT total_debit FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS journal_entry_amount,
+      (SELECT COALESCE(SUM(total_cost), 0) FROM invoice_items ii WHERE ii.invoice_id = t.id) AS cost_amount
+    FROM "invoices" t`;
+  }
+  if (table === 'purchase_invoices') {
+    return `SELECT t.*, 
+      (SELECT entry_number FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS entry_number,
+      (SELECT id FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS journal_entry_id,
+      (SELECT total_debit FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS journal_entry_amount,
+      (SELECT COALESCE(SUM(total), 0) FROM purchase_invoice_items pii WHERE pii.invoice_id = t.id) AS cost_amount
+    FROM "purchase_invoices" t`;
+  }
+  if (table === 'returns') {
+    return `SELECT t.*, 
+      COALESCE(t.subtotal, (SELECT SUM(total) FROM return_items ri WHERE ri.return_id = t.id), t.total_amount) AS subtotal,
+      COALESCE(t.tax_amount, (SELECT SUM(debit) FROM journal_entries je JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id JOIN accounts a ON a.id = jel.account_id WHERE je.reference_id = t.id AND (a.code LIKE '222%' OR a.name ILIKE '%قيمة مضافة%')), 0) AS tax_amount,
+      COALESCE(t.discount_amount, (SELECT SUM(credit) FROM journal_entries je JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id JOIN accounts a ON a.id = jel.account_id WHERE je.reference_id = t.id AND (a.code = '412' OR a.name ILIKE '%خصم%')), 0) AS discount_amount,
+      (SELECT entry_number FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS entry_number,
+      (SELECT id FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS journal_entry_id,
+      (SELECT total_debit FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS journal_entry_amount,
+      (SELECT COALESCE(SUM(quantity * unit_cost), 0) FROM return_items ri WHERE ri.return_id = t.id) AS cost_amount
+    FROM "returns" t`;
+  }
+  if (table === 'purchase_returns') {
+    return `SELECT t.*, 
+      COALESCE(t.subtotal, (SELECT SUM(total) FROM purchase_return_items pri WHERE pri.return_id = t.id), t.total_amount) AS subtotal,
+      COALESCE(t.tax_amount, (SELECT SUM(credit) FROM journal_entries je JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id JOIN accounts a ON a.id = jel.account_id WHERE je.reference_id = t.id AND (a.code LIKE '222%' OR a.name ILIKE '%قيمة مضافة%')), 0) AS tax_amount,
+      COALESCE(t.discount_amount, (SELECT SUM(debit) FROM journal_entries je JOIN journal_entry_lines jel ON jel.journal_entry_id = je.id JOIN accounts a ON a.id = jel.account_id WHERE je.reference_id = t.id AND (a.code = '512' OR a.name ILIKE '%خصم%')), 0) AS discount_amount,
+      (SELECT entry_number FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS entry_number,
+      (SELECT id FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS journal_entry_id,
+      (SELECT total_debit FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS journal_entry_amount,
+      (SELECT COALESCE(SUM(total), 0) FROM purchase_return_items pri WHERE pri.return_id = t.id) AS cost_amount
+    FROM "purchase_returns" t`;
+  }
   const journaledTables = [
-    'invoices', 'purchase_invoices', 'receipt_vouchers', 'payment_vouchers',
-    'returns', 'purchase_returns', 'cash_transfers', 'customer_discounts',
+    'receipt_vouchers', 'payment_vouchers',
+    'cash_transfers', 'customer_discounts',
     'supplier_discounts', 'opening_stock_balances', 'stock_adjustments',
-    'warehouse_transfers'
+    'warehouse_transfers', 'issued_cheques'
   ];
   if (journaledTables.includes(table)) {
-    sql = `SELECT t.*, (SELECT entry_number FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS entry_number FROM "${table}" t`;
-  } else {
-    sql = `SELECT * FROM "${table}"`;
+    return `SELECT t.*, (SELECT entry_number FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS entry_number FROM "${table}" t`;
   }
+  return `SELECT * FROM "${table}"`;
+}
+
+// Helper for generic list
+const getList = async (table: string, filters: any = {}) => {
+  let sql = buildSelectSql(table);
   const values: any[] = [];
   const conditions: string[] = [];
   
@@ -7885,18 +7926,7 @@ modules.forEach(moduleName => {
           const sortOrder = queryFilters._sortOrder || 'DESC';
           const search = queryFilters._search || '';
           
-          let sql;
-          const journaledTables = [
-            'invoices', 'purchase_invoices', 'receipt_vouchers', 'payment_vouchers',
-            'returns', 'purchase_returns', 'cash_transfers', 'customer_discounts',
-            'supplier_discounts', 'opening_stock_balances', 'stock_adjustments',
-            'warehouse_transfers'
-          ];
-          if (journaledTables.includes(moduleName)) {
-            sql = `SELECT t.*, (SELECT entry_number FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS entry_number FROM "${moduleName}" t`;
-          } else {
-            sql = `SELECT * FROM "${moduleName}"`;
-          }
+          let sql = buildSelectSql(moduleName);
           const values: any[] = [];
           const conditions: string[] = [];
           let paramIndex = 1;
@@ -7941,13 +7971,32 @@ modules.forEach(moduleName => {
           const countRes = await pool.query(countSql, values);
           const total = parseInt(countRes.rows[0].total);
 
-          let summary = {};
-          if (moduleName === 'invoices' || moduleName === 'purchase_invoices') {
-             const sumRes = await pool.query(`SELECT sum("total_amount" * COALESCE("exchange_rate", 1)) as sum1, sum("discount_amount" * COALESCE("exchange_rate", 1)) as sum2 FROM (${sql}) t`, values);
-             summary = { total_amount: Number(sumRes.rows[0].sum1 || 0), total_discount: Number(sumRes.rows[0].sum2 || 0) };
-          } else if (moduleName === 'returns' || moduleName === 'purchase_returns') {
-             const sumRes = await pool.query(`SELECT sum("total_amount" * COALESCE("exchange_rate", 1)) as sum1 FROM (${sql}) t`, values);
-             summary = { total_amount: Number(sumRes.rows[0].sum1 || 0) };
+          let summary: any = {};
+          if (['invoices', 'purchase_invoices', 'returns', 'purchase_returns'].includes(moduleName)) {
+             const sumRes = await pool.query(`
+               SELECT 
+                 sum(COALESCE("subtotal", 0) * COALESCE("exchange_rate", 1)) as sum_subtotal,
+                 sum(COALESCE("discount_amount", 0) * COALESCE("exchange_rate", 1)) as sum_discount,
+                 sum((COALESCE("subtotal", 0) - COALESCE("discount_amount", 0)) * COALESCE("exchange_rate", 1)) as sum_net_before_tax,
+                 sum(COALESCE("tax_amount", 0) * COALESCE("exchange_rate", 1)) as sum_tax,
+                 sum(COALESCE("withholding_tax_amount", 0) * COALESCE("exchange_rate", 1)) as sum_wht,
+                 sum(COALESCE("total_amount", 0) * COALESCE("exchange_rate", 1)) as sum_total,
+                 sum(COALESCE("cost_amount", 0) * COALESCE("exchange_rate", 1)) as sum_cost,
+                 sum(COALESCE("journal_entry_amount", 0) * COALESCE("exchange_rate", 1)) as sum_journal
+               FROM (${sql}) t
+             `, values);
+             const r = sumRes.rows[0] || {};
+             summary = { 
+               subtotal: Number(r.sum_subtotal || 0),
+               total_discount: Number(r.sum_discount || 0),
+               discount_amount: Number(r.sum_discount || 0),
+               net_before_tax: Number(r.sum_net_before_tax || 0),
+               tax_amount: Number(r.sum_tax || 0),
+               withholding_tax_amount: Number(r.sum_wht || 0),
+               total_amount: Number(r.sum_total || 0),
+               cost_amount: Number(r.sum_cost || 0),
+               journal_entry_amount: Number(r.sum_journal || 0)
+             };
           } else if (moduleName === 'receipt_vouchers' || moduleName === 'payment_vouchers') {
              const sumRes = await pool.query(`SELECT sum("amount" * COALESCE("exchange_rate", 1)) as sum1 FROM (${sql}) t`, values);
              summary = { total_amount: Number(sumRes.rows[0].sum1 || 0) };
@@ -8255,26 +8304,12 @@ modules.forEach(moduleName => {
 
         let queryStr;
         const queryParams: any[] = [id];
-        const journaledTables = [
-          'invoices', 'purchase_invoices', 'receipt_vouchers', 'payment_vouchers',
-          'returns', 'purchase_returns', 'cash_transfers', 'customer_discounts',
-          'supplier_discounts', 'opening_stock_balances', 'stock_adjustments',
-          'warehouse_transfers', 'issued_cheques'
-        ];
-        if (journaledTables.includes(moduleName)) {
-          if (shouldFilterTenant) {
-            queryStr = `SELECT t.*, (SELECT entry_number FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS entry_number FROM "${moduleName}" t WHERE t.id = $1 AND t.company_id = $2`;
-            queryParams.push(userCompanyId);
-          } else {
-            queryStr = `SELECT t.*, (SELECT entry_number FROM journal_entries je WHERE je.reference_id = t.id LIMIT 1) AS entry_number FROM "${moduleName}" t WHERE t.id = $1`;
-          }
+        const baseSelect = buildSelectSql(moduleName);
+        if (shouldFilterTenant) {
+          queryStr = `SELECT * FROM (${baseSelect}) t WHERE t.id = $1 AND t.company_id = $2`;
+          queryParams.push(userCompanyId);
         } else {
-          if (shouldFilterTenant) {
-            queryStr = `SELECT * FROM "${moduleName}" WHERE id = $1 AND company_id = $2`;
-            queryParams.push(userCompanyId);
-          } else {
-            queryStr = `SELECT * FROM "${moduleName}" WHERE id = $1`;
-          }
+          queryStr = `SELECT * FROM (${baseSelect}) t WHERE t.id = $1`;
         }
         const { rows }: any = await pool.query(queryStr, queryParams);
         const row = rows[0] || null;

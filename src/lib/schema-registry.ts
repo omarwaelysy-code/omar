@@ -81,14 +81,15 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'operation_id', 'department_id', 'cost_center_id'
   ],
   returns: [
-    'id', 'company_id', 'customer_id', 'customer_name', 'warehouse_id', 'return_number', 'date', 'withholding_tax_amount', 'total_amount', 
+    'id', 'company_id', 'customer_id', 'customer_name', 'warehouse_id', 'return_number', 'date', 'subtotal',
+    'tax_amount', 'discount_amount', 'withholding_tax_amount', 'total_amount', 
     'payment_type', 'payment_method_id', 'payment_method_name', 'description', 'notes', 'created_at',
     'currency_id', 'exchange_rate', 'eta_uuid', 'eta_invoice_number', 'attachments', 'batch_number'
   ],
   return_items: [
     'id', 'return_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
     'product_name', 'product_code', 'product_image_url', 'unit_cost',
-    'operation_id', 'department_id', 'cost_center_id',
+    'operation_id', 'department_id', 'cost_center_id', 'vat_rate', 'vat_amount', 'discount_amount',
     'withholding_tax_rate', 'withholding_tax_amount'
   ],
   purchase_invoices: [
@@ -106,7 +107,8 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'withholding_tax_rate', 'withholding_tax_amount'
   ],
   purchase_returns: [
-    'id', 'company_id', 'supplier_id', 'supplier_name', 'warehouse_id', 'return_number', 'date', 'withholding_tax_amount', 'total_amount', 
+    'id', 'company_id', 'supplier_id', 'supplier_name', 'warehouse_id', 'return_number', 'date', 'subtotal',
+    'tax_amount', 'discount_amount', 'withholding_tax_amount', 'total_amount', 
     'payment_type', 'payment_method_id', 'payment_method_name', 'description', 'notes', 'created_at',
     'currency_id', 'exchange_rate', 'eta_uuid', 'eta_invoice_number', 'attachments', 'batch_number'
   ],
@@ -116,7 +118,7 @@ export const EXPECTED_SCHEMA: TableSchema = {
   purchase_return_items: [
     'id', 'return_id', 'product_id', 'description', 'quantity', 'unit_price', 'total',
     'product_name', 'product_code', 'product_image_url', 'unit_cost',
-    'operation_id', 'department_id', 'cost_center_id',
+    'operation_id', 'department_id', 'cost_center_id', 'vat_rate', 'vat_amount', 'discount_amount',
     'withholding_tax_rate', 'withholding_tax_amount'
   ],
   receipt_vouchers: [

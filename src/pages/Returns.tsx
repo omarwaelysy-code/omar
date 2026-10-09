@@ -5,7 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { TransactionManager } from '../services/TransactionManager';
 import { ReturnSchema, JournalEntrySchema } from '../lib/schemas';
 import { Return, Customer, Product, ReturnItem, JournalEntry, JournalEntryItem, Account, PaymentMethod, Operation, Department, CostCenter, Currency, ExchangeRate } from '../types';
-import { Search, Plus, Trash2, X, Eye, Download, FileText, FileSpreadsheet, RotateCcw, History, Printer, Phone, Mail, MapPin, Wallet, Calendar, Box, CreditCard, User, ChevronDown, Layers, Save, Package, ChevronRight, ChevronLeft, Maximize2, Minimize2, LayoutGrid, List, CheckCheck, Copy, Coins, Image as ImageIcon, UploadCloud, AlertTriangle, Lock } from 'lucide-react';
+import { Search, Plus, Trash2, X, Eye, Download, FileText, FileSpreadsheet, RotateCcw, History, Printer, Phone, Mail, MapPin, Wallet, Calendar, Box, CreditCard, User, ChevronDown, Layers, Save, Package, ChevronRight, ChevronLeft, Maximize2, Minimize2, LayoutGrid, List, CheckCheck, Copy, Coins, Image as ImageIcon, UploadCloud, AlertTriangle, Lock, SlidersHorizontal, Calculator } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartAIInput } from '../components/SmartAIInput';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
@@ -81,14 +81,66 @@ export const Returns: React.FC = () => {
 
   const selectedTotals = useMemo(() => {
     const selected = returns.filter(r => selectedReturnIds.includes(r.id));
+    const subtotal = selected.reduce((sum, r) => sum + ((Number(r.subtotal) || Number(r.total_amount) || 0) * (Number(r.exchange_rate) || 1)), 0);
+    const discount_amount = selected.reduce((sum, r) => sum + ((Number(r.discount_amount || r.discount) || 0) * (Number(r.exchange_rate) || 1)), 0);
+    const net_before_tax = subtotal - discount_amount;
+    const tax_amount = selected.reduce((sum, r) => sum + ((Number(r.tax_amount || r.tax) || 0) * (Number(r.exchange_rate) || 1)), 0);
+    const withholding_tax_amount = selected.reduce((sum, r) => sum + ((Number(r.withholding_tax_amount) || 0) * (Number(r.exchange_rate) || 1)), 0);
     const total_amount = selected.reduce((sum, r) => sum + ((Number(r.total_amount) || 0) * (Number(r.exchange_rate) || 1)), 0);
-    const total_discount = selected.reduce((sum, r) => sum + ((Number(r.discount) || 0) * (Number(r.exchange_rate) || 1)), 0);
-    const net_amount = total_amount - total_discount;
-    return { total_amount, total_discount, net_amount };
+    const cost_amount = selected.reduce((sum, r) => sum + ((Number(r.cost_amount || r.subtotal) || 0) * (Number(r.exchange_rate) || 1)), 0);
+    const journal_entry_amount = selected.reduce((sum, r) => sum + ((Number(r.journal_entry_amount) || 0) * (Number(r.exchange_rate) || 1)), 0);
+    return { subtotal, discount_amount, net_before_tax, tax_amount, withholding_tax_amount, total_amount, cost_amount, journal_entry_amount };
   }, [returns, selectedReturnIds]);
 
   const [isColumnSelectorOpen, setIsColumnSelectorOpen] = useState(false);
   const columnSelectorRef = useRef<HTMLDivElement>(null);
+  const [isTotalsSelectorOpen, setIsTotalsSelectorOpen] = useState(false);
+  const totalsSelectorRef = useRef<HTMLDivElement>(null);
+
+  const [visibleTotals, setVisibleTotals] = useState<Record<string, boolean>>(() => {
+    const saved = localStorage.getItem(`returns_visible_totals_${user?.id}`);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return {
+      subtotal: true,
+      discount_amount: true,
+      net_before_tax: true,
+      tax_amount: true,
+      withholding_tax_amount: true,
+      total_amount: true,
+      cost_amount: true,
+      journal_entry_amount: true,
+    };
+  });
+
+  const toggleTotalVisibility = (key: string) => {
+    setVisibleTotals(prev => {
+      const updated = { ...prev, [key]: !prev[key] };
+      if (user?.id) {
+        try { localStorage.setItem(`returns_visible_totals_${user.id}`, JSON.stringify(updated)); } catch (e) {}
+      }
+      return updated;
+    });
+  };
+
+  const resetTotalsVisibility = () => {
+    const defaults = {
+      subtotal: true,
+      discount_amount: true,
+      net_before_tax: true,
+      tax_amount: true,
+      withholding_tax_amount: true,
+      total_amount: true,
+      cost_amount: true,
+      journal_entry_amount: true,
+    };
+    setVisibleTotals(defaults);
+    if (user?.id) {
+      try { localStorage.setItem(`returns_visible_totals_${user.id}`, JSON.stringify(defaults)); } catch (e) {}
+    }
+  };
+
 
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
     const saved = localStorage.getItem(`returns_visible_columns_${user?.id}`);
@@ -108,9 +160,13 @@ export const Returns: React.FC = () => {
       currency: true,
       foreign_amount: true,
       subtotal: true,
+      discount_amount: true,
+      net_before_tax: true,
       tax_amount: true,
       withholding_tax_amount: true,
       total_amount: true,
+      cost_amount: true,
+      journal_entry_amount: true,
       entry_number: true,
       created_date: false,
       created_time: false,
@@ -136,10 +192,14 @@ export const Returns: React.FC = () => {
       status: 85,
       currency: 70,
       foreign_amount: 100,
-      subtotal: 100,
-      tax_amount: 85,
+      subtotal: 105,
+      discount_amount: 90,
+      net_before_tax: 110,
+      tax_amount: 90,
       withholding_tax_amount: 90,
       total_amount: 110,
+      cost_amount: 105,
+      journal_entry_amount: 110,
       entry_number: 100,
       created_date: 95,
       created_time: 80,
@@ -152,6 +212,9 @@ export const Returns: React.FC = () => {
     const handleClickOutside = (event: MouseEvent) => {
       if (columnSelectorRef.current && !columnSelectorRef.current.contains(event.target as Node)) {
         setIsColumnSelectorOpen(false);
+      }
+      if (totalsSelectorRef.current && !totalsSelectorRef.current.contains(event.target as Node)) {
+        setIsTotalsSelectorOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -2118,30 +2181,71 @@ export const Returns: React.FC = () => {
           {serverSummary.total_amount !== undefined && (
             <div className="flex items-center justify-between flex-wrap gap-2 px-3 py-1 bg-white border border-slate-200/80 rounded-xl shadow-xs text-xs">
               <div className="flex items-center flex-wrap gap-2 text-xs">
-                <div className="flex items-center gap-1">
-                  <span className="text-slate-500 text-xs font-medium">{t('returns.summary_total')}:</span>
-                  <span className="font-bold text-emerald-700">{formatMoney(serverSummary.total_amount)} <span className="text-[10px] text-slate-400 font-mono">{(company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase()}</span></span>
-                </div>
-                <span className="text-slate-200 hidden sm:inline">|</span>
-                <div className="flex items-center gap-1">
-                  <span className="text-slate-500 text-xs font-medium">إجمالي الخصومات:</span>
-                  <span className="font-bold text-rose-600">{formatMoney(serverSummary.total_discount || 0)} <span className="text-[10px] text-slate-400 font-mono">{(company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase()}</span></span>
-                </div>
-                <span className="text-slate-200 hidden sm:inline">|</span>
-                <div className="flex items-center gap-1">
-                  <span className="text-slate-500 text-xs font-medium">الصافي:</span>
-                  <span className="font-bold text-blue-700">{formatMoney((serverSummary.total_amount || 0) - (serverSummary.total_discount || 0))} <span className="text-[10px] text-slate-400 font-mono">{(company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase()}</span></span>
-                </div>
+                {visibleTotals.subtotal && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'قبل الخصم:' : 'Subtotal:'}</span>
+                    <span className="font-bold text-slate-800">{formatMoney(serverSummary.subtotal || 0)} <span className="text-[10px] text-slate-400 font-mono">{(company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                  </div>
+                )}
+                {visibleTotals.subtotal && visibleTotals.discount_amount && <span className="text-slate-200 hidden sm:inline">|</span>}
+                {visibleTotals.discount_amount && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'الخصومات:' : 'Discounts:'}</span>
+                    <span className="font-bold text-rose-600">{formatMoney(serverSummary.discount_amount || serverSummary.total_discount || 0)} <span className="text-[10px] text-slate-400 font-mono">{(company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                  </div>
+                )}
+                {visibleTotals.discount_amount && visibleTotals.net_before_tax && <span className="text-slate-200 hidden sm:inline">|</span>}
+                {visibleTotals.net_before_tax && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'الصافي قبل الضريبة:' : 'Net before Tax:'}</span>
+                    <span className="font-bold text-indigo-700">{formatMoney(serverSummary.net_before_tax || ((Number(serverSummary.subtotal || 0)) - (Number(serverSummary.discount_amount || serverSummary.total_discount || 0))))} <span className="text-[10px] text-slate-400 font-mono">{(company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                  </div>
+                )}
+                {visibleTotals.tax_amount && <span className="text-slate-200 hidden sm:inline">|</span>}
+                {visibleTotals.tax_amount && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'ض.ق.م:' : 'VAT:'}</span>
+                    <span className="font-bold text-amber-700">{formatMoney(serverSummary.tax_amount || 0)} <span className="text-[10px] text-slate-400 font-mono">{(company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                  </div>
+                )}
+                {visibleTotals.withholding_tax_amount && isSalesWhtEnabled && <span className="text-slate-200 hidden sm:inline">|</span>}
+                {visibleTotals.withholding_tax_amount && isSalesWhtEnabled && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'ض.خ.أ:' : 'WHT:'}</span>
+                    <span className="font-bold text-amber-600">{formatMoney(serverSummary.withholding_tax_amount || 0)} <span className="text-[10px] text-slate-400 font-mono">{(company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                  </div>
+                )}
+                {visibleTotals.total_amount && <span className="text-slate-200 hidden sm:inline">|</span>}
+                {visibleTotals.total_amount && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'صافي العميل:' : 'Net Total:'}</span>
+                    <span className="font-bold text-emerald-700">{formatMoney(serverSummary.total_amount || 0)} <span className="text-[10px] text-slate-400 font-mono">{(company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                  </div>
+                )}
+                {visibleTotals.cost_amount && <span className="text-slate-200 hidden sm:inline">|</span>}
+                {visibleTotals.cost_amount && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'تكلفة المخزون:' : 'Cost:'}</span>
+                    <span className="font-bold text-blue-700">{formatMoney(serverSummary.cost_amount || serverSummary.subtotal || 0)} <span className="text-[10px] text-slate-400 font-mono">{(company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                  </div>
+                )}
+                {visibleTotals.journal_entry_amount && <span className="text-slate-200 hidden sm:inline">|</span>}
+                {visibleTotals.journal_entry_amount && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'إجمالي القيود:' : 'Journal Total:'}</span>
+                    <span className="font-bold text-purple-700">{formatMoney(serverSummary.journal_entry_amount || 0)} <span className="text-[10px] text-slate-400 font-mono">{(company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                  </div>
+                )}
               </div>
 
               {selectedReturnIds.length > 0 && (
                 <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 animate-in fade-in">
-                  <span>مجموع المحدد ({selectedReturnIds.length}):</span>
-                  <span className="text-emerald-700">{formatMoney(selectedTotals.total_amount)}</span>
-                  <span className="text-slate-300">/</span>
-                  <span className="text-rose-600">{formatMoney(selectedTotals.total_discount)}</span>
-                  <span className="text-slate-300">/</span>
-                  <span className="text-blue-700">{formatMoney(selectedTotals.net_amount)}</span>
+                  <span>{language === 'ar' ? 'مجموع المحدد' : 'Selected'} ({selectedReturnIds.length}):</span>
+                  {visibleTotals.subtotal && <span className="text-slate-800" title={language === 'ar' ? 'قبل الخصم' : 'Subtotal'}>{formatMoney(selectedTotals.subtotal)}</span>}
+                  {visibleTotals.discount_amount && <span className="text-rose-600" title={language === 'ar' ? 'الخصم' : 'Discount'}>-{formatMoney(selectedTotals.discount_amount)}</span>}
+                  {visibleTotals.tax_amount && <span className="text-amber-700" title={language === 'ar' ? 'ض.ق.م' : 'VAT'}>+{formatMoney(selectedTotals.tax_amount)}</span>}
+                  {visibleTotals.total_amount && <span className="text-emerald-700" title={language === 'ar' ? 'الصافي' : 'Net'}>={formatMoney(selectedTotals.total_amount)}</span>}
+                  {visibleTotals.journal_entry_amount && <span className="text-purple-700" title={language === 'ar' ? 'إجمالي القيد' : 'Journal Total'}>({formatMoney(selectedTotals.journal_entry_amount)})</span>}
                 </div>
               )}
             </div>
@@ -2175,6 +2279,54 @@ export const Returns: React.FC = () => {
               <LayoutGrid size={18} />
             </button>
           </div>
+
+                    {/* Totals Selection Dropdown */}
+          {view === 'table' && (
+            <div className="relative" ref={totalsSelectorRef}>
+              <button
+                onClick={() => setIsTotalsSelectorOpen(!isTotalsSelectorOpen)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow-sm active:scale-95"
+              >
+                <SlidersHorizontal size={14} className="text-slate-400" />
+                <span>{language === 'ar' ? 'إجماليات الجدول' : 'Table Totals'}</span>
+                <ChevronDown size={14} className="text-slate-400" />
+              </button>
+
+              {isTotalsSelectorOpen && (
+                <div className="absolute top-full mt-1.5 right-0 bg-white border border-slate-200 rounded-xl shadow-xl p-3 z-50 min-w-[220px] max-h-[320px] overflow-y-auto space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest pb-1 border-b border-slate-100 flex items-center justify-between">
+                    <span>{language === 'ar' ? 'تخصيص الإجماليات' : 'Customize Totals'}</span>
+                    <button
+                      onClick={resetTotalsVisibility}
+                      className="text-emerald-600 hover:underline text-[10px] lowercase capitalize"
+                    >
+                      {language === 'ar' ? 'استعادة' : 'Reset'}
+                    </button>
+                  </div>
+                  {[
+                    { id: 'subtotal', label: language === 'ar' ? 'قبل الخصم' : 'Subtotal' },
+                    { id: 'discount_amount', label: language === 'ar' ? 'الخصومات' : 'Discounts' },
+                    { id: 'net_before_tax', label: language === 'ar' ? 'الصافي قبل الضريبة' : 'Net before Tax' },
+                    { id: 'tax_amount', label: language === 'ar' ? 'ضريبة القيمة المضافة (ض.ق.م)' : 'VAT' },
+                    { id: 'withholding_tax_amount', label: language === 'ar' ? 'ضريبة الخصم والتحصيل (ض.خ.أ)' : 'WHT' },
+                    { id: 'total_amount', label: language === 'ar' ? 'صافي العميل (النهائي)' : 'Net Total' },
+                    { id: 'cost_amount', label: language === 'ar' ? 'تكلفة المخزون' : 'Inventory Cost' },
+                    { id: 'journal_entry_amount', label: language === 'ar' ? 'إجمالي القيد المحاسبي' : 'Journal Total' },
+                  ].map((tot) => (
+                    <label key={tot.id} className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer hover:bg-slate-50 p-1.5 rounded-lg transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={visibleTotals[tot.id]}
+                        onChange={() => toggleTotalVisibility(tot.id)}
+                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                      />
+                      <span>{tot.label}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Column Selection Dropdown */}
           {view === 'table' && (
@@ -2217,8 +2369,12 @@ export const Returns: React.FC = () => {
                       status: language === 'ar' ? 'حالة المرتجع' : 'Status',
                       currency: language === 'ar' ? 'العملة' : 'Currency',
                       foreign_amount: language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount',
-                      subtotal: language === 'ar' ? 'قبل الضريبة' : 'Subtotal',
-                      tax_amount: language === 'ar' ? 'الضريبة' : 'Tax',
+                      subtotal: language === 'ar' ? 'قبل الخصم' : 'Subtotal',
+                      discount_amount: language === 'ar' ? 'الخصم' : 'Discount',
+                      net_before_tax: language === 'ar' ? 'الصافي قبل الضريبة' : 'Net before Tax',
+                      tax_amount: language === 'ar' ? 'ض.ق.م' : 'VAT',
+                      cost_amount: language === 'ar' ? 'تكلفة المخزون' : 'Inventory Cost',
+                      journal_entry_amount: language === 'ar' ? 'إجمالي القيد' : 'Journal Total',
                       withholding_tax_amount: language === 'ar' ? 'ض.خ.إ' : 'WHT',
                       total_amount: language === 'ar' ? 'الإجمالي' : 'Total',
                       entry_number: language === 'ar' ? 'رقم القيد' : 'Entry No.',
@@ -2371,17 +2527,27 @@ export const Returns: React.FC = () => {
                   {visibleColumns.subtotal && (
                     <th className={`px-2 py-0.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('subtotal')}>
                       <div className="flex items-center gap-1">
-                        <span>قبل الضريبة</span>
+                        <span>{language === 'ar' ? 'قبل الخصم' : 'Subtotal'}</span>
                         <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                           {sortBy === 'subtotal' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                         </span>
                       </div>
                     </th>
                   )}
+                  {visibleColumns.discount_amount && (
+                    <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span>{language === 'ar' ? 'الخصم' : 'Discount'}</span>
+                    </th>
+                  )}
+                  {visibleColumns.net_before_tax && (
+                    <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span>{language === 'ar' ? 'الصافي قبل الضريبة' : 'Net before Tax'}</span>
+                    </th>
+                  )}
                   {visibleColumns.tax_amount && (
                     <th className={`px-2 py-0.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('tax')}>
                       <div className="flex items-center gap-1">
-                        <span>الضريبة</span>
+                        <span>{language === 'ar' ? 'ض.ق.م' : 'VAT'}</span>
                         <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                           {sortBy === 'tax' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                         </span>
@@ -2390,17 +2556,27 @@ export const Returns: React.FC = () => {
                   )}
                   {visibleColumns.withholding_tax_amount && isSalesWhtEnabled && (
                     <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                      {language === 'ar' ? 'ض.خ.إ' : 'WHT'}
+                      {language === 'ar' ? 'ض.خ.أ' : 'WHT'}
                     </th>
                   )}
                   {visibleColumns.total_amount && (
                     <th className={`px-2 py-0.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`} onClick={() => handleSort('total_amount')}>
                       <div className="flex items-center gap-1">
-                        {t('returns.column_total')}
+                        <span>{language === 'ar' ? 'صافي العميل' : 'Net Total'}</span>
                         <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                           {sortBy === 'total_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                         </span>
                       </div>
+                    </th>
+                  )}
+                  {visibleColumns.cost_amount && (
+                    <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span>{language === 'ar' ? 'تكلفة المخزون' : 'Cost'}</span>
+                    </th>
+                  )}
+                  {visibleColumns.journal_entry_amount && (
+                    <th className={`px-2 py-0.5 font-bold whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                      <span>{language === 'ar' ? 'إجمالي القيد' : 'Journal Total'}</span>
                     </th>
                   )}
                   {visibleColumns.entry_number && (
@@ -2516,22 +2692,42 @@ export const Returns: React.FC = () => {
                     )}
                     {visibleColumns.subtotal && (
                       <td className={`px-2 py-0.5 font-medium text-slate-600 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                        {formatMoney((Number(ret.subtotal) || Number(ret.total_amount) || 0) * (Number(ret.exchange_rate) || 1))}
+                        {formatMoney((Number(ret.subtotal) || 0) * (Number(ret.exchange_rate) || 1))}
+                      </td>
+                    )}
+                    {visibleColumns.discount_amount && (
+                      <td className={`px-2 py-0.5 font-medium text-rose-600 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {Number(ret.discount_amount || ret.discount || 0) > 0 ? formatMoney((Number(ret.discount_amount || ret.discount || 0)) * (Number(ret.exchange_rate) || 1)) : '-'}
+                      </td>
+                    )}
+                    {visibleColumns.net_before_tax && (
+                      <td className={`px-2 py-0.5 font-medium text-indigo-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {formatMoney(((Number(ret.subtotal) || 0) - (Number(ret.discount_amount || ret.discount) || 0)) * (Number(ret.exchange_rate) || 1))}
                       </td>
                     )}
                     {visibleColumns.tax_amount && (
-                      <td className={`px-2 py-0.5 font-bold text-slate-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                        {formatMoney((Number(ret.tax) || Number(ret.tax_amount) || 0) * (Number(ret.exchange_rate) || 1))}
+                      <td className={`px-2 py-0.5 font-bold text-amber-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {formatMoney((Number(ret.tax_amount || ret.tax) || 0) * (Number(ret.exchange_rate) || 1))}
                       </td>
                     )}
                     {visibleColumns.withholding_tax_amount && isSalesWhtEnabled && (
                       <td className={`px-2 py-0.5 font-bold text-amber-600 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                        {ret.withholding_tax_amount ? formatMoney(Number(ret.withholding_tax_amount) * (Number(ret.exchange_rate) || 1)) : '-'}
+                        {Number(ret.withholding_tax_amount) > 0 ? formatMoney(Number(ret.withholding_tax_amount) * (Number(ret.exchange_rate) || 1)) : '-'}
                       </td>
                     )}
                     {visibleColumns.total_amount && (
                       <td className={`px-2 py-0.5 font-bold text-emerald-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                         {formatMoney((Number(ret.total_amount) || 0) * (Number(ret.exchange_rate) || 1))} <span className="text-[10px] text-slate-400 font-mono">{(company?.settings?.currency || (company as any)?.currency || 'EGP').toUpperCase()}</span>
+                      </td>
+                    )}
+                    {visibleColumns.cost_amount && (
+                      <td className={`px-2 py-0.5 font-medium text-blue-600 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {formatMoney((Number(ret.cost_amount || ret.subtotal) || 0) * (Number(ret.exchange_rate) || 1))}
+                      </td>
+                    )}
+                    {visibleColumns.journal_entry_amount && (
+                      <td className={`px-2 py-0.5 font-bold text-purple-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                        {ret.journal_entry_amount ? formatMoney(Number(ret.journal_entry_amount) * (Number(ret.exchange_rate) || 1)) : '-'}
                       </td>
                     )}
                     {visibleColumns.entry_number && (

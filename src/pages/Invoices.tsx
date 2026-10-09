@@ -9,7 +9,7 @@ import {
   Wallet, Calendar, Package, Tag, Layers, Box, Paperclip, 
   Phone, Mail, Lock, LayoutGrid, List, Building2, ChevronDown, ChevronUp,
   CreditCard, RotateCcw, Save, ExternalLink, CheckCheck, Copy, Coins,
-  UploadCloud, AlertTriangle, ShieldCheck
+  UploadCloud, AlertTriangle, ShieldCheck, SlidersHorizontal
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Barcode from 'react-barcode';
@@ -211,6 +211,55 @@ export const Invoices: React.FC = () => {
 
   const [isColumnSelectorOpen, setIsColumnSelectorOpen] = useState(false);
   const columnSelectorRef = useRef<HTMLDivElement>(null);
+  const [isTotalsSelectorOpen, setIsTotalsSelectorOpen] = useState(false);
+  const totalsSelectorRef = useRef<HTMLDivElement>(null);
+
+  const [visibleTotals, setVisibleTotals] = useState<Record<string, boolean>>(() => {
+    const saved = localStorage.getItem(`invoices_visible_totals_${user?.id}`);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return {
+      subtotal: true,
+      discount_amount: true,
+      net_before_tax: true,
+      tax_amount: true,
+      withholding_tax_amount: true,
+      total_amount: true,
+      remaining: true,
+      cost_amount: true,
+      journal_entry_amount: true,
+    };
+  });
+
+  const toggleTotalVisibility = (key: string) => {
+    setVisibleTotals(prev => {
+      const updated = { ...prev, [key]: !prev[key] };
+      if (user?.id) {
+        try { localStorage.setItem(`invoices_visible_totals_${user.id}`, JSON.stringify(updated)); } catch (e) {}
+      }
+      return updated;
+    });
+  };
+
+  const resetTotalsVisibility = () => {
+    const defaults = {
+      subtotal: true,
+      discount_amount: true,
+      net_before_tax: true,
+      tax_amount: true,
+      withholding_tax_amount: true,
+      total_amount: true,
+      remaining: true,
+      cost_amount: true,
+      journal_entry_amount: true,
+    };
+    setVisibleTotals(defaults);
+    if (user?.id) {
+      try { localStorage.setItem(`invoices_visible_totals_${user.id}`, JSON.stringify(defaults)); } catch (e) {}
+    }
+  };
+
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
     invoice_number: true,
     eta_invoice_number: true,
@@ -225,9 +274,13 @@ export const Invoices: React.FC = () => {
     foreign_amount: true,
     remaining_foreign: true,
     subtotal: true,
+    discount_amount: true,
+    net_before_tax: true,
     tax_amount: true,
     withholding_tax_amount: true,
     base_amount: true,
+    cost_amount: true,
+    journal_entry_amount: true,
     remaining: true,
     entry_number: true,
     created_date: false,
@@ -250,9 +303,13 @@ export const Invoices: React.FC = () => {
     foreign_amount: 100,
     remaining_foreign: 100,
     subtotal: 100,
+    discount_amount: 90,
+    net_before_tax: 110,
     tax_amount: 85,
     withholding_tax_amount: 90,
     base_amount: 110,
+    cost_amount: 105,
+    journal_entry_amount: 110,
     remaining: 100,
     entry_number: 100,
     created_date: 95,
@@ -503,6 +560,9 @@ export const Invoices: React.FC = () => {
     const handleClickOutside = (event: MouseEvent) => {
       if (columnSelectorRef.current && !columnSelectorRef.current.contains(event.target as Node)) {
         setIsColumnSelectorOpen(false);
+      }
+      if (totalsSelectorRef.current && !totalsSelectorRef.current.contains(event.target as Node)) {
+        setIsTotalsSelectorOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -3575,9 +3635,14 @@ export const Invoices: React.FC = () => {
 
   const selectedTotals = React.useMemo(() => {
     const selectedInvoices = filteredInvoices.filter(inv => selectedInvoiceIds.includes(inv.id));
+    const subtotal = selectedInvoices.reduce((sum, inv) => sum + ((Number(inv.subtotal) || Number(inv.total_amount) || 0) * (Number(inv.exchange_rate) || 1)), 0);
+    const total_discount = selectedInvoices.reduce((sum, inv) => sum + ((Number(inv.discount_amount || (inv as any).discount) || 0) * (Number(inv.exchange_rate) || 1)), 0);
+    const net_before_tax = subtotal - total_discount;
+    const tax_amount = selectedInvoices.reduce((sum, inv) => sum + ((Number(inv.tax_amount) || 0) * (Number(inv.exchange_rate) || 1)), 0);
+    const withholding_tax_amount = selectedInvoices.reduce((sum, inv) => sum + ((Number(inv.withholding_tax_amount) || 0) * (Number(inv.exchange_rate) || 1)), 0);
     const total_amount = selectedInvoices.reduce((sum, inv) => sum + ((Number(inv.total_amount) || 0) * (Number(inv.exchange_rate) || 1)), 0);
-    const total_discount = selectedInvoices.reduce((sum, inv) => sum + ((Number(inv.discount_amount) || 0) * (Number(inv.exchange_rate) || 1)), 0);
-    const net_amount = total_amount - total_discount;
+    const cost_amount = selectedInvoices.reduce((sum, inv) => sum + ((Number(inv.cost_amount) || 0) * (Number(inv.exchange_rate) || 1)), 0);
+    const journal_entry_amount = selectedInvoices.reduce((sum, inv) => sum + ((Number(inv.journal_entry_amount) || 0) * (Number(inv.exchange_rate) || 1)), 0);
 
     const remaining_amount = selectedInvoices.reduce((sum, inv) => {
       const settlements = (allReceipts.length > 0 || allPayments.length > 0 || entries.length > 0) ? getInvoiceSettlements(inv) : (inv.settlements || []);
@@ -3587,7 +3652,7 @@ export const Invoices: React.FC = () => {
       return sum + remainingLocal;
     }, 0);
 
-    return { total_amount, total_discount, net_amount, remaining_amount };
+    return { subtotal, total_discount, net_before_tax, tax_amount, withholding_tax_amount, total_amount, cost_amount, journal_entry_amount, remaining_amount, net_amount: total_amount - total_discount };
   }, [selectedInvoiceIds, filteredInvoices, allReceipts, allPayments, entries]);
 
   const totalRemainingFiltered = React.useMemo(() => {
@@ -3681,37 +3746,79 @@ export const Invoices: React.FC = () => {
           {(serverSummary.total_amount !== undefined) && (
             <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-white border border-slate-200/80 rounded-xl shadow-xs text-xs">
               <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-4 gap-y-1 text-xs">
-                <div className="flex items-center gap-1">
-                  <span className="text-slate-500 text-xs font-medium">إجمالي الفواتير:</span>
-                  <span className="font-bold text-emerald-700">{formatMoney(serverSummary.total_amount)} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span></span>
-                </div>
-                <span className="text-slate-200 hidden sm:inline">|</span>
-                <div className="flex items-center gap-1">
-                  <span className="text-slate-500 text-xs font-medium">إجمالي الخصومات:</span>
-                  <span className="font-bold text-rose-600">{formatMoney(serverSummary.total_discount || 0)} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span></span>
-                </div>
-                <span className="text-slate-200 hidden sm:inline">|</span>
-                <div className="flex items-center gap-1">
-                  <span className="text-slate-500 text-xs font-medium">الصافي:</span>
-                  <span className="font-bold text-blue-700">{formatMoney((serverSummary.total_amount || 0) - (serverSummary.total_discount || 0))} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span></span>
-                </div>
-                <span className="text-slate-200 hidden sm:inline">|</span>
-                <div className="flex items-center gap-1">
-                  <span className="text-slate-500 text-xs font-medium">إجمالي المتبقي:</span>
-                  <span className="font-bold text-amber-700">{formatMoney(totalRemainingFiltered)} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span></span>
-                </div>
+                {visibleTotals.subtotal && isVatEnabled && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'قبل الخصم:' : 'Subtotal:'}</span>
+                    <span className="font-bold text-slate-800">{formatMoney(serverSummary.subtotal || serverSummary.total_amount || 0)} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                  </div>
+                )}
+                {visibleTotals.discount_amount && <span className="text-slate-200 hidden sm:inline">|</span>}
+                {visibleTotals.discount_amount && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'إجمالي الخصومات:' : 'Discounts:'}</span>
+                    <span className="font-bold text-rose-600">{formatMoney(serverSummary.total_discount || serverSummary.discount_amount || 0)} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                  </div>
+                )}
+                {visibleTotals.net_before_tax && isVatEnabled && <span className="text-slate-200 hidden sm:inline">|</span>}
+                {visibleTotals.net_before_tax && isVatEnabled && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'الصافي قبل الضريبة:' : 'Net before Tax:'}</span>
+                    <span className="font-bold text-blue-700">{formatMoney(serverSummary.net_before_tax || ((serverSummary.total_amount || 0) - (serverSummary.total_discount || 0)))} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                  </div>
+                )}
+                {visibleTotals.tax_amount && isVatEnabled && <span className="text-slate-200 hidden sm:inline">|</span>}
+                {visibleTotals.tax_amount && isVatEnabled && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'ض.ق.م:' : 'VAT:'}</span>
+                    <span className="font-bold text-amber-700">{formatMoney(serverSummary.tax_amount || 0)} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                  </div>
+                )}
+                {visibleTotals.withholding_tax_amount && isWhtEnabled && <span className="text-slate-200 hidden sm:inline">|</span>}
+                {visibleTotals.withholding_tax_amount && isWhtEnabled && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'ض.خ.أ:' : 'WHT:'}</span>
+                    <span className="font-bold text-amber-600">{formatMoney(serverSummary.withholding_tax_amount || 0)} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                  </div>
+                )}
+                {visibleTotals.total_amount && <span className="text-slate-200 hidden sm:inline">|</span>}
+                {visibleTotals.total_amount && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'إجمالي الفواتير:' : 'Total:'}</span>
+                    <span className="font-bold text-emerald-700">{formatMoney(serverSummary.total_amount)} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                  </div>
+                )}
+                {visibleTotals.remaining && <span className="text-slate-200 hidden sm:inline">|</span>}
+                {visibleTotals.remaining && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'إجمالي المتبقي:' : 'Remaining:'}</span>
+                    <span className="font-bold text-amber-700">{formatMoney(totalRemainingFiltered)} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                  </div>
+                )}
+                {visibleTotals.cost_amount && <span className="text-slate-200 hidden sm:inline">|</span>}
+                {visibleTotals.cost_amount && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'تكلفة المبيعات:' : 'Cost:'}</span>
+                    <span className="font-bold text-blue-700">{formatMoney(serverSummary.cost_amount || 0)} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                  </div>
+                )}
+                {visibleTotals.journal_entry_amount && <span className="text-slate-200 hidden sm:inline">|</span>}
+                {visibleTotals.journal_entry_amount && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500 text-xs font-medium">{language === 'ar' ? 'إجمالي القيود:' : 'Journal:'}</span>
+                    <span className="font-bold text-purple-700">{formatMoney(serverSummary.journal_entry_amount || 0)} <span className="text-[10px] text-slate-400 font-mono">{(companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase()}</span></span>
+                  </div>
+                )}
               </div>
 
               {selectedInvoiceIds.length > 0 && (
                 <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 animate-in fade-in">
-                  <span>مجموع المحدد ({selectedInvoiceIds.length}):</span>
-                  <span className="text-emerald-700">{formatMoney(selectedTotals.total_amount)}</span>
-                  <span className="text-slate-300">/</span>
-                  <span className="text-rose-600">{formatMoney(selectedTotals.total_discount)}</span>
-                  <span className="text-slate-300">/</span>
-                  <span className="text-blue-700">{formatMoney(selectedTotals.net_amount)}</span>
-                  <span className="text-slate-300">/</span>
-                  <span className="text-amber-700">{formatMoney(selectedTotals.remaining_amount)}</span>
+                  <span>{language === 'ar' ? 'مجموع المحدد' : 'Selected'} ({selectedInvoiceIds.length}):</span>
+                  {visibleTotals.subtotal && <span className="text-slate-800" title={language === 'ar' ? 'قبل الخصم' : 'Subtotal'}>{formatMoney(selectedTotals.subtotal)}</span>}
+                  {visibleTotals.discount_amount && <span className="text-rose-600" title={language === 'ar' ? 'الخصم' : 'Discount'}>-{formatMoney(selectedTotals.total_discount)}</span>}
+                  {visibleTotals.tax_amount && <span className="text-amber-700" title={language === 'ar' ? 'ض.ق.م' : 'VAT'}>+{formatMoney(selectedTotals.tax_amount)}</span>}
+                  {visibleTotals.total_amount && <span className="text-emerald-700" title={language === 'ar' ? 'الصافي' : 'Total'}>={formatMoney(selectedTotals.total_amount)}</span>}
+                  {visibleTotals.remaining && <span className="text-amber-700" title={language === 'ar' ? 'المتبقي' : 'Remaining'}>({formatMoney(selectedTotals.remaining_amount)})</span>}
+                  {visibleTotals.journal_entry_amount && <span className="text-purple-700" title={language === 'ar' ? 'إجمالي القيد' : 'Journal'}>[{formatMoney(selectedTotals.journal_entry_amount)}]</span>}
                 </div>
               )}
             </div>
@@ -3746,6 +3853,59 @@ export const Invoices: React.FC = () => {
                 </button>
               </div>
 
+              {/* Totals Selection Dropdown */}
+              {view === 'table' && (
+                <div className="relative" ref={totalsSelectorRef}>
+                  <button
+                    onClick={() => setIsTotalsSelectorOpen(!isTotalsSelectorOpen)}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow-sm active:scale-95"
+                    title={language === 'ar' ? 'تحديد أي الإجماليات تظهر' : 'Configure Visible Totals'}
+                  >
+                    <SlidersHorizontal size={14} className="text-slate-400" />
+                    <span>{language === 'ar' ? 'إجماليات الجدول' : 'Table Totals'}</span>
+                    <ChevronDown size={14} className="text-slate-400" />
+                  </button>
+
+                  {isTotalsSelectorOpen && (
+                    <div className="absolute top-full mt-1.5 right-0 bg-white border border-slate-200 rounded-xl shadow-xl p-3 z-50 min-w-[220px] max-h-[300px] overflow-y-auto space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                          {language === 'ar' ? 'عرض الإجماليات' : 'Display Totals'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={resetTotalsVisibility}
+                          className="text-emerald-600 hover:underline text-[10px] lowercase capitalize"
+                        >
+                          {language === 'ar' ? 'استعادة' : 'Reset'}
+                        </button>
+                      </div>
+                      {[
+                        { id: 'subtotal', label: language === 'ar' ? 'قبل الخصم' : 'Subtotal' },
+                        { id: 'discount_amount', label: language === 'ar' ? 'الخصومات' : 'Discounts' },
+                        { id: 'net_before_tax', label: language === 'ar' ? 'الصافي قبل الضريبة' : 'Net before Tax' },
+                        { id: 'tax_amount', label: language === 'ar' ? 'ضريبة القيمة المضافة (ض.ق.م)' : 'VAT' },
+                        { id: 'withholding_tax_amount', label: language === 'ar' ? 'ضريبة الخصم والتحصيل (ض.خ.أ)' : 'WHT' },
+                        { id: 'total_amount', label: language === 'ar' ? 'إجمالي الفواتير' : 'Invoices Total' },
+                        { id: 'remaining', label: language === 'ar' ? 'المتبقي' : 'Remaining' },
+                        { id: 'cost_amount', label: language === 'ar' ? 'تكلفة المبيعات' : 'Sales Cost (COGS)' },
+                        { id: 'journal_entry_amount', label: language === 'ar' ? 'إجمالي القيود المحاسبية' : 'Journal Total' },
+                      ].map((tot) => (
+                        <label key={tot.id} className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer hover:bg-slate-50 p-1.5 rounded-lg transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={visibleTotals[tot.id]}
+                            onChange={() => toggleTotalVisibility(tot.id)}
+                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                          />
+                          <span>{tot.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Column Selection Dropdown */}
               {view === 'table' && (
                 <div className="relative" ref={columnSelectorRef}>
@@ -3767,7 +3927,7 @@ export const Invoices: React.FC = () => {
                         if (colKey === 'currency' || colKey === 'foreign_amount' || colKey === 'remaining_foreign') {
                           return isMultiCurrencyEnabled;
                         }
-                        if (colKey === 'subtotal' || colKey === 'tax_amount') {
+                        if (colKey === 'subtotal' || colKey === 'tax_amount' || colKey === 'net_before_tax') {
                           return isVatEnabled;
                         }
                         if (colKey === 'withholding_tax_amount') {
@@ -3791,10 +3951,14 @@ export const Invoices: React.FC = () => {
                           currency: language === 'ar' ? 'العملة' : 'Currency',
                           foreign_amount: language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Currency Amount',
                           remaining_foreign: language === 'ar' ? 'الباقي بالعملة الأجنبية' : 'Remaining in Foreign Currency',
-                          subtotal: language === 'ar' ? 'قبل الضريبة' : 'Subtotal',
-                          tax_amount: language === 'ar' ? 'الضريبة' : 'Tax',
+                          subtotal: language === 'ar' ? 'قبل الخصم' : 'Subtotal',
+                          discount_amount: language === 'ar' ? 'الخصم' : 'Discount',
+                          net_before_tax: language === 'ar' ? 'الصافي قبل الضريبة' : 'Net before Tax',
+                          tax_amount: language === 'ar' ? 'ض.ق.م' : 'VAT',
                           withholding_tax_amount: language === 'ar' ? 'ض.خ.إ (خصم وإضافة)' : 'Withholding Tax',
                           base_amount: language === 'ar' ? 'القيمة المعادلة بالعملة المحلية' : 'Equivalent Local Amount',
+                          cost_amount: language === 'ar' ? 'تكلفة المبيعات' : 'Sales Cost (COGS)',
+                          journal_entry_amount: language === 'ar' ? 'إجمالي القيد' : 'Journal Total',
                           remaining: language === 'ar' ? 'الباقي من الفاتورة' : 'Remaining Balance',
                           entry_number: language === 'ar' ? 'رقم القيد' : 'Entry Number',
                           created_date: language === 'ar' ? 'تاريخ الإنشاء' : 'Created Date',
@@ -4040,12 +4204,42 @@ export const Invoices: React.FC = () => {
                           onClick={() => handleSort('subtotal')}
                         >
                           <div className="flex items-center gap-1">
-                            <span>{language === 'ar' ? 'قبل الضريبة' : 'Before Tax'}</span>
+                            <span>{language === 'ar' ? 'قبل الخصم' : 'Before Tax'}</span>
                             <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                               {sortBy === 'subtotal' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
                           </div>
                           {renderResizeHandles('subtotal')}
+                        </th>
+                      )}
+                      {visibleColumns.discount_amount && (
+                        <th 
+                          style={{ width: columnWidths.discount_amount || 90, minWidth: columnWidths.discount_amount || 90 }} 
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('discount_amount')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'الخصم' : 'Discount'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'discount_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('discount_amount')}
+                        </th>
+                      )}
+                      {visibleColumns.net_before_tax && isVatEnabled && (
+                        <th 
+                          style={{ width: columnWidths.net_before_tax || 110, minWidth: columnWidths.net_before_tax || 110 }} 
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('net_before_tax')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'الصافي قبل الضريبة' : 'Net Before Tax'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'net_before_tax' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('net_before_tax')}
                         </th>
                       )}
                       {visibleColumns.tax_amount && isVatEnabled && (
@@ -4055,7 +4249,7 @@ export const Invoices: React.FC = () => {
                           onClick={() => handleSort('tax_amount')}
                         >
                           <div className="flex items-center gap-1">
-                            <span>{language === 'ar' ? 'الضريبة' : 'Tax'}</span>
+                            <span>{language === 'ar' ? 'ض.ق.م' : 'Tax'}</span>
                             <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                               {sortBy === 'tax_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                             </span>
@@ -4091,6 +4285,36 @@ export const Invoices: React.FC = () => {
                             </span>
                           </div>
                           {renderResizeHandles('base_amount')}
+                        </th>
+                      )}
+                      {visibleColumns.cost_amount && (
+                        <th 
+                          style={{ width: columnWidths.cost_amount || 105, minWidth: columnWidths.cost_amount || 105 }} 
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('cost_amount')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'تكلفة المبيعات' : 'Cost (COGS)'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'cost_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('cost_amount')}
+                        </th>
+                      )}
+                      {visibleColumns.journal_entry_amount && (
+                        <th 
+                          style={{ width: columnWidths.journal_entry_amount || 110, minWidth: columnWidths.journal_entry_amount || 110 }} 
+                          className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('journal_entry_amount')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{language === 'ar' ? 'إجمالي القيد' : 'Journal Total'}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {sortBy === 'journal_entry_amount' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
+                            </span>
+                          </div>
+                          {renderResizeHandles('journal_entry_amount')}
                         </th>
                       )}
                       {visibleColumns.remaining && (
@@ -4368,19 +4592,39 @@ export const Invoices: React.FC = () => {
                               {formatMoney(inv.subtotal * (Number(inv.exchange_rate) || 1))}
                             </td>
                           )}
+                          {visibleColumns.discount_amount && (
+                            <td style={{ width: columnWidths.discount_amount || 90, minWidth: columnWidths.discount_amount || 90 }} className={`px-2 py-0.5 font-bold text-rose-600 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {formatMoney((Number(inv.discount_amount || (inv as any).discount) || 0) * (Number(inv.exchange_rate) || 1))}
+                            </td>
+                          )}
+                          {visibleColumns.net_before_tax && isVatEnabled && (
+                            <td style={{ width: columnWidths.net_before_tax || 110, minWidth: columnWidths.net_before_tax || 110 }} className={`px-2 py-0.5 font-bold text-blue-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {formatMoney(((Number(inv.subtotal) || 0) - (Number(inv.discount_amount || (inv as any).discount) || 0)) * (Number(inv.exchange_rate) || 1))}
+                            </td>
+                          )}
                           {visibleColumns.tax_amount && isVatEnabled && (
-                            <td style={{ width: columnWidths.tax_amount, minWidth: columnWidths.tax_amount }} className={`px-2 py-0.5 font-bold text-slate-900 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <td style={{ width: columnWidths.tax_amount, minWidth: columnWidths.tax_amount }} className={`px-2 py-0.5 font-bold text-amber-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {formatMoney(inv.tax_amount * (Number(inv.exchange_rate) || 1))}
                             </td>
                           )}
                           {visibleColumns.withholding_tax_amount && isWhtEnabled && (
-                            <td style={{ width: columnWidths.withholding_tax_amount || 110, minWidth: columnWidths.withholding_tax_amount || 110 }} className={`px-2 py-0.5 font-bold text-amber-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <td style={{ width: columnWidths.withholding_tax_amount || 110, minWidth: columnWidths.withholding_tax_amount || 110 }} className={`px-2 py-0.5 font-bold text-amber-600 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {formatMoney((Number(inv.withholding_tax_amount) || 0) * (Number(inv.exchange_rate) || 1))}
                             </td>
                           )}
                           {visibleColumns.base_amount && (
-                            <td style={{ width: columnWidths.base_amount, minWidth: columnWidths.base_amount }} className={`px-2 py-0.5 font-bold text-slate-900 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                            <td style={{ width: columnWidths.base_amount, minWidth: columnWidths.base_amount }} className={`px-2 py-0.5 font-bold text-emerald-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
                               {formatMoney(inv.total_amount * (Number(inv.exchange_rate) || 1))}
+                            </td>
+                          )}
+                          {visibleColumns.cost_amount && (
+                            <td style={{ width: columnWidths.cost_amount || 105, minWidth: columnWidths.cost_amount || 105 }} className={`px-2 py-0.5 font-bold text-slate-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {formatMoney((Number(inv.cost_amount) || 0) * (Number(inv.exchange_rate) || 1))}
+                            </td>
+                          )}
+                          {visibleColumns.journal_entry_amount && (
+                            <td style={{ width: columnWidths.journal_entry_amount || 110, minWidth: columnWidths.journal_entry_amount || 110 }} className={`px-2 py-0.5 font-bold text-purple-700 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {inv.journal_entry_amount ? formatMoney(Number(inv.journal_entry_amount) * (Number(inv.exchange_rate) || 1)) : '-'}
                             </td>
                           )}
                           {visibleColumns.remaining && (
