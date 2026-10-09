@@ -39,24 +39,60 @@ export const StockAdjustments: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const tableRef = useRef<HTMLDivElement>(null);
 
-  const handleExportExcel = () => {
+  const getAdjustmentValue = (adj: StockAdjustment): number => {
+    if (adj.items && Array.isArray(adj.items)) {
+      return adj.items.reduce((sum, it) => {
+        const cost = it.total_cost !== undefined && it.total_cost !== null
+          ? Number(it.total_cost)
+          : (Number(it.quantity || 0) * Number(it.unit_cost || 0));
+        return sum + (isNaN(cost) ? 0 : cost);
+      }, 0);
+    }
+    return 0;
+  };
+
+  const totalVisibleValue = adjustments.reduce((sum, adj) => sum + getAdjustmentValue(adj), 0);
+  const selectedAdjustments = adjustments.filter(adj => selectedIds.includes(adj.id));
+  const selectedTotalValue = selectedAdjustments.reduce((sum, adj) => sum + getAdjustmentValue(adj), 0);
+
+  const handleExportExcel = (dataToExport = adjustments) => {
     const headers = {
       'adjustment_number': 'رقم التسوية',
       'date': 'التاريخ',
       'account_name': 'الحساب المقابل',
+      'items_count': 'الأصناف المتأثرة',
+      'value': 'القيمة',
+      'entry_number': 'رقم القيد',
       'description': 'ملاحظات'
     };
-    const formattedData = formatDataForExcel(adjustments, headers);
+    const mapped = dataToExport.map(adj => ({
+      adjustment_number: adj.adjustment_number,
+      date: formatDate(adj.date),
+      account_name: adj.account_name || '-',
+      items_count: (adj.items ? adj.items.length : 1),
+      value: getAdjustmentValue(adj),
+      entry_number: adj.entry_number || '-',
+      description: adj.description || ''
+    }));
+    const formattedData = formatDataForExcel(mapped, headers);
     exportToExcel(formattedData, { filename: 'Stock_Adjustments', sheetName: 'تسويات المخزون' });
+  };
+
+  const handleExportExcelSelected = () => {
+    if (selectedAdjustments.length > 0) {
+      handleExportExcel(selectedAdjustments);
+    }
   };
 
   const handleExportPDF = async () => {
     if (tableRef.current) {
       await exportToPDFUtil(tableRef.current, {
         filename: 'Stock_Adjustments',
-        reportTitle: 'جدول تسويات كميات وأسعار المخزون'
+        reportTitle: 'جدول تسويات كميات وأسعار المخزون',
+        orientation: 'landscape'
       });
     }
   };
@@ -861,9 +897,11 @@ export const StockAdjustments: React.FC = () => {
 
             <div className="flex items-center gap-1.5">
               <ExportButtons
-                onExportExcel={handleExportExcel}
+                onExportExcel={() => handleExportExcel(adjustments)}
                 onExportPDF={handleExportPDF}
                 onPrint={() => printElement(tableRef.current, 'جدول تسويات كميات وأسعار المخزون')}
+                selectedCount={selectedIds.length}
+                onExportExcelSelected={handleExportExcelSelected}
               />
               <button
                 onClick={handleOpenCreateModal}
@@ -873,6 +911,73 @@ export const StockAdjustments: React.FC = () => {
                 <span>{language === 'ar' ? 'إنشاء سند تسوية' : 'Create Stock Adjustment'}</span>
               </button>
             </div>
+          </div>
+
+          {/* KPI Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
+            <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-slate-500 block">
+                  {language === 'ar' ? 'إجمالي السندات' : 'Total Adjustments'}
+                </span>
+                <span className="text-base font-black text-slate-800 font-mono">
+                  {totalRecords || adjustments.length}
+                </span>
+              </div>
+              <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-xs">
+                <Hash size={16} />
+              </div>
+            </div>
+
+            <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-slate-500 block">
+                  {language === 'ar' ? 'إجمالي أثر القيمة' : 'Net Discrepancy Value'}
+                </span>
+                <span className={`text-base font-black font-mono ${totalVisibleValue < 0 ? 'text-rose-600' : totalVisibleValue > 0 ? 'text-emerald-600' : 'text-slate-800'}`}>
+                  {totalVisibleValue > 0 ? '+' : ''}{formatNumber(totalVisibleValue)}
+                </span>
+              </div>
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs">
+                <Layers size={16} />
+              </div>
+            </div>
+
+            {selectedIds.length > 0 && (
+              <>
+                <div className="bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-200 shadow-xs flex items-center justify-between animate-in fade-in">
+                  <div>
+                    <span className="text-[11px] font-bold text-emerald-700 block">
+                      {language === 'ar' ? 'السندات المحددة' : 'Selected Adjustments'}
+                    </span>
+                    <span className="text-base font-black text-emerald-800 font-mono">
+                      {selectedIds.length} {language === 'ar' ? 'سند' : 'items'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setSelectedIds([])}
+                    className="text-[10px] font-bold text-emerald-700 bg-white hover:bg-emerald-100 border border-emerald-300 px-2 py-1 rounded-md transition-all active:scale-95"
+                    title={language === 'ar' ? 'إلغاء التحديد' : 'Clear selection'}
+                  >
+                    {language === 'ar' ? 'إلغاء التحديد' : 'Clear'}
+                  </button>
+                </div>
+
+                <div className="bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-200 shadow-xs flex items-center justify-between animate-in fade-in">
+                  <div>
+                    <span className="text-[11px] font-bold text-emerald-700 block">
+                      {language === 'ar' ? 'إجمالي قيمة المحدد' : 'Selected Total Value'}
+                    </span>
+                    <span className={`text-base font-black font-mono ${selectedTotalValue < 0 ? 'text-rose-600' : selectedTotalValue > 0 ? 'text-emerald-700' : 'text-emerald-800'}`}>
+                      {selectedTotalValue > 0 ? '+' : ''}{formatNumber(selectedTotalValue)}
+                    </span>
+                  </div>
+                  <div className="w-8 h-8 rounded-lg bg-white text-emerald-600 border border-emerald-200 flex items-center justify-center font-bold text-xs">
+                    ✓
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Filter panel */}
@@ -935,6 +1040,23 @@ export const StockAdjustments: React.FC = () => {
                 <table className="w-full border-collapse text-right text-xs">
                   <thead>
                     <tr className="bg-slate-50/90 border-b border-slate-200">
+                      <th className="px-2 py-1.5 text-center w-10">
+                        <input
+                          type="checkbox"
+                          checked={adjustments.length > 0 && adjustments.every(a => selectedIds.includes(a.id))}
+                          onChange={() => {
+                            const allSelected = adjustments.length > 0 && adjustments.every(a => selectedIds.includes(a.id));
+                            if (allSelected) {
+                              const pageIds = adjustments.map(a => a.id);
+                              setSelectedIds(prev => prev.filter(id => !pageIds.includes(id)));
+                            } else {
+                              setSelectedIds(prev => Array.from(new Set([...prev, ...adjustments.map(a => a.id)])));
+                            }
+                          }}
+                          className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer"
+                          title={language === 'ar' ? 'تحديد الكل' : 'Select All'}
+                        />
+                      </th>
                       <th 
                         onClick={() => handleSort('adjustment_number')}
                         className="px-2 py-1.5 font-bold text-slate-600 uppercase cursor-pointer hover:text-emerald-600 transition-colors text-[11px]"
@@ -953,6 +1075,9 @@ export const StockAdjustments: React.FC = () => {
                       <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-[11px]">
                         {language === 'ar' ? 'الأصناف المتأثرة' : 'Items Affected'}
                       </th>
+                      <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-center text-[11px]">
+                        {language === 'ar' ? 'القيمة' : 'Value'}
+                      </th>
                       <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-[11px]">
                         {language === 'ar' ? 'رقم القيد' : 'Journal Entry'}
                       </th>
@@ -965,39 +1090,57 @@ export const StockAdjustments: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {adjustments.map((adj) => (
-                      <tr key={adj.id} className="hover:bg-slate-50/70 transition-colors group">
-                        <td className="px-2 py-1 font-mono font-bold text-slate-900 text-xs">
-                          {adj.adjustment_number}
-                        </td>
-                        <td className="px-2 py-1 font-medium text-slate-500 whitespace-nowrap text-xs">
-                          {formatDate(adj.date)}
-                        </td>
-                        <td className="px-2 py-1 font-bold text-slate-700 text-xs">
-                          {adj.account_name || '-'}
-                        </td>
-                        <td className="px-2 py-1 font-bold text-slate-700 text-xs">
-                          {(adj as any).items_count || (adj.items ? adj.items.length : 1)}
-                        </td>
-                        <td className="px-2 py-1 font-mono text-slate-700 text-xs">
-                          {adj.entry_number ? (
-                            <button
-                              onClick={(e) => {
+                    {adjustments.map((adj) => {
+                      const adjVal = getAdjustmentValue(adj);
+                      return (
+                        <tr key={adj.id} className="hover:bg-slate-50/70 transition-colors group">
+                          <td className="px-2 py-1 text-center w-10">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.includes(adj.id)}
+                              onChange={(e) => {
                                 e.stopPropagation();
-                                setPendingViewDoc({ type: 'journal', idOrNumber: adj.entry_number! });
-                                setCurrentPage('journal_entries');
+                                setSelectedIds(prev =>
+                                  prev.includes(adj.id) ? prev.filter(id => id !== adj.id) : [...prev, adj.id]
+                                );
                               }}
-                              className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100/50 transition-all active:scale-95"
-                            >
-                              {adj.entry_number}
-                            </button>
-                          ) : (
-                            <span className="text-slate-400 font-mono text-xs">-</span>
-                          )}
-                        </td>
-                        <td className="px-2 py-1 font-normal text-slate-500 max-w-[200px] truncate text-xs" title={adj.description}>
-                          {adj.description || '-'}
-                        </td>
+                              className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer"
+                            />
+                          </td>
+                          <td className="px-2 py-1 font-mono font-bold text-slate-900 text-xs">
+                            {adj.adjustment_number}
+                          </td>
+                          <td className="px-2 py-1 font-medium text-slate-500 whitespace-nowrap text-xs">
+                            {formatDate(adj.date)}
+                          </td>
+                          <td className="px-2 py-1 font-bold text-slate-700 text-xs">
+                            {adj.account_name || '-'}
+                          </td>
+                          <td className="px-2 py-1 font-bold text-slate-700 text-xs">
+                            {(adj as any).items_count || (adj.items ? adj.items.length : 1)}
+                          </td>
+                          <td className="px-2 py-1 font-mono font-bold text-center text-xs" style={{ color: adjVal < 0 ? '#e11d48' : adjVal > 0 ? '#10b981' : '#475569' }}>
+                            {adjVal > 0 ? '+' : ''}{formatNumber(adjVal)}
+                          </td>
+                          <td className="px-2 py-1 font-mono text-slate-700 text-xs">
+                            {adj.entry_number ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPendingViewDoc({ type: 'journal', idOrNumber: adj.entry_number! });
+                                  setCurrentPage('journal_entries');
+                                }}
+                                className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100/50 transition-all active:scale-95"
+                              >
+                                {adj.entry_number}
+                              </button>
+                            ) : (
+                              <span className="text-slate-400 font-mono text-xs">-</span>
+                            )}
+                          </td>
+                          <td className="px-2 py-1 font-normal text-slate-500 max-w-[200px] truncate text-xs" title={adj.description}>
+                            {adj.description || '-'}
+                          </td>
                         <td className="px-2 py-1 text-center">
                           <div className="flex items-center justify-center gap-1">
                             <button
@@ -1024,7 +1167,8 @@ export const StockAdjustments: React.FC = () => {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    );
+                    })}
                   </tbody>
                 </table>
               </div>

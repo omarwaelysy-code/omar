@@ -269,15 +269,12 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
   
   const is58 = dto.paperSize === 'thermal_58' || templateName.toLowerCase().includes('58');
   
-  // Page Width (in points): A4 is 595.28, 80mm is ~226.77, 58mm is ~164.41
-  let pageWidth = isThermal ? (is58 ? 164.41 : 226.77) : 595.28;
-  let pageHeight = 841.89; // A4 height
+  const isLandscape = !isThermal && dto.orientation === 'landscape';
 
-  if (!isThermal && dto.orientation === 'landscape') {
-    pageWidth = 841.89;
-    pageHeight = 595.28;
-  }
-  
+  // Page Width (in points): A4 is 595.28, 80mm is ~226.77, 58mm is ~164.41
+  let pageWidth = isThermal ? (is58 ? 164.41 : 226.77) : (isLandscape ? 841.89 : 595.28);
+  let pageHeight = isThermal ? 841.89 : (isLandscape ? 595.28 : 841.89);
+
   // Estimate height dynamically for thermal receipts to avoid empty trailing space
   if (isThermal) {
     const itemCount = (dto.items || []).length;
@@ -294,7 +291,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({
-        size: [pageWidth, pageHeight],
+        size: isThermal ? [pageWidth, pageHeight] : 'A4',
+        layout: isLandscape ? 'landscape' : 'portrait',
         margins: isThermal 
           ? { top: 10, bottom: 10, left: 10, right: 10 }
           : { top: 40, bottom: 40, left: 30, right: 30 },
@@ -332,8 +330,18 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         }
       }
 
-      const paperWidthMm = isThermal ? (dto.customLayout?.paperWidth || 80) : 210;
-      const ptPerMm = isThermal ? (pageWidth / paperWidthMm) : (595.28 / 210);
+      const addNewPage = () => {
+        doc.addPage({
+          size: isThermal ? [pageWidth, pageHeight] : 'A4',
+          layout: isLandscape ? 'landscape' : 'portrait',
+          margins: isThermal 
+            ? { top: 10, bottom: 10, left: 10, right: 10 }
+            : { top: 40, bottom: 40, left: 30, right: 30 }
+        });
+      };
+
+      const paperWidthMm = isThermal ? (dto.customLayout?.paperWidth || 80) : (isLandscape ? 297 : 210);
+      const ptPerMm = isThermal ? (pageWidth / paperWidthMm) : (isLandscape ? (841.89 / 297) : (595.28 / 210));
 
       const hasCustomLayout = Boolean(dto.customLayout && Array.isArray(dto.customLayout.header) && dto.customLayout.header.length > 0);
 
@@ -635,7 +643,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
           // Check for page break (only for A4; thermal receipts print continuously on a single custom page)
           if (!isThermal && (y + maxCellHeight > doc.page.height - 50)) {
-            doc.addPage();
+            addNewPage();
             y = 40;
             if (!isHeader) {
               y = drawRow(columns.map(c => c.label), y, true);
@@ -790,7 +798,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
         // Page break check (only A4)
         if (!isThermal && (currentY + maxValHeight > doc.page.height - 50)) {
-          doc.addPage();
+          addNewPage();
           currentY = 40;
         }
 
@@ -844,7 +852,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
       // Helper to draw signatures
       const drawSignatures = (leftTitle: string, rightTitle: string) => {
         if (!isThermal && (currentY + 45 > doc.page.height - 45)) {
-          doc.addPage();
+          addNewPage();
           currentY = 40;
         }
         const boxWidth = isThermal ? 75 : 140;
@@ -1408,7 +1416,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             const qrSize = isThermal ? 50 : 60;
             const qrX = isThermal ? (pageWidth - qrSize) / 2 : sideMargin;
             if (!isThermal && (currentY + qrSize > doc.page.height - 50)) {
-              doc.addPage();
+              addNewPage();
               currentY = 40;
             }
             doc.image(qrBuffer, qrX, currentY, { width: qrSize, height: qrSize });
@@ -1533,7 +1541,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             const boxHeight = (isThermal ? 10 : 12) + wrappedDesc.length * (isThermal ? 9.5 : 11) + (isThermal ? 6 : 10);
 
             if (!isThermal && (currentY + boxHeight > doc.page.height - 50)) {
-              doc.addPage();
+              addNewPage();
               currentY = 40;
             }
 

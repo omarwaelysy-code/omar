@@ -117,24 +117,53 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
 
     targetThs.forEach((cell, index) => {
       const text = cell.textContent?.trim() || '';
+      const lowerText = text.toLowerCase();
+      const isActionCol = 
+        lowerText.includes('إجراء') || 
+        lowerText.includes('عمليات') || 
+        lowerText.includes('العمليات') || 
+        lowerText.includes('actions') || 
+        lowerText.includes('action') || 
+        lowerText.includes('خيارات') || 
+        lowerText.includes('options') || 
+        lowerText.includes('تعديل') || 
+        lowerText.includes('حذف');
+
       // Skip empty columns (checkboxes, selection/action columns, spacing gaps)
-      if (text === '') return;
+      if (text === '' || isActionCol) return;
 
       let width = 1.0;
       let align: 'left' | 'center' | 'right' = 'right';
       
-      const lowerText = text.toLowerCase();
       if (lowerText.includes('تاريخ') || lowerText.includes('date')) {
+        width = 1.3;
+        align = 'center';
+      } else if (lowerText.includes('كود') || lowerText.includes('code')) {
+        width = 1.1;
+        align = 'center';
+      } else if (lowerText.includes('هاتف') || lowerText.includes('جوال') || lowerText.includes('mobile') || lowerText.includes('phone')) {
         width = 1.4;
+        align = 'center';
+      } else if (lowerText.includes('ضريب') || lowerText.includes('tax') || lowerText.includes('سجل') || lowerText.includes('cr')) {
+        width = 1.4;
+        align = 'center';
+      } else if (lowerText.includes('حد الائتمان') || lowerText.includes('credit limit')) {
+        width = 1.3;
+        align = 'right';
+      } else if (lowerText.includes('سداد') || lowerText.includes('payment')) {
+        width = 1.2;
+        align = 'center';
+      } else if (lowerText.includes('حالة') || lowerText.includes('status')) {
+        width = 0.9;
         align = 'center';
       } else if (lowerText.includes('نوع') || lowerText.includes('type')) {
         width = 1.2;
         align = 'center';
       } else if (lowerText.includes('قيد') || lowerText.includes('entry')) {
-        width = 2.2;
+        width = 2.0;
         align = 'center';
       } else if (lowerText.includes('مرجع') || lowerText.includes('ref')) {
-        width = 1.8;
+        width = 1.5;
         align = 'center';
       } else if (
         lowerText.includes('البيان') || 
@@ -145,7 +174,7 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
         lowerText.includes('product') || 
         lowerText.includes('صنف')
       ) {
-        width = targetThs.length > 10 ? 1.6 : 3.0;
+        width = targetThs.length > 8 ? 2.0 : 2.8;
         align = 'right';
       } else if (lowerText.includes('مدين') || lowerText.includes('debit')) {
         width = 1.2;
@@ -153,8 +182,8 @@ export const exportToPDF = async (element: HTMLElement, options: PDFOptions) => 
       } else if (lowerText.includes('دائن') || lowerText.includes('credit')) {
         width = 1.2;
         align = 'right';
-      } else if (lowerText.includes('رصيد') || lowerText.includes('balance')) {
-        width = 1.4;
+      } else if (lowerText.includes('رصيد') || lowerText.includes('balance') || lowerText.includes('قيمة') || lowerText.includes('value')) {
+        width = 1.5;
         align = 'right';
       }
       
@@ -341,10 +370,26 @@ export const printElement = (element: HTMLElement | null, reportTitle: string = 
 
   // Clone element to remove interactive inputs or action columns if needed
   const cloned = element.cloneNode(true) as HTMLElement;
-  // Remove last header and body column if it contains action buttons
+  // Remove checkbox and action columns from table
   cloned.querySelectorAll('tr').forEach(tr => {
+    const cells = Array.from(tr.children);
+    // Remove leading checkbox column if present
+    const firstCell = cells[0];
+    if (firstCell && (firstCell.querySelector('input[type="checkbox"]') || firstCell.textContent?.trim() === '')) {
+      firstCell.remove();
+    }
+    // Remove trailing action column if present
     const lastCell = tr.lastElementChild;
-    if (lastCell && (lastCell.querySelector('button') || lastCell.textContent?.includes('إجراءات') || lastCell.textContent?.includes('Actions'))) {
+    if (lastCell && (
+      lastCell.querySelector('button') || 
+      lastCell.textContent?.includes('إجراءات') || 
+      lastCell.textContent?.includes('إجراء') || 
+      lastCell.textContent?.includes('العمليات') || 
+      lastCell.textContent?.includes('عمليات') || 
+      lastCell.textContent?.includes('Actions') ||
+      lastCell.textContent?.includes('Action') ||
+      lastCell.textContent?.includes('خيارات')
+    )) {
       lastCell.remove();
     }
   });
@@ -356,18 +401,19 @@ export const printElement = (element: HTMLElement | null, reportTitle: string = 
       <meta charset="utf-8">
       <title>${reportTitle}</title>
       <style>
-        body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 25px; direction: rtl; color: #1e293b; }
-        .header { text-align: center; margin-bottom: 25px; border-bottom: 2px solid #0f766e; padding-bottom: 15px; }
-        .header h1 { margin: 0 0 6px 0; font-size: 24px; color: #0f766e; font-weight: bold; }
-        .header h2 { margin: 0; font-size: 16px; color: #475569; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #fff; }
-        th, td { border: 1px solid #cbd5e1; padding: 10px 12px; text-align: right; font-size: 12px; }
+        body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 20px; direction: rtl; color: #1e293b; background: #fff; }
+        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #0f766e; padding-bottom: 12px; }
+        .header h1 { margin: 0 0 6px 0; font-size: 22px; color: #0f766e; font-weight: bold; }
+        .header h2 { margin: 0; font-size: 15px; color: #475569; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: #fff; }
+        th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: center; font-size: 11px; white-space: nowrap; }
+        td:nth-child(2), td:nth-child(3) { text-align: right; }
         th { background-color: #f1f5f9; font-weight: bold; color: #0f172a; }
         tr:nth-child(even) { background-color: #f8fafc; }
-        .footer { margin-top: 25px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 10px; }
-        button, .no-print, input[type="checkbox"] { display: none !important; }
+        .footer { margin-top: 20px; text-align: center; font-size: 10px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 8px; }
+        button, .no-print, input[type="checkbox"], a[role="button"] { display: none !important; }
         @media print {
-          @page { size: A4 landscape; margin: 10mm; }
+          @page { size: A4 landscape; margin: 8mm; }
           body { padding: 0; }
         }
       </style>
