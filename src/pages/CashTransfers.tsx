@@ -759,7 +759,7 @@ export const CashTransfers: React.FC = () => {
       };
 
       if (editingTransfer) {
-        await dbService.deleteJournalEntryByReference(editingTransfer.id, user.company_id);
+        // For editing: in-place atomic update strictly preserving the existing journal entry ID, date, and entry_number
         await TransactionManager.updateWithAccounting(
           'cash_transfers',
           editingTransfer.id,

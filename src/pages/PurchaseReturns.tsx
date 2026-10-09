@@ -2042,7 +2042,7 @@ export const PurchaseReturns: React.FC = () => {
 
       let savedReturnId: string | null = null;
       if (editingReturn) {
-        await dbService.deleteJournalEntryByReference(editingReturn.id, user.company_id);
+        // For editing: in-place atomic update strictly preserving the existing journal entry ID, date, and entry_number
         await TransactionManager.updateWithAccounting(
           'purchase_returns',
           editingReturn.id,

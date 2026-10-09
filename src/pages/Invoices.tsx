@@ -2698,8 +2698,7 @@ export const Invoices: React.FC = () => {
       };
 
       if (editingInvoice) {
-        // For editing, we still use TransactionManager approach by deleting old journal and adding new one
-        await dbService.deleteJournalEntryByReference(editingInvoice.id, user.company_id);
+        // For editing: in-place atomic update strictly preserving the existing journal entry ID, date, and entry_number
         await TransactionManager.updateWithAccounting(
           'invoices',
           editingInvoice.id,

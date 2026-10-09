@@ -1337,7 +1337,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
       let savedVoucherId = editingVoucher ? editingVoucher.id : '';
 
       if (editingVoucher) {
-        await dbService.deleteJournalEntryByReference(editingVoucher.id, user.company_id);
+        // For editing: in-place atomic update strictly preserving the existing journal entry ID, date, and entry_number
         const res = await TransactionManager.updateWithAccounting(
           'payment_vouchers',
           editingVoucher.id,

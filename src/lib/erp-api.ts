@@ -2572,7 +2572,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
           // NEVER use mathematical plugs (journalValue - netValue) so genuine variances are exposed!
           let actualCounter = 0;
           if (cfg.key === 'invoices') {
-            // In sales invoices, legitimate secondary debits are Cost of Goods Sold (COGS) + direct cash/bank collections on cash invoices + withholding/discounts
+            // In sales invoices, legitimate secondary debits are Cost of Goods Sold (COGS) + direct cash/bank collections on cash invoices + withholding/discounts + inventory restock on reversal entries
             const sideRes: any = await client.query(
               `SELECT COALESCE(SUM(jel.debit), 0)::numeric as side_tot
                FROM journal_entry_lines jel
@@ -2583,12 +2583,15 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
                  AND (
                    a.account_usage IN ('cost_of_sales', 'cost_of_goods_sold', 'cash', 'bank', 'withholding_tax_customers', 'earned_discounts')
                    OR a.code LIKE '51%'
+                   OR (a.account_usage = 'inventory' AND (je.description LIKE '%عكس%' OR je.reference_number LIKE 'REV-%'))
                  )`,
               [companyId]
             );
             actualCounter = parseFloat(sideRes.rows[0]?.side_tot || 0);
           } else if (cfg.key === 'returns') {
-            // In sales returns, legitimate secondary debit is the Inventory Restock debit (cost of returned goods)
+            // In sales returns, legitimate secondary debits are:
+            // 1. Inventory Restock debit (cost of returned goods)
+            // 2. Customer ledger settlement debits on cash returns
             const sideRes: any = await client.query(
               `SELECT COALESCE(SUM(jel.debit), 0)::numeric as side_tot
                FROM journal_entry_lines jel
@@ -2596,7 +2599,67 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
                JOIN accounts a ON a.id = jel.account_id
                WHERE je.company_id = $1 
                  AND je.reference_type IN ('return', 'sales_return')
-                 AND (a.account_usage = 'inventory' OR a.code LIKE '114%')`,
+                 AND (
+                   a.account_usage IN ('inventory', 'customer', 'accounts_receivable')
+                   OR a.code LIKE '114%'
+                   OR a.code LIKE '1115%'
+                   OR a.code LIKE '1101%'
+                 )`,
+              [companyId]
+            );
+            actualCounter = parseFloat(sideRes.rows[0]?.side_tot || 0);
+          } else if (cfg.key === 'purchase_invoices') {
+            // In purchase invoices, legitimate secondary debits are:
+            // 1. Supplier settlement debits on cash purchase invoices (to clear through supplier subledger)
+            const sideRes: any = await client.query(
+              `SELECT COALESCE(SUM(jel.debit), 0)::numeric as side_tot
+               FROM journal_entry_lines jel
+               JOIN journal_entries je ON je.id = jel.journal_entry_id
+               JOIN accounts a ON a.id = jel.account_id
+               WHERE je.company_id = $1 
+                 AND je.reference_type IN ('purchase_invoice', 'purchase')
+                 AND (
+                   a.account_usage IN ('supplier', 'accounts_payable')
+                   OR a.code LIKE '211%'
+                   OR a.code LIKE '2101%'
+                 )`,
+              [companyId]
+            );
+            const suppCashDebits = parseFloat(sideRes.rows[0]?.side_tot || 0);
+
+            // 2. Withholding tax: since document total_amount is net (excluding WHT), but journal debits are gross (Purchases + VAT)
+            const whtRes: any = await client.query(
+              `SELECT COALESCE(SUM(withholding_tax_amount * COALESCE(exchange_rate, 1)), 0)::numeric as wht_tot
+               FROM purchase_invoices
+               WHERE company_id = $1`,
+              [companyId]
+            );
+            const whtTot = parseFloat(whtRes.rows[0]?.wht_tot || 0);
+
+            // 3. Purchase discounts: since document total_amount is net of discount, but journal debits are gross before discount
+            const discRes: any = await client.query(
+              `SELECT COALESCE(SUM(discount_amount * COALESCE(exchange_rate, 1)), 0)::numeric as disc_tot
+               FROM purchase_invoices
+               WHERE company_id = $1`,
+              [companyId]
+            );
+            const discTot = parseFloat(discRes.rows[0]?.disc_tot || 0);
+
+            actualCounter = suppCashDebits + whtTot + discTot;
+          } else if (cfg.key === 'purchase_returns') {
+            // In purchase returns, legitimate secondary debits are:
+            // Cash / Bank debits on cash purchase returns
+            const sideRes: any = await client.query(
+              `SELECT COALESCE(SUM(jel.debit), 0)::numeric as side_tot
+               FROM journal_entry_lines jel
+               JOIN journal_entries je ON je.id = jel.journal_entry_id
+               JOIN accounts a ON a.id = jel.account_id
+               WHERE je.company_id = $1 
+                 AND je.reference_type IN ('purchase_return')
+                 AND (
+                   a.account_usage IN ('cash', 'bank', 'payment_method')
+                   OR a.code LIKE '111%'
+                 )`,
               [companyId]
             );
             actualCounter = parseFloat(sideRes.rows[0]?.side_tot || 0);
@@ -2685,7 +2748,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
             }
 
             // Check for specific document-level variance issues between document amount and journal entry
-            if (cfg.table && cfg.numCol && !['invoices', 'returns'].includes(cfg.key)) {
+            if (cfg.table && cfg.numCol && !['invoices', 'returns', 'purchase_invoices', 'purchase_returns'].includes(cfg.key)) {
               const diffRes: any = await client.query(
                 `SELECT d.id, d."${cfg.numCol}" as doc_num, d."${cfg.dateCol}" as doc_date,
                         ${docAmtExpr} as doc_amt,
@@ -11840,23 +11903,45 @@ router.post('/journal_entries', authenticateToken, TransactionsLimitMiddleware, 
       entryData.reference_number = entryData.entry_number;
     }
 
-    if (existingEntryId) {
-      await client.query('DELETE FROM journal_entries WHERE id = $1', [existingEntryId]);
-    }
+    const finalJeId = existingEntryId || entryId;
+    const finalJeNumber = existingEntryNumber || entryData.entry_number;
+    const finalEntryData = { ...entryData, id: finalJeId, entry_number: finalJeNumber, total_debit: roundedDebit, total_credit: roundedCredit };
 
-    const finalEntryData = { ...entryData, id: entryId };
-    const keys = Object.keys(finalEntryData);
-    const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
-    await client.query(
-      `INSERT INTO journal_entries (${keys.join(', ')}) VALUES (${placeholders})`,
-      Object.values(finalEntryData)
-    );
+    if (existingEntryId) {
+      // IN-PLACE UPDATE: Strictly preserve existing journal entry ID, number, created_at, created_by
+      await client.query(`
+        UPDATE journal_entries SET
+          date = $1,
+          description = $2,
+          reference_number = $3,
+          total_debit = $4,
+          total_credit = $5,
+          status = 'posted',
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $6
+      `, [
+        entryData.date,
+        entryData.description,
+        entryData.reference_number || existingReferenceNumber,
+        roundedDebit,
+        roundedCredit,
+        finalJeId
+      ]);
+      await client.query('DELETE FROM journal_entry_lines WHERE journal_entry_id = $1', [finalJeId]);
+    } else {
+      const keys = Object.keys(finalEntryData);
+      const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+      await client.query(
+        `INSERT INTO journal_entries (${keys.join(', ')}) VALUES (${placeholders})`,
+        Object.values(finalEntryData)
+      );
+    }
 
     for (const item of (items || [])) {
       const sanitizedItem = sanitizeData('journal_entry_lines', item);
       const itemId = uuidv4();
-      const itemData = { ...sanitizedItem, id: itemId, journal_entry_id: entryId };
-      if (finalEntryData.company_id) itemData.company_id = finalEntryData.company_id;
+      const itemData = { ...sanitizedItem, id: itemId, journal_entry_id: finalJeId };
+      if (entryData.company_id || companyId) itemData.company_id = entryData.company_id || companyId;
 
       // Control account protection: link customer_id or supplier_id
       if (!itemData.customer_id && (itemData.sub_account_type === 'customer' || String(item.account_code || '').startsWith('111') || (item.account_name && item.account_name.includes('عملاء')))) {
@@ -11876,10 +11961,10 @@ router.post('/journal_entries', authenticateToken, TransactionsLimitMiddleware, 
 
     
     if (['invoice', 'return', 'sales_return'].includes(finalEntryData.reference_type)) {
-       await syncCOGSForJournalEntry(client, companyId, entryId, finalEntryData.reference_id, finalEntryData.reference_type);
+       await syncCOGSForJournalEntry(client, companyId, finalJeId, finalEntryData.reference_id, finalEntryData.reference_type);
     }
 
-    await balanceAndValidateJournalEntry(client, entryId);
+    await balanceAndValidateJournalEntry(client, finalJeId);
     await client.query('COMMIT');
 
     // Audit Log
@@ -11888,16 +11973,16 @@ router.post('/journal_entries', authenticateToken, TransactionsLimitMiddleware, 
       user_id: req.user?.id,
       username: (req.user as any)?.username || req.user?.email,
       user_email: req.user?.email,
-      action: 'CREATE',
+      action: existingEntryId ? 'UPDATE' : 'CREATE',
       module: 'JOURNAL_ENTRIES',
-      details: `Created journal entry: ${finalEntryData.reference_number || entryId}`,
+      details: `${existingEntryId ? 'Updated' : 'Created'} journal entry: ${finalEntryData.reference_number || finalJeId}`,
       entity_type: 'journal_entries',
-      entity_id: entryId,
+      entity_id: finalJeId,
       ip_address: getIp(req),
       metadata: { entryData: finalEntryData, itemCount: (items || []).length }
     });
 
-    res.status(201).json({ id: entryId, entry_number: finalEntryData.entry_number });
+    res.status(existingEntryId ? 200 : 201).json({ id: finalJeId, entry_number: finalJeNumber });
   } catch (error: any) {
     if (client) await client.query('ROLLBACK');
     console.error('[CRASH PREVENTED] Journal entry creation error:', error);

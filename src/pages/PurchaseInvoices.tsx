@@ -3053,12 +3053,16 @@ export const PurchaseInvoices: React.FC = () => {
         const itemTotalFC = Number(item.total) || 0;
         const itemVatFC = isVatEnabled ? Number(item.vat_amount || 0) : 0;
         const itemDiscountFC = subtotalVal > 0 ? (itemTotalFC / subtotalVal) * discountVal : 0;
-        const itemNetTotalFC = itemTotalFC + itemVatFC - itemDiscountFC;
+        const prod = products.find(p => p.id === item.product_id);
+        const itemWhtRate = Number((item as any).withholding_tax_rate !== undefined ? (item as any).withholding_tax_rate : (prod?.purchase_withholding_tax_rate || 0));
+        const itemWhtFC = isPurchaseWhtEnabled ? Number(((itemTotalFC * (itemWhtRate / 100))).toFixed(2)) : 0;
+        const itemNetTotalFC = itemTotalFC + itemVatFC - itemDiscountFC - itemWhtFC;
 
         // Convert to local currency and round once
         const itemTotal = Number((itemTotalFC * rate).toFixed(2));
         const itemVat = Number((itemVatFC * rate).toFixed(2));
         const itemDiscount = Number((itemDiscountFC * rate).toFixed(2));
+        const itemWht = Number((itemWhtFC * rate).toFixed(2));
         const itemNetTotal = Number((itemNetTotalFC * rate).toFixed(2));
 
         let debitAccountId = '';
@@ -3131,6 +3135,36 @@ export const PurchaseInvoices: React.FC = () => {
             credit: itemDiscount,
             product_name: item.product_name || item.category_name,
             description: t('pi.discount_description', { number: invoice_number }) + (invoiceData.notes ? ` - ${invoiceData.notes}` : '')
+          });
+        }
+
+        // 3.5 Credit Withholding Tax Account (Current Liability - Tax Withheld for Suppliers)
+        if (itemWht > 0) {
+          let whtAccountId = prod?.purchase_withholding_tax_account_id || '';
+          let whtAccountName = prod?.purchase_withholding_tax_account_name || 'ضرائب خصم على الموردين';
+          if (!whtAccountId) {
+            const globalWhtAccount = accounts.find(a => 
+              a.account_usage === 'withholding_tax_suppliers' || 
+              a.id === (settings as any)?.withholding_tax_suppliers_account_id ||
+              a.name.includes('خصم على الموردين') ||
+              a.name.includes('خصم من الموردين') ||
+              a.name.includes('خصم دائنة') ||
+              a.name.includes('خصم موردين') ||
+              a.code === '213' ||
+              a.code?.startsWith('222')
+            );
+            whtAccountId = globalWhtAccount?.id || '';
+            whtAccountName = globalWhtAccount?.name || whtAccountName;
+          }
+          const whtAcc = accounts.find(a => a.id === whtAccountId);
+          journalItems.push({
+            account_id: whtAccountId,
+            account_name: whtAccountName,
+            account_code: whtAcc?.code || '',
+            product_name: item.product_name || item.category_name,
+            debit: 0,
+            credit: itemWht,
+            description: `ضريبة خصم وإضافة مشتريات (خصم على الموردين) - صنف: ${item.product_name || item.category_name} - فاتورة رقم ${invoice_number}`
           });
         }
 
@@ -3243,7 +3277,7 @@ export const PurchaseInvoices: React.FC = () => {
       };
 
       if (editingInvoice) {
-        await dbService.deleteJournalEntryByReference(editingInvoice.id, user.company_id);
+        // For editing: in-place atomic update strictly preserving the existing journal entry ID, date, and entry_number
         await TransactionManager.updateWithAccounting(
           'purchase_invoices',
           editingInvoice.id,

@@ -1255,7 +1255,7 @@ export const Receipts: React.FC = () => {
       let savedVoucherId = editingReceipt ? editingReceipt.id : '';
 
       if (editingReceipt) {
-        await dbService.deleteJournalEntryByReference(editingReceipt.id, user.company_id);
+        // For editing: in-place atomic update strictly preserving the existing journal entry ID, date, and entry_number
         const res = await TransactionManager.updateWithAccounting(
           'receipt_vouchers',
           editingReceipt.id,

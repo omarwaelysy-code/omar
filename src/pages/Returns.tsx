@@ -824,6 +824,35 @@ export const Returns: React.FC = () => {
           });
         }
 
+        // 3.5 Credit Withholding Tax Account (Reversal of Customer Tax Withheld Asset)
+        if (itemWht > 0) {
+          let whtAccountId = product.sales_withholding_tax_account_id || '';
+          let whtAccountName = product.sales_withholding_tax_account_name || 'ضرائب خصم من العملاء';
+          if (!whtAccountId) {
+            const globalWhtAccount = accounts.find(a => 
+              a.account_usage === 'withholding_tax_customers' || 
+              a.id === (settings as any)?.withholding_tax_customers_account_id ||
+              a.name.includes('تحت حساب الضريبة') ||
+              a.name.includes('خصم من العملاء') ||
+              a.name.includes('خصم عملاء') ||
+              a.code === '112' ||
+              a.code?.startsWith('118')
+            );
+            whtAccountId = globalWhtAccount?.id || '';
+            whtAccountName = globalWhtAccount?.name || whtAccountName;
+          }
+          const whtAcc = accounts.find(a => a.id === whtAccountId);
+          journalItems.push({
+            account_id: whtAccountId,
+            account_name: whtAccountName,
+            account_code: whtAcc?.code || '',
+            product_name: item.product_name,
+            debit: 0,
+            credit: itemWht,
+            description: `تسوية ضريبة خصم وإضافة مرتجع مبيعات - صنف: ${item.product_name} - مرتجع رقم ${return_number}`
+          });
+        }
+
         // 4. Debit Inventory & Credit COGS for physical goods (reverse cost of goods sold)
         if (product.type !== 'service') {
           const itemCost = Number(product.cost_price) || 0;
@@ -1404,6 +1433,35 @@ export const Returns: React.FC = () => {
           });
         }
 
+        // 3.5 Credit Withholding Tax Account (Reversal of Customer Tax Withheld Asset)
+        if (itemWht > 0) {
+          let whtAccountId = product.sales_withholding_tax_account_id || '';
+          let whtAccountName = product.sales_withholding_tax_account_name || 'ضرائب خصم من العملاء';
+          if (!whtAccountId) {
+            const globalWhtAccount = accounts.find(a => 
+              a.account_usage === 'withholding_tax_customers' || 
+              a.id === (settings as any)?.withholding_tax_customers_account_id ||
+              a.name.includes('تحت حساب الضريبة') ||
+              a.name.includes('خصم من العملاء') ||
+              a.name.includes('خصم عملاء') ||
+              a.code === '112' ||
+              a.code?.startsWith('118')
+            );
+            whtAccountId = globalWhtAccount?.id || '';
+            whtAccountName = globalWhtAccount?.name || whtAccountName;
+          }
+          const whtAcc = accounts.find(a => a.id === whtAccountId);
+          journalItems.push({
+            account_id: whtAccountId,
+            account_name: whtAccountName,
+            account_code: whtAcc?.code || '',
+            product_name: item.product_name,
+            debit: 0,
+            credit: itemWht,
+            description: `تسوية ضريبة خصم وإضافة مرتجع مبيعات - صنف: ${item.product_name} - مرتجع رقم ${return_number}`
+          });
+        }
+
         // 4. Debit Inventory & Credit COGS for physical goods (reverse cost of goods sold)
         if (product.type !== 'service') {
           const itemCost = Number(product.cost_price) || 0;
@@ -1721,7 +1779,7 @@ export const Returns: React.FC = () => {
           }
         });
 
-        await dbService.deleteJournalEntryByReference(editingReturn.id, user.company_id);
+        // For editing: in-place atomic update strictly preserving the existing journal entry ID, date, and entry_number
         await TransactionManager.updateWithAccounting(
           'returns',
           editingReturn.id,
