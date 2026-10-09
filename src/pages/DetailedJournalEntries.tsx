@@ -459,6 +459,12 @@ export const DetailedJournalEntries: React.FC = () => {
     } else if (normType === 'cash_transfer' || normType === 'transfer' || reference.startsWith('CT-') || reference.startsWith('TRF-')) {
       setPendingViewDoc({ type: 'cash_transfer', idOrNumber: reference });
       setCurrentPage('cash_transfers');
+    } else if (normType === 'stock_adjustment' || normType === 'adjustment' || reference.startsWith('ADJ-')) {
+      setPendingViewDoc({ type: 'stock_adjustment', idOrNumber: reference });
+      setCurrentPage('stock_adjustments');
+    } else if (normType === 'opening_stock_balance' || normType === 'opening_stock' || reference.startsWith('OPB-')) {
+      setPendingViewDoc({ type: 'opening_stock_balance', idOrNumber: reference });
+      setCurrentPage('opening_stock_balances');
     } else {
       setPendingViewDoc({ type: 'manual', idOrNumber: reference });
       setCurrentPage('journal_entries');

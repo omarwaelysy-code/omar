@@ -34,7 +34,7 @@ export const OpeningStockBalances: React.FC = () => {
   const { user } = useAuth();
   const { showNotification } = useNotification();
   const { t, dir, language } = useLanguage();
-  const { setPendingViewDoc, setCurrentPage } = useNavigation();
+  const { pendingViewDoc, setPendingViewDoc, setCurrentPage } = useNavigation();
 
   // Data states
   const [documents, setDocuments] = useState<OpeningStockBalance[]>([]);
@@ -43,25 +43,60 @@ export const OpeningStockBalances: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const tableRef = useRef<HTMLDivElement>(null);
 
-  const handleExportExcelList = () => {
+  const getDocValue = (doc: OpeningStockBalance): number => {
+    if (doc.items && Array.isArray(doc.items)) {
+      return doc.items.reduce((sum, item) => {
+        const lineCost = item.total_cost !== undefined && item.total_cost !== null
+          ? Number(item.total_cost)
+          : (Number(item.quantity || 0) * Number(item.unit_cost || 0));
+        return sum + (isNaN(lineCost) ? 0 : lineCost);
+      }, 0);
+    }
+    return 0;
+  };
+
+  const totalVisibleValue = documents.reduce((sum, doc) => sum + getDocValue(doc), 0);
+  const selectedDocuments = documents.filter(doc => selectedIds.includes(doc.id));
+  const selectedTotalValue = selectedDocuments.reduce((sum, doc) => sum + getDocValue(doc), 0);
+
+  const handleExportExcelList = (dataToExport = documents) => {
     const headers = {
       'document_number': 'رقم السند',
       'date': 'التاريخ',
       'debit_account_name': 'الحساب المدين',
       'credit_account_name': 'الحساب الدائن',
+      'value': 'القيمة',
+      'entry_number': 'رقم القيد',
       'description': 'ملاحظات'
     };
-    const formattedData = formatDataForExcel(documents, headers);
+    const mapped = dataToExport.map(doc => ({
+      document_number: doc.document_number,
+      date: formatDate(doc.date),
+      debit_account_name: doc.debit_account_name || '-',
+      credit_account_name: doc.credit_account_name || '-',
+      value: getDocValue(doc),
+      entry_number: doc.entry_number || '-',
+      description: doc.description || ''
+    }));
+    const formattedData = formatDataForExcel(mapped, headers);
     exportToExcel(formattedData, { filename: 'Opening_Stock_Balances', sheetName: 'أرصدة أولية مخزون' });
+  };
+
+  const handleExportExcelSelected = () => {
+    if (selectedDocuments.length > 0) {
+      handleExportExcelList(selectedDocuments);
+    }
   };
 
   const handleExportPDFList = async () => {
     if (tableRef.current) {
       await exportToPDFUtil(tableRef.current, {
         filename: 'Opening_Stock_Balances',
-        reportTitle: 'جدول أرصدة أول المدة للمخزون'
+        reportTitle: 'جدول أرصدة أول المدة للمخزون',
+        orientation: 'landscape'
       });
     }
   };
@@ -133,6 +168,17 @@ export const OpeningStockBalances: React.FC = () => {
       };
     }
   }, [user, page, limit, sortBy, sortOrder, searchTerm, dateFrom, dateTo]);
+
+  // Handle incoming navigation from journal entries or ledger
+  useEffect(() => {
+    if (pendingViewDoc && (pendingViewDoc.type === 'opening_stock_balance' || pendingViewDoc.type === 'opening_stock')) {
+      const target = documents.find(d => d.id === pendingViewDoc.idOrNumber || d.document_number === pendingViewDoc.idOrNumber);
+      if (target) {
+        setViewDoc(target);
+        setPendingViewDoc(null);
+      }
+    }
+  }, [pendingViewDoc, documents]);
 
   // Reset form
   const resetForm = () => {
@@ -1110,9 +1156,11 @@ export const OpeningStockBalances: React.FC = () => {
               </button>
 
               <ExportButtons
-                onExportExcel={handleExportExcelList}
+                onExportExcel={() => handleExportExcelList(documents)}
                 onExportPDF={handleExportPDFList}
                 onPrint={() => printElement(tableRef.current, 'جدول أرصدة أول المدة للمخزون')}
+                selectedCount={selectedIds.length}
+                onExportExcelSelected={handleExportExcelSelected}
               />
 
               <button
@@ -1123,6 +1171,73 @@ export const OpeningStockBalances: React.FC = () => {
                 <span>{language === 'ar' ? 'إضافة رصيد أول مدة' : 'Add Opening Stock'}</span>
               </button>
             </div>
+          </div>
+
+          {/* KPI Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
+            <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-slate-500 block">
+                  {language === 'ar' ? 'إجمالي السندات' : 'Total Documents'}
+                </span>
+                <span className="text-base font-black text-slate-800 font-mono">
+                  {totalRecords || documents.length}
+                </span>
+              </div>
+              <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-xs">
+                <Hash size={16} />
+              </div>
+            </div>
+
+            <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-slate-500 block">
+                  {language === 'ar' ? 'إجمالي قيمة المخزون الافتتاحي' : 'Total Opening Value'}
+                </span>
+                <span className="text-base font-black text-emerald-600 font-mono">
+                  {formatNumber(totalVisibleValue)}
+                </span>
+              </div>
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs">
+                <Layers size={16} />
+              </div>
+            </div>
+
+            {selectedIds.length > 0 && (
+              <>
+                <div className="bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-200 shadow-xs flex items-center justify-between animate-in fade-in">
+                  <div>
+                    <span className="text-[11px] font-bold text-emerald-700 block">
+                      {language === 'ar' ? 'السندات المحددة' : 'Selected Documents'}
+                    </span>
+                    <span className="text-base font-black text-emerald-800 font-mono">
+                      {selectedIds.length} {language === 'ar' ? 'سند' : 'items'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setSelectedIds([])}
+                    className="text-[10px] font-bold text-emerald-700 bg-white hover:bg-emerald-100 border border-emerald-300 px-2 py-1 rounded-md transition-all active:scale-95"
+                    title={language === 'ar' ? 'إلغاء التحديد' : 'Clear selection'}
+                  >
+                    {language === 'ar' ? 'إلغاء التحديد' : 'Clear'}
+                  </button>
+                </div>
+
+                <div className="bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-200 shadow-xs flex items-center justify-between animate-in fade-in">
+                  <div>
+                    <span className="text-[11px] font-bold text-emerald-700 block">
+                      {language === 'ar' ? 'إجمالي قيمة المحدد' : 'Selected Total Value'}
+                    </span>
+                    <span className="text-base font-black text-emerald-700 font-mono">
+                      {formatNumber(selectedTotalValue)}
+                    </span>
+                  </div>
+                  <div className="w-8 h-8 rounded-lg bg-white text-emerald-600 border border-emerald-200 flex items-center justify-center font-bold text-xs">
+                    ✓
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Filter panel */}
@@ -1185,6 +1300,23 @@ export const OpeningStockBalances: React.FC = () => {
                 <table className="w-full border-collapse text-right text-xs">
                   <thead>
                     <tr className="bg-slate-50/90 border-b border-slate-200">
+                      <th className="px-2 py-1.5 text-center w-10">
+                        <input
+                          type="checkbox"
+                          checked={documents.length > 0 && documents.every(d => selectedIds.includes(d.id))}
+                          onChange={() => {
+                            const allSelected = documents.length > 0 && documents.every(d => selectedIds.includes(d.id));
+                            if (allSelected) {
+                              const pageIds = documents.map(d => d.id);
+                              setSelectedIds(prev => prev.filter(id => !pageIds.includes(id)));
+                            } else {
+                              setSelectedIds(prev => Array.from(new Set([...prev, ...documents.map(d => d.id)])));
+                            }
+                          }}
+                          className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer"
+                          title={language === 'ar' ? 'تحديد الكل' : 'Select All'}
+                        />
+                      </th>
                       <th 
                         onClick={() => handleSort('document_number')}
                         className="px-2 py-1.5 font-bold text-slate-600 uppercase cursor-pointer hover:text-emerald-600 transition-colors text-[11px]"
@@ -1203,6 +1335,9 @@ export const OpeningStockBalances: React.FC = () => {
                       <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-[11px]">
                         {language === 'ar' ? 'الحساب الدائن' : 'Credit Account'}
                       </th>
+                      <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-center text-[11px]">
+                        {language === 'ar' ? 'القيمة' : 'Value'}
+                      </th>
                       <th className="px-2 py-1.5 font-bold text-slate-600 uppercase text-[11px]">
                         {language === 'ar' ? 'رقم القيد' : 'Journal Entry'}
                       </th>
@@ -1215,39 +1350,57 @@ export const OpeningStockBalances: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {documents.map((doc) => (
-                      <tr key={doc.id} className="hover:bg-slate-50/70 transition-colors group">
-                        <td className="px-2 py-1 font-mono font-bold text-slate-900 text-xs">
-                          {doc.document_number}
-                        </td>
-                        <td className="px-2 py-1 font-medium text-slate-500 whitespace-nowrap text-xs">
-                          {formatDate(doc.date)}
-                        </td>
-                        <td className="px-2 py-1 font-bold text-slate-700 text-xs">
-                          {doc.debit_account_name || '-'}
-                        </td>
-                        <td className="px-2 py-1 font-bold text-slate-700 text-xs">
-                          {doc.credit_account_name || '-'}
-                        </td>
-                        <td className="px-2 py-1 font-mono text-slate-700 text-xs">
-                          {doc.entry_number ? (
-                            <button
-                              onClick={(e) => {
+                    {documents.map((doc) => {
+                      const docVal = getDocValue(doc);
+                      return (
+                        <tr key={doc.id} className="hover:bg-slate-50/70 transition-colors group">
+                          <td className="px-2 py-1 text-center w-10">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.includes(doc.id)}
+                              onChange={(e) => {
                                 e.stopPropagation();
-                                setPendingViewDoc({ type: 'journal', idOrNumber: doc.entry_number! });
-                                setCurrentPage('journal_entries');
+                                setSelectedIds(prev =>
+                                  prev.includes(doc.id) ? prev.filter(id => id !== doc.id) : [...prev, doc.id]
+                                );
                               }}
-                              className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100/50 transition-all active:scale-95"
-                            >
-                              {doc.entry_number}
-                            </button>
-                          ) : (
-                            <span className="text-slate-400 font-mono text-xs">-</span>
-                          )}
-                        </td>
-                        <td className="px-2 py-1 font-normal text-slate-500 max-w-[200px] truncate text-xs" title={doc.description}>
-                          {doc.description || '-'}
-                        </td>
+                              className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer"
+                            />
+                          </td>
+                          <td className="px-2 py-1 font-mono font-bold text-slate-900 text-xs">
+                            {doc.document_number}
+                          </td>
+                          <td className="px-2 py-1 font-medium text-slate-500 whitespace-nowrap text-xs">
+                            {formatDate(doc.date)}
+                          </td>
+                          <td className="px-2 py-1 font-bold text-slate-700 text-xs">
+                            {doc.debit_account_name || '-'}
+                          </td>
+                          <td className="px-2 py-1 font-bold text-slate-700 text-xs">
+                            {doc.credit_account_name || '-'}
+                          </td>
+                          <td className="px-2 py-1 font-mono font-bold text-center text-xs text-emerald-600">
+                            {formatNumber(docVal)}
+                          </td>
+                          <td className="px-2 py-1 font-mono text-slate-700 text-xs">
+                            {doc.entry_number ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPendingViewDoc({ type: 'journal', idOrNumber: doc.entry_number! });
+                                  setCurrentPage('journal_entries');
+                                }}
+                                className="text-emerald-600 hover:text-emerald-700 hover:underline font-mono text-xs font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100/50 transition-all active:scale-95"
+                              >
+                                {doc.entry_number}
+                              </button>
+                            ) : (
+                              <span className="text-slate-400 font-mono text-xs">-</span>
+                            )}
+                          </td>
+                          <td className="px-2 py-1 font-normal text-slate-500 max-w-[200px] truncate text-xs" title={doc.description}>
+                            {doc.description || '-'}
+                          </td>
                         <td className="px-2 py-1 text-center">
                           <div className="flex items-center justify-center gap-1">
                             <button
@@ -1308,7 +1461,8 @@ export const OpeningStockBalances: React.FC = () => {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    );
+                    })}
                   </tbody>
                 </table>
               </div>

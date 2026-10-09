@@ -159,6 +159,7 @@ export const getDocumentTypeName = (
     else if (ref.startsWith('RCHK-')) type = 'received_cheque';
     else if (ref.startsWith('TRF-') || ref.startsWith('CT-')) type = 'cash_transfer';
     else if (ref.startsWith('ADJ-')) type = 'stock_adjustment';
+    else if (ref.startsWith('OPB-')) type = 'opening_stock_balance';
   }
 
   if (type === 'invoice' || type === 'sales_invoice') {
@@ -167,7 +168,7 @@ export const getDocumentTypeName = (
   if (type === 'purchase_invoice' || type === 'bill') {
     return lang === 'ar' ? 'فواتير المشتريات' : 'Purchase Invoice';
   }
-  if (type === 'opening_stock' || type === 'opening_stock_balance') {
+  if (type === 'opening_stock' || type === 'opening_stock_balance' || type === 'opening_stock_balances') {
     return lang === 'ar' ? 'أرصدة المخزون الافتتاحية' : 'Opening Stock Balance';
   }
   if (type === 'return' || type === 'sales_return') {

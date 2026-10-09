@@ -5089,7 +5089,14 @@ router.get('/detailed-journal-entries', authenticateToken, async (req: AuthReque
         je.date,
         je.description as entry_description,
         je.reference_type,
-        je.reference_number,
+        COALESCE(
+          NULLIF(je.reference_number, ''),
+          opb.document_number,
+          ct.transfer_number,
+          sa.adjustment_number,
+          inv.invoice_number,
+          pinv.invoice_number
+        ) as reference_number,
         je.reference_id,
         
         -- Account Type & Parent Account details
@@ -5141,6 +5148,9 @@ router.get('/detailed-journal-entries', authenticateToken, async (req: AuthReque
       LEFT JOIN operations op ON op.id = COALESCE(inv.operation_id, pinv.operation_id)
       LEFT JOIN departments dept ON dept.id = COALESCE(inv.department_id, pinv.department_id)
       LEFT JOIN cost_centers cc ON cc.id = COALESCE(inv.cost_center_id, pinv.cost_center_id)
+      LEFT JOIN opening_stock_balances opb ON (je.reference_type IN ('opening_stock_balance', 'opening_stock_balances', 'opening_stock') AND (je.reference_id = opb.id::text OR je.reference_id = opb.document_number))
+      LEFT JOIN cash_transfers ct ON (je.reference_type IN ('cash_transfer', 'transfer') AND (je.reference_id = ct.id::text OR je.reference_id = ct.transfer_number))
+      LEFT JOIN stock_adjustments sa ON (je.reference_type IN ('stock_adjustment', 'stock_adjustments') AND (je.reference_id = sa.id::text OR je.reference_id = sa.adjustment_number))
     `;
 
     const values: any[] = [];
@@ -13399,8 +13409,8 @@ router.post('/opening_stock_balances', authenticateToken, async (req: AuthReques
     const entryId = uuidv4();
     const entryNumber = await ensureUniqueSequenceNumber(client, companyId, 'journal_entries', docData.date);
     await client.query(
-      `INSERT INTO "journal_entries" (id, company_id, entry_number, date, description, reference_id, reference_type, total_debit, total_credit, created_at, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)`,
+      `INSERT INTO "journal_entries" (id, company_id, entry_number, date, description, reference_id, reference_type, total_debit, total_credit, created_at, created_by, reference_number)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10, $11)`,
       [
         entryId,
         companyId,
@@ -13411,7 +13421,8 @@ router.post('/opening_stock_balances', authenticateToken, async (req: AuthReques
         'opening_stock_balance',
         totalValue,
         totalValue,
-        req.user?.id || null
+        req.user?.id || null,
+        docData.document_number
       ]
     );
 
@@ -13646,8 +13657,8 @@ router.put('/opening_stock_balances/:id', authenticateToken, async (req: AuthReq
     const entryId = uuidv4();
     const entryNumber = await ensureUniqueSequenceNumber(client, companyId, 'journal_entries', docData.date);
     await client.query(
-      `INSERT INTO "journal_entries" (id, company_id, entry_number, date, description, reference_id, reference_type, total_debit, total_credit, created_at, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)`,
+      `INSERT INTO "journal_entries" (id, company_id, entry_number, date, description, reference_id, reference_type, total_debit, total_credit, created_at, created_by, reference_number)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10, $11)`,
       [
         entryId,
         companyId,
@@ -13658,7 +13669,8 @@ router.put('/opening_stock_balances/:id', authenticateToken, async (req: AuthReq
         'opening_stock_balance',
         totalValue,
         totalValue,
-        req.user?.id || null
+        req.user?.id || null,
+        docData.document_number || rawDocData.document_number
       ]
     );
 
