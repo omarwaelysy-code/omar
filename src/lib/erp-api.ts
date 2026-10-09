@@ -5769,175 +5769,213 @@ export async function processAtomicAccountingEntry(
     throw new Error('لا يمكن حفظ المستند: القيد المحاسبي المرفق لا يحتوي على بنود محاسبية صالحة.');
   }
 
-  const rawDate = accountingPayload.date || docData.date || new Date().toISOString().slice(0, 10);
-  const dateStr = parseToStandardDateStr(rawDate) || new Date().toISOString().slice(0, 10);
-  const docExchangeRate = Number(docData.exchange_rate) || 1.0;
-  const docCurrency = docData.currency_id || docData.currency || 'EGP';
-
-  // 1. Check existing journal entry for this reference_id to maintain sequence & avoid duplicates
-  const existingJeRes = await client.query(
-    'SELECT id, entry_number FROM journal_entries WHERE company_id = $1 AND reference_id = $2 ORDER BY created_at ASC LIMIT 1',
-    [companyId, String(docId)]
-  );
-  let jeId = existingJeRes.rows[0]?.id;
-  let entryNumber = existingJeRes.rows[0]?.entry_number;
-
-  if (!entryNumber) {
-    entryNumber = await ensureUniqueSequenceNumber(pool, companyId, 'journal_entries', dateStr);
+  // If passed the connection pool instead of an active transaction client, acquire a dedicated client and manage transaction
+  let dedicatedClient = client;
+  let isInternalTransaction = false;
+  if (!client || typeof client.connect === 'function') {
+    dedicatedClient = await pool.connect();
+    isInternalTransaction = true;
+    await dedicatedClient.query('BEGIN');
   }
 
-  // Delete existing lines if updating
-  if (jeId) {
-    await client.query('DELETE FROM journal_entry_lines WHERE journal_entry_id = $1', [jeId]);
-  } else {
-    jeId = uuidv4();
-  }
+  try {
+    const rawDate = accountingPayload.date || docData.date || new Date().toISOString().slice(0, 10);
+    const dateStr = parseToStandardDateStr(rawDate) || new Date().toISOString().slice(0, 10);
+    const docExchangeRate = Number(docData.exchange_rate) || 1.0;
+    const docCurrency = docData.currency_id || docData.currency || 'EGP';
 
-  // 2. Normalize and validate lines
-  let calculatedDebit = 0;
-  let calculatedCredit = 0;
-  const normalizedLines: any[] = [];
+    // 1. Check existing journal entry for this reference_id to maintain sequence & avoid duplicates
+    const existingJeRes = await dedicatedClient.query(
+      'SELECT id, entry_number FROM journal_entries WHERE company_id = $1 AND reference_id = $2 ORDER BY created_at ASC LIMIT 1',
+      [companyId, String(docId)]
+    );
+    let jeId = existingJeRes.rows[0]?.id;
+    let entryNumber = existingJeRes.rows[0]?.entry_number;
 
-  for (const item of rawItems) {
-    if (!item.account_id) {
-      throw new Error('لا يمكن حفظ المستند: يوجد طرف في القيد المحاسبي بدون تحديد حساب مالي صالح.');
+    if (!entryNumber) {
+      entryNumber = await ensureUniqueSequenceNumber(pool, companyId, 'journal_entries', dateStr);
     }
 
-    const itemRate = Number(item.exchange_rate) || docExchangeRate;
-    const itemCurrency = item.currency || docCurrency;
-    const isForeign = itemCurrency !== 'EGP' && itemRate > 0 && itemRate !== 1.0;
-
-    let lineDebit = Number(item.debit) || 0;
-    let lineCredit = Number(item.credit) || 0;
-    let foreignAmt = Number(item.foreign_amount) || 0;
-
-    // Convert foreign currency to local currency strictly if not already converted
-    if (foreignAmt > 0) {
-      if (lineDebit > 0 && Math.abs(lineDebit - foreignAmt) < 0.001) {
-        lineDebit = Math.round(foreignAmt * itemRate * 100) / 100;
-      }
-      if (lineCredit > 0 && Math.abs(lineCredit - foreignAmt) < 0.001) {
-        lineCredit = Math.round(foreignAmt * itemRate * 100) / 100;
-      }
-    } else if (isForeign) {
-      if (lineDebit > 0) {
-        foreignAmt = lineDebit;
-        lineDebit = Math.round(lineDebit * itemRate * 100) / 100;
-      }
-      if (lineCredit > 0) {
-        foreignAmt = lineCredit;
-        lineCredit = Math.round(lineCredit * itemRate * 100) / 100;
-      }
-    }
-
-    lineDebit = Math.round(lineDebit * 100) / 100;
-    lineCredit = Math.round(lineCredit * 100) / 100;
-
-    // Control Account Protection: Link customer_id or supplier_id directly on control account lines
-    let customerId = item.customer_id || (item.sub_account_type === 'customer' ? item.sub_account_id : null);
-    let supplierId = item.supplier_id || (item.sub_account_type === 'supplier' ? item.sub_account_id : null);
-
-    if (!customerId && (String(item.account_code || '').startsWith('111') || (item.account_name && item.account_name.includes('عملاء')))) {
-      customerId = docData.customer_id || null;
-    }
-    if (!supplierId && (String(item.account_code || '').startsWith('211') || (item.account_name && item.account_name.includes('موردين')))) {
-      supplierId = docData.supplier_id || null;
-    }
-
-    calculatedDebit += lineDebit;
-    calculatedCredit += lineCredit;
-
-    normalizedLines.push({
-      id: item.id || uuidv4(),
-      account_id: item.account_id,
-      account_name: item.account_name || '',
-      description: item.description || accountingPayload.description || '',
-      debit: lineDebit,
-      credit: lineCredit,
-      currency: itemCurrency,
-      exchange_rate: itemRate,
-      foreign_amount: foreignAmt || null,
-      customer_id: customerId || null,
-      supplier_id: supplierId || null,
-      sub_account_id: item.sub_account_id || customerId || supplierId || null,
-      sub_account_type: item.sub_account_type || (customerId ? 'customer' : (supplierId ? 'supplier' : null)),
-      cost_center_id: item.cost_center_id || docData.cost_center_id || null,
-      department_id: item.department_id || docData.department_id || null
-    });
-  }
-
-  calculatedDebit = Math.round(calculatedDebit * 100) / 100;
-  calculatedCredit = Math.round(calculatedCredit * 100) / 100;
-
-  // Strict mathematical balancing
-  const diff = Math.round((calculatedDebit - calculatedCredit) * 100) / 100;
-  if (Math.abs(diff) > 0.05) {
-    throw new Error(`القيد المحاسبي غير متزن تقنياً: مجموع المدين (${calculatedDebit.toFixed(2)}) لا يساوي مجموع الدائن (${calculatedCredit.toFixed(2)})، الفرق: ${diff.toFixed(2)}`);
-  } else if (diff !== 0 && normalizedLines.length > 0) {
-    if (diff > 0) {
-      const creditLine = normalizedLines.find(l => l.credit > 0) || normalizedLines[0];
-      creditLine.credit = Math.round((creditLine.credit + diff) * 100) / 100;
-      calculatedCredit = calculatedDebit;
+    // Delete existing lines if updating
+    if (jeId) {
+      await dedicatedClient.query('DELETE FROM journal_entry_lines WHERE journal_entry_id = $1', [jeId]);
     } else {
-      const debitLine = normalizedLines.find(l => l.debit > 0) || normalizedLines[0];
-      debitLine.debit = Math.round((debitLine.debit + Math.abs(diff)) * 100) / 100;
-      calculatedDebit = calculatedCredit;
+      jeId = uuidv4();
     }
-  }
 
-  const docNumber = docData.invoice_number || docData.return_number || docData.voucher_number || docData.transfer_number || docData.number || String(docId);
-  const description = accountingPayload.description || `قيد حركة ${docModule} رقم ${docNumber}`;
-  const refType = accountingPayload.reference_type || getReferenceTypeForModule(docModule);
+    // 2. Normalize and validate lines
+    let calculatedDebit = 0;
+    let calculatedCredit = 0;
+    const normalizedLines: any[] = [];
 
-  // 3. Upsert journal_entries header
-  await client.query(`
-    INSERT INTO journal_entries (
-      id, company_id, entry_number, date, description,
-      reference_id, reference_type, reference_number,
-      total_debit, total_credit, status, created_by, created_at, updated_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'posted', $11, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    ON CONFLICT (id) DO UPDATE SET
-      date = EXCLUDED.date,
-      description = EXCLUDED.description,
-      reference_number = EXCLUDED.reference_number,
-      total_debit = EXCLUDED.total_debit,
-      total_credit = EXCLUDED.total_credit,
-      status = 'posted',
-      updated_at = CURRENT_TIMESTAMP
-  `, [
-    jeId, companyId, entryNumber, dateStr, description,
-    String(docId), refType, docNumber,
-    calculatedDebit, calculatedCredit, userId || 'system'
-  ]);
+    for (const item of rawItems) {
+      if (!item.account_id) {
+        throw new Error('لا يمكن حفظ المستند: يوجد طرف في القيد المحاسبي بدون تحديد حساب مالي صالح.');
+      }
 
-  // 4. Insert journal_entry_lines
-  for (const line of normalizedLines) {
-    await client.query(`
-      INSERT INTO journal_entry_lines (
-        id, journal_entry_id, account_id, account_name, description,
-        debit, credit, company_id, currency, exchange_rate, foreign_amount,
-        customer_id, supplier_id, sub_account_id, sub_account_type,
-        cost_center_id, department_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+      const itemRate = Number(item.exchange_rate) || docExchangeRate;
+      const itemCurrency = item.currency || docCurrency;
+      const isForeign = itemCurrency !== 'EGP' && itemRate > 0 && itemRate !== 1.0;
+
+      let lineDebit = Number(item.debit) || 0;
+      let lineCredit = Number(item.credit) || 0;
+      let foreignAmt = Number(item.foreign_amount) || 0;
+
+      // Convert foreign currency to local currency strictly if not already converted
+      if (foreignAmt > 0) {
+        if (lineDebit > 0 && Math.abs(lineDebit - foreignAmt) < 0.001) {
+          lineDebit = Math.round(foreignAmt * itemRate * 100) / 100;
+        }
+        if (lineCredit > 0 && Math.abs(lineCredit - foreignAmt) < 0.001) {
+          lineCredit = Math.round(foreignAmt * itemRate * 100) / 100;
+        }
+      } else if (isForeign) {
+        if (lineDebit > 0) {
+          foreignAmt = lineDebit;
+          lineDebit = Math.round(lineDebit * itemRate * 100) / 100;
+        }
+        if (lineCredit > 0) {
+          foreignAmt = lineCredit;
+          lineCredit = Math.round(lineCredit * itemRate * 100) / 100;
+        }
+      }
+
+      lineDebit = Math.round(lineDebit * 100) / 100;
+      lineCredit = Math.round(lineCredit * 100) / 100;
+
+      // Control Account Protection: Link customer_id or supplier_id directly on control account lines
+      let customerId = item.customer_id || (item.sub_account_type === 'customer' ? item.sub_account_id : null);
+      let supplierId = item.supplier_id || (item.sub_account_type === 'supplier' ? item.sub_account_id : null);
+
+      if (!customerId && (String(item.account_code || '').startsWith('111') || (item.account_name && item.account_name.includes('عملاء')))) {
+        customerId = docData.customer_id || null;
+      }
+      if (!supplierId && (String(item.account_code || '').startsWith('211') || (item.account_name && item.account_name.includes('موردين')))) {
+        supplierId = docData.supplier_id || null;
+      }
+
+      calculatedDebit += lineDebit;
+      calculatedCredit += lineCredit;
+
+      normalizedLines.push({
+        id: item.id || uuidv4(),
+        account_id: item.account_id,
+        account_name: item.account_name || '',
+        description: item.description || accountingPayload.description || '',
+        debit: lineDebit,
+        credit: lineCredit,
+        currency: itemCurrency,
+        exchange_rate: itemRate,
+        foreign_amount: foreignAmt || null,
+        customer_id: customerId || null,
+        supplier_id: supplierId || null,
+        sub_account_id: item.sub_account_id || customerId || supplierId || null,
+        sub_account_type: item.sub_account_type || (customerId ? 'customer' : (supplierId ? 'supplier' : null)),
+        cost_center_id: item.cost_center_id || docData.cost_center_id || null,
+        department_id: item.department_id || docData.department_id || null
+      });
+    }
+
+    calculatedDebit = Math.round(calculatedDebit * 100) / 100;
+    calculatedCredit = Math.round(calculatedCredit * 100) / 100;
+
+    // Strict mathematical balancing
+    const diff = Math.round((calculatedDebit - calculatedCredit) * 100) / 100;
+    if (Math.abs(diff) > 0.05) {
+      throw new Error(`القيد المحاسبي غير متزن تقنياً: مجموع المدين (${calculatedDebit.toFixed(2)}) لا يساوي مجموع الدائن (${calculatedCredit.toFixed(2)})، الفرق: ${diff.toFixed(2)}`);
+    } else if (diff !== 0 && normalizedLines.length > 0) {
+      if (diff > 0) {
+        const creditLine = normalizedLines.find(l => l.credit > 0) || normalizedLines[0];
+        creditLine.credit = Math.round((creditLine.credit + diff) * 100) / 100;
+        calculatedCredit = calculatedDebit;
+      } else {
+        const debitLine = normalizedLines.find(l => l.debit > 0) || normalizedLines[0];
+        debitLine.debit = Math.round((debitLine.debit + Math.abs(diff)) * 100) / 100;
+        calculatedDebit = calculatedCredit;
+      }
+    }
+
+    const docNumber = docData.invoice_number || docData.return_number || docData.voucher_number || docData.transfer_number || docData.number || String(docId);
+    const description = accountingPayload.description || `قيد حركة ${docModule} رقم ${docNumber}`;
+    const refType = accountingPayload.reference_type || getReferenceTypeForModule(docModule);
+
+    // 3. Upsert journal_entries header
+    await dedicatedClient.query(`
+      INSERT INTO journal_entries (
+        id, company_id, entry_number, date, description,
+        reference_id, reference_type, reference_number,
+        total_debit, total_credit, status, created_by, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'posted', $11, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT (id) DO UPDATE SET
+        date = EXCLUDED.date,
+        description = EXCLUDED.description,
+        reference_number = EXCLUDED.reference_number,
+        total_debit = EXCLUDED.total_debit,
+        total_credit = EXCLUDED.total_credit,
+        status = 'posted',
+        updated_at = CURRENT_TIMESTAMP
     `, [
-      line.id, jeId, line.account_id, line.account_name, line.description,
-      line.debit, line.credit, companyId, line.currency, line.exchange_rate, line.foreign_amount,
-      line.customer_id, line.supplier_id, line.sub_account_id, line.sub_account_type,
-      line.cost_center_id, line.department_id
+      jeId, companyId, entryNumber, dateStr, description,
+      String(docId), refType, docNumber,
+      calculatedDebit, calculatedCredit, userId || 'system'
     ]);
-  }
 
-  // 5. If document is invoice/return, synchronize COGS entries if perpetual inventory
-  if (['invoice', 'return', 'sales_return'].includes(refType)) {
-    try {
-      await syncCOGSForJournalEntry(client, companyId, jeId, String(docId), refType);
-      await balanceAndValidateJournalEntry(client, jeId);
-    } catch (cogsErr) {
-      console.warn('[COGS_WARN] COGS sync notice:', cogsErr);
+    // 4. Insert journal_entry_lines in a single multi-row batch insert
+    if (normalizedLines.length > 0) {
+      const valuePlaceholders: string[] = [];
+      const values: any[] = [];
+      let pIdx = 1;
+
+      for (const line of normalizedLines) {
+        valuePlaceholders.push(`(
+          $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++},
+          $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++},
+          $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++},
+          $${pIdx++}, $${pIdx++}
+        )`);
+        values.push(
+          line.id, jeId, line.account_id, line.account_name, line.description,
+          line.debit, line.credit, companyId, line.currency, line.exchange_rate, line.foreign_amount,
+          line.customer_id, line.supplier_id, line.sub_account_id, line.sub_account_type,
+          line.cost_center_id, line.department_id
+        );
+      }
+
+      await dedicatedClient.query(`
+        INSERT INTO journal_entry_lines (
+          id, journal_entry_id, account_id, account_name, description,
+          debit, credit, company_id, currency, exchange_rate, foreign_amount,
+          customer_id, supplier_id, sub_account_id, sub_account_type,
+          cost_center_id, department_id
+        ) VALUES ${valuePlaceholders.join(', ')}
+      `, values);
+    }
+
+    // 5. If document is invoice/return, synchronize COGS entries if perpetual inventory
+    if (['invoice', 'return', 'sales_return'].includes(refType)) {
+      try {
+        await syncCOGSForJournalEntry(dedicatedClient, companyId, jeId, String(docId), refType);
+        await balanceAndValidateJournalEntry(dedicatedClient, jeId);
+      } catch (cogsErr) {
+        console.warn('[COGS_WARN] COGS sync notice:', cogsErr);
+      }
+    }
+
+    if (isInternalTransaction) {
+      await dedicatedClient.query('COMMIT');
+    }
+
+    return jeId;
+  } catch (err) {
+    if (isInternalTransaction) {
+      try { await dedicatedClient.query('ROLLBACK'); } catch (_) {}
+    }
+    throw err;
+  } finally {
+    if (isInternalTransaction) {
+      dedicatedClient.release();
     }
   }
-
-  return jeId;
 }
 
 // 1. Dashboard Stats
@@ -9020,20 +9058,34 @@ modules.forEach(moduleName => {
             }
           }
 
-          const result = await pool.query(query, params);
-          if (result.rowCount === 0) return sendError(res, 404, 'Not found or permission denied');
+          const client = await pool.connect();
+          try {
+            await client.query('BEGIN');
+            const result = await client.query(query, params);
+            if (result.rowCount === 0) {
+              await client.query('ROLLBACK');
+              return sendError(res, 404, 'Not found or permission denied');
+            }
 
-          // Enterprise Atomic Accounting Integration (Zero Orphan Documents)
-          if (req.body._accounting_entry) {
-            await processAtomicAccountingEntry(
-              pool,
-              companyId || '',
-              moduleName,
-              id,
-              sanitizedData,
-              req.body._accounting_entry,
-              req.user?.id
-            );
+            // Enterprise Atomic Accounting Integration (Zero Orphan Documents)
+            if (req.body._accounting_entry) {
+              await processAtomicAccountingEntry(
+                client,
+                companyId || '',
+                moduleName,
+                id,
+                sanitizedData,
+                req.body._accounting_entry,
+                req.user?.id
+              );
+            }
+
+            await client.query('COMMIT');
+          } catch (txErr) {
+            try { await client.query('ROLLBACK'); } catch (_) {}
+            throw txErr;
+          } finally {
+            client.release();
           }
 
           // MED-02-B: If user password was updated, sync password_hash across all company records for this email and invalidate active sessions
