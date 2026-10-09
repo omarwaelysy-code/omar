@@ -2422,7 +2422,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         key: 'customer_discounts',
         name: 'خصومات العملاء (المسموح به)',
         table: 'customer_discounts',
-        numCol: 'id',
+        numCol: 'number',
         dateCol: 'date',
         amountCol: 'amount',
         refTypes: ['customer_discount'],
@@ -2435,7 +2435,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         key: 'supplier_discounts',
         name: 'خصومات الموردين (الخصم المكتسب)',
         table: 'supplier_discounts',
-        numCol: 'id',
+        numCol: 'number',
         dateCol: 'date',
         amountCol: 'amount',
         refTypes: ['supplier_discount'],
@@ -2503,6 +2503,8 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
                     ELSE amount * COALESCE(exchange_rate, 1)
                   END
                 ), 0)`;
+              } else if (cfg.table === 'customer_discounts' || cfg.table === 'supplier_discounts') {
+                docAmtCol = `COALESCE(SUM("${cfg.amountCol}"), 0)`;
               } else {
                 const hasRate = EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate');
                 const rateExpr = hasRate ? 'COALESCE("exchange_rate", 1)' : '1';
@@ -2569,6 +2571,8 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
                     ELSE d.amount * COALESCE(d.exchange_rate, 1)
                   END
                 )`;
+              } else if (cfg.table === 'customer_discounts' || cfg.table === 'supplier_discounts') {
+                docAmtExpr = `d."${cfg.amountCol}"`;
               } else {
                 const hasRate = EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate');
                 const rateExpr = hasRate ? 'COALESCE(d."exchange_rate", 1)' : '1';
