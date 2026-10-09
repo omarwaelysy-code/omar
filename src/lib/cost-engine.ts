@@ -1,7 +1,7 @@
 import { PoolClient } from 'pg';
 import { v4 as uuidv4 } from 'uuid';
 
-export async function reverseAndRecalculate(client: PoolClient, companyId: string, referenceId: string) {
+export async function reverseAndRecalculate(client: PoolClient, companyId: string, referenceId: string, preserveJournalEntry: boolean = false) {
   // Find all affected products
   const movesRes = await client.query('SELECT DISTINCT product_id FROM inventory_movements WHERE reference_id = $1', [referenceId]);
   const productIds = movesRes.rows.map(r => r.product_id).filter(Boolean);
@@ -9,7 +9,9 @@ export async function reverseAndRecalculate(client: PoolClient, companyId: strin
   // Delete all old impacts
   await client.query('DELETE FROM inventory_movements WHERE reference_id = $1', [referenceId]);
   await client.query('DELETE FROM inventory_layers WHERE reference_id = $1', [referenceId]);
-  await client.query('DELETE FROM journal_entries WHERE reference_id = $1', [referenceId]);
+  if (!preserveJournalEntry) {
+    await client.query('DELETE FROM journal_entries WHERE reference_id = $1', [referenceId]);
+  }
 
   // Recalculate all affected products
   for (const pid of productIds) {

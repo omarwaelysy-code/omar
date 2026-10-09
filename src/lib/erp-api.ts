@@ -5828,7 +5828,7 @@ export async function processAtomicAccountingEntry(
     let entryNumber = existingJeRes.rows[0]?.entry_number;
 
     if (!entryNumber) {
-      entryNumber = await ensureUniqueSequenceNumber(pool, companyId, 'journal_entries', dateStr);
+      entryNumber = await ensureUniqueSequenceNumber(dedicatedClient, companyId, 'journal_entries', dateStr);
     }
 
     // Delete existing lines if updating
@@ -11840,71 +11840,81 @@ router.put('/purchase_returns/:id', authenticateToken, async (req: AuthRequest, 
     }
 
     if (items && Array.isArray(items) && items.length > 0) {
-    await client.query('DELETE FROM purchase_return_items WHERE return_id = $1', [returnId]);
-        await reverseAndRecalculate(client, companyId || '', returnId);
-        await InventoryMovementService.reverseMovement('purchase_return', returnId, client);
+      await client.query('DELETE FROM purchase_return_items WHERE return_id = $1', [returnId]);
+      await reverseAndRecalculate(client, companyId || '', returnId, true);
+      await client.query('DELETE FROM "inventory_movements_v2" WHERE "source_document_type" = $1 AND "source_document_id" = $2', ['purchase_return', returnId]);
+      await client.query('UPDATE "inventory_transaction_journal" SET "status" = $1, "cancelled_at" = NOW(), "movement_id" = NULL WHERE "source_document_type" = $2 AND "source_document_id" = $3', ['Reversed', 'purchase_return', returnId]);
     
-        const returnDataFinal = returnData;
-        const rData = returnDataFinal;
-        const cogsLines: { account_id: string; account_name: string; debit: number; credit: number; description: string }[] = [];
-        const movementLines: any[] = [];
-    for (const item of (items || [])) {
-          const sanitizedItem = sanitizeData('purchase_return_items', item);
-          const itemId = uuidv4();
-          const itemData = { ...sanitizedItem, id: itemId, return_id: returnId, unit_cost: 0 };
-          if (rData.company_id) itemData.company_id = rData.company_id;
+      const returnDataFinal = returnData;
+      const rData = returnDataFinal;
+      const cogsLines: { account_id: string; account_name: string; debit: number; credit: number; description: string }[] = [];
+      const movementLines: any[] = [];
+      for (const item of (items || [])) {
+        const sanitizedItem = sanitizeData('purchase_return_items', item);
+        const itemId = uuidv4();
+        const itemData = { ...sanitizedItem, id: itemId, return_id: returnId, unit_cost: 0 };
+        if (rData.company_id) itemData.company_id = rData.company_id;
     
-          // Cost and stock integration for purchase return
-          const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
-          if (prodRes.rows.length > 0) {
-            const prod = prodRes.rows[0];
-            if (prod.type !== 'service' && !prod.is_service) {
-              const qty = parseFloat(item.quantity || '0');
-              if (qty > 0) {
-                const returnUnitCost = parseFloat(item.unit_price || '0') || parseFloat(prod.weighted_average_cost || '0') || parseFloat(prod.cost_price || '0');
-                itemData.unit_cost = returnUnitCost;
-                const localReturnUnitCost = returnUnitCost * Number(returnDataFinal.exchange_rate || 1.0);
-                await recordPurchaseReturn(
-                  client,
-                  companyId,
-                  returnDataFinal.warehouse_id || null,
-                  item.product_id,
-                  qty,
-                  localReturnUnitCost,
-                  returnId,
-                  returnDataFinal.return_number || `PRET-${returnId}`,
-                  returnDataFinal.date
-                );
+        // Cost and stock integration for purchase return
+        const prodRes = await client.query('SELECT * FROM products WHERE id = $1', [item.product_id]);
+        if (prodRes.rows.length > 0) {
+          const prod = prodRes.rows[0];
+          if (prod.type !== 'service' && !prod.is_service) {
+            const qty = parseFloat(item.quantity || '0');
+            if (qty > 0) {
+              const returnUnitCost = parseFloat(item.unit_price || '0') || parseFloat(prod.weighted_average_cost || '0') || parseFloat(prod.cost_price || '0');
+              itemData.unit_cost = returnUnitCost;
+              const localReturnUnitCost = returnUnitCost * Number(returnDataFinal.exchange_rate || 1.0);
+              await recordPurchaseReturn(
+                client,
+                companyId,
+                returnDataFinal.warehouse_id || null,
+                item.product_id,
+                qty,
+                localReturnUnitCost,
+                returnId,
+                returnDataFinal.return_number || `PRET-${returnId}`,
+                returnDataFinal.date
+              );
     
-                movementLines.push({
-                  product_id: item.product_id,
-                  unit_id: item.unit_id || item.unit || 'default',
-                  quantity: qty,
-                  direction: 'OUT',
-                  unit_cost: localReturnUnitCost,
-                  total_cost: qty * localReturnUnitCost,
-                  batch_id: item.batch_id || null,
-                  serial_number: item.serial_number || null,
-                  notes: item.notes || null
-                });
-              }
+              movementLines.push({
+                product_id: item.product_id,
+                unit_id: item.unit_id || item.unit || 'default',
+                quantity: qty,
+                direction: 'OUT',
+                unit_cost: localReturnUnitCost,
+                total_cost: qty * localReturnUnitCost,
+                batch_id: item.batch_id || null,
+                serial_number: item.serial_number || null,
+                notes: item.notes || null
+              });
             }
           }
-    
-          const itemKeys = Object.keys(itemData);
-          const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
-          
-          await client.query(
-            `INSERT INTO "purchase_return_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
-            Object.values(itemData)
-          );
         }
     
+        const itemKeys = Object.keys(itemData);
+        const itemPlaceholders = itemKeys.map((_, i) => `$${i + 1}`).join(', ');
         
-        const productIdsToSync = (items || []).filter((i: any) => i.product_id).map((i: any) => i.product_id);
-        if (productIdsToSync.length > 0) {
-          await syncProductsCostAndJEs(client, companyId, productIdsToSync);
-        }
+        await client.query(
+          `INSERT INTO "purchase_return_items" ("${itemKeys.join('", "')}") VALUES (${itemPlaceholders})`,
+          Object.values(itemData)
+        );
+      }
+    
+      const productIdsToSync = (items || []).filter((i: any) => i.product_id).map((i: any) => i.product_id);
+      if (productIdsToSync.length > 0) {
+        setImmediate(async () => {
+          let bgClient = null;
+          try {
+            bgClient = await pool.connect();
+            await syncProductsCostAndJEs(bgClient, companyId || '', productIdsToSync);
+          } catch (err) {
+            console.error('[PURCHASE_RETURN_SYNC_WARN] Background cost sync:', err);
+          } finally {
+            if (bgClient) bgClient.release();
+          }
+        });
+      }
     
         // New Inventory Movement Engine integration (Phase 6)
         if (movementLines.length > 0) {
