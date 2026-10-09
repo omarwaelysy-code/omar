@@ -2495,7 +2495,19 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         if (cfg.table && cfg.table !== 'journal_entries') {
           try {
             let docAmtCol = '0';
-            if (cfg.amountCol && cfg.amountCol !== '0') {
+            if (cfg.table === 'opening_stock_balances') {
+              docAmtCol = `COALESCE((
+                SELECT SUM(osi.total_cost)
+                FROM opening_stock_items osi
+                WHERE osi.company_id = $1
+              ), 0)`;
+            } else if (cfg.table === 'stock_adjustments') {
+              docAmtCol = `COALESCE((
+                SELECT SUM(sai.total_cost)
+                FROM stock_adjustment_items sai
+                WHERE sai.company_id = $1
+              ), 0)`;
+            } else if (cfg.amountCol && cfg.amountCol !== '0') {
               if (cfg.table === 'cash_transfers') {
                 docAmtCol = `COALESCE(SUM(
                   CASE 
@@ -2552,7 +2564,9 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         if (cfg.table && cfg.table !== 'journal_entries') {
           count = docCount;
           netValue = parseFloat(docTotal.toFixed(2));
-          counterValue = Math.max(0, parseFloat((journalValue - netValue).toFixed(2)));
+          // Counter value (e.g. COGS/taxes) only legitimately applies to dual-entry trade documents (invoices & returns)
+          const allowsCounterSide = ['invoices', 'returns', 'purchase_invoices', 'purchase_returns'].includes(cfg.key);
+          counterValue = allowsCounterSide ? Math.max(0, parseFloat((journalValue - netValue).toFixed(2))) : 0;
         } else {
           count = jeCount;
           netValue = totalValue;
@@ -2563,7 +2577,19 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         if (cfg.table && cfg.numCol && cfg.table !== 'journal_entries') {
           try {
             let docAmtExpr = '0';
-            if (cfg.amountCol !== '0') {
+            if (cfg.table === 'opening_stock_balances') {
+              docAmtExpr = `COALESCE((
+                SELECT SUM(osi.total_cost)
+                FROM opening_stock_items osi
+                WHERE osi.opening_stock_id = d.id
+              ), 0)`;
+            } else if (cfg.table === 'stock_adjustments') {
+              docAmtExpr = `COALESCE((
+                SELECT SUM(sai.total_cost)
+                FROM stock_adjustment_items sai
+                WHERE sai.adjustment_id = d.id
+              ), 0)`;
+            } else if (cfg.amountCol !== '0') {
               if (cfg.table === 'cash_transfers') {
                 docAmtExpr = `(
                   CASE 
@@ -2580,9 +2606,14 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
                 docAmtExpr = `(d."${cfg.amountCol}" * ${rateExpr})`;
               }
             }
-            const amountFilter = (cfg.amountCol && cfg.amountCol !== '0')
-              ? `AND ABS(COALESCE(d."${cfg.amountCol}"::numeric, 0)) > 0.001`
-              : '';
+            let amountFilter = '';
+            if (cfg.table === 'opening_stock_balances') {
+              amountFilter = `AND (SELECT COALESCE(SUM(total_cost), 0) FROM opening_stock_items WHERE opening_stock_id = d.id) > 0.001`;
+            } else if (cfg.table === 'stock_adjustments') {
+              amountFilter = `AND (SELECT COALESCE(SUM(total_cost), 0) FROM stock_adjustment_items WHERE adjustment_id = d.id) > 0.001`;
+            } else if (cfg.amountCol && cfg.amountCol !== '0') {
+              amountFilter = `AND ABS(COALESCE(d."${cfg.amountCol}"::numeric, 0)) > 0.001`;
+            }
             const docFilter = cfg.docFilter ? `AND d.${cfg.docFilter}` : '';
             const unpostedRes: any = await client.query(
               `SELECT d.id, d."${cfg.numCol}" as doc_num, d."${cfg.dateCol}" as doc_date, 
