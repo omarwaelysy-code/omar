@@ -7562,42 +7562,8 @@ router.get(['/internal_messages', '/internal-messages'], authenticateToken, asyn
   }
 });
 
-// Single message detail endpoint (includes full attachment data URLs when requested)
-router.get(['/internal_messages/:id', '/internal-messages/:id'], authenticateToken, async (req: AuthRequest, res) => {
-  try {
-    const { id } = req.params;
-    const { rows } = await pool.query('SELECT * FROM internal_messages WHERE id = $1', [id]);
-    if (rows.length === 0) return res.status(404).json({ error: 'Message not found' });
-    const p = parseRow('internal_messages', rows[0]);
-    if (typeof p.category === 'string') {
-      p.category = p.category.replace(/^"|"$/g, '').trim();
-    }
-    const bodyBytes = Buffer.byteLength(p.body || '', 'utf8');
-    let attBytes = 0;
-    if (Array.isArray(p.attachments)) {
-      attBytes = p.attachments.reduce((sum: number, a: any) => {
-        const s = Number(a.size) || (a.url ? Math.round(a.url.length * 0.75) : 0);
-        return sum + s;
-      }, 0);
-    }
-    const totalSize = bodyBytes + attBytes;
-    p.total_size = totalSize;
-    if (totalSize < 1024) {
-      p.size_display = `${totalSize} B`;
-    } else if (totalSize < 1024 * 1024) {
-      p.size_display = `${(totalSize / 1024).toFixed(1)} KB`;
-    } else {
-      p.size_display = `${(totalSize / (1024 * 1024)).toFixed(2)} MB`;
-    }
-    res.json(p);
-  } catch (error: any) {
-    console.error('Error fetching message details:', error);
-    res.status(500).json({ error: 'Failed to fetch message details' });
-  }
-});
-
 // 1. Fetch mail contacts (Company users or support agents)
-router.get('/internal-messages/contacts', authenticateToken, async (req: AuthRequest, res) => {
+router.get(['/internal_messages/contacts', '/internal-messages/contacts'], authenticateToken, async (req: AuthRequest, res) => {
   try {
     const companyId = req.user?.company_id;
     const category = (req.query.category as string) || 'company';
@@ -7631,7 +7597,7 @@ router.get('/internal-messages/contacts', authenticateToken, async (req: AuthReq
 });
 
 // 2. Fetch unread count for current user
-router.get('/internal-messages/unread-count', authenticateToken, async (req: AuthRequest, res) => {
+router.get(['/internal_messages/unread-count', '/internal-messages/unread-count'], authenticateToken, async (req: AuthRequest, res) => {
   try {
     const userId = req.user?.id || '';
     const userEmail = (req.user?.email || '').toLowerCase().trim();
@@ -7697,6 +7663,40 @@ router.get('/internal-messages/unread-count', authenticateToken, async (req: Aut
   } catch (error: any) {
     console.error('Error fetching unread mail count:', error);
     res.json({ total: 0, company: 0, support: 0 });
+  }
+});
+
+// Single message detail endpoint (includes full attachment data URLs when requested)
+router.get(['/internal_messages/:id', '/internal-messages/:id'], authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await pool.query('SELECT * FROM internal_messages WHERE id = $1', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Message not found' });
+    const p = parseRow('internal_messages', rows[0]);
+    if (typeof p.category === 'string') {
+      p.category = p.category.replace(/^"|"$/g, '').trim();
+    }
+    const bodyBytes = Buffer.byteLength(p.body || '', 'utf8');
+    let attBytes = 0;
+    if (Array.isArray(p.attachments)) {
+      attBytes = p.attachments.reduce((sum: number, a: any) => {
+        const s = Number(a.size) || (a.url ? Math.round(a.url.length * 0.75) : 0);
+        return sum + s;
+      }, 0);
+    }
+    const totalSize = bodyBytes + attBytes;
+    p.total_size = totalSize;
+    if (totalSize < 1024) {
+      p.size_display = `${totalSize} B`;
+    } else if (totalSize < 1024 * 1024) {
+      p.size_display = `${(totalSize / 1024).toFixed(1)} KB`;
+    } else {
+      p.size_display = `${(totalSize / (1024 * 1024)).toFixed(2)} MB`;
+    }
+    res.json(p);
+  } catch (error: any) {
+    console.error('Error fetching message details:', error);
+    res.status(500).json({ error: 'Failed to fetch message details' });
   }
 });
 
