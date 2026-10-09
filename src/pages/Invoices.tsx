@@ -2156,6 +2156,7 @@ export const Invoices: React.FC = () => {
 
     setIsSubmitting(true);
     try {
+      const subtotal = Number(validItems.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)), 0)) || 0;
       let discount_amount = Number(discount) || 0;
       if (discount_amount === 0) {
         const itemDiscounts = validItems.reduce((sum, item) => sum + (Number((item as any).discount_amount || (item as any).discount || 0)), 0);
