@@ -2461,6 +2461,7 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
         key: 'account_opening_balances',
         name: 'الأرصدة الافتتاحية لدليل الحسابات',
         table: 'accounts',
+        docFilter: 'opening_balance != 0',
         numCol: 'code',
         dateCol: 'created_at',
         amountCol: 'opening_balance',
