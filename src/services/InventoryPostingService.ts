@@ -43,7 +43,8 @@ export class InventoryPostingService {
       if (direction === 'IN') {
         afterQty = beforeQty + quantity;
         if (afterQty > 0) {
-          afterCost = ((beforeQty * beforeCost) + (quantity * unitCost)) / afterQty;
+          const prevVal = (beforeQty > 0 && Number.isFinite(beforeCost)) ? (beforeQty * beforeCost) : 0;
+          afterCost = (prevVal + (quantity * unitCost)) / afterQty;
         } else {
           afterCost = unitCost;
         }
@@ -55,6 +56,14 @@ export class InventoryPostingService {
         }
         afterCost = beforeCost; // Cost remains unchanged on outflow under Moving Average
       }
+
+      // Strict sanitization: ensure all metrics are finite numbers to avoid numeric field overflow in postgres (e.g. Infinity / NaN)
+      beforeQty = Number.isFinite(beforeQty) ? Number(beforeQty.toFixed(4)) : 0;
+      afterQty = Number.isFinite(afterQty) ? Number(afterQty.toFixed(4)) : 0;
+      beforeCost = Number.isFinite(beforeCost) && beforeCost >= 0 ? Number(beforeCost.toFixed(4)) : (unitCost > 0 ? Number(unitCost.toFixed(4)) : 0);
+      afterCost = Number.isFinite(afterCost) && afterCost >= 0 ? Number(afterCost.toFixed(4)) : beforeCost;
+      const safeUnitCost = Number.isFinite(unitCost) ? Number(unitCost.toFixed(4)) : 0;
+      const safeTotalCost = Number.isFinite(totalCost) ? Number(totalCost.toFixed(4)) : Number((quantity * safeUnitCost).toFixed(4));
 
       // 3. Save snapshot metrics back to the movement line
       await client.query(
@@ -86,8 +95,8 @@ export class InventoryPostingService {
           afterQty,
           beforeCost,
           afterCost,
-          unitCost,
-          totalCost
+          safeUnitCost,
+          safeTotalCost
         ]
       );
 
@@ -143,6 +152,15 @@ export class InventoryPostingService {
     productId: string,
     sourceDocumentId: string
   ): Promise<{ beforeQty: number; beforeCost: number }> {
+    // Read current product metrics as fallback baseline
+    const prodRes = await client.query(
+      'SELECT stock, cost_price, weighted_average_cost FROM products WHERE id = $1',
+      [productId]
+    );
+    const prod = prodRes.rows[0];
+    const fallbackCost = prod ? (parseFloat(String(prod.weighted_average_cost || prod.cost_price || 0)) || 0) : 0;
+    const fallbackStock = prod ? (parseFloat(String(prod.stock || 0)) || 0) : 0;
+
     // Query all previous movements of this product from the old table (excluding this document)
     const movesRes = await client.query(
       `SELECT quantity, unit_cost FROM inventory_movements 
@@ -151,35 +169,39 @@ export class InventoryPostingService {
       [productId, sourceDocumentId]
     );
 
+    if (movesRes.rows.length === 0) {
+      return { beforeQty: fallbackStock, beforeCost: fallbackCost };
+    }
+
     let stock = 0;
-    let wac = 0;
+    let wac = fallbackCost;
+    let totalValue = 0;
 
     for (const move of movesRes.rows) {
-      const qty = parseFloat(String(move.quantity));
-      const unitCost = parseFloat(String(move.unit_cost || 0));
+      const origQty = parseFloat(String(move.quantity || 0));
+      const moveUnitCost = parseFloat(String(move.unit_cost || 0));
 
-      if (qty > 0) {
-        wac = (stock * wac + qty * unitCost) / (stock + qty);
-        stock += qty;
+      if (origQty > 0) {
+        const costToUse = moveUnitCost > 0 ? moveUnitCost : (wac > 0 ? wac : fallbackCost);
+        const moveTotal = origQty * costToUse;
+        const newStock = stock + origQty;
+        if (newStock > 0) {
+          const currentVal = Math.max(0, totalValue);
+          wac = (currentVal + moveTotal) / newStock;
+        } else if (costToUse > 0) {
+          wac = costToUse;
+        }
+        stock = newStock;
+        totalValue = Math.max(0, stock * wac);
       } else {
-        stock += qty; // qty is negative for outflows in old movements table
+        stock += origQty;
+        totalValue = Math.max(0, stock * wac);
       }
     }
 
-    // Fallback: If no movements exist in the old table, read from products
-    // (but adjust for possible updates already done by the old engine in the same transaction)
-    if (movesRes.rows.length === 0) {
-      const prodRes = await client.query(
-        'SELECT stock, cost_price FROM products WHERE id = $1',
-        [productId]
-      );
-      if (prodRes.rows.length > 0) {
-        const prodStock = parseFloat(String(prodRes.rows[0].stock || 0));
-        const prodCost = parseFloat(String(prodRes.rows[0].cost_price || 0));
-        return { beforeQty: prodStock, beforeCost: prodCost };
-      }
-    }
+    const safeWac = Number.isFinite(wac) && wac >= 0 ? Number(wac.toFixed(4)) : fallbackCost;
+    const safeStock = Number.isFinite(stock) ? Number(stock.toFixed(4)) : fallbackStock;
 
-    return { beforeQty: stock, beforeCost: wac };
+    return { beforeQty: safeStock, beforeCost: safeWac };
   }
 }
