@@ -1339,9 +1339,27 @@ export const PurchaseReturns: React.FC = () => {
           item.vat_amount = 0;
           item.total = 0;
         }
+      } else if (field === 'withholding_tax_amount') {
+        const val = value === '' ? '' : (parseFloat(value) || 0);
+        item.withholding_tax_amount = val;
+        const total = Number(item.total) || ((Number(item.quantity) || 0) * (Number(item.unit_price) || 0));
+        if (total > 0 && typeof val === 'number') {
+          item.withholding_tax_rate = Number(((val / total) * 100).toFixed(2));
+        } else if (val === '') {
+          item.withholding_tax_rate = '';
+        }
+      } else if (field === 'vat_amount') {
+        const val = value === '' ? '' : (parseFloat(value) || 0);
+        item.vat_amount = val;
+        const total = Number(item.total) || ((Number(item.quantity) || 0) * (Number(item.unit_price) || 0));
+        if (total > 0 && typeof val === 'number') {
+          item.vat_rate = Number(((val / total) * 100).toFixed(2));
+        } else if (val === '') {
+          item.vat_rate = '';
+        }
       } else {
         (item as any)[field] = value;
-      if (field === 'quantity' || field === 'unit_price' || field === 'vat_rate' || field === 'withholding_tax_rate') {
+        if (field === 'quantity' || field === 'unit_price' || field === 'vat_rate' || field === 'withholding_tax_rate') {
           if ((item.vat_rate === undefined || item.vat_rate === null || item.vat_rate === 0) && item.product_id) {
             const p = products.find(prod => prod.id === item.product_id);
             if (p && p.vat_rate) item.vat_rate = Number(p.vat_rate);
@@ -4478,21 +4496,31 @@ export const PurchaseReturns: React.FC = () => {
                                     <div className="flex items-center justify-center gap-0.5">
                                       <input 
                                         type="number" 
+                                        step="any"
                                         min={0}
                                         max={100}
-                                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs"
-                                        value={item.vat_rate !== undefined && item.vat_rate !== null ? Number(item.vat_rate) : 0}
-                                        onChange={(e) => updateItem(index, 'vat_rate', parseFloat(e.target.value) || 0)}
+                                        className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        value={item.vat_rate !== undefined && item.vat_rate !== null && item.vat_rate !== '' ? item.vat_rate : ''}
+                                        placeholder="0"
+                                        onChange={(e) => updateItem(index, 'vat_rate', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
                                       />
                                       <span className="text-sm text-zinc-900 font-black">%</span>
                                     </div>
                                   </td>
-                                  <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-amber-700 text-xs">
-                                    {formatMoney(
-                                      (item.vat_amount !== undefined && item.vat_amount !== null && Number(item.vat_amount) > 0)
-                                        ? Number(item.vat_amount)
-                                        : ((Number(item.quantity) || 0) * (Number(item.unit_price) || 0) * ((Number(item.vat_rate) || 0) / 100))
-                                    )}
+                                  <td className="p-0.5 border-b border-r border-zinc-200 w-24">
+                                    <input 
+                                      type="number"
+                                      step="any"
+                                      min={0}
+                                      className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-bold text-amber-700 outline-none transition-all text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                      value={
+                                        item.vat_amount !== undefined && item.vat_amount !== null && item.vat_amount !== ''
+                                          ? item.vat_amount
+                                          : (item.vat_rate ? Number(((Number(item.quantity) || 0) * (Number(item.unit_price) || 0) * (Number(item.vat_rate) / 100)).toFixed(2)) : '')
+                                      }
+                                      placeholder="0.00"
+                                      onChange={(e) => updateItem(index, 'vat_amount', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
+                                    />
                                   </td>
                                 </>
                               )}
@@ -4506,22 +4534,27 @@ export const PurchaseReturns: React.FC = () => {
                                         min={0}
                                         max={100}
                                         className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-black text-zinc-900 outline-none transition-all text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                        value={item.withholding_tax_rate !== undefined && item.withholding_tax_rate !== null ? Number(item.withholding_tax_rate) : 0}
-                                        onChange={(e) => updateItem(index, 'withholding_tax_rate', parseFloat(e.target.value) || 0)}
+                                        value={item.withholding_tax_rate !== undefined && item.withholding_tax_rate !== null && item.withholding_tax_rate !== '' ? item.withholding_tax_rate : ''}
+                                        placeholder="0"
+                                        onChange={(e) => updateItem(index, 'withholding_tax_rate', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
                                       />
                                       <span className="text-xs text-zinc-900 font-bold">%</span>
                                     </div>
                                   </td>
-                                  <td className="p-0.5 border-b border-r border-zinc-200 w-24 text-center font-bold text-amber-700 text-xs">
-                                    {(() => {
-                                      const qty = Number(item.quantity) || 0;
-                                      const price = Number(item.unit_price) || 0;
-                                      const rate = Number(item.withholding_tax_rate) || 0;
-                                      const wAmount = (item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null && Number(item.withholding_tax_amount) > 0)
-                                        ? Number(item.withholding_tax_amount)
-                                        : (qty * price * (rate / 100));
-                                      return wAmount > 0 ? `-${formatMoney(wAmount)}` : formatMoney(0);
-                                    })()}
+                                  <td className="p-0.5 border-b border-r border-zinc-200 w-24">
+                                    <input 
+                                      type="number" 
+                                      step="any"
+                                      min={0}
+                                      className="w-full bg-transparent border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white rounded px-1 py-0.5 text-center font-bold text-amber-700 outline-none transition-all text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                      value={
+                                        item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null && item.withholding_tax_amount !== ''
+                                          ? item.withholding_tax_amount
+                                          : (item.withholding_tax_rate ? Number(((Number(item.quantity) || 0) * (Number(item.unit_price) || 0) * (Number(item.withholding_tax_rate) / 100)).toFixed(2)) : '')
+                                      }
+                                      placeholder="0.00"
+                                      onChange={(e) => updateItem(index, 'withholding_tax_amount', e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
+                                    />
                                   </td>
                                 </>
                               )}
