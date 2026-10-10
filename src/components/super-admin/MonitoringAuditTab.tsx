@@ -14,7 +14,8 @@ import {
   XCircle, 
   ExternalLink,
   Activity,
-  ChevronLeft
+  ChevronLeft,
+  AlertCircle
 } from 'lucide-react';
 import { formatNumber } from '../../utils/formatUtils';
 import { DataCountsValues } from '../../pages/DataCountsValues';
