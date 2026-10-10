@@ -26,7 +26,8 @@ import {
   AlertCircle,
   Scale,
   BookOpen,
-  CheckCheck
+  CheckCheck,
+  ArrowRight
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -99,8 +100,15 @@ interface AuditData {
   reports_reconciliation?: ReportReconciliationItem[];
 }
 
-export const DataCountsValues: React.FC = () => {
+export interface DataCountsValuesProps {
+  companyId?: string;
+  companyName?: string;
+  onBack?: () => void;
+}
+
+export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, companyName, onBack }) => {
   const { user } = useAuth();
+  const effectiveCompanyId = companyId || user?.company_id;
   const { t, dir, language } = useLanguage();
   const { setCurrentPage } = useNavigation();
 
@@ -124,12 +132,12 @@ export const DataCountsValues: React.FC = () => {
   } | null>(null);
 
   const fetchData = async () => {
-    if (!user) return;
+    if (!user || !effectiveCompanyId) return;
     setLoading(true);
     setError(null);
     try {
       const token = localStorage.getItem('auth_token');
-      const res = await fetch(`/api/erp/system/data-audit?company_id=${user.company_id}`, {
+      const res = await fetch(`/api/erp/system/data-audit?company_id=${effectiveCompanyId}`, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : ''
         }
@@ -150,7 +158,7 @@ export const DataCountsValues: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, [user]);
+  }, [user, companyId]);
 
   const handleAutoFix = async () => {
     if (!user) return;
@@ -163,7 +171,7 @@ export const DataCountsValues: React.FC = () => {
     setFixing(true);
     try {
       const token = localStorage.getItem('auth_token');
-      const res = await fetch(`/api/erp/system/auto-fix-missing-accounts?company_id=${user.company_id}`, {
+      const res = await fetch(`/api/erp/system/auto-fix-missing-accounts?company_id=${effectiveCompanyId}`, {
         method: 'POST',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
@@ -338,8 +346,13 @@ export const DataCountsValues: React.FC = () => {
             <div className="p-2.5 bg-emerald-600 text-white rounded-2xl shadow-md shadow-emerald-600/20">
               <ShieldCheck size={24} />
             </div>
-            <h1 className="text-2xl font-black text-stone-900">
-              {language === 'ar' ? 'التدقيق الشامل' : 'Comprehensive System Audit'}
+            <h1 className="text-2xl font-black text-stone-900 flex items-center gap-2.5 flex-wrap">
+              <span>{language === 'ar' ? 'التدقيق الشامل' : 'Comprehensive System Audit'}</span>
+              {companyName && (
+                <span className="text-xs font-bold text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-3 py-1 rounded-xl">
+                  {companyName}
+                </span>
+              )}
             </h1>
           </div>
           <p className="text-xs font-bold text-stone-500">
@@ -350,6 +363,16 @@ export const DataCountsValues: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="px-4 py-2.5 bg-stone-900 hover:bg-black text-white rounded-2xl font-bold text-xs flex items-center gap-2 shadow-md transition-all active:scale-95"
+            >
+              <ArrowRight size={16} />
+              <span>{language === 'ar' ? 'العودة لجدول المراقبة' : 'Back to Monitoring'}</span>
+            </button>
+          )}
+
           <button
             onClick={handleAutoFix}
             disabled={fixing}

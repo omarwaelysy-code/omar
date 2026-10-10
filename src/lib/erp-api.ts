@@ -2120,15 +2120,8 @@ router.post('/system/restore', authenticateToken, authorizeRoles('super_admin', 
   }
 });
 
-// Data Audit & Counts & Values Endpoint
-router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res) => {
-  const companyId = (req.user?.role === 'super_admin' && req.query.company_id) 
-    ? String(req.query.company_id) 
-    : req.user?.company_id;
-
-  if (!companyId) return res.status(400).json({ error: 'Company ID required' });
-
-  const client = await pool.connect();
+// Core Data Audit Calculation Engine for a Single Company
+export async function computeCompanyAuditData(client: any, companyId: string) {
   try {
     // 1. MASTER DATA COUNTS
     const masterQueries = [
@@ -3244,16 +3237,107 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
       console.error('Reports reconciliation audit error:', err);
     }
 
-    res.json({
+    return {
       company_id: companyId,
       timestamp: new Date().toISOString(),
       master_data: masterData,
       operational_data: operationalData,
       posting_transactions: postingTransactions,
       reports_reconciliation: reportsReconciliation
-    });
+    };
+  } catch (error: any) {
+    console.error(`[AUDIT-ENGINE] Failed for company ${companyId}:`, error);
+    throw error;
+  }
+}
+
+// Data Audit & Counts & Values Endpoint
+router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = (req.user?.role === 'super_admin' && req.query.company_id) 
+    ? String(req.query.company_id) 
+    : req.user?.company_id;
+
+  if (!companyId) return res.status(400).json({ error: 'Company ID required' });
+
+  const client = await pool.connect();
+  try {
+    const data = await computeCompanyAuditData(client, companyId);
+    res.json(data);
   } catch (error: any) {
     console.error('Data audit failed:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Multi-company Audit Overview for Super Admin Monitoring
+router.get('/system/companies-audit-overview', authenticateToken, authorizeRoles('super_admin'), async (req: AuthRequest, res) => {
+  const client = await pool.connect();
+  try {
+    const compRes = await client.query(`
+      SELECT id, name, code, company_status 
+      FROM companies 
+      WHERE id != 'SYSTEM' 
+      ORDER BY name ASC
+    `);
+
+    const summaries = [];
+    for (const comp of compRes.rows) {
+      try {
+        const data = await computeCompanyAuditData(client, comp.id);
+        
+        const totalMasterCount = (data.master_data || []).reduce((acc: number, m: any) => acc + (m.count || 0), 0);
+        const totalOperationalCount = (data.operational_data || []).reduce((acc: number, o: any) => acc + (o.count || 0), 0);
+        const totalOperationalValue = (data.operational_data || []).reduce((acc: number, o: any) => acc + (o.total_value || 0), 0);
+        
+        const totalPostingCount = (data.posting_transactions || []).reduce((acc: number, p: any) => acc + (p.count || 0), 0);
+        const totalPostingValue = (data.posting_transactions || []).reduce((acc: number, p: any) => acc + (p.total_value || 0), 0);
+        
+        const totalUnpostedCount = (data.posting_transactions || []).reduce((acc: number, p: any) => acc + (p.unposted_count || 0), 0);
+        const totalUnbalancedCount = (data.posting_transactions || []).reduce((acc: number, p: any) => acc + (p.unbalanced_entries_count || 0), 0);
+        const totalMissingAccountsCount = (data.posting_transactions || []).reduce((acc: number, p: any) => acc + (p.missing_accounts_count || 0), 0);
+        
+        const totalReportsDiscrepancies = (data.reports_reconciliation || []).filter((r: any) => r.status === 'discrepancy' || Math.abs(r.variance || 0) > 0.05).length;
+        
+        summaries.push({
+          id: comp.id,
+          name: comp.name,
+          code: comp.code || '-',
+          company_status: comp.company_status,
+          posting_count: totalPostingCount,
+          posting_value: totalPostingValue,
+          operational_count: totalOperationalCount,
+          operational_value: totalOperationalValue,
+          unposted_count: totalUnpostedCount,
+          unbalanced_count: totalUnbalancedCount,
+          missing_accounts_count: totalMissingAccountsCount,
+          master_count: totalMasterCount,
+          reports_discrepancies: totalReportsDiscrepancies
+        });
+      } catch (err) {
+        console.error(`Error auditing company ${comp.name}:`, err);
+        summaries.push({
+          id: comp.id,
+          name: comp.name,
+          code: comp.code || '-',
+          company_status: comp.company_status,
+          posting_count: 0,
+          posting_value: 0,
+          operational_count: 0,
+          operational_value: 0,
+          unposted_count: 0,
+          unbalanced_count: 0,
+          missing_accounts_count: 0,
+          master_count: 0,
+          reports_discrepancies: 0
+        });
+      }
+    }
+    
+    res.json(summaries);
+  } catch (error: any) {
+    console.error('Companies audit overview failed:', error);
     res.status(500).json({ error: error.message });
   } finally {
     client.release();

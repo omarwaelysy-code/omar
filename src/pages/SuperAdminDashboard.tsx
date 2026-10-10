@@ -6,6 +6,7 @@ import { MaintenanceService } from '../services/MaintenanceService';
 import { AuditService } from '../services/AuditService';
 import { SubscriptionsTab } from '../components/super-admin/SubscriptionsTab';
 import { FeatureManagerTab } from '../components/super-admin/FeatureManagerTab';
+import { MonitoringAuditTab } from '../components/super-admin/MonitoringAuditTab';
 import { 
   Building2, 
   Users, 
@@ -1567,11 +1568,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ initia
           )}
 
           {activeTab === 'monitoring' && (
-            <div className="p-6 text-center text-stone-500">
-              <Activity className="w-8 h-8 mx-auto mb-2 text-stone-300" />
-              <h3 className="text-sm font-bold mb-1">مراقبة أداء النظام</h3>
-              <p className="text-xs">يتم تحميل لوحة المراقبة...</p>
-            </div>
+            <MonitoringAuditTab companies={companies} />
           )}
 
           {activeTab === 'reports' && (
