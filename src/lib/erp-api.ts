@@ -2639,8 +2639,11 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
                      WHERE je.company_id = $1 
                        AND je.reference_type IN ('return', 'sales_return')
                        AND (
-                         a.account_usage IN ('withholding_tax_customers')
-                         OR a.code = '112'
+                         a.account_usage IN ('withholding_tax_customers', 'earned_discounts', 'granted_discounts')
+                         OR a.code LIKE '112%'
+                         OR a.code LIKE '412%'
+                         OR a.code LIKE '4104%'
+                         OR a.code LIKE '5401%'
                        )
                    ), 0)
                  )::numeric as side_tot`,
@@ -2696,9 +2699,11 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
                WHERE je.company_id = $1 
                  AND je.reference_type IN ('purchase_return')
                  AND (
-                   a.account_usage IN ('cash', 'bank', 'payment_method', 'withholding_tax_suppliers')
+                   a.account_usage IN ('cash', 'bank', 'payment_method', 'withholding_tax_suppliers', 'earned_discounts', 'granted_discounts')
                    OR a.code LIKE '111%'
                    OR a.code LIKE '213%'
+                   OR a.code LIKE '512%'
+                   OR a.code LIKE '5105%'
                  )`,
               [companyId]
             );
