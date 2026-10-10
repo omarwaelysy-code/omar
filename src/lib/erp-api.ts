@@ -3276,7 +3276,7 @@ router.get('/system/companies-audit-overview', authenticateToken, authorizeRoles
   const client = await pool.connect();
   try {
     const compRes = await client.query(`
-      SELECT id, name, code, company_status 
+      SELECT id, name, code, company_status, COALESCE(currency, 'EGP') as currency 
       FROM companies 
       WHERE id != 'SYSTEM' 
       ORDER BY name ASC
@@ -3305,6 +3305,7 @@ router.get('/system/companies-audit-overview', authenticateToken, authorizeRoles
           name: comp.name,
           code: comp.code || '-',
           company_status: comp.company_status,
+          currency: comp.currency || 'EGP',
           posting_count: totalPostingCount,
           posting_value: totalPostingValue,
           operational_count: totalOperationalCount,
@@ -3322,6 +3323,7 @@ router.get('/system/companies-audit-overview', authenticateToken, authorizeRoles
           name: comp.name,
           code: comp.code || '-',
           company_status: comp.company_status,
+          currency: comp.currency || 'EGP',
           posting_count: 0,
           posting_value: 0,
           operational_count: 0,
