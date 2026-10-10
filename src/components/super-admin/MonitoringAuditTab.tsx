@@ -358,23 +358,21 @@ export const MonitoringAuditTab: React.FC<MonitoringAuditTabProps> = ({ companie
             <table className="w-full text-right border-collapse">
               <thead>
                 <tr className="bg-stone-100/70 border-b border-stone-200 text-stone-600 text-[11px] font-black uppercase tracking-wider">
-                  <th className="px-4 py-3">كود الشركة</th>
+                  <th className="px-3 py-3">كود الشركة</th>
                   <th className="px-4 py-3">اسم الشركة</th>
-                  <th className="px-4 py-3">الحركات المالية المقيدة</th>
-                  <th className="px-4 py-3">العمليات غير المقيدة</th>
-                  <th className="px-4 py-3">حركات بدون قيود مرحلة</th>
-                  <th className="px-4 py-3">سلامة الحسابات والتوازن</th>
-                  <th className="px-4 py-3">التقارير والمركز المالي</th>
-                  <th className="px-3 py-3 text-center">التدقيق</th>
+                  <th className="px-3 py-3 text-center">حركات مقيدة</th>
+                  <th className="px-3 py-3 text-center">قيمة المقيد (ج.م)</th>
+                  <th className="px-3 py-3 text-center">عمليات (عدد)</th>
+                  <th className="px-3 py-3 text-center">قيمة العمليات (ج.م)</th>
+                  <th className="px-3 py-3 text-center">حركات بدون قيود مرحلة</th>
+                  <th className="px-3 py-3 text-center">البيانات الأساسية</th>
+                  <th className="px-3 py-3 text-center">سلامة الحسابات والتوازن</th>
+                  <th className="px-3 py-3 text-center">التقارير والمركز المالي</th>
+                  <th className="px-2 py-3 text-center">التدقيق</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 text-xs">
                 {filteredRows.map((comp) => {
-                  const isClean = comp.unposted_count === 0 && 
-                                  comp.unbalanced_count === 0 && 
-                                  comp.missing_accounts_count === 0 && 
-                                  comp.reports_discrepancies === 0;
-
                   return (
                     <tr
                       key={comp.id}
@@ -383,7 +381,7 @@ export const MonitoringAuditTab: React.FC<MonitoringAuditTabProps> = ({ companie
                       title="اضغط لفتح شاشة التدقيق الشامل لهذه الشركة"
                     >
                       {/* 1. كود الشركة */}
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         <span className="font-mono font-bold text-stone-700 bg-stone-100 group-hover:bg-white group-hover:border-emerald-300 border border-stone-200 px-2.5 py-1 rounded-xl text-xs transition-colors">
                           {comp.code}
                         </span>
@@ -406,34 +404,38 @@ export const MonitoringAuditTab: React.FC<MonitoringAuditTabProps> = ({ companie
                         </div>
                       </td>
 
-                      {/* 3. الحركات المالية المقيدة (Card 1) */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div>
-                          <div className="font-black text-stone-900 flex items-center gap-1.5">
-                            <TrendingUp size={13} className="text-emerald-600" />
-                            <span>{formatNumber(comp.posting_count)} حركة</span>
-                          </div>
-                          <div className="text-[11px] font-bold text-emerald-700 font-mono mt-0.5">
-                            {formatNumber(comp.posting_value)} EGP
-                          </div>
+                      {/* 3. الحركات المقيدة (عدد) */}
+                      <td className="px-3 py-3 whitespace-nowrap text-center">
+                        <div className="font-black text-stone-900 inline-flex items-center gap-1.5">
+                          <TrendingUp size={13} className="text-emerald-600" />
+                          <span>{formatNumber(comp.posting_count)} حركة</span>
                         </div>
                       </td>
 
-                      {/* 4. العمليات غير المقيدة (Card 2) */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div>
-                          <div className="font-black text-stone-900 flex items-center gap-1.5">
-                            <Layers size={13} className="text-blue-600" />
-                            <span>{formatNumber(comp.operational_count)} عملية</span>
-                          </div>
-                          <div className="text-[11px] font-bold text-blue-700 font-mono mt-0.5">
-                            {formatNumber(comp.operational_value)} EGP
-                          </div>
+                      {/* 4. قيمة المقيد (ج.م) */}
+                      <td className="px-3 py-3 whitespace-nowrap text-center">
+                        <span className="text-[11px] font-bold text-emerald-700 font-mono">
+                          {formatNumber(comp.posting_value)} EGP
+                        </span>
+                      </td>
+
+                      {/* 5. العمليات غير المقيدة (عدد) */}
+                      <td className="px-3 py-3 whitespace-nowrap text-center">
+                        <div className="font-black text-stone-900 inline-flex items-center gap-1.5">
+                          <Layers size={13} className="text-blue-600" />
+                          <span>{formatNumber(comp.operational_count)} عملية</span>
                         </div>
                       </td>
 
-                      {/* 5. حركات بدون قيود مرحلة (Card 3) */}
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      {/* 6. قيمة العمليات (ج.م) */}
+                      <td className="px-3 py-3 whitespace-nowrap text-center">
+                        <span className="text-[11px] font-bold text-blue-700 font-mono">
+                          {formatNumber(comp.operational_value)} EGP
+                        </span>
+                      </td>
+
+                      {/* 7. حركات بدون قيود مرحلة */}
+                      <td className="px-3 py-3 whitespace-nowrap text-center">
                         {comp.unposted_count === 0 ? (
                           <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-50/70 border border-amber-200/80 text-amber-800 text-[11px] font-black">
                             <span>0.00</span>
@@ -447,50 +449,47 @@ export const MonitoringAuditTab: React.FC<MonitoringAuditTabProps> = ({ companie
                         )}
                       </td>
 
-                      {/* 6. سلامة الحسابات والتوازن (Card 4) */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div>
-                          {comp.unbalanced_count === 0 && comp.missing_accounts_count === 0 ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-black">
-                              <ShieldCheck size={12} className="text-emerald-600" />
-                              <span>سليم ومتزن 100%</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-800 text-[10px] font-black">
-                              <XCircle size={12} className="text-rose-600" />
-                              <span>
-                                {comp.missing_accounts_count > 0 ? `${comp.missing_accounts_count} حساب ناقص ` : ''}
-                                {comp.unbalanced_count > 0 ? `${comp.unbalanced_count} قيد غير متزن` : ''}
-                              </span>
-                            </span>
-                          )}
-                          <div className="text-[10px] font-bold text-stone-400 mt-0.5">
-                            {comp.master_count} بيان أساسي مسجل
-                          </div>
-                        </div>
+                      {/* 8. البيانات الأساسية */}
+                      <td className="px-3 py-3 whitespace-nowrap text-center">
+                        <span className="font-bold text-stone-700 bg-stone-100 px-2.5 py-1 rounded-xl font-mono text-xs">
+                          {comp.master_count} بيان
+                        </span>
                       </td>
 
-                      {/* 7. التقارير والمركز المالي (Card 5) */}
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div>
-                          {comp.reports_discrepancies === 0 ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-900 text-[10px] font-black">
-                              <Scale size={12} className="text-indigo-600" />
-                              <span>مطابقة تامة 100%</span>
+                      {/* 9. سلامة الحسابات والتوازن */}
+                      <td className="px-3 py-3 whitespace-nowrap text-center">
+                        {comp.unbalanced_count === 0 && comp.missing_accounts_count === 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-black">
+                            <ShieldCheck size={12} className="text-emerald-600" />
+                            <span>سليم ومتزن 100%</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-800 text-[10px] font-black">
+                            <XCircle size={12} className="text-rose-600" />
+                            <span>
+                              {comp.missing_accounts_count > 0 ? `${comp.missing_accounts_count} ناقص ` : ''}
+                              {comp.unbalanced_count > 0 ? `${comp.unbalanced_count} غير متزن` : ''}
                             </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-800 text-[10px] font-black">
-                              <span>{comp.reports_discrepancies} فرق بحاجة لمراجعة</span>
-                            </span>
-                          )}
-                          <div className="text-[10px] font-bold text-indigo-600 mt-0.5">
-                            مستحيل الخطأ تقنياً
-                          </div>
-                        </div>
+                          </span>
+                        )}
                       </td>
 
-                      {/* 8. Action Arrow */}
-                      <td className="px-3 py-3 text-center whitespace-nowrap">
+                      {/* 10. التقارير والمركز المالي */}
+                      <td className="px-3 py-3 whitespace-nowrap text-center">
+                        {comp.reports_discrepancies === 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-900 text-[10px] font-black">
+                            <Scale size={12} className="text-indigo-600" />
+                            <span>مطابقة تامة 100%</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-800 text-[10px] font-black">
+                            <span>{comp.reports_discrepancies} فرق بحاجة لمراجعة</span>
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 11. Action Arrow */}
+                      <td className="px-2 py-3 text-center whitespace-nowrap">
                         <div className="w-8 h-8 rounded-xl bg-stone-100 group-hover:bg-emerald-600 group-hover:text-white text-stone-500 flex items-center justify-center mx-auto transition-all shadow-xs">
                           <ChevronLeft size={16} />
                         </div>
