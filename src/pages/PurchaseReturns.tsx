@@ -2266,14 +2266,74 @@ export const PurchaseReturns: React.FC = () => {
     }
   };
 
-  const handleExportExcel = () => {
-    const formattedData = formatDataForExcel(filteredReturns, {
-      'return_number': 'رقم المرتجع',
-      'supplier_name': 'المورد',
-      'date': 'التاريخ',
-      'total_amount': 'المبلغ الإجمالي'
+  const handleExportExcel = (onlySelected: boolean = false) => {
+    const listToExport = onlySelected && selectedReturnIds.length > 0
+      ? filteredReturns.filter(ret => selectedReturnIds.includes(ret.id))
+      : filteredReturns;
+
+    const dataToExport = listToExport.map(ret => {
+      const baseCode = (company?.settings?.currency || (company as any)?.currency || 'egp').toLowerCase();
+      const currencyCode = ret.currency_id ? (companyCurrencies.find(c => c.id === ret.currency_id)?.code || '') : (company?.settings?.currency || 'EGP');
+      const isForeign = currencyCode.toLowerCase() !== baseCode;
+
+      return {
+        ...ret,
+        formatted_return_number: ret.return_number,
+        formatted_eta_invoice_number: ret.eta_invoice_number || '-',
+        formatted_supplier_name: ret.supplier_name || '-',
+        formatted_date: formatDate(ret.date),
+        formatted_description: ret.description || ret.notes || '-',
+        formatted_payment_type: ret.payment_type === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') : (language === 'ar' ? 'آجل' : 'Credit'),
+        formatted_status: language === 'ar' ? 'مكتمل' : 'Completed',
+        formatted_currency: currencyCode,
+        formatted_foreign_amount: isForeign ? (Number(ret.total_amount) || 0) : '-',
+        formatted_exchange_rate: Number(ret.exchange_rate) && Number(ret.exchange_rate) !== 1 ? Number(ret.exchange_rate) : 1,
+        formatted_subtotal: (Number(ret.subtotal) || 0) * (Number(ret.exchange_rate) || 1),
+        formatted_discount_amount: (Number(ret.discount_amount || ret.discount || 0)) * (Number(ret.exchange_rate) || 1),
+        formatted_net_before_tax: ((Number(ret.subtotal) || 0) - (Number(ret.discount_amount || ret.discount || 0))) * (Number(ret.exchange_rate) || 1),
+        formatted_tax_amount: (Number(ret.tax_amount || ret.tax) || 0) * (Number(ret.exchange_rate) || 1),
+        formatted_withholding_tax: Number(ret.withholding_tax_amount || 0) * (Number(ret.exchange_rate) || 1),
+        formatted_total_amount: (Number(ret.total_amount) || 0) * (Number(ret.exchange_rate) || 1),
+        formatted_cost_amount: (Number(ret.cost_amount || ret.subtotal) || 0) * (Number(ret.exchange_rate) || 1),
+        formatted_journal_entry_amount: ret.journal_entry_amount ? Number(ret.journal_entry_amount) : '-',
+        formatted_entry_number: ret.entry_number || '-',
+        formatted_created_date: ret.created_at ? formatDate(ret.created_at.slice(0, 10)) : '-',
+        formatted_created_time: ret.created_at && ret.created_at.length > 11 ? ret.created_at.slice(11, 16) : '-',
+        formatted_updated_date: ret.updated_at ? formatDate(ret.updated_at.slice(0, 10)) : (ret.created_at ? formatDate(ret.created_at.slice(0, 10)) : '-'),
+        formatted_updated_time: ret.updated_at && ret.updated_at.length > 11 ? ret.updated_at.slice(11, 16) : (ret.created_at && ret.created_at.length > 11 ? ret.created_at.slice(11, 16) : '-'),
+      };
     });
-    exportToExcel(formattedData, { filename: 'PurchaseReturns_Report', sheetName: language === 'ar' ? 'مرتجع مشتريات' : 'Purchase Returns' });
+
+    const keyMap: Record<string, string> = {};
+    if (visibleColumns.return_number) keyMap['formatted_return_number'] = language === 'ar' ? 'رقم المرتجع' : 'Return Number';
+    if (visibleColumns.eta_invoice_number) keyMap['formatted_eta_invoice_number'] = language === 'ar' ? 'رقم الوثيقة الإلكترونية' : 'Electronic Doc No.';
+    if (visibleColumns.supplier_name) keyMap['formatted_supplier_name'] = language === 'ar' ? 'المورد' : 'Supplier';
+    if (visibleColumns.date) keyMap['formatted_date'] = language === 'ar' ? 'التاريخ' : 'Date';
+    if (visibleColumns.description) keyMap['formatted_description'] = language === 'ar' ? 'وصف المرتجع' : 'Description';
+    if (visibleColumns.payment_type) keyMap['formatted_payment_type'] = language === 'ar' ? 'طريقة الدفع' : 'Payment Type';
+    if (visibleColumns.status) keyMap['formatted_status'] = language === 'ar' ? 'حالة المرتجع' : 'Status';
+    if (visibleColumns.currency && isMultiCurrencyEnabled) keyMap['formatted_currency'] = language === 'ar' ? 'العملة' : 'Currency';
+    if (visibleColumns.foreign_amount && isMultiCurrencyEnabled) keyMap['formatted_foreign_amount'] = language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount';
+    if (visibleColumns.exchange_rate && isMultiCurrencyEnabled) keyMap['formatted_exchange_rate'] = language === 'ar' ? 'سعر الصرف' : 'Exchange Rate';
+    if (visibleColumns.subtotal) keyMap['formatted_subtotal'] = language === 'ar' ? 'قبل الخصم' : 'Subtotal';
+    if (visibleColumns.discount_amount) keyMap['formatted_discount_amount'] = language === 'ar' ? 'الخصم' : 'Discount';
+    if (visibleColumns.net_before_tax) keyMap['formatted_net_before_tax'] = language === 'ar' ? 'الصافي قبل الضريبة' : 'Net before Tax';
+    if (visibleColumns.tax_amount) keyMap['formatted_tax_amount'] = language === 'ar' ? 'ض.ق.م' : 'VAT';
+    if (visibleColumns.withholding_tax_amount && isPurchaseWhtEnabled) keyMap['formatted_withholding_tax'] = language === 'ar' ? 'ض.خ.أ' : 'WHT';
+    if (visibleColumns.total_amount) keyMap['formatted_total_amount'] = language === 'ar' ? 'صافي المورد' : 'Net Total';
+    if (visibleColumns.cost_amount) keyMap['formatted_cost_amount'] = language === 'ar' ? 'تكلفة المخزون' : 'Inventory Cost';
+    if (visibleColumns.journal_entry_amount) keyMap['formatted_journal_entry_amount'] = language === 'ar' ? 'إجمالي القيد' : 'Journal Total';
+    if (visibleColumns.entry_number) keyMap['formatted_entry_number'] = language === 'ar' ? 'رقم القيد' : 'Entry No.';
+    if (visibleColumns.created_date) keyMap['formatted_created_date'] = language === 'ar' ? 'تاريخ الإنشاء' : 'Created Date';
+    if (visibleColumns.created_time) keyMap['formatted_created_time'] = language === 'ar' ? 'وقت الإنشاء' : 'Created Time';
+    if (visibleColumns.updated_date) keyMap['formatted_updated_date'] = language === 'ar' ? 'تاريخ آخر تعديل' : 'Last Modified Date';
+    if (visibleColumns.updated_time) keyMap['formatted_updated_time'] = language === 'ar' ? 'وقت آخر تعديل' : 'Last Modified Time';
+
+    const formattedData = formatDataForExcel(dataToExport, keyMap);
+    exportToExcel(formattedData, { 
+      filename: onlySelected ? 'PurchaseReturns_Selected_Report' : 'PurchaseReturns_Report', 
+      sheetName: language === 'ar' ? 'مرتجع مشتريات' : 'Purchase Returns' 
+    });
   };
 
   const handleExportPDF = async () => {
@@ -2568,9 +2628,11 @@ export const PurchaseReturns: React.FC = () => {
                 <span>{language === 'ar' ? 'إضافة مرتجع' : 'Add Return'}</span>
               </button>
               <ExportButtons 
-                onExportExcel={handleExportExcel} 
+                onExportExcel={() => handleExportExcel(false)} 
                 onExportPDF={handleExportPDF} 
                 onPrint={() => printElement(tableRef.current, 'مرتجعات المشتريات')}
+                onExportExcelSelected={() => handleExportExcel(true)}
+                selectedCount={selectedReturnIds.length}
                 size="sm"
               />
               <button 

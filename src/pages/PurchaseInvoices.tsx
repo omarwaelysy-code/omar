@@ -3832,10 +3832,15 @@ export const PurchaseInvoices: React.FC = () => {
         formatted_currency: currencyCode,
         formatted_foreign_amount: isForeign ? inv.total_amount : '-',
         formatted_remaining_foreign: isForeign ? remaining : '-',
+        formatted_exchange_rate: Number(inv.exchange_rate) && Number(inv.exchange_rate) !== 1 ? Number(inv.exchange_rate) : 1,
         formatted_subtotal: (Number(inv.subtotal) || Number(inv.total_amount) || 0) * (Number(inv.exchange_rate) || 1),
+        formatted_discount_amount: (Number(inv.discount_amount || inv.discount) || 0) * (Number(inv.exchange_rate) || 1),
+        formatted_net_before_tax: ((Number(inv.subtotal) || Number(inv.total_amount) || 0) - (Number(inv.discount_amount || inv.discount) || 0)) * (Number(inv.exchange_rate) || 1),
         formatted_tax_amount: (Number(inv.tax_amount) || 0) * (Number(inv.exchange_rate) || 1),
         formatted_withholding_tax: (Number(inv.withholding_tax_amount) || 0) * (Number(inv.exchange_rate) || 1),
         formatted_base_amount: (Number(inv.total_amount) || 0) * (Number(inv.exchange_rate) || 1),
+        formatted_cost_amount: (Number(inv.cost_amount || inv.subtotal) || 0) * (Number(inv.exchange_rate) || 1),
+        formatted_journal_entry_amount: inv.journal_entry_amount ? Number(inv.journal_entry_amount) : '-',
         formatted_remaining: remainingLocal,
         formatted_entry_number: inv.entry_number || '-',
         formatted_eta_invoice_number: inv.eta_invoice_number || '-',
@@ -3847,29 +3852,37 @@ export const PurchaseInvoices: React.FC = () => {
     });
 
     const keyMap: Record<string, string> = {};
-    if (visibleColumns.invoice_number) keyMap['formatted_invoice_number'] = 'رقم الفاتورة';
+    if (visibleColumns.invoice_number) keyMap['formatted_invoice_number'] = language === 'ar' ? 'رقم الفاتورة' : 'Invoice Number';
     if (showEtaColumns && visibleColumns.eta_invoice_number) keyMap['formatted_eta_invoice_number'] = language === 'ar' ? 'رقم الوثيقة الإلكترونية' : 'Electronic Doc No.';
-    if (visibleColumns.supplier_name) keyMap['formatted_supplier_name'] = 'المورد';
-    if (visibleColumns.date) keyMap['formatted_date'] = 'التاريخ';
-    if (visibleColumns.description) keyMap['formatted_description'] = 'وصف الفاتورة';
-    if (visibleColumns.payment_type) keyMap['formatted_payment_type'] = 'طريقة الدفع';
-    if (visibleColumns.status) keyMap['formatted_status'] = 'حالة الدفع';
-    if (visibleColumns.currency && isMultiCurrencyEnabled) keyMap['formatted_currency'] = 'العملة';
-    if (visibleColumns.foreign_amount && isMultiCurrencyEnabled) keyMap['formatted_foreign_amount'] = 'صافي القيمة بالعملة الأجنبية';
-    if (visibleColumns.remaining_foreign && isMultiCurrencyEnabled) keyMap['formatted_remaining_foreign'] = 'الباقي بالعملة الأجنبية';
-    if (visibleColumns.subtotal && isVatEnabled) keyMap['formatted_subtotal'] = 'قبل الضريبة';
-    if (visibleColumns.tax_amount && isVatEnabled) keyMap['formatted_tax_amount'] = 'الضريبة';
+    if (visibleColumns.supplier_name) keyMap['formatted_supplier_name'] = language === 'ar' ? 'المورد' : 'Supplier';
+    if (visibleColumns.date) keyMap['formatted_date'] = language === 'ar' ? 'التاريخ' : 'Date';
+    if (visibleColumns.description) keyMap['formatted_description'] = language === 'ar' ? 'وصف الفاتورة' : 'Description';
+    if (visibleColumns.payment_type) keyMap['formatted_payment_type'] = language === 'ar' ? 'طريقة الدفع' : 'Payment Type';
+    if (visibleColumns.status) keyMap['formatted_status'] = language === 'ar' ? 'حالة الدفع' : 'Payment Status';
+    if (visibleColumns.currency && isMultiCurrencyEnabled) keyMap['formatted_currency'] = language === 'ar' ? 'العملة' : 'Currency';
+    if (visibleColumns.foreign_amount && isMultiCurrencyEnabled) keyMap['formatted_foreign_amount'] = language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount';
+    if (visibleColumns.remaining_foreign && isMultiCurrencyEnabled) keyMap['formatted_remaining_foreign'] = language === 'ar' ? 'الباقي بالعملة الأجنبية' : 'Remaining Foreign';
+    if (visibleColumns.exchange_rate && isMultiCurrencyEnabled) keyMap['formatted_exchange_rate'] = language === 'ar' ? 'سعر الصرف' : 'Exchange Rate';
+    if (visibleColumns.subtotal && isVatEnabled) keyMap['formatted_subtotal'] = language === 'ar' ? 'قبل الخصم' : 'Subtotal';
+    if (visibleColumns.discount_amount) keyMap['formatted_discount_amount'] = language === 'ar' ? 'الخصم' : 'Discount';
+    if (visibleColumns.net_before_tax && isVatEnabled) keyMap['formatted_net_before_tax'] = language === 'ar' ? 'الصافي قبل الضريبة' : 'Net before Tax';
+    if (visibleColumns.tax_amount && isVatEnabled) keyMap['formatted_tax_amount'] = language === 'ar' ? 'ض.ق.م' : 'VAT';
     if (visibleColumns.withholding_tax_amount && isPurchaseWhtEnabled) keyMap['formatted_withholding_tax'] = language === 'ar' ? 'ض.خ.إ (خصم وإضافة)' : 'Withholding Tax';
-    if (visibleColumns.base_amount) keyMap['formatted_base_amount'] = 'القيمة المعادلة بالعملة المحلية';
-    if (visibleColumns.remaining) keyMap['formatted_remaining'] = 'الباقي من الفاتورة';
-    if (visibleColumns.entry_number) keyMap['formatted_entry_number'] = 'رقم القيد';
-    if (visibleColumns.created_date) keyMap['formatted_created_date'] = 'تاريخ الإنشاء';
-    if (visibleColumns.created_time) keyMap['formatted_created_time'] = 'وقت الإنشاء';
-    if (visibleColumns.updated_date) keyMap['formatted_updated_date'] = 'تاريخ آخر تعديل';
-    if (visibleColumns.updated_time) keyMap['formatted_updated_time'] = 'وقت آخر تعديل';
+    if (visibleColumns.base_amount) keyMap['formatted_base_amount'] = language === 'ar' ? 'القيمة المعادلة بالعملة المحلية' : 'Local Amount';
+    if (visibleColumns.cost_amount) keyMap['formatted_cost_amount'] = language === 'ar' ? 'تكلفة المشتريات' : 'Purchase Cost';
+    if (visibleColumns.journal_entry_amount) keyMap['formatted_journal_entry_amount'] = language === 'ar' ? 'إجمالي القيد' : 'Journal Total';
+    if (visibleColumns.remaining) keyMap['formatted_remaining'] = language === 'ar' ? 'الباقي من الفاتورة' : 'Remaining';
+    if (visibleColumns.entry_number) keyMap['formatted_entry_number'] = language === 'ar' ? 'رقم القيد' : 'Entry Number';
+    if (visibleColumns.created_date) keyMap['formatted_created_date'] = language === 'ar' ? 'تاريخ الإنشاء' : 'Created Date';
+    if (visibleColumns.created_time) keyMap['formatted_created_time'] = language === 'ar' ? 'وقت الإنشاء' : 'Created Time';
+    if (visibleColumns.updated_date) keyMap['formatted_updated_date'] = language === 'ar' ? 'تاريخ آخر تعديل' : 'Last Modified Date';
+    if (visibleColumns.updated_time) keyMap['formatted_updated_time'] = language === 'ar' ? 'وقت آخر تعديل' : 'Last Modified Time';
 
     const formattedData = formatDataForExcel(dataToExport, keyMap);
-    exportToExcel(formattedData, { filename: 'Purchase_Invoices_Report', sheetName: 'فواتير المشتريات' });
+    exportToExcel(formattedData, { 
+      filename: onlySelected ? 'Purchase_Invoices_Selected_Report' : 'Purchase_Invoices_Report', 
+      sheetName: 'فواتير المشتريات' 
+    });
   };
 
   const handleExportPDF = async (onlySelected: boolean = false) => {
