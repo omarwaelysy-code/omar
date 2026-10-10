@@ -2818,14 +2818,22 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
               );
 
               for (const df of diffRes.rows) {
+                const docAmtVal = parseFloat(df.doc_amt || 0);
+                const jeAmtVal = parseFloat(df.je_amt || 0);
+                const absDoc = Math.abs(docAmtVal);
+                const trueDiff = Math.abs(jeAmtVal - absDoc);
+                const isReverse = docAmtVal < 0;
+
                 issues.push({
                   document_id: df.id,
                   document_number: df.doc_num || df.id,
                   date: df.doc_date,
-                  amount: parseFloat(df.doc_amt || 0),
+                  amount: docAmtVal,
                   party_name: df.party || '',
-                  error_type: 'فارق في قيمة القيد المحاسبي',
-                  details: `قيمة المستند (${parseFloat(df.doc_amt).toLocaleString()} ج.م) لا تطابق قيمة القيد المحاسبي (${parseFloat(df.je_amt).toLocaleString()} ج.م) بفارق ${Math.abs(parseFloat(df.je_amt) - parseFloat(df.doc_amt)).toLocaleString()} ج.م`
+                  error_type: isReverse ? 'فارق قيد (رصيد دائن)' : 'فارق في قيمة القيد المحاسبي',
+                  details: isReverse
+                    ? `قيمة المستند (${absDoc.toLocaleString()} ج.م رصيد دائن/مكشوف) لا تطابق قيمة القيد المحاسبي (${jeAmtVal.toLocaleString()} ج.م) بفارق حقيقي قدره ${trueDiff.toLocaleString()} ج.م`
+                    : `قيمة المستند (${docAmtVal.toLocaleString()} ج.م) لا تطابق قيمة القيد المحاسبي (${jeAmtVal.toLocaleString()} ج.م) بفارق ${trueDiff.toLocaleString()} ج.م`
                 });
               }
             }

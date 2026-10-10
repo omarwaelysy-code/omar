@@ -115,8 +115,12 @@ export const DataCountsValues: React.FC = () => {
 
   // Modal for detailed issues report
   const [selectedItemIssues, setSelectedItemIssues] = useState<{
+    key?: string;
     name: string;
     issues: DocumentIssue[];
+    unposted_count?: number;
+    unbalanced_count?: number;
+    missing_accounts_count?: number;
   } | null>(null);
 
   const fetchData = async () => {
@@ -711,7 +715,14 @@ export const DataCountsValues: React.FC = () => {
                       <td className="py-1.5 px-3 text-center">
                         {row.issues && row.issues.length > 0 ? (
                           <button
-                            onClick={() => setSelectedItemIssues({ name: row.name, issues: row.issues })}
+                            onClick={() => setSelectedItemIssues({ 
+                              key: row.key,
+                              name: row.name, 
+                              issues: row.issues,
+                              unposted_count: row.unposted_count,
+                              unbalanced_count: row.unbalanced_entries_count,
+                              missing_accounts_count: row.missing_accounts_count
+                            })}
                             className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-md font-bold text-[11px] transition-all flex items-center gap-1 mx-auto"
                           >
                             <Info size={11} className="text-amber-600" />
@@ -1188,23 +1199,97 @@ export const DataCountsValues: React.FC = () => {
                 </button>
               </div>
 
-              {/* Proposed Solution Banner */}
-              <div className="my-4 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold space-y-1">
-                <div className="flex items-center gap-2 font-black text-amber-800">
-                  <Wrench size={16} />
-                  <span>{language === 'ar' ? 'الحل المقترح من النظام:' : 'System Proposed Solution:'}</span>
-                </div>
-                <p className="leading-relaxed">
-                  {language === 'ar'
-                    ? '1. في حال نقص حسابات الأصناف أو العملاء: اضغط على زر «إصلاح الحسابات الناقصة تلقائياً» لربطها بالحساب الافتراضي في الدليل بنقرة واحدة.'
-                    : '1. For missing product/customer accounts: Click "Auto-Fix Missing Accounts" to automatically bind default chart accounts.'}
-                </p>
-                <p className="leading-relaxed">
-                  {language === 'ar'
-                    ? '2. في حال وجود حركات غير مرحلة: سيقوم النظام بترحيل القيود تلقائياً بعد استكمال الحسابات لمطابقة أرصدة الدفاتر.'
-                    : '2. For unposted transactions: The system will generate journal entries once accounts are linked.'}
-                </p>
-              </div>
+              {/* Dynamic Context-Aware Diagnostic Banner */}
+              {(() => {
+                const issues = selectedItemIssues.issues || [];
+                const key = selectedItemIssues.key || '';
+                const isOpening = key.includes('opening') || selectedItemIssues.name.includes('افتتاح');
+                const hasNegative = issues.some(i => i.amount < 0 || i.error_type?.includes('دائن') || i.details?.includes('دائن'));
+                const hasUnposted = (selectedItemIssues.unposted_count || 0) > 0 || issues.some(i => i.error_type?.includes('غير مرحل'));
+                const hasMissingAccounts = (selectedItemIssues.missing_accounts_count || 0) > 0;
+
+                if (isOpening && hasNegative && !hasUnposted && !hasMissingAccounts) {
+                  return (
+                    <div className="my-4 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs font-bold space-y-2">
+                      <div className="flex items-center gap-2 font-black text-emerald-800">
+                        <CheckCircle2 size={16} />
+                        <span>{language === 'ar' ? 'التحليل المحاسبي للأرصدة العكسية (الدائنة / السحب على المكشوف):' : 'Accounting Analysis for Credit / Overdraft Balances:'}</span>
+                      </div>
+                      <p className="leading-relaxed text-emerald-900">
+                        {language === 'ar'
+                          ? '• المستندات ذات المبالغ السالبة تمثل أرصدة افتتاحية دائنة بطبيعتها (سحب على المكشوف للبنوك، أو دفعات مقدمة/أرصدة دائنة للعملاء).'
+                          : '• Negative amounts indicate credit opening balances (bank overdrafts or customer advance deposits).'}
+                      </p>
+                      <p className="leading-relaxed text-emerald-900">
+                        {language === 'ar'
+                          ? '• قيود اليومية العامة لهذه الحسابات مثبتة في الجانب الدائن بالقيمة الموجبة طبقاً لقواعد القيد المزدوج، وهي مطابقة وموزونة دفترياً بنسبة 100%.'
+                          : '• Journal entries correctly record positive credit amounts per double-entry accounting rules, fully balanced.'}
+                      </p>
+                    </div>
+                  );
+                }
+
+                if (hasUnposted) {
+                  return (
+                    <div className="my-4 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 text-xs font-bold space-y-2">
+                      <div className="flex items-center gap-2 font-black text-amber-800">
+                        <Wrench size={16} />
+                        <span>{language === 'ar' ? 'التشخيص والحل المقترح: مستندات غير مرحلة لدفتر اليومية:' : 'Diagnosis: Unposted Transactions:'}</span>
+                      </div>
+                      <p className="leading-relaxed text-amber-900">
+                        {language === 'ar'
+                          ? `• تم حصر ${selectedItemIssues.unposted_count || issues.filter(i => i.error_type?.includes('غير مرحل')).length} مستند مسجل بدون قيد محاسبي في اليومية العامة.`
+                          : `• Found ${selectedItemIssues.unposted_count || issues.length} unposted documents.`}
+                      </p>
+                      <p className="leading-relaxed text-amber-900">
+                        {language === 'ar'
+                          ? '• الإجراء المطلوب: الضغط أدناه لتوليد وترحيل القيود المحاسبية لهذه الحركات فوراً لمطابقة دفاتر الأستاذ.'
+                          : '• Action: Click below to post journal entries immediately.'}
+                      </p>
+                    </div>
+                  );
+                }
+
+                if (hasMissingAccounts) {
+                  return (
+                    <div className="my-4 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-950 text-xs font-bold space-y-2">
+                      <div className="flex items-center gap-2 font-black text-rose-800">
+                        <AlertTriangle size={16} />
+                        <span>{language === 'ar' ? 'التشخيص والحل المقترح: أطراف أو أصناف غير مرتبطة بحسابات مالية:' : 'Diagnosis: Missing Account Links:'}</span>
+                      </div>
+                      <p className="leading-relaxed text-rose-900">
+                        {language === 'ar'
+                          ? `• يوجد ${selectedItemIssues.missing_accounts_count} طرف أو صنف بدون حساب مالي في الدليل، مما يعطل الترحيل التلقائي.`
+                          : `• Found ${selectedItemIssues.missing_accounts_count} items without mapped chart accounts.`}
+                      </p>
+                      <p className="leading-relaxed text-rose-900">
+                        {language === 'ar'
+                          ? '• الإجراء المطلوب: الضغط أدناه للربط التلقائي بالحسابات الافتراضية المعتمدة في شجرة الحسابات.'
+                          : '• Action: Click below to auto-bind default chart accounts.'}
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="my-4 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 text-xs font-bold space-y-2">
+                    <div className="flex items-center gap-2 font-black text-amber-800">
+                      <AlertCircle size={16} />
+                      <span>{language === 'ar' ? 'التشخيص والحل المقترح: فروق بين قيم المستندات وأطراف القيود:' : 'Diagnosis: Document-to-Journal Variances:'}</span>
+                    </div>
+                    <p className="leading-relaxed text-amber-900">
+                      {language === 'ar'
+                        ? '• توجد مستندات تختلف قيمتها عن إجمالي أطراف قيدها المرحل باليومية (نتيجة تعديل المستند بعد الترحيل أو وجود أطراف ثانوية كالضرائب والخصومات).'
+                        : '• Variances found between document amounts and journal entry lines.'}
+                    </p>
+                    <p className="leading-relaxed text-amber-900">
+                      {language === 'ar'
+                        ? '• الإجراء المطلوب: مراجعة المستندات بالجدول أدناه وإعادة مزامنة القيود لتطابق المستندات.'
+                        : '• Action: Review items below and resync journal entries.'}
+                    </p>
+                  </div>
+                );
+              })()}
 
               {/* Table of issues */}
               <div className="flex-1 overflow-y-auto">
@@ -1239,16 +1324,46 @@ export const DataCountsValues: React.FC = () => {
               </div>
 
               <div className="pt-4 border-t border-stone-100 flex items-center justify-between gap-3 mt-4">
-                <button
-                  onClick={async () => {
-                    await handleAutoFix();
-                    setSelectedItemIssues(null);
-                  }}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2"
-                >
-                  <Wrench size={16} />
-                  <span>{language === 'ar' ? 'تطبيق الحل والإصلاح فوراً' : 'Apply Fix Immediately'}</span>
-                </button>
+                {(() => {
+                  const issues = selectedItemIssues.issues || [];
+                  const key = selectedItemIssues.key || '';
+                  const isOpening = key.includes('opening') || selectedItemIssues.name.includes('افتتاح');
+                  const hasNegative = issues.some(i => i.amount < 0 || i.error_type?.includes('دائن') || i.details?.includes('دائن'));
+                  const hasUnposted = (selectedItemIssues.unposted_count || 0) > 0 || issues.some(i => i.error_type?.includes('غير مرحل'));
+                  const hasMissingAccounts = (selectedItemIssues.missing_accounts_count || 0) > 0;
+
+                  if (isOpening && hasNegative && !hasUnposted && !hasMissingAccounts) {
+                    return (
+                      <button
+                        onClick={() => setSelectedItemIssues(null)}
+                        className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2"
+                      >
+                        <CheckCircle2 size={16} />
+                        <span>{language === 'ar' ? 'تأكيد سلامة المطابقة وإغلاق التقرير' : 'Confirm Balanced & Close'}</span>
+                      </button>
+                    );
+                  }
+
+                  let btnLabel = language === 'ar' ? 'تطبيق الحل والإصلاح فوراً' : 'Apply Fix Immediately';
+                  if (hasUnposted) {
+                    btnLabel = language === 'ar' ? 'ترحيل الحركات غير المرحلة فوراً' : 'Post Unposted Transactions';
+                  } else if (hasMissingAccounts) {
+                    btnLabel = language === 'ar' ? 'ربط الحسابات الناقصة تلقائياً' : 'Auto-Bind Missing Accounts';
+                  }
+
+                  return (
+                    <button
+                      onClick={async () => {
+                        await handleAutoFix();
+                        setSelectedItemIssues(null);
+                      }}
+                      className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2"
+                    >
+                      <Wrench size={16} />
+                      <span>{btnLabel}</span>
+                    </button>
+                  );
+                })()}
 
                 <button
                   onClick={() => setSelectedItemIssues(null)}
