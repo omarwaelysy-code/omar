@@ -177,6 +177,9 @@ const getTabIcon = (id: string) => {
     case 'activity_log_cancellations':
       return <Trash2 {...iconProps} />;
     case 'activity_log_modifications':
+    case 'activity_log_modifications_posting':
+    case 'activity_log_modifications_operational':
+    case 'activity_log_modifications_master':
       return <Edit3 {...iconProps} />;
     case 'activity_log_views':
       return <Eye {...iconProps} />;
@@ -1025,6 +1028,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, currentPag
       'activity_log': 'activity_logs',
       'activity_log_cancellations': 'activity_logs',
       'activity_log_modifications': 'activity_logs',
+      'activity_log_modifications_posting': 'activity_logs',
+      'activity_log_modifications_operational': 'activity_logs',
+      'activity_log_modifications_master': 'activity_logs',
       'activity_log_views': 'activity_logs',
       'activity_log_prints': 'activity_logs'
     };

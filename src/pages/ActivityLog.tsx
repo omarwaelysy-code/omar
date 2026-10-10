@@ -7,7 +7,7 @@ import {
   ShieldCheck, ExternalLink, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Calendar, 
   Download, FileSpreadsheet, Printer, CheckCircle2, XCircle, 
   Smartphone, Monitor, Tablet, Globe, RotateCcw,
-  Trash2, Edit3, Eye, FileText, BookOpen, X, AlertTriangle, ChevronDown, Check
+  Trash2, Edit3, Eye, FileText, BookOpen, X, AlertTriangle, ChevronDown, Check, TrendingUp
 } from 'lucide-react';
 import { dbService } from '../services/dbService';
 import { formatDateTime } from '../utils/formatUtils';
@@ -15,9 +15,11 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { EXPECTED_SCHEMA } from '../lib/schema-registry';
 
 export type ActivityLogMode = 'all' | 'cancellations' | 'modifications' | 'views' | 'prints';
+export type ActivityLogSection = 'all' | 'posting' | 'operational' | 'master';
 
 interface ActivityLogPageProps {
   initialMode?: ActivityLogMode;
+  initialSection?: ActivityLogSection;
 }
 
 // Helper to extract Document Number and Journal Entry Number from any log item
@@ -239,12 +241,157 @@ export function getDisplayScreenName(moduleName: string, meta: any, language: st
   return moduleName || (language === 'ar' ? 'شاشة النظام' : 'System Screen');
 }
 
-export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 'all' }) => {
+// Complete Module & Entity Registry mapped directly to the 3 audit sections
+export const MODULE_REGISTRY: Record<string, { nameAr: string; nameEn: string; category: 'posting' | 'operational' | 'master' }> = {
+  // 1. POSTING TRANSACTIONS (الحركات المالية المقيدة)
+  'invoices': { nameAr: 'فواتير المبيعات', nameEn: 'Sales Invoices', category: 'posting' },
+  'sales_invoices': { nameAr: 'فواتير المبيعات', nameEn: 'Sales Invoices', category: 'posting' },
+  'invoice_items': { nameAr: 'بنود فواتير المبيعات', nameEn: 'Sales Invoice Items', category: 'posting' },
+  'purchase_invoices': { nameAr: 'فواتير المشتريات', nameEn: 'Purchase Invoices', category: 'posting' },
+  'bills': { nameAr: 'فواتير المشتريات', nameEn: 'Bills', category: 'posting' },
+  'purchase_invoice_items': { nameAr: 'بنود فواتير المشتريات', nameEn: 'Purchase Invoice Items', category: 'posting' },
+  'returns': { nameAr: 'مردودات المبيعات', nameEn: 'Sales Returns', category: 'posting' },
+  'sales_returns': { nameAr: 'مردودات المبيعات', nameEn: 'Sales Returns', category: 'posting' },
+  'return_items': { nameAr: 'بنود مردودات المبيعات', nameEn: 'Sales Return Items', category: 'posting' },
+  'purchase_returns': { nameAr: 'مردودات المشتريات', nameEn: 'Purchase Returns', category: 'posting' },
+  'purchase_return_items': { nameAr: 'بنود مردودات المشتريات', nameEn: 'Purchase Return Items', category: 'posting' },
+  'receipt_vouchers': { nameAr: 'سندات القبض', nameEn: 'Receipt Vouchers', category: 'posting' },
+  'receipts': { nameAr: 'سندات القبض', nameEn: 'Receipts', category: 'posting' },
+  'payment_vouchers': { nameAr: 'سندات الصرف', nameEn: 'Payment Vouchers', category: 'posting' },
+  'payments': { nameAr: 'سندات الصرف والمدفوعات', nameEn: 'Payments', category: 'posting' },
+  'journal_entries': { nameAr: 'قيود اليومية العامة', nameEn: 'Journal Entries', category: 'posting' },
+  'journal_entry_lines': { nameAr: 'أسطر قيود اليومية', nameEn: 'Journal Entry Lines', category: 'posting' },
+  'cash_transfers': { nameAr: 'تحويلات النقدية والخزائن', nameEn: 'Cash Transfers', category: 'posting' },
+  'issued_cheques': { nameAr: 'الشيكات الصادرة', nameEn: 'Issued Cheques', category: 'posting' },
+  'received_cheques': { nameAr: 'الشيكات الواردة', nameEn: 'Received Cheques', category: 'posting' },
+  'cheque_payments': { nameAr: 'صرف الشيكات من البنك', nameEn: 'Cheque Bank Payments', category: 'posting' },
+  'cheque_cancellations': { nameAr: 'إلغاء واسترجاع الشيكات', nameEn: 'Cheque Cancellations', category: 'posting' },
+  'customer_discounts': { nameAr: 'خصومات العملاء (المسموح به)', nameEn: 'Customer Discounts', category: 'posting' },
+  'supplier_discounts': { nameAr: 'خصومات الموردين (المكتسب)', nameEn: 'Supplier Discounts', category: 'posting' },
+  'customer_settlements': { nameAr: 'تسويات العملاء', nameEn: 'Customer Settlements', category: 'posting' },
+  'supplier_settlements': { nameAr: 'تسويات الموردين', nameEn: 'Supplier Settlements', category: 'posting' },
+  'stock_adjustments': { nameAr: 'تسويات المخزون (أذون التسوية)', nameEn: 'Stock Adjustments', category: 'posting' },
+  'stock_adjustment_items': { nameAr: 'بنود تسويات المخزون', nameEn: 'Stock Adjustment Items', category: 'posting' },
+  'opening_stock_balances': { nameAr: 'أرصدة المخزون الافتتاحية', nameEn: 'Opening Stock Balances', category: 'posting' },
+  'opening_stock_items': { nameAr: 'بنود المخزون الافتتاحية', nameEn: 'Opening Stock Items', category: 'posting' },
+  'asset_depreciations': { nameAr: 'إهلاك الأصول الثابتة', nameEn: 'Asset Depreciation', category: 'posting' },
+  'asset_depreciation_runs': { nameAr: 'جلسات إهلاك الأصول', nameEn: 'Depreciation Runs', category: 'posting' },
+  'asset_depreciation_items': { nameAr: 'بنود إهلاك الأصول', nameEn: 'Depreciation Items', category: 'posting' },
+  'asset_disposals': { nameAr: 'استبعاد وتخريد الأصول', nameEn: 'Asset Disposals', category: 'posting' },
+  'asset_revaluations': { nameAr: 'إعادة تقييم الأصول', nameEn: 'Asset Revaluations', category: 'posting' },
+
+  // 2. OPERATIONAL DATA (العمليات غير المقيدة)
+  'sales_orders': { nameAr: 'أوامر البيع', nameEn: 'Sales Orders', category: 'operational' },
+  'sales_order_items': { nameAr: 'بنود أوامر البيع', nameEn: 'Sales Order Items', category: 'operational' },
+  'purchase_orders': { nameAr: 'أوامر الشراء', nameEn: 'Purchase Orders', category: 'operational' },
+  'purchase_order_items': { nameAr: 'بنود أوامر الشراء', nameEn: 'Purchase Order Items', category: 'operational' },
+  'quotations': { nameAr: 'عروض الأسعار', nameEn: 'Quotations', category: 'operational' },
+  'quotation_items': { nameAr: 'بنود عروض الأسعار', nameEn: 'Quotation Items', category: 'operational' },
+  'warehouse_transfers': { nameAr: 'التحويلات المخزنية', nameEn: 'Warehouse Transfers', category: 'operational' },
+  'warehouse_transfer_items': { nameAr: 'بنود التحويلات المخزنية', nameEn: 'Warehouse Transfer Items', category: 'operational' },
+  'goods_receipts': { nameAr: 'أذون استلام البضائع', nameEn: 'Goods Receipts', category: 'operational' },
+  'goods_receipt_items': { nameAr: 'بنود استلام البضائع', nameEn: 'Goods Receipt Items', category: 'operational' },
+  'delivery_notes': { nameAr: 'أذون تسليم البضائع', nameEn: 'Delivery Notes', category: 'operational' },
+  'delivery_note_items': { nameAr: 'بنود أذون التسليم', nameEn: 'Delivery Note Items', category: 'operational' },
+  'stock_counts': { nameAr: 'الجرد المخزني الفعلي', nameEn: 'Stock Counts', category: 'operational' },
+  'operations': { nameAr: 'العمليات التشغيلية والمرنة', nameEn: 'Operations', category: 'operational' },
+  'operation_records': { nameAr: 'سجلات العمليات', nameEn: 'Operation Records', category: 'operational' },
+  'operation_items': { nameAr: 'بنود العمليات', nameEn: 'Operation Items', category: 'operational' },
+  'asset_maintenance': { nameAr: 'صيانة الأصول', nameEn: 'Asset Maintenance', category: 'operational' },
+  'asset_transfers': { nameAr: 'نقل وتحويل الأصول', nameEn: 'Asset Transfers', category: 'operational' },
+
+  // 3. MASTER DATA (البيانات الأساسية)
+  'customers': { nameAr: 'العملاء', nameEn: 'Customers', category: 'master' },
+  'suppliers': { nameAr: 'الموردين', nameEn: 'Suppliers', category: 'master' },
+  'products': { nameAr: 'الأصناف والمنتجات', nameEn: 'Products', category: 'master' },
+  'item_groups': { nameAr: 'مجموعات الأصناف', nameEn: 'Item Groups', category: 'master' },
+  'units': { nameAr: 'وحدات القياس', nameEn: 'Units of Measure', category: 'master' },
+  'warehouses': { nameAr: 'المستودعات والمخازن', nameEn: 'Warehouses', category: 'master' },
+  'accounts': { nameAr: 'دليل وشجرة الحسابات', nameEn: 'Accounts', category: 'master' },
+  'account_types': { nameAr: 'أنواع الحسابات', nameEn: 'Account Types', category: 'master' },
+  'payment_methods': { nameAr: 'طرق الدفع والخزائن', nameEn: 'Payment Methods', category: 'master' },
+  'banks': { nameAr: 'البنوك والحسابات البنكية', nameEn: 'Banks', category: 'master' },
+  'employees': { nameAr: 'الموظفين', nameEn: 'Employees', category: 'master' },
+  'fixed_assets': { nameAr: 'الأصول الثابتة', nameEn: 'Fixed Assets', category: 'master' },
+  'assets': { nameAr: 'الأصول الثابتة', nameEn: 'Assets', category: 'master' },
+  'asset_categories': { nameAr: 'فئات وتصنيفات الأصول', nameEn: 'Asset Categories', category: 'master' },
+  'asset_components': { nameAr: 'مكونات الأصول', nameEn: 'Asset Components', category: 'master' },
+  'cost_centers': { nameAr: 'مراكز التكلفة', nameEn: 'Cost Centers', category: 'master' },
+  'departments': { nameAr: 'الأقسام والإدارات', nameEn: 'Departments', category: 'master' },
+  'operation_categories': { nameAr: 'تصنيفات العمليات', nameEn: 'Operation Categories', category: 'master' },
+  'operation_fields': { nameAr: 'حقول العمليات المخصصة', nameEn: 'Operation Fields', category: 'master' },
+  'users': { nameAr: 'المستخدمين', nameEn: 'Users', category: 'master' },
+  'roles': { nameAr: 'الأدوار والصلاحيات', nameEn: 'Roles & Permissions', category: 'master' },
+  'pos_connected_branches': { nameAr: 'فروع نقاط البيع (POS)', nameEn: 'POS Connected Branches', category: 'master' },
+  'pos_branches': { nameAr: 'فروع نقاط البيع', nameEn: 'POS Branches', category: 'master' },
+  'templates': { nameAr: 'قوالب المستندات', nameEn: 'Templates', category: 'master' },
+  'document_sequences': { nameAr: 'تسلسلات المستندات', nameEn: 'Document Sequences', category: 'master' },
+  'currencies': { nameAr: 'العملات', nameEn: 'Currencies', category: 'master' },
+  'currency_rates': { nameAr: 'أسعار صرف العملات', nameEn: 'Currency Rates', category: 'master' },
+  'exchange_rate_history': { nameAr: 'تاريخ أسعار الصرف', nameEn: 'Exchange Rate History', category: 'master' },
+  'companies': { nameAr: 'بيانات وإعدادات الشركة', nameEn: 'Company Settings', category: 'master' },
+  'company_settings': { nameAr: 'إعدادات الشركة', nameEn: 'Company Settings', category: 'master' },
+  'settings': { nameAr: 'إعدادات النظام العامة', nameEn: 'System Settings', category: 'master' },
+  'discount_settings': { nameAr: 'إعدادات الخصومات', nameEn: 'Discount Settings', category: 'master' },
+  'eta_settings': { nameAr: 'إعدادات الفاتورة الإلكترونية (ETA)', nameEn: 'ETA Settings', category: 'master' },
+  'default_accounts_settings': { nameAr: 'إعدادات الحسابات الافتراضية', nameEn: 'Default Accounts', category: 'master' },
+  'period_closing': { nameAr: 'إغلاق الفترات المحاسبية', nameEn: 'Period Closing', category: 'master' }
+};
+
+export function getModuleCategory(moduleKey: string): 'posting' | 'operational' | 'master' | 'other' {
+  const norm = String(moduleKey || '').toLowerCase().replace(/[\s-]/g, '_');
+  if (MODULE_REGISTRY[norm]) return MODULE_REGISTRY[norm].category;
+
+  if (
+    norm.includes('invoice') || norm.includes('bill') || norm.includes('voucher') || 
+    norm.includes('receipt') || norm.includes('payment') || norm.includes('cheque') || 
+    norm.includes('check') || norm.includes('journal') || norm.includes('entry') || 
+    norm.includes('return') || norm.includes('depreciat') || norm.includes('disposal') || 
+    norm.includes('revaluat') || norm.includes('discount') || norm.includes('settlement') ||
+    norm.includes('adjustment') || norm.includes('opening_stock')
+  ) {
+    return 'posting';
+  }
+
+  if (
+    norm.includes('order') || norm.includes('quotation') || norm.includes('delivery') || 
+    norm.includes('transfer') || norm.includes('goods_receipt') || norm.includes('operation') || 
+    norm.includes('maintenance') || norm.includes('stock_count')
+  ) {
+    return 'operational';
+  }
+
+  if (
+    norm.includes('customer') || norm.includes('supplier') || norm.includes('product') || 
+    norm.includes('item') || norm.includes('account') || norm.includes('user') || 
+    norm.includes('role') || norm.includes('asset') || norm.includes('branch') || 
+    norm.includes('bank') || norm.includes('warehouse') || norm.includes('store') || 
+    norm.includes('category') || norm.includes('department') || norm.includes('setting') || 
+    norm.includes('company') || norm.includes('currency') || norm.includes('template')
+  ) {
+    return 'master';
+  }
+
+  return 'other';
+}
+
+export function getModuleDisplayName(moduleKey: string, language: string = 'ar'): string {
+  const norm = String(moduleKey || '').toLowerCase().replace(/[\s-]/g, '_');
+  if (MODULE_REGISTRY[norm]) {
+    const item = MODULE_REGISTRY[norm];
+    return language === 'ar' ? `${item.nameAr} (${norm.toUpperCase()})` : `${item.nameEn} (${norm.toUpperCase()})`;
+  }
+  if (/[\u0600-\u06FF]/.test(moduleKey)) return moduleKey;
+  return norm.replace(/_/g, ' ').toUpperCase();
+}
+
+export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 'all', initialSection = 'all' }) => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { closeTab } = useNavigation();
   
   const [activeMode, setActiveMode] = useState<ActivityLogMode>(initialMode);
+  const [activeSection, setActiveSection] = useState<ActivityLogSection>(initialSection || 'all');
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasLoadedData, setHasLoadedData] = useState(false);
@@ -282,6 +429,13 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
     setActiveMode(initialMode);
     setPage(1);
   }, [initialMode]);
+
+  useEffect(() => {
+    if (initialSection) {
+      setActiveSection(initialSection);
+      setPage(1);
+    }
+  }, [initialSection]);
 
   // Click outside listener for user dropdown
   useEffect(() => {
@@ -510,25 +664,73 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
     return language === 'ar' ? `${selectedUsers.length} مستخدمين محددين` : `${selectedUsers.length} users selected`;
   };
 
-  // Compile Modules list dynamically
-  const dynamicModulesList = useMemo(() => {
-    const schemaKeys = Object.keys(EXPECTED_SCHEMA).map(k => k.replace(/_/g, ' ').toUpperCase());
-    const logModules = logs.map(l => String(l.module).toUpperCase()).filter(Boolean);
-    const combined = Array.from(new Set([...schemaKeys, ...logModules]));
-    return combined.sort();
-  }, [logs]);
+  // Compile section counts dynamically
+  const sectionCounts = useMemo(() => {
+    let posting = 0;
+    let operational = 0;
+    let master = 0;
+
+    for (const log of logs) {
+      if (!matchesActionCategory(log.action, log.details, activeMode)) continue;
+      const cat = getModuleCategory(log.module);
+      if (cat === 'posting') posting++;
+      else if (cat === 'operational') operational++;
+      else if (cat === 'master') master++;
+    }
+
+    return {
+      all: posting + operational + master,
+      posting,
+      operational,
+      master
+    };
+  }, [logs, activeMode]);
+
+  // Compile Modules list with categories dynamically
+  const modulesListWithMeta = useMemo(() => {
+    const schemaKeys = Object.keys(EXPECTED_SCHEMA);
+    const logModules = logs.map(l => String(l.module || '').toLowerCase().replace(/[\s-]/g, '_')).filter(Boolean);
+    const allKeys = Array.from(new Set([...schemaKeys, ...Object.keys(MODULE_REGISTRY), ...logModules]));
+
+    const list = allKeys.map(k => {
+      const cat = getModuleCategory(k);
+      const label = getModuleDisplayName(k, language);
+      return {
+        code: k,
+        label,
+        category: cat
+      };
+    });
+
+    list.sort((a, b) => a.label.localeCompare(b.label, language === 'ar' ? 'ar' : 'en'));
+    return list;
+  }, [logs, language]);
+
+  // Filter modules options based on active section
+  const filteredModulesList = useMemo(() => {
+    if (activeSection === 'all') return modulesListWithMeta;
+    return modulesListWithMeta.filter(m => m.category === activeSection);
+  }, [modulesListWithMeta, activeSection]);
 
   // Extract unique filter dropdown values
   const uniqueBranches = useMemo(() => Array.from(new Set(logs.map(l => (l as any).branch).filter(Boolean))).sort(), [logs]);
   const uniqueBrowsers = useMemo(() => Array.from(new Set(logs.map(l => (l as any).browser).filter(Boolean))).sort(), [logs]);
   const uniqueDevices = useMemo(() => Array.from(new Set(logs.map(l => (l as any).device).filter(Boolean))).sort(), [logs]);
 
-  // Filter logs by activeMode first, then by the user filters
+  // Filter logs by activeMode and activeSection first, then by the user filters
   const filteredLogs = useMemo(() => {
     return logs.filter(log => {
       // 0. Screen Mode Category Match
       if (!matchesActionCategory(log.action, log.details, activeMode)) {
         return false;
+      }
+
+      // 0.1 Section Category Match (الحركات المقيدة / العمليات غير المقيدة / البيانات الأساسية)
+      if (activeSection !== 'all') {
+        const cat = getModuleCategory(log.module);
+        if (cat !== activeSection) {
+          return false;
+        }
       }
 
       // Filter out internal background noise
@@ -580,7 +782,9 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
 
       const matchesCompany = companyFilter === 'all' || log.company_id === companyFilter;
       const matchesBranch = branchFilter === 'all' || (log as any).branch === branchFilter;
-      const matchesModule = moduleFilter === 'all' || String(log.module || '').toUpperCase() === moduleFilter.toUpperCase();
+      const logModNorm = String(log.module || '').toLowerCase().replace(/[\s-]/g, '_');
+      const filterModNorm = String(moduleFilter || '').toLowerCase().replace(/[\s-]/g, '_');
+      const matchesModule = moduleFilter === 'all' || logModNorm === filterModNorm || String(log.module || '').toUpperCase() === String(moduleFilter).toUpperCase();
       const matchesAction = actionFilter === 'all' || String(log.action || '').toUpperCase() === actionFilter.toUpperCase();
       const matchesStatus = 
         statusFilter === 'all' || 
@@ -598,7 +802,7 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
       );
     });
   }, [
-    logs, activeMode, searchTerm, documentNumberFilter, entryNumberFilter,
+    logs, activeMode, activeSection, searchTerm, documentNumberFilter, entryNumberFilter,
     startDate, endDate, selectedUsers, companyFilter, branchFilter,
     moduleFilter, actionFilter, statusFilter, deviceFilter, browserFilter, ipFilter
   ]);
@@ -1004,6 +1208,188 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
           )}
         </button>
       </div>
+
+      {/* 3 Sections Division for سجل الإنشاء والتعديلات (identical names and styling to شاشة التدقيق) */}
+      {(activeMode === 'modifications' || activeMode === 'all') && (
+        <div className="space-y-3 print:hidden">
+          {/* Section Tabs Bar */}
+          <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-zinc-100 shadow-xs flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              {/* Tab 1: All */}
+              <button
+                type="button"
+                onClick={() => { setActiveSection('all'); setModuleFilter('all'); setPage(1); }}
+                className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+                  activeSection === 'all'
+                    ? 'bg-zinc-900 text-white shadow-sm'
+                    : 'bg-zinc-50 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900'
+                }`}
+              >
+                <span>{language === 'ar' ? 'عرض الكل' : 'All Sections'}</span>
+                {hasLoadedData && (
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+                    activeSection === 'all' ? 'bg-white/20 text-white' : 'bg-zinc-200 text-zinc-700'
+                  }`}>
+                    {sectionCounts.all}
+                  </span>
+                )}
+              </button>
+
+              {/* Tab 2: Posting Movements (الحركات المالية المقيدة) */}
+              <button
+                type="button"
+                onClick={() => { setActiveSection('posting'); setModuleFilter('all'); setPage(1); }}
+                className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+                  activeSection === 'posting'
+                    ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-600/30'
+                    : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-100'
+                }`}
+              >
+                <TrendingUp size={14} />
+                <span>{language === 'ar' ? 'الحركات المالية المقيدة' : 'Posting Transactions'}</span>
+                {hasLoadedData && (
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                    activeSection === 'posting' ? 'bg-emerald-800 text-white' : 'bg-emerald-200 text-emerald-900'
+                  }`}>
+                    {sectionCounts.posting}
+                  </span>
+                )}
+              </button>
+
+              {/* Tab 3: Non-Posting Operations (العمليات غير المقيدة) */}
+              <button
+                type="button"
+                onClick={() => { setActiveSection('operational'); setModuleFilter('all'); setPage(1); }}
+                className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+                  activeSection === 'operational'
+                    ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-600/30'
+                    : 'bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-100'
+                }`}
+              >
+                <Layers size={14} />
+                <span>{language === 'ar' ? 'العمليات غير المقيدة' : 'Non-Posting Operations'}</span>
+                {hasLoadedData && (
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                    activeSection === 'operational' ? 'bg-blue-800 text-white' : 'bg-blue-200 text-blue-900'
+                  }`}>
+                    {sectionCounts.operational}
+                  </span>
+                )}
+              </button>
+
+              {/* Tab 4: Master Data (البيانات الأساسية) */}
+              <button
+                type="button"
+                onClick={() => { setActiveSection('master'); setModuleFilter('all'); setPage(1); }}
+                className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+                  activeSection === 'master'
+                    ? 'bg-purple-600 text-white shadow-sm ring-2 ring-purple-600/30'
+                    : 'bg-purple-50 text-purple-800 hover:bg-purple-100 border border-purple-100'
+                }`}
+              >
+                <BookOpen size={14} />
+                <span>{language === 'ar' ? 'البيانات الأساسية' : 'Master Data'}</span>
+                {hasLoadedData && (
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                    activeSection === 'master' ? 'bg-purple-800 text-white' : 'bg-purple-200 text-purple-900'
+                  }`}>
+                    {sectionCounts.master}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Explanatory badge */}
+            <div className="text-[11px] font-bold text-zinc-400 flex items-center gap-1.5 px-2">
+              <Filter size={12} className="text-zinc-400" />
+              <span>
+                {activeSection === 'all' 
+                  ? (language === 'ar' ? 'عرض شامل لجميع الحركات والعمليات والبيانات' : 'Showing all sections')
+                  : activeSection === 'posting'
+                  ? (language === 'ar' ? 'فواتير، سندات، قيود، شيكات، تسويات مخزون' : 'Invoices, vouchers, entries, cheques')
+                  : activeSection === 'operational'
+                  ? (language === 'ar' ? 'أوامر بيع وشراء، عروض أسعار، تحويلات' : 'Orders, quotations, transfers')
+                  : (language === 'ar' ? 'العملاء، الموردين، الأصناف، الحسابات، الإعدادات' : 'Customers, suppliers, products, accounts')}
+              </span>
+            </div>
+          </div>
+
+          {/* 3 KPI Cards for Quick Filtering */}
+          {hasLoadedData && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Card 1: Posting */}
+              <div 
+                onClick={() => { setActiveSection('posting'); setModuleFilter('all'); setPage(1); }}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-2xs ${
+                  activeSection === 'posting' 
+                    ? 'bg-emerald-50/80 border-emerald-300 ring-2 ring-emerald-500/20' 
+                    : 'bg-white border-zinc-200 hover:border-emerald-300'
+                }`}
+              >
+                <div>
+                  <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1">
+                    {language === 'ar' ? 'الحركات المالية المقيدة' : 'Posting Transactions'}
+                  </p>
+                  <h3 className="text-xl font-black text-emerald-950">{sectionCounts.posting}</h3>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">
+                    {language === 'ar' ? 'فواتير وسندات وقيود وشيكات' : 'Invoices, vouchers, entries'}
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                  <TrendingUp size={20} />
+                </div>
+              </div>
+
+              {/* Card 2: Operational */}
+              <div 
+                onClick={() => { setActiveSection('operational'); setModuleFilter('all'); setPage(1); }}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-2xs ${
+                  activeSection === 'operational' 
+                    ? 'bg-blue-50/80 border-blue-300 ring-2 ring-blue-500/20' 
+                    : 'bg-white border-zinc-200 hover:border-blue-300'
+                }`}
+              >
+                <div>
+                  <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1">
+                    {language === 'ar' ? 'العمليات غير المقيدة' : 'Non-Posting Operations'}
+                  </p>
+                  <h3 className="text-xl font-black text-blue-950">{sectionCounts.operational}</h3>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">
+                    {language === 'ar' ? 'أوامر بيع/شراء وعروض وتحويلات' : 'Orders, quotations, transfers'}
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                  <Layers size={20} />
+                </div>
+              </div>
+
+              {/* Card 3: Master Data */}
+              <div 
+                onClick={() => { setActiveSection('master'); setModuleFilter('all'); setPage(1); }}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between shadow-2xs ${
+                  activeSection === 'master' 
+                    ? 'bg-purple-50/80 border-purple-300 ring-2 ring-purple-500/20' 
+                    : 'bg-white border-zinc-200 hover:border-purple-300'
+                }`}
+              >
+                <div>
+                  <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1">
+                    {language === 'ar' ? 'البيانات الأساسية' : 'Master Data'}
+                  </p>
+                  <h3 className="text-xl font-black text-purple-950">{sectionCounts.master}</h3>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">
+                    {language === 'ar' ? 'عملاء، موردين، أصناف، حسابات' : 'Customers, suppliers, items, accounts'}
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                  <BookOpen size={20} />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="bg-white p-5 rounded-2xl border border-zinc-100 shadow-xs space-y-4 print:hidden">
         
         {/* Row 1: Search + Date Range */}
@@ -1184,14 +1570,59 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
 
           {/* Module / Department Filter */}
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-wider">{language === 'ar' ? 'القسم / الوجهة' : 'Module'}</label>
+            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-wider flex items-center justify-between">
+              <span>{language === 'ar' ? 'القسم / الجدول' : 'Module / Table'}</span>
+              {activeSection !== 'all' && (
+                <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
+                  activeSection === 'posting' ? 'bg-emerald-100 text-emerald-800' :
+                  activeSection === 'operational' ? 'bg-blue-100 text-blue-800' :
+                  'bg-purple-100 text-purple-800'
+                }`}>
+                  {activeSection === 'posting' ? (language === 'ar' ? 'حركات مقيدة' : 'Posting') :
+                   activeSection === 'operational' ? (language === 'ar' ? 'عمليات' : 'Operational') :
+                   (language === 'ar' ? 'أساسية' : 'Master')}
+                </span>
+              )}
+            </label>
             <select 
               value={moduleFilter}
               onChange={(e) => { setModuleFilter(e.target.value); setPage(1); }}
-              className="bg-zinc-50 border border-zinc-200 rounded-xl px-2 py-1.5 text-xs font-bold outline-none focus:border-emerald-500 cursor-pointer"
+              className="bg-zinc-50 border border-zinc-200 rounded-xl px-2 py-1.5 text-xs font-bold outline-none focus:border-emerald-500 cursor-pointer max-w-full"
             >
-              <option value="all">{language === 'ar' ? 'الكل' : 'All Modules'}</option>
-              {dynamicModulesList.map(m => <option key={m} value={m}>{m}</option>)}
+              <option value="all">{language === 'ar' ? 'الكل (جميع الأقسام)' : 'All Modules'}</option>
+              
+              {activeSection !== 'all' ? (
+                filteredModulesList.map(m => (
+                  <option key={m.code} value={m.code}>
+                    {m.label}
+                  </option>
+                ))
+              ) : (
+                <>
+                  <optgroup label={language === 'ar' ? '--- 1. الحركات المالية المقيدة ---' : '--- 1. Posting Transactions ---'}>
+                    {modulesListWithMeta.filter(m => m.category === 'posting').map(m => (
+                      <option key={m.code} value={m.code}>{m.label}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label={language === 'ar' ? '--- 2. العمليات غير المقيدة ---' : '--- 2. Non-Posting Operations ---'}>
+                    {modulesListWithMeta.filter(m => m.category === 'operational').map(m => (
+                      <option key={m.code} value={m.code}>{m.label}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label={language === 'ar' ? '--- 3. البيانات الأساسية ---' : '--- 3. Master Data ---'}>
+                    {modulesListWithMeta.filter(m => m.category === 'master').map(m => (
+                      <option key={m.code} value={m.code}>{m.label}</option>
+                    ))}
+                  </optgroup>
+                  {modulesListWithMeta.some(m => m.category === 'other') && (
+                    <optgroup label={language === 'ar' ? '--- أقسام أخرى / النظام ---' : '--- Other Modules ---'}>
+                      {modulesListWithMeta.filter(m => m.category === 'other').map(m => (
+                        <option key={m.code} value={m.code}>{m.label}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                </>
+              )}
             </select>
           </div>
 
@@ -1530,11 +1961,26 @@ export const ActivityLogPage: React.FC<ActivityLogPageProps> = ({ initialMode = 
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <div className="p-1 bg-zinc-50 rounded-lg border border-zinc-100 shrink-0">
-                            <Layers size={11} className="text-zinc-500" />
+                        <div className="flex items-center gap-2">
+                          <div className={`p-1.5 rounded-xl border shrink-0 ${
+                            getModuleCategory(log.module) === 'posting' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                            getModuleCategory(log.module) === 'operational' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                            getModuleCategory(log.module) === 'master' ? 'bg-purple-50 text-purple-600 border-purple-100' :
+                            'bg-zinc-50 text-zinc-500 border-zinc-100'
+                          }`}>
+                            {getModuleCategory(log.module) === 'posting' ? <TrendingUp size={13} /> :
+                             getModuleCategory(log.module) === 'operational' ? <Layers size={13} /> :
+                             getModuleCategory(log.module) === 'master' ? <BookOpen size={13} /> :
+                             <Layers size={13} />}
                           </div>
-                          <span className="text-xs font-bold text-zinc-700 tracking-tight">{log.module || 'SYSTEM'}</span>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-xs font-bold text-zinc-900 tracking-tight truncate">
+                              {MODULE_REGISTRY[String(log.module || '').toLowerCase().replace(/[\s-]/g, '_')]?.[language === 'ar' ? 'nameAr' : 'nameEn'] || log.module || 'SYSTEM'}
+                            </span>
+                            <span className="text-[10px] text-zinc-400 font-mono uppercase truncate">
+                              {log.module}
+                            </span>
+                          </div>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -1729,8 +2175,12 @@ export const ActivityLogCancellationsPage: React.FC = () => (
   <ActivityLogPage initialMode="cancellations" />
 );
 
-export const ActivityLogModificationsPage: React.FC = () => (
-  <ActivityLogPage initialMode="modifications" />
+export interface ActivityLogModificationsPageProps {
+  initialSection?: ActivityLogSection;
+}
+
+export const ActivityLogModificationsPage: React.FC<ActivityLogModificationsPageProps> = ({ initialSection = 'all' }) => (
+  <ActivityLogPage initialMode="modifications" initialSection={initialSection} />
 );
 
 export const ActivityLogViewsPage: React.FC = () => (

@@ -308,6 +308,9 @@ export default function App() {
       case 'activity_log': return <ActivityLogPage />;
       case 'activity_log_cancellations': return <ActivityLogCancellationsPage />;
       case 'activity_log_modifications': return <ActivityLogModificationsPage />;
+      case 'activity_log_modifications_posting': return <ActivityLogModificationsPage initialSection="posting" />;
+      case 'activity_log_modifications_operational': return <ActivityLogModificationsPage initialSection="operational" />;
+      case 'activity_log_modifications_master': return <ActivityLogModificationsPage initialSection="master" />;
       case 'activity_log_views': return <ActivityLogViewsPage />;
       case 'activity_log_prints': return <ActivityLogPrintsPage />;
       case 'company_settings': return <CompanySettings />;
