@@ -646,7 +646,8 @@ export const PurchaseReturns: React.FC = () => {
               const qty = Number(line.quantity) || 1;
               const unitVal = Number(line.unitPrice || line.unitValue?.amountEGP || line.unitValue?.amountSold || 0);
               const lineTotal = Number(line.salesTotal || line.lineTotal || (qty * unitVal)) || 0;
-              const lineTax = Number(line.taxAmount || line.valueDifference || (lineTotal * 0.14)) || 0;
+              const lineTax = Number(line.taxAmount !== undefined && line.taxAmount !== null ? line.taxAmount : (line.valueDifference || 0)) || 0;
+              const lineVatRate = lineTotal > 0 && lineTax > 0 ? Number(((lineTax / lineTotal) * 100).toFixed(2)) : 0;
 
               if (!matchedProd) {
                 try {
@@ -659,7 +660,7 @@ export const PurchaseReturns: React.FC = () => {
                     type: 'finished_good' as const,
                     cost_price: unitVal || 0,
                     sale_price: Number(((unitVal || 0) * 1.2).toFixed(2)),
-                    vat_rate: 14,
+                    vat_rate: lineVatRate,
                     company_id: user.company_id
                   };
                   const newProdId = await dbService.add('products', newProdData);
@@ -681,7 +682,7 @@ export const PurchaseReturns: React.FC = () => {
                 quantity: qty,
                 unit_price: unitVal || Number(matchedProd?.cost_price || 0),
                 total: lineTotal,
-                vat_rate: 14,
+                vat_rate: lineVatRate,
                 vat_amount: lineTax,
                 etaItemCode: etaCode,
                 etaItemName: etaDesc
@@ -690,6 +691,7 @@ export const PurchaseReturns: React.FC = () => {
           } else {
             const sub = Number(pendingEta.netAmount || pendingEta.totalSales || 0);
             const tax = Number(pendingEta.taxAmount || 0);
+            const fallbackVatRate = sub > 0 && tax > 0 ? Number(((tax / sub) * 100).toFixed(2)) : 0;
             let fallbackProd = currentProducts.find(p => p.name === 'مرتجع مشتريات إلكترونية');
             if (!fallbackProd) {
               try {
@@ -699,7 +701,7 @@ export const PurchaseReturns: React.FC = () => {
                   type: 'finished_good' as const,
                   cost_price: sub,
                   sale_price: sub,
-                  vat_rate: 14,
+                  vat_rate: fallbackVatRate,
                   company_id: user.company_id
                 };
                 const newProdId = await dbService.add('products', newProdData);
@@ -713,7 +715,7 @@ export const PurchaseReturns: React.FC = () => {
               quantity: 1,
               unit_price: sub,
               total: sub,
-              vat_rate: 14,
+              vat_rate: fallbackVatRate,
               vat_amount: tax,
               etaItemCode: '---',
               etaItemName: fallbackProd?.name || ''
