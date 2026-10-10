@@ -2102,7 +2102,7 @@ export const Returns: React.FC = () => {
       ? filteredReturns.filter(ret => selectedReturnIds.includes(ret.id))
       : filteredReturns;
 
-    const dataToExport = listToExport.map(ret => {
+    const dataToExport = listToExport.map((ret: any) => {
       const baseCode = (company?.settings?.currency || (company as any)?.currency || 'egp').toLowerCase();
       const currencyCode = ret.currency_id ? (companyCurrencies.find(c => c.id === ret.currency_id)?.code || '') : (company?.settings?.currency || 'EGP');
       const isForeign = currencyCode.toLowerCase() !== baseCode;

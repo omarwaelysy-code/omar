@@ -861,6 +861,8 @@ export interface Return extends ReversalTrackingFields {
   eta_submitted_at?: string;
   eta_error?: string;
   attachments?: AttachmentItem[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface PurchaseReturn extends ReversalTrackingFields {

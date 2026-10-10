@@ -3262,7 +3262,7 @@ export const Invoices: React.FC = () => {
       ? filteredInvoices.filter(inv => selectedInvoiceIds.includes(inv.id))
       : filteredInvoices;
 
-    const dataToExport = listToExport.map(inv => {
+    const dataToExport = listToExport.map((inv: any) => {
       const baseCode = (companyData?.settings?.currency || (companyData as any)?.currency || 'egp').toLowerCase();
       const currencyCode = inv.currency_id ? (companyCurrencies.find(c => c.id === inv.currency_id)?.code || '') : (companyData?.settings?.currency || 'EGP');
       const isForeign = currencyCode.toLowerCase() !== baseCode;
