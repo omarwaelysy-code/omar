@@ -2521,6 +2521,10 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
                 ), 0)`;
               } else if (cfg.table === 'customer_discounts' || cfg.table === 'supplier_discounts') {
                 docAmtCol = `COALESCE(SUM("${cfg.amountCol}"), 0)`;
+              } else if (['payment_methods', 'customers', 'suppliers', 'accounts'].includes(cfg.table) && cfg.refTypes.includes('opening_balance')) {
+                const hasRate = EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate');
+                const rateExpr = hasRate ? 'COALESCE("exchange_rate", 1)' : '1';
+                docAmtCol = `COALESCE(SUM(ABS("${cfg.amountCol}") * ${rateExpr}), 0)`;
               } else {
                 const hasRate = EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate');
                 const rateExpr = hasRate ? 'COALESCE("exchange_rate", 1)' : '1';
@@ -2746,6 +2750,10 @@ router.get('/system/data-audit', authenticateToken, async (req: AuthRequest, res
                 )`;
               } else if (cfg.table === 'customer_discounts' || cfg.table === 'supplier_discounts') {
                 docAmtExpr = `d."${cfg.amountCol}"`;
+              } else if (['payment_methods', 'customers', 'suppliers', 'accounts'].includes(cfg.table) && cfg.refTypes.includes('opening_balance')) {
+                const hasRate = EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate');
+                const rateExpr = hasRate ? 'COALESCE(d."exchange_rate", 1)' : '1';
+                docAmtExpr = `(ABS(d."${cfg.amountCol}") * ${rateExpr})`;
               } else {
                 const hasRate = EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate');
                 const rateExpr = hasRate ? 'COALESCE(d."exchange_rate", 1)' : '1';
@@ -9577,14 +9585,45 @@ modules.forEach(moduleName => {
           await client.query(`DELETE FROM journal_entry_lines WHERE journal_entry_id = $1`, [id]);
         }
 
-        if (moduleName === 'payment_vouchers' || moduleName === 'receipt_vouchers') {
-          // Cascade delete related journal entries & items
-          const voucherRes = await client.query(`SELECT voucher_number FROM "${moduleName}" WHERE id = $1`, [id]);
-          const vNum = voucherRes.rows[0]?.voucher_number;
+        // Cascade delete related journal entries when source document is deleted
+        const refTypesByModule: { [key: string]: string[] } = {
+          payment_vouchers: ['payment', 'payment_voucher', 'voucher'],
+          receipt_vouchers: ['receipt', 'receipt_voucher'],
+          invoices: ['invoice', 'sales_invoice'],
+          returns: ['return', 'sales_return'],
+          purchase_invoices: ['purchase', 'purchase_invoice'],
+          purchase_returns: ['purchase_return'],
+          cash_transfers: ['cash_transfer'],
+          stock_adjustments: ['stock_adjustment'],
+          opening_stock_balances: ['opening_stock_balance'],
+          customers: ['opening_balance'],
+          suppliers: ['opening_balance'],
+          payment_methods: ['opening_balance'],
+          customer_discounts: ['customer_discount'],
+          supplier_discounts: ['supplier_discount']
+        };
+
+        if (refTypesByModule[moduleName]) {
+          const types = refTypesByModule[moduleName];
+          let docNum: string | null = null;
+          try {
+            const numCols = ['voucher_number', 'invoice_number', 'return_number', 'transfer_number', 'adjustment_number', 'code', 'name', 'number'];
+            for (const col of numCols) {
+              if (EXPECTED_SCHEMA[moduleName]?.includes(col)) {
+                const numRes = await client.query(`SELECT "${col}" as num FROM "${moduleName}" WHERE id = $1`, [id]);
+                if (numRes.rows.length > 0 && numRes.rows[0].num) {
+                  docNum = String(numRes.rows[0].num);
+                  break;
+                }
+              }
+            }
+          } catch (e) {}
 
           const jeRes: any = await client.query(
-            `SELECT id FROM journal_entries WHERE reference_id = $1 OR (reference_number = $2 AND reference_type IN ('payment', 'receipt'))`,
-            [id, vNum || '___NONE___']
+            `SELECT id FROM journal_entries 
+             WHERE reference_id = $1 
+                OR (reference_number = $2 AND reference_type = ANY($3::varchar[]))`,
+            [id, docNum || '___NONE___', types]
           );
           const jeIds = jeRes.rows.map((r: any) => r.id);
           if (jeIds.length > 0) {
