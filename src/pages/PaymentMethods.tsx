@@ -10,6 +10,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { PaymentMethod, Account, JournalEntry } from '../types';
+import { getDefaultAccount, getCompatibleAccounts, useDefaultAccounts } from '../utils/defaultAccountsHelper';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
@@ -24,6 +25,7 @@ export const PaymentMethods: React.FC = () => {
   const { user } = useAuth();
   const { t, dir, language } = useLanguage();
   const { showNotification } = useNotification();
+  const { defaultAccountMap } = useDefaultAccounts(user?.company_id);
   
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -141,6 +143,26 @@ export const PaymentMethods: React.FC = () => {
       };
     }
   }, [user?.company_id]);
+
+  // Enterprise Auto-population: Ensure default accounts are immediately populated when adding a new payment method
+  useEffect(() => {
+    if (isModalOpen && !editingMethod && accounts.length > 0) {
+      setFormData(prev => {
+        let changed = false;
+        const updates: Partial<PaymentMethod> = {};
+        if (!prev.account_id) {
+          const key = prev.type === 'bank' ? 'bank' : (prev.type === 'wallet' ? 'wallet' : 'main_cash');
+          const acc = getDefaultAccount(key, defaultAccountMap, accounts);
+          if (acc) { updates.account_id = acc.id; changed = true; }
+        }
+        if (!prev.counter_account_id) {
+          const acc = getDefaultAccount('opening_balance', defaultAccountMap, accounts);
+          if (acc) { updates.counter_account_id = acc.id; changed = true; }
+        }
+        return changed ? { ...prev, ...updates } : prev;
+      });
+    }
+  }, [isModalOpen, editingMethod, accounts, defaultAccountMap]);
 
   // Enterprise Audit Trail Lock: check if payment method has recorded transactions
   const isAccountLocked = useMemo(() => {
@@ -434,15 +456,16 @@ export const PaymentMethods: React.FC = () => {
   };
 
   const resetForm = () => {
-    const defaultCashAccount = accounts.find(a => ['cash', 'petty_cash', 'bank', 'wallet', 'credit_card', 'debit_card', 'main_cash'].includes(a.account_usage || ''));
+    const defaultAccount = getDefaultAccount('main_cash', defaultAccountMap, accounts);
+    const defaultCounter = getDefaultAccount('opening_balance', defaultAccountMap, accounts);
     setEditingMethod(null);
     setFormData({
       code: '',
       name: '',
       opening_balance: 0,
       opening_balance_date: new Date().toISOString().slice(0, 10),
-      account_id: defaultCashAccount?.id || '',
-      counter_account_id: '',
+      account_id: defaultAccount?.id || '',
+      counter_account_id: defaultCounter?.id || '',
       type: 'cash',
       currency: 'EGP',
       bank_name: '',
@@ -1546,22 +1569,9 @@ export const PaymentMethods: React.FC = () => {
                                 onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
                               >
                                 <option value="">{language === 'ar' ? 'اختر الحساب المحاسبي...' : 'Select Account...'}</option>
-                                {accounts
-                                  .filter(acc => {
-                                    if (formData.type === 'cash') {
-                                      return ['cash', 'main_cash', 'petty_cash'].includes(acc.account_usage || '');
-                                    }
-                                    if (formData.type === 'bank') {
-                                      return ['bank', 'credit_card', 'debit_card', 'cheque', 'post_dated_cheque'].includes(acc.account_usage || '');
-                                    }
-                                    if (formData.type === 'wallet') {
-                                      return acc.account_usage === 'wallet';
-                                    }
-                                    return true;
-                                  })
-                                  .map(acc => (
-                                    <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
-                                  ))}
+                                {getCompatibleAccounts(formData.type === 'bank' ? 'bank' : (formData.type === 'wallet' ? 'wallet' : 'main_cash'), accounts, formData.account_id).map(acc => (
+                                  <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
+                                ))}
                               </select>
                             </div>
                             {isAccountLocked && (
@@ -1882,11 +1892,9 @@ export const PaymentMethods: React.FC = () => {
                                     <label className="block text-[10px] font-bold text-slate-500 mb-0.5 uppercase">{language === 'ar' ? 'حساب الطرف الآخر للقيد' : 'Counter Account'}</label>
                                     <select required className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" value={formData.counter_account_id} onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}>
                                       <option value="">{language === 'ar' ? 'اختر حساب الطرف الآخر...' : 'Select counter account...'}</option>
-                                      {accounts
-                                        .filter(acc => ['opening_balance', 'capital', 'equity', 'retained_earnings', 'other'].includes(acc.account_usage || ''))
-                                        .map(acc => (
-                                          <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
-                                        ))}
+                                      {getCompatibleAccounts('opening_balance', accounts, formData.counter_account_id).map(acc => (
+                                        <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
+                                      ))}
                                     </select>
                                  </div>
                                  {formData.counter_account_id && (

@@ -3614,6 +3614,9 @@ async function ensureDefaultAccountsForCompany(client: any, companyId: string) {
       targetAcc = { id: newAccId, code: def.code, name: def.nameAr, account_usage: def.usage };
       accByCode[def.code] = targetAcc;
       addedCount++;
+    } else if (!targetAcc.account_usage) {
+      await client.query('UPDATE accounts SET account_usage = $1 WHERE id = $2', [def.usage, targetAcc.id]);
+      targetAcc.account_usage = def.usage;
     }
 
     // Ensure mapping in default_account_mappings
@@ -3623,9 +3626,37 @@ async function ensureDefaultAccountsForCompany(client: any, companyId: string) {
       ON CONFLICT (company_id, setting_key) 
       DO NOTHING
     `, [uuidv4(), companyId, def.key, targetAcc.id, targetAcc.code, targetAcc.name]);
+
+    // If an existing mapping has a broken/null account_id, repair it
+    await client.query(`
+      UPDATE default_account_mappings
+      SET account_id = $1, account_code = $2, account_name = $3, updated_at = CURRENT_TIMESTAMP
+      WHERE company_id = $4 AND setting_key = $5 AND (account_id IS NULL OR account_id = '')
+    `, [targetAcc.id, targetAcc.code, targetAcc.name, companyId, def.key]);
   }
   return addedCount;
 }
+
+// GET /api/erp/default_account_mappings (ensures and returns mappings for subscriptions)
+router.get('/default_account_mappings', authenticateToken, async (req: AuthRequest, res) => {
+  const companyId = req.user?.company_id;
+  if (!companyId) return res.status(400).json({ error: 'Company ID required' });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await ensureDefaultAccountsForCompany(client, companyId);
+    await client.query('COMMIT');
+
+    const { rows } = await pool.query('SELECT * FROM default_account_mappings WHERE company_id = $1', [companyId]);
+    res.json(rows);
+  } catch (err: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
 
 // GET /api/erp/default-accounts
 router.get('/default-accounts', authenticateToken, async (req: AuthRequest, res) => {

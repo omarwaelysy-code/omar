@@ -26,6 +26,7 @@ import { formatNumber, formatMoney } from '../utils/formatUtils';
 import { FormattedNumberInput } from '../components/FormattedNumberInput';
 import { ExcelImportWizard } from '../components/ExcelImportWizard';
 import { EtaCodeRegistrationModal } from '../components/EtaCodeRegistrationModal';
+import { getDefaultAccount, getCompatibleAccounts, useDefaultAccounts } from '../utils/defaultAccountsHelper';
 
 interface ItemGroup {
   id: string;
@@ -328,7 +329,7 @@ export const Products: React.FC = () => {
     is_active: true
   });
 
-  const [defaultAccountMap, setDefaultAccountMap] = useState<Record<string, string>>({});
+  const { defaultAccountMap } = useDefaultAccounts(user?.company_id);
 
   useEffect(() => {
     if (user) {
@@ -339,12 +340,6 @@ export const Products: React.FC = () => {
 
       const unsubscribeAccounts = dbService.subscribe<Account>('accounts', user.company_id, (data) => {
         setAccounts(data);
-      });
-
-      const unsubscribeDefaultAccs = dbService.subscribe<any>('default_account_mappings', user.company_id, (data) => {
-        const map: Record<string, string> = {};
-        (data || []).forEach((r: any) => { if (r.setting_key && r.account_id) map[r.setting_key] = r.account_id; });
-        setDefaultAccountMap(map);
       });
 
       const unsubscribeItemGroups = dbService.subscribe<ItemGroup>('item_groups', user.company_id, (data) => {
@@ -358,7 +353,6 @@ export const Products: React.FC = () => {
       return () => {
         unsubscribe();
         unsubscribeAccounts();
-        unsubscribeDefaultAccs();
         unsubscribeItemGroups();
         unsubscribeCompany();
       };
@@ -747,14 +741,13 @@ export const Products: React.FC = () => {
   };
 
   const resetForm = () => {
-    const defaultRevenue = accounts.find(a => a.id === defaultAccountMap['sales_revenue']) || accounts.find(a => a.code === '4101') || accounts.find(a => ['sales_revenue', 'service_revenue', 'other_revenue'].includes(a.account_usage || ''));
-    const defaultCost = accounts.find(a => a.id === defaultAccountMap['cost_of_sales']) || accounts.find(a => a.code === '5101') || accounts.find(a => ['cost_of_sales', 'purchases'].includes(a.account_usage || ''));
-    const defaultInventory = accounts.find(a => a.id === defaultAccountMap['inventory']) || accounts.find(a => a.code === '110301') || accounts.find(a => ['inventory', 'raw_materials', 'work_in_progress', 'finished_goods'].includes(a.account_usage || ''));
-    const defaultVat = accounts.find(a => a.account_usage === 'vat');
-    const defaultSalesVat = accounts.find(a => a.id === defaultAccountMap['output_vat']) || accounts.find(a => a.code === '210202') || accounts.find(a => a.account_usage === 'output_vat') || defaultVat;
-    const defaultPurchaseVat = accounts.find(a => a.id === defaultAccountMap['input_vat']) || accounts.find(a => a.code === '110402') || accounts.find(a => a.account_usage === 'input_vat') || defaultVat;
-    const defaultSalesWht = accounts.find(a => a.id === defaultAccountMap['withholding_tax_customers']) || accounts.find(a => a.code === '110403') || accounts.find(a => a.account_usage === 'withholding_tax_customers');
-    const defaultPurchaseWht = accounts.find(a => a.id === defaultAccountMap['withholding_tax_suppliers']) || accounts.find(a => a.code === '210203') || accounts.find(a => a.account_usage === 'withholding_tax_suppliers');
+    const defaultRevenue = getDefaultAccount('sales_revenue', defaultAccountMap, accounts);
+    const defaultCost = getDefaultAccount('cost_of_sales', defaultAccountMap, accounts);
+    const defaultInventory = getDefaultAccount('inventory', defaultAccountMap, accounts);
+    const defaultSalesVat = getDefaultAccount('output_vat', defaultAccountMap, accounts);
+    const defaultPurchaseVat = getDefaultAccount('input_vat', defaultAccountMap, accounts);
+    const defaultSalesWht = getDefaultAccount('withholding_tax_customers', defaultAccountMap, accounts);
+    const defaultPurchaseWht = getDefaultAccount('withholding_tax_suppliers', defaultAccountMap, accounts);
 
     setEditingProduct(null);
     setFormData({ 
@@ -769,9 +762,9 @@ export const Products: React.FC = () => {
       cost_account_id: defaultCost?.id || '', 
       inventory_account_id: defaultInventory?.id || '', 
       inventory_cost_method: 'wac', 
-      vat_account_id: defaultSalesVat?.id || defaultPurchaseVat?.id || defaultVat?.id || '',
-      sales_vat_account_id: defaultSalesVat?.id || defaultVat?.id || '',
-      purchase_vat_account_id: defaultPurchaseVat?.id || defaultVat?.id || '',
+      vat_account_id: defaultSalesVat?.id || defaultPurchaseVat?.id || '',
+      sales_vat_account_id: defaultSalesVat?.id || '',
+      purchase_vat_account_id: defaultPurchaseVat?.id || '',
       vat_rate: 0, 
       purchase_vat_rate: 14,
       sales_withholding_tax_account_id: defaultSalesWht?.id || '',
@@ -796,6 +789,47 @@ export const Products: React.FC = () => {
     setFilterRefNum('');
     setFilterPartner('');
   };
+
+  // Enterprise Auto-population: Ensure default accounts are immediately populated when adding a new product
+  useEffect(() => {
+    if (isModalOpen && !editingProduct && accounts.length > 0) {
+      setFormData(prev => {
+        let changed = false;
+        const updates: Partial<Product> = {};
+
+        if (!prev.revenue_account_id) {
+          const acc = getDefaultAccount('sales_revenue', defaultAccountMap, accounts);
+          if (acc) { updates.revenue_account_id = acc.id; changed = true; }
+        }
+        if (!prev.cost_account_id) {
+          const acc = getDefaultAccount('cost_of_sales', defaultAccountMap, accounts);
+          if (acc) { updates.cost_account_id = acc.id; changed = true; }
+        }
+        if (!prev.inventory_account_id) {
+          const acc = getDefaultAccount('inventory', defaultAccountMap, accounts);
+          if (acc) { updates.inventory_account_id = acc.id; changed = true; }
+        }
+        if (!prev.sales_vat_account_id) {
+          const acc = getDefaultAccount('output_vat', defaultAccountMap, accounts);
+          if (acc) { updates.sales_vat_account_id = acc.id; updates.vat_account_id = acc.id; changed = true; }
+        }
+        if (!prev.purchase_vat_account_id) {
+          const acc = getDefaultAccount('input_vat', defaultAccountMap, accounts);
+          if (acc) { updates.purchase_vat_account_id = acc.id; changed = true; }
+        }
+        if (!prev.sales_withholding_tax_account_id) {
+          const acc = getDefaultAccount('withholding_tax_customers', defaultAccountMap, accounts);
+          if (acc) { updates.sales_withholding_tax_account_id = acc.id; updates.sales_withholding_tax_account_name = acc.name; changed = true; }
+        }
+        if (!prev.purchase_withholding_tax_account_id) {
+          const acc = getDefaultAccount('withholding_tax_suppliers', defaultAccountMap, accounts);
+          if (acc) { updates.purchase_withholding_tax_account_id = acc.id; updates.purchase_withholding_tax_account_name = acc.name; changed = true; }
+        }
+
+        return changed ? { ...prev, ...updates } : prev;
+      });
+    }
+  }, [isModalOpen, editingProduct, accounts, defaultAccountMap]);
 
   const openModal = (product: Product | null = null) => {
     if (product) {
@@ -2596,19 +2630,21 @@ export const Products: React.FC = () => {
                                          {isProductAccountsLocked && <Lock size={10} className="text-amber-500" />}
                                       </label>
                                       <select 
-                                        required 
-                                        disabled={isProductAccountsLocked}
-                                        className={`w-full px-2 py-1 border rounded-md text-xs font-bold appearance-none outline-none transition-all ${
-                                          isProductAccountsLocked 
-                                            ? 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed font-medium' 
-                                            : 'bg-white border-slate-200 focus:ring-1 focus:ring-emerald-500'
-                                        }`} 
-                                        value={formData.revenue_account_id} 
-                                        onChange={(e) => setFormData({ ...formData, revenue_account_id: e.target.value })}
-                                      >
-                                        <option value="">{t('common.select_category')}</option>
-                                        {accounts.filter(a => ['sales_revenue', 'service_revenue', 'other_revenue'].includes(a.account_usage || '')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
-                                      </select>
+                                         required 
+                                         disabled={isProductAccountsLocked}
+                                         className={`w-full px-2 py-1 border rounded-md text-xs font-bold appearance-none outline-none transition-all ${
+                                           isProductAccountsLocked 
+                                             ? 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed font-medium' 
+                                             : 'bg-white border-slate-200 focus:ring-1 focus:ring-emerald-500'
+                                         }`} 
+                                         value={formData.revenue_account_id} 
+                                         onChange={(e) => setFormData({ ...formData, revenue_account_id: e.target.value })}
+                                       >
+                                         <option value="">{t('common.select_category')}</option>
+                                         {getCompatibleAccounts('sales_revenue', accounts, formData.revenue_account_id).map(acc => (
+                                           <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
+                                         ))}
+                                       </select>
                                    </div>
 
                                    {/* حساب تكلفة المبيعات */}
@@ -2629,7 +2665,7 @@ export const Products: React.FC = () => {
                                         onChange={(e) => setFormData({ ...formData, cost_account_id: e.target.value })}
                                       >
                                         <option value="">{t('common.select_category')}</option>
-                                        {accounts.filter(a => a.account_usage === 'cost_of_sales').map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                        {getCompatibleAccounts('cost_of_sales', accounts, formData.cost_account_id).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                                       </select>
                                    </div>
 
@@ -2653,7 +2689,7 @@ export const Products: React.FC = () => {
                                            onChange={(e) => setFormData({ ...formData, inventory_account_id: e.target.value })}
                                          >
                                            <option value="">{t('common.select_account')}</option>
-                                           {accounts.filter(a => ['inventory', 'raw_materials', 'work_in_progress', 'finished_goods'].includes(a.account_usage || '')).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
+                                           {getCompatibleAccounts('inventory', accounts, formData.inventory_account_id).map(acc => <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>)}
                                          </select>
                                        </div>
 

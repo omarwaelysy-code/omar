@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Supplier, Account, JournalEntry, AttachmentItem, SupplierBankAccount } from '../types';
+import { getDefaultAccount, getCompatibleAccounts, useDefaultAccounts } from '../utils/defaultAccountsHelper';
 import { 
   Search, Plus, Trash2, Edit2, X, Truck, Phone, Mail, MapPin, 
   Wallet, Calendar, History, FileText, User, Hash, Box, Lock,
@@ -41,7 +42,7 @@ export const Suppliers: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [defaultAccountMap, setDefaultAccountMap] = useState<Record<string, string>>({});
+  const { defaultAccountMap } = useDefaultAccounts(user?.company_id);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -142,11 +143,7 @@ export const Suppliers: React.FC = () => {
         setAccounts(data);
       });
 
-      const unsubscribeDefaultAccs = dbService.subscribe<any>('default_account_mappings', user.company_id, (data) => {
-        const map: Record<string, string> = {};
-        (data || []).forEach((r: any) => { if (r.setting_key && r.account_id) map[r.setting_key] = r.account_id; });
-        setDefaultAccountMap(map);
-      });
+
 
       const unsubscribeEntries = dbService.subscribe<JournalEntry>('journal_entries', user.company_id, setEntries);
       const unsubscribeInvoices = dbService.subscribe<any>('purchase_invoices', user.company_id, setInvoices);
@@ -157,7 +154,6 @@ export const Suppliers: React.FC = () => {
       return () => {
         unsubscribe();
         unsubscribeAccounts();
-        unsubscribeDefaultAccs();
         unsubscribeEntries();
         unsubscribeInvoices();
         unsubscribeReturns();
@@ -166,6 +162,25 @@ export const Suppliers: React.FC = () => {
       };
     }
   }, [user?.company_id]);
+
+  // Enterprise Auto-population: Ensure default accounts are immediately populated when adding a new supplier
+  useEffect(() => {
+    if (isModalOpen && !editingSupplier && accounts.length > 0) {
+      setFormData(prev => {
+        let changed = false;
+        const updates: Partial<Supplier> = {};
+        if (!prev.account_id) {
+          const acc = getDefaultAccount('supplier', defaultAccountMap, accounts);
+          if (acc) { updates.account_id = acc.id; updates.account_name = acc.name; changed = true; }
+        }
+        if (!prev.counter_account_id) {
+          const acc = getDefaultAccount('opening_balance', defaultAccountMap, accounts);
+          if (acc) { updates.counter_account_id = acc.id; changed = true; }
+        }
+        return changed ? { ...prev, ...updates } : prev;
+      });
+    }
+  }, [isModalOpen, editingSupplier, accounts, defaultAccountMap]);
 
   // Enterprise Audit Trail Lock: check if supplier has recorded transactions
   const isSupplierAccountLocked = useMemo(() => {
@@ -181,8 +196,8 @@ export const Suppliers: React.FC = () => {
   // Handle incoming ETA Supplier creation
   useEffect(() => {
     if (pendingEtaSupplierForCreation && accounts.length > 0) {
-      const defaultAccount = accounts.find(a => a.account_usage === 'supplier') || accounts.find(a => a.account_usage === 'accounts_payable');
-      const defaultCounterAccount = accounts.find(a => a.account_usage === 'opening_balance');
+      const defaultAccount = getDefaultAccount('supplier', defaultAccountMap, accounts);
+      const defaultCounterAccount = getDefaultAccount('opening_balance', defaultAccountMap, accounts);
       setEditingSupplier(null);
       setFormData({
         name: cleanDuplicatedPartnerName(pendingEtaSupplierForCreation.name || ''),
@@ -512,8 +527,8 @@ export const Suppliers: React.FC = () => {
         return;
       }
     } else {
-      const defaultAccount = accounts.find(a => a.id === defaultAccountMap['supplier']) || accounts.find(a => a.code === '210101') || accounts.find(a => a.account_usage === 'supplier') || accounts.find(a => a.account_usage === 'accounts_payable');
-      const defaultCounterAccount = accounts.find(a => a.id === defaultAccountMap['opening_balance']) || accounts.find(a => a.code === '3104') || accounts.find(a => a.account_usage === 'opening_balance');
+      const defaultAccount = getDefaultAccount('supplier', defaultAccountMap, accounts);
+      const defaultCounterAccount = getDefaultAccount('opening_balance', defaultAccountMap, accounts);
       setEditingSupplier(null);
       setFormData({
         name: pendingEtaSupplierForCreation ? pendingEtaSupplierForCreation.name : '',
@@ -1449,7 +1464,7 @@ export const Suppliers: React.FC = () => {
                                 onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
                               >
                                 <option value="">{language === 'ar' ? 'اختر الحساب المحاسبي المرتبط...' : 'Select associated account...'}</option>
-                                {accounts.filter(a => a.account_usage === 'accounts_payable' || a.account_usage === 'supplier').map(account => (
+                                {getCompatibleAccounts('supplier', accounts, formData.account_id).map(account => (
                                   <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
                                 ))}
                               </select>
@@ -1664,7 +1679,7 @@ export const Suppliers: React.FC = () => {
                                     onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}
                                   >
                                     <option value="">{language === 'ar' ? 'اختر حساب الطرف الآخر...' : 'Select counter account...'}</option>
-                                    {accounts.filter(a => ['opening_balance', 'capital', 'equity', 'retained_earnings', 'other'].includes(a.account_usage || '')).map(account => (
+                                    {getCompatibleAccounts('opening_balance', accounts, formData.counter_account_id).map(account => (
                                       <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
                                     ))}
                                   </select>

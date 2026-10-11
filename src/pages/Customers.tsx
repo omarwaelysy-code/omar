@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Customer, Account, JournalEntry, AttachmentItem } from '../types';
+import { getDefaultAccount, getCompatibleAccounts, useDefaultAccounts } from '../utils/defaultAccountsHelper';
 import { 
   Search, Plus, Edit2, Trash2, X, History, FileText, User, 
   Hash, Box, Wallet, Calendar, Phone, Mail, MapPin, Lock,
@@ -34,7 +35,7 @@ export const Customers: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [defaultAccountMap, setDefaultAccountMap] = useState<Record<string, string>>({});
+  const { defaultAccountMap } = useDefaultAccounts(user?.company_id);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -104,11 +105,7 @@ export const Customers: React.FC = () => {
         setAccounts(data);
       });
 
-      const unsubscribeDefaultAccs = dbService.subscribe<any>('default_account_mappings', user.company_id, (data) => {
-        const map: Record<string, string> = {};
-        (data || []).forEach((r: any) => { if (r.setting_key && r.account_id) map[r.setting_key] = r.account_id; });
-        setDefaultAccountMap(map);
-      });
+
 
       const unsubscribeEntries = dbService.subscribe<JournalEntry>('journal_entries', user.company_id, setEntries);
       const unsubscribeInvoices = dbService.subscribe<any>('invoices', user.company_id, setInvoices);
@@ -119,7 +116,6 @@ export const Customers: React.FC = () => {
       return () => {
         unsubscribe();
         unsubscribeAccounts();
-        unsubscribeDefaultAccs();
         unsubscribeEntries();
         unsubscribeInvoices();
         unsubscribeReturns();
@@ -128,6 +124,25 @@ export const Customers: React.FC = () => {
       };
     }
   }, [user?.company_id]);
+
+  // Enterprise Auto-population: Ensure default accounts are immediately populated when adding a new customer
+  useEffect(() => {
+    if (isModalOpen && !editingCustomer && accounts.length > 0) {
+      setFormData(prev => {
+        let changed = false;
+        const updates: Partial<Customer> = {};
+        if (!prev.account_id) {
+          const acc = getDefaultAccount('customer', defaultAccountMap, accounts);
+          if (acc) { updates.account_id = acc.id; updates.account_name = acc.name; changed = true; }
+        }
+        if (!prev.counter_account_id) {
+          const acc = getDefaultAccount('opening_balance', defaultAccountMap, accounts);
+          if (acc) { updates.counter_account_id = acc.id; changed = true; }
+        }
+        return changed ? { ...prev, ...updates } : prev;
+      });
+    }
+  }, [isModalOpen, editingCustomer, accounts, defaultAccountMap]);
 
   // Enterprise Audit Trail Lock: check if customer has recorded transactions
   const isCustomerAccountLocked = useMemo(() => {
@@ -393,8 +408,8 @@ export const Customers: React.FC = () => {
         return;
       }
     } else {
-      const defaultAccount = accounts.find(a => a.id === defaultAccountMap['customer']) || accounts.find(a => a.code === '110201') || accounts.find(a => a.account_usage === 'customer') || accounts.find(a => a.account_usage === 'accounts_receivable');
-      const defaultCounterAccount = accounts.find(a => a.id === defaultAccountMap['opening_balance']) || accounts.find(a => a.code === '3104') || accounts.find(a => a.account_usage === 'opening_balance');
+      const defaultAccount = getDefaultAccount('customer', defaultAccountMap, accounts);
+      const defaultCounterAccount = getDefaultAccount('opening_balance', defaultAccountMap, accounts);
       setEditingCustomer(null);
       setFormData({ 
         name: '', 
@@ -941,7 +956,7 @@ export const Customers: React.FC = () => {
                                 onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
                               >
                                 <option value="">{language === 'ar' ? 'اختر الحساب المحاسبي...' : 'Select account...'}</option>
-                                {accounts.filter(a => a.account_usage === 'accounts_receivable' || a.account_usage === 'customer').map(account => (
+                                {getCompatibleAccounts('customer', accounts, formData.account_id).map(account => (
                                   <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
                                 ))}
                               </select>
@@ -1160,7 +1175,7 @@ export const Customers: React.FC = () => {
                                     onChange={(e) => setFormData({ ...formData, counter_account_id: e.target.value })}
                                   >
                                     <option value="">{language === 'ar' ? 'اختر حساب الطرف الآخر...' : 'Select counter account...'}</option>
-                                    {accounts.filter(a => ['opening_balance', 'capital', 'equity', 'retained_earnings', 'other'].includes(a.account_usage || '')).map(account => (
+                                    {getCompatibleAccounts('opening_balance', accounts, formData.counter_account_id).map(account => (
                                       <option key={account.id} value={account.id}>{account.code} - {account.name}</option>
                                     ))}
                                   </select>
