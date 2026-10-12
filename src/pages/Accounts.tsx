@@ -6,7 +6,7 @@ import { Account, AccountType, JournalEntry } from '../types';
 import { Search, Plus, Trash2, Edit2, X, History, Sparkles, Hash, FileText, BookOpen, User, Layers, AlertCircle, LayoutGrid, List, ChevronRight, ChevronLeft, Save, ChevronDown, CheckCircle2, Upload, Wallet, Calendar, Lock } from 'lucide-react';
 import { JournalEntryPreview } from '../components/JournalEntryPreview';
 import { motion, AnimatePresence } from 'framer-motion';
-import { dbService } from '../services/dbService';
+import { dbService, apiRequest } from '../services/dbService';
 import { PageActivityLog } from '../components/PageActivityLog';
 import { InlineActivityLog } from '../components/InlineActivityLog';
 import { parseAccount } from '../services/geminiService';
@@ -170,6 +170,7 @@ export const Accounts: React.FC = () => {
       });
     });
 
+    // 1. Direct balances calculation
     accounts.forEach(acc => {
       const type = types.find(t => t.id === acc.type_id);
       const classification = type?.classification || '';
@@ -184,7 +185,47 @@ export const Accounts: React.FC = () => {
       }
     });
 
-    return balances;
+    // 2. Hierarchical Rollup: Consolidate children balances into parent header accounts (IFRS standard)
+    const parentMap = new Map<string, string[]>();
+    accounts.forEach(acc => {
+      if (acc.parent_id) {
+        if (!parentMap.has(acc.parent_id)) parentMap.set(acc.parent_id, []);
+        parentMap.get(acc.parent_id)!.push(acc.id);
+      }
+    });
+
+    const memoRollup = new Map<string, { current: number; debit: number; credit: number }>();
+    const getRollup = (accId: string, visited: Set<string> = new Set()): { current: number; debit: number; credit: number } => {
+      if (memoRollup.has(accId)) return memoRollup.get(accId)!;
+      if (visited.has(accId)) return balances[accId] || { current: 0, debit: 0, credit: 0 };
+      visited.add(accId);
+
+      const children = parentMap.get(accId);
+      const direct = balances[accId] || { current: 0, debit: 0, credit: 0 };
+      if (!children || children.length === 0) {
+        memoRollup.set(accId, direct);
+        return direct;
+      }
+      let sumCurrent = direct.current;
+      let sumDebit = direct.debit;
+      let sumCredit = direct.credit;
+      children.forEach(childId => {
+        const cRes = getRollup(childId, new Set(visited));
+        sumCurrent += cRes.current;
+        sumDebit += cRes.debit;
+        sumCredit += cRes.credit;
+      });
+      const res = { current: sumCurrent, debit: sumDebit, credit: sumCredit };
+      memoRollup.set(accId, res);
+      return res;
+    };
+
+    const finalBalances: Record<string, { current: number; debit: number; credit: number }> = {};
+    accounts.forEach(acc => {
+      finalBalances[acc.id] = getRollup(acc.id);
+    });
+
+    return finalBalances;
   }, [accounts, entries, types]);
 
   // Enterprise Audit Trail Lock for Accounts
@@ -324,6 +365,20 @@ export const Accounts: React.FC = () => {
     } finally {
       setIsGeneratingCoa(false);
       setCoaProgress('');
+    }
+  };
+
+  const handleSyncDefaultAccounts = async () => {
+    if (!user) return;
+    try {
+      setIsGeneratingCoa(true);
+      const res: any = await apiRequest('/default-accounts/merge', 'POST');
+      showNotification(res.message || (language === 'ar' ? 'تم فحص دليل الحسابات وتحديثه بنجاح' : 'Chart of Accounts synchronized successfully'), 'success');
+    } catch (e: any) {
+      console.error(e);
+      showNotification(e.message || (language === 'ar' ? 'حدث خطأ أثناء فحص الدليل' : 'Error checking accounts'), 'error');
+    } finally {
+      setIsGeneratingCoa(false);
     }
   };
 
@@ -630,16 +685,25 @@ export const Accounts: React.FC = () => {
             <Upload size={16} className="text-emerald-600" />
             <span className="hidden md:inline">{language === 'ar' ? 'استيراد إكسيل' : 'Import Excel'}</span>
           </button>
-          {accounts.length === 0 && (
-            <button 
-              onClick={() => setIsCoaWizardOpen(true)}
-              className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-indigo-50 text-indigo-600 rounded-xl font-bold hover:bg-indigo-100 transition-all active:scale-95 border border-indigo-200 text-xs"
-              title={language === 'ar' ? 'إنشاء دليل محاسبي افتراضي' : 'Generate Default COA'}
-            >
-              <Sparkles size={16} />
-              <span className="hidden md:inline">{language === 'ar' ? 'دليل آلي' : 'Auto COA'}</span>
-            </button>
-          )}
+          <button 
+            onClick={() => {
+              if (accounts.length === 0) {
+                setIsCoaWizardOpen(true);
+              } else {
+                handleSyncDefaultAccounts();
+              }
+            }}
+            disabled={isGeneratingCoa}
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-indigo-50 text-indigo-700 rounded-xl font-bold hover:bg-indigo-100 transition-all active:scale-95 border border-indigo-200 text-xs disabled:opacity-50"
+            title={accounts.length === 0 ? (language === 'ar' ? 'إنشاء دليل محاسبي افتراضي' : 'Generate Default COA') : (language === 'ar' ? 'فحص واستكمال الحسابات الافتراضية' : 'Sync Default Accounts')}
+          >
+            <Sparkles size={16} className={isGeneratingCoa ? 'animate-spin text-indigo-600' : 'text-indigo-600'} />
+            <span className="hidden md:inline">
+              {accounts.length === 0 
+                ? (language === 'ar' ? 'دليل آلي' : 'Auto COA') 
+                : (language === 'ar' ? 'استكمال الافتراضي' : 'Sync Defaults')}
+            </span>
+          </button>
           <button 
             onClick={() => openModal()}
             className="flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-md shadow-emerald-500/20 active:scale-95 border border-emerald-500/50 text-xs"
@@ -712,6 +776,14 @@ export const Accounts: React.FC = () => {
                   const bal = accountBalances[account.id]?.current ?? Number(account.opening_balance || 0);
                   const opening = Number(account.opening_balance || 0);
                   const isOpeningDebit = opening > 0;
+                  const hasChildren = accounts.some(a => a.parent_id === account.id);
+                  const isDefault = isDefaultAccount(account);
+                  const hasTx = entries.some(entry => {
+                    const itemsList = (entry.items && Array.isArray(entry.items)) ? entry.items : ((entry as any).lines || []);
+                    return itemsList.some((item: any) => item.account_id === account.id);
+                  });
+                  const bObj = accountBalances[account.id];
+                  const hasMovements = hasTx || (bObj && (bObj.debit !== 0 || bObj.credit !== 0));
 
                   return (
                     <tr 
@@ -730,8 +802,21 @@ export const Accounts: React.FC = () => {
                       </td>
 
                       {/* 3. Name */}
-                      <td className="py-0.5 px-2 font-bold text-slate-900 text-xs whitespace-nowrap">
-                        {account.name}
+                      <td className="py-0.5 px-2 text-slate-900 text-xs whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`font-bold ${hasChildren ? 'text-slate-950 font-black' : 'text-slate-800'}`}>
+                            {account.name}
+                          </span>
+                          {isDefault && (
+                            <span 
+                              className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-300/80 shadow-2xs" 
+                              title={language === 'ar' ? 'حساب افتراضي معتمد من النظام' : 'Standard System Default Account'}
+                            >
+                              <Sparkles size={9} className="text-amber-600" />
+                              {language === 'ar' ? 'افتراضي' : 'Default'}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* NEW: Type Code */}
@@ -804,13 +889,19 @@ export const Accounts: React.FC = () => {
 
                       {/* 9. Opening Balance */}
                       <td className="py-0.5 px-1.5 text-center font-mono whitespace-nowrap text-[11px]">
-                        <span className={`font-bold ${opening !== 0 ? (isOpeningDebit ? 'text-blue-700' : 'text-amber-700') : 'text-slate-400'}`}>
-                          {formatMoney(Math.abs(opening))}
-                        </span>
-                        {opening !== 0 && (
-                          <span className="text-[8.5px] text-slate-400 mr-1">
-                            ({isOpeningDebit ? (language === 'ar' ? 'مدين' : 'Debit') : (language === 'ar' ? 'دائن' : 'Credit')})
-                          </span>
+                        {hasChildren ? (
+                          <span className="text-slate-300 font-bold" title={language === 'ar' ? 'الحسابات الرئيسية لا تقبل رصيداً افتتاحياً مستقلاً' : 'Parent accounts have no direct opening balance'}>-</span>
+                        ) : (
+                          <>
+                            <span className={`font-bold ${opening !== 0 ? (isOpeningDebit ? 'text-blue-700' : 'text-amber-700') : 'text-slate-400'}`}>
+                              {formatMoney(Math.abs(opening))}
+                            </span>
+                            {opening !== 0 && (
+                              <span className="text-[8.5px] text-slate-400 mr-1">
+                                ({isOpeningDebit ? (language === 'ar' ? 'مدين' : 'Debit') : (language === 'ar' ? 'دائن' : 'Credit')})
+                              </span>
+                            )}
+                          </>
                         )}
                       </td>
 
@@ -824,6 +915,11 @@ export const Accounts: React.FC = () => {
                         <span className={bal > 0 ? 'text-emerald-700' : (bal < 0 ? 'text-rose-700' : 'text-slate-500')}>
                           {formatMoney(bal)}
                         </span>
+                        {hasChildren && bal !== 0 && (
+                          <span className="text-[8.5px] text-slate-400 block font-normal -mt-0.5">
+                            {language === 'ar' ? '(تجميعي)' : '(Consolidated)'}
+                          </span>
+                        )}
                       </td>
 
                       {/* 12. Required Sub Account */}
@@ -872,9 +968,26 @@ export const Accounts: React.FC = () => {
                           >
                             <Edit2 size={14} />
                           </button>
-                          {isDefaultAccount(account) ? (
-                            <span className="p-1 text-amber-500" title={language === 'ar' ? 'حساب افتراضي محمي من الحذف' : 'Default account protected from deletion'}>
+                          {hasChildren ? (
+                            <span 
+                              className="p-1 text-slate-400 cursor-not-allowed inline-flex items-center justify-center" 
+                              title={language === 'ar' ? 'حساب رئيسي تتبعه حسابات فرعية (محمي من الحذف)' : 'Parent account with sub-accounts (Protected)'}
+                            >
+                              <Lock size={14} className="text-slate-400" />
+                            </span>
+                          ) : isDefault ? (
+                            <span 
+                              className="p-1 text-amber-500 cursor-not-allowed inline-flex items-center justify-center" 
+                              title={language === 'ar' ? 'حساب افتراضي معتمد من النظام (محمي من الحذف)' : 'System default account (Protected)'}
+                            >
                               <Lock size={14} />
+                            </span>
+                          ) : hasMovements ? (
+                            <span 
+                              className="p-1 text-slate-400 cursor-not-allowed inline-flex items-center justify-center" 
+                              title={language === 'ar' ? 'حساب مسجل عليه قيود أو حركات (محمي من الحذف)' : 'Account has recorded transactions (Protected)'}
+                            >
+                              <Lock size={14} className="text-slate-400" />
                             </span>
                           ) : (
                             <button 
@@ -903,6 +1016,17 @@ export const Accounts: React.FC = () => {
             [1,2,3,4,5,6].map(i => <div key={i} className="h-24 bg-slate-100 animate-pulse rounded-3xl border border-slate-200" />)
           ) : sortedFilteredAccounts.map(account => {
             const type = types.find(t => t.id === account.type_id);
+            const hasChildren = accounts.some(a => a.parent_id === account.id);
+            const isDefault = isDefaultAccount(account);
+            const hasTx = entries.some(entry => {
+              const itemsList = (entry.items && Array.isArray(entry.items)) ? entry.items : ((entry as any).lines || []);
+              return itemsList.some((item: any) => item.account_id === account.id);
+            });
+            const bObj = accountBalances[account.id];
+            const hasMovements = hasTx || (bObj && (bObj.debit !== 0 || bObj.credit !== 0));
+            const bal = accountBalances[account.id]?.current ?? Number(account.opening_balance || 0);
+            const opening = Number(account.opening_balance || 0);
+
             return (
               <div key={account.id} className="group bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 hover:border-emerald-200 transition-all duration-300 flex flex-col justify-between gap-4" dir={dir}>
                 <div className="flex items-start justify-between gap-4">
@@ -911,7 +1035,20 @@ export const Accounts: React.FC = () => {
                         <BookOpen size={24} />
                       </div>
                       <div>
-                        <h3 className="text-lg font-black text-slate-900 tracking-tight leading-tight group-hover:text-emerald-700 transition-colors">{account.name}</h3>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className={`text-lg font-black tracking-tight leading-tight group-hover:text-emerald-700 transition-colors ${hasChildren ? 'text-slate-950 font-black' : 'text-slate-900'}`}>
+                            {account.name}
+                          </h3>
+                          {isDefault && (
+                            <span 
+                              className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-300/80 shadow-2xs" 
+                              title={language === 'ar' ? 'حساب افتراضي معتمد من النظام' : 'Standard System Default Account'}
+                            >
+                              <Sparkles size={9} className="text-amber-600" />
+                              {language === 'ar' ? 'افتراضي' : 'Default'}
+                            </span>
+                          )}
+                        </div>
                         <div className={`flex items-center gap-2 mt-1.5 flex-wrap ${dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
                           <span className="font-mono text-[10px] font-black text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md uppercase tracking-wider border border-slate-200">{account.code}</span>
                           <span 
@@ -948,9 +1085,26 @@ export const Accounts: React.FC = () => {
                 <button onClick={() => openModal(account)} className="p-2 text-slate-300 hover:text-sky-600 hover:bg-sky-50 rounded-xl transition-all" title={language === 'ar' ? 'تعديل الحساب' : 'Edit Account'}>
                   <Edit2 size={16} />
                 </button>
-                {isDefaultAccount(account) ? (
-                  <span className="p-2 text-slate-300" title={language === 'ar' ? 'حساب افتراضي محمي من الحذف' : 'Default account protected from deletion'}>
+                {hasChildren ? (
+                  <span 
+                    className="p-2 text-slate-400 cursor-not-allowed inline-flex items-center justify-center" 
+                    title={language === 'ar' ? 'حساب رئيسي تتبعه حسابات فرعية (محمي من الحذف)' : 'Parent account with sub-accounts (Protected)'}
+                  >
+                    <Lock size={16} className="text-slate-400" />
+                  </span>
+                ) : isDefault ? (
+                  <span 
+                    className="p-2 text-amber-500 cursor-not-allowed inline-flex items-center justify-center" 
+                    title={language === 'ar' ? 'حساب افتراضي معتمد من النظام (محمي من الحذف)' : 'System default account (Protected)'}
+                  >
                     <Lock size={16} />
+                  </span>
+                ) : hasMovements ? (
+                  <span 
+                    className="p-2 text-slate-400 cursor-not-allowed inline-flex items-center justify-center" 
+                    title={language === 'ar' ? 'حساب مسجل عليه قيود أو حركات (محمي من الحذف)' : 'Account has recorded transactions (Protected)'}
+                  >
+                    <Lock size={16} className="text-slate-400" />
                   </span>
                 ) : (
                   <button onClick={() => handleDelete(account.id)} className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all" title={language === 'ar' ? 'حذف الحساب' : 'Delete Account'}>
@@ -961,8 +1115,29 @@ export const Accounts: React.FC = () => {
             </div>
             
             <div className="pt-3 border-t border-slate-50 flex items-center justify-between">
-               <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter italic">Accounting Balance</span>
-               <div className="w-2 h-2 rounded-full bg-slate-200 group-hover:bg-emerald-500 transition-all duration-500 group-hover:scale-125" />
+               <div className="flex flex-col">
+                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">
+                   {language === 'ar' ? 'الرصيد الحالي' : 'Current Balance'}
+                   {hasChildren && bal !== 0 && (
+                     <span className="text-slate-400 font-normal mr-1">({language === 'ar' ? 'تجميعي' : 'Consolidated'})</span>
+                   )}
+                 </span>
+                 <span className={`text-sm font-black font-mono ${bal > 0 ? 'text-emerald-700' : (bal < 0 ? 'text-rose-700' : 'text-slate-600')}`}>
+                   {formatMoney(bal)}
+                 </span>
+               </div>
+               <div className="text-left font-mono">
+                 <span className="text-[10px] font-black text-slate-400 block">
+                   {language === 'ar' ? 'الافتتاحي' : 'Opening'}
+                 </span>
+                 {hasChildren ? (
+                   <span className="text-slate-300 font-bold">-</span>
+                 ) : (
+                   <span className="text-xs font-bold text-slate-600">
+                     {formatMoney(Math.abs(opening))}
+                   </span>
+                 )}
+               </div>
             </div>
           </div>
         );
