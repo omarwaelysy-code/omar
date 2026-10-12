@@ -3524,6 +3524,9 @@ const DEFAULT_ACCOUNT_DEFS = [
 ];
 
 async function ensureDefaultAccountsForCompany(client: any, companyId: string) {
+  // Enterprise concurrency guard: Serialize execution per company to prevent race conditions & duplicate accounts
+  await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`ensure_default_accounts_${companyId}`]);
+
   // Ensure default_account_mappings table exists
   await client.query(`
     CREATE TABLE IF NOT EXISTS default_account_mappings (
