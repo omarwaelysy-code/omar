@@ -21,17 +21,17 @@ export const EXPECTED_SCHEMA: TableSchema = {
     'id', 'name', 'description', 'permissions', 'company_id'
   ],
   customers: [
-    'id', 'company_id', 'account_id', 'account_name', 'code', 'name', 'email', 'mobile', 'address', 
+    'id', 'company_id', 'account_id', 'account_name', 'code', 'manual_code', 'name', 'email', 'mobile', 'address', 
     'tax_number', 'commercial_register', 'opening_balance', 'opening_balance_date', 'counter_account_id', 'created_at',
     'payment_method', 'credit_limit', 'payment_terms', 'payment_terms_days', 'advance_percentage', 'attachments'
   ],
   suppliers: [
-    'id', 'company_id', 'account_id', 'account_name', 'name', 'code', 'email', 'mobile', 'address', 
+    'id', 'company_id', 'account_id', 'account_name', 'name', 'code', 'manual_code', 'email', 'mobile', 'address', 
     'tax_number', 'commercial_register', 'opening_balance', 'opening_balance_date', 'counter_account_id', 'created_at',
     'payment_method', 'credit_limit', 'payment_terms', 'payment_terms_days', 'advance_percentage', 'attachments', 'bank_accounts'
   ],
   products: [
-    'id', 'company_id', 'revenue_account_id', 'cost_account_id', 'revenue_account_name', 'cost_account_name', 'name', 'code', 'barcode',
+    'id', 'company_id', 'revenue_account_id', 'cost_account_id', 'revenue_account_name', 'cost_account_name', 'name', 'code', 'manual_code', 'barcode',
     'type', 'description', 'image_url', 'category', 'unit', 'cost_price', 'sale_price', 'stock', 'min_stock', 
     'current_stock', 'is_service', 'counter_account_id', 'inventory_account_id', 'inventory_account_name', 'vat_account_id', 'vat_account_name', 'sales_vat_account_id', 'sales_vat_account_name', 'purchase_vat_account_id', 'purchase_vat_account_name', 'vat_rate', 'purchase_vat_rate', 'sales_withholding_tax_account_id', 'sales_withholding_tax_account_name', 'sales_withholding_tax_rate', 'purchase_withholding_tax_account_id', 'purchase_withholding_tax_account_name', 'purchase_withholding_tax_rate', 'inventory_cost_method', 'item_group_id', 'item_group_name', 'barcode_settings', 'allow_issue_fraction', 'allow_receipt_fraction', 'allow_issue_fraction_pct', 'allow_receipt_fraction_pct', 'tax_item_code', 'tax_code_type', 'eta_item_code', 'eta_code_type', 'created_at'
   ],

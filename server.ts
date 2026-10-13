@@ -208,8 +208,11 @@ async function startServer() {
       'ALTER TABLE "suppliers" ADD COLUMN IF NOT EXISTS "payment_terms_days" INTEGER DEFAULT 0',
       'ALTER TABLE "suppliers" ADD COLUMN IF NOT EXISTS "advance_percentage" DECIMAL(5, 2) DEFAULT 0',
       'ALTER TABLE "customers" ADD COLUMN IF NOT EXISTS "attachments" JSONB DEFAULT \'[]\'::jsonb',
+      'ALTER TABLE "customers" ADD COLUMN IF NOT EXISTS "manual_code" VARCHAR(100)',
       'ALTER TABLE "suppliers" ADD COLUMN IF NOT EXISTS "attachments" JSONB DEFAULT \'[]\'::jsonb',
       'ALTER TABLE "suppliers" ADD COLUMN IF NOT EXISTS "bank_accounts" JSONB DEFAULT \'[]\'::jsonb',
+      'ALTER TABLE "suppliers" ADD COLUMN IF NOT EXISTS "manual_code" VARCHAR(100)',
+      'ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "manual_code" VARCHAR(100)',
 
       // Attachments for all transaction tables
       'ALTER TABLE "goods_receipts" ADD COLUMN IF NOT EXISTS "attachments" JSONB DEFAULT \'[]\'::jsonb',

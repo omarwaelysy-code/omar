@@ -235,6 +235,7 @@ export interface SupplierBankAccount {
 export interface Customer {
   id: string;
   code: string;
+  manual_code?: string;
   name: string;
   mobile: string;
   email?: string;
@@ -259,6 +260,7 @@ export interface Customer {
 export interface Supplier {
   id: string;
   code: string;
+  manual_code?: string;
   name: string;
   mobile: string;
   email?: string;
@@ -391,6 +393,7 @@ export interface CashTransfer extends ReversalTrackingFields {
 export interface Product {
   id: string;
   code: string;
+  manual_code?: string;
   name: string;
   type: 'service' | 'finished_good' | 'raw_material' | 'commodity' | 'consumable' | 'packaging';
   is_service?: boolean;

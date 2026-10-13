@@ -8,7 +8,8 @@ import {
   Search, Plus, Trash2, Edit2, X, Truck, Phone, Mail, MapPin, 
   Wallet, Calendar, History, FileText, User, Hash, Box, Lock,
   LayoutGrid, List, ChevronRight, ChevronLeft, CreditCard, FileUp,
-  Link2, Sparkles, Loader2, Landmark, Building2, Star, Check, Paperclip
+  Link2, Sparkles, Loader2, Landmark, Building2, Star, Check, Paperclip,
+  Eye, ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService, apiRequest } from '../services/dbService';
@@ -81,17 +82,50 @@ export const Suppliers: React.FC = () => {
   const [updateAddress, setUpdateAddress] = useState(true);
   const [isLinking, setIsLinking] = useState(false);
 
-  const handleExportExcel = () => {
-    const headers = {
-      'code': t('suppliers.column_code'),
-      'name': t('suppliers.column_name'),
-      'mobile': t('suppliers.form_mobile'),
-      'email': t('suppliers.form_email'),
-      'address': t('suppliers.form_address'),
-      'opening_balance': t('suppliers.form_opening_balance')
+  // Column Visibility & Selection
+  const DEFAULT_SUPPLIER_COLUMNS: { [key: string]: boolean } = {
+    code: true,
+    manual_code: true,
+    name: true,
+    mobile: true,
+    payment_method: true,
+    tax_number: true,
+    commercial_register: true,
+    credit_limit: true,
+    status: true,
+    current_balance: true
+  };
+
+  const [visibleColumns, setVisibleColumns] = useState<{ [key: string]: boolean }>(() => {
+    try {
+      const saved = localStorage.getItem('suppliers_visible_columns');
+      return saved ? { ...DEFAULT_SUPPLIER_COLUMNS, ...JSON.parse(saved) } : DEFAULT_SUPPLIER_COLUMNS;
+    } catch {
+      return DEFAULT_SUPPLIER_COLUMNS;
+    }
+  });
+  const [isColumnSelectorOpen, setIsColumnSelectorOpen] = useState(false);
+  const columnSelectorRef = useRef<HTMLDivElement>(null);
+  const [selectedSupplierIds, setSelectedSupplierIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (columnSelectorRef.current && !columnSelectorRef.current.contains(e.target as Node)) {
+        setIsColumnSelectorOpen(false);
+      }
     };
-    const formattedData = formatDataForExcel(suppliers, headers);
-    exportToExcel(formattedData, { filename: 'Suppliers_List', sheetName: t('suppliers.title') });
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const toggleColumn = (key: string) => {
+    setVisibleColumns(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      try {
+        localStorage.setItem('suppliers_visible_columns', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   };
 
   const handleExportPDF = async () => {
@@ -109,6 +143,7 @@ export const Suppliers: React.FC = () => {
     name: '',
     mobile: '',
     email: '',
+    manual_code: '',
     tax_number: '',
     commercial_register: '',
     address: '',
@@ -298,6 +333,7 @@ export const Suppliers: React.FC = () => {
 
       const dataToSave = {
         ...formData,
+        manual_code: formData.manual_code ? formData.manual_code.trim() : null,
         name: cleanDuplicatedPartnerName(formData.name),
         account_id: finalAccountId,
         counter_account_id: finalCounterAccountId,
@@ -309,6 +345,7 @@ export const Suppliers: React.FC = () => {
       if (editingSupplier) {
         const fieldsToTrack = [
           { field: 'name', label: 'اسم المورد' },
+          { field: 'manual_code', label: 'كود يدوي' },
           { field: 'mobile', label: 'رقم الهاتف' },
           { field: 'email', label: 'البريد الإلكتروني' },
           { field: 'tax_number', label: 'الرقم الضريبي' },
@@ -503,6 +540,7 @@ export const Suppliers: React.FC = () => {
           name: fullData.name,
           mobile: fullData.mobile,
           email: fullData.email || '',
+          manual_code: fullData.manual_code || '',
           tax_number: fullData.tax_number || '',
           commercial_register: fullData.commercial_register || '',
           address: fullData.address || '',
@@ -534,6 +572,7 @@ export const Suppliers: React.FC = () => {
         name: pendingEtaSupplierForCreation ? pendingEtaSupplierForCreation.name : '',
         mobile: '',
         email: '',
+        manual_code: '',
         tax_number: pendingEtaSupplierForCreation ? pendingEtaSupplierForCreation.taxNumber : '',
         commercial_register: '',
         address: pendingEtaSupplierForCreation?.address || '',
@@ -776,9 +815,155 @@ export const Suppliers: React.FC = () => {
   const filteredSuppliers = suppliers.filter(s => 
     s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (s.manual_code && s.manual_code.toLowerCase().includes(searchTerm.toLowerCase())) ||
     s.mobile.includes(searchTerm) ||
     (s.tax_number && s.tax_number.includes(searchTerm))
   );
+
+  const isAllSelected = useMemo(() => {
+    return filteredSuppliers.length > 0 && filteredSuppliers.every(s => selectedSupplierIds.includes(s.id));
+  }, [filteredSuppliers, selectedSupplierIds]);
+
+  const isIndeterminate = useMemo(() => {
+    return selectedSupplierIds.length > 0 && !isAllSelected;
+  }, [selectedSupplierIds, isAllSelected]);
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedSupplierIds([]);
+    } else {
+      setSelectedSupplierIds(filteredSuppliers.map(s => s.id));
+    }
+  };
+
+  const toggleSelectSupplier = (id: string) => {
+    setSelectedSupplierIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const totalBalance = useMemo(() => {
+    const list = selectedSupplierIds.length > 0
+      ? filteredSuppliers.filter(s => selectedSupplierIds.includes(s.id))
+      : filteredSuppliers;
+    return list.reduce((sum, s) => sum + getSupplierBalance(s.id), 0);
+  }, [filteredSuppliers, selectedSupplierIds, entries]);
+
+  const supplierColumnLabels: Record<string, string> = {
+    code: t('suppliers.column_code'),
+    manual_code: language === 'ar' ? 'كود يدوي' : 'Manual Code',
+    name: t('suppliers.column_name'),
+    mobile: language === 'ar' ? 'الهاتف' : 'Phone',
+    payment_method: language === 'ar' ? 'طريقة السداد' : 'Payment Method',
+    tax_number: language === 'ar' ? 'الرقم الضريبي' : 'Tax Number',
+    commercial_register: language === 'ar' ? 'السجل التجاري' : 'CR Number',
+    credit_limit: language === 'ar' ? 'حد الائتمان' : 'Credit Limit',
+    status: language === 'ar' ? 'الحالة' : 'Status',
+    current_balance: language === 'ar' ? 'الرصيد الحالي' : 'Current Balance'
+  };
+
+  const handleExportExcel = () => {
+    const allHeaders: Record<string, { label: string; format?: (s: Supplier) => any }> = {
+      code: { label: t('suppliers.column_code'), format: (s) => s.code },
+      manual_code: { label: language === 'ar' ? 'كود يدوي' : 'Manual Code', format: (s) => s.manual_code || '-' },
+      name: { label: t('suppliers.column_name'), format: (s) => s.name },
+      mobile: { label: language === 'ar' ? 'الهاتف' : 'Phone', format: (s) => s.mobile || '-' },
+      payment_method: { 
+        label: language === 'ar' ? 'طريقة السداد' : 'Payment Method', 
+        format: (s) => s.payment_method === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') :
+                       s.payment_method === 'credit' ? (language === 'ar' ? 'آجل' : 'Credit') :
+                       s.payment_method === 'installments' ? (language === 'ar' ? 'دفعات' : 'Installments') : (s.payment_method || '-')
+      },
+      tax_number: { label: language === 'ar' ? 'الرقم الضريبي' : 'Tax Number', format: (s) => s.tax_number || '-' },
+      commercial_register: { label: language === 'ar' ? 'السجل التجاري' : 'CR Number', format: (s) => s.commercial_register || '-' },
+      credit_limit: { label: language === 'ar' ? 'حد الائتمان' : 'Credit Limit', format: (s) => s.credit_limit || 0 },
+      status: { label: language === 'ar' ? 'الحالة' : 'Status', format: (s) => s.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive') },
+      current_balance: { label: language === 'ar' ? 'الرصيد الحالي' : 'Current Balance', format: (s) => getSupplierBalance(s.id) }
+    };
+
+    const activeHeaders: Record<string, string> = {};
+    Object.keys(visibleColumns).forEach(k => {
+      if (visibleColumns[k] !== false && allHeaders[k]) {
+        activeHeaders[k] = allHeaders[k].label;
+      }
+    });
+
+    const dataset = (selectedSupplierIds.length > 0 
+      ? filteredSuppliers.filter(s => selectedSupplierIds.includes(s.id))
+      : filteredSuppliers
+    ).map(s => {
+      const row: any = {};
+      Object.keys(visibleColumns).forEach(k => {
+        if (visibleColumns[k] !== false && allHeaders[k]) {
+          row[k] = allHeaders[k].format ? allHeaders[k].format(s) : (s as any)[k];
+        }
+      });
+      return row;
+    });
+
+    const formattedData = formatDataForExcel(dataset, activeHeaders);
+    exportToExcel(formattedData, { filename: 'Suppliers_List', sheetName: t('suppliers.title') });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedSupplierIds.length === 0) return;
+    
+    const safeToDelete: string[] = [];
+    const blocked: { name: string; reason: string }[] = [];
+
+    for (const id of selectedSupplierIds) {
+      const supplier = suppliers.find(s => s.id === id);
+      const sName = supplier?.name || id;
+
+      const hasInvoices = invoices.some(i => i.supplier_id === id);
+      const hasReturns = returns.some(r => r.supplier_id === id);
+      const hasVouchers = vouchers.some(v => v.supplier_id === id);
+      const hasDiscounts = discounts.some(d => d.supplier_id === id);
+      const hasEntries = entries.some(je => je.items?.some(i => (i.supplier_id === id || i.sub_account_id === id) && je.reference_type !== 'opening_balance'));
+
+      if (hasInvoices || hasReturns || hasVouchers || hasDiscounts || hasEntries) {
+        blocked.push({ name: sName, reason: 'مرتبط بمعاملات مالية أو فواتير مسجلة' });
+      } else {
+        safeToDelete.push(id);
+      }
+    }
+
+    if (safeToDelete.length === 0) {
+      showNotification(
+        language === 'ar'
+          ? `تعذر حذف أي من الموردين المحددين لوجود حركات ومعاملات مسجلة عليهم (${blocked.length} مورد).`
+          : `Cannot delete selected suppliers because they all have recorded transactions (${blocked.length}).`,
+        'error'
+      );
+      return;
+    }
+
+    const confirmMsg = language === 'ar'
+      ? `سيتم حذف (${safeToDelete.length}) مورد ليس عليهم حركة.${blocked.length > 0 ? `\n(تم استبعاد ${blocked.length} مورد لوجود حركة عليهم).` : ''}\nهل تريد بالتأكيد المتابعة؟`
+      : `Delete ${safeToDelete.length} suppliers without transactions?${blocked.length > 0 ? `\n(${blocked.length} excluded).` : ''}`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      for (const id of safeToDelete) {
+        const s = suppliers.find(x => x.id === id);
+        await dbService.deleteJournalEntryByReference(id, user!.company_id);
+        await dbService.delete('suppliers', id);
+        await dbService.logActivity(user!.id, user!.username, user!.company_id, 'حذف مورد', `حذف المورد: ${s?.name}`, 'suppliers');
+      }
+
+      setSelectedSupplierIds([]);
+      showNotification(
+        language === 'ar'
+          ? `تم حذف ${safeToDelete.length} مورد بنجاح.${blocked.length > 0 ? ` وتعذر حذف ${blocked.length} لوجود حركة.` : ''}`
+          : `Deleted ${safeToDelete.length} suppliers.${blocked.length > 0 ? ` (${blocked.length} skipped)` : ''}`,
+        'success'
+      );
+    } catch (e: any) {
+      console.error(e);
+      showNotification(e.message || 'حدث خطأ أثناء حذف بعض الموردين', 'error');
+    }
+  };
 
   return (
     <div className="h-full flex flex-col space-y-2 animate-in fade-in duration-500 overflow-hidden w-full px-1 sm:px-3 py-1" dir={dir}>
@@ -873,8 +1058,8 @@ export const Suppliers: React.FC = () => {
         {/* Main List Column */}
         <div className={`flex-1 flex flex-col transition-all duration-700 ease-in-out ${isModalOpen ? 'hidden' : 'w-full'}`}>
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col h-full">
-            <div className="p-2 border-b border-slate-100 flex items-center gap-2 bg-slate-50/30">
-              <div className="relative flex-1 group">
+            <div className="p-2 border-b border-slate-100 flex flex-wrap items-center gap-2 bg-slate-50/30">
+              <div className="relative flex-1 min-w-[200px] group">
                 <Search className={`absolute ${dir === 'rtl' ? 'right-3' : 'left-3'} top-2 text-slate-400 group-focus-within:text-emerald-500 transition-colors pointer-events-none`} size={15} />
                 <input
                   type="text"
@@ -884,6 +1069,64 @@ export const Suppliers: React.FC = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
+
+              {/* Table Columns Dropdown */}
+              <div className="relative" ref={columnSelectorRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsColumnSelectorOpen(!isColumnSelectorOpen)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:text-emerald-600 hover:border-emerald-200 rounded-lg text-xs font-bold transition-all shadow-xs active:scale-95"
+                  title="أعمدة الجدول"
+                >
+                  <Eye size={14} />
+                  <span>أعمدة الجدول</span>
+                  <ChevronDown size={14} className={`transform transition-transform ${isColumnSelectorOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isColumnSelectorOpen && (
+                  <div className={`absolute top-full mt-1.5 ${dir === 'rtl' ? 'left-0' : 'right-0'} w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-150`}>
+                    <div className="px-3 py-1.5 border-b border-slate-100 text-[11px] font-black text-slate-400 uppercase">
+                      {language === 'ar' ? 'تخصيص الأعمدة المعروضة' : 'Customize Columns'}
+                    </div>
+                    <div className="max-h-64 overflow-y-auto custom-scrollbar p-1 space-y-0.5">
+                      {Object.keys(DEFAULT_SUPPLIER_COLUMNS).map((colKey) => (
+                        <label
+                          key={colKey}
+                          className="flex items-center gap-2 px-2.5 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-xs font-bold text-slate-700 select-none transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
+                            checked={visibleColumns[colKey] !== false}
+                            onChange={() => toggleColumn(colKey)}
+                          />
+                          <span>{supplierColumnLabels[colKey] || colKey}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Delete Selected Button */}
+              {selectedSupplierIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleBulkDelete}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95 animate-in fade-in"
+                  title="حذف المحدد"
+                >
+                  <Trash2 size={14} />
+                  <span>{language === 'ar' ? `حذف المحدد (${selectedSupplierIds.length})` : `Delete Selected (${selectedSupplierIds.length})`}</span>
+                </button>
+              )}
+
+              {/* Total Balance Badge */}
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-200/60 rounded-lg text-emerald-800 text-xs font-bold shadow-xs">
+                <span>{selectedSupplierIds.length > 0 ? (language === 'ar' ? 'إجمالي رصيد المحدد:' : 'Selected Balance:') : (language === 'ar' ? 'إجمالي الرصيد الحالي:' : 'Total Current Balance:')}</span>
+                <span className="font-mono text-sm font-black">{formatBalance(totalBalance)}</span>
+              </div>
+
               <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 shadow-inner">
                 <button
                   onClick={() => setView('table')}
@@ -908,16 +1151,27 @@ export const Suppliers: React.FC = () => {
                   <table ref={tableRef} className="w-full">
                     <thead className="sticky top-0 bg-white/95 backdrop-blur-md z-10 border-b border-slate-100">
                       <tr className="text-slate-500 text-[10px] uppercase font-black tracking-wider whitespace-nowrap">
-                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_code')}</th>
-                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_name')}</th>
-                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الهاتف' : 'Phone'}</th>
-                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'طريقة السداد' : 'Payment Method'}</th>
-                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الرقم الضريبي' : 'Tax Number'}</th>
-                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'السجل التجاري' : 'CR Number'}</th>
-                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'حد الائتمان' : 'Credit Limit'}</th>
-                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الحالة' : 'Status'}</th>
-                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>الرصيد الحالي</th>
-                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
+                        <th className="px-2 py-1.5 text-center w-8" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                            checked={isAllSelected}
+                            ref={el => { if (el) el.indeterminate = isIndeterminate; }}
+                            onChange={toggleSelectAll}
+                            title={language === 'ar' ? 'تحديد الكل' : 'Select All'}
+                          />
+                        </th>
+                        {visibleColumns.code !== false && <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_code')}</th>}
+                        {visibleColumns.manual_code !== false && <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'كود يدوي' : 'Manual Code'}</th>}
+                        {visibleColumns.name !== false && <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.column_name')}</th>}
+                        {visibleColumns.mobile !== false && <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الهاتف' : 'Phone'}</th>}
+                        {visibleColumns.payment_method !== false && <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'طريقة السداد' : 'Payment Method'}</th>}
+                        {visibleColumns.tax_number !== false && <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الرقم الضريبي' : 'Tax Number'}</th>}
+                        {visibleColumns.commercial_register !== false && <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'السجل التجاري' : 'CR Number'}</th>}
+                        {visibleColumns.credit_limit !== false && <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'حد الائتمان' : 'Credit Limit'}</th>}
+                        {visibleColumns.status !== false && <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الحالة' : 'Status'}</th>}
+                        {visibleColumns.current_balance !== false && <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>الرصيد الحالي</th>}
+                        <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -937,83 +1191,120 @@ export const Suppliers: React.FC = () => {
                               : editingSupplier?.id === supplier.id ? 'bg-emerald-50 border-emerald-500' : ''
                           }`}
                         >
-                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-mono text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-bold border border-slate-200 group-hover:border-emerald-200 group-hover:text-emerald-700 transition-all">{supplier.code}</span>
-                              {supplier.bank_accounts && supplier.bank_accounts.length > 0 && (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-200" title={language === 'ar' ? `${supplier.bank_accounts.length} حسابات بنكية` : `${supplier.bank_accounts.length} bank accounts`}>
-                                  <Landmark size={10} />
-                                  <span>{supplier.bank_accounts.length}</span>
+                          <td className="px-2 py-1.5 text-center w-8" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                              checked={selectedSupplierIds.includes(supplier.id)}
+                              onChange={() => toggleSelectSupplier(supplier.id)}
+                            />
+                          </td>
+                          {visibleColumns.code !== false && (
+                            <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-bold border border-slate-200 group-hover:border-emerald-200 group-hover:text-emerald-700 transition-all">{supplier.code}</span>
+                                {supplier.bank_accounts && supplier.bank_accounts.length > 0 && (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-200" title={language === 'ar' ? `${supplier.bank_accounts.length} حسابات بنكية` : `${supplier.bank_accounts.length} bank accounts`}>
+                                    <Landmark size={10} />
+                                    <span>{supplier.bank_accounts.length}</span>
+                                  </span>
+                                )}
+                                {supplier.attachments && supplier.attachments.length > 0 && (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold border border-slate-200" title={language === 'ar' ? `${supplier.attachments.length} مرفق` : `${supplier.attachments.length} attachments`}>
+                                    <Paperclip size={10} className="text-emerald-600" />
+                                    <span>{supplier.attachments.length}</span>
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          )}
+                          {visibleColumns.manual_code !== false && (
+                            <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                              {supplier.manual_code ? (
+                                <span className="font-mono text-[10px] bg-emerald-50/80 px-2 py-0.5 rounded text-emerald-700 font-bold border border-emerald-200/60">
+                                  {supplier.manual_code}
                                 </span>
+                              ) : (
+                                <span className="text-slate-300 text-xs font-mono">-</span>
                               )}
-                              {supplier.attachments && supplier.attachments.length > 0 && (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold border border-slate-200" title={language === 'ar' ? `${supplier.attachments.length} مرفق` : `${supplier.attachments.length} attachments`}>
-                                  <Paperclip size={10} className="text-emerald-600" />
-                                  <span>{supplier.attachments.length}</span>
+                            </td>
+                          )}
+                          {visibleColumns.name !== false && (
+                            <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              <span className={`font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors ${editingSupplier?.id === supplier.id ? 'text-emerald-700' : ''}`}>{supplier.name}</span>
+                            </td>
+                          )}
+                          {visibleColumns.mobile !== false && (
+                            <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                              {supplier.mobile ? (
+                                <span className="text-xs text-slate-600 font-mono dir-ltr inline-block font-medium">{supplier.mobile}</span>
+                              ) : (
+                                <span className="text-slate-300 text-xs font-mono">-</span>
+                              )}
+                            </td>
+                          )}
+                          {visibleColumns.payment_method !== false && (
+                            <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                              {supplier.payment_method ? (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
+                                  {supplier.payment_method === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') :
+                                   supplier.payment_method === 'credit' ? (language === 'ar' ? 'آجل' : 'Credit') :
+                                   supplier.payment_method === 'installments' ? (language === 'ar' ? 'دفعات' : 'Installments') : 
+                                   (language === 'ar' ? 'أخرى' : 'Other')}
                                 </span>
+                              ) : (
+                                <span className="text-slate-300 text-xs font-mono">-</span>
                               )}
-                            </div>
-                          </td>
-                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                            <span className={`font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors ${editingSupplier?.id === supplier.id ? 'text-emerald-700' : ''}`}>{supplier.name}</span>
-                          </td>
-                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
-                            {supplier.mobile ? (
-                              <span className="text-xs text-slate-600 font-mono dir-ltr inline-block font-medium">{supplier.mobile}</span>
-                            ) : (
-                              <span className="text-slate-300 text-xs font-mono">-</span>
-                            )}
-                          </td>
-                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
-                            {supplier.payment_method ? (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
-                                {supplier.payment_method === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') :
-                                 supplier.payment_method === 'credit' ? (language === 'ar' ? 'آجل' : 'Credit') :
-                                 supplier.payment_method === 'installments' ? (language === 'ar' ? 'دفعات' : 'Installments') : 
-                                 (language === 'ar' ? 'أخرى' : 'Other')}
+                            </td>
+                          )}
+                          {visibleColumns.tax_number !== false && (
+                            <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                              {supplier.tax_number ? (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200/20 dir-ltr font-mono">
+                                  {supplier.tax_number}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300 text-xs font-mono">-</span>
+                              )}
+                            </td>
+                          )}
+                          {visibleColumns.commercial_register !== false && (
+                            <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                              {supplier.commercial_register ? (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded border border-purple-200/30 dir-ltr font-mono">
+                                  {supplier.commercial_register}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300 text-xs font-mono">-</span>
+                              )}
+                            </td>
+                          )}
+                          {visibleColumns.credit_limit !== false && (
+                            <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                              {supplier.credit_limit > 0 ? (
+                                <span className="text-[11px] font-bold px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded border border-amber-200/20 font-mono">
+                                  {formatNumber(supplier.credit_limit)}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300 text-xs font-mono">-</span>
+                              )}
+                            </td>
+                          )}
+                          {visibleColumns.status !== false && (
+                            <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${supplier.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                {supplier.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
                               </span>
-                            ) : (
-                              <span className="text-slate-300 text-xs font-mono">-</span>
-                            )}
-                          </td>
-                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
-                            {supplier.tax_number ? (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200/20 dir-ltr font-mono">
-                                {supplier.tax_number}
+                            </td>
+                          )}
+                          {visibleColumns.current_balance !== false && (
+                            <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                              <span className={`font-bold text-xs px-2 py-0.5 rounded-md ${getSupplierBalance(supplier.id) >= 0 ? 'bg-emerald-100/70 text-emerald-800' : 'bg-rose-100/70 text-rose-800'} border border-emerald-200/20 font-mono`}>
+                                {formatBalance(getSupplierBalance(supplier.id))}
                               </span>
-                            ) : (
-                              <span className="text-slate-300 text-xs font-mono">-</span>
-                            )}
-                          </td>
-                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
-                            {supplier.commercial_register ? (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded border border-purple-200/30 dir-ltr font-mono">
-                                {supplier.commercial_register}
-                              </span>
-                            ) : (
-                              <span className="text-slate-300 text-xs font-mono">-</span>
-                            )}
-                          </td>
-                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
-                            {supplier.credit_limit > 0 ? (
-                              <span className="text-[11px] font-bold px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded border border-amber-200/20 font-mono">
-                                {formatNumber(supplier.credit_limit)}
-                              </span>
-                            ) : (
-                              <span className="text-slate-300 text-xs font-mono">-</span>
-                            )}
-                          </td>
-                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${supplier.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                              {supplier.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
-                            </span>
-                          </td>
-                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
-                            <span className={`font-bold text-xs px-2 py-0.5 rounded-md ${getSupplierBalance(supplier.id) >= 0 ? 'bg-emerald-100/70 text-emerald-800' : 'bg-rose-100/70 text-rose-800'} border border-emerald-200/20 font-mono`}>
-                              {formatBalance(getSupplierBalance(supplier.id))}
-                            </span>
-                          </td>
-                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-left' : 'text-right'} whitespace-nowrap`}>
+                            </td>
+                          )}
+                          <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-left' : 'text-right'} whitespace-nowrap`}>
                             {pendingEtaSupplierForLinking ? (
                               <button
                                 type="button"
@@ -1351,6 +1642,23 @@ export const Suppliers: React.FC = () => {
                               </div>
                             </div>
                           )}
+
+                          {/* Manual Code */}
+                          <div className="sm:col-span-2 space-y-0.5">
+                            <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              {language === 'ar' ? 'كود يدوي' : 'Manual Code'} <span className="text-[9px] text-slate-400 font-normal">({language === 'ar' ? 'اختياري' : 'Optional'})</span>
+                            </label>
+                            <div className="relative group">
+                              <Hash className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={13} />
+                              <input
+                                type="text"
+                                placeholder={language === 'ar' ? 'مثال: SUPP-MAN-01' : 'e.g. SUPP-MAN-01'}
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-xs focus:ring-1 focus:ring-emerald-500 outline-none transition-all ps-7 font-mono"
+                                value={formData.manual_code || ''}
+                                onChange={(e) => setFormData({ ...formData, manual_code: e.target.value })}
+                              />
+                            </div>
+                          </div>
 
                           {/* Mobile */}
                           <div className="space-y-0.5">

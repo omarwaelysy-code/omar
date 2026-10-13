@@ -7,7 +7,8 @@ import { getDefaultAccount, getCompatibleAccounts, useDefaultAccounts } from '..
 import { 
   Search, Plus, Edit2, Trash2, X, History, FileText, User, 
   Hash, Box, Wallet, Calendar, Phone, Mail, MapPin, Lock,
-  LayoutGrid, List, ChevronRight, ChevronLeft, AlertCircle, CreditCard, FileUp, Paperclip, Building2
+  LayoutGrid, List, ChevronRight, ChevronLeft, AlertCircle, CreditCard, FileUp, Paperclip, Building2,
+  Eye, ChevronDown, CheckSquare, Square
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../services/dbService';
@@ -46,32 +47,57 @@ export const Customers: React.FC = () => {
   const [view, setView] = useViewPreference('customers', 'table');
   const [showImportWizard, setShowImportWizard] = useState(false);
 
-  const handleExportExcel = () => {
-    const headers = {
-      'code': t('customers.column_code'),
-      'name': t('customers.column_name'),
-      'mobile': t('customers.form_mobile'),
-      'email': t('customers.form_email'),
-      'address': t('customers.form_address'),
-      'opening_balance': t('customers.form_opening_balance')
-    };
-    const formattedData = formatDataForExcel(customers, headers);
-    exportToExcel(formattedData, { filename: 'Customers_List', sheetName: t('customers.title') });
+  // Column Visibility & Selection
+  const DEFAULT_CUSTOMER_COLUMNS: { [key: string]: boolean } = {
+    code: true,
+    manual_code: true,
+    name: true,
+    mobile: true,
+    payment_method: true,
+    tax_number: true,
+    commercial_register: true,
+    credit_limit: true,
+    status: true,
+    current_balance: true
   };
 
-  const handleExportPDF = async () => {
-    if (tableRef.current) {
-      await exportToPDFUtil(tableRef.current, { 
-        filename: 'Customers_List',
-        reportTitle: t('customers.list_title'),
-        orientation: 'landscape'
-      });
+  const [visibleColumns, setVisibleColumns] = useState<{ [key: string]: boolean }>(() => {
+    try {
+      const saved = localStorage.getItem('customers_visible_columns');
+      return saved ? { ...DEFAULT_CUSTOMER_COLUMNS, ...JSON.parse(saved) } : DEFAULT_CUSTOMER_COLUMNS;
+    } catch {
+      return DEFAULT_CUSTOMER_COLUMNS;
     }
+  });
+  const [isColumnSelectorOpen, setIsColumnSelectorOpen] = useState(false);
+  const columnSelectorRef = useRef<HTMLDivElement>(null);
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (columnSelectorRef.current && !columnSelectorRef.current.contains(e.target as Node)) {
+        setIsColumnSelectorOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const toggleColumn = (key: string) => {
+    setVisibleColumns(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      try {
+        localStorage.setItem('customers_visible_columns', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   };
+
   const [formData, setFormData] = useState({ 
     name: '', 
     mobile: '', 
     email: '', 
+    manual_code: '',
     tax_number: '',
     commercial_register: '',
     address: '',
@@ -218,6 +244,7 @@ export const Customers: React.FC = () => {
       if (editingCustomer) {
         const fieldsToTrack = [
           { field: 'name', label: 'اسم العميل' },
+          { field: 'manual_code', label: 'كود يدوي' },
           { field: 'mobile', label: 'رقم الهاتف' },
           { field: 'email', label: 'البريد الإلكتروني' },
           { field: 'tax_number', label: 'الرقم الضريبي' },
@@ -383,6 +410,7 @@ export const Customers: React.FC = () => {
         setEditingCustomer(fullData);
         setFormData({ 
           name: fullData.name, 
+          manual_code: fullData.manual_code || '',
           mobile: fullData.mobile,
           email: fullData.email || '',
           tax_number: fullData.tax_number || '',
@@ -413,6 +441,7 @@ export const Customers: React.FC = () => {
       setEditingCustomer(null);
       setFormData({ 
         name: '', 
+        manual_code: '',
         mobile: '', 
         email: '', 
         tax_number: '',
@@ -462,8 +491,164 @@ export const Customers: React.FC = () => {
 
   const filteredCustomers = customers.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.code.toLowerCase().includes(searchTerm.toLowerCase())
+    c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (c.manual_code && c.manual_code.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  const isAllSelected = useMemo(() => {
+    return filteredCustomers.length > 0 && filteredCustomers.every(c => selectedCustomerIds.includes(c.id));
+  }, [filteredCustomers, selectedCustomerIds]);
+
+  const isIndeterminate = useMemo(() => {
+    return selectedCustomerIds.length > 0 && !isAllSelected;
+  }, [selectedCustomerIds, isAllSelected]);
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedCustomerIds([]);
+    } else {
+      setSelectedCustomerIds(filteredCustomers.map(c => c.id));
+    }
+  };
+
+  const toggleSelectCustomer = (id: string) => {
+    setSelectedCustomerIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const totalBalance = useMemo(() => {
+    const list = selectedCustomerIds.length > 0
+      ? filteredCustomers.filter(c => selectedCustomerIds.includes(c.id))
+      : filteredCustomers;
+    return list.reduce((sum, c) => sum + getCustomerBalance(c.id), 0);
+  }, [filteredCustomers, selectedCustomerIds, entries]);
+
+  const customerColumnLabels: Record<string, string> = {
+    code: t('customers.column_code'),
+    manual_code: language === 'ar' ? 'كود يدوي' : 'Manual Code',
+    name: t('customers.column_name'),
+    mobile: language === 'ar' ? 'الهاتف' : 'Phone',
+    payment_method: language === 'ar' ? 'طريقة السداد' : 'Payment Method',
+    tax_number: language === 'ar' ? 'الرقم الضريبي' : 'Tax Number',
+    commercial_register: language === 'ar' ? 'السجل التجاري' : 'CR Number',
+    credit_limit: language === 'ar' ? 'حد الائتمان' : 'Credit Limit',
+    status: language === 'ar' ? 'الحالة' : 'Status',
+    current_balance: language === 'ar' ? 'الرصيد الحالي' : 'Current Balance'
+  };
+
+  const handleExportExcel = () => {
+    const allHeaders: Record<string, { label: string; format?: (c: Customer) => any }> = {
+      code: { label: t('customers.column_code'), format: (c) => c.code },
+      manual_code: { label: language === 'ar' ? 'كود يدوي' : 'Manual Code', format: (c) => c.manual_code || '-' },
+      name: { label: t('customers.column_name'), format: (c) => c.name },
+      mobile: { label: language === 'ar' ? 'الهاتف' : 'Phone', format: (c) => c.mobile || '-' },
+      payment_method: { 
+        label: language === 'ar' ? 'طريقة السداد' : 'Payment Method', 
+        format: (c) => c.payment_method === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') :
+                       c.payment_method === 'credit' ? (language === 'ar' ? 'آجل' : 'Credit') :
+                       c.payment_method === 'installments' ? (language === 'ar' ? 'دفعات' : 'Installments') : (c.payment_method || '-')
+      },
+      tax_number: { label: language === 'ar' ? 'الرقم الضريبي' : 'Tax Number', format: (c) => c.tax_number || '-' },
+      commercial_register: { label: language === 'ar' ? 'السجل التجاري' : 'CR Number', format: (c) => c.commercial_register || '-' },
+      credit_limit: { label: language === 'ar' ? 'حد الائتمان' : 'Credit Limit', format: (c) => c.credit_limit || 0 },
+      status: { label: language === 'ar' ? 'الحالة' : 'Status', format: (c) => c.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive') },
+      current_balance: { label: language === 'ar' ? 'الرصيد الحالي' : 'Current Balance', format: (c) => getCustomerBalance(c.id) }
+    };
+
+    const activeHeaders: Record<string, string> = {};
+    Object.keys(visibleColumns).forEach(k => {
+      if (visibleColumns[k] !== false && allHeaders[k]) {
+        activeHeaders[k] = allHeaders[k].label;
+      }
+    });
+
+    const dataset = (selectedCustomerIds.length > 0 
+      ? filteredCustomers.filter(c => selectedCustomerIds.includes(c.id))
+      : filteredCustomers
+    ).map(c => {
+      const row: any = {};
+      Object.keys(visibleColumns).forEach(k => {
+        if (visibleColumns[k] !== false && allHeaders[k]) {
+          row[k] = allHeaders[k].format ? allHeaders[k].format(c) : (c as any)[k];
+        }
+      });
+      return row;
+    });
+
+    const formattedData = formatDataForExcel(dataset, activeHeaders);
+    exportToExcel(formattedData, { filename: 'Customers_List', sheetName: t('customers.title') });
+  };
+
+  const handleExportPDF = async () => {
+    if (tableRef.current) {
+      await exportToPDFUtil(tableRef.current, { 
+        filename: 'Customers_List',
+        reportTitle: t('customers.list_title'),
+        orientation: 'landscape'
+      });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedCustomerIds.length === 0) return;
+    
+    const safeToDelete: string[] = [];
+    const blocked: { name: string; reason: string }[] = [];
+
+    for (const id of selectedCustomerIds) {
+      const customer = customers.find(c => c.id === id);
+      const custName = customer?.name || id;
+
+      const hasInvoices = invoices.some(i => i.customer_id === id);
+      const hasReturns = returns.some(r => r.customer_id === id);
+      const hasReceipts = receipts.some(r => r.customer_id === id);
+      const hasDiscounts = discounts.some(d => d.customer_id === id);
+      const hasJE = entries.some(je => je.items?.some((i: any) => (i.customer_id === id || i.sub_account_id === id) && je.reference_type !== 'opening_balance'));
+
+      if (hasInvoices || hasReturns || hasReceipts || hasDiscounts || hasJE) {
+        blocked.push({ name: custName, reason: 'معاملات مسجلة' });
+      } else {
+        safeToDelete.push(id);
+      }
+    }
+
+    if (blocked.length > 0 && safeToDelete.length === 0) {
+      showNotification(
+        language === 'ar'
+          ? `لا يمكن حذف أي من العملاء المحددين (${blocked.length}) لوجود حركات ومعاملات مالية مسجلة عليهم: ${blocked.map(b => b.name).join('، ')}`
+          : `Cannot delete selected customers (${blocked.length}) because they have associated transactions: ${blocked.map(b => b.name).join(', ')}`,
+        'error'
+      );
+      return;
+    }
+
+    const confirmMsg = blocked.length > 0
+      ? (language === 'ar'
+          ? `تنبيه: يوجد (${blocked.length}) عميل مرتبط بمعاملات وفواتير ولا يمكن حذفهم حفاظاً على الدفاتر: (${blocked.map(b => b.name).join('، ')}).\n\nهل ترغب في حذف باقي العملاء (${safeToDelete.length}) غير المرتبطين بأي حركات نهائياً؟`
+          : `Notice: ${blocked.length} customers have transactions and cannot be deleted. Do you want to delete the remaining ${safeToDelete.length} customer(s)?`)
+      : (language === 'ar'
+          ? `هل أنت متأكد من حذف ${safeToDelete.length} عميل محدد؟`
+          : `Are you sure you want to delete ${safeToDelete.length} selected customer(s)?`);
+
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      for (const id of safeToDelete) {
+        await dbService.deleteJournalEntryByReference(id, user!.company_id);
+        await dbService.delete('customers', id);
+      }
+      setSelectedCustomerIds([]);
+      showNotification(
+        language === 'ar'
+          ? `تم حذف ${safeToDelete.length} عميل بنجاح`
+          : `Successfully deleted ${safeToDelete.length} customer(s)`,
+        'success'
+      );
+    } catch (err: any) {
+      showNotification(err.message || 'حدث خطأ أثناء الحذف', 'error');
+    }
+  };
 
   if (!canView) {
     return (
@@ -504,6 +689,52 @@ export const Customers: React.FC = () => {
               onExportPDF={handleExportPDF} 
               onPrint={() => printElement(tableRef.current, t('customers.list_title'))}
             />
+
+            {/* Column Customization Dropdown (أعمدة الجدول) */}
+            <div className="relative" ref={columnSelectorRef}>
+              <button
+                type="button"
+                onClick={() => setIsColumnSelectorOpen(!isColumnSelectorOpen)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 transition-all shadow-xs active:scale-95"
+              >
+                <Eye size={14} className="text-slate-400" />
+                <span>{language === 'ar' ? 'أعمدة الجدول' : 'Table Columns'}</span>
+                <ChevronDown size={14} className="text-slate-400" />
+              </button>
+              
+              {isColumnSelectorOpen && (
+                <div className="absolute top-full mt-1.5 right-0 bg-white border border-slate-200 rounded-xl shadow-xl p-3 z-50 min-w-[210px] max-h-[320px] overflow-y-auto space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider pb-1 border-b border-slate-100 flex items-center justify-between">
+                    <span>{language === 'ar' ? 'تخصيص الأعمدة' : 'Customize Columns'}</span>
+                    <span className="text-[9px] text-emerald-600 font-bold">{Object.values(visibleColumns).filter(Boolean).length} / {Object.keys(customerColumnLabels).length}</span>
+                  </div>
+                  {Object.entries(customerColumnLabels).map(([colKey, label]) => (
+                    <label key={colKey} className="flex items-center gap-2 p-1 hover:bg-slate-50 rounded-lg cursor-pointer text-xs font-bold text-slate-700 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={visibleColumns[colKey] !== false}
+                        onChange={() => toggleColumn(colKey)}
+                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {canDelete && selectedCustomerIds.length > 0 && (
+              <button
+                type="button"
+                onClick={handleBulkDelete}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 text-white rounded-lg font-bold text-xs hover:bg-rose-700 transition-all shadow-sm active:scale-95 animate-in fade-in"
+                title={language === 'ar' ? 'حذف المحدد' : 'Delete Selected'}
+              >
+                <Trash2 size={14} />
+                <span>{language === 'ar' ? `حذف المحدد (${selectedCustomerIds.length})` : `Delete (${selectedCustomerIds.length})`}</span>
+              </button>
+            )}
+
             {canCreate && (
               <button
                 onClick={() => setShowImportWizard(true)}
@@ -531,51 +762,100 @@ export const Customers: React.FC = () => {
         {/* Main List Column */}
         <div className={`flex-1 flex flex-col transition-all duration-500 ease-in-out ${isModalOpen ? 'hidden' : 'w-full'}`}>
           <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col h-full">
-            <div className="p-2 border-b border-slate-100 flex items-center gap-2 bg-slate-50/30">
-              <div className="relative flex-1 group">
-                <Search className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 group-focus-within:text-emerald-500 transition-colors pointer-events-none`} size={15} />
-                <input
-                  type="text"
-                  placeholder={t('customers.search_placeholder')}
-                  className={`w-full ${dir === 'rtl' ? 'pr-8 pl-3' : 'pl-8 pr-3'} py-1.5 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-emerald-500 outline-none transition-all font-bold text-xs text-slate-900 placeholder:text-slate-400`}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+            <div className="p-2 border-b border-slate-100 flex items-center justify-between gap-2 bg-slate-50/30 flex-wrap">
+              <div className="flex items-center gap-2 flex-1 min-w-[250px]">
+                <div className="relative flex-1 group">
+                  <Search className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400 group-focus-within:text-emerald-500 transition-colors pointer-events-none`} size={15} />
+                  <input
+                    type="text"
+                    placeholder={t('customers.search_placeholder')}
+                    className={`w-full ${dir === 'rtl' ? 'pr-8 pl-3' : 'pl-8 pr-3'} py-1.5 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-emerald-500 outline-none transition-all font-bold text-xs text-slate-900 placeholder:text-slate-400`}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 shadow-inner">
+                  <button
+                    onClick={() => setView('table')}
+                    className={`p-1.5 rounded-md transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-xs border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}
+                    title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
+                  >
+                    <List size={16} />
+                  </button>
+                  <button
+                    onClick={() => setView('card')}
+                    className={`p-1.5 rounded-md transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-xs border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}
+                    title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
+                  >
+                    <LayoutGrid size={16} />
+                  </button>
+                </div>
               </div>
-              <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 shadow-inner">
-                <button
-                  onClick={() => setView('table')}
-                  className={`p-1.5 rounded-md transition-all ${view === 'table' ? 'bg-white text-emerald-600 shadow-xs border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}
-                  title={language === 'ar' ? 'عرض الجدول' : 'Table View'}
-                >
-                  <List size={16} />
-                </button>
-                <button
-                  onClick={() => setView('card')}
-                  className={`p-1.5 rounded-md transition-all ${view === 'card' ? 'bg-white text-emerald-600 shadow-xs border border-slate-100' : 'text-slate-500 hover:text-slate-700'}`}
-                  title={language === 'ar' ? 'عرض الكروت' : 'Card View'}
-                >
-                  <LayoutGrid size={16} />
-                </button>
+
+              {/* Total Balance Badge (إجمالي الرصيد الحالي / المحدد) */}
+              <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50/90 border border-emerald-200/70 rounded-lg shadow-2xs">
+                <Wallet size={14} className="text-emerald-600 shrink-0" />
+                <span className="text-[11px] font-bold text-slate-600 whitespace-nowrap">
+                  {selectedCustomerIds.length > 0 
+                    ? (language === 'ar' ? `إجمالي رصيد المحدد (${selectedCustomerIds.length}):` : `Selected Balance (${selectedCustomerIds.length}):`)
+                    : (language === 'ar' ? 'إجمالي الرصيد الحالي:' : 'Total Current Balance:')
+                  }
+                </span>
+                <span className={`text-xs font-black font-mono px-2 py-0.5 rounded ${totalBalance >= 0 ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}>
+                  {formatBalance(totalBalance)} {language === 'ar' ? 'ج.م' : 'EGP'}
+                </span>
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar">
               {view === 'table' ? (
                 <div className="hidden md:block overflow-x-auto h-full">
-                  <table ref={tableRef} className="w-full">
+                  <table ref={tableRef} className="w-full text-xs">
                     <thead className="sticky top-0 bg-white/95 backdrop-blur-md z-10 border-b border-slate-100">
                       <tr className="text-slate-500 text-[10px] uppercase font-black tracking-wider whitespace-nowrap">
-                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_code')}</th>
-                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_name')}</th>
-                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الهاتف' : 'Phone'}</th>
-                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'طريقة السداد' : 'Payment Method'}</th>
-                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الرقم الضريبي' : 'Tax Number'}</th>
-                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'السجل التجاري' : 'CR Number'}</th>
-                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'حد الائتمان' : 'Credit Limit'}</th>
-                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الحالة' : 'Status'}</th>
-                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>الرصيد الحالي</th>
-                        <th className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
+                        <th className="px-2 py-1.5 w-8 text-center">
+                          <input
+                            type="checkbox"
+                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
+                            checked={isAllSelected}
+                            ref={input => {
+                              if (input) input.indeterminate = isIndeterminate;
+                            }}
+                            onChange={toggleSelectAll}
+                            title={language === 'ar' ? 'تحديد الكل' : 'Select All'}
+                          />
+                        </th>
+                        {visibleColumns.code !== false && (
+                          <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_code')}</th>
+                        )}
+                        {visibleColumns.manual_code !== false && (
+                          <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'كود يدوي' : 'Manual Code'}</th>
+                        )}
+                        {visibleColumns.name !== false && (
+                          <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('customers.column_name')}</th>
+                        )}
+                        {visibleColumns.mobile !== false && (
+                          <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الهاتف' : 'Phone'}</th>
+                        )}
+                        {visibleColumns.payment_method !== false && (
+                          <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'طريقة السداد' : 'Payment Method'}</th>
+                        )}
+                        {visibleColumns.tax_number !== false && (
+                          <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الرقم الضريبي' : 'Tax Number'}</th>
+                        )}
+                        {visibleColumns.commercial_register !== false && (
+                          <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'السجل التجاري' : 'CR Number'}</th>
+                        )}
+                        {visibleColumns.credit_limit !== false && (
+                          <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'حد الائتمان' : 'Credit Limit'}</th>
+                        )}
+                        {visibleColumns.status !== false && (
+                          <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الحالة' : 'Status'}</th>
+                        )}
+                        {visibleColumns.current_balance !== false && (
+                          <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>الرصيد الحالي</th>
+                        )}
+                        <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -583,79 +863,114 @@ export const Customers: React.FC = () => {
                         <tr 
                           key={customer.id} 
                           onClick={() => openModal(customer)}
-                          className={`hover:bg-emerald-50/40 transition-all group cursor-pointer border-transparent border-x-2 ${editingCustomer?.id === customer.id ? 'bg-emerald-50/80 border-emerald-500' : ''}`}
+                          className={`hover:bg-emerald-50/40 transition-all group cursor-pointer border-transparent border-x-2 ${editingCustomer?.id === customer.id ? 'bg-emerald-50/80 border-emerald-500' : ''} ${selectedCustomerIds.includes(customer.id) ? 'bg-emerald-50/30' : ''}`}
                         >
-                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-mono text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-bold border border-slate-200 group-hover:border-emerald-200 group-hover:text-emerald-700 transition-all">{customer.code}</span>
-                              {customer.attachments && customer.attachments.length > 0 && (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold border border-slate-200" title={language === 'ar' ? `${customer.attachments.length} مرفق` : `${customer.attachments.length} attachments`}>
-                                  <Paperclip size={10} className="text-emerald-600" />
-                                  <span>{customer.attachments.length}</span>
-                                </span>
+                          <td className="px-2 py-1.5 w-8 text-center" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
+                              checked={selectedCustomerIds.includes(customer.id)}
+                              onChange={() => toggleSelectCustomer(customer.id)}
+                            />
+                          </td>
+                          {visibleColumns.code !== false && (
+                            <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold border border-slate-200 group-hover:border-emerald-200 group-hover:text-emerald-700 transition-all">{customer.code}</span>
+                                {customer.attachments && customer.attachments.length > 0 && (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold border border-slate-200" title={language === 'ar' ? `${customer.attachments.length} مرفق` : `${customer.attachments.length} attachments`}>
+                                    <Paperclip size={10} className="text-emerald-600" />
+                                    <span>{customer.attachments.length}</span>
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          )}
+                          {visibleColumns.manual_code !== false && (
+                            <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                              {customer.manual_code ? (
+                                <span className="font-mono text-[10px] bg-slate-50 px-1.5 py-0.5 rounded text-slate-700 font-bold border border-slate-200">{customer.manual_code}</span>
+                              ) : (
+                                <span className="text-slate-300 text-xs font-mono">-</span>
                               )}
-                            </div>
-                          </td>
-                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                            <span className={`font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors ${editingCustomer?.id === customer.id ? 'text-emerald-700' : ''}`}>{customer.name}</span>
-                          </td>
-                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
-                            {customer.mobile ? (
-                              <span className="text-xs text-slate-600 font-mono dir-ltr inline-block font-medium">{customer.mobile}</span>
-                            ) : (
-                              <span className="text-slate-300 text-xs font-mono">-</span>
-                            )}
-                          </td>
-                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
-                            {customer.payment_method ? (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
-                                {customer.payment_method === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') :
-                                 customer.payment_method === 'credit' ? (language === 'ar' ? 'آجل' : 'Credit') :
-                                 customer.payment_method === 'installments' ? (language === 'ar' ? 'دفعات' : 'Installments') : 
-                                 (language === 'ar' ? 'أخرى' : 'Other')}
+                            </td>
+                          )}
+                          {visibleColumns.name !== false && (
+                            <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                              <span className={`font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors ${editingCustomer?.id === customer.id ? 'text-emerald-700' : ''}`}>{customer.name}</span>
+                            </td>
+                          )}
+                          {visibleColumns.mobile !== false && (
+                            <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                              {customer.mobile ? (
+                                <span className="text-xs text-slate-600 font-mono dir-ltr inline-block font-medium">{customer.mobile}</span>
+                              ) : (
+                                <span className="text-slate-300 text-xs font-mono">-</span>
+                              )}
+                            </td>
+                          )}
+                          {visibleColumns.payment_method !== false && (
+                            <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                              {customer.payment_method ? (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">
+                                  {customer.payment_method === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash') :
+                                   customer.payment_method === 'credit' ? (language === 'ar' ? 'آجل' : 'Credit') :
+                                   customer.payment_method === 'installments' ? (language === 'ar' ? 'دفعات' : 'Installments') : 
+                                   (language === 'ar' ? 'أخرى' : 'Other')}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300 text-xs font-mono">-</span>
+                              )}
+                            </td>
+                          )}
+                          {visibleColumns.tax_number !== false && (
+                            <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                              {customer.tax_number ? (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200/20 dir-ltr font-mono">
+                                  {customer.tax_number}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300 text-xs font-mono">-</span>
+                              )}
+                            </td>
+                          )}
+                          {visibleColumns.commercial_register !== false && (
+                            <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                              {customer.commercial_register ? (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded border border-purple-200/30 dir-ltr font-mono">
+                                  {customer.commercial_register}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300 text-xs font-mono">-</span>
+                              )}
+                            </td>
+                          )}
+                          {visibleColumns.credit_limit !== false && (
+                            <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                              {customer.credit_limit > 0 ? (
+                                <span className="text-[11px] font-bold px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded border border-amber-200/20 font-mono">
+                                  {formatNumber(customer.credit_limit)}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300 text-xs font-mono">-</span>
+                              )}
+                            </td>
+                          )}
+                          {visibleColumns.status !== false && (
+                            <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${customer.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                {customer.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
                               </span>
-                            ) : (
-                              <span className="text-slate-300 text-xs font-mono">-</span>
-                            )}
-                          </td>
-                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
-                            {customer.tax_number ? (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200/20 dir-ltr font-mono">
-                                {customer.tax_number}
+                            </td>
+                          )}
+                          {visibleColumns.current_balance !== false && (
+                            <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
+                              <span className={`font-bold text-xs px-2 py-0.5 rounded-md ${getCustomerBalance(customer.id) >= 0 ? 'bg-emerald-100/70 text-emerald-800' : 'bg-rose-100/70 text-rose-800'} border border-emerald-200/20 font-mono`}>
+                                {formatBalance(getCustomerBalance(customer.id))}
                               </span>
-                            ) : (
-                              <span className="text-slate-300 text-xs font-mono">-</span>
-                            )}
-                          </td>
-                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
-                            {customer.commercial_register ? (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded border border-purple-200/30 dir-ltr font-mono">
-                                {customer.commercial_register}
-                              </span>
-                            ) : (
-                              <span className="text-slate-300 text-xs font-mono">-</span>
-                            )}
-                          </td>
-                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
-                            {customer.credit_limit > 0 ? (
-                              <span className="text-[11px] font-bold px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded border border-amber-200/20 font-mono">
-                                {formatNumber(customer.credit_limit)}
-                              </span>
-                            ) : (
-                              <span className="text-slate-300 text-xs font-mono">-</span>
-                            )}
-                          </td>
-                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${customer.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/20' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                              {customer.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
-                            </span>
-                          </td>
-                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-right' : 'text-left'} whitespace-nowrap`}>
-                            <span className={`font-bold text-xs px-2 py-0.5 rounded-md ${getCustomerBalance(customer.id) >= 0 ? 'bg-emerald-100/70 text-emerald-800' : 'bg-rose-100/70 text-rose-800'} border border-emerald-200/20 font-mono`}>
-                              {formatBalance(getCustomerBalance(customer.id))}
-                            </span>
-                          </td>
-                          <td className={`px-3 py-2.5 ${dir === 'rtl' ? 'text-left' : 'text-right'} whitespace-nowrap`}>
+                            </td>
+                          )}
+                          <td className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-left' : 'text-right'} whitespace-nowrap`}>
                             <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1 opacity-0 group-hover:opacity-100 transition-all`}>
                                {canDelete && (
                                 <button 
@@ -663,11 +978,11 @@ export const Customers: React.FC = () => {
                                   className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
                                   title="حذف"
                                 >
-                                  <Trash2 size={15} />
+                                  <Trash2 size={14} />
                                 </button>
                               )}
                               <div className="p-1 text-emerald-500 bg-emerald-50 rounded-lg">
-                                 {dir === 'rtl' ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
+                                 {dir === 'rtl' ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
                               </div>
                             </div>
                           </td>
@@ -815,7 +1130,7 @@ export const Customers: React.FC = () => {
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {/* Name */}
-                          <div className="sm:col-span-2 space-y-0.5">
+                          <div className="space-y-0.5">
                             <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">{t('customers.form_name')}</label>
                             <input
                               required
@@ -825,6 +1140,23 @@ export const Customers: React.FC = () => {
                               value={formData.name}
                               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             />
+                          </div>
+
+                          {/* Manual Code (كود يدوي) */}
+                          <div className="space-y-0.5">
+                            <label className="block text-[10px] font-bold text-slate-500 px-0.5 mb-0.5">
+                              {language === 'ar' ? 'كود يدوي' : 'Manual Code'} <span className="text-[9px] text-slate-400 font-normal">({language === 'ar' ? 'اختياري' : 'Optional'})</span>
+                            </label>
+                            <div className="relative group">
+                              <Hash className={`absolute ${dir === 'rtl' ? 'right-2.5' : 'left-2.5'} top-2 text-slate-400`} size={14} />
+                              <input
+                                type="text"
+                                placeholder={language === 'ar' ? 'كود يدوي' : 'Manual Code'}
+                                className={`w-full ${dir === 'rtl' ? 'pr-7 pl-2.5' : 'pl-7 pr-2.5'} py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500 transition-all font-mono`}
+                                value={formData.manual_code || ''}
+                                onChange={(e) => setFormData({ ...formData, manual_code: e.target.value })}
+                              />
+                            </div>
                           </div>
 
                           {/* Code (if editing) */}

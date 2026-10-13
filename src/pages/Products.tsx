@@ -3,7 +3,7 @@ import {
   Search, Plus, Trash2, X, Package, History, ChevronRight, ChevronLeft, ChevronDown, Folder, FolderOpen, 
   Wallet, Layers, Hash, User, Calendar, Paperclip, LayoutGrid, List,
   Lock, Camera, Printer, Download, Upload, FileText, RefreshCw, AlertCircle, Settings, FileUp, Percent,
-  Link2, Check, Sparkles, CheckCircle, Clock, ShieldCheck, Filter
+  Link2, Check, Sparkles, CheckCircle, Clock, ShieldCheck, Filter, Eye
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Barcode from 'react-barcode';
@@ -258,6 +258,50 @@ export const Products: React.FC = () => {
   const isPurchaseWhtEnabled = !!(company?.settings?.purchase_wht_enabled ?? (company as any)?.purchase_wht_enabled);
   const isReadOnly = editingProduct ? !canEdit : !canCreate;
 
+  // Column Visibility & Selection
+  const DEFAULT_PRODUCT_COLUMNS: { [key: string]: boolean } = {
+    code: true,
+    manual_code: true,
+    name: true,
+    eta_item_code: true,
+    tax_item_code: true,
+    status: true,
+    type: true,
+    stock: true,
+    sale_price: true
+  };
+
+  const [visibleColumns, setVisibleColumns] = useState<{ [key: string]: boolean }>(() => {
+    try {
+      const saved = localStorage.getItem('products_visible_columns');
+      return saved ? { ...DEFAULT_PRODUCT_COLUMNS, ...JSON.parse(saved) } : DEFAULT_PRODUCT_COLUMNS;
+    } catch {
+      return DEFAULT_PRODUCT_COLUMNS;
+    }
+  });
+  const [isColumnSelectorOpen, setIsColumnSelectorOpen] = useState(false);
+  const columnSelectorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (columnSelectorRef.current && !columnSelectorRef.current.contains(e.target as Node)) {
+        setIsColumnSelectorOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const toggleColumn = (key: string) => {
+    setVisibleColumns(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      try {
+        localStorage.setItem('products_visible_columns', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
   // Barcode Systems States
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [isBarcodeSettingsOpen, setIsBarcodeSettingsOpen] = useState(false);
@@ -286,6 +330,7 @@ export const Products: React.FC = () => {
 
   const [formData, setFormData] = useState({ 
     code: '', 
+    manual_code: '',
     name: '', 
     type: 'finished_good' as 'service' | 'finished_good' | 'raw_material' | 'commodity' | 'consumable' | 'packaging',
     category: '',
@@ -698,7 +743,8 @@ export const Products: React.FC = () => {
         sales_withholding_tax_rate: Number(formData.sales_withholding_tax_rate) || 0,
         purchase_withholding_tax_account_id: formData.purchase_withholding_tax_account_id || null,
         purchase_withholding_tax_account_name: purchaseWhtAccount?.name || '',
-        purchase_withholding_tax_rate: Number(formData.purchase_withholding_tax_rate) || 0
+        purchase_withholding_tax_rate: Number(formData.purchase_withholding_tax_rate) || 0,
+        manual_code: formData.manual_code ? formData.manual_code.trim() : null
       };
 
       if (editingProduct) {
@@ -751,7 +797,7 @@ export const Products: React.FC = () => {
 
     setEditingProduct(null);
     setFormData({ 
-      code: '', name: '', type: 'finished_good', category: '', unit: 'قطعة',
+      code: '', manual_code: '', name: '', type: 'finished_good', category: '', unit: 'قطعة',
       sale_price: 0, cost_price: 0, description: '', image_url: '', 
       barcode: '', stock: 0, min_stock: 0, 
       allow_issue_fraction: false,
@@ -837,6 +883,7 @@ export const Products: React.FC = () => {
       setIsAutoCode(false);
       setFormData({ 
         ...product,
+        manual_code: product.manual_code || '',
         type: (product.type as any) === 'product' ? 'finished_good' : product.type,
         category: product.category || '',
         unit: product.unit || 'قطعة',
@@ -1105,20 +1152,7 @@ export const Products: React.FC = () => {
     }, 300);
   };
 
-  const handleExportExcel = () => {
-    const headers = { 
-      'code': t('products.column_code'), 
-      'name': t('products.column_name'), 
-      'barcode': t('products.form_barcode'), 
-      'eta_item_code': language === 'ar' ? 'كود رفع الوثائق (المبيعات)' : 'Sales Upload Code',
-      'eta_code_type': language === 'ar' ? 'نوع كود الرفع' : 'Upload Code Type',
-      'tax_item_code': language === 'ar' ? 'كود ربط الوثائق المستلمة (المشتريات)' : 'Received Mapping Code',
-      'tax_code_type': language === 'ar' ? 'نوع كود الاستلام' : 'Received Code Type',
-      'sale_price': t('products.column_sale_price'), 
-      'cost_price': t('products.column_cost_price') 
-    };
-    exportToExcel(formatDataForExcel(products, headers), { filename: 'Products_Inventory', sheetName: t('products.title') });
-  };
+
 
   const handleExportPDF = async () => { if (tableRef.current) await exportToPDFUtil(tableRef.current, { filename: 'Products_Inventory', reportTitle: t('products.list_title') }); };
 
@@ -1278,11 +1312,130 @@ export const Products: React.FC = () => {
     return (
       (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
       (p.code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.manual_code && p.manual_code.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (p.barcode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (p.eta_item_code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (p.tax_item_code || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
   });
+
+  const isAllSelected = useMemo(() => {
+    return filteredProducts.length > 0 && filteredProducts.every(p => selectedProductIds.includes(p.id));
+  }, [filteredProducts, selectedProductIds]);
+
+  const isIndeterminate = useMemo(() => {
+    return selectedProductIds.length > 0 && !isAllSelected;
+  }, [selectedProductIds, isAllSelected]);
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedProductIds([]);
+    } else {
+      setSelectedProductIds(filteredProducts.map(p => p.id));
+    }
+  };
+
+  const productColumnLabels: Record<string, string> = {
+    code: t('products.column_code'),
+    manual_code: language === 'ar' ? 'كود يدوي' : 'Manual Code',
+    name: t('products.column_name'),
+    eta_item_code: t('products.column_eta_sent'),
+    tax_item_code: t('products.column_eta_received'),
+    status: language === 'ar' ? 'الحالة' : 'Status',
+    type: t('products.column_type'),
+    stock: t('products.column_stock'),
+    sale_price: t('products.column_sale_price')
+  };
+
+  const handleExportExcel = () => {
+    const allHeaders: Record<string, { label: string; format?: (p: Product) => any }> = {
+      code: { label: t('products.column_code'), format: (p) => p.code },
+      manual_code: { label: language === 'ar' ? 'كود يدوي' : 'Manual Code', format: (p) => p.manual_code || '-' },
+      name: { label: t('products.column_name'), format: (p) => p.name },
+      eta_item_code: { label: t('products.column_eta_sent'), format: (p) => p.eta_item_code || '-' },
+      tax_item_code: { label: t('products.column_eta_received'), format: (p) => p.tax_item_code || '-' },
+      status: { label: language === 'ar' ? 'الحالة' : 'Status', format: (p) => p.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive') },
+      type: { label: t('products.column_type'), format: (p) => getItemTypeBadge(p.type, language).label },
+      stock: { label: t('products.column_stock'), format: (p) => p.type === 'service' ? '-' : (p.current_stock ?? p.stock ?? 0) },
+      sale_price: { label: t('products.column_sale_price'), format: (p) => p.sale_price || 0 }
+    };
+
+    const activeHeaders: Record<string, string> = {};
+    Object.keys(visibleColumns).forEach(k => {
+      if (visibleColumns[k] !== false && allHeaders[k]) {
+        activeHeaders[k] = allHeaders[k].label;
+      }
+    });
+
+    const dataset = (selectedProductIds.length > 0 
+      ? filteredProducts.filter(p => selectedProductIds.includes(p.id))
+      : filteredProducts
+    ).map(p => {
+      const row: any = {};
+      Object.keys(visibleColumns).forEach(k => {
+        if (visibleColumns[k] !== false && allHeaders[k]) {
+          row[k] = allHeaders[k].format ? allHeaders[k].format(p) : (p as any)[k];
+        }
+      });
+      return row;
+    });
+
+    const formattedData = formatDataForExcel(dataset, activeHeaders);
+    exportToExcel(formattedData, { filename: 'Products_Inventory', sheetName: t('products.title') });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedProductIds.length === 0) return;
+
+    if (!window.confirm(
+      language === 'ar'
+        ? `هل أنت متأكد من رغبتك في حذف الأصناف المحددة (${selectedProductIds.length} صنف)؟\n(سيتم حظر حذف أي صنف مسجل عليه حركة أو فواتير).`
+        : `Delete selected products (${selectedProductIds.length})? Items with transactions will be protected.`
+    )) {
+      return;
+    }
+
+    const safeDeleted: string[] = [];
+    const blocked: { name: string; reason: string }[] = [];
+
+    for (const id of selectedProductIds) {
+      const prod = products.find(p => p.id === id);
+      const prodName = prod?.name || id;
+
+      try {
+        await dbService.delete('products', id);
+        safeDeleted.push(id);
+      } catch (err: any) {
+        blocked.push({ name: prodName, reason: err.message || 'مرتبط بحركات مخزنية أو فواتير' });
+      }
+    }
+
+    if (safeDeleted.length > 0) {
+      setProducts(prev => prev.filter(p => !safeDeleted.includes(p.id)));
+      setSelectedProductIds(prev => prev.filter(id => !safeDeleted.includes(id)));
+    }
+
+    if (safeDeleted.length > 0 && blocked.length === 0) {
+      showNotification(
+        language === 'ar' ? `تم حذف ${safeDeleted.length} صنف بنجاح` : `Deleted ${safeDeleted.length} products successfully`,
+        'success'
+      );
+    } else if (safeDeleted.length > 0 && blocked.length > 0) {
+      showNotification(
+        language === 'ar'
+          ? `تم حذف ${safeDeleted.length} صنف بنجاح، وتعذر حذف ${blocked.length} صنف لوجود حركات مسجلة عليها.`
+          : `Deleted ${safeDeleted.length}, skipped ${blocked.length} due to existing movements.`,
+        'warning'
+      );
+    } else {
+      showNotification(
+        language === 'ar'
+          ? `تعذر حذف أي من الأصناف المحددة لوجود حركات مخزنية أو فواتير مسجلة عليها (${blocked.length} صنف).`
+          : `Cannot delete selected products because they have recorded movements (${blocked.length}).`,
+        'error'
+      );
+    }
+  };
 
   const groupedProducts = React.useMemo(() => {
     if (groupMode === 'none') return [];
@@ -1569,6 +1722,57 @@ export const Products: React.FC = () => {
                   )}
                 </div>
 
+                {/* Table Columns Dropdown */}
+                <div className="relative" ref={columnSelectorRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsColumnSelectorOpen(!isColumnSelectorOpen)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:text-emerald-600 hover:border-emerald-200 rounded-xl text-xs font-bold transition-all shadow-2xs active:scale-95"
+                    title="أعمدة الجدول"
+                  >
+                    <Eye size={14} />
+                    <span>أعمدة الجدول</span>
+                    <ChevronDown size={14} className={`transform transition-transform ${isColumnSelectorOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isColumnSelectorOpen && (
+                    <div className={`absolute top-full mt-1.5 ${dir === 'rtl' ? 'left-0' : 'right-0'} w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-150`}>
+                      <div className="px-3 py-1.5 border-b border-slate-100 text-[11px] font-black text-slate-400 uppercase">
+                        {language === 'ar' ? 'تخصيص الأعمدة المعروضة' : 'Customize Columns'}
+                      </div>
+                      <div className="max-h-64 overflow-y-auto custom-scrollbar p-1 space-y-0.5">
+                        {Object.keys(DEFAULT_PRODUCT_COLUMNS).map((colKey) => (
+                          <label
+                            key={colKey}
+                            className="flex items-center gap-2 px-2.5 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer text-xs font-bold text-slate-700 select-none transition-colors"
+                          >
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
+                              checked={visibleColumns[colKey] !== false}
+                              onChange={() => toggleColumn(colKey)}
+                            />
+                            <span>{productColumnLabels[colKey] || colKey}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Bulk Delete Button */}
+                {selectedProductIds.length > 0 && canDelete && (
+                  <button
+                    type="button"
+                    onClick={handleBulkDelete}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 animate-in fade-in"
+                    title="حذف المحدد"
+                  >
+                    <Trash2 size={14} />
+                    <span>{language === 'ar' ? `حذف المحدد (${selectedProductIds.length})` : `Delete Selected (${selectedProductIds.length})`}</span>
+                  </button>
+                )}
+
                 <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
                   <button onClick={() => setView('table')} className={`p-1.5 rounded-lg transition-all ${view === 'table' ? 'bg-zinc-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}><List size={16} /></button>
                   <button onClick={() => setView('card')} className={`p-1.5 rounded-lg transition-all ${view === 'card' ? 'bg-zinc-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}><LayoutGrid size={16} /></button>
@@ -1577,40 +1781,37 @@ export const Products: React.FC = () => {
 
               <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {view === 'table' ? (
-                  <div className="overflow-x-auto h-full p-3">
+                  <div className="overflow-x-auto h-full p-2">
                     <table ref={tableRef} className="w-full text-xs">
                       <thead className="bg-slate-100/80 rounded-xl">
-                        <tr className="text-slate-600 text-[11px] font-bold border-b border-slate-200">
-                          <th className="px-3 py-2 rounded-s-lg text-center" style={{ width: '45px' }}>
+                        <tr className="text-slate-600 text-[10.5px] font-bold border-b border-slate-200">
+                          <th className="px-2 py-1.5 rounded-s-lg text-center" style={{ width: '40px' }}>
                             <input 
                               type="checkbox" 
-                              className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer" 
-                              checked={filteredProducts.length > 0 && selectedProductIds.length === filteredProducts.length} 
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedProductIds(filteredProducts.map(p => p.id));
-                                } else {
-                                  setSelectedProductIds([]);
-                                }
-                              }} 
+                              className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer" 
+                              checked={isAllSelected} 
+                              ref={el => { if (el) el.indeterminate = isIndeterminate; }}
+                              onChange={toggleSelectAll} 
+                              title={language === 'ar' ? 'تحديد الكل' : 'Select All'}
                             />
                           </th>
-                          <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_code')}</th>
-                          <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_name')}</th>
-                          <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_eta_sent')}</th>
-                          <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_eta_received')}</th>
-                          <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الحالة' : 'Status'}</th>
-                          <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_type')}</th>
-                          <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_stock')}</th>
-                          <th className={`px-3 py-2 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_sale_price')}</th>
-                          <th className={`px-3 py-2 rounded-e-lg ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
+                          {visibleColumns.code !== false && <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_code')}</th>}
+                          {visibleColumns.manual_code !== false && <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'كود يدوي' : 'Manual Code'}</th>}
+                          {visibleColumns.name !== false && <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_name')}</th>}
+                          {visibleColumns.eta_item_code !== false && <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_eta_sent')}</th>}
+                          {visibleColumns.tax_item_code !== false && <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_eta_received')}</th>}
+                          {visibleColumns.status !== false && <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{language === 'ar' ? 'الحالة' : 'Status'}</th>}
+                          {visibleColumns.type !== false && <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_type')}</th>}
+                          {visibleColumns.stock !== false && <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_stock')}</th>}
+                          {visibleColumns.sale_price !== false && <th className={`px-2 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('products.column_sale_price')}</th>}
+                          <th className={`px-2 py-1.5 rounded-e-lg ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>{t('invoices.column_actions')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {loading ? (
-                          <tr><td colSpan={10} className="py-12 text-center"><div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>
+                          <tr><td colSpan={12} className="py-12 text-center"><div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div></td></tr>
                         ) : filteredProducts.length === 0 ? (
-                          <tr><td colSpan={10} className="py-10 text-center text-slate-400 font-bold text-xs">{t('common.no_data')}</td></tr>
+                          <tr><td colSpan={12} className="py-10 text-center text-slate-400 font-bold text-xs">{t('common.no_data')}</td></tr>
                         ) : isGrouped ? (
                           groupedProducts.map((group) => {
                             const isCollapsed = !!collapsedGroupIds[group.id];
@@ -1620,7 +1821,7 @@ export const Products: React.FC = () => {
                                   onClick={() => toggleGroupCollapse(group.id)}
                                   className="bg-slate-100/90 hover:bg-slate-200/70 cursor-pointer select-none transition-colors border-y border-slate-200"
                                 >
-                                  <td colSpan={10} className="px-3 py-1.5">
+                                  <td colSpan={12} className="px-2 py-1">
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-2">
                                         <span className="p-0.5 rounded text-slate-600 bg-white shadow-2xs">
@@ -1661,10 +1862,10 @@ export const Products: React.FC = () => {
                                     onClick={() => openModal(product)}
                                     className="hover:bg-slate-50 transition-colors group cursor-pointer border-b border-slate-100"
                                   >
-                                    <td className="px-3 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                    <td className="w-8 px-2 py-1 text-center" onClick={(e) => e.stopPropagation()}>
                                       <input 
                                         type="checkbox" 
-                                        className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer" 
+                                        className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer" 
                                         checked={selectedProductIds.includes(product.id)} 
                                         onChange={(e) => {
                                           if (e.target.checked) {
@@ -1675,120 +1876,147 @@ export const Products: React.FC = () => {
                                         }} 
                                       />
                                     </td>
-                                    <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                      <span className="font-mono text-[10.5px] bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200/80 group-hover:border-emerald-300 transition-all">{product.code}</span>
-                                    </td>
-                                     <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                        <div className="flex items-center gap-2.5">
-                                           <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center overflow-hidden border border-slate-200 shrink-0">
-                                             {product.image_url ? <img src={product.image_url} alt="" className="w-full h-full object-cover" /> : <Package size={14} />}
-                                           </div>
-                                           <div className="flex flex-col min-w-0">
-                                              <span className="font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors truncate">{product.name}</span>
-                                           </div>
-                                        </div>
-                                     </td>
-                                     <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                       {product.eta_item_code ? (
-                                         <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200/60 max-w-full" title={language === 'ar' ? 'كود الفاتورة الإلكترونية (صادر / مبيعات)' : 'ETA Sent Code'}>
-                                           {product.eta_code_type && <span className="text-[7.5px] bg-purple-200/70 text-purple-800 px-1 py-0.2 rounded font-black shrink-0">{product.eta_code_type}</span>}
-                                           <span className="truncate">{product.eta_item_code}</span>
-                                         </span>
-                                       ) : (
-                                         <span className="text-slate-300 font-mono text-xs">-</span>
-                                       )}
-                                     </td>
-                                     <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                       {product.tax_item_code ? (
-                                         <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200/60 max-w-full" title={language === 'ar' ? 'كود ربط الوارد (مستلم / مشتريات)' : 'ETA Received Code'}>
-                                           {product.tax_code_type && <span className="text-[7.5px] bg-blue-200/70 text-blue-800 px-1 py-0.2 rounded font-black shrink-0">{product.tax_code_type}</span>}
-                                           <span className="truncate">{product.tax_item_code}</span>
-                                         </span>
-                                       ) : (
-                                         <span className="text-slate-300 font-mono text-xs">-</span>
-                                       )}
-                                     </td>
-                                     <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                       <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-bold border ${product.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50' : 'bg-rose-50 text-rose-700 border-rose-200/50'}`}>
-                                         {product.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
-                                       </span>
-                                     </td>
-                                    <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                      {(() => {
-                                        const badge = getItemTypeBadge(product.type, language);
-                                        return (
-                                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-bold border ${badge.className}`}>
-                                            {badge.label}
+                                    {visibleColumns.code !== false && (
+                                      <td className={`px-2 py-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                        <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 font-bold border border-slate-200/80 group-hover:border-emerald-300 transition-all">{product.code}</span>
+                                      </td>
+                                    )}
+                                    {visibleColumns.manual_code !== false && (
+                                      <td className={`px-2 py-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                        {product.manual_code ? (
+                                          <span className="font-mono text-[10px] bg-emerald-50/80 px-1.5 py-0.5 rounded text-emerald-700 font-bold border border-emerald-200/60">
+                                            {product.manual_code}
                                           </span>
-                                        );
-                                      })()}
-                                    </td>
-                                    <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                      {product.type === 'service' ? (
-                                        <span className="text-slate-300 font-mono text-xs font-bold">-</span>
-                                      ) : (
-                                        <div className="flex items-center gap-1.5">
-                                          <span className={`font-mono font-bold text-xs ${
-                                            Number(product.current_stock ?? product.stock ?? 0) <= 0 
-                                              ? 'text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200/70' 
-                                              : 'text-slate-900 bg-slate-100/90 px-2 py-0.5 rounded border border-slate-200'
-                                          }`}>
-                                            {formatNumber(product.current_stock ?? product.stock ?? 0)}
-                                          </span>
-                                          {product.unit && (
-                                            <span className="text-[10px] text-slate-400 font-medium">{product.unit}</span>
-                                          )}
+                                        ) : (
+                                          <span className="text-slate-300 font-mono text-xs">-</span>
+                                        )}
+                                      </td>
+                                    )}
+                                    {visibleColumns.name !== false && (
+                                      <td className={`px-2 py-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                        <div className="flex items-center gap-2">
+                                          <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center overflow-hidden border border-slate-200 shrink-0">
+                                            {product.image_url ? <img src={product.image_url} alt="" className="w-full h-full object-cover" /> : <Package size={13} />}
+                                          </div>
+                                          <div className="flex flex-col min-w-0">
+                                            <span className="font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors truncate">{product.name}</span>
+                                          </div>
                                         </div>
-                                      )}
-                                    </td>
-                                    <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                      <span className="font-black text-emerald-600 text-xs">{formatNumber(product.sale_price || 0)} <span className="text-[9px] text-slate-400 font-normal ms-0.5">{t('invoices.currency')}</span></span>
-                                    </td>
-                                    <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                                        <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1 ${pendingEtaProductForLinking ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-all`}>
-                                           {pendingEtaProductForLinking && (
-                                             <button
-                                               type="button"
-                                               onClick={(e) => {
-                                                 e.stopPropagation();
-                                                 handleLinkExistingToEta(product);
-                                               }}
-                                               disabled={isLinkingDirect}
-                                               className="px-2 py-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg text-[10.5px] font-bold transition-all flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
-                                               title={language === 'ar' ? 'ربط هذا الصنف مع كود الضرائب' : 'Link with ETA'}
-                                             >
-                                               <Link2 size={12} />
-                                               <span>{language === 'ar' ? 'ربط مع ETA' : 'Link ETA'}</span>
-                                             </button>
-                                           )}
-                                          <button 
+                                      </td>
+                                    )}
+                                    {visibleColumns.eta_item_code !== false && (
+                                      <td className={`px-2 py-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                        {product.eta_item_code ? (
+                                          <span className="inline-flex items-center gap-1 font-mono text-[9.5px] font-bold px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200/60 max-w-full" title={language === 'ar' ? 'كود الفاتورة الإلكترونية (صادر / مبيعات)' : 'ETA Sent Code'}>
+                                            {product.eta_code_type && <span className="text-[7.5px] bg-purple-200/70 text-purple-800 px-1 py-0.2 rounded font-black shrink-0">{product.eta_code_type}</span>}
+                                            <span className="truncate">{product.eta_item_code}</span>
+                                          </span>
+                                        ) : (
+                                          <span className="text-slate-300 font-mono text-xs">-</span>
+                                        )}
+                                      </td>
+                                    )}
+                                    {visibleColumns.tax_item_code !== false && (
+                                      <td className={`px-2 py-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                        {product.tax_item_code ? (
+                                          <span className="inline-flex items-center gap-1 font-mono text-[9.5px] font-bold px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200/60 max-w-full" title={language === 'ar' ? 'كود ربط الوارد (مستلم / مشتريات)' : 'ETA Received Code'}>
+                                            {product.tax_code_type && <span className="text-[7.5px] bg-blue-200/70 text-blue-800 px-1 py-0.2 rounded font-black shrink-0">{product.tax_code_type}</span>}
+                                            <span className="truncate">{product.tax_item_code}</span>
+                                          </span>
+                                        ) : (
+                                          <span className="text-slate-300 font-mono text-xs">-</span>
+                                        )}
+                                      </td>
+                                    )}
+                                    {visibleColumns.status !== false && (
+                                      <td className={`px-2 py-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border ${product.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50' : 'bg-rose-50 text-rose-700 border-rose-200/50'}`}>
+                                          {product.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
+                                        </span>
+                                      </td>
+                                    )}
+                                    {visibleColumns.type !== false && (
+                                      <td className={`px-2 py-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                        {(() => {
+                                          const badge = getItemTypeBadge(product.type, language);
+                                          return (
+                                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border ${badge.className}`}>
+                                              {badge.label}
+                                            </span>
+                                          );
+                                        })()}
+                                      </td>
+                                    )}
+                                    {visibleColumns.stock !== false && (
+                                      <td className={`px-2 py-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                        {product.type === 'service' ? (
+                                          <span className="text-slate-300 font-mono text-xs font-bold">-</span>
+                                        ) : (
+                                          <div className="flex items-center gap-1">
+                                            <span className={`font-mono font-bold text-xs ${
+                                              Number(product.current_stock ?? product.stock ?? 0) <= 0 
+                                                ? 'text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200/70' 
+                                                : 'text-slate-900 bg-slate-100/90 px-1.5 py-0.5 rounded border border-slate-200'
+                                            }`}>
+                                              {formatNumber(product.current_stock ?? product.stock ?? 0)}
+                                            </span>
+                                            {product.unit && (
+                                              <span className="text-[10px] text-slate-400 font-medium">{product.unit}</span>
+                                            )}
+                                          </div>
+                                        )}
+                                      </td>
+                                    )}
+                                    {visibleColumns.sale_price !== false && (
+                                      <td className={`px-2 py-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                        <span className="font-black text-emerald-600 text-xs">{formatNumber(product.sale_price || 0)} <span className="text-[9px] text-slate-400 font-normal ms-0.5">{t('invoices.currency')}</span></span>
+                                      </td>
+                                    )}
+                                    <td className={`px-2 py-1 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                                      <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1 ${pendingEtaProductForLinking ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-all`}>
+                                        {pendingEtaProductForLinking && (
+                                          <button
+                                            type="button"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              setPendingViewDoc({ type: 'stock_card', idOrNumber: product.id });
-                                              setCurrentPage('stock_card_report');
-                                            }} 
-                                            className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                                            title={language === 'ar' ? 'تقرير حركة وتكلفة الصنف (كارت الصنف)' : 'Product stock card report'}
+                                              handleLinkExistingToEta(product);
+                                            }}
+                                            disabled={isLinkingDirect}
+                                            className="px-2 py-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg text-[10.5px] font-bold transition-all flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
+                                            title={language === 'ar' ? 'ربط هذا الصنف مع كود الضرائب' : 'Link with ETA'}
                                           >
-                                            <History size={15} />
+                                            <Link2 size={12} />
+                                            <span>{language === 'ar' ? 'ربط مع ETA' : 'Link ETA'}</span>
                                           </button>
-                                          {canDelete && (
-                                            <button onClick={async (e) => { 
-                                              e.stopPropagation(); 
-                                              if (window.confirm(t('common.confirm_delete'))) {
-                                                try {
-                                                  await dbService.delete('products', product.id);
-                                                  setProducts(products.filter(p => p.id !== product.id));
-                                                  showNotification(t('common.delete_success'), 'success');
-                                                } catch (err: any) {
-                                                  showNotification(err.message || t('common.error'), 'error');
-                                                }
+                                        )}
+                                        <button 
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setPendingViewDoc({ type: 'stock_card', idOrNumber: product.id });
+                                            setCurrentPage('stock_card_report');
+                                          }} 
+                                          className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                          title={language === 'ar' ? 'تقرير حركة وتكلفة الصنف (كارت الصنف)' : 'Product stock card report'}
+                                        >
+                                          <History size={14} />
+                                        </button>
+                                        {canDelete && (
+                                          <button onClick={async (e) => { 
+                                            e.stopPropagation(); 
+                                            if (window.confirm(t('common.confirm_delete'))) {
+                                              try {
+                                                await dbService.delete('products', product.id);
+                                                setProducts(products.filter(p => p.id !== product.id));
+                                                showNotification(t('common.delete_success'), 'success');
+                                              } catch (err: any) {
+                                                showNotification(err.message || t('common.error'), 'error');
                                               }
-                                            }} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all">
-                                              <Trash2 size={15} />
-                                            </button>
-                                          )}
-                                        </div>
+                                            }
+                                          }} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all">
+                                            <Trash2 size={14} />
+                                          </button>
+                                        )}
+                                      </div>
                                     </td>
                                   </tr>
                                 ))}
@@ -1802,10 +2030,10 @@ export const Products: React.FC = () => {
                               onClick={() => openModal(product)}
                               className="hover:bg-slate-50 transition-colors group cursor-pointer border-b border-slate-100"
                             >
-                              <td className="px-3 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
+                              <td className="w-8 px-2 py-1 text-center" onClick={(e) => e.stopPropagation()}>
                                 <input 
                                   type="checkbox" 
-                                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer" 
+                                  className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20 cursor-pointer" 
                                   checked={selectedProductIds.includes(product.id)} 
                                   onChange={(e) => {
                                     if (e.target.checked) {
@@ -1816,118 +2044,147 @@ export const Products: React.FC = () => {
                                   }} 
                                 />
                               </td>
-                              <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                <span className="font-mono text-[10.5px] bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200/80 group-hover:border-emerald-300 transition-all">{product.code}</span>
-                              </td>
-                              <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                  <div className="flex items-center gap-2.5">
-                                     <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center overflow-hidden border border-slate-200 shrink-0">
-                                       {product.image_url ? <img src={product.image_url} alt="" className="w-full h-full object-cover" /> : <Package size={14} />}
-                                     </div>
-                                     <div className="flex flex-col min-w-0">
-                                        <span className="font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors truncate">{product.name}</span>
-                                     </div>
-                                  </div>
-                               </td>
-                               <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                 {product.eta_item_code ? (
-                                   <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200/60 max-w-full" title={language === 'ar' ? 'كود الفاتورة الإلكترونية (صادر / مبيعات)' : 'ETA Sent Code'}>
-                                     {product.eta_code_type && <span className="text-[7.5px] bg-purple-200/70 text-purple-800 px-1 py-0.2 rounded font-black shrink-0">{product.eta_code_type}</span>}
-                                     <span className="truncate">{product.eta_item_code}</span>
-                                   </span>
-                                 ) : (
-                                   <span className="text-slate-300 font-mono text-xs">-</span>
-                                 )}
-                               </td>
-                               <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                 {product.tax_item_code ? (
-                                   <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200/60 max-w-full" title={language === 'ar' ? 'كود ربط الوارد (مستلم / مشتريات)' : 'ETA Received Code'}>
-                                     {product.tax_code_type && <span className="text-[7.5px] bg-blue-200/70 text-blue-800 px-1 py-0.2 rounded font-black shrink-0">{product.tax_code_type}</span>}
-                                     <span className="truncate">{product.tax_item_code}</span>
-                                   </span>
-                                 ) : (
-                                   <span className="text-slate-300 font-mono text-xs">-</span>
-                                 )}
-                               </td>
-                               <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-bold border ${product.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50' : 'bg-rose-50 text-rose-700 border-rose-200/50'}`}>
-                                   {product.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
-                                 </span>
-                               </td>
-                              <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                {(() => {
-                                  const badge = getItemTypeBadge(product.type, language);
-                                  return (
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-bold border ${badge.className}`}>
-                                      {badge.label}
+                              {visibleColumns.code !== false && (
+                                <td className={`px-2 py-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 font-bold border border-slate-200/80 group-hover:border-emerald-300 transition-all">{product.code}</span>
+                                </td>
+                              )}
+                              {visibleColumns.manual_code !== false && (
+                                <td className={`px-2 py-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  {product.manual_code ? (
+                                    <span className="font-mono text-[10px] bg-emerald-50/80 px-1.5 py-0.5 rounded text-emerald-700 font-bold border border-emerald-200/60">
+                                      {product.manual_code}
                                     </span>
-                                  );
-                                })()}
-                              </td>
-                              <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                {product.type === 'service' ? (
-                                  <span className="text-slate-300 font-mono text-xs font-bold">-</span>
-                                ) : (
-                                  <div className="flex items-center gap-1.5">
-                                    <span className={`font-mono font-bold text-xs ${
-                                      Number(product.current_stock ?? product.stock ?? 0) <= 0 
-                                        ? 'text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200/70' 
-                                        : 'text-slate-900 bg-slate-100/90 px-2 py-0.5 rounded border border-slate-200'
-                                    }`}>
-                                      {formatNumber(product.current_stock ?? product.stock ?? 0)}
-                                    </span>
-                                    {product.unit && (
-                                      <span className="text-[10px] text-slate-400 font-medium">{product.unit}</span>
-                                    )}
+                                  ) : (
+                                    <span className="text-slate-300 font-mono text-xs">-</span>
+                                  )}
+                                </td>
+                              )}
+                              {visibleColumns.name !== false && (
+                                <td className={`px-2 py-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center overflow-hidden border border-slate-200 shrink-0">
+                                      {product.image_url ? <img src={product.image_url} alt="" className="w-full h-full object-cover" /> : <Package size={13} />}
+                                    </div>
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition-colors truncate">{product.name}</span>
+                                    </div>
                                   </div>
-                                )}
-                              </td>
-                              <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                                <span className="font-black text-emerald-600 text-xs">{formatNumber(product.sale_price || 0)} <span className="text-[9px] text-slate-400 font-normal ms-0.5">{t('invoices.currency')}</span></span>
-                              </td>
-                              <td className={`px-3 py-1.5 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
-                                  <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1 ${pendingEtaProductForLinking ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-all`}>
-                                     {pendingEtaProductForLinking && (
-                                       <button
-                                         type="button"
-                                         onClick={(e) => {
-                                           e.stopPropagation();
-                                           handleLinkExistingToEta(product);
-                                         }}
-                                         disabled={isLinkingDirect}
-                                         className="px-2 py-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg text-[10.5px] font-bold transition-all flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
-                                       >
-                                         <Link2 size={12} />
-                                         <span>{language === 'ar' ? 'ربط مع ETA' : 'Link ETA'}</span>
-                                       </button>
-                                     )}
-                                    <button 
+                                </td>
+                              )}
+                              {visibleColumns.eta_item_code !== false && (
+                                <td className={`px-2 py-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  {product.eta_item_code ? (
+                                    <span className="inline-flex items-center gap-1 font-mono text-[9.5px] font-bold px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200/60 max-w-full" title={language === 'ar' ? 'كود الفاتورة الإلكترونية (صادر / مبيعات)' : 'ETA Sent Code'}>
+                                      {product.eta_code_type && <span className="text-[7.5px] bg-purple-200/70 text-purple-800 px-1 py-0.2 rounded font-black shrink-0">{product.eta_code_type}</span>}
+                                      <span className="truncate">{product.eta_item_code}</span>
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-300 font-mono text-xs">-</span>
+                                  )}
+                                </td>
+                              )}
+                              {visibleColumns.tax_item_code !== false && (
+                                <td className={`px-2 py-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  {product.tax_item_code ? (
+                                    <span className="inline-flex items-center gap-1 font-mono text-[9.5px] font-bold px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200/60 max-w-full" title={language === 'ar' ? 'كود ربط الوارد (مستلم / مشتريات)' : 'ETA Received Code'}>
+                                      {product.tax_code_type && <span className="text-[7.5px] bg-blue-200/70 text-blue-800 px-1 py-0.2 rounded font-black shrink-0">{product.tax_code_type}</span>}
+                                      <span className="truncate">{product.tax_item_code}</span>
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-300 font-mono text-xs">-</span>
+                                  )}
+                                </td>
+                              )}
+                              {visibleColumns.status !== false && (
+                                <td className={`px-2 py-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border ${product.is_active !== false ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50' : 'bg-rose-50 text-rose-700 border-rose-200/50'}`}>
+                                    {product.is_active !== false ? (language === 'ar' ? 'نشط' : 'Active') : (language === 'ar' ? 'غير نشط' : 'Inactive')}
+                                  </span>
+                                </td>
+                              )}
+                              {visibleColumns.type !== false && (
+                                <td className={`px-2 py-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  {(() => {
+                                    const badge = getItemTypeBadge(product.type, language);
+                                    return (
+                                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${badge.className}`}>
+                                        {badge.label}
+                                      </span>
+                                    );
+                                  })()}
+                                </td>
+                              )}
+                              {visibleColumns.stock !== false && (
+                                <td className={`px-2 py-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  {product.type === 'service' ? (
+                                    <span className="text-slate-300 font-mono text-xs font-bold">-</span>
+                                  ) : (
+                                    <div className="flex items-center gap-1">
+                                      <span className={`font-mono font-bold text-xs ${
+                                        Number(product.current_stock ?? product.stock ?? 0) <= 0 
+                                          ? 'text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200/70' 
+                                          : 'text-slate-900 bg-slate-100/90 px-1.5 py-0.5 rounded border border-slate-200'
+                                      }`}>
+                                        {formatNumber(product.current_stock ?? product.stock ?? 0)}
+                                      </span>
+                                      {product.unit && (
+                                        <span className="text-[10px] text-slate-400 font-medium">{product.unit}</span>
+                                      )}
+                                    </div>
+                                  )}
+                                </td>
+                              )}
+                              {visibleColumns.sale_price !== false && (
+                                <td className={`px-2 py-1 ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+                                  <span className="font-black text-emerald-600 text-xs">{formatNumber(product.sale_price || 0)} <span className="text-[9px] text-slate-400 font-normal ms-0.5">{t('invoices.currency')}</span></span>
+                                </td>
+                              )}
+                              <td className={`px-2 py-1 ${dir === 'rtl' ? 'text-left' : 'text-right'}`}>
+                                <div className={`flex items-center ${dir === 'rtl' ? 'justify-start' : 'justify-end'} gap-1 ${pendingEtaProductForLinking ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-all`}>
+                                  {pendingEtaProductForLinking && (
+                                    <button
+                                      type="button"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        setPendingViewDoc({ type: 'stock_card', idOrNumber: product.id });
-                                        setCurrentPage('stock_card_report');
-                                      }} 
-                                      className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                        handleLinkExistingToEta(product);
+                                      }}
+                                      disabled={isLinkingDirect}
+                                      className="px-2 py-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg text-[10.5px] font-bold transition-all flex items-center gap-1 shadow-xs active:scale-95 disabled:opacity-50"
+                                      title={language === 'ar' ? 'ربط هذا الصنف مع كود الضرائب' : 'Link with ETA'}
                                     >
-                                      <History size={15} />
+                                      <Link2 size={12} />
+                                      <span>{language === 'ar' ? 'ربط مع ETA' : 'Link ETA'}</span>
                                     </button>
-                                    {canDelete && (
-                                      <button onClick={async (e) => { 
-                                        e.stopPropagation(); 
-                                        if (window.confirm(t('common.confirm_delete'))) {
-                                          try {
-                                            await dbService.delete('products', product.id);
-                                            setProducts(products.filter(p => p.id !== product.id));
-                                            showNotification(t('common.delete_success'), 'success');
-                                          } catch (err: any) {
-                                            showNotification(err.message || t('common.error'), 'error');
-                                          }
+                                  )}
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPendingViewDoc({ type: 'stock_card', idOrNumber: product.id });
+                                      setCurrentPage('stock_card_report');
+                                    }} 
+                                    className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                    title={language === 'ar' ? 'تقرير حركة وتكلفة الصنف (كارت الصنف)' : 'Product stock card report'}
+                                  >
+                                    <History size={14} />
+                                  </button>
+                                  {canDelete && (
+                                    <button onClick={async (e) => { 
+                                      e.stopPropagation(); 
+                                      if (window.confirm(t('common.confirm_delete'))) {
+                                        try {
+                                          await dbService.delete('products', product.id);
+                                          setProducts(products.filter(p => p.id !== product.id));
+                                          showNotification(t('common.delete_success'), 'success');
+                                        } catch (err: any) {
+                                          showNotification(err.message || t('common.error'), 'error');
                                         }
-                                      }} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all">
-                                        <Trash2 size={15} />
-                                      </button>
-                                    )}
-                                  </div>
+                                      }
+                                    }} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all">
+                                      <Trash2 size={14} />
+                                    </button>
+                                  )}
+                                </div>
                               </td>
                             </tr>
                           ))
@@ -2197,6 +2454,23 @@ export const Products: React.FC = () => {
                                        />
                                      </div>
                                   </div>
+
+                                   {/* كود يدوي */}
+                                   <div className="space-y-0.5">
+                                      <label className="block text-[10px] font-bold text-slate-500 px-0.5">
+                                        {language === 'ar' ? 'كود يدوي' : 'Manual Code'} <span className="text-[9px] text-slate-400 font-normal">({language === 'ar' ? 'اختياري' : 'Optional'})</span>
+                                      </label>
+                                      <div className="relative group">
+                                        <Hash className={`absolute ${dir === 'rtl' ? 'right-2' : 'left-2'} top-1.5 text-slate-400`} size={13} />
+                                        <input 
+                                          type="text" 
+                                          placeholder={language === 'ar' ? 'مثال: PRD-MAN-001' : 'e.g. PRD-MAN-001'} 
+                                          className={`w-full ${dir === 'rtl' ? 'pr-6 pl-2' : 'pl-6 pr-2'} py-1 bg-white border border-slate-200 rounded-md font-mono text-xs font-bold text-slate-900 outline-none focus:ring-1 focus:ring-emerald-500 transition-all`} 
+                                          value={formData.manual_code || ''} 
+                                          onChange={(e) => setFormData({ ...formData, manual_code: e.target.value })} 
+                                        />
+                                      </div>
+                                   </div>
 
                                   {/* نوع الصنف */}
                                   <div className="space-y-0.5">

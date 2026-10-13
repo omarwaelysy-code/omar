@@ -9563,15 +9563,66 @@ modules.forEach(moduleName => {
           }
         }
 
-        if (moduleName === 'suppliers') {
-          const chkSuppCheck = await client.query(
-            'SELECT COUNT(*) FROM issued_cheques WHERE supplier_id = $1',
-            [id]
-          );
-          if (parseInt(chkSuppCheck.rows[0]?.count || '0', 10) > 0) {
+        if (moduleName === 'customers') {
+          const txCheck = await client.query(`
+            SELECT (
+              (SELECT COUNT(*) FROM invoices WHERE customer_id = $1) +
+              (SELECT COUNT(*) FROM returns WHERE customer_id = $1) +
+              (SELECT COUNT(*) FROM receipt_vouchers WHERE customer_id = $1) +
+              (SELECT COUNT(*) FROM customer_discounts WHERE customer_id = $1) +
+              (SELECT COUNT(*) FROM sales_orders WHERE customer_id = $1) +
+              (SELECT COUNT(*) FROM received_cheques WHERE customer_id = $1) +
+              (SELECT COUNT(*) FROM journal_entry_lines WHERE customer_id = $1 OR sub_account_id = $1)
+            ) as total_count
+          `, [id]);
+          if (parseInt(txCheck.rows[0]?.total_count || '0', 10) > 0) {
             await client.query('ROLLBACK');
             client.release();
-            return sendError(res, 400, 'لا يمكن حذف المورد لوجود شيكات صادرة محررة لصالحه.');
+            return sendError(res, 400, 'لا يمكن حذف هذا العميل لوجود معاملات أو فواتير أو سندات مسجلة عليه في النظام.');
+          }
+        }
+
+        if (moduleName === 'suppliers') {
+          const txCheck = await client.query(`
+            SELECT (
+              (SELECT COUNT(*) FROM purchase_invoices WHERE supplier_id = $1) +
+              (SELECT COUNT(*) FROM purchase_returns WHERE supplier_id = $1) +
+              (SELECT COUNT(*) FROM payment_vouchers WHERE supplier_id = $1) +
+              (SELECT COUNT(*) FROM supplier_discounts WHERE supplier_id = $1) +
+              (SELECT COUNT(*) FROM purchase_orders WHERE supplier_id = $1) +
+              (SELECT COUNT(*) FROM goods_receipts WHERE supplier_id = $1) +
+              (SELECT COUNT(*) FROM issued_cheques WHERE supplier_id = $1) +
+              (SELECT COUNT(*) FROM journal_entry_lines WHERE supplier_id = $1 OR sub_account_id = $1)
+            ) as total_count
+          `, [id]);
+          if (parseInt(txCheck.rows[0]?.total_count || '0', 10) > 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, 'لا يمكن حذف هذا المورد لوجود معاملات أو فواتير أو سندات مسجلة عليه في النظام.');
+          }
+        }
+
+        if (moduleName === 'products') {
+          const txCheck = await client.query(`
+            SELECT (
+              (SELECT COUNT(*) FROM invoice_items WHERE product_id = $1) +
+              (SELECT COUNT(*) FROM purchase_invoice_items WHERE product_id = $1) +
+              (SELECT COUNT(*) FROM return_items WHERE product_id = $1) +
+              (SELECT COUNT(*) FROM purchase_return_items WHERE product_id = $1) +
+              (SELECT COUNT(*) FROM inventory_movement_lines WHERE product_id = $1) +
+              (SELECT COUNT(*) FROM stock_card WHERE product_id = $1) +
+              (SELECT COUNT(*) FROM opening_stock_items WHERE product_id = $1) +
+              (SELECT COUNT(*) FROM stock_adjustment_items WHERE product_id = $1) +
+              (SELECT COUNT(*) FROM goods_receipt_items WHERE product_id = $1) +
+              (SELECT COUNT(*) FROM sales_order_items WHERE product_id = $1) +
+              (SELECT COUNT(*) FROM purchase_order_items WHERE product_id = $1) +
+              (SELECT COUNT(*) FROM journal_entry_lines WHERE sub_account_id = $1)
+            ) as total_count
+          `, [id]);
+          if (parseInt(txCheck.rows[0]?.total_count || '0', 10) > 0) {
+            await client.query('ROLLBACK');
+            client.release();
+            return sendError(res, 400, 'لا يمكن حذف هذا الصنف لوجود حركات مخزنية أو فواتير مسجلة عليه في النظام.');
           }
         }
 
