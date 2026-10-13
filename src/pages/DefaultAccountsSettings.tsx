@@ -124,9 +124,83 @@ export const DefaultAccountsSettings: React.FC = () => {
   const [namingMode, setNamingMode] = useState<'ar' | 'en' | 'bilingual'>(() => {
     return (localStorage.getItem('default_accounts_naming_mode') as 'ar' | 'en' | 'bilingual') || 'ar';
   });
+  const [isApplyingNaming, setIsApplyingNaming] = useState(false);
+
   const handleNamingModeChange = (mode: 'ar' | 'en' | 'bilingual') => {
     setNamingMode(mode);
     localStorage.setItem('default_accounts_naming_mode', mode);
+  };
+
+  const PARENTS_EN_MAP: Record<string, { ar: string; en: string }> = {
+    '11': { ar: 'الأصول المتداولة', en: 'Current Assets' },
+    '1101': { ar: 'النقدية وما في حكمها', en: 'Cash and Cash Equivalents' },
+    '1102': { ar: 'الذمم المدينة', en: 'Trade & Other Receivables' },
+    '1103': { ar: 'المخزون', en: 'Inventory' },
+    '1104': { ar: 'أرصدة مدينة أخرى', en: 'Other Debit Balances' },
+    '21': { ar: 'الالتزامات المتداولة', en: 'Current Liabilities' },
+    '2101': { ar: 'الذمم الدائنة', en: 'Trade & Other Payables' },
+    '2102': { ar: 'أرصدة دائنة أخرى', en: 'Other Credit Balances' },
+    '41': { ar: 'الإيرادات التشغيلية', en: 'Operating Revenue' },
+    '42': { ar: 'إيرادات أخرى', en: 'Other Income' },
+    '4202': { ar: 'أرباح فروق عملة', en: 'Foreign Exchange Gains' },
+    '63': { ar: 'المصروفات المالية والإهلاكات', en: 'Finance Costs & Depreciation' },
+    '6302': { ar: 'خسائر فروق عملة', en: 'Foreign Exchange Losses' }
+  };
+
+  const handleApplyNamingToCoa = async () => {
+    if (!user?.company_id) return;
+    const modeLabel = namingMode === 'ar' ? 'العربية' : (namingMode === 'en' ? 'الإنجليزية' : 'باللغتين (عربي | English)');
+    const confirmed = window.confirm(`هل أنت متأكد من تطبيق صيغة التسمية [${modeLabel}] على أسماء الحسابات الافتراضية في دليل الحسابات؟`);
+    if (!confirmed) return;
+
+    setIsApplyingNaming(true);
+    try {
+      let updatedCount = 0;
+      // 1. Update leaf default accounts
+      for (const item of items) {
+        const targetId = selectedMappings[item.key] || item.accountId;
+        if (!targetId) continue;
+        const targetAcc = accounts.find(a => a.id === targetId);
+        if (!targetAcc) continue;
+
+        let newName = item.nameAr;
+        if (namingMode === 'en') {
+          newName = item.nameEn || item.nameAr;
+        } else if (namingMode === 'bilingual') {
+          newName = item.nameEn ? `${item.nameAr} | ${item.nameEn}` : item.nameAr;
+        }
+
+        if (targetAcc.name !== newName) {
+          await dbService.update('accounts', targetId, { name: newName });
+          updatedCount++;
+        }
+      }
+
+      // 2. Update parent default accounts if present
+      for (const [code, pData] of Object.entries(PARENTS_EN_MAP)) {
+        const parentAcc = accounts.find(a => a.code === code);
+        if (parentAcc) {
+          let newParentName = pData.ar;
+          if (namingMode === 'en') {
+            newParentName = pData.en;
+          } else if (namingMode === 'bilingual') {
+            newParentName = `${pData.ar} | ${pData.en}`;
+          }
+
+          if (parentAcc.name !== newParentName) {
+            await dbService.update('accounts', parentAcc.id, { name: newParentName });
+            updatedCount++;
+          }
+        }
+      }
+
+      showNotification(`تم تحديث تسمية ${updatedCount} حساب في دليل الحسابات بصيغة: ${modeLabel}`, 'success');
+      await loadDefaultAccounts();
+    } catch (err: any) {
+      showNotification(err.message || 'حدث خطأ أثناء تطبيق التسمية', 'error');
+    } finally {
+      setIsApplyingNaming(false);
+    }
   };
 
   // 1. Fetch Company Accounts
@@ -365,7 +439,7 @@ export const DefaultAccountsSettings: React.FC = () => {
         </div>
 
         {/* 3 Choices for Default Account Display: Arabic / English / Bilingual */}
-        <div className="flex items-center gap-2 w-full lg:w-auto justify-end">
+        <div className="flex items-center gap-2 w-full lg:w-auto justify-end flex-wrap">
           <div className="inline-flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200/80">
             <span className="text-[11px] font-bold text-slate-500 px-2 flex items-center gap-1 shrink-0">
               <Globe size={13} className="text-emerald-600" />
@@ -406,6 +480,17 @@ export const DefaultAccountsSettings: React.FC = () => {
               باللغتين
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={handleApplyNamingToCoa}
+            disabled={isApplyingNaming || loading}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300/80 font-bold text-xs transition-all active:scale-95 disabled:opacity-50"
+            title="تحديث وتطبيق هذه الصيغة على أسماء الحسابات في الدليل المحاسبي"
+          >
+            <Check size={13} className={isApplyingNaming ? 'animate-spin text-emerald-600' : 'text-emerald-600'} />
+            <span>{isApplyingNaming ? 'جاري التطبيق...' : 'تطبيق على الدليل'}</span>
+          </button>
         </div>
       </div>
 
