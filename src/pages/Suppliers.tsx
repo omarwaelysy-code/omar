@@ -429,15 +429,19 @@ export const Suppliers: React.FC = () => {
         if (editingSupplier) {
           // Always handle journal entry to ensure consistency
           await dbService.deleteJournalEntryByReference(id, user.company_id);
+          if (editingSupplier.code && editingSupplier.code !== id) {
+            await dbService.deleteJournalEntryByReference(editingSupplier.code, user.company_id);
+          }
         } else {
           await dbService.logActivity(user.id, user.username, user.company_id, 'إضافة مورد', `إضافة مورد جديد: ${formData.name}`, 'suppliers', id);
         }
 
         // Create Journal Entry if balance is not zero
-        if (formData.opening_balance !== 0) {
+        const openingBal = parseFloat(String(formData.opening_balance || 0).replace(/,/g, '')) || 0;
+        if (Math.abs(openingBal) > 0.0001) {
           const counterAccount = accounts.find(a => a.id === finalCounterAccountId);
-          const absBalance = Math.abs(formData.opening_balance);
-          const isNegative = formData.opening_balance < 0;
+          const absBalance = Math.abs(openingBal);
+          const isNegative = openingBal < 0;
 
           const existingJe = editingSupplier?.id ? entries.find(e => 
             (e.reference_id === editingSupplier.id || (editingSupplier.code && e.reference_number === editingSupplier.code)) && 
@@ -475,6 +479,9 @@ export const Suppliers: React.FC = () => {
             created_by: user.id
           });
         }
+
+        const refreshedEntries = await dbService.getAll<any>('journal_entries');
+        setEntries(refreshedEntries || []);
       } catch (postError) {
         console.error('Post-save operations failed:', postError);
       }
@@ -545,7 +552,7 @@ export const Suppliers: React.FC = () => {
           tax_number: fullData.tax_number || '',
           commercial_register: fullData.commercial_register || '',
           address: fullData.address || '',
-          opening_balance: fullData.opening_balance,
+          opening_balance: parseFloat(String(fullData.opening_balance || 0).replace(/,/g, '')) || 0,
           opening_balance_date: (fullData.opening_balance_date || new Date().toISOString()).slice(0, 10),
           account_id: fullData.account_id || '',
           account_name: fullData.account_name || '',
@@ -1915,9 +1922,12 @@ export const Suppliers: React.FC = () => {
                         {/* Financial & Opening Balance Section */}
                         <div className="p-3 bg-slate-50/60 rounded-xl border border-slate-200/60 space-y-2">
                           {(() => {
-                            const linkedJe = editingSupplier?.id ? entries.find(e => 
+                            const openingBal = parseFloat(String(formData.opening_balance || 0).replace(/,/g, '')) || 0;
+                            const hasOpeningBal = Math.abs(openingBal) > 0.0001;
+                            const linkedJe = (editingSupplier?.id && hasOpeningBal) ? entries.find(e => 
                               (e.reference_id === editingSupplier.id || (editingSupplier.code && e.reference_number === editingSupplier.code)) && 
-                              e.reference_type === 'opening_balance'
+                              e.reference_type === 'opening_balance' &&
+                              (Number(e.total_debit) > 0 || Number(e.total_credit) > 0)
                             ) : null;
                             return (
                               <div className="flex items-center justify-between border-b border-slate-200/50 pb-1.5 flex-wrap gap-2">
@@ -1976,7 +1986,7 @@ export const Suppliers: React.FC = () => {
                               </div>
                             </div>
 
-                            {formData.opening_balance !== 0 && (
+                            {Math.abs(parseFloat(String(formData.opening_balance || 0).replace(/,/g, '')) || 0) > 0.0001 && (
                               <div className="sm:col-span-2 space-y-0.5">
                                 <label className={`block text-[10px] font-bold text-slate-500 mb-0.5 uppercase ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{t('suppliers.form_counter_account')}</label>
                                 <div className="relative group">
@@ -1997,7 +2007,7 @@ export const Suppliers: React.FC = () => {
                             )}
                           </div>
 
-                          {formData.opening_balance !== 0 && formData.counter_account_id && (() => {
+                          {Math.abs(parseFloat(String(formData.opening_balance || 0).replace(/,/g, '')) || 0) > 0.0001 && formData.counter_account_id && (() => {
                             let finalAccountId = formData.account_id;
                             let finalCounterAccountId = formData.counter_account_id;
 
@@ -2015,9 +2025,12 @@ export const Suppliers: React.FC = () => {
                             const supplierAccount = accounts.find(a => a.id === finalAccountId);
                             const counterAccount = accounts.find(a => a.id === finalCounterAccountId);
 
-                            const linkedJe = editingSupplier?.id ? entries.find(e => 
+                            const openingBal = parseFloat(String(formData.opening_balance || 0).replace(/,/g, '')) || 0;
+                            const hasOpeningBal = Math.abs(openingBal) > 0.0001;
+                            const linkedJe = (editingSupplier?.id && hasOpeningBal) ? entries.find(e => 
                               (e.reference_id === editingSupplier.id || (editingSupplier.code && e.reference_number === editingSupplier.code)) && 
-                              e.reference_type === 'opening_balance'
+                              e.reference_type === 'opening_balance' &&
+                              (Number(e.total_debit) > 0 || Number(e.total_credit) > 0)
                             ) : null;
 
                             return (

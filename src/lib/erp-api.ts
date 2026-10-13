@@ -12203,6 +12203,21 @@ router.post('/journal_entries', authenticateToken, TransactionsLimitMiddleware, 
       return sendError(res, 400, `القيد غير متزن (مجموع المدين لا يساوي مجموع الدائن). مجموع المدين: ${roundedDebit.toFixed(2)}، مجموع الدائن: ${roundedCredit.toFixed(2)}`);
     }
 
+    // For opening balance entries, if total debit and credit are zero, do NOT create the entry
+    if (
+      (rawEntryData.reference_type === 'opening_balance' || rawEntryData.reference_type?.startsWith('opening_')) &&
+      roundedDebit === 0 && roundedCredit === 0
+    ) {
+      if (rawEntryData.reference_id) {
+        await client.query(
+          'DELETE FROM journal_entries WHERE company_id = $1 AND (reference_id = $2 OR reference_number = $2) AND (reference_type = $3 OR reference_type LIKE $4)',
+          [companyId, rawEntryData.reference_id, 'opening_balance', 'opening_%']
+        );
+      }
+      await client.query('COMMIT');
+      return res.status(200).json({ success: true, message: 'Opening balance is zero, no journal entry created' });
+    }
+
     const entryData = sanitizeData('journal_entries', rawEntryData);
     if (!entryData.company_id) entryData.company_id = companyId;
     entryData.total_debit = roundedDebit;
