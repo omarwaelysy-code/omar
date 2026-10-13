@@ -480,7 +480,7 @@ export const Suppliers: React.FC = () => {
           });
         }
 
-        const refreshedEntries = await dbService.getAll<any>('journal_entries');
+        const refreshedEntries = await dbService.listAll<any>('journal_entries');
         setEntries(refreshedEntries || []);
       } catch (postError) {
         console.error('Post-save operations failed:', postError);
