@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Search, Plus, Trash2, X, Package, History, ChevronRight, ChevronLeft, ChevronDown, Folder, FolderOpen, 
   Wallet, Layers, Hash, User, Calendar, Paperclip, LayoutGrid, List,

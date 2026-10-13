@@ -238,6 +238,7 @@ export const Suppliers: React.FC = () => {
         name: cleanDuplicatedPartnerName(pendingEtaSupplierForCreation.name || ''),
         mobile: pendingEtaSupplierForCreation.phone || '',
         email: '',
+        manual_code: '',
         tax_number: pendingEtaSupplierForCreation.taxNumber || '',
         commercial_register: '',
         address: pendingEtaSupplierForCreation.address || '',
