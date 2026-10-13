@@ -29,6 +29,7 @@ const IMPORT_CONFIGS: Record<string, {
     columns: [
       // تعريف العميل
       { key: 'code',                  label: 'كود العميل *',                   labelEn: 'Customer Code (Required, unique)',         required: true,  type: 'text',         example: 'CUST-001' },
+      { key: 'manual_code',           label: 'كود يدوي',                       labelEn: 'Manual Code (Optional)',                   required: false, type: 'text',         example: '8880' },
       { key: 'name',                  label: 'اسم العميل *',                    labelEn: 'Customer Name (Required)',                 required: true,  type: 'text',         example: 'شركة ABC للتجارة' },
       { key: 'mobile',                label: 'رقم الجوال',                      labelEn: 'Mobile Number',                           required: false, type: 'text',         example: '0501234567' },
       { key: 'email',                 label: 'البريد الإلكتروني',               labelEn: 'Email',                                   required: false, type: 'text',         example: 'info@abc.com' },
@@ -55,6 +56,7 @@ const IMPORT_CONFIGS: Record<string, {
     uniqueKey: 'code',
     columns: [
       { key: 'code',                  label: 'كود المورد *',                    labelEn: 'Supplier Code (Required, unique)',         required: true,  type: 'text',         example: 'SUPP-001' },
+      { key: 'manual_code',           label: 'كود يدوي',                       labelEn: 'Manual Code (Optional)',                   required: false, type: 'text',         example: '7770' },
       { key: 'name',                  label: 'اسم المورد *',                     labelEn: 'Supplier Name (Required)',                 required: true,  type: 'text',         example: 'شركة XYZ للتوريد' },
       { key: 'mobile',                label: 'رقم الجوال',                       labelEn: 'Mobile Number',                           required: false, type: 'text',         example: '0501234567' },
       { key: 'email',                 label: 'البريد الإلكتروني',                labelEn: 'Email',                                   required: false, type: 'text',         example: 'info@xyz.com' },
@@ -140,6 +142,7 @@ const IMPORT_CONFIGS: Record<string, {
     columns: [
       // تعريف الصنف
       { key: 'code',                    label: 'كود الصنف *',                       labelEn: 'Product Code (Required, unique)',                    required: true,  type: 'text',         example: 'PROD-001' },
+      { key: 'manual_code',             label: 'كود يدوي',                          labelEn: 'Manual Code (Optional)',                             required: false, type: 'text',         example: '5550' },
       { key: 'name',                    label: 'اسم الصنف *',                        labelEn: 'Product Name (Required)',                            required: true,  type: 'text',         example: 'لابتوب HP Core i7' },
       { key: 'type',                    label: 'نوع الصنف *',                        labelEn: 'Product Type (Required)',                            required: true,  type: 'select',       options: ['product', 'service', 'raw_material', 'semi_finished'], example: 'product' },
       { key: 'barcode',                 label: 'الباركود',                           labelEn: 'Barcode (optional)',                                 required: false, type: 'text',         example: '6281234567890' },
@@ -329,15 +332,20 @@ router.post('/import/validate/:module', authenticateToken, upload.single('file')
       acRes.rows.forEach((r: any) => { accountMap[String(r.code).trim()] = { id: r.id, name: r.name }; });
     } catch (e) { console.warn('Could not load accounts:', e); }
 
-    // Existing unique keys for duplicate detection
+    // Existing unique keys for duplicate detection and record mapping
     let existingCodes = new Set<string>();
+    const existingCodeToId: Record<string, string> = {};
     if (config.uniqueKey) {
       try {
         const exRes = await pool.query(
-          `SELECT ${config.uniqueKey} FROM ${config.dbTable} WHERE company_id = $1`,
+          `SELECT id, ${config.uniqueKey} FROM ${config.dbTable} WHERE company_id = $1`,
           [companyId]
         );
-        existingCodes = new Set(exRes.rows.map((r: any) => String(r[config.uniqueKey!]).trim()));
+        exRes.rows.forEach((r: any) => {
+          const val = String(r[config.uniqueKey!]).trim();
+          existingCodes.add(val);
+          existingCodeToId[val] = r.id;
+        });
       } catch (e) { /* non-fatal */ }
     }
 
@@ -440,7 +448,12 @@ router.post('/import/validate/:module', authenticateToken, upload.single('file')
         } else {
           codesInFile.add(codeVal);
         }
-        if (existingCodes.has(codeVal)) rowData['_existing'] = true;
+        if (existingCodes.has(codeVal)) {
+          rowData['_existing'] = true;
+          if (existingCodeToId[codeVal]) {
+            rowData['id'] = existingCodeToId[codeVal];
+          }
+        }
       }
 
       // Products: resolve item_group_code → item_group_id
@@ -502,7 +515,7 @@ router.post('/import/execute/:module', authenticateToken, async (req: AuthReques
       // Remove raw _code display fields (account_code, revenue_account_code, etc.)
       // The resolved _id and _name fields are already in rowData from validation
       Object.keys(rowToInsert).forEach(k => {
-        if (k.endsWith('_code') && !['employee_code', 'item_group_code', 'eta_item_code', 'tax_item_code', 'code'].includes(k)) {
+        if (k.endsWith('_code') && !['employee_code', 'item_group_code', 'eta_item_code', 'tax_item_code', 'code', 'manual_code'].includes(k)) {
           delete rowToInsert[k];
         }
       });
