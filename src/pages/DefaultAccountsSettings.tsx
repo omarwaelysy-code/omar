@@ -16,43 +16,40 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-// Arabic translation map for account usage
-export const getAccountUsageArabic = (usage?: string): string => {
-  if (!usage) return 'غير محدد';
-  const specialMap: Record<string, string> = {
-    cash: 'نقدية',
-    bank: 'بنك',
-    customer: 'عملاء',
-    accounts_receivable: 'عملاء',
-    supplier: 'موردين',
-    accounts_payable: 'موردين',
-    inventory: 'مخزون',
-    vat: 'ضريبة قيمة مضافة',
-    input_vat: 'ضريبة مدخلات',
-    output_vat: 'ضريبة مخرجات',
-    withholding_tax_customers: 'خصم أ.ت.ص عملاء',
-    withholding_tax_suppliers: 'خصم أ.ت.ص موردين',
-    capital: 'رأس المال',
-    retained_earnings: 'أرباح مرحلة',
-    opening_balance: 'رصيد افتتاحي',
-    sales_revenue: 'إيراد مبيعات',
-    sales_returns: 'مردودات مبيعات',
-    earned_discounts: 'خصم مبيعات (مسموح به)',
-    cost_of_sales: 'تكلفة مبيعات',
-    purchases: 'مشتريات',
-    purchase_returns: 'مردودات مشتريات',
-    granted_discounts: 'خصم مشتريات (مكتسب)',
-    realized_forex_gain: 'أرباح فروق عملة محققة',
-    realized_forex_loss: 'خسائر فروق عملة محققة',
-    unrealized_forex_gain: 'أرباح فروق عملة غير محققة',
-    unrealized_forex_loss: 'خسائر فروق عملة غير محققة',
-    operating_expense: 'مصروفات تشغيلية',
-    administrative_expense: 'مصروفات إدارية',
-    petty_cash: 'عهد نقدية',
-    equity: 'حقوق ملكية',
-    fixed_asset: 'أصل ثابت'
+// Translation helpers for account usages, screens, and classifications
+export const getAccountUsageDisplay = (usage?: string, language: 'ar' | 'en' = 'ar'): string => {
+  if (!usage) return language === 'ar' ? 'غير محدد' : 'Undefined';
+  return getAccountUsageLabel(usage, language) || usage;
+};
+
+export const getTargetScreenLabel = (screenName: string, language: 'ar' | 'en' = 'ar'): string => {
+  if (language === 'ar') return screenName;
+  const map: Record<string, string> = {
+    'شاشة طرق الدفع والخزائن': 'Payment Methods & Cash Desks',
+    'شاشة طرق الدفع والبنوك': 'Payment Methods & Banks',
+    'شاشة البيانات الأساسية للعملاء': 'Customers Master Data',
+    'شاشة البيانات الأساسية للموردين': 'Suppliers Master Data',
+    'شاشة بطاقة الصنف': 'Item Card Screen',
+    'شاشة إعدادات الشركة': 'Company Settings',
+    'شاشة إعدادات الحسابات الافتراضية': 'Default Accounts Settings',
+    'شاشة الأرصدة الافتتاحية': 'Opening Balances Screen',
+    'شاشة إعدادات الخصم': 'Discount Settings'
   };
-  return specialMap[usage] || getAccountUsageLabel(usage, 'ar') || usage;
+  return map[screenName] || screenName;
+};
+
+export const getClassificationDisplay = (classificationAr: string, language: 'ar' | 'en' = 'ar'): string => {
+  if (language === 'ar') return classificationAr;
+  const map: Record<string, string> = {
+    'الميزانية / أصول متداولة': 'Balance Sheet / Current Assets',
+    'الميزانية / التزامات متداولة': 'Balance Sheet / Current Liabilities',
+    'الميزانية / حقوق ملكية': 'Balance Sheet / Equity',
+    'قائمة الدخل / إيرادات': 'Income Statement / Revenue',
+    'قائمة الدخل / إيرادات أخرى': 'Income Statement / Other Income',
+    'قائمة الدخل / تكاليف': 'Income Statement / Cost of Sales',
+    'قائمة الدخل / مصروفات مالية': 'Income Statement / Finance Expenses'
+  };
+  return map[classificationAr] || classificationAr;
 };
 
 // Compatible usage values for matching default account items
@@ -109,7 +106,7 @@ const getCompatibleUsages = (targetUsage: string): string[] => {
 
 export const DefaultAccountsSettings: React.FC = () => {
   const { user } = useAuth();
-  const { dir } = useLanguage();
+  const { language, dir } = useLanguage();
   const { showNotification } = useNotification();
 
   const [loading, setLoading] = useState(true);
@@ -122,9 +119,19 @@ export const DefaultAccountsSettings: React.FC = () => {
   const [selectedScreenFilter, setSelectedScreenFilter] = useState('all');
   const [saveSuccessMap, setSaveSuccessMap] = useState<Record<string, boolean>>({});
   const [namingMode, setNamingMode] = useState<'ar' | 'en' | 'bilingual'>(() => {
-    return (localStorage.getItem('default_accounts_naming_mode') as 'ar' | 'en' | 'bilingual') || 'ar';
+    const saved = localStorage.getItem('default_accounts_naming_mode') as 'ar' | 'en' | 'bilingual' | null;
+    if (saved) return saved;
+    return language === 'en' ? 'en' : 'ar';
   });
   const [isApplyingNaming, setIsApplyingNaming] = useState(false);
+
+  // Automatically adapt default naming mode when user toggles application language
+  useEffect(() => {
+    const saved = localStorage.getItem('default_accounts_naming_mode');
+    if (!saved) {
+      setNamingMode(language === 'en' ? 'en' : 'ar');
+    }
+  }, [language]);
 
   const handleNamingModeChange = (mode: 'ar' | 'en' | 'bilingual') => {
     setNamingMode(mode);
@@ -149,9 +156,12 @@ export const DefaultAccountsSettings: React.FC = () => {
 
   const handleApplyNamingToCoa = async () => {
     if (!user?.company_id) return;
-    const modeLabel = namingMode === 'ar' ? 'العربية' : (namingMode === 'en' ? 'الإنجليزية' : 'باللغتين (عربي | English)');
-    const confirmed = window.confirm(`هل أنت متأكد من تطبيق صيغة التسمية [${modeLabel}] على أسماء الحسابات الافتراضية في دليل الحسابات؟`);
-    if (!confirmed) return;
+    const modeLabel = namingMode === 'ar' ? (language === 'ar' ? 'العربية' : 'Arabic') : (namingMode === 'en' ? (language === 'ar' ? 'الإنجليزية' : 'English') : (language === 'ar' ? 'باللغتين (عربي | English)' : 'Bilingual (Arabic | English)'));
+    const confirmMsg = language === 'ar' 
+      ? `هل أنت متأكد من تطبيق صيغة التسمية [${modeLabel}] على أسماء الحسابات الافتراضية في دليل الحسابات؟`
+      : `Are you sure you want to apply the [${modeLabel}] naming format to default accounts in the Chart of Accounts?`;
+    
+    if (!window.confirm(confirmMsg)) return;
 
     setIsApplyingNaming(true);
     try {
@@ -194,10 +204,13 @@ export const DefaultAccountsSettings: React.FC = () => {
         }
       }
 
-      showNotification(`تم تحديث تسمية ${updatedCount} حساب في دليل الحسابات بصيغة: ${modeLabel}`, 'success');
+      const successMsg = language === 'ar'
+        ? `تم تحديث تسمية ${updatedCount} حساب في دليل الحسابات بصيغة: ${modeLabel}`
+        : `Successfully updated ${updatedCount} accounts in Chart of Accounts with format: ${modeLabel}`;
+      showNotification(successMsg, 'success');
       await loadDefaultAccounts();
     } catch (err: any) {
-      showNotification(err.message || 'حدث خطأ أثناء تطبيق التسمية', 'error');
+      showNotification(err.message || (language === 'ar' ? 'حدث خطأ أثناء تطبيق التسمية' : 'Error applying naming format'), 'error');
     } finally {
       setIsApplyingNaming(false);
     }
@@ -222,7 +235,7 @@ export const DefaultAccountsSettings: React.FC = () => {
       setItems(loadedAccounts);
     } catch (err: any) {
       console.error(err);
-      showNotification('فشل تحميل الحسابات الافتراضية', 'error');
+      showNotification(language === 'ar' ? 'فشل تحميل الحسابات الافتراضية' : 'Failed to load default accounts', 'error');
     } finally {
       setLoading(false);
     }
@@ -250,17 +263,17 @@ export const DefaultAccountsSettings: React.FC = () => {
     try {
       const success = await defaultAccountsService.updateDefaultAccount(key, accountId);
       if (success) {
-        showNotification('تم تحديث الحساب الافتراضي بنجاح', 'success');
+        showNotification(language === 'ar' ? 'تم تحديث الحساب الافتراضي بنجاح' : 'Default account updated successfully', 'success');
         setSaveSuccessMap(prev => ({ ...prev, [key]: true }));
         setTimeout(() => {
           setSaveSuccessMap(prev => ({ ...prev, [key]: false }));
         }, 2500);
         await loadDefaultAccounts();
       } else {
-        showNotification('فشل حفظ الحساب الافتراضي', 'error');
+        showNotification(language === 'ar' ? 'فشل حفظ الحساب الافتراضي' : 'Failed to save default account', 'error');
       }
     } catch (err: any) {
-      showNotification(err.message || 'حدث خطأ أثناء الحفظ', 'error');
+      showNotification(err.message || (language === 'ar' ? 'حدث خطأ أثناء الحفظ' : 'Error saving changes'), 'error');
     } finally {
       setSaving(false);
     }
@@ -272,13 +285,13 @@ export const DefaultAccountsSettings: React.FC = () => {
     try {
       const success = await defaultAccountsService.saveAllDefaultAccounts(selectedMappings);
       if (success) {
-        showNotification('تم حفظ وتحديث جميع الحسابات الافتراضية بنجاح', 'success');
+        showNotification(language === 'ar' ? 'تم حفظ وتحديث جميع الحسابات الافتراضية بنجاح' : 'All default accounts saved successfully', 'success');
         await loadDefaultAccounts();
       } else {
-        showNotification('فشل حفظ التغييرات', 'error');
+        showNotification(language === 'ar' ? 'فشل حفظ التغييرات' : 'Failed to save changes', 'error');
       }
     } catch (err: any) {
-      showNotification(err.message || 'حدث خطأ أثناء الحفظ', 'error');
+      showNotification(err.message || (language === 'ar' ? 'حدث خطأ أثناء الحفظ' : 'Error saving changes'), 'error');
     } finally {
       setSaving(false);
     }
@@ -293,10 +306,10 @@ export const DefaultAccountsSettings: React.FC = () => {
         showNotification(res.message, 'success');
         await loadDefaultAccounts();
       } else {
-        showNotification('حدث خطأ أثناء فحص ودمج الحسابات', 'error');
+        showNotification(language === 'ar' ? 'حدث خطأ أثناء فحص ودمج الحسابات' : 'Error checking and merging accounts', 'error');
       }
     } catch (err: any) {
-      showNotification(err.message || 'حدث خطأ أثناء فحص الدليل', 'error');
+      showNotification(err.message || (language === 'ar' ? 'حدث خطأ أثناء فحص الدليل' : 'Error checking Chart of Accounts'), 'error');
     } finally {
       setMerging(false);
     }
@@ -328,15 +341,24 @@ export const DefaultAccountsSettings: React.FC = () => {
   // Filtered rows
   const filteredItems = useMemo(() => {
     return items.filter(item => {
-      const usageAr = getAccountUsageArabic(item.accountUsage).toLowerCase();
+      const usageLabelAr = getAccountUsageDisplay(item.accountUsage, 'ar').toLowerCase();
+      const usageLabelEn = getAccountUsageDisplay(item.accountUsage, 'en').toLowerCase();
+      const screenLabelAr = getTargetScreenLabel(item.targetScreen, 'ar').toLowerCase();
+      const screenLabelEn = getTargetScreenLabel(item.targetScreen, 'en').toLowerCase();
+      const classLabelAr = getClassificationDisplay(item.classificationAr, 'ar').toLowerCase();
+      const classLabelEn = getClassificationDisplay(item.classificationAr, 'en').toLowerCase();
+
       const term = searchTerm.toLowerCase();
       const matchesSearch = 
         item.defaultCode.toLowerCase().includes(term) ||
         item.nameAr.toLowerCase().includes(term) ||
         (item.nameEn && item.nameEn.toLowerCase().includes(term)) ||
-        item.targetScreen.toLowerCase().includes(term) ||
-        item.classificationAr.toLowerCase().includes(term) ||
-        usageAr.includes(term) ||
+        screenLabelAr.includes(term) ||
+        screenLabelEn.includes(term) ||
+        classLabelAr.includes(term) ||
+        classLabelEn.includes(term) ||
+        usageLabelAr.includes(term) ||
+        usageLabelEn.includes(term) ||
         (item.accountName && item.accountName.toLowerCase().includes(term)) ||
         (item.accountCode && item.accountCode.toLowerCase().includes(term));
       
@@ -354,13 +376,17 @@ export const DefaultAccountsSettings: React.FC = () => {
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 border border-white/20 text-emerald-100 text-xs font-bold tracking-wide">
               <ShieldCheck size={14} />
-              <span>إدارة الحسابات الافتراضية وحماية الدليل المحاسبي</span>
+              <span>
+                {language === 'ar' ? 'إدارة الحسابات الافتراضية وحماية الدليل المحاسبي' : 'Default Accounts Management & COA Protection'}
+              </span>
             </div>
             <h1 className="text-xl md:text-2xl font-black text-white tracking-tight">
-              إعدادات الحسابات الافتراضية
+              {language === 'ar' ? 'إعدادات الحسابات الافتراضية' : 'Default Accounts Settings'}
             </h1>
             <p className="text-emerald-100/90 text-xs md:text-sm max-w-2xl leading-relaxed font-medium">
-              جدول الحسابات الافتراضية الإلزامية لتوجيه القيود الآلية (المبيعات، المخزون، الضرائب، فروق العملة، الأرباح المرحلة). يمكنك ربط أي حساب بديل من نفس الاستخدام مع حماية الحسابات من الحذف.
+              {language === 'ar'
+                ? 'جدول الحسابات الافتراضية الإلزامية لتوجيه القيود الآلية (المبيعات، المخزون، الضرائب، فروق العملة، الأرباح المرحلة). يمكنك ربط أي حساب بديل من نفس الاستخدام مع حماية الحسابات من الحذف.'
+                : 'Mandatory default accounts for automated system entries (Sales, Inventory, VAT, FX differences, Retained Earnings). You can map compatible alternative accounts while preserving deletion protection.'}
             </p>
           </div>
 
@@ -372,7 +398,11 @@ export const DefaultAccountsSettings: React.FC = () => {
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-xs shadow-md border border-white/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
             >
               <RefreshCw size={15} className={merging ? 'animate-spin' : ''} />
-              <span>{merging ? 'جاري فحص ودمج الحسابات...' : 'فحص ودمج الحسابات مع الدليل'}</span>
+              <span>
+                {merging 
+                  ? (language === 'ar' ? 'جاري فحص ودمج الحسابات...' : 'Checking & Merging...') 
+                  : (language === 'ar' ? 'فحص ودمج الحسابات مع الدليل' : 'Check & Merge with COA')}
+              </span>
             </button>
 
             <button
@@ -381,7 +411,11 @@ export const DefaultAccountsSettings: React.FC = () => {
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-emerald-50 text-emerald-900 font-bold text-xs shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
             >
               <Save size={15} className={saving ? 'animate-spin' : ''} />
-              <span>{saving ? 'جاري الحفظ...' : 'حفظ كافة التغييرات'}</span>
+              <span>
+                {saving 
+                  ? (language === 'ar' ? 'جاري الحفظ...' : 'Saving...') 
+                  : (language === 'ar' ? 'حفظ كافة التغييرات' : 'Save All Changes')}
+              </span>
             </button>
           </div>
         </div>
@@ -390,19 +424,31 @@ export const DefaultAccountsSettings: React.FC = () => {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-3 border-t border-white/15 text-xs">
           <div className="flex items-center gap-2 text-emerald-100">
             <div className="w-2 h-2 rounded-full bg-white"></div>
-            <span>إجمالي الحسابات: <strong className="text-white">{items.length} حساب</strong></span>
+            <span>
+              {language === 'ar' ? 'إجمالي الحسابات: ' : 'Total Accounts: '}
+              <strong className="text-white">{items.length} {language === 'ar' ? 'حساب' : 'Accounts'}</strong>
+            </span>
           </div>
           <div className="flex items-center gap-2 text-emerald-100">
             <div className="w-2 h-2 rounded-full bg-emerald-300"></div>
-            <span>حسابات بطاقة الصنف: <strong className="text-white">{items.filter(i => i.targetScreen.includes('الصنف')).length} حسابات</strong></span>
+            <span>
+              {language === 'ar' ? 'حسابات بطاقة الصنف: ' : 'Item Card Accounts: '}
+              <strong className="text-white">{items.filter(i => i.targetScreen.includes('الصنف')).length} {language === 'ar' ? 'حسابات' : 'Accounts'}</strong>
+            </span>
           </div>
           <div className="flex items-center gap-2 text-emerald-100">
             <div className="w-2 h-2 rounded-full bg-teal-300"></div>
-            <span>طرق الدفع والخزائن: <strong className="text-white">{items.filter(i => i.targetScreen.includes('الدفع')).length} حسابات</strong></span>
+            <span>
+              {language === 'ar' ? 'طرق الدفع والخزائن: ' : 'Payment & Cash: '}
+              <strong className="text-white">{items.filter(i => i.targetScreen.includes('الدفع')).length} {language === 'ar' ? 'حسابات' : 'Accounts'}</strong>
+            </span>
           </div>
           <div className="flex items-center gap-2 text-emerald-100">
             <div className="w-2 h-2 rounded-full bg-amber-300"></div>
-            <span>حماية الحذف: <strong className="text-white">مفعلة تلقائياً</strong></span>
+            <span>
+              {language === 'ar' ? 'حماية الحذف: ' : 'Deletion Protection: '}
+              <strong className="text-white">{language === 'ar' ? 'مفعلة تلقائياً' : 'Auto Enabled'}</strong>
+            </span>
           </div>
         </div>
       </div>
@@ -411,13 +457,15 @@ export const DefaultAccountsSettings: React.FC = () => {
       <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-sm flex flex-col lg:flex-row gap-3 items-center justify-between">
         <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full lg:w-auto flex-1">
           <div className="relative w-full sm:w-80">
-            <Search size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={16} className={`absolute top-1/2 -translate-y-1/2 text-slate-400 ${dir === 'rtl' ? 'right-3.5' : 'left-3.5'}`} />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="بحث برمز، اسم، أو استخدام الحساب..."
-              className="w-full pr-10 pl-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-xs transition-all"
+              placeholder={language === 'ar' ? 'بحث برمز، اسم، أو استخدام الحساب...' : 'Search by code, name, or account usage...'}
+              className={`w-full py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-xs transition-all ${
+                dir === 'rtl' ? 'pr-10 pl-3' : 'pl-10 pr-3'
+              }`}
             />
           </div>
 
@@ -426,12 +474,14 @@ export const DefaultAccountsSettings: React.FC = () => {
             <select
               value={selectedScreenFilter}
               onChange={(e) => setSelectedScreenFilter(e.target.value)}
-              className="w-full sm:w-64 px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-xs bg-white font-medium text-slate-700 transition-all"
+              className="w-full sm:w-64 px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-xs bg-white font-medium text-slate-700 transition-all cursor-pointer"
             >
-              <option value="all">جميع الشاشات ({items.length})</option>
+              <option value="all">
+                {language === 'ar' ? `جميع الشاشات (${items.length})` : `All Screens (${items.length})`}
+              </option>
               {uniqueScreens.map(screen => (
                 <option key={screen} value={screen}>
-                  {screen} ({items.filter(i => i.targetScreen === screen).length})
+                  {getTargetScreenLabel(screen, language)} ({items.filter(i => i.targetScreen === screen).length})
                 </option>
               ))}
             </select>
@@ -443,7 +493,7 @@ export const DefaultAccountsSettings: React.FC = () => {
           <div className="inline-flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200/80">
             <span className="text-[11px] font-bold text-slate-500 px-2 flex items-center gap-1 shrink-0">
               <Globe size={13} className="text-emerald-600" />
-              <span>عرض الدليل:</span>
+              <span>{language === 'ar' ? 'عرض الدليل:' : 'COA View:'}</span>
             </span>
             <button
               type="button"
@@ -454,7 +504,7 @@ export const DefaultAccountsSettings: React.FC = () => {
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }`}
             >
-              عربي
+              {language === 'ar' ? 'عربي' : 'Arabic'}
             </button>
             <button
               type="button"
@@ -475,9 +525,9 @@ export const DefaultAccountsSettings: React.FC = () => {
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }`}
-              title="عرض الاسمين معاً (عربي | إنجليزي)"
+              title={language === 'ar' ? 'عرض الاسمين معاً (عربي | إنجليزي)' : 'Display both names (Arabic | English)'}
             >
-              باللغتين
+              {language === 'ar' ? 'باللغتين' : 'Bilingual'}
             </button>
           </div>
 
@@ -486,10 +536,10 @@ export const DefaultAccountsSettings: React.FC = () => {
             onClick={handleApplyNamingToCoa}
             disabled={isApplyingNaming || loading}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300/80 font-bold text-xs transition-all active:scale-95 disabled:opacity-50"
-            title="تحديث وتطبيق هذه الصيغة على أسماء الحسابات في الدليل المحاسبي"
+            title={language === 'ar' ? 'تحديث وتطبيق هذه الصيغة على أسماء الحسابات في الدليل المحاسبي' : 'Apply this naming format to default accounts in Chart of Accounts'}
           >
             <Check size={13} className={isApplyingNaming ? 'animate-spin text-emerald-600' : 'text-emerald-600'} />
-            <span>{isApplyingNaming ? 'جاري التطبيق...' : 'تطبيق على الدليل'}</span>
+            <span>{isApplyingNaming ? (language === 'ar' ? 'جاري التطبيق...' : 'Applying...') : (language === 'ar' ? 'تطبيق على الدليل' : 'Apply to COA')}</span>
           </button>
         </div>
       </div>
@@ -499,25 +549,43 @@ export const DefaultAccountsSettings: React.FC = () => {
         {loading ? (
           <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400">
             <div className="w-10 h-10 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="font-bold text-xs">جاري تحميل جدول الحسابات الافتراضية...</p>
+            <p className="font-bold text-xs">
+              {language === 'ar' ? 'جاري تحميل جدول الحسابات الافتراضية...' : 'Loading default accounts table...'}
+            </p>
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="py-16 text-center text-slate-500 space-y-2">
-            <p className="font-bold text-sm">لا توجد نتائج مطابقة لبحثك</p>
-            <p className="text-xs text-slate-400">جرب البحث بكلمات أخرى أو اختر جميع الشاشات</p>
+            <p className="font-bold text-sm">
+              {language === 'ar' ? 'لا توجد نتائج مطابقة لبحثك' : 'No matching results found'}
+            </p>
+            <p className="text-xs text-slate-400">
+              {language === 'ar' ? 'جرب البحث بكلمات أخرى أو اختر جميع الشاشات' : 'Try searching with other keywords or select all screens'}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-right border-collapse">
+            <table className={`w-full border-collapse ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200/80 text-slate-600 text-xs font-black uppercase tracking-wider">
                   <th className="py-2.5 px-2 w-10 text-center">#</th>
-                  <th className="py-2.5 px-3 min-w-[170px]">الحساب الافتراضي القياسي</th>
-                  <th className="py-2.5 px-3 w-32 whitespace-nowrap">استخدام الحساب</th>
-                  <th className="py-2.5 px-3 w-36 whitespace-nowrap">القائمة / التصنيف</th>
-                  <th className="py-2.5 px-3 min-w-[240px]">الحساب المربوط حالياً</th>
-                  <th className="py-2.5 px-3 w-44 whitespace-nowrap">شاشة التعيين التلقائي</th>
-                  <th className="py-2.5 px-2 w-14 text-center">حفظ</th>
+                  <th className="py-2.5 px-3 min-w-[180px]">
+                    {language === 'ar' ? 'الحساب الافتراضي القياسي' : 'Standard Default Account'}
+                  </th>
+                  <th className="py-2.5 px-3 w-36 whitespace-nowrap">
+                    {language === 'ar' ? 'استخدام الحساب' : 'Account Usage'}
+                  </th>
+                  <th className="py-2.5 px-3 w-44 whitespace-nowrap">
+                    {language === 'ar' ? 'القائمة / التصنيف' : 'Statement / Classification'}
+                  </th>
+                  <th className="py-2.5 px-3 min-w-[260px]">
+                    {language === 'ar' ? 'الحساب المربوط حالياً' : 'Currently Linked Account'}
+                  </th>
+                  <th className="py-2.5 px-3 w-48 whitespace-nowrap">
+                    {language === 'ar' ? 'شاشة التعيين التلقائي' : 'Auto Assignment Screen'}
+                  </th>
+                  <th className="py-2.5 px-2 w-14 text-center">
+                    {language === 'ar' ? 'حفظ' : 'Save'}
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
@@ -536,12 +604,12 @@ export const DefaultAccountsSettings: React.FC = () => {
                       className="hover:bg-slate-50/70 transition-colors group"
                     >
                       {/* 1. Index */}
-                      <td className="py-2 px-2 text-center font-bold text-slate-400 text-xs">
+                      <td className="py-2.5 px-2 text-center font-bold text-slate-400 text-xs">
                         {index + 1}
                       </td>
 
                       {/* 2. Standard Default Account */}
-                      <td className="py-2 px-3">
+                      <td className="py-2.5 px-3">
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-slate-100 font-bold text-slate-700 border border-slate-200/70 shrink-0">
                             {item.defaultCode}
@@ -564,57 +632,68 @@ export const DefaultAccountsSettings: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* 3. Account Usage (in Arabic) */}
-                      <td className="py-2 px-3 whitespace-nowrap">
+                      {/* 3. Account Usage */}
+                      <td className="py-2.5 px-3 whitespace-nowrap">
                         <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200/60">
-                          {getAccountUsageArabic(item.accountUsage)}
+                          {getAccountUsageDisplay(item.accountUsage, language)}
                         </span>
                       </td>
 
                       {/* 4. Classification */}
-                      <td className="py-2 px-3 whitespace-nowrap">
+                      <td className="py-2.5 px-3 whitespace-nowrap">
                         <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700">
-                          {item.classificationAr}
+                          {getClassificationDisplay(item.classificationAr, language)}
                         </span>
                       </td>
 
                       {/* 5. Active Linked Account & Dropdown Selector */}
-                      <td className="py-2 px-3">
+                      <td className="py-2.5 px-3">
                         <div className="relative">
                           <select
                             value={currentSelectedId || ''}
                             onChange={(e) => handleSelectAccount(item.key, e.target.value)}
-                            className={`w-full py-1.5 px-2.5 pr-3 pl-7 text-xs rounded-lg border font-medium transition-all appearance-none cursor-pointer focus:outline-none focus:ring-2 ${
+                            className={`w-full py-1.5 px-2.5 text-xs rounded-lg border font-medium transition-all appearance-none cursor-pointer focus:outline-none focus:ring-2 ${
+                              dir === 'rtl' ? 'pr-3 pl-7' : 'pl-3 pr-7'
+                            } ${
                               isModified
                                 ? 'border-amber-400 bg-amber-50/50 text-amber-900 focus:ring-amber-500/20'
                                 : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300 focus:ring-emerald-500/20 focus:border-emerald-500'
                             }`}
                           >
-                            <option value="">-- اختر حساباً بديلاً من الدليل --</option>
+                            <option value="">
+                              {language === 'ar' ? '-- اختر حساباً بديلاً من الدليل --' : '-- Select alternative account from COA --'}
+                            </option>
                             {compatibleAccounts.map(acc => (
                               <option key={acc.id} value={acc.id}>
-                                {acc.code} - {acc.name} {acc.account_usage ? `(${getAccountUsageArabic(acc.account_usage)})` : ''}
+                                {acc.code} - {acc.name} {acc.account_usage ? `(${getAccountUsageDisplay(acc.account_usage, language)})` : ''}
                               </option>
                             ))}
                           </select>
-                          <ArrowRightLeft size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                          <ArrowRightLeft 
+                            size={13} 
+                            className={`absolute top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none ${
+                              dir === 'rtl' ? 'left-2' : 'right-2'
+                            }`} 
+                          />
                         </div>
                       </td>
 
                       {/* 6. Target Screen */}
-                      <td className="py-2 px-3 whitespace-nowrap">
+                      <td className="py-2.5 px-3 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-100">
                           <Layers size={11} className="text-emerald-600" />
-                          {item.targetScreen}
+                          {getTargetScreenLabel(item.targetScreen, language)}
                         </span>
                       </td>
 
                       {/* 7. Actions */}
-                      <td className="py-2 px-2 text-center">
+                      <td className="py-2.5 px-2 text-center">
                         <button
                           onClick={() => handleSaveSingle(item.key)}
                           disabled={saving || !isModified}
-                          title={isModified ? 'حفظ التغيير لهذا الحساب' : 'الحساب محفوظ'}
+                          title={isModified 
+                            ? (language === 'ar' ? 'حفظ التغيير لهذا الحساب' : 'Save change for this account') 
+                            : (language === 'ar' ? 'الحساب محفوظ' : 'Account saved')}
                           className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
                             isSavedSuccessfully
                               ? 'bg-emerald-500 text-white shadow-sm'
@@ -643,25 +722,39 @@ export const DefaultAccountsSettings: React.FC = () => {
       <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 md:p-5 space-y-3">
         <div className="flex items-center gap-2.5 text-slate-800 font-black text-base">
           <BookOpen size={18} className="text-emerald-600" />
-          <h3>ملاحظات وقواعد عمل الحسابات الافتراضية</h3>
+          <h3>
+            {language === 'ar' ? 'ملاحظات وقواعد عمل الحسابات الافتراضية' : 'Default Accounts Rules & Operational Notes'}
+          </h3>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-600 leading-relaxed">
           <div className="p-3 bg-white rounded-xl border border-slate-100 shadow-sm space-y-1.5">
-            <h4 className="font-bold text-slate-900">1. الدمج التلقائي مع أي دليل</h4>
+            <h4 className="font-bold text-slate-900">
+              {language === 'ar' ? '1. الدمج التلقائي مع أي دليل' : '1. Automatic Merge with COA'}
+            </h4>
             <p>
-              عند الضغط على زر &quot;فحص ودمج الحسابات&quot; يتم فحص الدليل المحاسبي للشركة، وإن كان ينقصه أي من هذه الحسابات، يتم إنشاؤه فوراً تحت التصنيف المناسب دون تكرار أو مساس بالحسابات الحالية.
+              {language === 'ar'
+                ? 'عند الضغط على زر "فحص ودمج الحسابات" يتم فحص الدليل المحاسبي للشركة، وإن كان ينقصه أي من هذه الحسابات، يتم إنشاؤه فوراً تحت التصنيف المناسب دون تكرار أو مساس بالحسابات الحالية.'
+                : 'Clicking "Check & Merge with COA" scans company accounts and generates any missing standard accounts under their proper classifications without duplicates or affecting existing accounts.'}
             </p>
           </div>
           <div className="p-3 bg-white rounded-xl border border-slate-100 shadow-sm space-y-1.5">
-            <h4 className="font-bold text-slate-900">2. تغيير الحساب المربوط بنفس الاستخدام</h4>
+            <h4 className="font-bold text-slate-900">
+              {language === 'ar' ? '2. تغيير الحساب المربوط بنفس الاستخدام' : '2. Compatible Account Reassignment'}
+            </h4>
             <p>
-              يمكنك تغيير ربط أي حساب باختيار حساب بديل من نفس الاستخدام (مثلاً نقدية لنقدية، مورد لمورد، عميل لعميل) وتوجيه القيود الآلية إليه فوراً وبشكل منضبط محاسبياً.
+              {language === 'ar'
+                ? 'يمكنك تغيير ربط أي حساب باختيار حساب بديل من نفس الاستخدام (مثلاً نقدية لنقدية، مورد لمورد، عميل لعميل) وتوجيه القيود الآلية إليه فوراً وبشكل منضبط محاسبياً.'
+                : 'You can reassign any mapping to a compatible alternative account with the same usage (e.g. Cash to Cash, Supplier to Supplier) to direct automated entries seamlessly.'}
             </p>
           </div>
           <div className="p-3 bg-white rounded-xl border border-slate-100 shadow-sm space-y-1.5">
-            <h4 className="font-bold text-slate-900">3. الحماية الصارمة من الحذف</h4>
+            <h4 className="font-bold text-slate-900">
+              {language === 'ar' ? '3. الحماية الصارمة من الحذف' : '3. Strict Deletion Protection'}
+            </h4>
             <p>
-              تمنع قاعدة البيانات والنظام حذف أي حساب معتمد كافتراضي (سواء كان الكود القياسي أو الحساب الذي قمت بتحديده) لضمان عدم اختلال القيود الآلية أو التقارير المالية.
+              {language === 'ar'
+                ? 'تمنع قاعدة البيانات والنظام حذف أي حساب معتمد كافتراضي (سواء كان الكود القياسي أو الحساب الذي قمت بتحديده) لضمان عدم اختلال القيود الآلية أو التقارير المالية.'
+                : 'The system and database strictly prevent deleting any mapped default account to preserve accounting integrity for automated postings and financial statements.'}
             </p>
           </div>
         </div>
