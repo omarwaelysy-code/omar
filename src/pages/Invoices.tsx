@@ -5934,7 +5934,7 @@ export const Invoices: React.FC = () => {
                                 onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
                               />
                             </div>
-                            <span className="font-bold text-[11px]">-{formatMoney(Math.abs(discount))}</span>
+                            <span className="font-bold text-[11px]">{formatMoney(Math.abs(discount))}</span>
                           </div>
                           {isVatEnabled && (() => {
                             const calculatedVatAmount = items.reduce((sum, i) => {
@@ -5970,7 +5970,7 @@ export const Invoices: React.FC = () => {
                               <div className="flex justify-between items-center text-amber-700 text-[10px] pt-0.5 border-t border-dashed border-zinc-200">
                                 <span className="font-medium">{language === 'ar' ? 'ضريبة الخصم والإضافة (ض.خ.إ)' : 'Withholding Tax (WHT)'}</span>
                                 <span className="font-bold text-[11px]">
-                                  -{formatMoney(calculatedWhtAmount)}
+                                  {formatMoney(calculatedWhtAmount)}
                                 </span>
                               </div>
                             );

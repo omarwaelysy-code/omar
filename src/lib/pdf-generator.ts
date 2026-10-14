@@ -1379,7 +1379,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
             if (hasDiscount) {
               const rawDisc = Number(dto.discount_amount || 0);
-              drawCardRow(isEn ? 'Discount' : 'الخصم', `-${formatNumberValue(Math.abs(rawDisc))}`, false, '#dc2626');
+              drawCardRow(isEn ? 'Discount' : 'الخصم', formatNumberValue(Math.abs(rawDisc)), false, '#dc2626');
             }
 
             if (isVatEnabled) {

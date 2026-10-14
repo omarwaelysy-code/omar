@@ -5923,7 +5923,7 @@ export const PurchaseInvoices: React.FC = () => {
                                 onChange={(e) => setInvoiceData({ ...invoiceData, discount: parseFloat(e.target.value) || 0 })}
                               />
                             </div>
-                            <span className="font-bold text-[11px]">-{formatMoney(invoiceData.discount)}</span>
+                            <span className="font-bold text-[11px]">{formatMoney(Math.abs(invoiceData.discount || 0))}</span>
                           </div>
                           {isVatEnabled && (() => {
                             const calculatedVatAmount = items.reduce((sum, i) => {
@@ -5939,7 +5939,7 @@ export const PurchaseInvoices: React.FC = () => {
                               <div className="flex justify-between items-center text-zinc-650 text-[10px] pt-0.5 border-t border-dashed border-zinc-200">
                                 <span className="font-medium">{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</span>
                                 <span className="font-bold text-[11px]">
-                                  +{formatMoney(calculatedVatAmount)}
+                                  {calculatedVatAmount >= 0 ? `+${formatMoney(calculatedVatAmount)}` : formatMoney(calculatedVatAmount)}
                                 </span>
                               </div>
                             );
@@ -5951,7 +5951,7 @@ export const PurchaseInvoices: React.FC = () => {
                               <div className="flex justify-between items-center text-amber-700 text-[10px] pt-0.5 border-t border-dashed border-zinc-200">
                                 <span className="font-medium">{language === 'ar' ? 'ضريبة الخصم والإضافة (ض.خ.إ)' : 'Withholding Tax (WHT)'}</span>
                                 <span className="font-bold text-[11px]">
-                                  -{formatMoney(calculatedWhtAmount)}
+                                  {formatMoney(calculatedWhtAmount)}
                                 </span>
                               </div>
                             );
