@@ -574,11 +574,15 @@ export function UnifiedPrintEngine() {
       return '-';
     };
 
+    const isCompanyVatActive = company?.settings?.vat_enabled ?? company?.vat_enabled ?? false;
+
     const companyDto = {
       name: normalized.company_name || '',
       logoUrl: normalized.company_logo || '',
       taxNumber: normalized.company_tax_number || '',
-      phone: normalized.company_phone || ''
+      phone: normalized.company_phone || '',
+      vat_enabled: isCompanyVatActive,
+      settings: company?.settings || { vat_enabled: isCompanyVatActive }
     };
 
     const itemsDto = (normalized.items || []).map(itm => ({
@@ -628,6 +632,7 @@ export function UnifiedPrintEngine() {
         userName: normalized.user_name,
         branchName: normalized.branch_name,
         operation_type: operationType,
+        vat_enabled: isCompanyVatActive,
         language: language
       };
     } else if (operationType === 'purchase_invoices' || operationType === 'purchase_returns' || operationType === 'purchase_orders') {
@@ -651,6 +656,7 @@ export function UnifiedPrintEngine() {
         userName: normalized.user_name,
         branchName: normalized.branch_name,
         operation_type: operationType,
+        vat_enabled: isCompanyVatActive,
         language: language
       };
     } else if (operationType === 'receipt_vouchers' || operationType === 'payment_vouchers') {

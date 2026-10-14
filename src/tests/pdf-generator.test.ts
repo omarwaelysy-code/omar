@@ -362,6 +362,39 @@ describe('PDF Engine Architectural Tests', () => {
       expect(buffer.length).toBeGreaterThan(100);
       expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
     });
+
+    it('should generate a valid Sales Invoice PDF when company has VAT disabled without forcing 14% tax', async () => {
+      const dto = {
+        company: {
+          ...mockCompany,
+          settings: { vat_enabled: false },
+          vat_enabled: false
+        },
+        invoice_number: 'INV-2026-10-000004',
+        date: '2026-10-12',
+        payment_method: 'آجل',
+        customer_name: 'ا/ فايز',
+        items: [
+          {
+            product_code: 'SRV-0005',
+            product_name: 'جاكيت',
+            quantity: '455',
+            unit_price: '150.00',
+            discount: '0.00',
+            total: '68250.00'
+          }
+        ],
+        subtotal: '68250.00',
+        discount_amount: '0.00',
+        vat_amount: '0.00',
+        net_total: '68250.00'
+      };
+
+      const buffer = await generatePDF('SalesInvoicePdf', dto);
+      expect(buffer).toBeInstanceOf(Buffer);
+      expect(buffer.length).toBeGreaterThan(100);
+      expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
+    });
   });
 });
 

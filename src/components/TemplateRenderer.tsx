@@ -209,7 +209,11 @@ export function normalizeDocumentData(
       unit_price: Number(itm.unit_price || 0),
       discount: Number(itm.discount || 0),
       vat_amount: Number(itm.vat_amount || 0),
-      vat_rate: itm.vat_rate !== undefined ? `% ${itm.vat_rate}` : (itm.tax_rate !== undefined ? `% ${itm.tax_rate}` : '% 14'),
+      vat_rate: itm.vat_rate !== undefined && itm.vat_rate !== null && String(itm.vat_rate).trim() !== '' 
+        ? (String(itm.vat_rate).includes('%') ? itm.vat_rate : `% ${itm.vat_rate}`) 
+        : (itm.tax_rate !== undefined && itm.tax_rate !== null && String(itm.tax_rate).trim() !== '' 
+          ? (String(itm.tax_rate).includes('%') ? itm.tax_rate : `% ${itm.tax_rate}`) 
+          : (Number(data.tax_amount || 0) > 0 ? '% 14' : '% 0')),
       withholding_tax_rate: itm.withholding_tax_rate !== undefined ? `% ${itm.withholding_tax_rate}` : '% 0',
       withholding_tax_amount: Number(itm.withholding_tax_amount || 0),
       total: Number(itm.total || 0)
@@ -239,7 +243,11 @@ export function normalizeDocumentData(
       unit_price: Number(itm.unit_price || 0),
       discount: Number(itm.discount || 0),
       vat_amount: Number(itm.vat_amount || 0),
-      vat_rate: itm.vat_rate !== undefined ? `% ${itm.vat_rate}` : (itm.tax_rate !== undefined ? `% ${itm.tax_rate}` : '% 14'),
+      vat_rate: itm.vat_rate !== undefined && itm.vat_rate !== null && String(itm.vat_rate).trim() !== '' 
+        ? (String(itm.vat_rate).includes('%') ? itm.vat_rate : `% ${itm.vat_rate}`) 
+        : (itm.tax_rate !== undefined && itm.tax_rate !== null && String(itm.tax_rate).trim() !== '' 
+          ? (String(itm.tax_rate).includes('%') ? itm.tax_rate : `% ${itm.tax_rate}`) 
+          : (Number(data.tax_amount || 0) > 0 ? '% 14' : '% 0')),
       withholding_tax_rate: itm.withholding_tax_rate !== undefined ? `% ${itm.withholding_tax_rate}` : '% 0',
       withholding_tax_amount: Number(itm.withholding_tax_amount || 0),
       total: Number(itm.total || 0)
@@ -570,15 +578,21 @@ export function TemplateRenderer({
           {/* Details / Table section (paginated contents) */}
           <div className="my-2 relative z-10" style={{ minHeight: `${availableDetailsHeight * 0.8 * scale}px` }}>
             {/* 1. Main dynamic columns table */}
-            {layout.details.columns && layout.details.columns.length > 0 && (
-              <TableComponent
-                columns={layout.details.columns}
-                items={pageItems}
-                properties={layout.details.properties}
-                scale={scale}
-                dir={dir}
-              />
-            )}
+            {layout.details.columns && layout.details.columns.length > 0 && (() => {
+              const hasDocVat = Number(data.vat_amount || 0) > 0 || (data.items || []).some((i: any) => Number(i.vat_amount || 0) > 0);
+              const effectiveCols = hasDocVat 
+                ? layout.details.columns 
+                : layout.details.columns.filter((c: any) => c.field !== 'vat_rate' && c.field !== 'vat_amount');
+              return (
+                <TableComponent
+                  columns={effectiveCols}
+                  items={pageItems}
+                  properties={layout.details.properties}
+                  scale={scale}
+                  dir={dir}
+                />
+              );
+            })()}
 
             {/* 2. Visual layout Repeater Engine */}
             {layout.details.elements && layout.details.elements.length > 0 && (

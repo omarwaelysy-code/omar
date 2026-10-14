@@ -1045,7 +1045,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               product_name: row.product_name || row.item_name || row.description || row.col_1 || row.col_2 || row['صنف'] || row['الصنف'] || row['البيان'] || '-',
               quantity: row.quantity || row.qty || row.col_2 || row.col_3 || row['الكمية'] || 1,
               unit_price: row.unit_price || row.price || row.cost_price || row.col_3 || row.col_4 || row['السعر'] || 0,
-              vat_rate: row.vat_rate || row.tax_rate || row['ض ق م %'] || row['نسبة الضريبة'] || 14,
+              vat_rate: row.vat_rate || row.tax_rate || row['ض ق م %'] || row['نسبة الضريبة'] || (Number(row.vat_amount || row.tax || 0) > 0 ? 14 : 0),
               vat_amount: row.vat_amount || row.tax || row['مبلغ الضريبة'] || row['الضريبة'] || 0,
               total: row.total || row.total_amount || row['الإجمالي'] || 0
             }));
@@ -1096,8 +1096,11 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             ?? dto.settings?.vat_enabled 
             ?? dto.vat_enabled 
             ?? dto.vatEnabled;
+
+          const isCompanyVatDisabled = companyVatFlag === false || companyVatFlag === 'false' || companyVatFlag === 0;
+          const dtoVatAmount = isCompanyVatDisabled ? 0 : Number(dto.vat_amount ?? dto.tax_amount ?? dto.tax ?? dto.vat_total ?? dto.total_vat ?? 0);
           
-          // Pre-format items with vat_rate_formatted (% 14) and computed vat_amount FIRST
+          // Pre-format items with vat_rate_formatted and computed vat_amount
           const resolveCode = (itm: any): string => {
             const list = [itm.product_code, itm.code, itm.sku, itm.item_code, itm.barcode, itm.product_sku];
             for (const val of list) {
@@ -1136,18 +1139,24 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             let itemVatVal = Number(item.vat_amount ?? item.tax_amount ?? item.tax ?? item.vat_val ?? item.vat ?? 0);
             const itemTotal = Number(item.total || (Number(item.quantity || 0) * Number(item.unit_price || 0)) || 0);
 
-            if (!numRate && itemVatVal > 0 && itemTotal > 0) {
-              numRate = Math.round((itemVatVal / itemTotal) * 100);
-            }
-            if (!numRate && Number(dto.vat_amount || 0) > 0 && Number(dto.subtotal || 0) > 0) {
-              numRate = Math.round((Number(dto.vat_amount) / Number(dto.subtotal)) * 100);
-            }
-            if (!numRate) {
-              numRate = 14;
-            }
+            if (isCompanyVatDisabled) {
+              numRate = 0;
+              itemVatVal = 0;
+            } else {
+              if (!numRate && itemVatVal > 0 && itemTotal > 0) {
+                numRate = Math.round((itemVatVal / itemTotal) * 100);
+              }
+              if (!numRate && dtoVatAmount > 0 && Number(dto.subtotal || 0) > 0) {
+                numRate = Math.round((dtoVatAmount / Number(dto.subtotal)) * 100);
+              }
+              // Only default to 14% if the document explicitly has a positive VAT amount
+              if (!numRate && dtoVatAmount > 0) {
+                numRate = 14;
+              }
 
-            if (itemVatVal <= 0 && numRate > 0 && itemTotal > 0) {
-              itemVatVal = Number(((itemTotal * numRate) / 100).toFixed(2));
+              if (itemVatVal <= 0 && numRate > 0 && itemTotal > 0) {
+                itemVatVal = Number(((itemTotal * numRate) / 100).toFixed(2));
+              }
             }
 
             const rateStr = numRate > 0 ? `% ${numRate}` : '0%';
@@ -1160,18 +1169,17 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           });
 
           const itemsVatSum = formattedItems.reduce((sum: number, item: any) => sum + Number(item.vat_amount || 0), 0);
-          const dtoVatAmount = Number(dto.vat_amount ?? dto.tax_amount ?? dto.tax ?? dto.vat_total ?? dto.total_vat ?? 0);
-          const effectiveVatAmount = dtoVatAmount > 0 ? dtoVatAmount : itemsVatSum;
+          const effectiveVatAmount = isCompanyVatDisabled ? 0 : (dtoVatAmount > 0 ? dtoVatAmount : itemsVatSum);
 
-          const hasActualVat = (effectiveVatAmount > 0) || formattedItems.some((item: any) => Number(item.vat_amount || 0) > 0);
+          const hasActualVat = !isCompanyVatDisabled && (effectiveVatAmount > 0 || formattedItems.some((item: any) => Number(item.vat_amount || 0) > 0));
 
-          let isVatEnabled = true;
-          if (hasActualVat) {
-            isVatEnabled = true;
-          } else if (companyVatFlag === false || companyVatFlag === 'false' || companyVatFlag === 0) {
+          let isVatEnabled = false;
+          if (isCompanyVatDisabled) {
             isVatEnabled = false;
-          } else {
+          } else if (hasActualVat) {
             isVatEnabled = true;
+          } else {
+            isVatEnabled = false;
           }
 
           let sectionBottomY = currentY + 66;
@@ -1400,12 +1408,13 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 14, align: 'right' }
             ];
           } else {
-            // VAT Disabled: Hide Tax %, Tax Amount, and Unit columns
+            // VAT Disabled: Hide Tax % and Tax Amount columns
             columns = [
-              { id: 'product_code', label: isEn ? 'Item Code' : 'كود الصنف', width: 15, align: isRtl ? 'right' : 'left' },
-              { id: 'product_name', label: isEn ? 'Item Name' : 'الصنف', width: 47, align: isRtl ? 'right' : 'left' },
-              { id: 'quantity', label: isEn ? 'Qty' : 'الكمية', width: 11, align: 'right' },
-              { id: 'unit_price', label: isEn ? 'Price' : 'السعر', width: 13, align: 'right' },
+              { id: 'product_code', label: isEn ? 'Item Code' : 'كود الصنف', width: 14, align: isRtl ? 'right' : 'left' },
+              { id: 'product_name', label: isEn ? 'Item Name' : 'الصنف', width: 44, align: isRtl ? 'right' : 'left' },
+              { id: 'quantity', label: isEn ? 'Qty' : 'الكمية', width: 12, align: 'right' },
+              { id: 'unit_price', label: isEn ? 'Price' : 'السعر', width: 15, align: 'right' },
+              { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 15, align: 'right' }
             ];
           }
 
