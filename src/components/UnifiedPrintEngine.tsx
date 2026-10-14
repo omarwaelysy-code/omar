@@ -210,13 +210,15 @@ const DEFAULT_TEMPLATE_LAYOUT = {
   ],
   details: {
     columns: [
-      { id: 'product_code', label: 'كود الصنف', field: 'product_code', width: 14 },
-      { id: 'product_name', label: 'الصنف', field: 'product_name', width: 38 },
-      { id: 'quantity', label: 'الكمية', field: 'quantity', width: 10 },
+      { id: 'product_code', label: 'كود الصنف', field: 'product_code', width: 12 },
+      { id: 'product_name', label: 'الصنف', field: 'product_name', width: 30 },
+      { id: 'quantity', label: 'الكمية', field: 'quantity', width: 9 },
       { id: 'unit_price', label: 'السعر', field: 'unit_price', width: 12 },
-      { id: 'vat_rate', label: 'نسبة الضريبة', field: 'vat_rate', width: 13 },
+      { id: 'vat_rate', label: 'نسبة الضريبة', field: 'vat_rate', width: 11 },
       { id: 'vat_amount', label: 'الضريبة', field: 'vat_amount', width: 10 },
-      { id: 'total', label: 'الإجمالي', field: 'total', width: 14 }
+      { id: 'withholding_tax_rate', label: 'ض.خ.إ %', field: 'withholding_tax_rate', width: 9 },
+      { id: 'withholding_tax_amount', label: 'مبلغ ض.خ.إ', field: 'withholding_tax_amount', width: 10 },
+      { id: 'total', label: 'الإجمالي', field: 'total', width: 12 }
     ],
     properties: {
       fontSize: 9.5,
@@ -594,6 +596,8 @@ export function UnifiedPrintEngine() {
       discount: String(itm.discount || '0'),
       vat_rate: String((itm as any).vat_rate || '0'),
       vat_amount: String(itm.vat_amount || '0'),
+      withholding_tax_rate: String((itm as any).withholding_tax_rate || '0'),
+      withholding_tax_amount: String((itm as any).withholding_tax_amount || '0'),
       total: String(itm.total || '0')
     }));
 
@@ -627,6 +631,7 @@ export function UnifiedPrintEngine() {
         subtotal: String(normalized.subtotal || '0'),
         discount_amount: String(normalized.discount_amount || '0'),
         vat_amount: String(normalized.vat_amount || '0'),
+        withholding_tax_amount: String(normalized.withholding_tax_amount || documentData?.withholding_tax_amount || documentData?.withholding_tax_total || '0'),
         net_total: String(normalized.net_total || '0'),
         currency_code: normalized.currency_code || (companyDto as any).currency || 'AED',
         userName: normalized.user_name,
@@ -651,6 +656,7 @@ export function UnifiedPrintEngine() {
         subtotal: String(normalized.subtotal || '0'),
         discount_amount: String(normalized.discount_amount || '0'),
         vat_amount: String(normalized.vat_amount || '0'),
+        withholding_tax_amount: String(normalized.withholding_tax_amount || documentData?.withholding_tax_amount || documentData?.withholding_tax_total || '0'),
         net_total: String(normalized.net_total || '0'),
         currency_code: normalized.currency_code || (companyDto as any).currency || 'AED',
         userName: normalized.user_name,

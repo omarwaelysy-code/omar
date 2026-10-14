@@ -309,7 +309,7 @@ export function normalizeDocumentData(
     doc.subtotal = Number(data.subtotal || data.sub_total || itemsSubtotalSum || 0);
     doc.discount_amount = Number(data.discount_amount || data.discount || 0);
     doc.vat_amount = Number(parentTaxVal || itemsVatSum || 0);
-    doc.net_total = Number((doc.subtotal + doc.vat_amount - doc.discount_amount).toFixed(2));
+    doc.net_total = Number((data.total_amount ?? (doc.subtotal + doc.vat_amount - doc.discount_amount - (doc.withholding_tax_amount || 0))).toFixed(2));
     doc.paid_amount = doc.net_total;
     doc.remaining_amount = 0;
   } 
@@ -580,9 +580,12 @@ export function TemplateRenderer({
             {/* 1. Main dynamic columns table */}
             {layout.details.columns && layout.details.columns.length > 0 && (() => {
               const hasDocVat = Number(data.vat_amount || 0) > 0 || (data.items || []).some((i: any) => Number(i.vat_amount || 0) > 0);
-              const effectiveCols = hasDocVat 
-                ? layout.details.columns 
-                : layout.details.columns.filter((c: any) => c.field !== 'vat_rate' && c.field !== 'vat_amount');
+              const hasDocWht = Number(data.withholding_tax_amount || 0) > 0 || (data.items || []).some((i: any) => Number(i.withholding_tax_amount || 0) > 0);
+              const effectiveCols = layout.details.columns.filter((c: any) => {
+                if (!hasDocVat && (c.field === 'vat_rate' || c.field === 'vat_amount')) return false;
+                if (!hasDocWht && (c.field === 'withholding_tax_rate' || c.field === 'withholding_tax_amount')) return false;
+                return true;
+              });
               return (
                 <TableComponent
                   columns={effectiveCols}

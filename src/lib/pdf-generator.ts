@@ -1160,16 +1160,40 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             }
 
             const rateStr = numRate > 0 ? `% ${numRate}` : '0%';
+
+            // Parse withholding tax rate and amount
+            let whtRateNum = 0;
+            const rawWhtRateStr = String(item.withholding_tax_rate ?? item.wht_rate ?? item.withholding_rate ?? '');
+            const cleanWhtDigits = rawWhtRateStr.replace(/[^0-9.]/g, '');
+            if (cleanWhtDigits !== '') {
+              whtRateNum = parseFloat(cleanWhtDigits);
+            }
+            let itemWhtAmt = Math.abs(Number(item.withholding_tax_amount ?? item.wht_amount ?? 0));
+            if (itemWhtAmt === 0 && whtRateNum > 0 && itemTotal > 0) {
+              itemWhtAmt = Number(((itemTotal * whtRateNum) / 100).toFixed(2));
+            }
+            const whtRateStr = whtRateNum > 0 ? `% ${whtRateNum}` : (itemWhtAmt > 0 ? '% 1' : '% 0');
+            const whtAmtFormatted = itemWhtAmt > 0 ? `-${formatNumberValue(itemWhtAmt)}` : '0.00';
+
             return {
               ...item,
               product_code: resolveCode(item),
               vat_amount: itemVatVal,
-              vat_rate_formatted: rateStr
+              vat_rate_formatted: rateStr,
+              withholding_tax_rate: whtRateNum,
+              withholding_tax_rate_formatted: whtRateStr,
+              withholding_tax_amount: itemWhtAmt > 0 ? -itemWhtAmt : 0,
+              withholding_tax_amount_formatted: whtAmtFormatted
             };
           });
 
           const itemsVatSum = formattedItems.reduce((sum: number, item: any) => sum + Number(item.vat_amount || 0), 0);
           const effectiveVatAmount = isCompanyVatDisabled ? 0 : (dtoVatAmount > 0 ? dtoVatAmount : itemsVatSum);
+
+          const itemsWhtSum = formattedItems.reduce((sum: number, item: any) => sum + Math.abs(Number(item.withholding_tax_amount || 0)), 0);
+          const dtoWhtAmt = Math.abs(Number(dto.withholding_tax_amount || dto.withholding_tax_total || 0));
+          const effectiveWhtAmount = dtoWhtAmt > 0 ? dtoWhtAmt : itemsWhtSum;
+          const hasWht = effectiveWhtAmount > 0;
 
           const hasActualVat = !isCompanyVatDisabled && (effectiveVatAmount > 0 || formattedItems.some((item: any) => Number(item.vat_amount || 0) > 0));
 
@@ -1245,8 +1269,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             const cardWidth = isThermal ? 140 : 215;
             const hasDiscount = Number(dto.discount_amount) > 0;
             const cardHeight = isThermal 
-              ? (60 + (hasDiscount ? 12 : 0) - (!isVatEnabled ? 10 : 0))
-              : (80 + (hasDiscount ? 14 : 0) - (!isVatEnabled ? 13 : 0));
+              ? (60 + (hasDiscount ? 12 : 0) + (hasWht ? 12 : 0) - (!isVatEnabled ? 10 : 0))
+              : (80 + (hasDiscount ? 14 : 0) + (hasWht ? 14 : 0) - (!isVatEnabled ? 13 : 0));
 
             const cardX = isRtl ? sideMargin : (doc.page.width - sideMargin - cardWidth);
             const cardY = middleY;
@@ -1306,9 +1330,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               drawCardRow(isEn ? 'VAT' : 'ضريبة القيمة المضافة', effectiveVatAmount);
             }
 
-            const whtAmt = Number(dto.withholding_tax_amount || dto.withholding_tax_total || 0);
-            if (whtAmt > 0) {
-              drawCardRow(isEn ? 'Withholding Tax' : 'ضريبة الخصم والإضافة', `-${formatNumberValue(whtAmt)}`, false, '#d97706');
+            if (hasWht) {
+              drawCardRow(isEn ? 'Withholding Tax' : 'ضريبة الخصم والإضافة (ض.خ.إ)', `-${formatNumberValue(effectiveWhtAmount)}`, false, '#dc2626');
             }
 
             // Card Divider Line
@@ -1316,11 +1339,12 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             doc.strokeColor('#cbd5e1').lineWidth(0.5).moveTo(cardX + 8, rowY).lineTo(cardX + cardWidth - 8, rowY).stroke();
             rowY += isThermal ? 2 : 3;
 
-            // Calculate Net Total accurately: Subtotal + VAT - Discount
+            // Calculate Net Total accurately: Subtotal + VAT - Discount - Withholding Tax
             const rawVatAmt = isVatEnabled ? effectiveVatAmount : 0;
             const rawDiscAmt = Number(dto.discount_amount || 0);
-            let calcNetTotal = Number((subtotalVal + rawVatAmt - rawDiscAmt - (Number(dto.withholding_tax_amount || dto.withholding_tax_total) || 0)).toFixed(2));
-            if (calcNetTotal <= 0) calcNetTotal = Number(dto.net_total || 0);
+            const rawWhtAmt = hasWht ? effectiveWhtAmount : 0;
+            let calcNetTotal = Number((subtotalVal + rawVatAmt - rawDiscAmt - rawWhtAmt).toFixed(2));
+            if (calcNetTotal <= 0 && Number(dto.net_total || 0) > 0) calcNetTotal = Number(dto.net_total || 0);
             
             const currencyCode = dto.currency_code || dto.currency || dto.company?.currency || 'AED';
             const formattedNetTotalStr = `${formatNumberValue(calcNetTotal)} ${currencyCode}`;
@@ -1379,13 +1403,19 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
           // Advance currentY past top layout to start the items table
           currentY = sectionBottomY + (isThermal ? 10 : 16);
-          // Table Columns based on custom layout, thermal mode and VAT status
+          // Table Columns based on custom layout, thermal mode, VAT status and Withholding Tax status
           let columns: ColumnDef[] = [];
           if (dto.customLayout && dto.customLayout.details && Array.isArray(dto.customLayout.details.columns) && dto.customLayout.details.columns.length > 0) {
-            const customCols = dto.customLayout.details.columns;
+            let customCols = dto.customLayout.details.columns;
+            if (!isVatEnabled) {
+              customCols = customCols.filter((c: any) => c.field !== 'vat_rate' && c.field !== 'vat_amount');
+            }
+            if (!hasWht) {
+              customCols = customCols.filter((c: any) => c.field !== 'withholding_tax_rate' && c.field !== 'withholding_tax_amount' && c.id !== 'withholding_tax_rate' && c.id !== 'withholding_tax_amount');
+            }
             const sumW = customCols.reduce((acc: number, c: any) => acc + (Number(c.width) || 15), 0) || 100;
             columns = customCols.map((c: any) => ({
-              id: c.field === 'vat_rate' ? 'vat_rate_formatted' : (c.field || c.id),
+              id: c.field === 'vat_rate' ? 'vat_rate_formatted' : (c.field === 'withholding_tax_rate' ? 'withholding_tax_rate_formatted' : (c.field || c.id)),
               label: isEn ? (c.enLabel || c.label || c.field) : (c.arLabel || c.label || c.field),
               width: Math.round(((Number(c.width) || 15) / sumW) * 100),
               align: (c.align || (isRtl ? 'right' : 'left')) as any
@@ -1396,8 +1426,21 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               { id: 'quantity', label: isEn ? 'Qty' : 'الكمية', width: 15, align: 'right' },
               { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 30, align: 'right' }
             ];
-          } else if (isVatEnabled) {
-            // VAT Enabled: Include Tax % and Tax Amount columns with optimized wide widths so numbers never wrap
+          } else if (isVatEnabled && hasWht) {
+            // Both VAT and Withholding Tax Enabled
+            columns = [
+              { id: 'product_code', label: isEn ? 'Item Code' : 'كود الصنف', width: 10, align: isRtl ? 'right' : 'left' },
+              { id: 'product_name', label: isEn ? 'Item Name' : 'الصنف', width: 23, align: isRtl ? 'right' : 'left' },
+              { id: 'quantity', label: isEn ? 'Qty' : 'الكمية', width: 7, align: 'right' },
+              { id: 'unit_price', label: isEn ? 'Price' : 'السعر', width: 11, align: 'right' },
+              { id: 'vat_rate_formatted', label: isEn ? 'Tax %' : 'نسبة الضريبة', width: 9, align: 'center' },
+              { id: 'vat_amount', label: isEn ? 'VAT' : 'الضريبة', width: 11, align: 'right' },
+              { id: 'withholding_tax_rate_formatted', label: isEn ? 'WHT %' : 'ض.خ.إ %', width: 8, align: 'center' },
+              { id: 'withholding_tax_amount', label: isEn ? 'WHT' : 'مبلغ ض.خ.إ', width: 10, align: 'right' },
+              { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 11, align: 'right' }
+            ];
+          } else if (isVatEnabled && !hasWht) {
+            // VAT Enabled, Withholding Tax Disabled
             columns = [
               { id: 'product_code', label: isEn ? 'Item Code' : 'كود الصنف', width: 11, align: isRtl ? 'right' : 'left' },
               { id: 'product_name', label: isEn ? 'Item Name' : 'الصنف', width: 29, align: isRtl ? 'right' : 'left' },
@@ -1407,8 +1450,19 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               { id: 'vat_amount', label: isEn ? 'VAT' : 'الضريبة', width: 14, align: 'right' },
               { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 14, align: 'right' }
             ];
+          } else if (!isVatEnabled && hasWht) {
+            // VAT Disabled, Withholding Tax Enabled
+            columns = [
+              { id: 'product_code', label: isEn ? 'Item Code' : 'كود الصنف', width: 12, align: isRtl ? 'right' : 'left' },
+              { id: 'product_name', label: isEn ? 'Item Name' : 'الصنف', width: 34, align: isRtl ? 'right' : 'left' },
+              { id: 'quantity', label: isEn ? 'Qty' : 'الكمية', width: 9, align: 'right' },
+              { id: 'unit_price', label: isEn ? 'Price' : 'السعر', width: 14, align: 'right' },
+              { id: 'withholding_tax_rate_formatted', label: isEn ? 'WHT %' : 'ض.خ.إ %', width: 9, align: 'center' },
+              { id: 'withholding_tax_amount', label: isEn ? 'WHT' : 'مبلغ ض.خ.إ', width: 10, align: 'right' },
+              { id: 'total', label: isEn ? 'Total' : 'الإجمالي', width: 12, align: 'right' }
+            ];
           } else {
-            // VAT Disabled: Hide Tax % and Tax Amount columns
+            // Both Disabled
             columns = [
               { id: 'product_code', label: isEn ? 'Item Code' : 'كود الصنف', width: 14, align: isRtl ? 'right' : 'left' },
               { id: 'product_name', label: isEn ? 'Item Name' : 'الصنف', width: 44, align: isRtl ? 'right' : 'left' },

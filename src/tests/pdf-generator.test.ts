@@ -89,6 +89,67 @@ describe('PDF Engine Architectural Tests', () => {
       expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
     });
 
+    it('should generate a valid Sales Invoice PDF buffer with Withholding Tax', async () => {
+      const dto = {
+        company: mockCompany,
+        invoice_number: 'REV-INV-2026-09-000019',
+        date: '2026-09-24',
+        payment_method: 'آجل',
+        customer_name: 'المصرية السعودية',
+        customer_tax_number: '-',
+        items: [
+          {
+            product_code: '2',
+            product_name: 'تيشرت',
+            quantity: '10',
+            unit_price: '150.00',
+            discount: '0.00',
+            vat_rate: '14%',
+            vat_amount: '210.00',
+            withholding_tax_rate: '1',
+            withholding_tax_amount: '15.00',
+            total: '1695.00'
+          },
+          {
+            product_code: 'CMD-0003',
+            product_name: 'بنطلون',
+            quantity: '5',
+            unit_price: '200.00',
+            discount: '0.00',
+            vat_rate: '14%',
+            vat_amount: '137.20',
+            withholding_tax_rate: '1',
+            withholding_tax_amount: '9.80',
+            total: '1107.40'
+          },
+          {
+            product_code: 'CMD-0004',
+            product_name: 'سامسونج شاشة 65',
+            quantity: '1',
+            unit_price: '40400.00',
+            discount: '0.00',
+            vat_rate: '14%',
+            vat_amount: '5656.00',
+            withholding_tax_rate: '0',
+            withholding_tax_amount: '0.00',
+            total: '46056.00'
+          }
+        ],
+        subtotal: '42900.00',
+        discount_amount: '20.00',
+        vat_amount: '6003.20',
+        withholding_tax_amount: '24.80',
+        net_total: '48858.40',
+        branchName: 'الفرع الرئيسي',
+        userName: 'وائل المحاسب'
+      };
+
+      const buffer = await generatePDF('SalesInvoicePdf', dto);
+      expect(buffer).toBeInstanceOf(Buffer);
+      expect(buffer.length).toBeGreaterThan(100);
+      expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
+    });
+
     it('should generate a valid Customer Statement PDF buffer', async () => {
       const dto = {
         company: mockCompany,

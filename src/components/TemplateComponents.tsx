@@ -290,7 +290,7 @@ export const TableComponent: React.FC<TableComponentProps> = ({
 }) => {
   // Compute column totals for number fields
   const computeTotal = (field: string) => {
-    const isNumberField = ['quantity', 'unit_price', 'discount', 'vat_amount', 'total'].includes(field);
+    const isNumberField = ['quantity', 'unit_price', 'discount', 'vat_amount', 'withholding_tax_amount', 'total'].includes(field);
     if (!isNumberField) return '';
     const total = items.reduce((sum, item) => sum + Number(item[field] || 0), 0);
     return total > 0 ? total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-';
