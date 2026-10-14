@@ -395,6 +395,85 @@ describe('PDF Engine Architectural Tests', () => {
       expect(buffer.length).toBeGreaterThan(100);
       expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
     });
+
+    it('should generate a valid Purchase Invoice PDF when company has VAT disabled without forcing 14% tax', async () => {
+      const dto = {
+        company: {
+          ...mockCompany,
+          settings: { vat_enabled: false },
+          vat_enabled: false
+        },
+        invoice_number: 'PINV-2026-10-000001',
+        date: '2026-10-12',
+        payment_method: 'آجل',
+        supplier_name: 'شركة الأقمشة الحديثة',
+        items: [
+          {
+            product_code: 'FAB-01',
+            product_name: 'قماش صوف',
+            quantity: '100',
+            unit_price: '200.00',
+            discount: '0.00',
+            total: '20000.00'
+          }
+        ],
+        subtotal: '20000.00',
+        discount_amount: '0.00',
+        vat_amount: '0.00',
+        net_total: '20000.00'
+      };
+
+      const buffer = await generatePDF('PurchaseInvoicePdf', dto);
+      expect(buffer).toBeInstanceOf(Buffer);
+      expect(buffer.length).toBeGreaterThan(100);
+      expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
+    });
+
+    it('should generate a valid Sales Return and Purchase Return PDF when company has VAT disabled', async () => {
+      const salesReturnDto = {
+        company: {
+          ...mockCompany,
+          settings: { vat_enabled: false },
+          vat_enabled: false
+        },
+        operation_type: 'returns',
+        invoice_number: 'RET-2026-0001',
+        date: '2026-10-12',
+        customer_name: 'عميل مرتجع',
+        items: [
+          { product_code: 'SRV-0005', product_name: 'جاكيت', quantity: '5', unit_price: '150.00', total: '750.00' }
+        ],
+        subtotal: '750.00',
+        vat_amount: '0.00',
+        net_total: '750.00'
+      };
+
+      const sBuf = await generatePDF('SalesInvoicePdf', salesReturnDto);
+      expect(sBuf).toBeInstanceOf(Buffer);
+      expect(sBuf.length).toBeGreaterThan(100);
+
+      const purchReturnDto = {
+        company: {
+          ...mockCompany,
+          settings: { vat_enabled: false },
+          vat_enabled: false
+        },
+        operation_type: 'purchase_returns',
+        invoice_number: 'PRET-2026-0001',
+        date: '2026-10-12',
+        supplier_name: 'مورد مرتجع',
+        items: [
+          { product_code: 'FAB-01', product_name: 'قماش صوف', quantity: '10', unit_price: '200.00', total: '2000.00' }
+        ],
+        subtotal: '2000.00',
+        vat_amount: '0.00',
+        net_total: '2000.00'
+      };
+
+      const pBuf = await generatePDF('PurchaseInvoicePdf', purchReturnDto);
+      expect(pBuf).toBeInstanceOf(Buffer);
+      expect(pBuf.length).toBeGreaterThan(100);
+    });
   });
 });
 
