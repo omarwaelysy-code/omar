@@ -565,16 +565,17 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           return s;
         }
 
-        // Format pure numbers to (55,000.00) or 55,000.00
+        // Format pure numbers to -55,000.00 or 55,000.00
         if (/^-?\d+(\.\d+)?$/.test(s)) {
           const num = parseFloat(s);
           if (!isNaN(num)) {
+            const isQty = colKey.includes('qty') || colKey.includes('quantity') || colLabel.includes('كمية');
             const formatted = new Intl.NumberFormat('en-US', {
-              minimumFractionDigits: 2,
+              minimumFractionDigits: isQty && Number.isInteger(num) ? 0 : 2,
               maximumFractionDigits: 2,
               useGrouping: true
             }).format(Math.abs(num));
-            return num < 0 ? `(${formatted})` : formatted;
+            return num < 0 ? `-${formatted}` : formatted;
           }
         }
 
@@ -1191,10 +1192,17 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             const whtRateStr = whtRateNum > 0 ? `% ${whtRateNum}` : (itemWhtAmt > 0 ? '% 1' : '% 0');
             const whtAmtFormatted = itemWhtAmt > 0 ? `-${formatNumberValue(itemWhtAmt)}` : '0.00';
 
+            const itemQty = isReversalDoc && Number(item.quantity || 0) !== 0 ? -Math.abs(Number(item.quantity)) : Number(item.quantity || 0);
+            const rawItemTotal = Number(item.total || (Number(item.quantity || 0) * Number(item.unit_price || 0)) || 0);
+            const finalItemTotal = isReversalDoc && rawItemTotal !== 0 ? -Math.abs(rawItemTotal) : rawItemTotal;
+            const finalItemVat = isReversalDoc && itemVatVal > 0 ? -itemVatVal : itemVatVal;
+
             return {
               ...item,
               product_code: resolveCode(item),
-              vat_amount: itemVatVal,
+              quantity: itemQty,
+              total: finalItemTotal,
+              vat_amount: finalItemVat,
               vat_rate_formatted: rateStr,
               withholding_tax_rate: whtRateNum,
               withholding_tax_rate_formatted: whtRateStr,
@@ -1358,7 +1366,8 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             };
 
             // Subtotal Row
-            const subtotalVal = Number(dto.subtotal || (Number(dto.net_total || 0) - Number(effectiveVatAmount || 0) + Number(dto.discount_amount || 0)));
+            const rawSubtotal = Number(dto.subtotal || (Number(dto.net_total || 0) - Number(effectiveVatAmount || 0) + Number(dto.discount_amount || 0)));
+            const subtotalVal = isReversalDoc && rawSubtotal !== 0 ? -Math.abs(rawSubtotal) : rawSubtotal;
             const subtotalLabel = hasDiscount 
               ? (isEn ? 'Subtotal Before Discount' : 'الإجمالي قبل الخصم')
               : (isEn ? 'Total' : 'الإجمالي');
@@ -1366,11 +1375,13 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             drawCardRow(subtotalLabel, subtotalVal);
 
             if (hasDiscount) {
-              drawCardRow(isEn ? 'Discount' : 'الخصم', `-${formatNumberValue(dto.discount_amount)}`, false, '#dc2626');
+              const rawDisc = Number(dto.discount_amount || 0);
+              drawCardRow(isEn ? 'Discount' : 'الخصم', `-${formatNumberValue(Math.abs(rawDisc))}`, false, '#dc2626');
             }
 
             if (isVatEnabled) {
-              drawCardRow(isEn ? 'VAT' : 'ضريبة القيمة المضافة', effectiveVatAmount);
+              const finalVatVal = isReversalDoc && effectiveVatAmount !== 0 ? -Math.abs(effectiveVatAmount) : effectiveVatAmount;
+              drawCardRow(isEn ? 'VAT' : 'ضريبة القيمة المضافة', finalVatVal);
             }
 
             if (hasWht) {
@@ -1386,8 +1397,10 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             const rawVatAmt = isVatEnabled ? effectiveVatAmount : 0;
             const rawDiscAmt = Number(dto.discount_amount || 0);
             const rawWhtAmt = hasWht ? effectiveWhtAmount : 0;
-            let calcNetTotal = Number((subtotalVal + rawVatAmt - rawDiscAmt - rawWhtAmt).toFixed(2));
-            if (calcNetTotal <= 0 && Number(dto.net_total || 0) > 0) calcNetTotal = Number(dto.net_total || 0);
+            let calcNetTotal = isReversalDoc
+              ? -Math.abs(Number(dto.net_total || (Math.abs(subtotalVal) + Math.abs(rawVatAmt) - rawDiscAmt - rawWhtAmt)))
+              : Number((subtotalVal + rawVatAmt - rawDiscAmt - rawWhtAmt).toFixed(2));
+            if (!isReversalDoc && calcNetTotal <= 0 && Number(dto.net_total || 0) > 0) calcNetTotal = Number(dto.net_total || 0);
             
             const currencyCode = dto.currency_code || dto.currency || dto.company?.currency || 'AED';
             const formattedNetTotalStr = `${formatNumberValue(calcNetTotal)} ${currencyCode}`;
@@ -1764,11 +1777,15 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
           drawHeader(title, dto.branchName, dto.userName, dto.date);
 
           const curSuffix = dto.currency_code ? ` (${dto.currency_code})` : '';
+          const rawVoucherAmt = Number(dto.amount || 0);
+          const effectiveVoucherAmt = isReversalDoc && rawVoucherAmt !== 0 ? -Math.abs(rawVoucherAmt) : rawVoucherAmt;
+          const formattedVoucherAmtStr = `${formatNumberValue(effectiveVoucherAmt)} ${dto.currency_code || ''}`.trim();
+
           const metaItems = [
             { label: 'رقم السند:', val: dto.voucher_number || '' },
             { label: 'طريقة الدفع:', val: dto.payment_method || '' },
             { label: dto.isReceipt ? 'مستلم من:' : 'مدفوع لـ:', val: dto.party_name || '' },
-            { label: 'المبلغ الإجمالي:', val: `${dto.amount || '0.00'} ${dto.currency_code || ''}`.trim() }
+            { label: 'المبلغ الإجمالي:', val: formattedVoucherAmtStr }
           ];
 
           if (isReversalDoc) {
@@ -1852,10 +1869,16 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               { id: 'description', label: 'شرح السطر', width: 33, align: 'right' },
               { id: 'amount', label: `المبلغ${curSuffix}`, width: 16, align: 'right' }
             ];
+            const formattedVoucherItems = dto.items.map((itm: any) => ({
+              ...itm,
+              amount: isReversalDoc && Number(itm.amount || 0) !== 0
+                ? -Math.abs(Number(itm.amount))
+                : itm.amount
+            }));
             const totals = {
-              amount: `${dto.amount || '0.00'} ${dto.currency_code || ''}`.trim()
+              amount: formattedVoucherAmtStr
             };
-            drawTable(columns, dto.items, totals);
+            drawTable(columns, formattedVoucherItems, totals);
           }
 
           currentY += isThermal ? 5 : 10;

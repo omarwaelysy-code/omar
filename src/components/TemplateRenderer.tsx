@@ -415,6 +415,25 @@ export function normalizeDocumentData(
     doc.dynamicFields = fieldsMap;
   }
 
+  // Invert signs for reversal documents so all amounts & quantities display negative (-)
+  if (doc.is_reversal_doc) {
+    if (doc.subtotal !== undefined && doc.subtotal !== 0) doc.subtotal = -Math.abs(doc.subtotal);
+    if (doc.discount_amount !== undefined && doc.discount_amount !== 0) doc.discount_amount = -Math.abs(doc.discount_amount);
+    if (doc.vat_amount !== undefined && doc.vat_amount !== 0) doc.vat_amount = -Math.abs(doc.vat_amount);
+    if (doc.withholding_tax_amount !== undefined && doc.withholding_tax_amount !== 0) doc.withholding_tax_amount = -Math.abs(doc.withholding_tax_amount);
+    if (doc.net_total !== undefined && doc.net_total !== 0) doc.net_total = -Math.abs(doc.net_total);
+    if (doc.paid_amount !== undefined && doc.paid_amount !== 0) doc.paid_amount = -Math.abs(doc.paid_amount);
+    if (doc.remaining_amount !== undefined && doc.remaining_amount !== 0) doc.remaining_amount = -Math.abs(doc.remaining_amount);
+
+    doc.items = (doc.items || []).map(itm => ({
+      ...itm,
+      quantity: itm.quantity !== 0 ? -Math.abs(itm.quantity) : 0,
+      total: itm.total !== 0 ? -Math.abs(itm.total) : 0,
+      vat_amount: itm.vat_amount && itm.vat_amount !== 0 ? -Math.abs(itm.vat_amount) : 0,
+      withholding_tax_amount: itm.withholding_tax_amount && itm.withholding_tax_amount !== 0 ? -Math.abs(itm.withholding_tax_amount) : 0
+    }));
+  }
+
   return doc;
 }
 

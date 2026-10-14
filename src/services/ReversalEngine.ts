@@ -411,6 +411,21 @@ export class ReversalEngine {
       reversalDoc.settlements = JSON.stringify(reversalSettlements);
     }
 
+    // Invert amounts for reversal document so they are stored as negative (-) in DB
+    const amountCols = [
+      'subtotal', 'sub_total', 'total_amount', 'tax_amount', 'tax_total', 'vat_amount', 'vat_total',
+      'total_vat', 'discount_amount', 'discount', 'net_total', 'paid_amount', 'remaining_amount',
+      'withholding_tax_amount', 'withholding_tax_total', 'amount'
+    ];
+    for (const ac of amountCols) {
+      if (validColumns.has(ac) && reversalDoc[ac] !== undefined && reversalDoc[ac] !== null) {
+        const numVal = Number(reversalDoc[ac]);
+        if (!isNaN(numVal) && numVal !== 0) {
+          reversalDoc[ac] = -Math.abs(numVal);
+        }
+      }
+    }
+
     // Build dynamic INSERT query based strictly on validColumns
     const keys = Object.keys(reversalDoc).filter(k => reversalDoc[k] !== undefined && validColumns.has(k));
     const columns = keys.map(k => `"${k}"`).join(', ');
@@ -450,6 +465,19 @@ export class ReversalEngine {
         }
         itemCopy.id = uuidv4();
         itemCopy[config.itemFkColumn] = reversalDocId;
+
+        // Invert item quantities and amounts for reversal document so they are stored as negative (-) in DB
+        const itemAmountCols = [
+          'quantity', 'total', 'vat_amount', 'tax_amount', 'discount', 'withholding_tax_amount', 'amount'
+        ];
+        for (const iac of itemAmountCols) {
+          if (validItemColumns.has(iac) && itemCopy[iac] !== undefined && itemCopy[iac] !== null) {
+            const numVal = Number(itemCopy[iac]);
+            if (!isNaN(numVal) && numVal !== 0) {
+              itemCopy[iac] = -Math.abs(numVal);
+            }
+          }
+        }
 
         const itemKeys = Object.keys(itemCopy).filter(k => itemCopy[k] !== undefined && validItemColumns.has(k));
         const itemCols = itemKeys.map(k => `"${k}"`).join(', ');
