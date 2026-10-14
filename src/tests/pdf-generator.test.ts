@@ -150,6 +150,74 @@ describe('PDF Engine Architectural Tests', () => {
       expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
     });
 
+    it('should generate a valid Reversal Document PDF buffer with Original Document details and stamp', async () => {
+      const dto = {
+        company: mockCompany,
+        invoice_number: 'REV-INV-2026-09-000019',
+        date: '2026-09-24',
+        payment_method: 'آجل',
+        customer_name: 'المصرية السعودية',
+        customer_tax_number: '-',
+        is_reversal_doc: true,
+        original_doc_number: 'INV-2026-09-000019',
+        original_entry_number: 'JE-2026-09-24-00007',
+        items: [
+          {
+            product_code: '2',
+            product_name: 'تيشرت',
+            quantity: '10',
+            unit_price: '150.00',
+            vat_amount: '210.00',
+            total: '1695.00'
+          }
+        ],
+        subtotal: '42900.00',
+        vat_amount: '6003.20',
+        net_total: '48858.40',
+        branchName: 'الفرع الرئيسي',
+        userName: 'وائل المحاسب'
+      };
+
+      const buffer = await generatePDF('SalesInvoicePdf', dto);
+      expect(buffer).toBeInstanceOf(Buffer);
+      expect(buffer.length).toBeGreaterThan(100);
+      expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
+    });
+
+    it('should generate a valid Reversed Document PDF buffer showing Reversal Document link', async () => {
+      const dto = {
+        company: mockCompany,
+        invoice_number: 'INV-2026-09-000019',
+        date: '2026-09-24',
+        payment_method: 'آجل',
+        customer_name: 'المصرية السعودية',
+        customer_tax_number: '-',
+        is_reversed: true,
+        reversed_by_doc_number: 'REV-INV-2026-09-000019',
+        reversed_at: '2026-09-24',
+        items: [
+          {
+            product_code: '2',
+            product_name: 'تيشرت',
+            quantity: '10',
+            unit_price: '150.00',
+            vat_amount: '210.00',
+            total: '1695.00'
+          }
+        ],
+        subtotal: '42900.00',
+        vat_amount: '6003.20',
+        net_total: '48858.40',
+        branchName: 'الفرع الرئيسي',
+        userName: 'وائل المحاسب'
+      };
+
+      const buffer = await generatePDF('SalesInvoicePdf', dto);
+      expect(buffer).toBeInstanceOf(Buffer);
+      expect(buffer.length).toBeGreaterThan(100);
+      expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
+    });
+
     it('should generate a valid Customer Statement PDF buffer', async () => {
       const dto = {
         company: mockCompany,

@@ -638,7 +638,15 @@ export function UnifiedPrintEngine() {
         branchName: normalized.branch_name,
         operation_type: operationType,
         vat_enabled: isCompanyVatActive,
-        language: language
+        language: language,
+        is_reversal_doc: Boolean(normalized.is_reversal_doc ?? documentData?.is_reversal_doc ?? String(normalized.document_number || '').startsWith('REV-')),
+        original_doc_number: normalized.original_doc_number || documentData?.original_doc_number || (String(normalized.document_number || '').startsWith('REV-') ? String(normalized.document_number).replace(/^REV-/, '') : ''),
+        original_entry_number: normalized.original_entry_number || documentData?.original_entry_number || '',
+        is_reversed: Boolean(normalized.is_reversed ?? documentData?.is_reversed),
+        reversed_by_doc_number: normalized.reversed_by_doc_number || documentData?.reversed_by_doc_number || '',
+        reversed_by_entry_number: normalized.reversed_by_entry_number || documentData?.reversed_by_entry_number || '',
+        reversed_at: cleanDateVal(normalized.reversed_at || documentData?.reversed_at),
+        reversal_reason: normalized.reversal_reason || documentData?.reversal_reason || ''
       };
     } else if (operationType === 'purchase_invoices' || operationType === 'purchase_returns' || operationType === 'purchase_orders') {
       templateName = 'PurchaseInvoicePdf';
@@ -663,7 +671,15 @@ export function UnifiedPrintEngine() {
         branchName: normalized.branch_name,
         operation_type: operationType,
         vat_enabled: isCompanyVatActive,
-        language: language
+        language: language,
+        is_reversal_doc: Boolean(normalized.is_reversal_doc ?? documentData?.is_reversal_doc ?? String(normalized.document_number || '').startsWith('REV-')),
+        original_doc_number: normalized.original_doc_number || documentData?.original_doc_number || (String(normalized.document_number || '').startsWith('REV-') ? String(normalized.document_number).replace(/^REV-/, '') : ''),
+        original_entry_number: normalized.original_entry_number || documentData?.original_entry_number || '',
+        is_reversed: Boolean(normalized.is_reversed ?? documentData?.is_reversed),
+        reversed_by_doc_number: normalized.reversed_by_doc_number || documentData?.reversed_by_doc_number || '',
+        reversed_by_entry_number: normalized.reversed_by_entry_number || documentData?.reversed_by_entry_number || '',
+        reversed_at: cleanDateVal(normalized.reversed_at || documentData?.reversed_at),
+        reversal_reason: normalized.reversal_reason || documentData?.reversal_reason || ''
       };
     } else if (operationType === 'receipt_vouchers' || operationType === 'payment_vouchers') {
       templateName = 'VoucherPdf';

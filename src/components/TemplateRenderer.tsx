@@ -114,6 +114,14 @@ export interface NormalizedDocument {
   paid_amount?: number;
   remaining_amount?: number;
   withholding_tax_amount?: number;
+  is_reversal_doc?: boolean;
+  original_doc_number?: string;
+  original_entry_number?: string;
+  is_reversed?: boolean;
+  reversed_by_doc_number?: string;
+  reversed_by_entry_number?: string;
+  reversed_at?: string;
+  reversal_reason?: string;
   items: Array<{
     product_code: string;
     product_name: string;
@@ -137,6 +145,9 @@ export function normalizeDocumentData(
   company: any,
   currentUser: any
 ): NormalizedDocument {
+  const isRevDoc = Boolean(data?.is_reversal_doc || String(data?.invoice_number || data?.return_number || data?.order_number || data?.voucher_number || data?.entry_number || data?.document_number || '').startsWith('REV-'));
+  const origDocNum = data?.original_doc_number || (isRevDoc && String(data?.invoice_number || data?.return_number || data?.order_number || data?.voucher_number || data?.entry_number || data?.document_number || '').startsWith('REV-') ? String(data?.invoice_number || data?.return_number || data?.order_number || data?.voucher_number || data?.entry_number || data?.document_number).replace(/^REV-/, '') : '');
+
   const doc: NormalizedDocument = {
     company_logo: company?.logo_url || '',
     company_name: company?.name || '',
@@ -153,6 +164,14 @@ export function normalizeDocumentData(
     current_time: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
     currency_code: data?.currency || data?.currency_code || company?.settings?.currency || company?.currency || 'EGP',
     payment_method: data?.payment_method_name || data?.payment_type || 'نقداً',
+    is_reversal_doc: isRevDoc,
+    original_doc_number: origDocNum,
+    original_entry_number: data?.original_entry_number || '',
+    is_reversed: Boolean(data?.is_reversed),
+    reversed_by_doc_number: data?.reversed_by_doc_number || '',
+    reversed_by_entry_number: data?.reversed_by_entry_number || '',
+    reversed_at: data?.reversed_at || '',
+    reversal_reason: data?.reversal_reason || '',
     items: [],
     dynamicFields: {},
     customer_tax_number: data.customer_tax_number || data.tax_number || '',
@@ -526,20 +545,32 @@ export function TemplateRenderer({
           dir={dir}
         >
           {/* Watermark rendering */}
-          {layout.watermarkText && (
-            <div
-              className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0"
-              style={{
-                opacity: layout.watermarkOpacity ?? 0.15,
-                transform: `rotate(${layout.watermarkRotation ?? -45}deg)`,
-                fontSize: '5vw',
-                fontWeight: 'bold',
-                color: '#000000',
-              }}
-            >
-              {layout.watermarkText}
-            </div>
-          )}
+          {(() => {
+            const isRevDoc = Boolean(data.is_reversal_doc || String(data.document_number || '').startsWith('REV-'));
+            const isRev = Boolean(data.is_reversed);
+            const wmText = layout.watermarkText || (
+              isRevDoc 
+                ? 'مستند حركة عكسية (Reversal Document)' 
+                : (isRev ? 'مستند معكوس (Reversed Document)' : null)
+            );
+            if (!wmText) return null;
+            return (
+              <div
+                className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0"
+                style={{
+                  opacity: layout.watermarkOpacity ?? ((isRevDoc || isRev) ? 0.22 : 0.15),
+                  transform: `rotate(${layout.watermarkRotation ?? -32}deg)`,
+                  fontSize: `${(isRevDoc || isRev) ? 36 * scale : 48 * scale}px`,
+                  fontWeight: 'bold',
+                  color: (isRevDoc || isRev) ? '#dc2626' : '#000000',
+                  textAlign: 'center',
+                  fontFamily: 'Cairo'
+                }}
+              >
+                {wmText}
+              </div>
+            );
+          })()}
           {layout.watermarkImage && (
             <div
               className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0"
@@ -574,6 +605,39 @@ export function TemplateRenderer({
                 />
               ))}
           </div>
+
+          {/* Reversal Alert Banner for Preview */}
+          {pageIdx === 0 && Boolean(data.is_reversal_doc || String(data.document_number || '').startsWith('REV-')) && (
+            <div className="mx-2 mb-2 p-2 bg-rose-50 border-2 border-rose-300 rounded-lg text-rose-800 text-xs font-bold flex flex-wrap items-center justify-between gap-2 z-10 relative" dir="rtl">
+              <span className="flex items-center gap-1.5 text-sm">
+                <span>🔄</span>
+                <span>مستند حركة عكسية (Reversal Document)</span>
+              </span>
+              {data.original_doc_number && (
+                <span className="bg-rose-100/90 border border-rose-300 px-2 py-0.5 rounded text-rose-950 font-mono">
+                  المستند الأصلي: {data.original_doc_number}
+                </span>
+              )}
+              {data.original_entry_number && (
+                <span className="bg-rose-100/90 border border-rose-300 px-2 py-0.5 rounded text-rose-950 font-mono">
+                  القيد الأصلي: {data.original_entry_number}
+                </span>
+              )}
+            </div>
+          )}
+          {pageIdx === 0 && Boolean(data.is_reversed) && (
+            <div className="mx-2 mb-2 p-2 bg-amber-50 border-2 border-amber-300 rounded-lg text-amber-900 text-xs font-bold flex flex-wrap items-center justify-between gap-2 z-10 relative" dir="rtl">
+              <span className="flex items-center gap-1.5 text-sm">
+                <span>⚠️</span>
+                <span>هذا المستند معكوس وملغي (Reversed Document)</span>
+              </span>
+              {data.reversed_by_doc_number && (
+                <span className="bg-amber-100 border border-amber-300 px-2 py-0.5 rounded text-amber-950 font-mono">
+                  المستند العكسي: {data.reversed_by_doc_number}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Details / Table section (paginated contents) */}
           <div className="my-2 relative z-10" style={{ minHeight: `${availableDetailsHeight * 0.8 * scale}px` }}>

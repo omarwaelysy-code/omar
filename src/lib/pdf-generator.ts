@@ -1128,6 +1128,22 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             return '-';
           };
 
+          const isReversalDoc = Boolean(
+            dto.is_reversal_doc || 
+            String(dto.invoice_number || '').startsWith('REV-') ||
+            String(dto.document_number || '').startsWith('REV-')
+          );
+          const originalDocNum = dto.original_doc_number || (
+            isReversalDoc && String(dto.invoice_number || '').startsWith('REV-')
+              ? String(dto.invoice_number).replace(/^REV-/, '')
+              : ''
+          );
+          const originalEntryNum = dto.original_entry_number || '';
+          const isReversed = Boolean(dto.is_reversed);
+          const reversedByDocNum = dto.reversed_by_doc_number || '';
+          const reversedAtStr = dto.reversed_at || '';
+          const reversalReasonStr = dto.reversal_reason || '';
+
           const formattedItems = (dto.items || []).map((item: any) => {
             let numRate = 0;
             const rawRateStr = String(item.vat_rate ?? item.tax_rate ?? item.vat_percentage ?? item.tax_percentage ?? '');
@@ -1246,15 +1262,42 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             // Invoice Number & Date placed directly under Title on the Right (exactly like user's image)
             const numAndDateText = `${dto.invoice_number || ''}    ${invoiceDateStr}`;
             doc.fillColor('#1e293b');
-            renderText(numAndDateText, titleX, headerStartY + (isThermal ? 13 : 30), { 
+            renderText(numAndDateText, titleX, headerStartY + (isThermal ? 13 : 28), { 
               width: titleWidth, 
               align: isRtl ? 'right' : 'left', 
               font: 'ArabicBold', 
               size: isThermal ? 8 : 10.5 
             });
 
+            let headerExtraOffset = 0;
+            if (isReversalDoc) {
+              const revNoticeText = originalDocNum 
+                ? (isEn ? `[ Reversal Document | Original: ${originalDocNum} ]` : `[ مستند حركة عكسية | المستند الأصلي: ${originalDocNum} ]`)
+                : (isEn ? `[ Reversal Document ]` : `[ مستند حركة عكسية ]`);
+              doc.fillColor('#dc2626');
+              renderText(revNoticeText, titleX, headerStartY + (isThermal ? 24 : 44), {
+                width: titleWidth,
+                align: isRtl ? 'right' : 'left',
+                font: 'ArabicBold',
+                size: isThermal ? 7.5 : 9.5
+              });
+              headerExtraOffset = isThermal ? 14 : 18;
+            } else if (isReversed) {
+              const revStatusText = reversedByDocNum
+                ? (isEn ? `[ REVERSED DOCUMENT | Reversal Doc: ${reversedByDocNum} ]` : `[ مستند ملغي / معكوس | المستند العكسي: ${reversedByDocNum} ]`)
+                : (isEn ? `[ REVERSED DOCUMENT ]` : `[ مستند ملغي / معكوس ]`);
+              doc.fillColor('#dc2626');
+              renderText(revStatusText, titleX, headerStartY + (isThermal ? 24 : 44), {
+                width: titleWidth,
+                align: isRtl ? 'right' : 'left',
+                font: 'ArabicBold',
+                size: isThermal ? 7.5 : 9.5
+              });
+              headerExtraOffset = isThermal ? 14 : 18;
+            }
+
             // Top Header Height
-            const topHeaderHeight = isThermal ? (Math.max(logoSize, 25) + 6) : 66;
+            const topHeaderHeight = isThermal ? (Math.max(logoSize, 25) + headerExtraOffset + 6) : (66 + headerExtraOffset);
             const line1Y = headerStartY + topHeaderHeight;
 
             // ─── HORIZONTAL DIVIDER LINE 1 ───
@@ -1395,6 +1438,85 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             doc.fillColor('#64748b');
             renderText(branchLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7.5 : 9 });
             infoY += isThermal ? 10 : 16;
+
+            // Reversal Document & Original Doc details in info section
+            if (isReversalDoc) {
+              doc.fillColor('#dc2626');
+              const revTypeLine = isEn ? 'Document Type: Reversal Document' : 'نوع المستند: مستند حركة عكسية (Reversal Document)';
+              renderText(revTypeLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 7.5 : 9.5 });
+              infoY += isThermal ? 10 : 16;
+
+              if (originalDocNum) {
+                const origDocLine = isEn ? `Original Document: ${originalDocNum}` : `المستند الأصلي: ${originalDocNum}`;
+                renderText(origDocLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 7.5 : 9.5 });
+                infoY += isThermal ? 10 : 16;
+              }
+
+              if (originalEntryNum) {
+                doc.fillColor('#475569');
+                const origEntryLine = isEn ? `Original Entry: ${originalEntryNum}` : `القيد الأصلي: ${originalEntryNum}`;
+                renderText(origEntryLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7 : 8.5 });
+                infoY += isThermal ? 9 : 14;
+              }
+            } else if (isReversed) {
+              doc.fillColor('#dc2626');
+              const revStatusLine = isEn ? 'Document Status: REVERSED (Cancelled)' : 'حالة المستند: مستند معكوس (ملغي)';
+              renderText(revStatusLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 7.5 : 9.5 });
+              infoY += isThermal ? 10 : 16;
+
+              if (reversedByDocNum) {
+                const revByLine = isEn ? `Reversal Document: ${reversedByDocNum}` : `المستند العكسي: ${reversedByDocNum}`;
+                renderText(revByLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicBold', size: isThermal ? 7.5 : 9.5 });
+                infoY += isThermal ? 10 : 16;
+              }
+
+              if (reversedAtStr) {
+                doc.fillColor('#475569');
+                const revAtLine = isEn ? `Reversed At: ${reversedAtStr}` : `تاريخ العكس: ${reversedAtStr}`;
+                renderText(revAtLine, infoX, infoY, { width: infoWidth, align: isRtl ? 'right' : 'left', font: 'ArabicRegular', size: isThermal ? 7 : 8.5 });
+                infoY += isThermal ? 9 : 14;
+              }
+            }
+
+            // ─── RED DIAGONAL STAMP / WATERMARK (Matching exact user mockup) ───
+            if (isReversalDoc) {
+              const stampCenterY = isThermal ? (middleY + 30) : (middleY + 45);
+              const stampCenterX = isThermal ? (pageWidth / 2) : (cardX + cardWidth + 14 + (pageWidth - sideMargin - (cardX + cardWidth + 14)) / 2);
+              doc.save();
+              try {
+                doc.fillOpacity(0.24);
+                doc.fillColor('#dc2626');
+                doc.rotate(-32, { origin: [stampCenterX, stampCenterY] });
+                renderText('مستند حركة عكسية (Reversal Document)', stampCenterX - 180, stampCenterY - 8, {
+                  width: 360,
+                  align: 'center',
+                  font: 'ArabicBold',
+                  size: isThermal ? 10 : 14
+                });
+              } finally {
+                doc.restore();
+                doc.fillOpacity(1);
+              }
+            } else if (isReversed) {
+              const stampCenterY = isThermal ? (middleY + 30) : (middleY + 45);
+              const stampCenterX = isThermal ? (pageWidth / 2) : (cardX + cardWidth + 14 + (pageWidth - sideMargin - (cardX + cardWidth + 14)) / 2);
+              doc.save();
+              try {
+                doc.fillOpacity(0.24);
+                doc.fillColor('#dc2626');
+                doc.rotate(-32, { origin: [stampCenterX, stampCenterY] });
+                renderText('مستند معكوس (Reversed Document)', stampCenterX - 180, stampCenterY - 8, {
+                  width: 360,
+                  align: 'center',
+                  font: 'ArabicBold',
+                  size: isThermal ? 10 : 14
+                });
+              } finally {
+                doc.restore();
+                doc.fillOpacity(1);
+              }
+            }
+
             sectionBottomY = Math.max(cardY + cardHeight, infoY) + 12;
             if (!isThermal) {
               doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(sideMargin, sectionBottomY).lineTo(pageWidth - sideMargin, sectionBottomY).stroke();
