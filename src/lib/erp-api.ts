@@ -5945,10 +5945,10 @@ export async function processAtomicAccountingEntry(
     throw new Error('لا يمكن حفظ المستند: القيد المحاسبي المرفق لا يحتوي على بنود محاسبية صالحة.');
   }
 
-  // If passed the connection pool instead of an active transaction client, acquire a dedicated client and manage transaction
+  // If passed the connection pool or null instead of an active client, acquire a dedicated client and manage transaction
   let dedicatedClient = client;
   let isInternalTransaction = false;
-  if (!client || typeof client.connect === 'function') {
+  if (!client || typeof client.release !== 'function') {
     dedicatedClient = await pool.connect();
     isInternalTransaction = true;
     await dedicatedClient.query('BEGIN');
@@ -10459,7 +10459,7 @@ router.put('/invoices/:id', authenticateToken, async (req: AuthRequest, res) => 
     // Sync Items
     if (items && Array.isArray(items) && items.length > 0) {
       await client.query('DELETE FROM invoice_items WHERE invoice_id = $1', [invoiceId]);
-      await reverseAndRecalculate(client, companyId || '', invoiceId);
+      await reverseAndRecalculate(client, companyId || '', invoiceId, true);
       await InventoryMovementService.reverseMovement('sales_invoice', invoiceId, client);
   
       const invData = invoiceData;
@@ -11603,7 +11603,7 @@ router.put('/purchase_invoices/:id', authenticateToken, async (req: AuthRequest,
         await client.query('DELETE FROM purchase_invoice_items WHERE invoice_id = $1', [invoiceId]);
     
         if (!previouslyLinkedToGR) {
-          await reverseAndRecalculate(client, companyId || '', invoiceId);
+          await reverseAndRecalculate(client, companyId || '', invoiceId, true);
           await client.query('DELETE FROM "inventory_movements_v2" WHERE "source_document_type" = $1 AND "source_document_id" = $2', ['purchase_invoice', invoiceId]);
           await client.query('UPDATE "inventory_transaction_journal" SET "status" = $1, "cancelled_at" = NOW(), "movement_id" = NULL WHERE "source_document_type" = $2 AND "source_document_id" = $3', ['Reversed', 'purchase_invoice', invoiceId]);
         }
