@@ -232,7 +232,7 @@ export function normalizeDocumentData(
         ? (String(itm.vat_rate).includes('%') ? itm.vat_rate : `% ${itm.vat_rate}`) 
         : (itm.tax_rate !== undefined && itm.tax_rate !== null && String(itm.tax_rate).trim() !== '' 
           ? (String(itm.tax_rate).includes('%') ? itm.tax_rate : `% ${itm.tax_rate}`) 
-          : (Number(data.tax_amount || 0) > 0 ? '% 14' : '% 0')),
+          : (Math.abs(Number(data.tax_amount || 0)) > 0 ? '% 14' : '% 0')),
       withholding_tax_rate: itm.withholding_tax_rate !== undefined ? `% ${itm.withholding_tax_rate}` : '% 0',
       withholding_tax_amount: Number(itm.withholding_tax_amount || 0),
       total: Number(itm.total || 0)
@@ -266,7 +266,7 @@ export function normalizeDocumentData(
         ? (String(itm.vat_rate).includes('%') ? itm.vat_rate : `% ${itm.vat_rate}`) 
         : (itm.tax_rate !== undefined && itm.tax_rate !== null && String(itm.tax_rate).trim() !== '' 
           ? (String(itm.tax_rate).includes('%') ? itm.tax_rate : `% ${itm.tax_rate}`) 
-          : (Number(data.tax_amount || 0) > 0 ? '% 14' : '% 0')),
+          : (Math.abs(Number(data.tax_amount || 0)) > 0 ? '% 14' : '% 0')),
       withholding_tax_rate: itm.withholding_tax_rate !== undefined ? `% ${itm.withholding_tax_rate}` : '% 0',
       withholding_tax_amount: Number(itm.withholding_tax_amount || 0),
       total: Number(itm.total || 0)
@@ -297,7 +297,7 @@ export function normalizeDocumentData(
       }
       
       const parentTax = Number(data.tax_amount ?? data.tax ?? data.vat_amount ?? data.vat_total ?? data.total_vat ?? data.tax_total ?? 0);
-      if (!vatRateNum && parentTax > 0) {
+      if (!vatRateNum && Math.abs(parentTax) > 0) {
         vatRateNum = 14;
       }
       
@@ -418,9 +418,9 @@ export function normalizeDocumentData(
   // Invert signs for reversal documents so all amounts & quantities display negative (-)
   if (doc.is_reversal_doc) {
     if (doc.subtotal !== undefined && doc.subtotal !== 0) doc.subtotal = -Math.abs(doc.subtotal);
-    if (doc.discount_amount !== undefined && doc.discount_amount !== 0) doc.discount_amount = -Math.abs(doc.discount_amount);
+    if (doc.discount_amount !== undefined && doc.discount_amount !== 0) doc.discount_amount = Math.abs(doc.discount_amount);
     if (doc.vat_amount !== undefined && doc.vat_amount !== 0) doc.vat_amount = -Math.abs(doc.vat_amount);
-    if (doc.withholding_tax_amount !== undefined && doc.withholding_tax_amount !== 0) doc.withholding_tax_amount = -Math.abs(doc.withholding_tax_amount);
+    if (doc.withholding_tax_amount !== undefined && doc.withholding_tax_amount !== 0) doc.withholding_tax_amount = Math.abs(doc.withholding_tax_amount);
     if (doc.net_total !== undefined && doc.net_total !== 0) doc.net_total = -Math.abs(doc.net_total);
     if (doc.paid_amount !== undefined && doc.paid_amount !== 0) doc.paid_amount = -Math.abs(doc.paid_amount);
     if (doc.remaining_amount !== undefined && doc.remaining_amount !== 0) doc.remaining_amount = -Math.abs(doc.remaining_amount);
@@ -430,7 +430,7 @@ export function normalizeDocumentData(
       quantity: itm.quantity !== 0 ? -Math.abs(itm.quantity) : 0,
       total: itm.total !== 0 ? -Math.abs(itm.total) : 0,
       vat_amount: itm.vat_amount && itm.vat_amount !== 0 ? -Math.abs(itm.vat_amount) : 0,
-      withholding_tax_amount: itm.withholding_tax_amount && itm.withholding_tax_amount !== 0 ? -Math.abs(itm.withholding_tax_amount) : 0
+      withholding_tax_amount: itm.withholding_tax_amount ? Math.abs(itm.withholding_tax_amount) : 0
     }));
   }
 
@@ -662,8 +662,8 @@ export function TemplateRenderer({
           <div className="my-2 relative z-10" style={{ minHeight: `${availableDetailsHeight * 0.8 * scale}px` }}>
             {/* 1. Main dynamic columns table */}
             {layout.details.columns && layout.details.columns.length > 0 && (() => {
-              const hasDocVat = Number(data.vat_amount || 0) > 0 || (data.items || []).some((i: any) => Number(i.vat_amount || 0) > 0);
-              const hasDocWht = Number(data.withholding_tax_amount || 0) > 0 || (data.items || []).some((i: any) => Number(i.withholding_tax_amount || 0) > 0);
+              const hasDocVat = Math.abs(Number(data.vat_amount || 0)) > 0 || (data.items || []).some((i: any) => Math.abs(Number(i.vat_amount || 0)) > 0);
+              const hasDocWht = Math.abs(Number(data.withholding_tax_amount || 0)) > 0 || (data.items || []).some((i: any) => Math.abs(Number(i.withholding_tax_amount || 0)) > 0);
               const effectiveCols = layout.details.columns.filter((c: any) => {
                 if (!hasDocVat && (c.field === 'vat_rate' || c.field === 'vat_amount')) return false;
                 if (!hasDocWht && (c.field === 'withholding_tax_rate' || c.field === 'withholding_tax_amount')) return false;

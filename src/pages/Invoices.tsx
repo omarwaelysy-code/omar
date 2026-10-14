@@ -5934,14 +5934,14 @@ export const Invoices: React.FC = () => {
                                 onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
                               />
                             </div>
-                            <span className="font-bold text-[11px]">-{formatMoney(discount)}</span>
+                            <span className="font-bold text-[11px]">-{formatMoney(Math.abs(discount))}</span>
                           </div>
                           {isVatEnabled && (() => {
                             const calculatedVatAmount = items.reduce((sum, i) => {
                               const qty = Number(i.quantity) || 0;
                               const price = Number(i.unit_price) || 0;
                               const rate = Number(i.vat_rate) || 0;
-                              const vAmount = (i.vat_amount !== undefined && i.vat_amount !== null && Number(i.vat_amount) > 0)
+                              const vAmount = (i.vat_amount !== undefined && i.vat_amount !== null && Math.abs(Number(i.vat_amount)) > 0)
                                 ? Number(i.vat_amount)
                                 : (qty * price * (rate / 100));
                               return sum + vAmount;
@@ -5950,7 +5950,7 @@ export const Invoices: React.FC = () => {
                               <div className="flex justify-between items-center text-zinc-650 text-[10px] pt-0.5 border-t border-dashed border-zinc-200">
                                 <span className="font-medium">{language === 'ar' ? 'ضريبة القيمة المضافة' : 'VAT'}</span>
                                 <span className="font-bold text-[11px]">
-                                  +{formatMoney(calculatedVatAmount)}
+                                  {calculatedVatAmount >= 0 ? `+${formatMoney(calculatedVatAmount)}` : formatMoney(calculatedVatAmount)}
                                 </span>
                               </div>
                             );
@@ -5960,9 +5960,9 @@ export const Invoices: React.FC = () => {
                               const qty = Number(i.quantity) || 0;
                               const price = Number(i.unit_price) || 0;
                               const rate = Number(i.withholding_tax_rate) || 0;
-                              const wAmount = (i.withholding_tax_amount !== undefined && i.withholding_tax_amount !== null && Number(i.withholding_tax_amount) > 0)
-                                ? Number(i.withholding_tax_amount)
-                                : (qty * price * (rate / 100));
+                              const wAmount = (i.withholding_tax_amount !== undefined && i.withholding_tax_amount !== null && Math.abs(Number(i.withholding_tax_amount)) > 0)
+                                ? Math.abs(Number(i.withholding_tax_amount))
+                                : Math.abs(qty * price * (rate / 100));
                               return sum + wAmount;
                             }, 0);
                             if (calculatedWhtAmount <= 0) return null;
@@ -5979,22 +5979,27 @@ export const Invoices: React.FC = () => {
                             <span className="font-black text-[11px]">{t('invoices.summary_total')}</span>
                             <div className="flex flex-col items-end">
                               <span className="font-black text-xs tracking-tighter text-left">
-                                {formatMoney(
-                                  items.reduce((sum, i) => sum + (Number(i.total) || 0), 0) + 
-                                  (isVatEnabled ? items.reduce((sum, i) => {
+                                {(() => {
+                                  const baseSum = items.reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+                                  const isDocNeg = baseSum < 0;
+                                  const effDisc = Math.abs(discount);
+                                  const effVat = isVatEnabled ? items.reduce((sum, i) => {
                                     const qty = Number(i.quantity) || 0;
                                     const price = Number(i.unit_price) || 0;
                                     const rate = Number(i.vat_rate) || 0;
-                                    return sum + ((i.vat_amount !== undefined && i.vat_amount !== null && Number(i.vat_amount) > 0) ? Number(i.vat_amount) : (qty * price * (rate / 100)));
-                                  }, 0) : 0) - 
-                                  discount -
-                                  (isWhtEnabled ? items.reduce((sum, i) => {
+                                    return sum + ((i.vat_amount !== undefined && i.vat_amount !== null && Math.abs(Number(i.vat_amount)) > 0) ? Math.abs(Number(i.vat_amount)) : Math.abs(qty * price * (rate / 100)));
+                                  }, 0) : 0;
+                                  const effWht = isWhtEnabled ? items.reduce((sum, i) => {
                                     const qty = Number(i.quantity) || 0;
                                     const price = Number(i.unit_price) || 0;
                                     const rate = Number(i.withholding_tax_rate) || 0;
-                                    return sum + ((i.withholding_tax_amount !== undefined && i.withholding_tax_amount !== null && Number(i.withholding_tax_amount) > 0) ? Number(i.withholding_tax_amount) : (qty * price * (rate / 100)));
-                                  }, 0) : 0)
-                                )} {currentInvoiceCurrencyCode}
+                                    return sum + ((i.withholding_tax_amount !== undefined && i.withholding_tax_amount !== null && Math.abs(Number(i.withholding_tax_amount)) > 0) ? Math.abs(Number(i.withholding_tax_amount)) : Math.abs(qty * price * (rate / 100)));
+                                  }, 0) : 0;
+                                  const finalNet = isDocNeg
+                                    ? -(Math.abs(baseSum) + effVat - effDisc - effWht)
+                                    : (baseSum + effVat - effDisc - effWht);
+                                  return formatMoney(finalNet);
+                                })()} {currentInvoiceCurrencyCode}
                               </span>
                             </div>
                           </div>
@@ -6387,10 +6392,10 @@ export const Invoices: React.FC = () => {
                                         const qty = Number(item.quantity) || 0;
                                         const price = Number(item.unit_price) || 0;
                                         const rate = Number(item.withholding_tax_rate) || 0;
-                                        const wAmount = (item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null && Number(item.withholding_tax_amount) > 0)
-                                          ? Number(item.withholding_tax_amount)
-                                          : (qty * price * (rate / 100));
-                                        return wAmount > 0 ? `-${formatMoney(wAmount)}` : formatMoney(0);
+                                        const wAmount = (item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null && Math.abs(Number(item.withholding_tax_amount)) > 0)
+                                          ? Math.abs(Number(item.withholding_tax_amount))
+                                          : Math.abs(qty * price * (rate / 100));
+                                        return formatMoney(wAmount);
                                       })()}
                                     </td>
                                   </>
@@ -6400,19 +6405,22 @@ export const Invoices: React.FC = () => {
                                     const qty = Number(item.quantity) || 0;
                                     const price = Number(item.unit_price) || 0;
                                     const base = qty * price;
+                                    const isNeg = base < 0;
                                     const vatRate = Number(item.vat_rate) || 0;
                                     const vatAmount = isVatEnabled
-                                      ? ((item.vat_amount !== undefined && item.vat_amount !== null && Number(item.vat_amount) > 0)
+                                      ? ((item.vat_amount !== undefined && item.vat_amount !== null && Math.abs(Number(item.vat_amount)) > 0)
                                           ? Number(item.vat_amount)
                                           : (base * (vatRate / 100)))
                                       : 0;
                                     const whtRate = isWhtEnabled ? (Number(item.withholding_tax_rate) || 0) : 0;
                                     const whtAmount = isWhtEnabled
-                                      ? ((item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null && Number(item.withholding_tax_amount) > 0)
-                                          ? Number(item.withholding_tax_amount)
-                                          : (base * (whtRate / 100)))
+                                      ? ((item.withholding_tax_amount !== undefined && item.withholding_tax_amount !== null && Math.abs(Number(item.withholding_tax_amount)) > 0)
+                                          ? Math.abs(Number(item.withholding_tax_amount))
+                                          : Math.abs(base * (whtRate / 100)))
                                       : 0;
-                                    const rowTotal = base + vatAmount - whtAmount;
+                                    const rowTotal = isNeg 
+                                      ? -(Math.abs(base) + Math.abs(vatAmount) - whtAmount)
+                                      : (base + vatAmount - whtAmount);
                                     return formatMoney(rowTotal);
                                   })()}
                                 </td>

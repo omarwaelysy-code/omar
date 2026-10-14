@@ -1160,19 +1160,19 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               numRate = 0;
               itemVatVal = 0;
             } else {
-              if (!numRate && itemVatVal > 0 && itemTotal > 0) {
-                numRate = Math.round((itemVatVal / itemTotal) * 100);
+              if (!numRate && Math.abs(itemVatVal) > 0 && Math.abs(itemTotal) > 0) {
+                numRate = Math.round((Math.abs(itemVatVal) / Math.abs(itemTotal)) * 100);
               }
-              if (!numRate && dtoVatAmount > 0 && Number(dto.subtotal || 0) > 0) {
-                numRate = Math.round((dtoVatAmount / Number(dto.subtotal)) * 100);
+              if (!numRate && Math.abs(dtoVatAmount) > 0 && Math.abs(Number(dto.subtotal || 0)) > 0) {
+                numRate = Math.round((Math.abs(dtoVatAmount) / Math.abs(Number(dto.subtotal))) * 100);
               }
               // Only default to 14% if the document explicitly has a positive VAT amount
-              if (!numRate && dtoVatAmount > 0) {
+              if (!numRate && Math.abs(dtoVatAmount) > 0) {
                 numRate = 14;
               }
 
-              if (itemVatVal <= 0 && numRate > 0 && itemTotal > 0) {
-                itemVatVal = Number(((itemTotal * numRate) / 100).toFixed(2));
+              if (Math.abs(itemVatVal) <= 0 && numRate > 0 && Math.abs(itemTotal) > 0) {
+                itemVatVal = Number(((Math.abs(itemTotal) * numRate) / 100).toFixed(2));
               }
             }
 
@@ -1186,16 +1186,16 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               whtRateNum = parseFloat(cleanWhtDigits);
             }
             let itemWhtAmt = Math.abs(Number(item.withholding_tax_amount ?? item.wht_amount ?? 0));
-            if (itemWhtAmt === 0 && whtRateNum > 0 && itemTotal > 0) {
-              itemWhtAmt = Number(((itemTotal * whtRateNum) / 100).toFixed(2));
+            if (itemWhtAmt === 0 && whtRateNum > 0 && Math.abs(itemTotal) > 0) {
+              itemWhtAmt = Number(((Math.abs(itemTotal) * whtRateNum) / 100).toFixed(2));
             }
             const whtRateStr = whtRateNum > 0 ? `% ${whtRateNum}` : (itemWhtAmt > 0 ? '% 1' : '% 0');
-            const whtAmtFormatted = itemWhtAmt > 0 ? `-${formatNumberValue(itemWhtAmt)}` : '0.00';
+            const whtAmtFormatted = itemWhtAmt > 0 ? formatNumberValue(itemWhtAmt) : '0.00';
 
             const itemQty = isReversalDoc && Number(item.quantity || 0) !== 0 ? -Math.abs(Number(item.quantity)) : Number(item.quantity || 0);
             const rawItemTotal = Number(item.total || (Number(item.quantity || 0) * Number(item.unit_price || 0)) || 0);
             const finalItemTotal = isReversalDoc && rawItemTotal !== 0 ? -Math.abs(rawItemTotal) : rawItemTotal;
-            const finalItemVat = isReversalDoc && itemVatVal > 0 ? -itemVatVal : itemVatVal;
+            const finalItemVat = isReversalDoc && itemVatVal !== 0 ? -Math.abs(itemVatVal) : itemVatVal;
 
             return {
               ...item,
@@ -1206,20 +1206,23 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
               vat_rate_formatted: rateStr,
               withholding_tax_rate: whtRateNum,
               withholding_tax_rate_formatted: whtRateStr,
-              withholding_tax_amount: itemWhtAmt > 0 ? -itemWhtAmt : 0,
+              withholding_tax_amount: itemWhtAmt > 0 ? itemWhtAmt : 0,
               withholding_tax_amount_formatted: whtAmtFormatted
             };
           });
 
           const itemsVatSum = formattedItems.reduce((sum: number, item: any) => sum + Number(item.vat_amount || 0), 0);
-          const effectiveVatAmount = isCompanyVatDisabled ? 0 : (dtoVatAmount > 0 ? dtoVatAmount : itemsVatSum);
+          const effectiveVatAmount = isCompanyVatDisabled ? 0 : (Math.abs(dtoVatAmount) > 0 ? dtoVatAmount : itemsVatSum);
 
           const itemsWhtSum = formattedItems.reduce((sum: number, item: any) => sum + Math.abs(Number(item.withholding_tax_amount || 0)), 0);
           const dtoWhtAmt = Math.abs(Number(dto.withholding_tax_amount || dto.withholding_tax_total || 0));
           const effectiveWhtAmount = dtoWhtAmt > 0 ? dtoWhtAmt : itemsWhtSum;
           const hasWht = effectiveWhtAmount > 0;
 
-          const hasActualVat = !isCompanyVatDisabled && (effectiveVatAmount > 0 || formattedItems.some((item: any) => Number(item.vat_amount || 0) > 0));
+          const hasActualVat = !isCompanyVatDisabled && (
+            Math.abs(effectiveVatAmount) > 0 || 
+            formattedItems.some((item: any) => Math.abs(Number(item.vat_amount || 0)) > 0)
+          );
 
           let isVatEnabled = false;
           if (isCompanyVatDisabled) {
@@ -1385,7 +1388,7 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             }
 
             if (hasWht) {
-              drawCardRow(isEn ? 'Withholding Tax' : 'ضريبة الخصم والإضافة (ض.خ.إ)', `-${formatNumberValue(effectiveWhtAmount)}`, false, '#dc2626');
+              drawCardRow(isEn ? 'Withholding Tax' : 'ضريبة الخصم والإضافة (ض.خ.إ)', formatNumberValue(effectiveWhtAmount), false, '#dc2626');
             }
 
             // Card Divider Line

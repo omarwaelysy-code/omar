@@ -165,15 +165,19 @@ describe('PDF Engine Architectural Tests', () => {
           {
             product_code: '2',
             product_name: 'تيشرت',
-            quantity: '10',
+            quantity: '-10',
             unit_price: '150.00',
-            vat_amount: '210.00',
-            total: '1695.00'
+            vat_rate: '14%',
+            vat_amount: '-210.00',
+            withholding_tax_rate: '1',
+            withholding_tax_amount: '15.00',
+            total: '-1695.00'
           }
         ],
-        subtotal: '42900.00',
-        vat_amount: '6003.20',
-        net_total: '48858.40',
+        subtotal: '-42900.00',
+        vat_amount: '-6003.20',
+        withholding_tax_amount: '24.80',
+        net_total: '-48858.40',
         branchName: 'الفرع الرئيسي',
         userName: 'وائل المحاسب'
       };

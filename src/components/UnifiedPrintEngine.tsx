@@ -596,10 +596,8 @@ export function UnifiedPrintEngine() {
     const effectiveSubtotal = isRevDoc && normalized.subtotal ? -Math.abs(Number(normalized.subtotal)) : (normalized.subtotal || 0);
     const effectiveNetTotal = isRevDoc && normalized.net_total ? -Math.abs(Number(normalized.net_total)) : (normalized.net_total || 0);
     const effectiveVatAmt = isRevDoc && normalized.vat_amount ? -Math.abs(Number(normalized.vat_amount)) : (normalized.vat_amount || 0);
-    const effectiveDiscAmt = isRevDoc && normalized.discount_amount ? -Math.abs(Number(normalized.discount_amount)) : (normalized.discount_amount || 0);
-    const effectiveWhtAmt = isRevDoc && (normalized.withholding_tax_amount || documentData?.withholding_tax_amount) 
-      ? -Math.abs(Number(normalized.withholding_tax_amount || documentData?.withholding_tax_amount || 0)) 
-      : (normalized.withholding_tax_amount || documentData?.withholding_tax_amount || '0');
+    const effectiveDiscAmt = Math.abs(Number(normalized.discount_amount || 0));
+    const effectiveWhtAmt = Math.abs(Number(normalized.withholding_tax_amount || documentData?.withholding_tax_amount || 0));
 
     const itemsDto = (normalized.items || []).map(itm => ({
       product_code: resolveItemCode(itm),
@@ -607,11 +605,11 @@ export function UnifiedPrintEngine() {
       quantity: String(isRevDoc && itm.quantity ? -Math.abs(Number(itm.quantity)) : (itm.quantity || '0')),
       unit: String(itm.unit || 'حبة'),
       unit_price: String(itm.unit_price || '0'),
-      discount: String(isRevDoc && itm.discount ? -Math.abs(Number(itm.discount)) : (itm.discount || '0')),
+      discount: String(Math.abs(Number(itm.discount || '0'))),
       vat_rate: String((itm as any).vat_rate || '0'),
       vat_amount: String(isRevDoc && itm.vat_amount ? -Math.abs(Number(itm.vat_amount)) : (itm.vat_amount || '0')),
       withholding_tax_rate: String((itm as any).withholding_tax_rate || '0'),
-      withholding_tax_amount: String(isRevDoc && (itm as any).withholding_tax_amount ? -Math.abs(Number((itm as any).withholding_tax_amount)) : ((itm as any).withholding_tax_amount || '0')),
+      withholding_tax_amount: String(Math.abs(Number((itm as any).withholding_tax_amount || '0'))),
       total: String(isRevDoc && itm.total ? -Math.abs(Number(itm.total)) : (itm.total || '0'))
     }));
 
