@@ -1669,12 +1669,58 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
         case 'LedgerTemplate':
         case 'LedgerPdf': {
-          drawHeader('دفتر الأستاذ العام', dto.branchName, dto.userName);
+          const isReversalDoc = Boolean(dto.is_reversal_doc || String(dto.entry_num || dto.entry_number || dto.document_number || '').startsWith('REV-'));
+          const originalDocNum = dto.original_doc_number || (isReversalDoc && String(dto.entry_num || dto.entry_number || dto.document_number || '').startsWith('REV-') ? String(dto.entry_num || dto.entry_number || dto.document_number).replace(/^REV-/, '') : '');
+          const originalEntryNum = dto.original_entry_number || '';
+          const isReversed = Boolean(dto.is_reversed);
+          const reversedByDocNum = dto.reversed_by_doc_number || dto.reversed_by_entry_number || '';
+
+          let title = 'دفتر الأستاذ العام';
+          if (isReversalDoc) {
+            title += originalDocNum ? ` [قيد حركة عكسية - الأصلي: ${originalDocNum}]` : ` [قيد حركة عكسية]`;
+          } else if (isReversed) {
+            title += reversedByDocNum ? ` [قيد معكوس وملغي - العكسي: ${reversedByDocNum}]` : ` [قيد معكوس وملغي]`;
+          }
+
+          drawHeader(title, dto.branchName, dto.userName);
 
           const metaItems = [
-            { label: 'الفترة:', val: `من ${dto.date_from || ''} إلى ${dto.date_to || ''}` }
+            { label: 'الفترة:', val: dto.date_from ? `من ${dto.date_from || ''} إلى ${dto.date_to || ''}` : (dto.date || '') }
           ];
+
+          if (isReversalDoc) {
+            metaItems.push({ label: 'نوع القيد:', val: 'قيد حركة عكسية (Reversal Entry)' });
+            if (originalDocNum || originalEntryNum) {
+              metaItems.push({ label: 'القيد الأصلي:', val: originalDocNum || originalEntryNum });
+            }
+          } else if (isReversed) {
+            metaItems.push({ label: 'حالة القيد:', val: 'قيد معكوس (ملغي)' });
+            if (reversedByDocNum) {
+              metaItems.push({ label: 'القيد العكسي:', val: reversedByDocNum });
+            }
+          }
+
           drawMetaGrid(metaItems);
+
+          if (isReversalDoc || isReversed) {
+            const stampCenterY = isThermal ? (currentY + 20) : (currentY + 30);
+            const stampCenterX = pageWidth / 2;
+            doc.save();
+            try {
+              doc.fillOpacity(0.24);
+              doc.fillColor('#dc2626');
+              doc.rotate(-32, { origin: [stampCenterX, stampCenterY] });
+              renderText(isReversalDoc ? 'قيد حركة عكسية (Reversal Entry)' : 'قيد معكوس (Reversed Entry)', stampCenterX - 180, stampCenterY - 8, {
+                width: 360,
+                align: 'center',
+                font: 'ArabicBold',
+                size: isThermal ? 10 : 14
+              });
+            } finally {
+              doc.restore();
+              doc.fillOpacity(1);
+            }
+          }
 
           const columns: ColumnDef[] = isThermal ? [
             { id: 'date', label: 'التاريخ', width: 30, align: 'right' },
@@ -1702,7 +1748,19 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
 
         case 'VoucherTemplate':
         case 'VoucherPdf': {
-          const title = dto.isReceipt ? 'سند قبض نقدي / بنكي' : 'سند صرف نقدي / بنكي';
+          const isReversalDoc = Boolean(dto.is_reversal_doc || String(dto.voucher_number || dto.document_number || '').startsWith('REV-'));
+          const originalDocNum = dto.original_doc_number || (isReversalDoc && String(dto.voucher_number || dto.document_number || '').startsWith('REV-') ? String(dto.voucher_number || dto.document_number).replace(/^REV-/, '') : '');
+          const originalEntryNum = dto.original_entry_number || '';
+          const isReversed = Boolean(dto.is_reversed);
+          const reversedByDocNum = dto.reversed_by_doc_number || dto.reversed_by_entry_number || '';
+
+          let title = dto.isReceipt ? 'سند قبض نقدي / بنكي' : 'سند صرف نقدي / بنكي';
+          if (isReversalDoc) {
+            title += originalDocNum ? ` [سند حركة عكسية - الأصلي: ${originalDocNum}]` : ` [سند حركة عكسية]`;
+          } else if (isReversed) {
+            title += reversedByDocNum ? ` [سند معكوس وملغي - العكسي: ${reversedByDocNum}]` : ` [سند معكوس وملغي]`;
+          }
+
           drawHeader(title, dto.branchName, dto.userName, dto.date);
 
           const curSuffix = dto.currency_code ? ` (${dto.currency_code})` : '';
@@ -1712,7 +1770,43 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
             { label: dto.isReceipt ? 'مستلم من:' : 'مدفوع لـ:', val: dto.party_name || '' },
             { label: 'المبلغ الإجمالي:', val: `${dto.amount || '0.00'} ${dto.currency_code || ''}`.trim() }
           ];
+
+          if (isReversalDoc) {
+            metaItems.push({ label: 'نوع المستند:', val: 'سند حركة عكسية (Reversal Voucher)' });
+            if (originalDocNum) {
+              metaItems.push({ label: 'المستند الأصلي:', val: originalDocNum });
+            }
+            if (originalEntryNum) {
+              metaItems.push({ label: 'القيد الأصلي:', val: originalEntryNum });
+            }
+          } else if (isReversed) {
+            metaItems.push({ label: 'حالة المستند:', val: 'سند معكوس (ملغي)' });
+            if (reversedByDocNum) {
+              metaItems.push({ label: 'المستند العكسي:', val: reversedByDocNum });
+            }
+          }
+
           drawMetaGrid(metaItems);
+
+          if (isReversalDoc || isReversed) {
+            const stampCenterY = isThermal ? (currentY + 20) : (currentY + 30);
+            const stampCenterX = pageWidth / 2;
+            doc.save();
+            try {
+              doc.fillOpacity(0.24);
+              doc.fillColor('#dc2626');
+              doc.rotate(-32, { origin: [stampCenterX, stampCenterY] });
+              renderText(isReversalDoc ? 'مستند حركة عكسية (Reversal Document)' : 'مستند معكوس (Reversed Document)', stampCenterX - 180, stampCenterY - 8, {
+                width: 360,
+                align: 'center',
+                font: 'ArabicBold',
+                size: isThermal ? 10 : 14
+              });
+            } finally {
+              doc.restore();
+              doc.fillOpacity(1);
+            }
+          }
 
           if (dto.description) {
             const fontLabel = 'ArabicRegular';
@@ -1770,12 +1864,43 @@ export async function generatePDF(templateName: string, dto: any): Promise<Buffe
         }
 
         default: {
-          const title = dto.reportTitle || 'تقرير النظام';
+          const isReversalDoc = Boolean(dto.is_reversal_doc || String(dto.invoice_number || dto.voucher_number || dto.document_number || '').startsWith('REV-'));
+          const originalDocNum = dto.original_doc_number || (isReversalDoc && String(dto.invoice_number || dto.voucher_number || dto.document_number || '').startsWith('REV-') ? String(dto.invoice_number || dto.voucher_number || dto.document_number).replace(/^REV-/, '') : '');
+          const isReversed = Boolean(dto.is_reversed);
+          const reversedByDocNum = dto.reversed_by_doc_number || '';
+
+          let title = dto.reportTitle || 'تقرير النظام';
+          if (isReversalDoc) {
+            title += originalDocNum ? ` [مستند حركة عكسية - الأصلي: ${originalDocNum}]` : ` [مستند حركة عكسية]`;
+          } else if (isReversed) {
+            title += reversedByDocNum ? ` [مستند معكوس وملغي - العكسي: ${reversedByDocNum}]` : ` [مستند معكوس وملغي]`;
+          }
+
           const columnsRaw = dto.columns || [];
           const rows = dto.rows || [];
           const totals = dto.totals || {};
 
           drawHeader(title, dto.branchName, dto.userName);
+
+          if (isReversalDoc || isReversed) {
+            const stampCenterY = isThermal ? (currentY + 20) : (currentY + 40);
+            const stampCenterX = pageWidth / 2;
+            doc.save();
+            try {
+              doc.fillOpacity(0.24);
+              doc.fillColor('#dc2626');
+              doc.rotate(-32, { origin: [stampCenterX, stampCenterY] });
+              renderText(isReversalDoc ? 'مستند حركة عكسية (Reversal Document)' : 'مستند معكوس (Reversed Document)', stampCenterX - 180, stampCenterY - 8, {
+                width: 360,
+                align: 'center',
+                font: 'ArabicBold',
+                size: isThermal ? 10 : 14
+              });
+            } finally {
+              doc.restore();
+              doc.fillOpacity(1);
+            }
+          }
 
           // Render Optional Top Summary Table (e.g. Debt Aging Summary row above details)
           if (dto.summaryTable && Array.isArray(dto.summaryTable.columns) && Array.isArray(dto.summaryTable.rows) && dto.summaryTable.rows.length > 0) {

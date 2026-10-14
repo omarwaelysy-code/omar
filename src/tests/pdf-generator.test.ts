@@ -366,6 +366,78 @@ describe('PDF Engine Architectural Tests', () => {
       expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
     });
 
+    it('should generate a valid Reversal Voucher PDF buffer with watermark and original voucher reference', async () => {
+      const dto = {
+        company: mockCompany,
+        voucher_number: 'REV-RV-1002',
+        date: '2026-09-24',
+        payment_method: 'تحويل بنكي',
+        party_name: 'شركة الأفق للاستشارات',
+        amount: '5000.00',
+        description: 'عكس سند القبض رقم RV-1002 نظراً لخطأ في التوجيه المحاسبي',
+        is_reversal_doc: true,
+        original_doc_number: 'RV-1002',
+        original_entry_number: 'JE-2026-09-24-00008',
+        items: [
+          {
+            account_code: '110201',
+            account_name: 'البنك الأهلي التجاري',
+            description: 'عكس إيداع بنكي',
+            amount: '5000.00'
+          }
+        ],
+        branchName: 'الفرع الرئيسي',
+        userName: 'وائل المحاسب',
+        isReceipt: true
+      };
+
+      const buffer = await generatePDF('VoucherPdf', dto);
+      expect(buffer).toBeInstanceOf(Buffer);
+      expect(buffer.length).toBeGreaterThan(100);
+      expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
+    });
+
+    it('should generate a valid Reversal Ledger / Journal Entry PDF buffer with watermark and original entry reference', async () => {
+      const dto = {
+        company: mockCompany,
+        entry_num: 'REV-JE-2026-09-24-00007',
+        date_from: '2026-09-24',
+        date_to: '2026-09-24',
+        is_reversal_doc: true,
+        original_doc_number: 'JE-2026-09-24-00007',
+        original_entry_number: 'JE-2026-09-24-00007',
+        rows: [
+          {
+            date: '2026-09-24',
+            entry_num: 'REV-JE-2026-09-24-00007',
+            account_code: '4101',
+            account_name: 'المبيعات',
+            description: 'عكس قيد مبيعات',
+            debit: '1000.00',
+            credit: '0.00'
+          },
+          {
+            date: '2026-09-24',
+            entry_num: 'REV-JE-2026-09-24-00007',
+            account_code: '1101',
+            account_name: 'الصندوق',
+            description: 'عكس قيد مبيعات',
+            debit: '0.00',
+            credit: '1000.00'
+          }
+        ],
+        total_debit: '1000.00',
+        total_credit: '1000.00',
+        branchName: 'الفرع الرئيسي',
+        userName: 'وائل المحاسب'
+      };
+
+      const buffer = await generatePDF('LedgerPdf', dto);
+      expect(buffer).toBeInstanceOf(Buffer);
+      expect(buffer.length).toBeGreaterThan(100);
+      expect(buffer.toString('utf8', 0, 5)).toBe('%PDF-');
+    });
+
     it('should fallback to default generic report layout successfully', async () => {
       const dto = {
         company: mockCompany,

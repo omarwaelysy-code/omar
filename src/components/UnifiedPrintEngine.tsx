@@ -700,7 +700,15 @@ export function UnifiedPrintEngine() {
         })),
         userName: normalized.user_name,
         branchName: normalized.branch_name,
-        isReceipt: operationType === 'receipt_vouchers'
+        isReceipt: operationType === 'receipt_vouchers',
+        is_reversal_doc: Boolean(normalized.is_reversal_doc ?? documentData?.is_reversal_doc ?? String(normalized.document_number || '').startsWith('REV-')),
+        original_doc_number: normalized.original_doc_number || documentData?.original_doc_number || (String(normalized.document_number || '').startsWith('REV-') ? String(normalized.document_number).replace(/^REV-/, '') : ''),
+        original_entry_number: normalized.original_entry_number || documentData?.original_entry_number || '',
+        is_reversed: Boolean(normalized.is_reversed ?? documentData?.is_reversed),
+        reversed_by_doc_number: normalized.reversed_by_doc_number || documentData?.reversed_by_doc_number || '',
+        reversed_by_entry_number: normalized.reversed_by_entry_number || documentData?.reversed_by_entry_number || '',
+        reversed_at: cleanDateVal(normalized.reversed_at || documentData?.reversed_at),
+        reversal_reason: normalized.reversal_reason || documentData?.reversal_reason || ''
       };
     } else if (operationType === 'journal_entries') {
       templateName = 'LedgerPdf';
@@ -720,9 +728,27 @@ export function UnifiedPrintEngine() {
         total_debit: String(normalized.subtotal || '0'),
         total_credit: String(normalized.subtotal || '0'),
         userName: normalized.user_name,
-        branchName: normalized.branch_name
+        branchName: normalized.branch_name,
+        is_reversal_doc: Boolean(normalized.is_reversal_doc ?? documentData?.is_reversal_doc ?? String(normalized.document_number || '').startsWith('REV-')),
+        original_doc_number: normalized.original_doc_number || documentData?.original_doc_number || (String(normalized.document_number || '').startsWith('REV-') ? String(normalized.document_number).replace(/^REV-/, '') : ''),
+        original_entry_number: normalized.original_entry_number || documentData?.original_entry_number || '',
+        is_reversed: Boolean(normalized.is_reversed ?? documentData?.is_reversed),
+        reversed_by_doc_number: normalized.reversed_by_doc_number || documentData?.reversed_by_doc_number || '',
+        reversed_by_entry_number: normalized.reversed_by_entry_number || documentData?.reversed_by_entry_number || '',
+        reversed_at: cleanDateVal(normalized.reversed_at || documentData?.reversed_at),
+        reversal_reason: normalized.reversal_reason || documentData?.reversal_reason || ''
       };
     }
+
+    // Ensure all reversal tracking metadata is attached unconditionally to dto across all operations
+    dto.is_reversal_doc = dto.is_reversal_doc ?? Boolean(normalized.is_reversal_doc ?? documentData?.is_reversal_doc ?? String(normalized.document_number || '').startsWith('REV-'));
+    dto.original_doc_number = dto.original_doc_number || normalized.original_doc_number || documentData?.original_doc_number || (String(normalized.document_number || '').startsWith('REV-') ? String(normalized.document_number).replace(/^REV-/, '') : '');
+    dto.original_entry_number = dto.original_entry_number || normalized.original_entry_number || documentData?.original_entry_number || '';
+    dto.is_reversed = dto.is_reversed ?? Boolean(normalized.is_reversed ?? documentData?.is_reversed);
+    dto.reversed_by_doc_number = dto.reversed_by_doc_number || normalized.reversed_by_doc_number || documentData?.reversed_by_doc_number || '';
+    dto.reversed_by_entry_number = dto.reversed_by_entry_number || normalized.reversed_by_entry_number || documentData?.reversed_by_entry_number || '';
+    dto.reversed_at = dto.reversed_at || cleanDateVal(normalized.reversed_at || documentData?.reversed_at);
+    dto.reversal_reason = dto.reversal_reason || normalized.reversal_reason || documentData?.reversal_reason || '';
 
     if (selectedTemplate && !selectedTemplate.is_system && !selectedTemplate.is_default && selectedTemplate.id !== 'fallback' && !selectedTemplate.id.startsWith('default-')) {
       dto.isCustomTemplate = true;
