@@ -3501,7 +3501,11 @@ export const Invoices: React.FC = () => {
       }
 
       setDate(fullData.date.slice(0, 10));
-      setInvoiceNumber(fullData.invoice_number);
+      const isRev = Boolean(fullData.is_reversal_doc || String(fullData.invoice_number || '').startsWith('REV-'));
+      const resolvedInvNum = isRev && !String(fullData.invoice_number || '').startsWith('REV-')
+        ? `REV-${fullData.invoice_number}`
+        : (fullData.invoice_number || '');
+      setInvoiceNumber(resolvedInvNum);
       setItems(fullData.items || []);
       setAttachments(Array.isArray(fullData.attachments) ? fullData.attachments : []);
       setDiscount(fullData.discount_amount || fullData.discount || 0);

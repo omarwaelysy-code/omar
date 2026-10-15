@@ -3657,8 +3657,11 @@ export const PurchaseInvoices: React.FC = () => {
         setPaymentTerms(fullData.payment_terms || 'due_on_receipt');
         setPaymentTermsDays(fullData.payment_terms_days || 0);
         setAdvancePercentage(fullData.advance_percentage || 0);
-        setDueDate(fullData.due_date ? fullData.due_date.slice(0, 10) : (fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10)));
-        setInvoiceNumber(fullData.invoice_number);
+        const isRev = Boolean(fullData.is_reversal_doc || String(fullData.invoice_number || '').startsWith('REV-'));
+        const resolvedInvNum = isRev && !String(fullData.invoice_number || '').startsWith('REV-')
+          ? `REV-${fullData.invoice_number}`
+          : (fullData.invoice_number || '');
+        setInvoiceNumber(resolvedInvNum);
         setAttachments(Array.isArray(fullData.attachments) ? fullData.attachments : []);
         setFormSettlementNumber(fullData.settlement_number || '');
         setFormSettlementDate(fullData.settlement_date ? fullData.settlement_date.slice(0, 10) : (fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10)));

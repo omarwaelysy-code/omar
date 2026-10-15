@@ -1538,14 +1538,30 @@ export const Receipts: React.FC = () => {
 
       if (!fullData) throw new Error('Receipt not found');
 
-      setInternalRef(fullData.voucher_number || '');
+      const isRev = Boolean(
+        fullData.is_reversal_doc || 
+        receipt.is_reversal_doc || 
+        String(fullData.voucher_number || '').startsWith('REV-') || 
+        String(fullData.internal_reference || '').startsWith('REV-')
+      );
+      const resolvedRef = isRev
+        ? (String(fullData.voucher_number || '').startsWith('REV-')
+            ? fullData.voucher_number
+            : (String(fullData.internal_reference || '').startsWith('REV-')
+                ? fullData.internal_reference
+                : `REV-${fullData.internal_reference || fullData.voucher_number || ''}`))
+        : (fullData.internal_reference || fullData.voucher_number || '');
+      setInternalRef(resolvedRef);
       
       const loadedItems = fullData.items && fullData.items.length > 0
-        ? fullData.items
+        ? fullData.items.map((item: any) => ({
+            ...item,
+            amount: isRev && item.amount ? -Math.abs(Number(item.amount)) : (Number(item.amount) || 0)
+          }))
         : [{
             type: 'customer' as const,
             entity_id: fullData.customer_id || '',
-            amount: fullData.amount,
+            amount: isRev && fullData.amount ? -Math.abs(Number(fullData.amount)) : (Number(fullData.amount) || 0),
             description: fullData.description || ''
           }];
 
@@ -1612,12 +1628,12 @@ export const Receipts: React.FC = () => {
 
       setAttachments(Array.isArray(fullData.attachments) ? fullData.attachments : []);
       setVoucherData({
-        internal_reference: fullData.internal_reference || fullData.voucher_number || '',
+        internal_reference: resolvedRef,
         manual_reference: fullData.manual_reference || '',
         items: mergedItems,
         customer_id: fullData.customer_id || '',
         supplier_id: fullData.supplier_id || '',
-        amount: fullData.amount,
+        amount: isRev && fullData.amount ? -Math.abs(Number(fullData.amount)) : (Number(fullData.amount) || 0),
         payment_method_id: fullData.payment_method_id || '',
         date: fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
         notes: fullData.description || '',
@@ -2372,7 +2388,11 @@ export const Receipts: React.FC = () => {
                         />
                       </td>
                       <td className="px-2.5 py-2 whitespace-nowrap">
-                        <span className="font-mono text-xs bg-emerald-50 px-2 py-0.5 rounded text-emerald-700 font-bold border border-emerald-100">{receipt.voucher_number}</span>
+                        <span className="font-mono text-xs bg-emerald-50 px-2 py-0.5 rounded text-emerald-700 font-bold border border-emerald-100">
+                          {receipt.is_reversal_doc && !String(receipt.voucher_number || '').startsWith('REV-')
+                            ? `REV-${receipt.voucher_number}`
+                            : receipt.voucher_number}
+                        </span>
                       </td>
                       <td className="px-2.5 py-2 whitespace-nowrap">
                         {getReceiptKind(receipt) === 'customer' ? (
@@ -2583,7 +2603,11 @@ export const Receipts: React.FC = () => {
                 <div className="flex justify-between items-start">
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">{receipt.voucher_number}</span>
+                      <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">
+                        {receipt.is_reversal_doc && !String(receipt.voucher_number || '').startsWith('REV-')
+                          ? `REV-${receipt.voucher_number}`
+                          : receipt.voucher_number}
+                      </span>
                       {getReceiptKind(receipt) === 'customer' ? (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                           قبض من عميل
@@ -2999,7 +3023,7 @@ export const Receipts: React.FC = () => {
                                 readOnly
                                 type="text" 
                                 className={`w-full ${dir === 'rtl' ? 'pr-8 pl-2' : 'pl-8 pr-2'} py-1.5 bg-zinc-100 border border-zinc-200 cursor-not-allowed rounded-xl font-bold text-zinc-500 text-xs outline-none font-mono h-9`}
-                                value={editingReceipt ? voucherData.internal_reference : (internalRef || voucherData.internal_reference)}
+                                value={editingReceipt ? (editingReceipt.is_reversal_doc && !String(voucherData.internal_reference || '').startsWith('REV-') ? `REV-${voucherData.internal_reference || editingReceipt.voucher_number}` : (voucherData.internal_reference || editingReceipt.voucher_number)) : (internalRef || voucherData.internal_reference)}
                               />
                             </div>
                           </div>
@@ -3171,11 +3195,13 @@ export const Receipts: React.FC = () => {
                       <div className="space-y-3">
                         {/* Total Amount & Tafqeet Banner */}
                         {(() => {
-                          const totalAmount = voucherData.items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+                          const rawSum = voucherData.items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+                          const isRevVoucher = Boolean(editingReceipt?.is_reversal_doc || (voucherData as any).is_reversal_doc || String(voucherData.internal_reference || '').startsWith('REV-'));
+                          const totalAmount = isRevVoucher && rawSum !== 0 ? -Math.abs(rawSum) : rawSum;
                           const baseCurrency = (companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase();
                           const activeCurrency = companyCurrencies.find(c => c.id === voucherData.currency_id);
                           const currencyCode = (activeCurrency?.code || baseCurrency).toUpperCase();
-                          const tafqeetText = tafqeet(totalAmount, currencyCode, language === 'ar' ? 'ar' : 'en');
+                          const tafqeetText = (totalAmount < 0 ? (language === 'ar' ? 'سالب ' : 'Negative ') : '') + tafqeet(Math.abs(totalAmount), currencyCode, language === 'ar' ? 'ar' : 'en');
                           const isForeign = currencyCode !== baseCurrency && (Number(voucherData.exchange_rate) > 0 && Number(voucherData.exchange_rate) !== 1);
 
                           return (

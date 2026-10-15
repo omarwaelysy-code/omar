@@ -323,7 +323,10 @@ export const SupplierDiscounts: React.FC = () => {
       setCustomAccountId('');
     }
 
-    const docNum = discount.number || discount.discount_number || '';
+    const isRev = Boolean(discount.is_reversal_doc || String(discount.number || discount.discount_number || '').startsWith('REV-'));
+    const docNum = isRev && !String(discount.number || discount.discount_number || '').startsWith('REV-')
+      ? `REV-${discount.number || discount.discount_number || ''}`
+      : (discount.number || discount.discount_number || '');
     setDiscountNumber(docNum);
     if (!docNum && discount.date) {
       generateDiscountNumber(discount.date).then(num => {
@@ -331,10 +334,12 @@ export const SupplierDiscounts: React.FC = () => {
       });
     }
 
-    const numAmount = parseFloat(String(discount.amount || 0));
-    const currAmount = discount.currency_amount !== undefined && discount.currency_amount !== null
+    const rawAmount = parseFloat(String(discount.amount || 0));
+    const numAmount = isRev && rawAmount ? -Math.abs(rawAmount) : rawAmount;
+    const rawCurrAmount = discount.currency_amount !== undefined && discount.currency_amount !== null
       ? parseFloat(String(discount.currency_amount))
-      : numAmount;
+      : rawAmount;
+    const currAmount = isRev && rawCurrAmount ? -Math.abs(rawCurrAmount) : rawCurrAmount;
     const discRate = discount.exchange_rate ? parseFloat(String(discount.exchange_rate)) : 1;
     const discCurr = discount.currency || baseCurrencyCode;
     const matchedCurr = companyCurrencies.find(c => c.code?.toUpperCase() === discCurr.toUpperCase());
@@ -919,7 +924,9 @@ export const SupplierDiscounts: React.FC = () => {
                         />
                       </td>
                       <td className="px-2 py-1 font-mono font-bold text-slate-900 text-xs">
-                        {discount.number || '-'}
+                        {discount.is_reversal_doc && !String(discount.number || '').startsWith('REV-')
+                          ? `REV-${discount.number}`
+                          : (discount.number || '-')}
                       </td>
                       <td className="px-2 py-1 font-bold text-slate-900 text-xs">
                         {discount.supplier_name}
@@ -1054,7 +1061,9 @@ export const SupplierDiscounts: React.FC = () => {
                       className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
                     />
                     <span className="text-xs font-bold text-slate-900 font-mono bg-slate-100 px-2 py-0.5 rounded">
-                      {discount.number || '-'}
+                      {discount.is_reversal_doc && !String(discount.number || '').startsWith('REV-')
+                        ? `REV-${discount.number}`
+                        : (discount.number || '-')}
                     </span>
                   </div>
                   <span className="text-[11px] text-slate-400 font-medium">{formatDate(discount.date)}</span>

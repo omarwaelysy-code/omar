@@ -359,6 +359,16 @@ export class ReversalEngine {
     if (validColumns.has(config.numberColumn)) {
       reversalDoc[config.numberColumn] = reversalDocNumber;
     }
+    // Also ensure all common reference / number columns get the reversal doc number
+    const docNumberColumns = [
+      'voucher_number', 'internal_reference', 'invoice_number', 'return_number',
+      'transfer_number', 'document_number', 'number', 'discount_number'
+    ];
+    for (const col of docNumberColumns) {
+      if (validColumns.has(col)) {
+        reversalDoc[col] = reversalDocNumber;
+      }
+    }
     if (validColumns.has('date')) {
       reversalDoc.date = reversalDate;
     }
@@ -423,6 +433,25 @@ export class ReversalEngine {
         if (!isNaN(numVal) && numVal !== 0) {
           reversalDoc[ac] = -Math.abs(numVal);
         }
+      }
+    }
+
+    // Invert item amounts if items are stored directly in this table (JSON or JSONB column)
+    if (validColumns.has('items') && reversalDoc.items) {
+      let itArr = reversalDoc.items;
+      let wasString = false;
+      if (typeof itArr === 'string') {
+        try {
+          itArr = JSON.parse(itArr);
+          wasString = true;
+        } catch (_) {}
+      }
+      if (Array.isArray(itArr)) {
+        const updated = itArr.map((it: any) => ({
+          ...it,
+          amount: it.amount !== undefined && it.amount !== null ? -Math.abs(Number(it.amount)) : 0
+        }));
+        reversalDoc.items = wasString ? JSON.stringify(updated) : updated;
       }
     }
 

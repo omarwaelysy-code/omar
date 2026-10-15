@@ -1979,7 +1979,11 @@ export const Returns: React.FC = () => {
         });
         setItems(loadedItems);
         setAttachments(Array.isArray(fullData.attachments) ? fullData.attachments : []);
-        setReturnNumber(fullData.return_number);
+        const isRev = Boolean(fullData.is_reversal_doc || String(fullData.return_number || '').startsWith('REV-'));
+        const resolvedRetNum = isRev && !String(fullData.return_number || '').startsWith('REV-')
+          ? `REV-${fullData.return_number}`
+          : (fullData.return_number || '');
+        setReturnNumber(resolvedRetNum);
         setDiscount(fullData.discount || 0);
         setDescription(fullData.description || '');
         setSelectedOperationId(fullData.operation_id || '');

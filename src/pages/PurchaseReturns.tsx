@@ -2418,7 +2418,11 @@ export const PurchaseReturns: React.FC = () => {
       } else {
         setEtaLockData(null);
       }
-      setReturnNumber(fullData.return_number);
+      const isRev = Boolean(fullData.is_reversal_doc || String(fullData.return_number || '').startsWith('REV-'));
+      const resolvedRetNum = isRev && !String(fullData.return_number || '').startsWith('REV-')
+        ? `REV-${fullData.return_number}`
+        : (fullData.return_number || '');
+      setReturnNumber(resolvedRetNum);
       setReturnData({
         supplier_id: fullData.supplier_id,
         warehouse_id: fullData.warehouse_id || '',

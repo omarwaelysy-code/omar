@@ -250,17 +250,22 @@ export const CashTransfers: React.FC = () => {
       }
     }
 
+    const isRev = Boolean(transfer.is_reversal_doc || String(transfer.transfer_number || '').startsWith('REV-'));
+    const resolvedNum = isRev && !String(transfer.transfer_number || '').startsWith('REV-')
+      ? `REV-${transfer.transfer_number}`
+      : (transfer.transfer_number || '');
+
     setFormData({
       date: transfer.date ? transfer.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
-      amount: Number(transfer.amount) || 0,
+      amount: isRev && transfer.amount ? -Math.abs(Number(transfer.amount)) : (Number(transfer.amount) || 0),
       from_payment_method_id: transfer.from_payment_method_id,
       to_payment_method_id: transfer.to_payment_method_id,
       description: transfer.description,
-      transfer_number: transfer.transfer_number || '',
+      transfer_number: resolvedNum,
       from_currency: fromCurr,
       to_currency: toCurr,
       exchange_rate: rate,
-      converted_amount: converted
+      converted_amount: isRev && converted ? -Math.abs(Number(converted)) : (Number(converted) || 0)
     });
   };
 
@@ -1297,7 +1302,9 @@ export const CashTransfers: React.FC = () => {
                       <td className="px-3 py-2 font-bold text-zinc-900 whitespace-nowrap">{formatDate(transfer.date)}</td>
                       <td className="px-3 py-2 whitespace-nowrap">
                         <span className="font-mono text-xs bg-zinc-50 px-2 py-0.5 rounded text-zinc-700 font-bold border border-zinc-200">
-                          {transfer.transfer_number || '-'}
+                          {transfer.is_reversal_doc && !String(transfer.transfer_number || '').startsWith('REV-')
+                            ? `REV-${transfer.transfer_number}`
+                            : (transfer.transfer_number || '-')}
                         </span>
                       </td>
                       {/* لوجو البنك (المصدر) - يظهر فقط إذا كان بنك */}
@@ -1527,7 +1534,11 @@ export const CashTransfers: React.FC = () => {
                         <div className="flex flex-col text-right">
                           <span className="text-xs text-zinc-400 font-semibold">{formatDate(transfer.date)}</span>
                           {transfer.transfer_number && (
-                            <span className="font-mono text-[10px] text-emerald-700 font-bold mt-0.5">{transfer.transfer_number}</span>
+                            <span className="font-mono text-[10px] text-emerald-700 font-bold mt-0.5">
+                              {transfer.is_reversal_doc && !String(transfer.transfer_number || '').startsWith('REV-')
+                                ? `REV-${transfer.transfer_number}`
+                                : transfer.transfer_number}
+                            </span>
                           )}
                         </div>
                         {transfer.entry_number && (

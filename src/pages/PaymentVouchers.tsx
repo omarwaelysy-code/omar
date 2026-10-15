@@ -2117,7 +2117,21 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
       if (!fullData) throw new Error('Payment voucher not found');
 
       setModalMode(getVoucherKind(fullData));
-      setInternalRef(fullData.internal_reference || fullData.voucher_number || '');
+      
+      const isRev = Boolean(
+        fullData.is_reversal_doc || 
+        voucher.is_reversal_doc || 
+        String(fullData.voucher_number || '').startsWith('REV-') || 
+        String(fullData.internal_reference || '').startsWith('REV-')
+      );
+      const resolvedRef = isRev
+        ? (String(fullData.voucher_number || '').startsWith('REV-')
+            ? fullData.voucher_number
+            : (String(fullData.internal_reference || '').startsWith('REV-')
+                ? fullData.internal_reference
+                : `REV-${fullData.internal_reference || fullData.voucher_number || ''}`))
+        : (fullData.internal_reference || fullData.voucher_number || '');
+      setInternalRef(resolvedRef);
       
       // Ensure we have a clean copy of items or create from old format
       let items = [];
@@ -2140,7 +2154,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
             type,
             entity_id: entity_id || item.account_id || '', // Fallback to account_id
             sub_account_id,
-            amount: item.amount || 0,
+            amount: isRev && item.amount ? -Math.abs(Number(item.amount)) : (Number(item.amount) || 0),
             description: item.description || '',
             settlement_date: item.settlement_date,
             settlement_number: item.settlement_number,
@@ -2153,21 +2167,21 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
           items.push({ 
             type: 'supplier', 
             entity_id: fullData.supplier_id, 
-            amount: fullData.amount || 0, 
+            amount: isRev && fullData.amount ? -Math.abs(Number(fullData.amount)) : (Number(fullData.amount) || 0), 
             description: fullData.description || '' 
           });
         } else if (fullData.expense_category_id && fullData.expense_category_id !== '') {
           items.push({ 
             type: 'expense', 
             entity_id: fullData.expense_category_id, 
-            amount: fullData.amount || 0, 
+            amount: isRev && fullData.amount ? -Math.abs(Number(fullData.amount)) : (Number(fullData.amount) || 0), 
             description: fullData.description || '' 
           });
         } else if (fullData.customer_id && fullData.customer_id !== '') {
           items.push({ 
             type: 'customer', 
             entity_id: fullData.customer_id, 
-            amount: fullData.amount || 0, 
+            amount: isRev && fullData.amount ? -Math.abs(Number(fullData.amount)) : (Number(fullData.amount) || 0), 
             description: fullData.description || '' 
           });
         } else if (fullData.account_id && fullData.account_id !== '' && fullData.account_id !== fullData.payment_method_account_id) {
@@ -2176,7 +2190,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
             items.push({ 
               type: 'account', 
               entity_id: fullData.account_id, 
-              amount: fullData.amount || 0, 
+              amount: isRev && fullData.amount ? -Math.abs(Number(fullData.amount)) : (Number(fullData.amount) || 0), 
               description: fullData.description || '' 
             });
           }
@@ -2246,14 +2260,14 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
 
       setAttachments(Array.isArray(fullData.attachments) ? fullData.attachments : []);
       setVoucherData({
-        internal_reference: fullData.internal_reference || fullData.voucher_number || fullData.number || '',
+        internal_reference: resolvedRef,
         manual_reference: fullData.manual_reference || '',
         items: mergedItems,
         type: 'multi',
         supplier_id: fullData.supplier_id?.toString() || '',
         expense_category_id: fullData.expense_category_id?.toString() || '',
         customer_id: fullData.customer_id?.toString() || '',
-        amount: fullData.amount || 0,
+        amount: isRev && fullData.amount ? -Math.abs(Number(fullData.amount)) : (Number(fullData.amount) || 0),
         payment_method_id: fullData.payment_method_id?.toString() || '',
         date: fullData.date ? fullData.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
         notes: fullData.description || fullData.notes || '',
@@ -2599,7 +2613,11 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                       </td>
                       <td className="px-2.5 py-2 whitespace-nowrap">
                         <div className="flex flex-col gap-0.5">
-                          <span className="font-mono text-xs bg-zinc-100 px-2 py-0.5 rounded text-zinc-700 font-bold w-fit border border-zinc-200/60">{voucher.internal_reference || voucher.voucher_number || voucher.number}</span>
+                          <span className="font-mono text-xs bg-zinc-100 px-2 py-0.5 rounded text-zinc-700 font-bold w-fit border border-zinc-200/60">
+                            {voucher.is_reversal_doc && !String(voucher.internal_reference || voucher.voucher_number || '').startsWith('REV-')
+                              ? `REV-${voucher.internal_reference || voucher.voucher_number || voucher.number}`
+                              : (voucher.internal_reference || voucher.voucher_number || voucher.number)}
+                          </span>
                           {voucher.manual_reference && (
                             <span className="text-[10px] text-zinc-400 font-mono italic">M: {voucher.manual_reference}</span>
                           )}
@@ -2825,7 +2843,9 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100 italic">
-                        {voucher.internal_reference || voucher.voucher_number || voucher.number}
+                        {voucher.is_reversal_doc && !String(voucher.internal_reference || voucher.voucher_number || '').startsWith('REV-')
+                          ? `REV-${voucher.internal_reference || voucher.voucher_number || voucher.number}`
+                          : (voucher.internal_reference || voucher.voucher_number || voucher.number)}
                       </span>
                       {voucher.entry_number && (
                         <button
@@ -3229,7 +3249,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                                 readOnly
                                 type="text" 
                                 className={`w-full ${dir === 'rtl' ? 'pr-8 pl-2' : 'pl-8 pr-2'} py-1.5 bg-zinc-100 border border-zinc-200 cursor-not-allowed rounded-xl font-bold text-zinc-500 text-xs outline-none font-mono h-9`}
-                                value={editingVoucher ? voucherData.internal_reference : (internalRef || voucherData.internal_reference)}
+                                value={editingVoucher ? (editingVoucher.is_reversal_doc && !String(voucherData.internal_reference || '').startsWith('REV-') ? `REV-${voucherData.internal_reference || editingVoucher.voucher_number}` : (voucherData.internal_reference || editingVoucher.voucher_number)) : (internalRef || voucherData.internal_reference)}
                               />
                             </div>
                           </div>
@@ -3401,11 +3421,13 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                       <div className="space-y-3">
                         {/* Total Amount & Tafqeet Banner */}
                         {(() => {
-                          const totalAmount = voucherData.items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+                          const rawSum = voucherData.items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+                          const isRevVoucher = Boolean(editingVoucher?.is_reversal_doc || (voucherData as any).is_reversal_doc || String(voucherData.internal_reference || '').startsWith('REV-'));
+                          const totalAmount = isRevVoucher && rawSum !== 0 ? -Math.abs(rawSum) : rawSum;
                           const baseCurrency = (companyData?.settings?.currency || (companyData as any)?.currency || 'EGP').toUpperCase();
                           const activeCurrency = companyCurrencies.find(c => c.id === voucherData.currency_id);
                           const currencyCode = (activeCurrency?.code || baseCurrency).toUpperCase();
-                          const tafqeetText = tafqeet(totalAmount, currencyCode, language === 'ar' ? 'ar' : 'en');
+                          const tafqeetText = (totalAmount < 0 ? (language === 'ar' ? 'سالب ' : 'Negative ') : '') + tafqeet(Math.abs(totalAmount), currencyCode, language === 'ar' ? 'ar' : 'en');
                           const isForeign = currencyCode !== baseCurrency && (Number(voucherData.exchange_rate) > 0 && Number(voucherData.exchange_rate) !== 1);
 
                           return (
