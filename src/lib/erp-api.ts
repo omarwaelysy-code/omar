@@ -2479,8 +2479,6 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
       'payment_vouchers',
       'received_cheques',
       'issued_cheques',
-      'customer_discounts',
-      'supplier_discounts',
       'cash_transfers'
     ]);
 
@@ -2527,7 +2525,7 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
                   END
                 ), 0)`;
               } else if (cfg.table === 'customer_discounts' || cfg.table === 'supplier_discounts') {
-                docAmtCol = `COALESCE(SUM("${cfg.amountCol}" * COALESCE("exchange_rate", 1)), 0)`;
+                docAmtCol = `COALESCE(SUM("${cfg.amountCol}"), 0)`;
               } else if (['payment_methods', 'customers', 'suppliers', 'accounts'].includes(cfg.table) && cfg.refTypes.includes('opening_balance')) {
                 const hasRate = TABLES_WITH_EXCHANGE_RATE.has(cfg.table) || (EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate') ?? false);
                 const rateExpr = hasRate ? 'COALESCE("exchange_rate", 1)' : '1';
@@ -2787,7 +2785,7 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
                   END
                 )`;
               } else if (cfg.table === 'customer_discounts' || cfg.table === 'supplier_discounts') {
-                docAmtExpr = `(d."${cfg.amountCol}" * COALESCE(d."exchange_rate", 1))`;
+                docAmtExpr = `d."${cfg.amountCol}"`;
               } else if (['payment_methods', 'customers', 'suppliers', 'accounts'].includes(cfg.table) && cfg.refTypes.includes('opening_balance')) {
                 const hasRate = TABLES_WITH_EXCHANGE_RATE.has(cfg.table) || (EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate') ?? false);
                 const rateExpr = hasRate ? 'COALESCE(d."exchange_rate", 1)' : '1';
