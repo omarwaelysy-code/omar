@@ -61,7 +61,14 @@ export class ReversalEngine {
 
     const originalDocNumber = String(originalDoc[config.numberColumn] || originalDoc.id.slice(0, 8));
     const reversalDocId = uuidv4();
-    const reversalDocNumber = `REV-${originalDocNumber}`;
+    const reversalDocNumber = await this.generateReversalSequenceNumber(
+      client,
+      companyId,
+      config.moduleName,
+      reversalDate,
+      config.tableName,
+      config.numberColumn
+    );
 
     // 3. Find and Reverse Related Journal Entry
     let originalEntryNumber: string | undefined;
@@ -80,7 +87,14 @@ export class ReversalEngine {
       const origJE = jes[0];
       originalEntryNumber = origJE.entry_number || origJE.id.slice(0, 8);
       reversalEntryId = uuidv4();
-      reversalEntryNumber = `REV-${originalEntryNumber}`;
+      reversalEntryNumber = await this.generateReversalSequenceNumber(
+        client,
+        companyId,
+        'journal_entries',
+        reversalDate,
+        'journal_entries',
+        'entry_number'
+      );
 
       // Fetch original journal lines
       const { rows: origLines } = await client.query(
@@ -670,4 +684,114 @@ export class ReversalEngine {
         return null;
     }
   }
+
+  /**
+   * Generates the next independent sequential number for a reversal document (Method B)
+   * Example: If last was RV-2026-07-000004, this returns REV-RV-2026-07-000005
+   */
+  static async generateReversalSequenceNumber(
+    client: PoolClient | Pool,
+    companyId: string,
+    moduleName: string,
+    dateStr: string,
+    tableName: string,
+    numberColumn: string
+  ): Promise<string> {
+    const configMap: Record<string, { prefix: string; padLength: number; periodType: 'day' | 'month' }> = {
+      'invoices': { prefix: 'INV', padLength: 6, periodType: 'month' },
+      'sales_invoices': { prefix: 'INV', padLength: 6, periodType: 'month' },
+      'purchase_invoices': { prefix: 'PINV', padLength: 6, periodType: 'month' },
+      'returns': { prefix: 'RET', padLength: 6, periodType: 'month' },
+      'sales_returns': { prefix: 'RET', padLength: 6, periodType: 'month' },
+      'purchase_returns': { prefix: 'PRET', padLength: 6, periodType: 'month' },
+      'payment_vouchers': { prefix: 'PV', padLength: 6, periodType: 'month' },
+      'payments': { prefix: 'PV', padLength: 6, periodType: 'month' },
+      'receipt_vouchers': { prefix: 'RV', padLength: 6, periodType: 'month' },
+      'receipts': { prefix: 'RV', padLength: 6, periodType: 'month' },
+      'cash_transfers': { prefix: 'CT', padLength: 6, periodType: 'month' },
+      'customer_discounts': { prefix: 'CDISC', padLength: 5, periodType: 'month' },
+      'supplier_discounts': { prefix: 'SDISC', padLength: 5, periodType: 'month' },
+      'opening_stock_balances': { prefix: 'OPB', padLength: 6, periodType: 'month' },
+      'journal_entries': { prefix: 'JE', padLength: 5, periodType: 'day' }
+    };
+
+    const target = configMap[moduleName] || { prefix: 'REV', padLength: 6, periodType: 'month' };
+
+    let safeDateStr = '';
+    if ((dateStr as any) instanceof Date) {
+      safeDateStr = (dateStr as any).toISOString().slice(0, 10);
+    } else if (typeof dateStr === 'string' && dateStr.trim() !== '') {
+      safeDateStr = dateStr.slice(0, 10);
+    } else {
+      safeDateStr = new Date().toISOString().slice(0, 10);
+    }
+
+    const parts = safeDateStr.split('-');
+    const year = parts[0] || new Date().getFullYear().toString();
+    const month = (parts[1] || '01').padStart(2, '0');
+    const day = (parts[2] || '01').padStart(2, '0');
+
+    const period = target.periodType === 'day' ? `${year}-${month}-${day}` : `${year}-${month}`;
+    const seqKeyModule = moduleName === 'sales_invoices' ? 'invoices' 
+                       : moduleName === 'sales_returns' ? 'returns'
+                       : moduleName === 'receipts' ? 'receipt_vouchers'
+                       : moduleName === 'payments' ? 'payment_vouchers'
+                       : moduleName;
+
+    const seqId = `${companyId}:${seqKeyModule}:${period}`;
+
+    // 1. Increment sequence counter atomically in document_sequences
+    const seqResult = await client.query(`
+      INSERT INTO "document_sequences" (id, company_id, module, period, last_seq, updated_at)
+      VALUES ($1, $2, $3, $4, 1, NOW())
+      ON CONFLICT (company_id, module, period)
+      DO UPDATE SET last_seq = document_sequences.last_seq + 1, updated_at = NOW()
+      RETURNING last_seq
+    `, [seqId, companyId, seqKeyModule, period]);
+
+    let seq = Number(seqResult.rows[0].last_seq);
+
+    // 2. Query table to prevent any collision with existing normal OR reversal numbers
+    try {
+      const prefixPattern = `${target.prefix}-${period}-%`;
+      const revPrefixPattern = `REV-${target.prefix}-${period}-%`;
+      const maxRes = await client.query(
+        `SELECT "${numberColumn}" FROM "${tableName}" 
+         WHERE "company_id" = $1 AND ("${numberColumn}" LIKE $2 OR "${numberColumn}" LIKE $3)
+         ORDER BY length("${numberColumn}") DESC, "${numberColumn}" DESC LIMIT 20`,
+        [companyId, prefixPattern, revPrefixPattern]
+      );
+
+      for (const row of maxRes.rows) {
+        const rawVal = String(row[numberColumn] || '');
+        const cleanVal = rawVal.replace(/^REV-/, '');
+        const valParts = cleanVal.split('-');
+        const lastPart = valParts[valParts.length - 1];
+        const numVal = parseInt(lastPart, 10);
+        if (!isNaN(numVal) && numVal >= seq) {
+          seq = numVal + 1;
+        }
+      }
+
+      // Synchronize document_sequences to true max
+      await client.query(
+        `UPDATE "document_sequences" SET last_seq = $1, updated_at = NOW() 
+         WHERE "company_id" = $2 AND "module" = $3 AND "period" = $4`,
+        [seq, companyId, seqKeyModule, period]
+      );
+    } catch (e) {
+      console.warn('[ReversalEngine] Warning checking table max sequence:', e);
+    }
+
+    const seqStr = String(seq).padStart(target.padLength, '0');
+    let baseNumber = '';
+    if (moduleName === 'journal_entries') {
+      baseNumber = `JE-${year}-${month}-${day}-${seqStr}`;
+    } else {
+      baseNumber = `${target.prefix}-${year}-${month}-${seqStr}`;
+    }
+
+    return `REV-${baseNumber}`;
+  }
 }
+

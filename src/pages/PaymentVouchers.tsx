@@ -2550,6 +2550,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                       </span>
                     </div>
                   </th>
+                  <th className="px-2.5 py-2.5 font-bold text-center whitespace-nowrap">{language === 'ar' ? 'الحالة' : 'Status'}</th>
                   <th className="px-2.5 py-2.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap" onClick={() => handleSort('voucher_type')}>
                     <div className="flex items-center gap-1">
                       {language === 'ar' ? 'النوع' : 'Type'}
@@ -2587,11 +2588,14 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
               <tbody className="divide-y divide-zinc-100 text-xs">
                 {filteredVouchers.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="px-6 py-12 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد سندات صرف حالياً' : 'No payment vouchers currently'}</td>
+                    <td colSpan={14} className="px-6 py-12 text-center text-zinc-400 italic">{language === 'ar' ? 'لا توجد سندات صرف حالياً' : 'No payment vouchers currently'}</td>
                   </tr>
                 ) : filteredVouchers.map((voucher) => {
                   const curInfo = getVoucherCurrencyInfo(voucher);
                   const isChecked = selectedVoucherIds.includes(voucher.id);
+                  const isReversal = Boolean(voucher.is_reversal_doc || String(voucher.internal_reference || voucher.voucher_number || '').startsWith('REV-'));
+                  const isReversed = Boolean(voucher.is_reversed);
+                  const displayDocNumber = voucher.internal_reference || voucher.voucher_number || voucher.number || '';
                   return (
                     <tr 
                       key={voucher.id} 
@@ -2601,7 +2605,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                       <td className="w-8 px-2 py-2 text-center" onClick={(e) => e.stopPropagation()}>
                         <input 
                           type="checkbox"
-                          aria-label={`تحديد سند ${voucher.voucher_number || voucher.internal_reference}`}
+                          aria-label={`تحديد سند ${displayDocNumber}`}
                           checked={isChecked}
                           onChange={() => {
                             setSelectedVoucherIds(prev => 
@@ -2613,15 +2617,62 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
                       </td>
                       <td className="px-2.5 py-2 whitespace-nowrap">
                         <div className="flex flex-col gap-0.5">
-                          <span className="font-mono text-xs bg-zinc-100 px-2 py-0.5 rounded text-zinc-700 font-bold w-fit border border-zinc-200/60">
-                            {voucher.is_reversal_doc && !String(voucher.internal_reference || voucher.voucher_number || '').startsWith('REV-')
-                              ? `REV-${voucher.internal_reference || voucher.voucher_number || voucher.number}`
-                              : (voucher.internal_reference || voucher.voucher_number || voucher.number)}
-                          </span>
+                          {isReversed ? (
+                            <>
+                              <span className="font-mono text-xs bg-rose-50 px-2 py-0.5 rounded text-rose-700 font-bold border border-rose-200 line-through opacity-85 w-fit">
+                                {displayDocNumber}
+                              </span>
+                              {voucher.reversed_by_doc_number && (
+                                <span className="text-[10px] text-rose-600 font-mono font-bold">
+                                  {language === 'ar' ? `أُلغي بـ: ${voucher.reversed_by_doc_number}` : `Rev by: ${voucher.reversed_by_doc_number}`}
+                                </span>
+                              )}
+                            </>
+                          ) : isReversal ? (
+                            <>
+                              <span className="font-mono text-xs bg-amber-50 px-2 py-0.5 rounded text-amber-800 font-bold border border-amber-200 w-fit">
+                                {displayDocNumber}
+                              </span>
+                              {voucher.original_doc_number && (
+                                <span className="text-[10px] text-zinc-500 font-mono font-bold">
+                                  {language === 'ar' ? `عكس: ${voucher.original_doc_number}` : `Rev of: ${voucher.original_doc_number}`}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="font-mono text-xs bg-zinc-100 px-2 py-0.5 rounded text-zinc-700 font-bold w-fit border border-zinc-200/60">
+                              {displayDocNumber}
+                            </span>
+                          )}
                           {voucher.manual_reference && (
                             <span className="text-[10px] text-zinc-400 font-mono italic">M: {voucher.manual_reference}</span>
                           )}
                         </div>
+                      </td>
+                      <td className="px-2.5 py-2 text-center whitespace-nowrap">
+                        {isReversed ? (
+                          <span 
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-100/90 text-rose-800 border border-rose-300 shadow-sm"
+                            title={language === 'ar' ? `تم عكس هذا السند بموجب السند: ${voucher.reversed_by_doc_number || ''}` : `Reversed by: ${voucher.reversed_by_doc_number || ''}`}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping" />
+                            <RotateCcw size={12} className="text-rose-700" />
+                            <span>{language === 'ar' ? 'معكوس' : 'Reversed'}</span>
+                          </span>
+                        ) : isReversal ? (
+                          <span 
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-100/90 text-amber-800 border border-amber-300 shadow-sm"
+                            title={language === 'ar' ? `حركة عكسية للسند رقم: ${voucher.original_doc_number || ''}` : `Reversal of: ${voucher.original_doc_number || ''}`}
+                          >
+                            <RotateCcw size={12} className="text-amber-700" />
+                            <span>{language === 'ar' ? 'حركة عكسية' : 'Reversal'}</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            <span>{language === 'ar' ? 'معتمد' : 'Active'}</span>
+                          </span>
+                        )}
                       </td>
                       <td className="px-2.5 py-2 whitespace-nowrap">
                         {getVoucherKind(voucher) === 'supplier' ? (

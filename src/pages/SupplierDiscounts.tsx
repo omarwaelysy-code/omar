@@ -868,6 +868,7 @@ export const SupplierDiscounts: React.FC = () => {
                     />
                   </th>
                   <th className="px-2 py-1 font-bold">{language === 'ar' ? 'رقم المستند' : t('discounts.discount_number')}</th>
+                  <th className="px-2 py-1 font-bold text-center whitespace-nowrap">{language === 'ar' ? 'الحالة' : 'Status'}</th>
                   <th className="px-2 py-1 font-bold cursor-pointer hover:text-amber-600 transition-colors" onClick={() => handleSort('supplier_name')}>
                     <div className="flex items-center gap-1">
                       <span>{t('discounts.column_supplier')}</span>
@@ -923,10 +924,61 @@ export const SupplierDiscounts: React.FC = () => {
                           className="w-3.5 h-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer align-middle"
                         />
                       </td>
-                      <td className="px-2 py-1 font-mono font-bold text-slate-900 text-xs">
-                        {discount.is_reversal_doc && !String(discount.number || '').startsWith('REV-')
-                          ? `REV-${discount.number}`
-                          : (discount.number || '-')}
+                      <td className="px-2 py-1 whitespace-nowrap">
+                        <div className="flex flex-col gap-0.5">
+                          {discount.is_reversed ? (
+                            <>
+                              <span className="font-mono text-xs bg-rose-50 px-2 py-0.5 rounded text-rose-700 font-bold border border-rose-200 line-through opacity-85 w-fit">
+                                {discount.number || '-'}
+                              </span>
+                              {discount.reversed_by_doc_number && (
+                                <span className="text-[10px] text-rose-600 font-mono font-bold">
+                                  {language === 'ar' ? `أُلغي بـ: ${discount.reversed_by_doc_number}` : `Rev by: ${discount.reversed_by_doc_number}`}
+                                </span>
+                              )}
+                            </>
+                          ) : (discount.is_reversal_doc || String(discount.number || '').startsWith('REV-')) ? (
+                            <>
+                              <span className="font-mono text-xs bg-amber-50 px-2 py-0.5 rounded text-amber-800 font-bold border border-amber-200 w-fit">
+                                {discount.number || '-'}
+                              </span>
+                              {discount.original_doc_number && (
+                                <span className="text-[10px] text-zinc-500 font-mono font-bold">
+                                  {language === 'ar' ? `عكس: ${discount.original_doc_number}` : `Rev of: ${discount.original_doc_number}`}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="font-mono text-xs bg-slate-50 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200 w-fit">
+                              {discount.number || '-'}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-2 py-1 text-center whitespace-nowrap">
+                        {discount.is_reversed ? (
+                          <span 
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-black bg-rose-100/90 text-rose-800 border border-rose-300 shadow-sm"
+                            title={language === 'ar' ? `تم عكس هذا الخصم بموجب: ${discount.reversed_by_doc_number || ''}` : `Reversed by: ${discount.reversed_by_doc_number || ''}`}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping" />
+                            <RotateCcw size={11} className="text-rose-700" />
+                            <span>{language === 'ar' ? 'معكوس' : 'Reversed'}</span>
+                          </span>
+                        ) : (discount.is_reversal_doc || String(discount.number || '').startsWith('REV-')) ? (
+                          <span 
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-black bg-amber-100/90 text-amber-800 border border-amber-300 shadow-sm"
+                            title={language === 'ar' ? `حركة عكسية للخصم رقم: ${discount.original_doc_number || ''}` : `Reversal of: ${discount.original_doc_number || ''}`}
+                          >
+                            <RotateCcw size={11} className="text-amber-700" />
+                            <span>{language === 'ar' ? 'حركة عكسية' : 'Reversal'}</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            <span>{language === 'ar' ? 'معتمد' : 'Active'}</span>
+                          </span>
+                        )}
                       </td>
                       <td className="px-2 py-1 font-bold text-slate-900 text-xs">
                         {discount.supplier_name}

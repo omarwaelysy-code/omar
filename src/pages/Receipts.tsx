@@ -2338,6 +2338,7 @@ export const Receipts: React.FC = () => {
                       </span>
                     </div>
                   </th>
+                  <th className="px-2.5 py-2.5 font-bold text-center whitespace-nowrap">{language === 'ar' ? 'الحالة' : 'Status'}</th>
                   <th className="px-2.5 py-2.5 font-bold whitespace-nowrap">{language === 'ar' ? 'النوع' : 'Type'}</th>
                   <th className="px-2.5 py-2.5 font-bold whitespace-nowrap">{language === 'ar' ? 'المستفيد / العميل' : 'Customer / Beneficiary'}</th>
                   <th className="px-2.5 py-2.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap" onClick={() => handleSort('date')}>
@@ -2368,6 +2369,8 @@ export const Receipts: React.FC = () => {
                 {filteredReceipts.map((receipt) => {
                   const curInfo = getVoucherCurrencyInfo(receipt);
                   const isChecked = selectedReceiptIds.includes(receipt.id);
+                  const isReversal = Boolean(receipt.is_reversal_doc || String(receipt.voucher_number || '').startsWith('REV-'));
+                  const isReversed = Boolean(receipt.is_reversed);
                   return (
                     <tr 
                       key={receipt.id} 
@@ -2388,11 +2391,60 @@ export const Receipts: React.FC = () => {
                         />
                       </td>
                       <td className="px-2.5 py-2 whitespace-nowrap">
-                        <span className="font-mono text-xs bg-emerald-50 px-2 py-0.5 rounded text-emerald-700 font-bold border border-emerald-100">
-                          {receipt.is_reversal_doc && !String(receipt.voucher_number || '').startsWith('REV-')
-                            ? `REV-${receipt.voucher_number}`
-                            : receipt.voucher_number}
-                        </span>
+                        <div className="flex flex-col gap-0.5">
+                          {isReversed ? (
+                            <>
+                              <span className="font-mono text-xs bg-rose-50 px-2 py-0.5 rounded text-rose-700 font-bold border border-rose-200 line-through opacity-85 w-fit">
+                                {receipt.voucher_number}
+                              </span>
+                              {receipt.reversed_by_doc_number && (
+                                <span className="text-[10px] text-rose-600 font-mono font-bold">
+                                  {language === 'ar' ? `أُلغي بـ: ${receipt.reversed_by_doc_number}` : `Rev by: ${receipt.reversed_by_doc_number}`}
+                                </span>
+                              )}
+                            </>
+                          ) : isReversal ? (
+                            <>
+                              <span className="font-mono text-xs bg-amber-50 px-2 py-0.5 rounded text-amber-800 font-bold border border-amber-200 w-fit">
+                                {receipt.voucher_number}
+                              </span>
+                              {receipt.original_doc_number && (
+                                <span className="text-[10px] text-zinc-500 font-mono font-bold">
+                                  {language === 'ar' ? `عكس: ${receipt.original_doc_number}` : `Rev of: ${receipt.original_doc_number}`}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="font-mono text-xs bg-emerald-50 px-2 py-0.5 rounded text-emerald-700 font-bold border border-emerald-100 w-fit">
+                              {receipt.voucher_number}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-2.5 py-2 text-center whitespace-nowrap">
+                        {isReversed ? (
+                          <span 
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-100/90 text-rose-800 border border-rose-300 shadow-sm"
+                            title={language === 'ar' ? `تم عكس هذا السند بموجب السند: ${receipt.reversed_by_doc_number || ''}` : `Reversed by: ${receipt.reversed_by_doc_number || ''}`}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping" />
+                            <RotateCcw size={12} className="text-rose-700" />
+                            <span>{language === 'ar' ? 'معكوس' : 'Reversed'}</span>
+                          </span>
+                        ) : isReversal ? (
+                          <span 
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-100/90 text-amber-800 border border-amber-300 shadow-sm"
+                            title={language === 'ar' ? `حركة عكسية للسند رقم: ${receipt.original_doc_number || ''}` : `Reversal of: ${receipt.original_doc_number || ''}`}
+                          >
+                            <RotateCcw size={12} className="text-amber-700" />
+                            <span>{language === 'ar' ? 'حركة عكسية' : 'Reversal'}</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            <span>{language === 'ar' ? 'معتمد' : 'Active'}</span>
+                          </span>
+                        )}
                       </td>
                       <td className="px-2.5 py-2 whitespace-nowrap">
                         {getReceiptKind(receipt) === 'customer' ? (
@@ -2602,12 +2654,29 @@ export const Receipts: React.FC = () => {
 
                 <div className="flex justify-between items-start">
                   <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] bg-white px-2 py-1 rounded text-emerald-700 font-bold w-fit border border-emerald-100">
-                        {receipt.is_reversal_doc && !String(receipt.voucher_number || '').startsWith('REV-')
-                          ? `REV-${receipt.voucher_number}`
-                          : receipt.voucher_number}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`font-mono text-[10px] px-2 py-1 rounded font-bold w-fit border ${
+                        receipt.is_reversed ? 'bg-rose-50 text-rose-700 border-rose-200 line-through' :
+                        (receipt.is_reversal_doc || String(receipt.voucher_number || '').startsWith('REV-')) ? 'bg-amber-50 text-amber-800 border-amber-200' :
+                        'bg-white text-emerald-700 border-emerald-100'
+                      }`}>
+                        {receipt.voucher_number}
                       </span>
+                      {receipt.is_reversed ? (
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200 inline-flex items-center gap-1">
+                          <RotateCcw size={10} className="text-rose-600" />
+                          معكوس
+                        </span>
+                      ) : (receipt.is_reversal_doc || String(receipt.voucher_number || '').startsWith('REV-')) ? (
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 inline-flex items-center gap-1">
+                          <RotateCcw size={10} className="text-amber-600" />
+                          حركة عكسية
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          معتمد
+                        </span>
+                      )}
                       {getReceiptKind(receipt) === 'customer' ? (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                           قبض من عميل
@@ -2618,6 +2687,16 @@ export const Receipts: React.FC = () => {
                         </span>
                       )}
                     </div>
+                    {receipt.is_reversed && receipt.reversed_by_doc_number && (
+                      <span className="text-[10px] text-rose-600 font-mono font-bold">
+                        أُلغي بـ: {receipt.reversed_by_doc_number}
+                      </span>
+                    )}
+                    {(receipt.is_reversal_doc || String(receipt.voucher_number || '').startsWith('REV-')) && receipt.original_doc_number && (
+                      <span className="text-[10px] text-zinc-500 font-mono font-bold">
+                        عكس: {receipt.original_doc_number}
+                      </span>
+                    )}
                     <h4 className="font-bold text-zinc-900 group-hover:text-emerald-700 transition-colors text-xl mt-1 tracking-tight">{receipt.customer_name}</h4>
                   </div>
                   {receipt.entry_number && (

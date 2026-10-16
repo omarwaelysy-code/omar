@@ -4863,24 +4863,26 @@ export async function getNextAtomicSequence(
 
   const target = tableNames[module];
   if (target) {
-    try {
       const prefixPattern = `${target.prefix}-${period}-%`;
+      const revPrefixPattern = `REV-${target.prefix}-${period}-%`;
       const maxRes = await pool.query(
-        `SELECT "${target.field}" FROM "${target.table}" WHERE company_id = $1 AND "${target.field}" LIKE $2 ORDER BY length("${target.field}") DESC, "${target.field}" DESC LIMIT 1`,
-        [companyId, prefixPattern]
+        `SELECT "${target.field}" FROM "${target.table}" WHERE company_id = $1 AND ("${target.field}" LIKE $2 OR "${target.field}" LIKE $3) ORDER BY length("${target.field}") DESC, "${target.field}" DESC LIMIT 10`,
+        [companyId, prefixPattern, revPrefixPattern]
       );
       if (maxRes.rows.length > 0) {
-        const val = maxRes.rows[0][target.field] || '';
-        const parts = val.split('-');
-        const lastPart = parts[parts.length - 1];
-        const numVal = parseInt(lastPart, 10);
-        if (!isNaN(numVal) && numVal >= seq) {
-          seq = numVal + 1;
-          // Synchronize sequence table to the true max
-          await pool.query(
-            `UPDATE "document_sequences" SET last_seq = $1, updated_at = NOW() WHERE company_id = $2 AND module = $3 AND period = $4`,
-            [seq, companyId, module, period]
-          );
+        for (const row of maxRes.rows) {
+          const val = String(row[target.field] || '').replace(/^REV-/, '');
+          const parts = val.split('-');
+          const lastPart = parts[parts.length - 1];
+          const numVal = parseInt(lastPart, 10);
+          if (!isNaN(numVal) && numVal >= seq) {
+            seq = numVal + 1;
+            // Synchronize sequence table to the true max
+            await pool.query(
+              `UPDATE "document_sequences" SET last_seq = $1, updated_at = NOW() WHERE company_id = $2 AND module = $3 AND period = $4`,
+              [seq, companyId, module, period]
+            );
+          }
         }
       }
     } catch (e) {
@@ -5055,17 +5057,20 @@ export async function generateNextSequence(client: any, companyId: string, modul
     const target = tableNames[moduleName];
     if (target) {
       const prefixPattern = `${target.prefix}-${period}-%`;
+      const revPrefixPattern = `REV-${target.prefix}-${period}-%`;
       const maxRes = await client.query(
-        `SELECT "${target.field}" FROM "${target.table}" WHERE company_id = $1 AND "${target.field}" LIKE $2 ORDER BY length("${target.field}") DESC, "${target.field}" DESC LIMIT 1`,
-        [companyId, prefixPattern]
+        `SELECT "${target.field}" FROM "${target.table}" WHERE company_id = $1 AND ("${target.field}" LIKE $2 OR "${target.field}" LIKE $3) ORDER BY length("${target.field}") DESC, "${target.field}" DESC LIMIT 10`,
+        [companyId, prefixPattern, revPrefixPattern]
       );
       if (maxRes.rows.length > 0) {
-        const val = maxRes.rows[0][target.field] || '';
-        const parts = val.split('-');
-        const lastPart = parts[parts.length - 1];
-        const numVal = parseInt(lastPart, 10);
-        if (!isNaN(numVal) && numVal > currentSeq) {
-          currentSeq = numVal;
+        for (const row of maxRes.rows) {
+          const val = String(row[target.field] || '').replace(/^REV-/, '');
+          const parts = val.split('-');
+          const lastPart = parts[parts.length - 1];
+          const numVal = parseInt(lastPart, 10);
+          if (!isNaN(numVal) && numVal > currentSeq) {
+            currentSeq = numVal;
+          }
         }
       }
     }

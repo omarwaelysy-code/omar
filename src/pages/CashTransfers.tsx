@@ -1191,6 +1191,7 @@ export const CashTransfers: React.FC = () => {
                       </span>
                     </div>
                   </th>
+                  <th className="px-2.5 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter text-center whitespace-nowrap">{language === 'ar' ? 'الحالة' : 'Status'}</th>
                   <th className="px-2.5 py-2.5 text-xs font-bold text-zinc-700 uppercase tracking-tighter text-center">
                     {language === 'ar' ? 'لوجو البنك' : 'Bank Logo'}
                   </th>
@@ -1301,11 +1302,60 @@ export const CashTransfers: React.FC = () => {
                       </td>
                       <td className="px-3 py-2 font-bold text-zinc-900 whitespace-nowrap">{formatDate(transfer.date)}</td>
                       <td className="px-3 py-2 whitespace-nowrap">
-                        <span className="font-mono text-xs bg-zinc-50 px-2 py-0.5 rounded text-zinc-700 font-bold border border-zinc-200">
-                          {transfer.is_reversal_doc && !String(transfer.transfer_number || '').startsWith('REV-')
-                            ? `REV-${transfer.transfer_number}`
-                            : (transfer.transfer_number || '-')}
-                        </span>
+                        <div className="flex flex-col gap-0.5">
+                          {transfer.is_reversed ? (
+                            <>
+                              <span className="font-mono text-xs bg-rose-50 px-2 py-0.5 rounded text-rose-700 font-bold border border-rose-200 line-through opacity-85 w-fit">
+                                {transfer.transfer_number || '-'}
+                              </span>
+                              {transfer.reversed_by_doc_number && (
+                                <span className="text-[10px] text-rose-600 font-mono font-bold">
+                                  {language === 'ar' ? `أُلغي بـ: ${transfer.reversed_by_doc_number}` : `Rev by: ${transfer.reversed_by_doc_number}`}
+                                </span>
+                              )}
+                            </>
+                          ) : (transfer.is_reversal_doc || String(transfer.transfer_number || '').startsWith('REV-')) ? (
+                            <>
+                              <span className="font-mono text-xs bg-amber-50 px-2 py-0.5 rounded text-amber-800 font-bold border border-amber-200 w-fit">
+                                {transfer.transfer_number || '-'}
+                              </span>
+                              {transfer.original_doc_number && (
+                                <span className="text-[10px] text-zinc-500 font-mono font-bold">
+                                  {language === 'ar' ? `عكس: ${transfer.original_doc_number}` : `Rev of: ${transfer.original_doc_number}`}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="font-mono text-xs bg-zinc-50 px-2 py-0.5 rounded text-zinc-700 font-bold border border-zinc-200 w-fit">
+                              {transfer.transfer_number || '-'}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-2.5 py-2 text-center whitespace-nowrap">
+                        {transfer.is_reversed ? (
+                          <span 
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-100/90 text-rose-800 border border-rose-300 shadow-sm"
+                            title={language === 'ar' ? `تم عكس هذا التحويل بموجب: ${transfer.reversed_by_doc_number || ''}` : `Reversed by: ${transfer.reversed_by_doc_number || ''}`}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping" />
+                            <RotateCcw size={12} className="text-rose-700" />
+                            <span>{language === 'ar' ? 'معكوس' : 'Reversed'}</span>
+                          </span>
+                        ) : (transfer.is_reversal_doc || String(transfer.transfer_number || '').startsWith('REV-')) ? (
+                          <span 
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-100/90 text-amber-800 border border-amber-300 shadow-sm"
+                            title={language === 'ar' ? `حركة عكسية للتحويل رقم: ${transfer.original_doc_number || ''}` : `Reversal of: ${transfer.original_doc_number || ''}`}
+                          >
+                            <RotateCcw size={12} className="text-amber-700" />
+                            <span>{language === 'ar' ? 'حركة عكسية' : 'Reversal'}</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            <span>{language === 'ar' ? 'معتمد' : 'Active'}</span>
+                          </span>
+                        )}
                       </td>
                       {/* لوجو البنك (المصدر) - يظهر فقط إذا كان بنك */}
                       <td className="px-2.5 py-2 text-center whitespace-nowrap">

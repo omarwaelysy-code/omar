@@ -681,12 +681,46 @@ export const JournalEntries: React.FC = () => {
                   </td>
                   <td className="px-6 py-4">
                     {entry.entry_number ? (
-                      <span 
-                        onClick={() => setSelectedEntry(entry)}
-                        className="px-3 py-1 bg-zinc-100 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 font-mono"
-                      >
-                        {entry.entry_number}
-                      </span>
+                      <div className="flex flex-col gap-0.5">
+                        {entry.is_reversed ? (
+                          <>
+                            <span 
+                              onClick={() => setSelectedEntry(entry)}
+                              className="px-2.5 py-1 bg-rose-50 text-rose-700 line-through rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 font-mono border border-rose-200 w-fit"
+                              title={language === 'ar' ? `تم عكس هذا القيد بالقيد: ${entry.reversed_by_entry_number || ''}` : `Reversed by: ${entry.reversed_by_entry_number || ''}`}
+                            >
+                              {entry.entry_number}
+                            </span>
+                            {entry.reversed_by_entry_number && (
+                              <span className="text-[10px] text-rose-600 font-mono font-bold">
+                                {language === 'ar' ? `أُلغي بـ: ${entry.reversed_by_entry_number}` : `Rev by: ${entry.reversed_by_entry_number}`}
+                              </span>
+                            )}
+                          </>
+                        ) : (entry.is_reversal_entry || String(entry.entry_number || '').startsWith('REV-')) ? (
+                          <>
+                            <span 
+                              onClick={() => setSelectedEntry(entry)}
+                              className="px-2.5 py-1 bg-amber-50 text-amber-800 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 font-mono border border-amber-200 w-fit"
+                              title={language === 'ar' ? `قيد عكسي للقيد: ${entry.original_entry_number || ''}` : `Reversal of: ${entry.original_entry_number || ''}`}
+                            >
+                              {entry.entry_number}
+                            </span>
+                            {entry.original_entry_number && (
+                              <span className="text-[10px] text-zinc-500 font-mono font-bold">
+                                {language === 'ar' ? `عكس: ${entry.original_entry_number}` : `Rev of: ${entry.original_entry_number}`}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span 
+                            onClick={() => setSelectedEntry(entry)}
+                            className="px-3 py-1 bg-zinc-100 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg text-xs font-black cursor-pointer transition-all inline-block hover:scale-105 active:scale-95 font-mono w-fit"
+                          >
+                            {entry.entry_number}
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <span className="px-3 py-1 bg-zinc-100 text-zinc-400 rounded-lg text-xs font-bold font-mono">
                         -
