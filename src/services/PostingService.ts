@@ -70,6 +70,10 @@ export class PostingService {
       let cashAccountId = pm?.account_id || '';
       let cashAccountName = pm?.account_name || 'حساب النقدية';
 
+      if (!cashAccountId) {
+        throw new Error(`لا يمكن إنشاء القيد المحاسبي: حساب طريقة السداد "${pm?.name || invoice.payment_method_id || 'الافتراضية'}" غير محدد أو غير مربوط بدليل الحسابات.`);
+      }
+
       // Debit Cash/Bank
       journalItems.push({
         account_id: cashAccountId,
@@ -415,6 +419,10 @@ export class PostingService {
       let cashAccountId = pm?.account_id || '';
       let cashAccountName = pm?.account_name || 'حساب النقدية';
 
+      if (!cashAccountId) {
+        throw new Error(`لا يمكن إنشاء القيد المحاسبي: حساب طريقة السداد "${pm?.name || doc.payment_method_id || 'الافتراضية'}" غير محدد أو غير مربوط بدليل الحسابات.`);
+      }
+
       // Debit Customer (to offset the credit return)
       journalItems.push({
         account_id: customerAccountId,
@@ -594,6 +602,10 @@ export class PostingService {
       let cashAccountId = pm?.account_id || '';
       let cashAccountName = pm?.account_name || 'حساب النقدية';
 
+      if (!cashAccountId) {
+        throw new Error(`لا يمكن حفظ القيد: حساب طريقة السداد "${pm?.name || doc.payment_method_id || 'الافتراضية'}" غير محدد أو غير مربوط بدليل الحسابات.`);
+      }
+
       // Credit Cash/Bank
       journalItems.push({
         account_id: cashAccountId,
@@ -708,6 +720,10 @@ export class PostingService {
       const pm = paymentMethods.find(p => p.id === doc.payment_method_id);
       let cashAccountId = pm?.account_id || '';
       let cashAccountName = pm?.account_name || 'حساب النقدية';
+
+      if (!cashAccountId) {
+        throw new Error(`لا يمكن حفظ القيد: حساب طريقة السداد "${pm?.name || doc.payment_method_id || 'الافتراضية'}" غير محدد أو غير مربوط بدليل الحسابات.`);
+      }
 
       // Debit Cash/Bank
       journalItems.push({

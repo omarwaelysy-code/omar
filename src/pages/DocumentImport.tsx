@@ -123,6 +123,7 @@ interface ParsedDocument {
   warehouse_name?: string;
   payment_type: 'cash' | 'credit';
   payment_method_id?: string;
+  payment_method_name?: string;
   notes?: string;
   items: ParsedItem[];
   // Calculated totals
@@ -550,6 +551,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             warehouse_name: matchedWh?.name || d.warehouse_name || '',
             payment_type: d.payment_type || 'آجل',
             payment_method_id: d.payment_method_id || '',
+            payment_method_name: d.payment_method_name || (d.payment_method_id ? paymentMethods.find(p => p.id === d.payment_method_id)?.name : undefined),
             notes: d.notes || '',
             items,
             gross_total: items.length > 0 ? Number(gross.toFixed(2)) : (Number(d.gross_total) || Number(d.total_amount) || 0),
@@ -872,9 +874,10 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       ['8. الكمية والسعر والخصم:', 'الكمية يجب أن تكون رقماً موجباً أكبر من صفر. السعر هو سعر الوحدة قبل الضريبة والخصم. الخصم قيمة نقدية على مستوى البند (أو 0).'],
       ['9. ضريبة القيمة المضافة %:', isVatEnabled ? 'النسبة المئوية لضريبة القيمة المضافة مثل 14 أو 0 (النظام مفعل له ض.ق.م).' : 'ضريبة القيمة المضافة معطلة في إعدادات الشركة الحالية (تكون 0%).'],
       ['10. ضريبة الخصم والإضافة %:', isWhtEnabled ? 'النسبة المئوية لضريبة الخصم والإضافة مثل 1 أو 0 (النظام مفعل له ض.خ.أ).' : 'ضريبة الخصم والإضافة معطلة في إعدادات الشركة الحالية (تكون 0%).'],
-      ['11. طريقة الدفع:', 'إما (آجل) أو (نقدي). إذا كانت نقدي، يمكن تحديد اسم الخزينة / طريقة الدفع.'],
-      ['12. تكرار بيانات المستند:', 'يجب تكرار بيانات الفاتورة (رقم المرجع، النوع، التاريخ، ' + entityLabel + ') في كل سطر يحتوي على صنف لنفس الفاتورة.'],
-      ['13. رقم العملية / الإدارة / مركز التكلفة:', 'حقول اختيارية تماماً (غير إلزامية). يمكن إدخال رقم العملية، واسم أو كود الإدارة، واسم أو كود مركز التكلفة لربط البند تلقائياً.'],
+      ['11. طريقة الدفع:', 'إما (آجل) أو (نقدي).'],
+      ['12. طريقة السداد (الخزينة / البنك):', 'إلزامية في حال كانت طريقة الدفع (نقدي). يجب أن تطابق اسم أو كود خزينة أو بنك مسجل بالنظام (مثل: ' + (paymentMethods[0]?.name || 'الخزينة الرئيسية') + '). في حال كانت طريقة الدفع (آجل) يترك هذا الحقل فارغاً.'],
+      ['13. تكرار بيانات المستند:', 'يجب تكرار بيانات الفاتورة (رقم المرجع، النوع، التاريخ، ' + entityLabel + '، طريقة الدفع، طريقة السداد) في كل سطر يحتوي على صنف لنفس الفاتورة.'],
+      ['14. رقم العملية / الإدارة / مركز التكلفة:', 'حقول اختيارية تماماً (غير إلزامية). يمكن إدخال رقم العملية، واسم أو كود الإدارة، واسم أو كود مركز التكلفة لربط البند تلقائياً.'],
       ['']
     ] : [
       ['Excel Import Guide for ' + (isSales ? 'Sales' : 'Purchase') + ' Documents'],
@@ -890,14 +893,15 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       ['8. Quantity, Price & Discount:', 'Quantity must be > 0. Price is unit price before tax and discount. Discount is flat amount.'],
       ['9. VAT %:', isVatEnabled ? 'VAT percentage like 14 or 0.' : 'VAT is currently disabled in company settings (set to 0).'],
       ['10. WHT %:', isWhtEnabled ? 'Withholding tax percentage like 1 or 0.' : 'WHT is currently disabled in company settings (set to 0).'],
-      ['11. Payment Method:', 'Either "credit" or "cash".'],
-      ['12. Repeating Document Data:', 'Repeat document header info (Ref, Type, Date, Party) across all line items of the same invoice.'],
-      ['13. Operation / Dept / Cost Center:', 'Optional fields. Code or name will be matched automatically.'],
+      ['11. Payment Type:', 'Either "credit" or "cash".'],
+      ['12. Payment Method (Cashbox / Bank):', 'Required when Payment Type is "cash". Must match a registered cashbox/bank name or code (e.g. ' + (paymentMethods[0]?.name || 'Main Cashbox') + '). Leave empty for "credit".'],
+      ['13. Repeating Document Data:', 'Repeat document header info (Ref, Type, Date, Party, Payment Type, Payment Method) across all line items of the same invoice.'],
+      ['14. Operation / Dept / Cost Center:', 'Optional fields. Code or name will be matched automatically.'],
       ['']
     ];
 
     const guideWs = XLSX.utils.aoa_to_sheet(guideRows);
-    guideWs['!cols'] = [{ wch: 32 }, { wch: 90 }];
+    guideWs['!cols'] = [{ wch: 36 }, { wch: 95 }];
     XLSX.utils.book_append_sheet(wb, guideWs, isAr ? 'دليل التعليمات' : 'Import Guide');
 
     // Sheet 2: Data Template with examples
@@ -909,6 +913,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     const sampleProd2 = products[1]?.code || 'PRD-002';
     const sampleProdName2 = products[1]?.name || (isAr ? 'صنف تجريبي رقم 2' : 'Sample Product 2');
     const sampleWarehouse = warehouses[0]?.name || warehouses[0]?.code || (isAr ? 'المخزن الرئيسي' : 'Main Warehouse');
+    const samplePaymentMethod = paymentMethods[0]?.name || (isAr ? 'الخزينة الرئيسية' : 'Main Cashbox');
     const sampleOp = operations[0]?.operation_number || '';
     const sampleDept = departments[0]?.name || '';
     const sampleCC = costCenters[0]?.name || '';
@@ -927,6 +932,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       'نسبة ضريبة القيمة المضافة %',
       'نسبة ضريبة الخصم والاضافة %',
       'طريقة الدفع',
+      'طريقة السداد',
       'ملاحظات',
       'رقم العملية',
       'الإدارة',
@@ -944,6 +950,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       'Discount',
       'VAT %',
       'WHT %',
+      'Payment Type',
       'Payment Method',
       'Notes',
       'Operation Number',
@@ -952,25 +959,25 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
     ];
 
     const exampleRows = isSales ? (isAr ? [
-      ['Ref-000001', 'فاتورة بيع', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 10, 150, 0, sampleVatRate, sampleWhtRate, 'آجل', 'فاتورة مبيعات بضاعة - صنف أول', sampleOp, sampleDept, sampleCC],
-      ['Ref-000001', 'فاتورة بيع', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 5, 200, 20, sampleVatRate, sampleWhtRate, 'آجل', 'فاتورة مبيعات بضاعة - صنف ثانٍ لنفس الفاتورة', sampleOp, sampleDept, sampleCC],
-      ['Ref-000002', 'أمر بيع', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 25, 145, 50, sampleVatRate, 0, 'آجل', 'أمر بيع معتمد للعميل', '', '', sampleCC],
-      ['Ref-000003', 'مرتجع بيع', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 2, 200, 0, sampleVatRate, sampleWhtRate, 'نقدي', 'مرتجع مبيعات نقدي تالف', '', sampleDept, '']
+      ['Ref-000001', 'فاتورة بيع', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 10, 150, 0, sampleVatRate, sampleWhtRate, 'آجل', '', 'فاتورة مبيعات بضاعة - صنف أول', sampleOp, sampleDept, sampleCC],
+      ['Ref-000001', 'فاتورة بيع', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 5, 200, 20, sampleVatRate, sampleWhtRate, 'آجل', '', 'فاتورة مبيعات بضاعة - صنف ثانٍ لنفس الفاتورة', sampleOp, sampleDept, sampleCC],
+      ['Ref-000002', 'أمر بيع', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 25, 145, 50, sampleVatRate, 0, 'آجل', '', 'أمر بيع معتمد للعميل', '', '', sampleCC],
+      ['Ref-000003', 'مرتجع بيع', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 2, 200, 0, sampleVatRate, sampleWhtRate, 'نقدي', samplePaymentMethod, 'مرتجع مبيعات نقدي تالف', '', sampleDept, '']
     ] : [
-      ['Ref-000001', 'فاتورة بيع', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 10, 150, 0, sampleVatRate, sampleWhtRate, 'credit', 'Sales invoice line 1', sampleOp, sampleDept, sampleCC],
-      ['Ref-000001', 'فاتورة بيع', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 5, 200, 20, sampleVatRate, sampleWhtRate, 'credit', 'Sales invoice line 2', sampleOp, sampleDept, sampleCC],
-      ['Ref-000002', 'أمر بيع', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 25, 145, 50, sampleVatRate, 0, 'credit', 'Confirmed sales order', '', '', sampleCC],
-      ['Ref-000003', 'مرتجع بيع', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 2, 200, 0, sampleVatRate, sampleWhtRate, 'cash', 'Damaged goods return', '', sampleDept, '']
+      ['Ref-000001', 'فاتورة بيع', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 10, 150, 0, sampleVatRate, sampleWhtRate, 'credit', '', 'Sales invoice line 1', sampleOp, sampleDept, sampleCC],
+      ['Ref-000001', 'فاتورة بيع', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 5, 200, 20, sampleVatRate, sampleWhtRate, 'credit', '', 'Sales invoice line 2', sampleOp, sampleDept, sampleCC],
+      ['Ref-000002', 'أمر بيع', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 25, 145, 50, sampleVatRate, 0, 'credit', '', 'Confirmed sales order', '', '', sampleCC],
+      ['Ref-000003', 'مرتجع بيع', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 2, 200, 0, sampleVatRate, sampleWhtRate, 'cash', samplePaymentMethod, 'Damaged goods return', '', sampleDept, '']
     ]) : (isAr ? [
-      ['Ref-000001', 'فاتورة شراء', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 50, 120, 100, sampleVatRate, sampleWhtRate, 'آجل', 'فاتورة توريد خامات - بند أول', sampleOp, sampleDept, sampleCC],
-      ['Ref-000001', 'فاتورة شراء', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 30, 180, 0, sampleVatRate, sampleWhtRate, 'آجل', 'فاتورة توريد خامات - بند ثانٍ', sampleOp, sampleDept, sampleCC],
-      ['Ref-000002', 'أمر شراء', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 100, 115, 0, sampleVatRate, 0, 'آجل', 'أمر شراء معتمد للمورد', '', '', sampleCC],
-      ['Ref-000003', 'مرتجع شراء', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 5, 180, 0, sampleVatRate, sampleWhtRate, 'آجل', 'مرتجع مشتريات لعدم مطابقة المواصفات', '', sampleDept, '']
+      ['Ref-000001', 'فاتورة شراء', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 50, 120, 100, sampleVatRate, sampleWhtRate, 'آجل', '', 'فاتورة توريد خامات - بند أول', sampleOp, sampleDept, sampleCC],
+      ['Ref-000001', 'فاتورة شراء', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 30, 180, 0, sampleVatRate, sampleWhtRate, 'آجل', '', 'فاتورة توريد خامات - بند ثانٍ', sampleOp, sampleDept, sampleCC],
+      ['Ref-000002', 'أمر شراء', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 100, 115, 0, sampleVatRate, 0, 'آجل', '', 'أمر شراء معتمد للمورد', '', '', sampleCC],
+      ['Ref-000003', 'مرتجع شراء', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 5, 180, 0, sampleVatRate, sampleWhtRate, 'نقدي', samplePaymentMethod, 'مرتجع مشتريات نقدي لعدم مطابقة المواصفات', '', sampleDept, '']
     ] : [
-      ['Ref-000001', 'فاتورة شراء', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 50, 120, 100, sampleVatRate, sampleWhtRate, 'credit', 'Raw materials purchase line 1', sampleOp, sampleDept, sampleCC],
-      ['Ref-000001', 'فاتورة شراء', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 30, 180, 0, sampleVatRate, sampleWhtRate, 'credit', 'Raw materials purchase line 2', sampleOp, sampleDept, sampleCC],
-      ['Ref-000002', 'أمر شراء', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 100, 115, 0, sampleVatRate, 0, 'credit', 'Purchase order', '', '', sampleCC],
-      ['Ref-000003', 'مرتجع شراء', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 5, 180, 0, sampleVatRate, sampleWhtRate, 'credit', 'Purchase return', '', sampleDept, '']
+      ['Ref-000001', 'فاتورة شراء', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 50, 120, 100, sampleVatRate, sampleWhtRate, 'credit', '', 'Raw materials purchase line 1', sampleOp, sampleDept, sampleCC],
+      ['Ref-000001', 'فاتورة شراء', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 30, 180, 0, sampleVatRate, sampleWhtRate, 'credit', '', 'Raw materials purchase line 2', sampleOp, sampleDept, sampleCC],
+      ['Ref-000002', 'أمر شراء', batchDate, sampleParty, sampleProd1, sampleProdName1, sampleWarehouse, 100, 115, 0, sampleVatRate, 0, 'credit', '', 'Purchase order', '', '', sampleCC],
+      ['Ref-000003', 'مرتجع شراء', batchDate, sampleParty, sampleProd2, sampleProdName2, sampleWarehouse, 5, 180, 0, sampleVatRate, sampleWhtRate, 'cash', samplePaymentMethod, 'Purchase return cash', '', sampleDept, '']
     ]);
 
     const dataWs = XLSX.utils.aoa_to_sheet([headers, ...exampleRows]);
@@ -988,6 +995,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       { wch: 16 }, // VAT %
       { wch: 16 }, // WHT %
       { wch: 14 }, // Payment Type
+      { wch: 20 }, // Payment Method
       { wch: 30 }, // Notes
       { wch: 18 }, // Operation Number
       { wch: 20 }, // Department
@@ -1517,6 +1525,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           warehouse_name?: string;
           payment_type: 'cash' | 'credit';
           payment_method_id?: string;
+          payment_method_name?: string;
           notes?: string;
         };
         items: ParsedItem[];
@@ -1585,11 +1594,29 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         ['خصم والاضافة', 'خصم وإضافة', 'ض.خ', 'wht'],
         11
       );
-      const payTypeCol = findColIdx(['طريقة الدفع', 'طريقة السداد', 'طريقة دفع', 'طريقة سداد'], ['طريقة الدفع', 'طريقة السداد', 'دفع', 'سداد'], 12);
-      const notesCol = findColIdx(['ملاحظات', 'ملاحظة', 'بيان', 'notes', 'remarks'], ['ملاحظات', 'ملاحظة', 'notes'], 13);
-      const opCol = findColIdx(['رقم العملية', 'العملية', 'operation'], ['رقم العملية', 'العملية', 'operation'], 14);
-      const deptCol = findColIdx(['الإدارة', 'الادارة', 'إدارة', 'ادارة', 'department'], ['الإدارة', 'الادارة', 'إدارة', 'ادارة', 'department'], 15);
-      const ccCol = findColIdx(['مركز التكلفة', 'مركز تكلفة', 'cost center', 'cost_center'], ['مركز التكلفة', 'مركز تكلفة', 'cost center'], 16);
+      const payTypeCol = findColIdx(
+        ['طريقة الدفع', 'طريقة دفع', 'نوع الدفع', 'payment type', 'payment_type'],
+        ['طريقة الدفع', 'نوع الدفع', 'payment type'],
+        12
+      );
+
+      // Check if payment method column exists in the file (supports new template while maintaining backward compatibility with legacy files)
+      const isPayMethodInHeader = headerRow.some((h, idx) => 
+        idx !== payTypeCol && ['طريقة السداد', 'وسيلة الدفع', 'وسيلة السداد', 'الخزينة', 'البنك', 'payment method', 'payment_method'].some(kw => h.toLowerCase().includes(kw))
+      );
+
+      const payMethodCol = isPayMethodInHeader 
+        ? findColIdx(
+            ['طريقة السداد', 'وسيلة الدفع', 'وسيلة السداد', 'الخزينة / البنك', 'الخزينة/البنك', 'الخزينة', 'البنك', 'حساب السداد', 'payment method', 'payment_method'],
+            ['طريقة السداد', 'وسيلة السداد', 'الخزينة', 'البنك', 'payment method'],
+            13
+          )
+        : -1;
+
+      const notesCol = findColIdx(['ملاحظات', 'ملاحظة', 'بيان', 'notes', 'remarks'], ['ملاحظات', 'ملاحظة', 'notes'], payMethodCol !== -1 ? 14 : 13);
+      const opCol = findColIdx(['رقم العملية', 'العملية', 'operation'], ['رقم العملية', 'العملية', 'operation'], payMethodCol !== -1 ? 15 : 14);
+      const deptCol = findColIdx(['الإدارة', 'الادارة', 'إدارة', 'ادارة', 'department'], ['الإدارة', 'الادارة', 'إدارة', 'ادارة', 'department'], payMethodCol !== -1 ? 16 : 15);
+      const ccCol = findColIdx(['مركز التكلفة', 'مركز تكلفة', 'cost center', 'cost_center'], ['مركز التكلفة', 'مركز تكلفة', 'cost center'], payMethodCol !== -1 ? 17 : 16);
 
       // Parse data rows (row index 0 is header)
       for (let i = 1; i < rawRows.length; i++) {
@@ -1614,6 +1641,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         const rawVatRate = row[vatCol];
         const rawWhtRate = row[whtCol];
         const rawPaymentType = String(row[payTypeCol] || '').trim();
+        const rawPaymentMethod = payMethodCol !== -1 ? String(row[payMethodCol] || '').trim() : '';
         const rawNotes = String(row[notesCol] || '').trim();
         const rawOperation = String(row[opCol] || '').trim();
         const rawDepartment = String(row[deptCol] || '').trim();
@@ -1943,6 +1971,68 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         // Payment type parsing
         const paymentType: 'cash' | 'credit' = (rawPaymentType === 'نقدي' || rawPaymentType.toLowerCase() === 'cash') ? 'cash' : 'credit';
 
+        // Payment method parsing & validation for Cash documents
+        let matchedPaymentMethod: PaymentMethod | undefined = undefined;
+        if (paymentType === 'cash') {
+          if (rawPaymentMethod) {
+            matchedPaymentMethod = paymentMethods.find(pm =>
+              pm.id === rawPaymentMethod ||
+              (pm.name && pm.name.trim().toLowerCase() === rawPaymentMethod.toLowerCase()) ||
+              (pm.code && pm.code.trim().toLowerCase() === rawPaymentMethod.toLowerCase())
+            );
+            if (!matchedPaymentMethod) {
+              matchedPaymentMethod = paymentMethods.find(pm =>
+                pm.name && (pm.name.trim().toLowerCase().includes(rawPaymentMethod.toLowerCase()) ||
+                rawPaymentMethod.toLowerCase().includes(pm.name.trim().toLowerCase()))
+              );
+            }
+
+            if (!matchedPaymentMethod) {
+              errors.push({
+                rowNumber,
+                ref: rawRef,
+                field: isAr ? 'طريقة السداد' : 'Payment Method',
+                message: isAr
+                  ? `طريقة السداد "${rawPaymentMethod}" غير معرفة في قائمة طرق الدفع / الخزائن بالنظام.`
+                  : `Payment method "${rawPaymentMethod}" is not defined in system payment methods.`
+              });
+            } else if (!matchedPaymentMethod.account_id) {
+              errors.push({
+                rowNumber,
+                ref: rawRef,
+                field: isAr ? 'حساب طريقة السداد' : 'Payment Method Account',
+                message: isAr
+                  ? `طريقة السداد "${matchedPaymentMethod.name}" غير مربوطة بحساب مالي (خزينة/بنك) في دليل الحسابات.`
+                  : `Payment method "${matchedPaymentMethod.name}" is not linked to a GL cash/bank account.`
+              });
+            }
+          } else if (payMethodCol !== -1) {
+            // Column exists in Excel but left empty for cash row
+            errors.push({
+              rowNumber,
+              ref: rawRef,
+              field: isAr ? 'طريقة السداد' : 'Payment Method',
+              message: isAr
+                ? 'طريقة السداد (الخزينة / البنك) إلزامية عند اختيار طريقة الدفع نقدي.'
+                : 'Payment method (Cashbox / Bank) is required when payment type is cash.'
+            });
+          } else {
+            // Backwards compatibility: old file without payment method column
+            if (paymentMethods.length > 0) {
+              matchedPaymentMethod = paymentMethods[0];
+            } else {
+              errors.push({
+                rowNumber,
+                ref: rawRef,
+                field: isAr ? 'طريقة السداد' : 'Payment Method',
+                message: isAr
+                  ? 'لا توجد أي طرق دفع أو خزائن مسجلة بالنظام لربط المستند النقدي.'
+                  : 'No payment methods or cashboxes found in the system for cash document.'
+              });
+            }
+          }
+        }
+
         // Calculation of line
         const lineGross = (qtyNum || 0) * (priceNum || 0);
         const lineSubtotal = Math.max(0, lineGross - discountNum);
@@ -1964,7 +2054,8 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 warehouse_id: matchedWarehouse?.id || null,
                 warehouse_name: matchedWarehouse?.name || '',
                 payment_type: paymentType,
-                payment_method_id: paymentMethods[0]?.id || '',
+                payment_method_id: paymentType === 'cash' ? (matchedPaymentMethod?.id || '') : undefined,
+                payment_method_name: paymentType === 'cash' ? (matchedPaymentMethod?.name || '') : undefined,
                 notes: rawNotes
               },
               items: []
@@ -1996,6 +2087,26 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                 message: isAr
                   ? `تعارض في اسم ${entityLabel} لنفس المرجع "${rawRef}": (${existingHeader.party_name} مقابل ${matchedParty.name})`
                   : `Conflict in ${entityLabel} for reference "${rawRef}": (${existingHeader.party_name} vs ${matchedParty.name})`
+              });
+            }
+            if (existingHeader.payment_type !== paymentType) {
+              errors.push({
+                rowNumber,
+                ref: rawRef,
+                field: isAr ? 'طريقة الدفع' : 'Payment Type',
+                message: isAr
+                  ? `تعارض في طريقة الدفع لنفس المرجع "${rawRef}": (${existingHeader.payment_type === 'cash' ? 'نقدي' : 'آجل'} مقابل ${paymentType === 'cash' ? 'نقدي' : 'آجل'})`
+                  : `Payment type conflict for reference "${rawRef}": (${existingHeader.payment_type} vs ${paymentType})`
+              });
+            }
+            if (paymentType === 'cash' && matchedPaymentMethod && existingHeader.payment_method_id && existingHeader.payment_method_id !== matchedPaymentMethod.id) {
+              errors.push({
+                rowNumber,
+                ref: rawRef,
+                field: isAr ? 'طريقة السداد' : 'Payment Method',
+                message: isAr
+                  ? `تعارض في طريقة السداد لنفس المرجع "${rawRef}": (${existingHeader.payment_method_name || existingHeader.payment_method_id} مقابل ${matchedPaymentMethod.name})`
+                  : `Payment method conflict for reference "${rawRef}": (${existingHeader.payment_method_name || existingHeader.payment_method_id} vs ${matchedPaymentMethod.name})`
               });
             }
           }
@@ -2076,6 +2187,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           warehouse_name: allServices ? (isAr ? 'خدمات (بدون مخزن)' : 'Services (No warehouse)') : (g.header.warehouse_name || defaultWh?.name || ''),
           payment_type: g.header.payment_type,
           payment_method_id: g.header.payment_method_id,
+          payment_method_name: g.header.payment_method_name,
           notes: g.header.notes,
           items: g.items,
           is_all_services: allServices,
@@ -2161,7 +2273,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       party_id: doc.party_id || '',
       warehouse_id: doc.warehouse_id || '',
       payment_type: doc.payment_type || 'credit',
-      payment_method_id: doc.payment_method_id || '',
+      payment_method_id: doc.payment_method_id || paymentMethods[0]?.id || '',
       notes: doc.notes || '',
       ref: doc.ref
     });
@@ -2174,6 +2286,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       ? customers.find(c => c.id === editDocForm.party_id)
       : suppliers.find(s => s.id === editDocForm.party_id);
     const matchedWh = warehouses.find(w => w.id === editDocForm.warehouse_id);
+    const selectedPm = paymentMethods.find(p => p.id === editDocForm.payment_method_id);
 
     const updated = documents.map(doc => {
       if (doc.ref !== editingDoc.ref) return doc;
@@ -2188,6 +2301,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
         warehouse_name: matchedWh?.name || (editDocForm.warehouse_id ? doc.warehouse_name : undefined),
         payment_type: editDocForm.payment_type,
         payment_method_id: editDocForm.payment_type === 'cash' ? editDocForm.payment_method_id : undefined,
+        payment_method_name: editDocForm.payment_type === 'cash' ? (selectedPm?.name || '') : undefined,
         notes: editDocForm.notes,
         is_modified: true,
         status: (doc.status === 'saved' ? 'pending' : doc.status) as any
@@ -2562,6 +2676,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             total_amount: doc.total_amount,
             payment_type: doc.payment_type,
             payment_method_id: doc.payment_type === 'cash' ? doc.payment_method_id : null,
+            payment_method_name: doc.payment_type === 'cash' ? (doc.payment_method_name || paymentMethods.find(p => p.id === doc.payment_method_id)?.name || null) : null,
             notes: doc.notes || '',
             description: isAr ? `استيراد مبيعات تشغيلة: ${batchNumber} - مرجع: ${doc.ref}` : `Import Sales Batch: ${batchNumber} - Ref: ${doc.ref}`,
             batch_number: batchNumber,
@@ -2644,6 +2759,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             total_amount: doc.total_amount,
             payment_type: doc.payment_type,
             payment_method_id: doc.payment_type === 'cash' ? doc.payment_method_id : null,
+            payment_method_name: doc.payment_type === 'cash' ? (doc.payment_method_name || paymentMethods.find(p => p.id === doc.payment_method_id)?.name || null) : null,
             notes: doc.notes || '',
             description: `استيراد مرتجع بيع تشغيلة: ${batchNumber} - مرجع: ${doc.ref}`,
             batch_number: batchNumber,
@@ -2695,6 +2811,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             total_amount: doc.total_amount,
             payment_type: doc.payment_type,
             payment_method_id: doc.payment_type === 'cash' ? doc.payment_method_id : null,
+            payment_method_name: doc.payment_type === 'cash' ? (doc.payment_method_name || paymentMethods.find(p => p.id === doc.payment_method_id)?.name || null) : null,
             notes: doc.notes || '',
             description: isAr ? `استيراد مشتريات تشغيلة: ${batchNumber} - مرجع: ${doc.ref}` : `Import Purchases Batch: ${batchNumber} - Ref: ${doc.ref}`,
             batch_number: batchNumber,
@@ -2776,6 +2893,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
             total_amount: doc.total_amount,
             payment_type: doc.payment_type,
             payment_method_id: doc.payment_type === 'cash' ? doc.payment_method_id : null,
+            payment_method_name: doc.payment_type === 'cash' ? (doc.payment_method_name || paymentMethods.find(p => p.id === doc.payment_method_id)?.name || null) : null,
             notes: doc.notes || '',
             description: `استيراد مرتجع شراء تشغيلة: ${batchNumber} - مرجع: ${doc.ref}`,
             batch_number: batchNumber,
@@ -2883,6 +3001,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           total_amount: d.total_amount,
           payment_type: d.payment_type,
           payment_method_id: d.payment_method_id,
+          payment_method_name: d.payment_method_name,
           created_document_id: d.created_document_id,
           created_document_number: d.created_document_number,
           created_journal_id: d.created_journal_id,
@@ -2942,6 +3061,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       'قيمة ض.خ.أ',
       'الإجمالي النهائي للسطر',
       'طريقة الدفع',
+      'طريقة السداد',
       'حالة الحفظ والترحيل',
       'ملاحظات'
     ] : [
@@ -2965,6 +3085,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
       'WHT %',
       'WHT Amount',
       'Line Total',
+      'Payment Type',
       'Payment Method',
       'Status',
       'Notes'
@@ -2996,6 +3117,7 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
           item.withholding_tax_amount,
           item.total,
           doc.payment_type === 'cash' ? (isAr ? 'نقدي' : 'Cash') : (isAr ? 'آجل' : 'Credit'),
+          doc.payment_type === 'cash' ? (doc.payment_method_name || paymentMethods.find(p => p.id === doc.payment_method_id)?.name || '-') : '-',
           doc.status === 'saved' ? (isAr ? 'تم الحفظ والترحيل' : 'Saved & Posted') : (isAr ? `فشل: ${doc.error_message || 'لم يحفظ'}` : `Failed: ${doc.error_message || 'Not saved'}`),
           item.description || doc.notes || ''
         ]);
@@ -3872,9 +3994,11 @@ export const DocumentImport: React.FC<DocumentImportProps> = ({ type }) => {
                             </span>
                           ) : null}
 
-                          {/* 9. Payment Type */}
+                          {/* 9. Payment Type & Method */}
                           <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                            {doc.payment_type === 'cash' ? (isAr ? 'نقدي' : 'Cash') : (isAr ? 'آجل' : 'Credit')}
+                            {doc.payment_type === 'cash' 
+                              ? ((isAr ? 'نقدي' : 'Cash') + (doc.payment_method_name ? ` (${doc.payment_method_name})` : ''))
+                              : (isAr ? 'آجل' : 'Credit')}
                           </span>
 
                           {/* 10. Edit Document Header Button */}

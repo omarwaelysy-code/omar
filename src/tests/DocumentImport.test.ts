@@ -32,18 +32,19 @@ describe('Document Import Module & Sequences', () => {
   });
 
   it('correctly parses Excel structure with Ref, DocType, Customer, and item calculations', () => {
-    // Simulate generating a workbook matching the template
+    // Simulate generating a workbook matching the template with Payment Method column
     const headers = [
       'Ref', 'نوع المستند', 'التاريخ', 'كود العميل / المورد', 
       'كود الصنف / الباركود', 'اسم الصنف', 'المخزن', 
       'الكمية', 'السعر', 'الخصم', 'نسبة ضريبة القيمة المضافة %', 
-      'نسبة ضريبة الخصم والاضافة %', 'طريقة الدفع', 'ملاحظات'
+      'نسبة ضريبة الخصم والاضافة %', 'طريقة الدفع', 'طريقة السداد', 'ملاحظات'
     ];
 
     const rows = [
-      ['Ref-000001', 'فاتورة بيع', '2026-09-24', 'CUST-01', 'ITEM-01', 'صنف تجريبي 1', 'المخزن الرئيسي', 10, 100, 50, 14, 1, 'آجل', 'بند 1'],
-      ['Ref-000001', 'فاتورة بيع', '2026-09-24', 'CUST-01', 'ITEM-02', 'صنف تجريبي 2', 'المخزن الرئيسي', 5, 200, 0, 14, 1, 'آجل', 'بند 2'],
-      ['Ref-000002', 'أمر بيع', '2026-09-24', 'CUST-02', 'ITEM-01', 'صنف تجريبي 1', 'المخزن الرئيسي', 20, 95, 0, 14, 0, 'آجل', 'أمر بيع']
+      ['Ref-000001', 'فاتورة بيع', '2026-09-24', 'CUST-01', 'ITEM-01', 'صنف تجريبي 1', 'المخزن الرئيسي', 10, 100, 50, 14, 1, 'آجل', '', 'بند 1'],
+      ['Ref-000001', 'فاتورة بيع', '2026-09-24', 'CUST-01', 'ITEM-02', 'صنف تجريبي 2', 'المخزن الرئيسي', 5, 200, 0, 14, 1, 'آجل', '', 'بند 2'],
+      ['Ref-000002', 'أمر بيع', '2026-09-24', 'CUST-02', 'ITEM-01', 'صنف تجريبي 1', 'المخزن الرئيسي', 20, 95, 0, 14, 0, 'آجل', '', 'أمر بيع'],
+      ['Ref-000003', 'مرتجع بيع', '2026-09-24', 'CUST-01', 'ITEM-02', 'صنف تجريبي 2', 'المخزن الرئيسي', 2, 200, 0, 14, 1, 'نقدي', 'الخزينة الرئيسية', 'مرتجع نقدي']
     ];
 
     const wb = XLSX.utils.book_new();
@@ -55,11 +56,18 @@ describe('Document Import Module & Sequences', () => {
     const parsedWb = XLSX.read(outBuffer, { type: 'buffer' });
     const parsedRows: any[][] = XLSX.utils.sheet_to_json(parsedWb.Sheets['بيانات المستندات'], { header: 1 });
 
-    expect(parsedRows.length).toBe(4); // 1 header + 3 rows
+    expect(parsedRows.length).toBe(5); // 1 header + 4 rows
     expect(parsedRows[0][0]).toBe('Ref');
+    expect(parsedRows[0][12]).toBe('طريقة الدفع');
+    expect(parsedRows[0][13]).toBe('طريقة السداد');
     expect(parsedRows[1][0]).toBe('Ref-000001');
     expect(parsedRows[1][1]).toBe('فاتورة بيع');
     expect(parsedRows[2][0]).toBe('Ref-000001');
+
+    // Verify cash row has payment method
+    expect(parsedRows[4][0]).toBe('Ref-000003');
+    expect(parsedRows[4][12]).toBe('نقدي');
+    expect(parsedRows[4][13]).toBe('الخزينة الرئيسية');
 
     // Test Item 1 calculations:
     // Qty = 10, Price = 100 => Gross = 1000
