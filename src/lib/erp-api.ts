@@ -2470,7 +2470,21 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
       }
     ];
 
-        const postingTransactions = [];
+    const TABLES_WITH_EXCHANGE_RATE = new Set([
+      'invoices',
+      'returns',
+      'purchase_invoices',
+      'purchase_returns',
+      'receipt_vouchers',
+      'payment_vouchers',
+      'received_cheques',
+      'issued_cheques',
+      'customer_discounts',
+      'supplier_discounts',
+      'cash_transfers'
+    ]);
+
+    const postingTransactions = [];
     for (const cfg of postingConfigs) {
       try {
         let count = 0;
@@ -2513,13 +2527,13 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
                   END
                 ), 0)`;
               } else if (cfg.table === 'customer_discounts' || cfg.table === 'supplier_discounts') {
-                docAmtCol = `COALESCE(SUM("${cfg.amountCol}"), 0)`;
+                docAmtCol = `COALESCE(SUM("${cfg.amountCol}" * COALESCE("exchange_rate", 1)), 0)`;
               } else if (['payment_methods', 'customers', 'suppliers', 'accounts'].includes(cfg.table) && cfg.refTypes.includes('opening_balance')) {
-                const hasRate = EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate');
+                const hasRate = TABLES_WITH_EXCHANGE_RATE.has(cfg.table) || (EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate') ?? false);
                 const rateExpr = hasRate ? 'COALESCE("exchange_rate", 1)' : '1';
                 docAmtCol = `COALESCE(SUM(ABS("${cfg.amountCol}") * ${rateExpr}), 0)`;
               } else {
-                const hasRate = EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate');
+                const hasRate = TABLES_WITH_EXCHANGE_RATE.has(cfg.table) || (EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate') ?? false);
                 const rateExpr = hasRate ? 'COALESCE("exchange_rate", 1)' : '1';
                 docAmtCol = `COALESCE(SUM(("${cfg.amountCol}") * ${rateExpr}), 0)`;
               }
@@ -2548,7 +2562,12 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
         const jeRes: any = await client.query(
           `SELECT 
              COUNT(*)::int as count, 
-             COALESCE(SUM(total_debit), 0)::numeric as total_val,
+             COALESCE(SUM(
+               CASE 
+                 WHEN reference_number LIKE 'REV-%' OR entry_number LIKE 'REV-%' OR description LIKE '%عكس%' THEN -total_debit 
+                 ELSE total_debit 
+               END
+             ), 0)::numeric as total_val,
              COUNT(CASE WHEN ABS(ROUND(total_debit, 2) - ROUND(total_credit, 2)) > 0.01 THEN 1 END)::int as unbal_cnt
            FROM journal_entries
            WHERE ${whereJe}`,
@@ -2569,8 +2588,9 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
           // NEVER use mathematical plugs (journalValue - netValue) so genuine variances are exposed!
           let actualCounter = 0;
           if (cfg.key === 'invoices') {
-            // In sales invoices, legitimate secondary debits are Cost of Goods Sold (COGS) + direct cash/bank collections on cash invoices + withholding/discounts + inventory restock on reversal entries
-            // Plus reversal entries credits for withholding tax & discounts
+            // In sales invoices, legitimate secondary debits are Cost of Goods Sold (COGS) + direct cash/bank collections on cash invoices + withholding/discounts
+            // For normal entries, they are debited (+jel.debit).
+            // For reversal entries, their reverse legs are credited (-jel.credit), so they net out properly.
             const sideRes: any = await client.query(
               `SELECT 
                  (
@@ -2581,13 +2601,13 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
                      JOIN accounts a ON a.id = jel.account_id
                      WHERE je.company_id = $1 
                        AND je.reference_type IN ('invoice', 'sales_invoice')
+                       AND NOT (je.description LIKE '%عكس%' OR je.reference_number LIKE 'REV-%' OR je.entry_number LIKE 'REV-%')
                        AND (
                          a.account_usage IN ('cost_of_sales', 'cost_of_goods_sold', 'cash', 'bank', 'withholding_tax_customers', 'earned_discounts')
                          OR a.code LIKE '51%'
-                         OR (a.account_usage = 'inventory' AND (je.description LIKE '%عكس%' OR je.reference_number LIKE 'REV-%' OR je.entry_number LIKE 'REV-%'))
                        )
                    ), 0)
-                   +
+                   -
                    COALESCE((
                      SELECT SUM(jel.credit)
                      FROM journal_entry_lines jel
@@ -2597,7 +2617,8 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
                        AND je.reference_type IN ('invoice', 'sales_invoice')
                        AND (je.description LIKE '%عكس%' OR je.reference_number LIKE 'REV-%' OR je.entry_number LIKE 'REV-%')
                        AND (
-                         a.account_usage IN ('withholding_tax_customers', 'earned_discounts')
+                         a.account_usage IN ('cost_of_sales', 'cost_of_goods_sold', 'cash', 'bank', 'withholding_tax_customers', 'earned_discounts')
+                         OR a.code LIKE '51%'
                          OR a.code IN ('112', '412', '4104')
                        )
                    ), 0)
@@ -2614,7 +2635,13 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
               `SELECT 
                  (
                    COALESCE((
-                     SELECT SUM(jel.debit)
+                     SELECT SUM(
+                       CASE 
+                         WHEN je.description LIKE '%عكس%' OR je.reference_number LIKE 'REV-%' OR je.entry_number LIKE 'REV-%' 
+                         THEN -jel.debit 
+                         ELSE jel.debit 
+                       END
+                     )
                      FROM journal_entry_lines jel
                      JOIN journal_entries je ON je.id = jel.journal_entry_id
                      JOIN accounts a ON a.id = jel.account_id
@@ -2629,7 +2656,13 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
                    ), 0)
                    +
                    COALESCE((
-                     SELECT SUM(jel.credit)
+                     SELECT SUM(
+                       CASE 
+                         WHEN je.description LIKE '%عكس%' OR je.reference_number LIKE 'REV-%' OR je.entry_number LIKE 'REV-%' 
+                         THEN -jel.credit 
+                         ELSE jel.credit 
+                       END
+                     )
                      FROM journal_entry_lines jel
                      JOIN journal_entries je ON je.id = jel.journal_entry_id
                      JOIN accounts a ON a.id = jel.account_id
@@ -2651,7 +2684,13 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
             // In purchase invoices, legitimate secondary debits are:
             // 1. Supplier settlement debits on cash purchase invoices (to clear through supplier subledger)
             const sideRes: any = await client.query(
-              `SELECT COALESCE(SUM(jel.debit), 0)::numeric as side_tot
+              `SELECT COALESCE(SUM(
+                 CASE 
+                   WHEN je.description LIKE '%عكس%' OR je.reference_number LIKE 'REV-%' OR je.entry_number LIKE 'REV-%' 
+                   THEN -jel.debit 
+                   ELSE jel.debit 
+                 END
+               ), 0)::numeric as side_tot
                FROM journal_entry_lines jel
                JOIN journal_entries je ON je.id = jel.journal_entry_id
                JOIN accounts a ON a.id = jel.account_id
@@ -2689,7 +2728,13 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
             // In purchase returns, legitimate secondary debits are:
             // Cash / Bank debits on cash purchase returns + withholding tax debits
             const sideRes: any = await client.query(
-              `SELECT COALESCE(SUM(jel.debit), 0)::numeric as side_tot
+              `SELECT COALESCE(SUM(
+                 CASE 
+                   WHEN je.description LIKE '%عكس%' OR je.reference_number LIKE 'REV-%' OR je.entry_number LIKE 'REV-%' 
+                   THEN -jel.debit 
+                   ELSE jel.debit 
+                 END
+               ), 0)::numeric as side_tot
                FROM journal_entry_lines jel
                JOIN journal_entries je ON je.id = jel.journal_entry_id
                JOIN accounts a ON a.id = jel.account_id
@@ -2742,13 +2787,13 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
                   END
                 )`;
               } else if (cfg.table === 'customer_discounts' || cfg.table === 'supplier_discounts') {
-                docAmtExpr = `d."${cfg.amountCol}"`;
+                docAmtExpr = `(d."${cfg.amountCol}" * COALESCE(d."exchange_rate", 1))`;
               } else if (['payment_methods', 'customers', 'suppliers', 'accounts'].includes(cfg.table) && cfg.refTypes.includes('opening_balance')) {
-                const hasRate = EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate');
+                const hasRate = TABLES_WITH_EXCHANGE_RATE.has(cfg.table) || (EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate') ?? false);
                 const rateExpr = hasRate ? 'COALESCE(d."exchange_rate", 1)' : '1';
                 docAmtExpr = `(ABS(d."${cfg.amountCol}") * ${rateExpr})`;
               } else {
-                const hasRate = EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate');
+                const hasRate = TABLES_WITH_EXCHANGE_RATE.has(cfg.table) || (EXPECTED_SCHEMA[cfg.table]?.includes('exchange_rate') ?? false);
                 const rateExpr = hasRate ? 'COALESCE(d."exchange_rate", 1)' : '1';
                 docAmtExpr = `(d."${cfg.amountCol}" * ${rateExpr})`;
               }
@@ -2805,7 +2850,7 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
                  WHERE d.company_id = $1
                    AND je.company_id = $1
                    AND je.reference_type IN (${placeholders})
-                   AND ABS(ROUND(je.total_debit, 2) - ROUND(${docAmtExpr}, 2)) > 0.05
+                   AND ABS(ROUND(je.total_debit, 2) - ROUND(ABS(${docAmtExpr}), 2)) > 0.05
                  LIMIT 10`,
                 [companyId, ...cfg.refTypes]
               );
@@ -2823,9 +2868,9 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
                   date: df.doc_date,
                   amount: docAmtVal,
                   party_name: df.party || '',
-                  error_type: isReverse ? 'فارق قيد (رصيد دائن)' : 'فارق في قيمة القيد المحاسبي',
+                  error_type: isReverse ? 'فارق قيد (حركة عكسية)' : 'فارق في قيمة القيد المحاسبي',
                   details: isReverse
-                    ? `قيمة المستند (${absDoc.toLocaleString()} ج.م رصيد دائن/مكشوف) لا تطابق قيمة القيد المحاسبي (${jeAmtVal.toLocaleString()} ج.م) بفارق حقيقي قدره ${trueDiff.toLocaleString()} ج.م`
+                    ? `قيمة المستند العكسي (${absDoc.toLocaleString()} ج.م) لا تطابق قيمة القيد المحاسبي (${jeAmtVal.toLocaleString()} ج.م) بفارق قدره ${trueDiff.toLocaleString()} ج.م`
                     : `قيمة المستند (${docAmtVal.toLocaleString()} ج.م) لا تطابق قيمة القيد المحاسبي (${jeAmtVal.toLocaleString()} ج.م) بفارق ${trueDiff.toLocaleString()} ج.م`
                 });
               }
