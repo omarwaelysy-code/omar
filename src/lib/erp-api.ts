@@ -4863,6 +4863,7 @@ export async function getNextAtomicSequence(
 
   const target = tableNames[module];
   if (target) {
+    try {
       const prefixPattern = `${target.prefix}-${period}-%`;
       const revPrefixPattern = `REV-${target.prefix}-${period}-%`;
       const maxRes = await pool.query(
