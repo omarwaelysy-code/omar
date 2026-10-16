@@ -243,17 +243,28 @@ export const CustomerDiscounts: React.FC = () => {
 
   const handleExportExcel = (onlySelected = false) => {
     const list = onlySelected ? discounts.filter(d => selectedIds.includes(d.id)) : discounts;
-    const formattedData = list.map(d => ({
-      'رقم المستند': d.number || '-',
-      'العميل': d.customer_name || '-',
-      'الحساب': accounts.find(a => a.id === d.account_id)?.name || d.account_name || '-',
-      'التاريخ': formatDate(d.date),
-      'المبلغ بالعملة': d.currency_amount !== undefined && d.currency_amount !== null ? d.currency_amount : d.amount,
-      'العملة': d.currency || baseCurrencyCode,
-      'سعر الصرف': d.exchange_rate || 1,
-      'المبلغ المحلي': d.amount,
-      'البيان': d.notes || '-'
-    }));
+    const formattedData = list.map(d => {
+      const isReversed = !!d.is_reversed;
+      const isReversal = !!d.is_reversal_doc || String(d.number || '').startsWith('REV-');
+      const statusLabel = isReversed
+        ? (language === 'ar' ? `معكوس (أُلغي بـ: ${d.reversed_by_doc_number || '-'})` : `Reversed (by ${d.reversed_by_doc_number || '-'})`)
+        : isReversal
+        ? (language === 'ar' ? `حركة عكسية (عكس: ${d.original_doc_number || '-'})` : `Reversal (of ${d.original_doc_number || '-'})`)
+        : (language === 'ar' ? 'معتمد' : 'Active');
+
+      return {
+        'رقم المستند': d.number || '-',
+        'الحالة': statusLabel,
+        'العميل': d.customer_name || '-',
+        'الحساب': accounts.find(a => a.id === d.account_id)?.name || d.account_name || '-',
+        'التاريخ': formatDate(d.date),
+        'المبلغ بالعملة': d.currency_amount !== undefined && d.currency_amount !== null ? d.currency_amount : d.amount,
+        'العملة': d.currency || baseCurrencyCode,
+        'سعر الصرف': d.exchange_rate || 1,
+        'المبلغ المحلي': d.amount,
+        'البيان': d.notes || '-'
+      };
+    });
     exportToExcel(formattedData, { filename: onlySelected ? 'Selected_Customer_Discounts' : 'Customer_Discounts', sheetName: 'خصم العملاء' });
   };
 

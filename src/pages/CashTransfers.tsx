@@ -963,6 +963,7 @@ export const CashTransfers: React.FC = () => {
     const headers = {
       'date': 'التاريخ',
       'transfer_number': 'رقم التحويل',
+      'resolved_status': language === 'ar' ? 'الحالة' : 'Status',
       'from_payment_method_name': 'من بنك / خزينة',
       'from_currency': 'عملة المصدر',
       'amount': 'المبلغ المصدر',
@@ -976,6 +977,14 @@ export const CashTransfers: React.FC = () => {
       'description': 'الوصف'
     };
     const exportRows = filteredTransfers.map(t => {
+      const isReversed = !!t.is_reversed;
+      const isReversal = !!t.is_reversal_doc || (t.transfer_number || '').startsWith('REV-');
+      const statusLabel = isReversed
+        ? (language === 'ar' ? `معكوس (أُلغي بـ: ${t.reversed_by_doc_number || '-'})` : `Reversed (by ${t.reversed_by_doc_number || '-'})`)
+        : isReversal
+        ? (language === 'ar' ? `حركة عكسية (عكس: ${t.original_doc_number || '-'})` : `Reversal (of ${t.original_doc_number || '-'})`)
+        : (language === 'ar' ? 'معتمد' : 'Active');
+
       const fromCurr = getEffectiveFromCurrency(t);
       const toCurr = getEffectiveToCurrency(t);
       const isMulti = fromCurr !== toCurr;
@@ -1008,6 +1017,7 @@ export const CashTransfers: React.FC = () => {
 
       return {
         ...t,
+        resolved_status: statusLabel,
         from_currency: fromCurr,
         to_currency: toCurr,
         deposited_amount: depositedAmt,

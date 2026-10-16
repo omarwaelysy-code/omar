@@ -134,9 +134,22 @@ export const sanitizeForExcel = (data: any[]): any[] => {
   });
 };
 
+/**
+ * Sanitizes a sheet name to adhere to Excel's strict rules:
+ * - Cannot exceed 31 characters
+ * - Cannot contain any of: : \ / ? * [ ]
+ * - Cannot be empty
+ */
+export const sanitizeSheetName = (name?: string): string => {
+  if (!name) return 'Sheet1';
+  const clean = name.replace(/[:\\/?*\[\]]/g, '-').trim();
+  return clean.slice(0, 31) || 'Sheet1';
+};
+
 export const exportToExcel = (data: any[], options: string | ExcelOptions) => {
   const opts: ExcelOptions = typeof options === 'string' ? { filename: options } : options;
-  const { filename, sheetName = 'Sheet1' } = opts;
+  const { filename } = opts;
+  const safeSheetName = sanitizeSheetName(opts.sheetName);
   
   if (!data || data.length === 0) {
     console.warn('No data to export to Excel');
@@ -170,16 +183,17 @@ export const exportToExcel = (data: any[], options: string | ExcelOptions) => {
       const chunk = sanitizedData.slice(i, i + MAX_ROWS_PER_SHEET);
       const ws = XLSX.utils.json_to_sheet(chunk);
       applyNumberFormat(ws);
-      XLSX.utils.book_append_sheet(wb, ws, `${sheetName}_${Math.floor(i / MAX_ROWS_PER_SHEET) + 1}`);
+      const chunkSheetName = sanitizeSheetName(`${safeSheetName.slice(0, 26)}_${Math.floor(i / MAX_ROWS_PER_SHEET) + 1}`);
+      XLSX.utils.book_append_sheet(wb, ws, chunkSheetName);
     }
   } else {
     const ws = XLSX.utils.json_to_sheet(sanitizedData);
     applyNumberFormat(ws);
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
   }
   
   // Write file
-  XLSX.writeFile(wb, `${filename}.xlsx`);
+  XLSX.writeFile(wb, `${filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`}`);
 };
 
 /**
@@ -381,7 +395,7 @@ export const exportSingleDocumentToExcel = (options: SingleDocExportOptions) => 
   ws['!cols'] = colWidths;
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.utils.book_append_sheet(wb, ws, sanitizeSheetName(sheetName));
   XLSX.writeFile(wb, `${filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`}`);
 };
 

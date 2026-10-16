@@ -1878,6 +1878,14 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
         recipient = voucher.type === 'supplier' ? (voucher.supplier_name || '') : (voucher.category_name || '');
       }
 
+      const isReversed = !!voucher.is_reversed;
+      const isReversal = !!voucher.is_reversal_doc || (voucher.voucher_number || '').startsWith('REV-');
+      const statusLabel = isReversed
+        ? (language === 'ar' ? `معكوس (أُلغي بـ: ${voucher.reversed_by_doc_number || '-'})` : `Reversed (by ${voucher.reversed_by_doc_number || '-'})`)
+        : isReversal
+        ? (language === 'ar' ? `حركة عكسية (عكس: ${voucher.original_doc_number || '-'})` : `Reversal (of ${voucher.original_doc_number || '-'})`)
+        : (language === 'ar' ? 'معتمد' : 'Active');
+
       // Resolve voucher type label
       const typeLabel = getVoucherKind(voucher) === 'supplier' 
         ? (language === 'ar' ? 'صرف لمورد' : 'Supplier Payment') 
@@ -1885,6 +1893,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
 
       return {
         ...voucher,
+        resolved_status: statusLabel,
         resolved_recipient: recipient,
         resolved_type: typeLabel,
         resolved_date: formatDate(voucher.date),
@@ -1894,6 +1903,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
 
     const formattedData = formatDataForExcel(preparedData, {
       'voucher_number': language === 'ar' ? 'رقم السند / المرجع' : 'Voucher No. / Ref',
+      'resolved_status': language === 'ar' ? 'الحالة' : 'Status',
       'resolved_type': language === 'ar' ? 'النوع' : 'Type',
       'resolved_recipient': language === 'ar' ? 'المستفيد / الفئة' : 'Beneficiary / Class',
       'resolved_date': language === 'ar' ? 'التاريخ' : 'Date',
@@ -1903,7 +1913,7 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
       'description': language === 'ar' ? 'البيان / التفاصيل' : 'Description / Details'
     });
 
-    exportToExcel(formattedData, { filename: 'PaymentVouchers_Report', sheetName: t('payments.title') });
+    exportToExcel(formattedData, { filename: 'PaymentVouchers_Report', sheetName: language === 'ar' ? 'سندات الصرف' : 'Payment Vouchers' });
   };
 
   const handleExportPDF = async () => {

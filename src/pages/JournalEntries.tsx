@@ -302,16 +302,27 @@ export const JournalEntries: React.FC = () => {
   };
 
   const handleExportExcel = () => {
-    const data = filteredEntries.map(entry => ({
-      [t('journal.column_date')]: formatDate(entry.date),
-      [language === 'ar' ? 'نوع الحركة / المستند' : 'Document Type']: getDocumentTypeName(entry.reference_type, entry.description, entry.reference_number, language),
-      [t('journal.column_entry_number')]: entry.entry_number || '-',
-      [t('journal.column_description')]: entry.description,
-      [t('journal.column_reference')]: entry.reference_number || '-',
-      [t('journal.column_debit')]: entry.total_debit,
-      [t('journal.column_credit')]: entry.total_credit
-    }));
-    exportToExcel(data, { filename: 'Journal_Entries' });
+    const data = filteredEntries.map(entry => {
+      const isReversed = !!entry.is_reversed;
+      const isReversal = !!entry.is_reversal_doc || String(entry.entry_number || '').startsWith('REV-') || String(entry.reference_number || '').startsWith('REV-');
+      const statusLabel = isReversed
+        ? (language === 'ar' ? `معكوس (أُلغي بـ: ${entry.reversed_by_doc_number || '-'})` : `Reversed (by ${entry.reversed_by_doc_number || '-'})`)
+        : isReversal
+        ? (language === 'ar' ? `حركة عكسية (عكس: ${entry.original_doc_number || '-'})` : `Reversal (of ${entry.original_doc_number || '-'})`)
+        : (language === 'ar' ? 'معتمد' : 'Active');
+
+      return {
+        [t('journal.column_date')]: formatDate(entry.date),
+        [language === 'ar' ? 'نوع الحركة / المستند' : 'Document Type']: getDocumentTypeName(entry.reference_type, entry.description, entry.reference_number, language),
+        [t('journal.column_entry_number')]: entry.entry_number || '-',
+        [language === 'ar' ? 'الحالة' : 'Status']: statusLabel,
+        [t('journal.column_description')]: entry.description,
+        [t('journal.column_reference')]: entry.reference_number || '-',
+        [t('journal.column_debit')]: entry.total_debit,
+        [t('journal.column_credit')]: entry.total_credit
+      };
+    });
+    exportToExcel(data, { filename: 'Journal_Entries', sheetName: language === 'ar' ? 'قيود اليومية' : 'Journal Entries' });
   };
 
   const handleDelete = async (id: string) => {

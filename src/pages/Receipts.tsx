@@ -2050,11 +2050,20 @@ export const Receipts: React.FC = () => {
 
   const handleExportExcel = () => {
     const preparedData = filteredReceipts.map(receipt => {
+      const isReversed = !!receipt.is_reversed;
+      const isReversal = !!receipt.is_reversal_doc || (receipt.voucher_number || '').startsWith('REV-');
+      const statusLabel = isReversed
+        ? (language === 'ar' ? `معكوس (أُلغي بـ: ${receipt.reversed_by_doc_number || '-'})` : `Reversed (by ${receipt.reversed_by_doc_number || '-'})`)
+        : isReversal
+        ? (language === 'ar' ? `حركة عكسية (عكس: ${receipt.original_doc_number || '-'})` : `Reversal (of ${receipt.original_doc_number || '-'})`)
+        : (language === 'ar' ? 'معتمد' : 'Active');
+
       const typeLabel = getReceiptKind(receipt) === 'customer' 
         ? (language === 'ar' ? 'قبض من عميل' : 'Customer Receipt') 
         : (language === 'ar' ? 'سند قبض' : 'Receipt Voucher');
       return {
         ...receipt,
+        resolved_status: statusLabel,
         resolved_type: typeLabel,
         resolved_date: formatDate(receipt.date),
         resolved_amount: receipt.amount
@@ -2063,6 +2072,7 @@ export const Receipts: React.FC = () => {
 
     const formattedData = formatDataForExcel(preparedData, {
       'voucher_number': language === 'ar' ? 'الرقم' : 'Number',
+      'resolved_status': language === 'ar' ? 'الحالة' : 'Status',
       'resolved_type': language === 'ar' ? 'النوع' : 'Type',
       'customer_name': language === 'ar' ? 'المستفيد / العميل' : 'Customer / Beneficiary',
       'resolved_date': language === 'ar' ? 'التاريخ' : 'Date',
@@ -2072,7 +2082,7 @@ export const Receipts: React.FC = () => {
       'description': language === 'ar' ? 'البيان' : 'Description'
     });
 
-    exportToExcel(formattedData, { filename: 'Receipts_Report', sheetName: t('receipts.title') });
+    exportToExcel(formattedData, { filename: 'Receipts_Report', sheetName: language === 'ar' ? 'سندات القبض' : 'Receipts' });
   };
 
   const handleExportPDF = async () => {

@@ -174,6 +174,7 @@ export const PurchaseReturns: React.FC = () => {
     }
     return {
       return_number: true,
+      doc_status: true,
       eta_invoice_number: true,
       supplier_name: true,
       date: true,
@@ -206,6 +207,7 @@ export const PurchaseReturns: React.FC = () => {
     }
     return {
       return_number: 120,
+      doc_status: 105,
       eta_invoice_number: 115,
       supplier_name: 150,
       date: 95,
@@ -2278,9 +2280,18 @@ export const PurchaseReturns: React.FC = () => {
       const currencyCode = ret.currency_id ? (companyCurrencies.find(c => c.id === ret.currency_id)?.code || '') : (company?.settings?.currency || 'EGP');
       const isForeign = currencyCode.toLowerCase() !== baseCode;
 
+      const isReversed = !!ret.is_reversed;
+      const isReversal = !!ret.is_reversal_doc || String(ret.return_number || '').startsWith('REV-');
+      const docStatus = isReversed
+        ? (language === 'ar' ? `معكوس (أُلغي بـ: ${ret.reversed_by_doc_number || '-'})` : `Reversed (by ${ret.reversed_by_doc_number || '-'})`)
+        : isReversal
+        ? (language === 'ar' ? `حركة عكسية (عكس: ${ret.original_doc_number || '-'})` : `Reversal (of ${ret.original_doc_number || '-'})`)
+        : (language === 'ar' ? 'معتمد' : 'Active');
+
       return {
         ...ret,
         formatted_return_number: ret.return_number,
+        formatted_doc_status: docStatus,
         formatted_eta_invoice_number: ret.eta_invoice_number || '-',
         formatted_supplier_name: ret.supplier_name || '-',
         formatted_date: formatDate(ret.date),
@@ -2308,6 +2319,7 @@ export const PurchaseReturns: React.FC = () => {
 
     const keyMap: Record<string, string> = {};
     if (visibleColumns.return_number) keyMap['formatted_return_number'] = language === 'ar' ? 'رقم المرتجع' : 'Return Number';
+    if (visibleColumns.doc_status !== false) keyMap['formatted_doc_status'] = language === 'ar' ? 'الحالة' : 'Status';
     if (visibleColumns.eta_invoice_number) keyMap['formatted_eta_invoice_number'] = language === 'ar' ? 'رقم الوثيقة الإلكترونية' : 'Electronic Doc No.';
     if (visibleColumns.supplier_name) keyMap['formatted_supplier_name'] = language === 'ar' ? 'المورد' : 'Supplier';
     if (visibleColumns.date) keyMap['formatted_date'] = language === 'ar' ? 'التاريخ' : 'Date';
@@ -2334,7 +2346,7 @@ export const PurchaseReturns: React.FC = () => {
     const formattedData = formatDataForExcel(dataToExport, keyMap);
     exportToExcel(formattedData, { 
       filename: onlySelected ? 'PurchaseReturns_Selected_Report' : 'PurchaseReturns_Report', 
-      sheetName: language === 'ar' ? 'مرتجع مشتريات' : 'Purchase Returns' 
+      sheetName: language === 'ar' ? 'مردودات المشتريات' : 'Purchase Returns' 
     });
   };
 
@@ -2831,6 +2843,7 @@ export const PurchaseReturns: React.FC = () => {
                   }).map((colKey) => {
                     const labels: Record<string, string> = {
                       return_number: language === 'ar' ? 'رقم المرتجع' : 'Return Number',
+                      doc_status: language === 'ar' ? 'الحالة' : 'Status',
                       eta_invoice_number: language === 'ar' ? 'رقم الوثيقة الإلكترونية' : 'Electronic Doc No.',
                       supplier_name: language === 'ar' ? 'المورد' : 'Supplier',
                       date: language === 'ar' ? 'التاريخ' : 'Date',
@@ -2912,6 +2925,13 @@ export const PurchaseReturns: React.FC = () => {
                         <span className="opacity-0 group-hover:opacity-100 transition-opacity">
                           {sortBy === 'return_number' ? (sortOrder === 'ASC' ? '↑' : '↓') : '↕'}
                         </span>
+                      </div>
+                    </th>
+                  )}
+                  {visibleColumns.doc_status && (
+                    <th className={`px-2 py-0.5 font-bold cursor-pointer hover:text-emerald-600 transition-colors group whitespace-nowrap text-center`} onClick={() => handleSort('doc_status')}>
+                      <div className="flex items-center justify-center gap-1">
+                        <span>{language === 'ar' ? 'الحالة' : 'Status'}</span>
                       </div>
                     </th>
                   )}
@@ -3087,7 +3107,62 @@ export const PurchaseReturns: React.FC = () => {
                     </td>
                     {visibleColumns.return_number && (
                       <td className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>
-                        <span className="font-mono text-xs font-bold text-slate-950 bg-slate-100 px-2 py-0.5 rounded">{ret.return_number}</span>
+                        <div className="flex flex-col">
+                          {ret.is_reversed ? (
+                            <>
+                              <span className="font-mono text-xs text-zinc-400 line-through font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 w-fit select-all">
+                                {ret.return_number}
+                              </span>
+                              {ret.reversed_by_doc_number && (
+                                <span className="text-[10px] text-rose-600 font-mono font-bold">
+                                  {language === 'ar' ? `أُلغي بـ: ${ret.reversed_by_doc_number}` : `Rev by: ${ret.reversed_by_doc_number}`}
+                                </span>
+                              )}
+                            </>
+                          ) : (ret.is_reversal_doc || String(ret.return_number || '').startsWith('REV-')) ? (
+                            <>
+                              <span className="font-mono text-xs bg-amber-50 px-1.5 py-0.5 rounded text-amber-800 font-bold border border-amber-200 w-fit select-all">
+                                {ret.return_number}
+                              </span>
+                              {ret.original_doc_number && (
+                                <span className="text-[10px] text-zinc-500 font-mono font-bold">
+                                  {language === 'ar' ? `عكس: ${ret.original_doc_number}` : `Rev of: ${ret.original_doc_number}`}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="font-mono text-xs font-bold text-slate-950 bg-slate-100 px-2 py-0.5 rounded select-all">
+                              {ret.return_number}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    )}
+                    {visibleColumns.doc_status && (
+                      <td className="px-2 py-0.5 text-center whitespace-nowrap">
+                        {ret.is_reversed ? (
+                          <span 
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-100/90 text-rose-800 border border-rose-300 shadow-sm"
+                            title={language === 'ar' ? `تم عكس هذا المرتجع بموجب: ${ret.reversed_by_doc_number || ''}` : `Reversed by: ${ret.reversed_by_doc_number || ''}`}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping" />
+                            <RotateCcw size={12} className="text-rose-700" />
+                            <span>{language === 'ar' ? 'معكوس' : 'Reversed'}</span>
+                          </span>
+                        ) : (ret.is_reversal_doc || String(ret.return_number || '').startsWith('REV-')) ? (
+                          <span 
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-100/90 text-amber-800 border border-amber-300 shadow-sm"
+                            title={language === 'ar' ? `مرتجع عكسي للمستند رقم: ${ret.original_doc_number || ''}` : `Reversal of: ${ret.original_doc_number || ''}`}
+                          >
+                            <RotateCcw size={12} className="text-amber-700" />
+                            <span>{language === 'ar' ? 'حركة عكسية' : 'Reversal'}</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            <span>{language === 'ar' ? 'معتمد' : 'Active'}</span>
+                          </span>
+                        )}
                       </td>
                     )}
                     {visibleColumns.eta_invoice_number && (

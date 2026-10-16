@@ -136,6 +136,7 @@ export const PurchaseInvoices: React.FC = () => {
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
     const defaults: Record<string, boolean> = {
       invoice_number: true,
+      doc_status: true,
       eta_invoice_number: true,
       supplier_name: true,
       date: true,
@@ -173,6 +174,7 @@ export const PurchaseInvoices: React.FC = () => {
 
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     invoice_number: 115,
+    doc_status: 105,
     eta_invoice_number: 115,
     supplier_name: 140,
     date: 95,
@@ -3826,9 +3828,18 @@ export const PurchaseInvoices: React.FC = () => {
       };
       const paymentStatus = statusLabels[getPaymentStatus(inv)] || 'غير مدفوعة';
 
+      const isReversed = !!inv.is_reversed;
+      const isReversal = !!inv.is_reversal_doc || String(inv.invoice_number || '').startsWith('REV-');
+      const docStatus = isReversed
+        ? (language === 'ar' ? `معكوسة (أُلغيت بـ: ${inv.reversed_by_doc_number || '-'})` : `Reversed (by ${inv.reversed_by_doc_number || '-'})`)
+        : isReversal
+        ? (language === 'ar' ? `حركة عكسية (عكس: ${inv.original_doc_number || '-'})` : `Reversal (of ${inv.original_doc_number || '-'})`)
+        : (language === 'ar' ? 'معتمدة' : 'Active');
+
       return {
         ...inv,
         formatted_invoice_number: inv.invoice_number,
+        formatted_doc_status: docStatus,
         formatted_supplier_name: inv.supplier_name,
         formatted_date: formatDate(inv.date),
         formatted_description: inv.description || '-',
@@ -3858,6 +3869,7 @@ export const PurchaseInvoices: React.FC = () => {
 
     const keyMap: Record<string, string> = {};
     if (visibleColumns.invoice_number) keyMap['formatted_invoice_number'] = language === 'ar' ? 'رقم الفاتورة' : 'Invoice Number';
+    if (visibleColumns.doc_status !== false) keyMap['formatted_doc_status'] = language === 'ar' ? 'الحالة' : 'Status';
     if (showEtaColumns && visibleColumns.eta_invoice_number) keyMap['formatted_eta_invoice_number'] = language === 'ar' ? 'رقم الوثيقة الإلكترونية' : 'Electronic Doc No.';
     if (visibleColumns.supplier_name) keyMap['formatted_supplier_name'] = language === 'ar' ? 'المورد' : 'Supplier';
     if (visibleColumns.date) keyMap['formatted_date'] = language === 'ar' ? 'التاريخ' : 'Date';
@@ -4269,6 +4281,7 @@ export const PurchaseInvoices: React.FC = () => {
                       }).map((colKey) => {
                         const labels: Record<string, string> = {
                           invoice_number: language === 'ar' ? 'رقم الفاتورة' : 'Invoice Number',
+                          doc_status: language === 'ar' ? 'الحالة' : 'Status',
                           eta_invoice_number: language === 'ar' ? 'رقم الوثيقة الإلكترونية' : 'Electronic Doc No.',
                           supplier_name: language === 'ar' ? 'المورد' : 'Supplier',
                           date: language === 'ar' ? 'التاريخ' : 'Date',
@@ -4358,6 +4371,18 @@ export const PurchaseInvoices: React.FC = () => {
                             </span>
                           </div>
                           {renderResizeHandles('invoice_number')}
+                        </th>
+                      )}
+                      {visibleColumns.doc_status && (
+                        <th 
+                          style={{ width: columnWidths.doc_status || 105, minWidth: columnWidths.doc_status || 105 }} 
+                          className={`px-2 py-0.5 whitespace-nowrap text-center cursor-pointer hover:text-emerald-600 transition-colors group relative`} 
+                          onClick={() => handleSort('doc_status')}
+                        >
+                          <div className="flex items-center justify-center gap-1">
+                            <span>{language === 'ar' ? 'الحالة' : 'Status'}</span>
+                          </div>
+                          {renderResizeHandles('doc_status')}
                         </th>
                       )}
                       {showEtaColumns && visibleColumns.eta_invoice_number && (
@@ -4793,15 +4818,66 @@ export const PurchaseInvoices: React.FC = () => {
                           {visibleColumns.invoice_number && (
                             <td style={{ width: columnWidths.invoice_number, minWidth: columnWidths.invoice_number }} className={`px-2 py-0.5 whitespace-nowrap ${dir === 'rtl' ? 'text-right' : 'text-left'} truncate`}>
                               <div className="flex flex-col gap-1 items-start">
-                                <span className="font-mono font-bold text-slate-950 text-xs select-all">
-                                  {inv.invoice_number}
-                                </span>
+                                {inv.is_reversed ? (
+                                  <>
+                                    <span className="font-mono text-xs text-zinc-400 line-through font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 w-fit select-all">
+                                      {inv.invoice_number}
+                                    </span>
+                                    {inv.reversed_by_doc_number && (
+                                      <span className="text-[10px] text-rose-600 font-mono font-bold">
+                                        {language === 'ar' ? `أُلغيت بـ: ${inv.reversed_by_doc_number}` : `Rev by: ${inv.reversed_by_doc_number}`}
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (inv.is_reversal_doc || String(inv.invoice_number || '').startsWith('REV-')) ? (
+                                  <>
+                                    <span className="font-mono text-xs bg-amber-50 px-1.5 py-0.5 rounded text-amber-800 font-bold border border-amber-200 w-fit select-all">
+                                      {inv.invoice_number}
+                                    </span>
+                                    {inv.original_doc_number && (
+                                      <span className="text-[10px] text-zinc-500 font-mono font-bold">
+                                        {language === 'ar' ? `عكس: ${inv.original_doc_number}` : `Rev of: ${inv.original_doc_number}`}
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span className="font-mono font-bold text-slate-950 text-xs select-all">
+                                    {inv.invoice_number}
+                                  </span>
+                                )}
                                 {!visibleColumns.eta_invoice_number && inv.eta_invoice_number && (
                                   <span className="font-mono text-[9px] bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-indigo-700 font-bold" title={inv.eta_uuid || ''}>
                                     {language === 'ar' ? 'إلكترونية:' : 'ETA:'} {inv.eta_invoice_number}
                                   </span>
                                 )}
                               </div>
+                            </td>
+                          )}
+                          {visibleColumns.doc_status && (
+                            <td style={{ width: columnWidths.doc_status || 105, minWidth: columnWidths.doc_status || 105 }} className="px-2 py-0.5 text-center whitespace-nowrap">
+                              {inv.is_reversed ? (
+                                <span 
+                                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-100/90 text-rose-800 border border-rose-300 shadow-sm"
+                                  title={language === 'ar' ? `تم عكس هذه الفاتورة بموجب: ${inv.reversed_by_doc_number || ''}` : `Reversed by: ${inv.reversed_by_doc_number || ''}`}
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping" />
+                                  <RotateCcw size={12} className="text-rose-700" />
+                                  <span>{language === 'ar' ? 'معكوسة' : 'Reversed'}</span>
+                                </span>
+                              ) : (inv.is_reversal_doc || String(inv.invoice_number || '').startsWith('REV-')) ? (
+                                <span 
+                                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-100/90 text-amber-800 border border-amber-300 shadow-sm"
+                                  title={language === 'ar' ? `فاتورة عكسية للمستند رقم: ${inv.original_doc_number || ''}` : `Reversal of: ${inv.original_doc_number || ''}`}
+                                >
+                                  <RotateCcw size={12} className="text-amber-700" />
+                                  <span>{language === 'ar' ? 'حركة عكسية' : 'Reversal'}</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                  <span>{language === 'ar' ? 'معتمدة' : 'Active'}</span>
+                                </span>
+                              )}
                             </td>
                           )}
                           {showEtaColumns && visibleColumns.eta_invoice_number && (
