@@ -459,6 +459,7 @@ export interface ReversalTrackingFields {
   reversed_by_entry_id?: string;
   reversed_by_entry_number?: string;
   is_reversal_doc?: boolean;
+  is_reversal_entry?: boolean;
   original_doc_id?: string;
   original_doc_number?: string;
   original_entry_id?: string;
