@@ -4,9 +4,10 @@ import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService, apiRequest } from '../services/dbService';
 import { Account, Customer, Supplier, JournalEntry, JournalEntryItem, Department, CostCenter, Operation, Currency, AccountType, ExchangeRate } from '../types';
-import { Plus, Trash2, Save, AlertCircle, CheckCircle2, ArrowRightLeft, User, Truck, Copy, X, Check, Search, Info, CheckCheck } from 'lucide-react';
+import { Plus, Trash2, Save, AlertCircle, CheckCircle2, ArrowRightLeft, User, Truck, Copy, X, Check, Search, Info, CheckCheck, FileSpreadsheet } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatNumber } from '../utils/formatUtils';
+import { ExcelImportWizard } from '../components/ExcelImportWizard';
 
 const normalizeText = (text: string): string => {
   if (!text) return '';
@@ -46,6 +47,7 @@ export const CreateJournalEntry: React.FC = () => {
 
   // States for Copy / Duplicate Feature
   const [showCopyModal, setShowCopyModal] = useState(false);
+  const [showImportWizard, setShowImportWizard] = useState(false);
   const [recentEntries, setRecentEntries] = useState<JournalEntry[]>([]);
   const [copySearchQuery, setCopySearchQuery] = useState('');
 
@@ -498,81 +500,90 @@ export const CreateJournalEntry: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500" dir={dir}>
       {/* Top Header Row with Title and Action Buttons */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-zinc-100 shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white px-5 py-3.5 rounded-2xl border border-zinc-100 shadow-sm">
         <div>
-          <h2 className="text-2xl font-black text-zinc-900">{language === 'ar' ? 'إضافة قيد يومية' : 'Create Journal Entry'}</h2>
-          <p className="text-zinc-500 text-sm mt-1">{language === 'ar' ? 'تسجيل القيود المحاسبية اليدوية مع الفروع والعملات والتحقق التلقائي' : 'Record manual double-entry transactions with currencies'}</p>
+          <h2 className="text-xl font-black text-zinc-900">{language === 'ar' ? 'إضافة قيد يومية' : 'Create Journal Entry'}</h2>
+          <p className="text-zinc-500 text-xs mt-0.5">{language === 'ar' ? 'تسجيل القيود المحاسبية اليدوية مع الفروع والعملات والتحقق التلقائي' : 'Record manual double-entry transactions with currencies'}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowImportWizard(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl font-bold text-xs transition-all hover:scale-105 active:scale-95 shadow-sm"
+            title="استيراد قيود اليومية من ملف Excel"
+          >
+            <FileSpreadsheet size={16} />
+            <span>{language === 'ar' ? 'استيراد Excel' : 'Import Excel'}</span>
+          </button>
           <button
             type="button"
             onClick={() => setShowCopyModal(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-2xl font-bold transition-all hover:scale-105 active:scale-95 border border-zinc-200"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-xl font-bold text-xs transition-all hover:scale-105 active:scale-95 border border-zinc-200"
           >
-            <Copy size={18} />
+            <Copy size={16} />
             <span>{language === 'ar' ? 'نسخ' : 'Copy'}</span>
           </button>
           <button
             type="button"
             onClick={() => handleSubmit()}
             disabled={isSubmitting || difference >= 0.01 || totalDebit === 0}
-            className="flex items-center gap-2 px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 shadow-lg shadow-emerald-500/10"
+            className="flex items-center gap-1.5 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 shadow-md shadow-emerald-600/10"
           >
             {isSubmitting ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
-              <Save size={18} />
+              <Save size={16} />
             )}
             <span>{language === 'ar' ? 'حفظ قيد اليومية' : 'Save Entry'}</span>
           </button>
         </div>
       </div>
 
-      <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-6">
+      <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-4">
         {/* Main Card with Date, Description, and Header Operations */}
-        <div className="bg-white p-8 rounded-[2.5rem] border border-zinc-100 shadow-sm space-y-6">
-          <div className="flex flex-col xl:flex-row gap-8">
+        <div className="bg-white p-5 md:p-6 rounded-2xl border border-zinc-100 shadow-sm space-y-4">
+          <div className="flex flex-col xl:flex-row gap-5">
             {/* Right Side fields (in RTL) */}
-            <div className="flex-1 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="space-y-2">
-                  <label className="block text-sm font-bold text-zinc-700 mr-1">تاريخ القيد</label>
+            <div className="flex-1 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-zinc-700 mr-1">تاريخ القيد</label>
                   <input
                     required
                     type="date"
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium text-sm text-zinc-800"
+                    className="w-full px-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none transition-all font-medium text-xs text-zinc-800 h-[36px]"
                     value={formData.date}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                   />
                 </div>
                 
-                <div className="space-y-2">
-                  <label className="block text-sm font-bold text-zinc-700 mr-1">رقم القيد التلقائي</label>
-                  <div className="w-full px-4 py-3 bg-zinc-100 border border-zinc-200 rounded-2xl font-mono text-sm text-zinc-600 font-bold select-none h-[46px] flex items-center">
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-zinc-700 mr-1">رقم القيد التلقائي</label>
+                  <div className="w-full px-3 py-1.5 bg-zinc-100 border border-zinc-200 rounded-xl font-mono text-xs text-zinc-600 font-bold select-none h-[36px] flex items-center">
                     {entryNumber || 'JE-YYYY-MM-DD-00000'}
                   </div>
                 </div>
 
-                <div className="space-y-2 md:col-span-2">
-                  <label className="block text-sm font-bold text-zinc-700 mr-1">البيان العام للقيد</label>
+                <div className="space-y-1 md:col-span-2">
+                  <label className="block text-xs font-bold text-zinc-700 mr-1">البيان العام للقيد</label>
                   <input
                     required
                     type="text"
                     placeholder="وصف مختصر للقيد..."
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm text-zinc-800 font-medium"
+                    className="w-full px-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none transition-all text-xs text-zinc-800 font-medium h-[36px]"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="block text-sm font-bold text-zinc-700 mr-1">رقم المرجع (اختياري)</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-zinc-700 mr-1">رقم المرجع (اختياري)</label>
                   <input
                     type="text"
                     placeholder="رقم مرجع خارجي..."
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all text-sm text-zinc-800 font-medium"
+                    className="w-full px-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-1 focus:ring-emerald-500 outline-none transition-all text-xs text-zinc-800 font-medium h-[36px]"
                     value={formData.reference_number}
                     onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
                   />
@@ -581,46 +592,46 @@ export const CreateJournalEntry: React.FC = () => {
             </div>
 
             {/* Left Side Status and Totals (in RTL) */}
-            <div className="w-full xl:w-80 flex flex-col gap-3 justify-end">
+            <div className="w-full xl:w-72 flex flex-col gap-2 justify-end">
               {/* Balance status label above the numbers */}
               {difference >= 0.01 || totalDebit === 0 ? (
-                <div className="flex items-center gap-2 text-amber-700 bg-amber-50 border border-amber-100 px-5 py-3 rounded-2xl text-xs font-black animate-pulse shadow-sm">
-                  <AlertCircle size={18} className="text-amber-600 flex-shrink-0" />
-                  <span>{language === 'ar' ? 'القيد غير متنز حالياً' : 'Entry is currently unbalanced'}</span>
+                <div className="flex items-center gap-2 text-amber-700 bg-amber-50 border border-amber-100 px-3.5 py-2 rounded-xl text-xs font-black animate-pulse shadow-sm">
+                  <AlertCircle size={15} className="text-amber-600 flex-shrink-0" />
+                  <span>{language === 'ar' ? 'القيد غير متزن حالياً' : 'Entry is currently unbalanced'}</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-100 px-5 py-3 rounded-2xl text-xs font-black shadow-sm">
-                  <CheckCircle2 size={18} className="text-emerald-600 flex-shrink-0" />
+                <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-100 px-3.5 py-2 rounded-xl text-xs font-black shadow-sm">
+                  <CheckCircle2 size={15} className="text-emerald-600 flex-shrink-0" />
                   <span>{language === 'ar' ? 'القيد متزن تماماً وجاهز للحفظ' : 'Entry is balanced and ready'}</span>
                 </div>
               )}
 
               {/* Totals numbers */}
-              <div className="flex items-center gap-4 bg-zinc-50 px-6 py-4 rounded-3xl border border-zinc-200 w-full justify-around shadow-sm select-none">
+              <div className="flex items-center gap-3 bg-zinc-50 px-4 py-2.5 rounded-2xl border border-zinc-200 w-full justify-around shadow-sm select-none">
                 <div className="text-center">
                   <p className="text-[10px] font-black text-zinc-400 uppercase mb-0.5">الفرق</p>
-                  <p className={`text-base font-black ${difference < 0.01 ? 'text-emerald-600' : 'text-amber-600 animate-pulse'}`}>
+                  <p className={`text-sm font-black ${difference < 0.01 ? 'text-emerald-600' : 'text-amber-600 animate-pulse'}`}>
                     {formatNumber(difference)}
                   </p>
                 </div>
-                <div className="w-px h-8 bg-zinc-200" />
+                <div className="w-px h-6 bg-zinc-200" />
                 <div className="text-center">
                   <p className="text-[10px] font-black text-zinc-400 uppercase mb-0.5">دائن</p>
-                  <p className="text-base font-black text-red-600">{formatNumber(totalCredit)}</p>
+                  <p className="text-sm font-black text-red-600">{formatNumber(totalCredit)}</p>
                 </div>
-                <div className="w-px h-8 bg-zinc-200" />
+                <div className="w-px h-6 bg-zinc-200" />
                 <div className="text-center">
                   <p className="text-[10px] font-black text-zinc-400 uppercase mb-0.5">مدين</p>
-                  <p className="text-base font-black text-emerald-600">{formatNumber(totalDebit)}</p>
+                  <p className="text-sm font-black text-emerald-600">{formatNumber(totalDebit)}</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Header Operations Box */}
-          <div className="p-5 bg-zinc-50/50 rounded-3xl border border-zinc-200/50 space-y-4">
-            <h4 className="text-xs font-black text-zinc-500 uppercase tracking-wider flex items-center gap-2">
-              <Info size={14} className="text-emerald-500" />
+          <div className="p-3 bg-zinc-50/60 rounded-xl border border-zinc-200/70 space-y-2">
+            <h4 className="text-[11px] font-black text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
+              <Info size={13} className="text-emerald-500" />
               <span>{language === 'ar' ? 'أبعاد العمليات الافتراضية للجدول (تطبيق كالفاتورة)' : 'Default Operational Dimensions (Apply like invoice)'}</span>
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -767,24 +778,24 @@ export const CreateJournalEntry: React.FC = () => {
           </div>
 
           {/* Excel-Style Spreadsheet Table Grid */}
-          <div className="overflow-x-auto rounded-2xl border border-zinc-200 shadow-inner">
-            <table className="w-full border-collapse min-w-[1700px]" dir={dir}>
+          <div className="overflow-x-auto rounded-xl border border-zinc-200 shadow-sm">
+            <table className="w-full border-collapse min-w-[1550px] text-xs" dir={dir}>
               <thead>
-                <tr className="bg-zinc-50/80 border-b border-zinc-200 text-xs font-black uppercase text-zinc-500 select-none">
-                  <th className="py-2.5 px-3 border-r border-zinc-200 text-center w-28 bg-emerald-50/20 text-emerald-700">{language === 'ar' ? 'مدين' : 'Debit'}</th>
-                  <th className="py-2.5 px-3 border-r border-zinc-200 text-center w-28 bg-red-50/20 text-red-700">{language === 'ar' ? 'دائن' : 'Credit'}</th>
-                  <th className="py-2.5 px-3 border-r border-zinc-200 text-right w-36">{language === 'ar' ? 'كود الحساب' : 'Account Code'}</th>
-                  <th className="py-2.5 px-3 border-r border-zinc-200 text-right w-64">{language === 'ar' ? 'الحساب' : 'Account Name'}</th>
-                  <th className="py-2.5 px-3 border-r border-zinc-200 text-right w-36 text-zinc-400 bg-zinc-50/20 font-bold">{language === 'ar' ? 'نوع الحساب' : 'Account Type'}</th>
-                  <th className="py-2.5 px-3 border-r border-zinc-200 text-right w-60">{language === 'ar' ? 'الحساب الفرعي' : 'Sub-Account'}</th>
-                  <th className="py-2.5 px-3 border-r border-zinc-200 text-center w-36">{language === 'ar' ? 'العملة' : 'Currency'}</th>
-                  <th className="py-2.5 px-3 border-r border-zinc-200 text-center w-28">{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
-                  <th className="py-2.5 px-3 border-r border-zinc-200 text-center w-36">{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</th>
-                  <th className="py-2.5 px-3 border-r border-zinc-200 text-right w-48">{language === 'ar' ? 'العملية' : 'Operation'}</th>
-                  <th className="py-2.5 px-3 border-r border-zinc-200 text-right w-48">{language === 'ar' ? 'مركز التكلفة' : 'Cost Center'}</th>
-                  <th className="py-2.5 px-3 border-r border-zinc-200 text-right w-48">{language === 'ar' ? 'الإدارة' : 'Department'}</th>
-                  <th className="py-2.5 px-3 border-r border-zinc-200 text-right">{language === 'ar' ? 'البيان' : 'Row Description'}</th>
-                  <th className="py-2.5 px-2 text-center w-12"></th>
+                <tr className="bg-zinc-50 border-b border-zinc-200 text-[11px] font-black uppercase text-zinc-600 select-none">
+                  <th className="py-2 px-2 border-r border-zinc-200 text-center w-24 bg-emerald-50/30 text-emerald-800">{language === 'ar' ? 'مدين' : 'Debit'}</th>
+                  <th className="py-2 px-2 border-r border-zinc-200 text-center w-24 bg-red-50/30 text-red-800">{language === 'ar' ? 'دائن' : 'Credit'}</th>
+                  <th className="py-2 px-2 border-r border-zinc-200 text-right w-28">{language === 'ar' ? 'كود الحساب' : 'Account Code'}</th>
+                  <th className="py-2 px-2 border-r border-zinc-200 text-right w-56">{language === 'ar' ? 'الحساب' : 'Account Name'}</th>
+                  <th className="py-2 px-2 border-r border-zinc-200 text-right w-28 text-zinc-400 bg-zinc-50/20 font-bold">{language === 'ar' ? 'نوع الحساب' : 'Account Type'}</th>
+                  <th className="py-2 px-2 border-r border-zinc-200 text-right w-48">{language === 'ar' ? 'الحساب الفرعي' : 'Sub-Account'}</th>
+                  <th className="py-2 px-2 border-r border-zinc-200 text-center w-28">{language === 'ar' ? 'العملة' : 'Currency'}</th>
+                  <th className="py-2 px-2 border-r border-zinc-200 text-center w-20">{language === 'ar' ? 'سعر الصرف' : 'Exchange Rate'}</th>
+                  <th className="py-2 px-2 border-r border-zinc-200 text-center w-24">{language === 'ar' ? 'المبلغ بالعملة الأجنبية' : 'Foreign Amount'}</th>
+                  <th className="py-2 px-2 border-r border-zinc-200 text-right w-36">{language === 'ar' ? 'العملية' : 'Operation'}</th>
+                  <th className="py-2 px-2 border-r border-zinc-200 text-right w-36">{language === 'ar' ? 'مركز التكلفة' : 'Cost Center'}</th>
+                  <th className="py-2 px-2 border-r border-zinc-200 text-right w-36">{language === 'ar' ? 'الإدارة' : 'Department'}</th>
+                  <th className="py-2 px-2 border-r border-zinc-200 text-right">{language === 'ar' ? 'البيان' : 'Row Description'}</th>
+                  <th className="py-2 px-1 text-center w-10"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 bg-white">
@@ -794,12 +805,12 @@ export const CreateJournalEntry: React.FC = () => {
                     className={`transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-zinc-50/40'} hover:bg-emerald-50/15`}
                   >
                     {/* Debit Input */}
-                    <td className="p-0 border-r border-zinc-200 w-28 bg-emerald-50/5">
+                    <td className="p-0 border-r border-zinc-200 w-24 bg-emerald-50/5">
                       <input
                         type="number"
                         step="any"
                         placeholder="0.00"
-                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/20 px-3 py-2.5 text-sm font-black text-emerald-600 text-center bg-transparent outline-none transition-all shadow-inner"
+                        className="w-full h-[34px] border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/20 px-2 py-1 text-xs font-black text-emerald-600 text-center bg-transparent outline-none transition-all shadow-inner"
                         value={item.debit || ''}
                         onChange={(e) => handleCalculations(index, 'debit', parseFloat(e.target.value) || 0)}
                         onFocus={(e) => e.target.select()}
@@ -807,12 +818,12 @@ export const CreateJournalEntry: React.FC = () => {
                     </td>
                     
                     {/* Credit Input */}
-                    <td className="p-0 border-r border-zinc-200 w-28 bg-red-50/5">
+                    <td className="p-0 border-r border-zinc-200 w-24 bg-red-50/5">
                       <input
                         type="number"
                         step="any"
                         placeholder="0.00"
-                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/20 px-3 py-2.5 text-sm font-black text-red-600 text-center bg-transparent outline-none transition-all shadow-inner"
+                        className="w-full h-[34px] border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/20 px-2 py-1 text-xs font-black text-red-600 text-center bg-transparent outline-none transition-all shadow-inner"
                         value={item.credit || ''}
                         onChange={(e) => handleCalculations(index, 'credit', parseFloat(e.target.value) || 0)}
                         onFocus={(e) => e.target.select()}
@@ -820,11 +831,11 @@ export const CreateJournalEntry: React.FC = () => {
                     </td>
 
                     {/* Account Code Selector (Searchable) */}
-                    <td className="p-0 border-r border-zinc-200 w-36 relative" onClick={(e) => e.stopPropagation()}>
+                    <td className="p-0 border-r border-zinc-200 w-28 relative" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="text"
                         placeholder="رمز الحساب..."
-                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white px-3 py-2 text-sm bg-transparent outline-none font-mono text-right"
+                        className="w-full h-[34px] border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white px-2 py-1 text-xs bg-transparent outline-none font-mono text-right"
                         value={
                           activeRowSearch && activeRowSearch.index === index && activeRowSearch.field === 'account_code'
                             ? activeRowSearch.query
@@ -870,11 +881,11 @@ export const CreateJournalEntry: React.FC = () => {
                     </td>
 
                     {/* Account Name Selector (Searchable) */}
-                    <td className="p-0 border-r border-zinc-200 w-64 relative" onClick={(e) => e.stopPropagation()}>
+                    <td className="p-0 border-r border-zinc-200 w-56 relative" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="text"
                         placeholder="اسم الحساب..."
-                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white px-3 py-2 text-sm bg-transparent outline-none font-bold text-zinc-800"
+                        className="w-full h-[34px] border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white px-2 py-1 text-xs bg-transparent outline-none font-bold text-zinc-800"
                         value={
                           activeRowSearch && activeRowSearch.index === index && activeRowSearch.field === 'account_name'
                             ? activeRowSearch.query
@@ -920,16 +931,16 @@ export const CreateJournalEntry: React.FC = () => {
                     </td>
 
                     {/* Account Type (Read-only) */}
-                    <td className="p-3 border-r border-zinc-200 w-36 text-right text-xs font-bold text-zinc-500 bg-zinc-50/20 select-none">
+                    <td className="px-2 py-1 border-r border-zinc-200 w-28 text-right text-[11px] font-bold text-zinc-500 bg-zinc-50/20 select-none h-[34px]">
                       {getAccountTypeName(item.account_id) || '---'}
                     </td>
 
                     {/* Sub-Account Selector (Dynamic Inline) */}
-                    <td className="p-0 border-r border-zinc-200 w-60 bg-zinc-50/20">
+                    <td className="p-0 border-r border-zinc-200 w-48 bg-zinc-50/20">
                       {needsSubAccount(item.account_id) ? (
                         <select
                           required
-                          className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/20 px-3 py-2 text-sm bg-transparent outline-none font-bold text-emerald-700 cursor-pointer"
+                          className="w-full h-[34px] border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/20 px-2 py-1 text-xs bg-transparent outline-none font-bold text-emerald-700 cursor-pointer"
                           value={item.sub_account_id}
                           onChange={(e) => updateItem(index, 'sub_account_id', e.target.value)}
                         >
@@ -939,16 +950,16 @@ export const CreateJournalEntry: React.FC = () => {
                           ))}
                         </select>
                       ) : (
-                        <div className="w-full h-full bg-zinc-100/50 py-2.5 px-3 text-xs text-zinc-400 italic font-medium select-none">
+                        <div className="w-full h-[34px] bg-zinc-100/50 py-1.5 px-2 text-[11px] text-zinc-400 italic font-medium select-none flex items-center">
                           {language === 'ar' ? 'غير مطلوب' : 'Not required'}
                         </div>
                       )}
                     </td>
 
                     {/* Currency Selector */}
-                    <td className="p-0 border-r border-zinc-200 w-36">
+                    <td className="p-0 border-r border-zinc-200 w-28">
                       <select
-                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/10 px-3 py-2 text-sm bg-transparent outline-none font-semibold text-zinc-700 cursor-pointer"
+                        className="w-full h-[34px] border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/10 px-2 py-1 text-xs bg-transparent outline-none font-semibold text-zinc-700 cursor-pointer"
                         value={item.currency || 'local'}
                         onChange={(e) => updateItem(index, 'currency', e.target.value)}
                       >
@@ -962,13 +973,13 @@ export const CreateJournalEntry: React.FC = () => {
                     </td>
 
                     {/* Exchange Rate */}
-                    <td className="p-0 border-r border-zinc-200 w-28 bg-zinc-50/5">
+                    <td className="p-0 border-r border-zinc-200 w-20 bg-zinc-50/5">
                       <input
                         type="number"
                         step="any"
                         disabled={item.currency === 'local'}
                         placeholder="1.00"
-                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/20 px-3 py-2.5 text-sm font-bold text-zinc-700 text-center bg-transparent outline-none disabled:opacity-50 disabled:bg-zinc-100/30"
+                        className="w-full h-[34px] border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/20 px-2 py-1 text-xs font-bold text-zinc-700 text-center bg-transparent outline-none disabled:opacity-50 disabled:bg-zinc-100/30"
                         value={item.exchange_rate || ''}
                         onChange={(e) => handleCalculations(index, 'exchange_rate', parseFloat(e.target.value) || 1)}
                         onFocus={(e) => e.target.select()}
@@ -976,13 +987,13 @@ export const CreateJournalEntry: React.FC = () => {
                     </td>
 
                     {/* Foreign Currency Amount */}
-                    <td className="p-0 border-r border-zinc-200 w-36 bg-zinc-50/5">
+                    <td className="p-0 border-r border-zinc-200 w-24 bg-zinc-50/5">
                       <input
                         type="number"
                         step="any"
                         disabled={item.currency === 'local'}
                         placeholder="0.00"
-                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/20 px-3 py-2.5 text-sm font-black text-emerald-700 text-center bg-transparent outline-none disabled:opacity-50 disabled:bg-zinc-100/30"
+                        className="w-full h-[34px] border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/20 px-2 py-1 text-xs font-black text-emerald-700 text-center bg-transparent outline-none disabled:opacity-50 disabled:bg-zinc-100/30"
                         value={item.foreign_amount || ''}
                         onChange={(e) => handleCalculations(index, 'foreign_amount', parseFloat(e.target.value) || 0)}
                         onFocus={(e) => e.target.select()}
@@ -990,11 +1001,11 @@ export const CreateJournalEntry: React.FC = () => {
                     </td>
 
                     {/* Operation dimension select (Searchable) */}
-                    <td className="p-0 border-r border-zinc-200 w-48 relative" onClick={(e) => e.stopPropagation()}>
+                    <td className="p-0 border-r border-zinc-200 w-36 relative" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="text"
                         placeholder="ابحث..."
-                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white px-3 py-2 text-xs bg-transparent outline-none font-semibold text-zinc-700"
+                        className="w-full h-[34px] border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-white px-2 py-1 text-xs bg-transparent outline-none font-semibold text-zinc-700"
                         value={
                           activeRowSearch && activeRowSearch.index === index && activeRowSearch.field === 'operation'
                             ? activeRowSearch.query
@@ -1040,9 +1051,9 @@ export const CreateJournalEntry: React.FC = () => {
                     </td>
 
                     {/* Cost center dimension select */}
-                    <td className="p-0 border-r border-zinc-200 w-48">
+                    <td className="p-0 border-r border-zinc-200 w-36">
                       <select
-                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/10 px-3 py-2 text-xs bg-transparent outline-none font-semibold text-zinc-700 cursor-pointer"
+                        className="w-full h-[34px] border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/10 px-2 py-1 text-xs bg-transparent outline-none font-semibold text-zinc-700 cursor-pointer"
                         value={item.cost_center_id || ''}
                         onChange={(e) => updateItem(index, 'cost_center_id', e.target.value)}
                       >
@@ -1054,9 +1065,9 @@ export const CreateJournalEntry: React.FC = () => {
                     </td>
 
                     {/* Department dimension select */}
-                    <td className="p-0 border-r border-zinc-200 w-48">
+                    <td className="p-0 border-r border-zinc-200 w-36">
                       <select
-                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/10 px-3 py-2 text-xs bg-transparent outline-none font-semibold text-zinc-700 cursor-pointer"
+                        className="w-full h-[34px] border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/10 px-2 py-1 text-xs bg-transparent outline-none font-semibold text-zinc-700 cursor-pointer"
                         value={item.department_id || ''}
                         onChange={(e) => updateItem(index, 'department_id', e.target.value)}
                       >
@@ -1072,21 +1083,21 @@ export const CreateJournalEntry: React.FC = () => {
                       <input
                         type="text"
                         placeholder="شرح وتفاصيل السطر..."
-                        className="w-full h-full border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/20 px-3 py-2.5 text-sm bg-transparent outline-none text-zinc-800"
+                        className="w-full h-[34px] border-0 focus:ring-1 focus:ring-emerald-500 focus:bg-emerald-50/20 px-2 py-1 text-xs bg-transparent outline-none text-zinc-800"
                         value={item.description || ''}
                         onChange={(e) => updateItem(index, 'description', e.target.value)}
                       />
                     </td>
 
                     {/* Delete button */}
-                    <td className="p-0 text-center w-12 bg-zinc-50/10">
+                    <td className="p-0 text-center w-10 bg-zinc-50/10">
                       <button
                         type="button"
                         onClick={() => removeItem(index)}
-                        className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50/50 rounded-lg transition-all mx-auto block"
+                        className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50/50 rounded-lg transition-all mx-auto block"
                         title="حذف السطر"
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={14} />
                       </button>
                     </td>
                   </tr>
@@ -1095,32 +1106,32 @@ export const CreateJournalEntry: React.FC = () => {
 
               {/* Table Footer with Sum of columns and status indicator */}
               <tfoot className="bg-zinc-50 border-t-2 border-zinc-200 select-none">
-                <tr className="font-bold text-sm text-zinc-700">
+                <tr className="font-bold text-xs text-zinc-700">
                   {/* Total Debit */}
-                  <td className="p-2 border-r border-zinc-200 text-center font-black text-emerald-600 bg-emerald-50/10 shadow-inner">
+                  <td className="py-1.5 px-2 border-r border-zinc-200 text-center font-black text-emerald-600 bg-emerald-50/10 shadow-inner">
                     {formatNumber(totalDebit)}
                   </td>
                   {/* Total Credit */}
-                  <td className="p-2 border-r border-zinc-200 text-center font-black text-red-600 bg-red-50/10 shadow-inner">
+                  <td className="py-1.5 px-2 border-r border-zinc-200 text-center font-black text-red-600 bg-red-50/10 shadow-inner">
                     {formatNumber(totalCredit)}
                   </td>
                   {/* Status Indicator */}
-                  <td colSpan={4} className="p-2 border-r border-zinc-200 text-right bg-zinc-100/30">
+                  <td colSpan={4} className="py-1.5 px-2 border-r border-zinc-200 text-right bg-zinc-100/30">
                     <div className="flex items-center gap-2">
                       {difference < 0.01 && totalDebit > 0 ? (
                         <div className="flex items-center gap-1.5 text-emerald-700 text-xs font-black">
-                          <CheckCircle2 size={16} className="text-emerald-600" />
+                          <CheckCircle2 size={14} className="text-emerald-600" />
                           <span>{language === 'ar' ? 'متزن وجاهز للحفظ' : 'Balanced & Ready'}</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1.5 text-amber-700 text-xs font-black animate-pulse">
-                          <AlertCircle size={16} className="text-amber-600" />
+                          <AlertCircle size={14} className="text-amber-600" />
                           <span>{language === 'ar' ? 'غير متزن حالياً' : 'Currently unbalanced'}</span>
                         </div>
                       )}
                     </div>
                   </td>
-                  <td colSpan={7} className="p-2 text-zinc-500 text-xs font-black text-center bg-zinc-100/30">
+                  <td colSpan={7} className="py-1.5 px-2 text-zinc-500 text-xs font-black text-center bg-zinc-100/30">
                     {difference < 0.01 ? '' : `${language === 'ar' ? 'الفارق:' : 'Difference:'} ${formatNumber(difference)}`}
                   </td>
                 </tr>
@@ -1129,13 +1140,13 @@ export const CreateJournalEntry: React.FC = () => {
           </div>
 
           {/* Add Row Button at the bottom of the table card */}
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6 pt-2">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-1">
             <button
               type="button"
               onClick={addItem}
-              className="flex items-center gap-2 px-6 py-3 bg-zinc-100 text-zinc-700 rounded-2xl font-bold hover:bg-zinc-200 transition-all hover:scale-105 active:scale-95 shadow-sm border border-zinc-200"
+              className="flex items-center gap-1.5 px-4 py-2 bg-zinc-100 text-zinc-700 rounded-xl font-bold hover:bg-zinc-200 transition-all hover:scale-105 active:scale-95 shadow-sm border border-zinc-200 text-xs"
             >
-              <Plus size={18} />
+              <Plus size={16} />
               <span>إضافة سطر جديد</span>
             </button>
           </div>
@@ -1221,6 +1232,19 @@ export const CreateJournalEntry: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Excel Import Wizard Modal */}
+      {showImportWizard && (
+        <ExcelImportWizard
+          module="journal_entries"
+          moduleNameAr="قيود اليومية"
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={() => {
+            setShowImportWizard(false);
+            showNotification('تم استيراد قيود اليومية بنجاح', 'success');
+          }}
+        />
+      )}
     </div>
   );
 };

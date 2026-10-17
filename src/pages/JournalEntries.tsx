@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService } from '../services/dbService';
 import { JournalEntry, Account } from '../types';
-import { Search, Calendar, FileText, Eye, Download, Printer, Filter, ArrowLeftRight, Trash2, RotateCcw, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+import { Search, Calendar, FileText, Eye, Download, Printer, Filter, ArrowLeftRight, Trash2, RotateCcw, ChevronLeft, ChevronRight, ChevronDown, FileSpreadsheet } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { exportToPDF } from '../utils/pdfUtils';
@@ -13,6 +13,7 @@ import { formatNumber, formatMoney, formatDate, getDocumentTypeName, DOCUMENT_TY
 import { PaginationControls } from '../components/PaginationControls';
 import { printDocument } from '../utils/printEngine';
 import { useNavigation } from '../contexts/NavigationContext';
+import { ExcelImportWizard } from '../components/ExcelImportWizard';
 
 export const JournalEntries: React.FC = () => {
   const { user } = useAuth();
@@ -90,6 +91,7 @@ export const JournalEntries: React.FC = () => {
   const [preset, setPreset] = useState('this_month');
   const [selectedDocTypes, setSelectedDocTypes] = useState<string[]>([]);
   const [showDocTypeDropdown, setShowDocTypeDropdown] = useState(false);
+  const [showImportWizard, setShowImportWizard] = useState(false);
   const docTypeDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -366,6 +368,14 @@ export const JournalEntries: React.FC = () => {
           <p className="text-zinc-500 font-medium mt-1">{t('journal.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowImportWizard(true)}
+            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl font-bold text-xs transition-all shadow-sm"
+            title="استيراد قيود من ملف Excel"
+          >
+            <FileSpreadsheet size={16} />
+            <span>{language === 'ar' ? 'استيراد Excel' : 'Import Excel'}</span>
+          </button>
           <button onClick={handleExportPDF} className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 transition-all shadow-sm"><Printer size={20} /></button>
           <button onClick={handleExportExcel} className="p-2.5 bg-white border border-zinc-200 text-zinc-600 rounded-xl hover:bg-zinc-50 transition-all shadow-sm"><Download size={20} /></button>
         </div>
@@ -960,6 +970,21 @@ export const JournalEntries: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Excel Import Wizard Modal */}
+      {showImportWizard && (
+        <ExcelImportWizard
+          module="journal_entries"
+          moduleNameAr="قيود اليومية"
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={() => {
+            setShowImportWizard(false);
+            showNotification('تم استيراد قيود اليومية بنجاح', 'success');
+            // Trigger refresh by advancing page or resetting
+            setPage(1);
+          }}
+        />
+      )}
     </div>
   );
 };
