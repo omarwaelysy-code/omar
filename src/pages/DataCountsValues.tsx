@@ -887,20 +887,45 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 font-bold text-stone-700">
-                {filteredOperational.map((row) => (
-                  <tr key={row.key} className="hover:bg-stone-50/70 transition-colors">
-                    <td className="py-1.5 px-3 flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold flex-shrink-0">
-                        <Layers size={13} />
-                      </div>
-                      <span className="font-black text-stone-900 text-xs">{row.name}</span>
-                    </td>
+                {filteredOperational.map((row) => {
+                  const operationalPageMap: Record<string, string> = {
+                    'sales_orders': 'sales_orders',
+                    'purchase_orders': 'purchase_orders',
+                    'quotations': 'quotations',
+                    'warehouse_transfers': 'warehouse_transfers',
+                    'goods_receipts': 'goods_receipts',
+                    'customer_settlements': 'customer_settlements',
+                    'supplier_settlements': 'supplier_settlements',
+                    'inventory_movements': 'general_stock_movements_report'
+                  };
+                  const targetPage = operationalPageMap[row.key];
 
-                    <td className="py-1.5 px-3 text-center">
-                      <span className="px-2 py-0.5 rounded-md bg-stone-100 font-mono font-bold text-stone-800 text-xs">
-                        {formatNumber(row.count)}
-                      </span>
-                    </td>
+                  return (
+                    <tr key={row.key} className="hover:bg-stone-50/70 transition-colors">
+                      <td className="py-1.5 px-3 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold flex-shrink-0">
+                            <Layers size={13} />
+                          </div>
+                          <span className="font-black text-stone-900 text-xs">{row.name}</span>
+                        </div>
+                        {targetPage && (
+                          <button
+                            type="button"
+                            onClick={() => setCurrentPage(targetPage)}
+                            className="p-1 rounded-md text-stone-400 hover:text-blue-700 hover:bg-blue-100 transition-colors"
+                            title={language === 'ar' ? `فتح شاشة ${row.name}` : `Open ${row.name}`}
+                          >
+                            <ExternalLink size={13} />
+                          </button>
+                        )}
+                      </td>
+
+                      <td className="py-1.5 px-3 text-center">
+                        <span className="px-2 py-0.5 rounded-md bg-stone-100 font-mono font-bold text-stone-800 text-xs">
+                          {formatNumber(row.count)}
+                        </span>
+                      </td>
 
                     <td className="py-1.5 px-3 text-left font-mono font-black text-blue-900 text-xs">
                       {formatNumber(row.total_value)} EGP

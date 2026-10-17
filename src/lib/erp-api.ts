@@ -2145,7 +2145,10 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
       { key: 'roles', name: 'الأدوار والصلاحيات', table: 'roles', valCol: null },
       { key: 'pos_branches', name: 'الفروع المتصلة (POS)', table: 'pos_connected_branches', valCol: null },
       { key: 'templates', name: 'قوالب المستندات', table: 'templates', valCol: null },
-      { key: 'document_sequences', name: 'تسلسلات المستندات', table: 'document_sequences', valCol: null }
+      { key: 'document_sequences', name: 'تسلسلات المستندات', table: 'document_sequences', valCol: null },
+      { key: 'expense_categories', name: 'تصنيفات المصروفات', table: 'expense_categories', valCol: null },
+      { key: 'currencies', name: 'العملات وأسعار الصرف', table: 'currencies', valCol: null },
+      { key: 'period_closings', name: 'إقفال الفترات المحاسبية', table: 'period_closings', valCol: null }
     ];
 
     const masterData = [];
@@ -2168,21 +2171,66 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
     }
 
     // 2. OPERATIONAL DATA (العمليات التي لا يلزم عنها قيود ولكن تشمل قيماً)
-    const operationalQueries = [
+    const operationalQueries: any[] = [
       { key: 'sales_orders', name: 'أوامر البيع', table: 'sales_orders', sumCol: 'total_amount', notes: 'أوامر بيع وطلبيات عملاء' },
       { key: 'purchase_orders', name: 'أوامر الشراء', table: 'purchase_orders', sumCol: 'total_amount', notes: 'أوامر شراء للموردين' },
       { key: 'quotations', name: 'عروض الأسعار', table: 'quotations', sumCol: 'total_amount', notes: 'عروض أسعار تقديرية' },
-      { key: 'warehouse_transfers', name: 'التحويلات المخزنية', table: 'warehouse_transfers', sumCol: 'total_amount', notes: 'نقل مخزني بين المستودعات' }
+      { key: 'warehouse_transfers', name: 'التحويلات المخزنية', table: 'warehouse_transfers', sumCol: 'total_amount', notes: 'نقل مخزني بين المستودعات' },
+      { 
+        key: 'goods_receipts', 
+        name: 'أذون استلام البضائع', 
+        table: 'goods_receipts', 
+        customSumSql: 'COALESCE((SELECT SUM(gri.total_cost) FROM goods_receipt_items gri WHERE gri.company_id = $1), 0)', 
+        notes: 'أذون استلام البضائع والمشتريات بالمخازن' 
+      },
+      {
+        key: 'customer_settlements',
+        name: 'تسويات فواتير العملاء',
+        customQuery: `
+          SELECT 
+            COUNT(DISTINCT s->>'settlement_number')::int as count,
+            COALESCE(SUM((s->>'settled_amount')::numeric), 0)::numeric as total_value
+          FROM invoices, jsonb_array_elements(CASE WHEN jsonb_typeof(settlements) = 'array' THEN settlements ELSE '[]'::jsonb END) s
+          WHERE company_id = $1 AND s->>'settlement_number' IS NOT NULL
+        `,
+        notes: 'مطابقة وتسوية فواتير المبيعات مع سندات القبض'
+      },
+      {
+        key: 'supplier_settlements',
+        name: 'تسويات فواتير الموردين',
+        customQuery: `
+          SELECT 
+            COUNT(DISTINCT s->>'settlement_number')::int as count,
+            COALESCE(SUM((s->>'settled_amount')::numeric), 0)::numeric as total_value
+          FROM purchase_invoices, jsonb_array_elements(CASE WHEN jsonb_typeof(settlements) = 'array' THEN settlements ELSE '[]'::jsonb END) s
+          WHERE company_id = $1 AND s->>'settlement_number' IS NOT NULL
+        `,
+        notes: 'مطابقة وتسوية فواتير المشتريات مع سندات الصرف'
+      },
+      {
+        key: 'inventory_movements',
+        name: 'سجل حركات المخزون (كارت الصنف)',
+        table: 'inventory_movements',
+        sumCol: 'total_cost',
+        notes: 'حركات الإضافة والصرف المخزني اللحظية'
+      }
     ];
 
     const operationalData = [];
     for (const item of operationalQueries) {
       try {
-        const sumSql = item.sumCol ? `COALESCE(SUM(${item.sumCol}), 0)` : '0';
-        const qRes = await client.query(
-          `SELECT COUNT(*)::int as count, ${sumSql}::numeric as total_value FROM "${item.table}" WHERE company_id = $1`,
-          [companyId]
-        );
+        let qRes;
+        if (item.customQuery) {
+          qRes = await client.query(item.customQuery, [companyId]);
+        } else {
+          const sumSql = item.customSumSql 
+            ? item.customSumSql 
+            : (item.sumCol ? `COALESCE(SUM(${item.sumCol}), 0)` : '0');
+          qRes = await client.query(
+            `SELECT COUNT(*)::int as count, ${sumSql}::numeric as total_value FROM "${item.table}" WHERE company_id = $1`,
+            [companyId]
+          );
+        }
         operationalData.push({
           key: item.key,
           name: item.name,
@@ -2464,6 +2512,19 @@ export async function computeCompanyAuditData(client: any, companyId: string) {
         refTypes: ['opening_balance'],
         jeFilter: "description NOT LIKE 'رصيد افتتاحي للعميل:%' AND description NOT LIKE 'رصيد افتتاحي للمورد:%' AND description NOT LIKE 'رصيد افتتاحي لطريقة%'",
         partyCol: 'name',
+        partyIdCol: null,
+        partyTable: null,
+        partyAccCol: null
+      },
+      {
+        key: 'asset_depreciation_runs',
+        name: 'إهلاك الأصول الثابتة (جلسات الإهلاك)',
+        table: 'asset_depreciation_runs',
+        numCol: 'run_number',
+        dateCol: 'to_date',
+        amountCol: 'total_depreciation',
+        refTypes: ['asset_depreciation', 'depreciation'],
+        partyCol: 'period_name',
         partyIdCol: null,
         partyTable: null,
         partyAccCol: null
