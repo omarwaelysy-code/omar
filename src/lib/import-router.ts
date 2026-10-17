@@ -432,6 +432,7 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
   let samplePm   = { name: 'الخزينة الرئيسية', type: 'cash' };
   let sampleProd = { code: 'PROD-001', name: 'لابتوب ديل للأعمال' };
   let sampleWh   = { id: '', code: 'WH-01', name: 'المستودع الرئيسي' };
+  let sampleWh2  = { id: '', code: 'WH-02', name: 'مستودع المعادي' };
   let sampleExp  = { code: 'EXP-001', name: 'مصاريف إيجار' };
 
   try {
@@ -443,7 +444,6 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
     if (pmRes.rows[0]) samplePm = pmRes.rows[0];
     const pRes = await pool.query(`SELECT code, name FROM products WHERE company_id = $1 ORDER BY id LIMIT 1`, [companyId]);
     if (pRes.rows[0]) sampleProd = pRes.rows[0];
-    let sampleWh2 = { id: '', code: 'WH-02', name: 'مستودع المعادي' };
     const wRes = await pool.query(`SELECT id, code, name FROM warehouses WHERE company_id = $1 ORDER BY id LIMIT 2`, [companyId]);
     if (wRes.rows[0]) sampleWh = wRes.rows[0];
     if (wRes.rows[1]) sampleWh2 = wRes.rows[1];
