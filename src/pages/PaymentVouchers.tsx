@@ -5109,7 +5109,6 @@ export const PaymentVouchers: React.FC<PaymentVouchersProps> = ({
           onClose={() => setShowImportWizard(false)}
           onSuccess={() => {
             setShowImportWizard(false);
-            dbService.notify('payment_vouchers');
             window.dispatchEvent(new CustomEvent('refresh-payment-vouchers'));
             window.dispatchEvent(new Event('db-change'));
           }}

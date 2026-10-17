@@ -1552,7 +1552,6 @@ export const OpeningStockBalances: React.FC = () => {
           onClose={() => setShowImportWizard(false)}
           onSuccess={() => {
             setShowImportWizard(false);
-            dbService.notify('opening_stock_balances');
             window.dispatchEvent(new Event('db-change'));
           }}
         />

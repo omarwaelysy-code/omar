@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Customer, Account, JournalEntry, JournalEntryItem, Currency } from '../types';
-import { Search, Plus, Trash2, X, Tag, User, Calendar, Save, Wallet, CreditCard, History, BookOpen, Phone, Mail, MapPin, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, ChevronDown, LayoutGrid, List, Hash, Copy, Check, Coins, RefreshCw } from 'lucide-react';
+import { Search, Plus, Trash2, X, Tag, User, Calendar, Save, Wallet, CreditCard, History, BookOpen, Phone, Mail, MapPin, Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, ChevronDown, LayoutGrid, List, Hash, Copy, Check, Coins, RefreshCw, FileSpreadsheet } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '../contexts/LanguageContext';
 import { dbService, apiRequest } from '../services/dbService';
@@ -2004,7 +2004,6 @@ export const CustomerDiscounts: React.FC = () => {
           onClose={() => setShowImportWizard(false)}
           onSuccess={() => {
             setShowImportWizard(false);
-            dbService.notify('customer_discounts');
             window.dispatchEvent(new Event('db-change'));
           }}
         />

@@ -4844,7 +4844,6 @@ export const Receipts: React.FC = () => {
           onClose={() => setShowImportWizard(false)}
           onSuccess={() => {
             setShowImportWizard(false);
-            dbService.notify('receipt_vouchers');
             window.dispatchEvent(new CustomEvent('refresh-receipts'));
             window.dispatchEvent(new Event('db-change'));
           }}

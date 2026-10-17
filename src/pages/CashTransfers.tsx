@@ -9,7 +9,7 @@ import {
   Download, Eye, FileText, History, Printer, 
   Wallet, Calendar, Hash, Layers, Save,
   Maximize2, Minimize2, ChevronRight, ChevronLeft, RotateCcw, User, ChevronDown, LayoutGrid, List,
-  Coins, DollarSign
+  Coins, DollarSign, FileSpreadsheet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils';
@@ -2481,7 +2481,6 @@ export const CashTransfers: React.FC = () => {
           onClose={() => setShowImportWizard(false)}
           onSuccess={() => {
             setShowImportWizard(false);
-            dbService.notify('cash_transfers');
             window.dispatchEvent(new CustomEvent('refresh-cash-transfers'));
             window.dispatchEvent(new Event('db-change'));
           }}

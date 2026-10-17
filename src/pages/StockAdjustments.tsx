@@ -1246,7 +1246,6 @@ export const StockAdjustments: React.FC = () => {
           onClose={() => setShowImportWizard(false)}
           onSuccess={() => {
             setShowImportWizard(false);
-            dbService.notify('stock_adjustments');
             window.dispatchEvent(new Event('db-change'));
           }}
         />
