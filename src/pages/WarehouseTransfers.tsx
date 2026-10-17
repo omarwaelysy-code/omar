@@ -17,6 +17,7 @@ import { exportToPDF as exportToPDFUtil, printElement } from '../utils/pdfUtils'
 import { exportToExcel, formatDataForExcel } from '../utils/excelUtils';
 import { ExportButtons } from '../components/ExportButtons';
 import { AttachmentsManager } from '../components/common/AttachmentsManager';
+import { ExcelImportWizard } from '../components/ExcelImportWizard';
 
 
 interface TransferItemInput {
@@ -78,6 +79,7 @@ export const WarehouseTransfers: React.FC = () => {
   const [transferToDelete, setTransferToDelete] = useState<string | null>(null);
   const [view, setView] = useState<'table' | 'card'>('table');
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [showImportWizard, setShowImportWizard] = useState(false);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -743,6 +745,13 @@ export const WarehouseTransfers: React.FC = () => {
               <p className="text-slate-500 font-medium mt-0.5 text-[11px]">{t('warehouse_transfers.subtitle')}</p>
             </div>
             <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setShowImportWizard(true)}
+                className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg font-bold text-xs shadow-sm hover:scale-[1.01] active:scale-[0.98] transition-all"
+              >
+                <FileSpreadsheet size={15} />
+                <span>{language === 'ar' ? 'استيراد Excel' : 'Import Excel'}</span>
+              </button>
               <ExportButtons
                 onExportExcel={handleExportExcel}
                 onExportPDF={handleExportPDF}
@@ -978,6 +987,18 @@ export const WarehouseTransfers: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {showImportWizard && (
+        <ExcelImportWizard
+          module="warehouse_transfers"
+          moduleNameAr="التحويل بين المخازن"
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={() => {
+            setShowImportWizard(false);
+            setPage(1);
+          }}
+        />
+      )}
     </div>
   );
 };

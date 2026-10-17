@@ -218,7 +218,7 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
                 </div>
 
                 {/* تنبيه باللون الأحمر بحذف المثال */}
-                {['journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods', 'opening_stock_balances', 'stock_adjustments', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers', 'customer_discounts', 'supplier_discounts', 'issued_cheques', 'received_cheques'].includes(module) && (
+                {['journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods', 'opening_stock_balances', 'stock_adjustments', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers', 'customer_discounts', 'supplier_discounts', 'issued_cheques', 'received_cheques', 'goods_receipts', 'warehouse_transfers'].includes(module) && (
                   <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
                     <AlertTriangle className="text-red-600 shrink-0 mt-0.5" size={22} />
                     <div className="text-sm text-red-800 space-y-1">
@@ -228,7 +228,7 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
                       </p>
                       <p className="leading-relaxed font-semibold">
                         تم وضع صفوف كأمثلة توضيحية داخل نموذج الـ Excel المرفق لمساعدتك على معرفة طريقة ملء البيانات
-                        {module === 'journal_entries' ? ' (يشمل أمثلة للحسابات الفرعية للعملاء، الموردين، والخزائن مع توازن الطرفين المدين والدائن)' : module === 'issued_cheques' ? ' (يشمل شيكات لموردين وشيكات عامة بدون مورد)' : module === 'received_cheques' ? ' (يشمل شيكات من عملاء وشيكات عامة بدون عميل)' : ''}.
+                        {module === 'journal_entries' ? ' (يشمل أمثلة للحسابات الفرعية للعملاء، الموردين، والخزائن مع توازن الطرفين المدين والدائن)' : module === 'issued_cheques' ? ' (يشمل شيكات لموردين وشيكات عامة بدون مورد)' : module === 'received_cheques' ? ' (يشمل شيكات من عملاء وشيكات عامة بدون عميل)' : module === 'goods_receipts' ? ' (يشمل إذن استلام بضائع لمستودع مع تفاصيل الأصناف والموردين)' : module === 'warehouse_transfers' ? ' (يشمل تحويل بضاعة بين مستودعين مع تفاصيل الأصناف)' : ''}.
                         <span className="font-black text-red-950 underline mx-1">
                           يجب حذف صفوف المثال التوضيحي بالكامل
                         </span>
@@ -244,7 +244,7 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
                     <div className="text-sm text-amber-800 space-y-1">
                       <p className="font-bold">تعليمات مهمة:</p>
                       <ul className="list-disc list-inside space-y-1 text-amber-700">
-                        {['journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods', 'opening_stock_balances', 'stock_adjustments', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers', 'customer_discounts', 'supplier_discounts', 'issued_cheques', 'received_cheques'].includes(module) && (
+                        {['journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods', 'opening_stock_balances', 'stock_adjustments', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers', 'customer_discounts', 'supplier_discounts', 'issued_cheques', 'received_cheques', 'goods_receipts', 'warehouse_transfers'].includes(module) && (
                           <li className="text-red-600 font-black">
                             ⚠️ احذف صفوف المثال التوضيحي المرفقة بالنموذج قبل حفظ الملف ورفعه إلى النظام
                           </li>
@@ -301,6 +301,24 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
                             <li>في حالة شيك بدون عميل: اسم الساحب وكود الحساب الدائن إجباريان من دليل الحسابات</li>
                             <li>كود حساب أوراق القبض (المدين) إجباري بدليل الحسابات</li>
                             <li>يتم إنشاء قيد استلام الشيكات وحافظة أوراق القبض آلياً وموازنتها فور تنفيذ الاستيراد</li>
+                          </>
+                        ) : module === 'goods_receipts' ? (
+                          <>
+                            <li>العمود الأول "رقم إذن الاستلام *" يجمع الأصناف التي تنتمي لنفس إذن الاستلام (مثل GR-000001)</li>
+                            <li>يجب تكرار بيانات إذن الاستلام (رقم الإذن، التاريخ، المستودع، والمورد) لكل صنف في نفس الإذن</li>
+                            <li>المستودع والأصناف يجب أن تكون مسجلة مسبقاً في النظام (راجع أوراق العمل المرفقة)</li>
+                            <li>كود المورد اختياري ولكن إن وُجد يجب أن يكون مسجلاً بالنظام</li>
+                            <li>الكميات يجب أن تكون موجبة أكبر من صفر (> 0) والتكلفة لا تقل عن صفر (>= 0)</li>
+                            <li>يتم إثبات حركات المخزون وطبقات التكلفة آلياً فور تنفيذ الاستيراد</li>
+                          </>
+                        ) : module === 'warehouse_transfers' ? (
+                          <>
+                            <li>العمود الأول "رقم التحويل *" يجمع الأصناف التي تنتمي لنفس عملية التحويل (مثل TR-000001)</li>
+                            <li>يجب تكرار بيانات عملية التحويل (رقم التحويل، التاريخ، مستودع المصدر، مستودع الوجهة) لكل صنف في نفس التحويل</li>
+                            <li>يجب أن يختلف مستودع المصدر عن مستودع الوجهة</li>
+                            <li>المستودعات والأصناف يجب أن تكون مسجلة مسبقاً بالنظام (راجع أوراق العمل المرفقة)</li>
+                            <li>الكميات المحولة يجب أن تكون موجبة أكبر من صفر (> 0)</li>
+                            <li>يتم تسجيل حركات الصرف والإضافة المخزنية آلياً فور تنفيذ الاستيراد</li>
                           </>
                         ) : (
                           <>

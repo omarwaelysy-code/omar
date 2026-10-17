@@ -19,8 +19,8 @@ import { CompanyInvoiceHeader } from '../components/CompanyInvoiceHeader';
 import { useNavigation } from '../contexts/NavigationContext';
 import { printElement, exportToPDF } from '../utils/pdfUtils';
 import { exportToExcel } from '../utils/excelUtils';
-import { printDocument } from '../utils/printEngine';
 import { AttachmentsManager } from '../components/common/AttachmentsManager';
+import { ExcelImportWizard } from '../components/ExcelImportWizard';
 
 interface GoodsReceiptItem {
   id?: string;
@@ -153,6 +153,7 @@ export const GoodsReceipts: React.FC = () => {
   const [selectedPOId, setSelectedPOId] = useState('');
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showImportWizard, setShowImportWizard] = useState(false);
 
   const [view, setView] = useViewPreference('goods_receipts', 'table');
   const toggleViewPreference = () => {
@@ -1009,15 +1010,24 @@ export const GoodsReceipts: React.FC = () => {
               </h1>
               <p className="text-slate-400 text-xs font-medium mt-0.5">{gt('subtitle')}</p>
             </div>
-            {canCreate && (
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => handleOpenModal()}
-                className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-xl font-bold shadow-sm transition-all text-xs active:scale-95"
+                onClick={() => setShowImportWizard(true)}
+                className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-xl font-bold shadow-sm transition-all text-xs active:scale-95"
               >
-                <Plus size={14} />
-                <span>{gt('add_receipt')}</span>
+                <FileSpreadsheet size={14} />
+                <span>{language === 'ar' ? 'استيراد Excel' : 'Import Excel'}</span>
               </button>
-            )}
+              {canCreate && (
+                <button
+                  onClick={() => handleOpenModal()}
+                  className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-xl font-bold shadow-sm transition-all text-xs active:scale-95"
+                >
+                  <Plus size={14} />
+                  <span>{gt('add_receipt')}</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Control Bar */}
@@ -1384,6 +1394,16 @@ export const GoodsReceipts: React.FC = () => {
             </div>
           )}
         </div>
+      {showImportWizard && (
+        <ExcelImportWizard
+          module="goods_receipts"
+          moduleNameAr="أذون استلام البضائع"
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={() => {
+            setShowImportWizard(false);
+            setPage(1);
+          }}
+        />
       )}
     </div>
   );

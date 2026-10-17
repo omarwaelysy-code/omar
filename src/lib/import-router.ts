@@ -5,7 +5,8 @@ import pool from './postgres';
 import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
 import { ensureUniqueSequenceNumber } from './erp-api';
-import { recordAdjustment } from './cost-engine';
+import { recordAdjustment, recordGoodsReceipt, recordTransfer } from './cost-engine';
+import { InventoryMovementService } from '../services/InventoryMovementService';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -360,6 +361,41 @@ const IMPORT_CONFIGS: Record<string, {
       { key: 'description',         label: 'البيان / الغرض',                  labelEn: 'Description',                                                 required: false, type: 'text',         example: 'تحصيل دفعة بشيك مؤجل' },
       { key: 'notes',               label: 'ملاحظات إضافية',                  labelEn: 'Notes',                                                       required: false, type: 'text',         example: 'حافظة شيكات واردة' },
     ]
+  },
+
+  // ── أذون استلام البضائع ──────────────────────────────────────────
+  goods_receipts: {
+    nameAr: 'أذون استلام البضائع',
+    dbTable: 'goods_receipts',
+    uniqueKey: 'receipt_number',
+    columns: [
+      { key: 'receipt_number',  label: 'رقم إذن الاستلام *',         labelEn: 'Goods Receipt Number (Required, e.g. GR-000001)',  required: true,  type: 'text',   example: 'GR-000001', note: 'رقم يجمع أصناف إذن الاستلام الواحد' },
+      { key: 'date',            label: 'تاريخ الاستلام *',          labelEn: 'Receipt Date (YYYY-MM-DD, Required)',               required: true,  type: 'date',   example: '2026-10-17' },
+      { key: 'warehouse_name',  label: 'اسم أو كود المستودع *',     labelEn: 'Warehouse Name or Code (Required)',                 required: true,  type: 'text',   example: 'المستودع الرئيسي', note: 'اسم أو كود المستودع المستلم' },
+      { key: 'supplier_code',   label: 'كود أو اسم المورد',         labelEn: 'Supplier Code or Name (Optional)',                  required: false, type: 'text',   example: 'SUPP-001',   note: 'كود أو اسم المورد المستلم منه (اختياري)' },
+      { key: 'product_code',    label: 'كود الصنف *',               labelEn: 'Product Code (Required)',                           required: true,  type: 'text',   example: 'PROD-001',   note: 'كود الصنف المسجل بالنظام' },
+      { key: 'quantity',        label: 'الكمية *',                  labelEn: 'Quantity (Positive number > 0)',                    required: true,  type: 'number', example: '50' },
+      { key: 'unit_cost',       label: 'تكلفة الوحدة *',            labelEn: 'Unit Cost (>= 0)',                                  required: true,  type: 'number', example: '100' },
+      { key: 'batch_id',        label: 'رقم التشغيلة (الباتش)',     labelEn: 'Batch / Lot Number (Optional)',                     required: false, type: 'text',   example: 'BATCH-01' },
+      { key: 'serial_number',   label: 'الرقم التسلسلي (سيريال)',   labelEn: 'Serial Number (Optional)',                          required: false, type: 'text',   example: 'SN-001' },
+      { key: 'notes',           label: 'ملاحظات السطر',             labelEn: 'Item Notes',                                        required: false, type: 'text',   example: 'استلام بضائع للمستودع' },
+    ]
+  },
+
+  // ── التحويل بين المخازن ──────────────────────────────────────────
+  warehouse_transfers: {
+    nameAr: 'التحويل بين المخازن',
+    dbTable: 'warehouse_transfers',
+    uniqueKey: 'transfer_number',
+    columns: [
+      { key: 'transfer_number',     label: 'رقم التحويل *',             labelEn: 'Transfer Number (Required, e.g. TR-000001)',         required: true,  type: 'text',   example: 'TR-000001', note: 'رقم يجمع أصناف إذن التحويل الواحد' },
+      { key: 'date',                label: 'تاريخ التحويل *',           labelEn: 'Transfer Date (YYYY-MM-DD, Required)',               required: true,  type: 'date',   example: '2026-10-17' },
+      { key: 'from_warehouse_name', label: 'من مستودع (المصدر) *',       labelEn: 'Source Warehouse Name or Code (Required)',           required: true,  type: 'text',   example: 'المستودع الرئيسي' },
+      { key: 'to_warehouse_name',   label: 'إلى مستودع (الوجهة) *',     labelEn: 'Destination Warehouse Name or Code (Required)',      required: true,  type: 'text',   example: 'مستودع المعادي' },
+      { key: 'product_code',        label: 'كود الصنف *',               labelEn: 'Product Code (Required)',                           required: true,  type: 'text',   example: 'PROD-001' },
+      { key: 'quantity',            label: 'الكمية المحولة *',          labelEn: 'Quantity (Positive number > 0)',                    required: true,  type: 'number', example: '10' },
+      { key: 'notes',               label: 'البيان / ملاحظات',          labelEn: 'Description / Notes',                               required: false, type: 'text',   example: 'تحويل بضاعة بين المستودعات' },
+    ]
   }
 };
 
@@ -407,8 +443,10 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
     if (pmRes.rows[0]) samplePm = pmRes.rows[0];
     const pRes = await pool.query(`SELECT code, name FROM products WHERE company_id = $1 ORDER BY id LIMIT 1`, [companyId]);
     if (pRes.rows[0]) sampleProd = pRes.rows[0];
-    const wRes = await pool.query(`SELECT id, code, name FROM warehouses WHERE company_id = $1 ORDER BY id LIMIT 1`, [companyId]);
+    let sampleWh2 = { id: '', code: 'WH-02', name: 'مستودع المعادي' };
+    const wRes = await pool.query(`SELECT id, code, name FROM warehouses WHERE company_id = $1 ORDER BY id LIMIT 2`, [companyId]);
     if (wRes.rows[0]) sampleWh = wRes.rows[0];
+    if (wRes.rows[1]) sampleWh2 = wRes.rows[1];
     const expRes = await pool.query(`SELECT code, name FROM expense_categories WHERE company_id = $1 ORDER BY id LIMIT 1`, [companyId]);
     if (expRes.rows[0]) sampleExp = expRes.rows[0];
   } catch (e) { /* non-fatal */ }
@@ -764,6 +802,60 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
     ];
   }
 
+  if (moduleName === 'goods_receipts') {
+    // مثالان توضيحيان يوضحان تجميع أصناف نفس إذن الاستلام برقم إذن واحد (GR-000001)
+    exampleRows = [
+      [
+        'GR-000001',
+        '2026-10-17',
+        sampleWh.name,
+        sampleSupp.code,
+        sampleProd.code,
+        50,
+        100,
+        'BATCH-01',
+        'SN-001',
+        'مثال توضيحي: إذن استلام بضائع للمستودع (احذف هذا الصف قبل الرفع)'
+      ],
+      [
+        'GR-000001',
+        '2026-10-17',
+        sampleWh.name,
+        sampleSupp.code,
+        sampleProd.code,
+        25,
+        120,
+        'BATCH-02',
+        '',
+        'مثال توضيحي: صنف ثانٍ بنفس إذن الاستلام (احذف هذا الصف قبل الرفع)'
+      ]
+    ];
+  }
+
+  if (moduleName === 'warehouse_transfers') {
+    // مثالان توضيحيان يوضحان تجميع أصناف نفس إذن التحويل برقم تحويل واحد (TR-000001)
+    exampleRows = [
+      [
+        'TR-000001',
+        '2026-10-17',
+        sampleWh.name,
+        sampleWh2.name,
+        sampleProd.code,
+        10,
+        'مثال توضيحي: تحويل أصناف بين مستودعين (احذف هذا الصف قبل الرفع)'
+      ],
+      [
+        'TR-000001',
+        '2026-10-17',
+        sampleWh.name,
+        sampleWh2.name,
+        sampleProd.code,
+        5,
+        'مثال توضيحي: صنف ثانٍ بنفس إذن التحويل (احذف هذا الصف قبل الرفع)'
+      ]
+    ];
+  }
+
   // ── Data Sheet: Header on Row 0, Example Rows follow directly from Row 1 ──
   const arabicHeaders = config.columns.map(c => c.label);
   const wsData: any[][] = [arabicHeaders, ...exampleRows];
@@ -841,7 +933,7 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
     }
 
     // 2. الموردين
-    if (['journal_entries', 'receipt_vouchers', 'payment_vouchers', 'supplier_discounts', 'issued_cheques'].includes(moduleName)) {
+    if (['journal_entries', 'receipt_vouchers', 'payment_vouchers', 'supplier_discounts', 'issued_cheques', 'goods_receipts'].includes(moduleName)) {
       const suppRes = await pool.query(`SELECT code, name FROM suppliers WHERE company_id = $1 ORDER BY code`, [companyId]);
       if (suppRes.rows.length > 0) {
         const sData = [['كود المورد', 'اسم المورد'], ...suppRes.rows.map(s => [s.code, s.name])];
@@ -863,7 +955,7 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
     }
 
     // 4. المستودعات
-    if (['opening_stock_balances', 'stock_adjustments'].includes(moduleName)) {
+    if (['opening_stock_balances', 'stock_adjustments', 'goods_receipts', 'warehouse_transfers'].includes(moduleName)) {
       const whRes = await pool.query(`SELECT code, name FROM warehouses WHERE company_id = $1 ORDER BY name`, [companyId]);
       if (whRes.rows.length > 0) {
         const whData = [['كود المستودع', 'اسم المستودع'], ...whRes.rows.map(w => [w.code || '-', w.name])];
@@ -874,7 +966,7 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
     }
 
     // 5. الأصناف
-    if (['opening_stock_balances', 'stock_adjustments'].includes(moduleName)) {
+    if (['opening_stock_balances', 'stock_adjustments', 'goods_receipts', 'warehouse_transfers'].includes(moduleName)) {
       const prRes = await pool.query(`SELECT code, name, unit FROM products WHERE company_id = $1 ORDER BY code`, [companyId]);
       if (prRes.rows.length > 0) {
         const prData = [['كود الصنف', 'اسم الصنف', 'وحدة القياس'], ...prRes.rows.map(p => [p.code, p.name, p.unit || 'قطعة'])];
@@ -911,7 +1003,7 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
   const hasExampleRow = [
     'journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods',
     'opening_stock_balances', 'stock_adjustments', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers', 'customer_discounts', 'supplier_discounts',
-    'issued_cheques', 'received_cheques'
+    'issued_cheques', 'received_cheques', 'goods_receipts', 'warehouse_transfers'
   ].includes(moduleName);
 
   const instructions = [
@@ -1002,6 +1094,22 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
       ['9. كود حساب أوراق القبض (المدين): كود حساب أوراق القبض بدليل الحسابات (مثل 110202)'],
       ['10. يتم إنشاء قيد إثبات استلام الشيكات وحافظة أوراق القبض بحالة "مستلم بالحافظة" آلياً فور التنفيذ'],
       ['11. تنسيق التواريخ: YYYY-MM-DD (مثال: 2026-10-17)'],
+    ] : moduleName === 'goods_receipts' ? [
+      ['4. العمود الأول "رقم إذن الاستلام *" يجمع الأصناف التي تنتمي لنفس إذن الاستلام (مثل GR-000001)'],
+      ['5. يجب تكرار بيانات إذن الاستلام (رقم الإذن، التاريخ، المستودع، والمورد) لكل صنف في نفس الإذن'],
+      ['6. المستودع والأصناف يجب أن تكون مسجلة مسبقاً في النظام (راجع أوراق العمل المرفقة)'],
+      ['7. كود المورد اختياري ولكن إن وُجد يجب أن يكون مسجلاً بالنظام (راجع ورقة "الموردين")'],
+      ['8. الكميات يجب أن تكون موجبة أكبر من صفر (> 0) والتكلفة لا تقل عن صفر (>= 0)'],
+      ['9. يتم إثبات حركات المخزون وطبقات التكلفة آلياً فور تنفيذ الاستيراد'],
+      ['10. تنسيق التواريخ: YYYY-MM-DD (مثال: 2026-10-17)'],
+    ] : moduleName === 'warehouse_transfers' ? [
+      ['4. العمود الأول "رقم التحويل *" يجمع الأصناف التي تنتمي لنفس عملية التحويل (مثل TR-000001)'],
+      ['5. يجب تكرار بيانات عملية التحويل (رقم التحويل، التاريخ، مستودع المصدر، مستودع الوجهة) لكل صنف في نفس التحويل'],
+      ['6. يجب أن يختلف مستودع المصدر عن مستودع الوجهة'],
+      ['7. المستودعات والأصناف يجب أن تكون مسجلة مسبقاً بالنظام (راجع أوراق العمل المرفقة)'],
+      ['8. الكميات المحولة يجب أن تكون موجبة أكبر من صفر (> 0)'],
+      ['9. يتم تسجيل حركات الصرف والإضافة المخزنية آلياً فور تنفيذ الاستيراد'],
+      ['10. تنسيق التواريخ: YYYY-MM-DD (مثال: 2026-10-17)'],
     ] : [
       ['4. الأكواد يجب أن تكون فريدة وغير مكررة'],
       ['5. أعمدة "كود الحساب" يجب إدخال كود الحساب الموجود في دليل الحسابات'],
@@ -1112,7 +1220,9 @@ router.post('/import/validate/:module', authenticateToken, upload.single('file')
                s.includes('pv-example') ||
                s.includes('tr-example') ||
                s.includes('cdisc-example') ||
-               s.includes('sdisc-example');
+               s.includes('sdisc-example') ||
+               s.includes('gr-000001') ||
+               s.includes('gr-example');
       });
     };
 
@@ -2237,6 +2347,339 @@ router.post('/import/validate/:module', authenticateToken, upload.single('file')
         columns:     config.columns.map(c => ({ key: c.key, label: c.label, type: c.type })),
         moduleConfig: { nameAr: config.nameAr, uniqueKey: config.uniqueKey }
       });
+    // ================================================================
+    // 8: GOODS RECEIPTS VALIDATION (أذون استلام البضائع)
+    // ================================================================
+    if (moduleName === 'goods_receipts') {
+      const whRes = await pool.query('SELECT id, code, name FROM warehouses WHERE company_id = $1', [companyId]);
+      const whMap: Record<string, any> = {};
+      whRes.rows.forEach(w => {
+        if (w.name) whMap[String(w.name).trim().toLowerCase()] = w;
+        if (w.code) whMap[String(w.code).trim().toLowerCase()] = w;
+      });
+
+      const prodRes = await pool.query('SELECT id, code, name, unit FROM products WHERE company_id = $1', [companyId]);
+      const prodMapByCode: Record<string, any> = {};
+      const prodMapByName: Record<string, any> = {};
+      prodRes.rows.forEach(p => {
+        if (p.code) prodMapByCode[String(p.code).trim().toLowerCase()] = p;
+        if (p.name) prodMapByName[String(p.name).trim().toLowerCase()] = p;
+      });
+
+      const suppRes = await pool.query('SELECT id, code, name FROM suppliers WHERE company_id = $1', [companyId]);
+      const suppMapByCode: Record<string, any> = {};
+      const suppMapByName: Record<string, any> = {};
+      suppRes.rows.forEach(s => {
+        if (s.code) suppMapByCode[String(s.code).trim().toLowerCase()] = s;
+        if (s.name) suppMapByName[String(s.name).trim().toLowerCase()] = s;
+      });
+
+      const validatedRows: { rowNumber: number; data: Record<string, any> }[] = [];
+      const rowsWithErrors: { rowNumber: number; data: Record<string, any>; errors: string[] }[] = [];
+      const receiptGroups: Record<string, { rows: { rowNumber: number; data: Record<string, any>; errors: string[] }[]; warehouse_id?: string; date?: string; supplier_id?: string }> = {};
+
+      for (const item of dataRowsWithIdx) {
+        const rawRow = item.rawRow;
+        const rowNumber = item.originalRowNumber;
+        const errors: string[] = [];
+        const rowData: Record<string, any> = {};
+
+        for (let colIdx = 0; colIdx < config.columns.length; colIdx++) {
+          const colDef = config.columns[colIdx];
+          let val = rawRow[colIdx];
+          if (typeof val === 'string') val = val.trim();
+
+          if (colDef.type === 'date' && typeof val === 'number') {
+            try {
+              const d = XLSX.SSF.parse_date_code(val);
+              if (d) val = `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
+            } catch { /* ignore */ }
+          }
+
+          const isEmpty = val === undefined || val === null || val === '';
+          if (colDef.required && isEmpty) {
+            errors.push(`الحقل "${colDef.label.replace(' *', '')}" مطلوب`);
+            rowData[colDef.key] = null;
+            continue;
+          }
+          if (isEmpty) {
+            rowData[colDef.key] = colDef.type === 'number' ? 0 : null;
+            continue;
+          }
+
+          if (colDef.type === 'number') {
+            const num = Number(val);
+            if (isNaN(num)) errors.push(`"${colDef.label.replace(' *', '')}" يجب أن يكون رقماً`);
+            else val = num;
+          }
+
+          if (colDef.type === 'date') {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(String(val))) {
+              errors.push(`تاريخ "${val}" يجب أن يكون بتنسيق YYYY-MM-DD`);
+            }
+          }
+
+          rowData[colDef.key] = val;
+        }
+
+        // Warehouse resolution
+        const whVal = String(rowData.warehouse_name || '').trim().toLowerCase();
+        const wh = whMap[whVal];
+        if (!wh) {
+          errors.push(`المستودع "${rowData.warehouse_name}" غير مسجل في دليل المستودعات`);
+        } else {
+          rowData.warehouse_id = wh.id;
+          rowData.warehouse_name = wh.name;
+        }
+
+        // Product resolution
+        const prodVal = String(rowData.product_code || '').trim().toLowerCase();
+        const prod = prodMapByCode[prodVal] || prodMapByName[prodVal];
+        if (!prod) {
+          errors.push(`الصنف "${rowData.product_code}" غير مسجل في دليل الأصناف`);
+        } else {
+          rowData.product_id = prod.id;
+          rowData.product_name = prod.name;
+          rowData.product_code = prod.code;
+          rowData.unit = prod.unit || 'default';
+        }
+
+        // Supplier resolution (optional)
+        if (rowData.supplier_code) {
+          const suppVal = String(rowData.supplier_code).trim().toLowerCase();
+          const supp = suppMapByCode[suppVal] || suppMapByName[suppVal];
+          if (!supp) {
+            errors.push(`المورد "${rowData.supplier_code}" غير مسجل في دليل الموردين`);
+          } else {
+            rowData.supplier_id = supp.id;
+            rowData.supplier_name = supp.name;
+          }
+        }
+
+        // Qty and Cost validation
+        const qty = Number(rowData.quantity) || 0;
+        const cost = Number(rowData.unit_cost) || 0;
+        if (qty <= 0) errors.push('الكمية يجب أن تكون أكبر من صفر');
+        if (cost < 0) errors.push('تكلفة الوحدة لا يمكن أن تكون سالبة');
+
+        const rowObj = { rowNumber, data: rowData, errors };
+        if (errors.length > 0) {
+          rowsWithErrors.push(rowObj);
+        } else {
+          validatedRows.push({ rowNumber, data: rowData });
+        }
+
+        // Group by receipt_number
+        const ref = String(rowData.receipt_number || `ROW-${rowNumber}`).trim();
+        if (!receiptGroups[ref]) {
+          receiptGroups[ref] = { rows: [], warehouse_id: rowData.warehouse_id, date: rowData.date, supplier_id: rowData.supplier_id };
+        }
+        receiptGroups[ref].rows.push(rowObj);
+      }
+
+      // Group consistency checks
+      for (const [ref, group] of Object.entries(receiptGroups)) {
+        const groupErrors: string[] = [];
+        const firstRow = group.rows[0]?.data;
+        for (let i = 1; i < group.rows.length; i++) {
+          const cur = group.rows[i].data;
+          if (cur.warehouse_id && firstRow.warehouse_id && cur.warehouse_id !== firstRow.warehouse_id) {
+            groupErrors.push(`إذن الاستلام رقم "${ref}": لا يمكن أن يحتوي على مستودعات مختلفة لنفس الإذن`);
+            break;
+          }
+          if (cur.date && firstRow.date && cur.date !== firstRow.date) {
+            groupErrors.push(`إذن الاستلام رقم "${ref}": يجب أن يكون التاريخ موحداً لجميع أصناف نفس الإذن`);
+            break;
+          }
+        }
+
+        if (groupErrors.length > 0) {
+          for (const rObj of group.rows) {
+            rObj.errors.push(...groupErrors);
+            const vIdx = validatedRows.findIndex(v => v.rowNumber === rObj.rowNumber);
+            if (vIdx !== -1) {
+              validatedRows.splice(vIdx, 1);
+              rowsWithErrors.push(rObj);
+            }
+          }
+        }
+      }
+
+      return res.json({
+        total:       dataRowsWithIdx.length,
+        valid:       validatedRows.length,
+        errors:      rowsWithErrors.length,
+        validRows:   validatedRows,
+        errorRows:   rowsWithErrors,
+        columns:     config.columns.map(c => ({ key: c.key, label: c.label, type: c.type })),
+        moduleConfig: { nameAr: config.nameAr, uniqueKey: config.uniqueKey }
+      });
+    }
+
+    // ================================================================
+    // 9: WAREHOUSE TRANSFERS VALIDATION (التحويل بين المخازن)
+    // ================================================================
+    if (moduleName === 'warehouse_transfers') {
+      const whRes = await pool.query('SELECT id, code, name FROM warehouses WHERE company_id = $1', [companyId]);
+      const whMap: Record<string, any> = {};
+      whRes.rows.forEach(w => {
+        if (w.name) whMap[String(w.name).trim().toLowerCase()] = w;
+        if (w.code) whMap[String(w.code).trim().toLowerCase()] = w;
+      });
+
+      const prodRes = await pool.query('SELECT id, code, name, unit, cost_price, weighted_average_cost FROM products WHERE company_id = $1', [companyId]);
+      const prodMapByCode: Record<string, any> = {};
+      const prodMapByName: Record<string, any> = {};
+      prodRes.rows.forEach(p => {
+        if (p.code) prodMapByCode[String(p.code).trim().toLowerCase()] = p;
+        if (p.name) prodMapByName[String(p.name).trim().toLowerCase()] = p;
+      });
+
+      const validatedRows: { rowNumber: number; data: Record<string, any> }[] = [];
+      const rowsWithErrors: { rowNumber: number; data: Record<string, any>; errors: string[] }[] = [];
+      const transferGroups: Record<string, { rows: { rowNumber: number; data: Record<string, any>; errors: string[] }[]; from_warehouse_id?: string; to_warehouse_id?: string; date?: string }> = {};
+
+      for (const item of dataRowsWithIdx) {
+        const rawRow = item.rawRow;
+        const rowNumber = item.originalRowNumber;
+        const errors: string[] = [];
+        const rowData: Record<string, any> = {};
+
+        for (let colIdx = 0; colIdx < config.columns.length; colIdx++) {
+          const colDef = config.columns[colIdx];
+          let val = rawRow[colIdx];
+          if (typeof val === 'string') val = val.trim();
+
+          if (colDef.type === 'date' && typeof val === 'number') {
+            try {
+              const d = XLSX.SSF.parse_date_code(val);
+              if (d) val = `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
+            } catch { /* ignore */ }
+          }
+
+          const isEmpty = val === undefined || val === null || val === '';
+          if (colDef.required && isEmpty) {
+            errors.push(`الحقل "${colDef.label.replace(' *', '')}" مطلوب`);
+            rowData[colDef.key] = null;
+            continue;
+          }
+          if (isEmpty) {
+            rowData[colDef.key] = colDef.type === 'number' ? 0 : null;
+            continue;
+          }
+
+          if (colDef.type === 'number') {
+            const num = Number(val);
+            if (isNaN(num)) errors.push(`"${colDef.label.replace(' *', '')}" يجب أن يكون رقماً`);
+            else val = num;
+          }
+
+          if (colDef.type === 'date') {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(String(val))) {
+              errors.push(`تاريخ "${val}" يجب أن يكون بتنسيق YYYY-MM-DD`);
+            }
+          }
+
+          rowData[colDef.key] = val;
+        }
+
+        // Source warehouse
+        const fromWhVal = String(rowData.from_warehouse_name || '').trim().toLowerCase();
+        const fromWh = whMap[fromWhVal];
+        if (!fromWh) {
+          errors.push(`مستودع المصدر "${rowData.from_warehouse_name}" غير مسجل في دليل المستودعات`);
+        } else {
+          rowData.from_warehouse_id = fromWh.id;
+          rowData.from_warehouse_name = fromWh.name;
+        }
+
+        // Destination warehouse
+        const toWhVal = String(rowData.to_warehouse_name || '').trim().toLowerCase();
+        const toWh = whMap[toWhVal];
+        if (!toWh) {
+          errors.push(`مستودع الوجهة "${rowData.to_warehouse_name}" غير مسجل في دليل المستودعات`);
+        } else {
+          rowData.to_warehouse_id = toWh.id;
+          rowData.to_warehouse_name = toWh.name;
+        }
+
+        if (fromWh && toWh && fromWh.id === toWh.id) {
+          errors.push('مستودع المصدر ومستودع الوجهة متطابقان؛ يجب أن يختلفا في عملية التحويل');
+        }
+
+        // Product resolution
+        const prodVal = String(rowData.product_code || '').trim().toLowerCase();
+        const prod = prodMapByCode[prodVal] || prodMapByName[prodVal];
+        if (!prod) {
+          errors.push(`الصنف "${rowData.product_code}" غير مسجل في دليل الأصناف`);
+        } else {
+          rowData.product_id = prod.id;
+          rowData.product_name = prod.name;
+          rowData.product_code = prod.code;
+          rowData.unit = prod.unit || 'default';
+          const currentCost = parseFloat(prod.weighted_average_cost || '0') || parseFloat(prod.cost_price || '0') || 0;
+          rowData.unit_cost = currentCost;
+        }
+
+        const qty = Number(rowData.quantity) || 0;
+        if (qty <= 0) errors.push('الكمية المحولة يجب أن تكون أكبر من صفر');
+
+        const rowObj = { rowNumber, data: rowData, errors };
+        if (errors.length > 0) {
+          rowsWithErrors.push(rowObj);
+        } else {
+          validatedRows.push({ rowNumber, data: rowData });
+        }
+
+        // Group by transfer_number
+        const ref = String(rowData.transfer_number || `ROW-${rowNumber}`).trim();
+        if (!transferGroups[ref]) {
+          transferGroups[ref] = { rows: [], from_warehouse_id: rowData.from_warehouse_id, to_warehouse_id: rowData.to_warehouse_id, date: rowData.date };
+        }
+        transferGroups[ref].rows.push(rowObj);
+      }
+
+      // Group consistency checks
+      for (const [ref, group] of Object.entries(transferGroups)) {
+        const groupErrors: string[] = [];
+        const firstRow = group.rows[0]?.data;
+        for (let i = 1; i < group.rows.length; i++) {
+          const cur = group.rows[i].data;
+          if (cur.from_warehouse_id && firstRow.from_warehouse_id && cur.from_warehouse_id !== firstRow.from_warehouse_id) {
+            groupErrors.push(`عملية التحويل "${ref}": مستودع المصدر غير متطابق عبر أسطر التحويل`);
+            break;
+          }
+          if (cur.to_warehouse_id && firstRow.to_warehouse_id && cur.to_warehouse_id !== firstRow.to_warehouse_id) {
+            groupErrors.push(`عملية التحويل "${ref}": مستودع الوجهة غير متطابق عبر أسطر التحويل`);
+            break;
+          }
+          if (cur.date && firstRow.date && cur.date !== firstRow.date) {
+            groupErrors.push(`عملية التحويل "${ref}": التاريخ غير متطابق عبر أسطر التحويل`);
+            break;
+          }
+        }
+
+        if (groupErrors.length > 0) {
+          for (const rObj of group.rows) {
+            rObj.errors.push(...groupErrors);
+            const vIdx = validatedRows.findIndex(v => v.rowNumber === rObj.rowNumber);
+            if (vIdx !== -1) {
+              validatedRows.splice(vIdx, 1);
+              rowsWithErrors.push(rObj);
+            }
+          }
+        }
+      }
+
+      return res.json({
+        total:       dataRowsWithIdx.length,
+        valid:       validatedRows.length,
+        errors:      rowsWithErrors.length,
+        validRows:   validatedRows,
+        errorRows:   rowsWithErrors,
+        columns:     config.columns.map(c => ({ key: c.key, label: c.label, type: c.type })),
+        moduleConfig: { nameAr: config.nameAr, uniqueKey: config.uniqueKey }
+      });
     }
 
     // ================================================================
@@ -3268,6 +3711,238 @@ router.post('/import/execute/:module', authenticateToken, async (req: AuthReques
           `UPDATE "received_cheques" SET receive_journal_entry_id = $1 WHERE id = $2`,
           [jeId, docId]
         );
+
+        count++;
+      }
+
+      await client.query('COMMIT');
+      return res.json({ success: true, inserted: count, updated: 0, total: rows.length });
+    }
+
+    // ── GOODS RECEIPTS EXECUTE (أذون استلام البضائع) ──────────────────
+    if (moduleName === 'goods_receipts') {
+      const groups: Record<string, any[]> = {};
+      for (const { data } of rows) {
+        const ref = String(data.receipt_number || 'GR-DEFAULT').trim();
+        if (!groups[ref]) groups[ref] = [];
+        groups[ref].push(data);
+      }
+
+      let count = 0;
+      for (const [ref, lines] of Object.entries(groups)) {
+        const docId = uuidv4();
+        const firstLine = lines[0];
+        const dateStr = firstLine.date || new Date().toISOString().split('T')[0];
+        const docNumber = await ensureUniqueSequenceNumber(
+          client,
+          companyId || '',
+          'goods_receipts',
+          dateStr,
+          ref.startsWith('GR-DEFAULT') ? undefined : ref
+        );
+        const description = firstLine.notes || `إذن استلام بضائع مستورد - ${docNumber}`;
+
+        await client.query(
+          `INSERT INTO "goods_receipts" (
+            id, company_id, receipt_number, warehouse_id, warehouse_name,
+            supplier_id, supplier_name, date, status, document_origin,
+            created_automatically, notes, created_by, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'posted', 'excel_import', false, $9, $10, CURRENT_TIMESTAMP)`,
+          [
+            docId, companyId, docNumber, firstLine.warehouse_id, firstLine.warehouse_name,
+            firstLine.supplier_id || null, firstLine.supplier_name || null,
+            dateStr, description, req.user?.id || 'system'
+          ]
+        );
+
+        const movementLines: any[] = [];
+        for (const line of lines) {
+          const itemId = uuidv4();
+          const qty = Number(line.quantity) || 0;
+          const cost = Number(line.unit_cost) || 0;
+          const lineTotal = Math.round(qty * cost * 100) / 100;
+
+          await client.query(
+            `INSERT INTO "goods_receipt_items" (
+              id, goods_receipt_id, company_id, product_id, product_name, product_code,
+              unit, quantity, unit_cost, total_cost, batch_id, serial_number, notes,
+              billed_quantity, remaining_quantity, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 0, $14, CURRENT_TIMESTAMP)`,
+            [
+              itemId, docId, companyId, line.product_id, line.product_name, line.product_code,
+              line.unit || 'default', qty, cost, lineTotal, line.batch_id || null, line.serial_number || null,
+              line.notes || null, qty
+            ]
+          );
+
+          if (qty > 0) {
+            await recordGoodsReceipt(
+              client,
+              companyId || '',
+              firstLine.warehouse_id || null,
+              line.product_id,
+              qty,
+              cost,
+              docId,
+              docNumber,
+              dateStr
+            );
+
+            movementLines.push({
+              product_id: line.product_id,
+              unit_id: line.unit || 'default',
+              quantity: qty,
+              direction: 'IN',
+              unit_cost: cost,
+              total_cost: lineTotal,
+              batch_id: line.batch_id || null,
+              serial_number: line.serial_number || null,
+              notes: line.notes || null
+            });
+          }
+        }
+
+        if (movementLines.length > 0) {
+          await InventoryMovementService.createMovement({
+            company_id: companyId,
+            warehouse_id: firstLine.warehouse_id || null,
+            movement_number: docNumber,
+            movement_type: 'goods_receipt',
+            source_document_type: 'goods_receipt',
+            source_document_id: docId,
+            movement_date: dateStr,
+            status: 'posted',
+            notes: description,
+            created_by: req.user?.id || 'system'
+          }, movementLines, client);
+        }
+
+        count++;
+      }
+
+      await client.query('COMMIT');
+      return res.json({ success: true, inserted: count, updated: 0, total: rows.length });
+    }
+
+    // ── WAREHOUSE TRANSFERS EXECUTE (التحويل بين المخازن) ────────────────
+    if (moduleName === 'warehouse_transfers') {
+      const groups: Record<string, any[]> = {};
+      for (const { data } of rows) {
+        const ref = String(data.transfer_number || 'TR-DEFAULT').trim();
+        if (!groups[ref]) groups[ref] = [];
+        groups[ref].push(data);
+      }
+
+      let count = 0;
+      for (const [ref, lines] of Object.entries(groups)) {
+        const docId = uuidv4();
+        const firstLine = lines[0];
+        const dateStr = firstLine.date || new Date().toISOString().split('T')[0];
+        const docNumber = await ensureUniqueSequenceNumber(
+          client,
+          companyId || '',
+          'warehouse_transfers',
+          dateStr,
+          ref.startsWith('TR-DEFAULT') ? undefined : ref
+        );
+        const description = firstLine.notes || `تحويل مخزني مستورد - ${docNumber}`;
+
+        await client.query(
+          `INSERT INTO "warehouse_transfers" (
+            id, company_id, transfer_number, from_warehouse_id, to_warehouse_id,
+            from_warehouse_name, to_warehouse_name, date, description, created_by, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)`,
+          [
+            docId, companyId, docNumber, firstLine.from_warehouse_id, firstLine.to_warehouse_id,
+            firstLine.from_warehouse_name, firstLine.to_warehouse_name,
+            dateStr, description, req.user?.id || 'system'
+          ]
+        );
+
+        const fromMovementLines: any[] = [];
+        const toMovementLines: any[] = [];
+
+        for (const line of lines) {
+          const itemId = uuidv4();
+          const qty = Number(line.quantity) || 0;
+
+          const prodRes = await client.query('SELECT cost_price, weighted_average_cost FROM products WHERE id = $1', [line.product_id]);
+          const currentCost = (prodRes.rows[0] && (parseFloat(prodRes.rows[0].weighted_average_cost || '0') || parseFloat(prodRes.rows[0].cost_price || '0'))) || Number(line.unit_cost) || 0;
+          const lineTotal = Math.round(qty * currentCost * 100) / 100;
+
+          await client.query(
+            `INSERT INTO "warehouse_transfer_items" (
+              id, transfer_id, product_id, product_name, product_code,
+              quantity, unit_cost, total_cost, company_id, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)`,
+            [
+              itemId, docId, line.product_id, line.product_name, line.product_code,
+              qty, currentCost, lineTotal, companyId
+            ]
+          );
+
+          if (qty > 0) {
+            await recordTransfer(
+              client,
+              companyId || '',
+              firstLine.from_warehouse_id,
+              firstLine.to_warehouse_id,
+              line.product_id,
+              qty,
+              docId,
+              docNumber,
+              dateStr
+            );
+
+            fromMovementLines.push({
+              product_id: line.product_id,
+              unit_id: line.unit || 'default',
+              quantity: qty,
+              direction: 'OUT',
+              unit_cost: currentCost,
+              total_cost: lineTotal,
+              notes: line.notes || null
+            });
+
+            toMovementLines.push({
+              product_id: line.product_id,
+              unit_id: line.unit || 'default',
+              quantity: qty,
+              direction: 'IN',
+              unit_cost: currentCost,
+              total_cost: lineTotal,
+              notes: line.notes || null
+            });
+          }
+        }
+
+        if (fromMovementLines.length > 0) {
+          await InventoryMovementService.createMovement({
+            company_id: companyId,
+            warehouse_id: firstLine.from_warehouse_id,
+            movement_number: `${docNumber}-OUT`,
+            movement_type: 'warehouse_transfer',
+            source_document_type: 'warehouse_transfer',
+            source_document_id: docId,
+            movement_date: dateStr,
+            status: 'posted',
+            notes: `تحويل منصرف إلى ${firstLine.to_warehouse_name} - ${docNumber}`,
+            created_by: req.user?.id || 'system'
+          }, fromMovementLines, client);
+
+          await InventoryMovementService.createMovement({
+            company_id: companyId,
+            warehouse_id: firstLine.to_warehouse_id,
+            movement_number: `${docNumber}-IN`,
+            movement_type: 'warehouse_transfer',
+            source_document_type: 'warehouse_transfer',
+            source_document_id: docId,
+            movement_date: dateStr,
+            status: 'posted',
+            notes: `تحويل وارد من ${firstLine.from_warehouse_name} - ${docNumber}`,
+            created_by: req.user?.id || 'system'
+          }, toMovementLines, client);
+        }
 
         count++;
       }
