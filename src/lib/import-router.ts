@@ -427,8 +427,8 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
   const expAccCode  = findAccCode(a => a.name.includes('مصروف') || a.code === '511', '511');
   const invAccCode  = findAccCode(a => a.name.includes('مخزون') || a.name.includes('بضاعة') || a.code === '1115', '1115');
   const capAccCode  = findAccCode(a => a.name.includes('رأس المال') || a.name.includes('افتتاحي') || a.name.includes('أرباح') || a.code === '31', '31');
-  const notesPayableAccCode = findAccCode(a => a.account_usage === 'notes_payable' || a.name.includes('أوراق دفع') || a.name.includes('اوراق دفع') || a.code === '210102', '210102');
-  const notesReceivableAccCode = findAccCode(a => a.account_usage === 'notes_receivable' || a.name.includes('أوراق قبض') || a.name.includes('اوراق قبض') || a.code === '110202', '110202');
+  const notesPayableAccCode = findAccCode(a => a.name.includes('أوراق دفع') || a.name.includes('اوراق دفع') || a.code === '210102', '210102');
+  const notesReceivableAccCode = findAccCode(a => a.name.includes('أوراق قبض') || a.name.includes('اوراق قبض') || a.code === '110202', '110202');
 
   let exampleRows: any[][] = [];
 
