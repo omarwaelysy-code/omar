@@ -941,7 +941,8 @@ export const DataCountsValues: React.FC<DataCountsValuesProps> = ({ companyId, c
                       </span>
                     </td>
                   </tr>
-                ))}
+                );
+              })}
               </tbody>
               <tfoot>
                 <tr className="bg-blue-50/70 border-t-2 border-blue-200 font-black text-slate-900">
