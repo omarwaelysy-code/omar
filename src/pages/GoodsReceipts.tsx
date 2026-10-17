@@ -1394,6 +1394,8 @@ export const GoodsReceipts: React.FC = () => {
             </div>
           )}
         </div>
+      )}
+
       {showImportWizard && (
         <ExcelImportWizard
           module="goods_receipts"

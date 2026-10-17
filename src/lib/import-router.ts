@@ -2347,6 +2347,8 @@ router.post('/import/validate/:module', authenticateToken, upload.single('file')
         columns:     config.columns.map(c => ({ key: c.key, label: c.label, type: c.type })),
         moduleConfig: { nameAr: config.nameAr, uniqueKey: config.uniqueKey }
       });
+    }
+
     // ================================================================
     // 8: GOODS RECEIPTS VALIDATION (أذون استلام البضائع)
     // ================================================================
