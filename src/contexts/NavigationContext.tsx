@@ -136,7 +136,6 @@ export const pageLabels: { [key: string]: string } = {
   'supplier_settlements': 'تسويات الموردين',
   'cash_transfers': 'حوالات الخزينة',
   'warehouse_transfers': 'حوالات المستودعات',
-  'goods_receipts': 'أذون استلام البضائع',
   'opening_stock_balances': 'أرصدة أول المدة للمخزون',
   'stock_adjustments': 'تسويات المخزون',
   'stock_balances_report': 'تقرير أرصدة المخزون',
