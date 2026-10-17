@@ -218,7 +218,7 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
                 </div>
 
                 {/* تنبيه باللون الأحمر بحذف المثال */}
-                {['journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods', 'opening_stock_balances', 'stock_adjustments', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers', 'customer_discounts', 'supplier_discounts'].includes(module) && (
+                {['journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods', 'opening_stock_balances', 'stock_adjustments', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers', 'customer_discounts', 'supplier_discounts', 'issued_cheques', 'received_cheques'].includes(module) && (
                   <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
                     <AlertTriangle className="text-red-600 shrink-0 mt-0.5" size={22} />
                     <div className="text-sm text-red-800 space-y-1">
@@ -228,7 +228,7 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
                       </p>
                       <p className="leading-relaxed font-semibold">
                         تم وضع صفوف كأمثلة توضيحية داخل نموذج الـ Excel المرفق لمساعدتك على معرفة طريقة ملء البيانات
-                        {module === 'journal_entries' ? ' (يشمل أمثلة للحسابات الفرعية للعملاء، الموردين، والخزائن مع توازن الطرفين المدين والدائن)' : ''}.
+                        {module === 'journal_entries' ? ' (يشمل أمثلة للحسابات الفرعية للعملاء، الموردين، والخزائن مع توازن الطرفين المدين والدائن)' : module === 'issued_cheques' ? ' (يشمل شيكات لموردين وشيكات عامة بدون مورد)' : module === 'received_cheques' ? ' (يشمل شيكات من عملاء وشيكات عامة بدون عميل)' : ''}.
                         <span className="font-black text-red-950 underline mx-1">
                           يجب حذف صفوف المثال التوضيحي بالكامل
                         </span>
@@ -244,7 +244,7 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
                     <div className="text-sm text-amber-800 space-y-1">
                       <p className="font-bold">تعليمات مهمة:</p>
                       <ul className="list-disc list-inside space-y-1 text-amber-700">
-                        {['journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods', 'opening_stock_balances', 'stock_adjustments', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers', 'customer_discounts', 'supplier_discounts'].includes(module) && (
+                        {['journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods', 'opening_stock_balances', 'stock_adjustments', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers', 'customer_discounts', 'supplier_discounts', 'issued_cheques', 'received_cheques'].includes(module) && (
                           <li className="text-red-600 font-black">
                             ⚠️ احذف صفوف المثال التوضيحي المرفقة بالنموذج قبل حفظ الملف ورفعه إلى النظام
                           </li>
@@ -283,6 +283,24 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
                             <li>يجب أن يكون العميل / المورد مسجلاً بالنظام ومربوطاً بحساب محاسبي</li>
                             <li>يجب أن يكون كود حساب الخصم صحيحاً ومسجلاً بدليل الحسابات</li>
                             <li>مبلغ الخصم يجب أن يكون أكبر من صفر</li>
+                          </>
+                        ) : module === 'issued_cheques' ? (
+                          <>
+                            <li>رقم الشيك وتاريخ التحرير وتاريخ الاستحقاق والمبلغ إجبارية</li>
+                            <li>نوع المستفيد: اختر supplier (شيك لمورد) أو general (شيك بدون مورد / مصروفات وجهات أخرى)</li>
+                            <li>في حالة الشيك لمورد: كود المورد إجباري ويتم ربطه بحساب المورد الفرعي تلقائياً</li>
+                            <li>في حالة شيك بدون مورد: اسم المستفيد وكود الحساب المدين إجباريان من دليل الحسابات</li>
+                            <li>كود حساب أوراق الدفع واسم البنك المسحوب عليه إجباريان</li>
+                            <li>يتم إنشاء قيد إصدار الشيكات برسم الدفع آلياً وموازنته فور تنفيذ الاستيراد</li>
+                          </>
+                        ) : module === 'received_cheques' ? (
+                          <>
+                            <li>رقم الشيك وتاريخ الاستلام وتاريخ الاستحقاق والمبلغ واسم بنك الساحب إجبارية</li>
+                            <li>نوع الساحب: اختر customer (شيك من عميل) أو general (شيك بدون عميل / إيرادات وجهات أخرى)</li>
+                            <li>في حالة الشيك من عميل: كود العميل إجباري ويتم ربطه بحساب العميل الفرعي تلقائياً</li>
+                            <li>في حالة شيك بدون عميل: اسم الساحب وكود الحساب الدائن إجباريان من دليل الحسابات</li>
+                            <li>كود حساب أوراق القبض (المدين) إجباري بدليل الحسابات</li>
+                            <li>يتم إنشاء قيد استلام الشيكات وحافظة أوراق القبض آلياً وموازنتها فور تنفيذ الاستيراد</li>
                           </>
                         ) : (
                           <>

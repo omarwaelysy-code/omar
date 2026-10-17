@@ -317,6 +317,49 @@ const IMPORT_CONFIGS: Record<string, {
       { key: 'description',   label: 'البيان / سبب الخصم',          labelEn: 'Description',                                           required: false, type: 'text',         example: 'خصم كمية من المورد' },
       { key: 'notes',         label: 'ملاحظات إضافية',              labelEn: 'Notes',                                                 required: false, type: 'text',         example: 'تسوية سنوية' },
     ]
+  },
+
+  // ── الشيكات الصادرة (أوراق الدفع) ──────────────────────────────────
+  issued_cheques: {
+    nameAr: 'الشيكات الصادرة',
+    dbTable: 'issued_cheques',
+    uniqueKey: 'cheque_number',
+    columns: [
+      { key: 'cheque_number',       label: 'رقم الشيك *',                     labelEn: 'Cheque Number (Required)',                                    required: true,  type: 'text',         example: 'CHQ-100251', note: 'رقم الشيك الفعلي المطبوع' },
+      { key: 'issue_date',          label: 'تاريخ التحرير والإصدار *',        labelEn: 'Issue Date (YYYY-MM-DD, Required)',                           required: true,  type: 'date',         example: '2026-10-17' },
+      { key: 'due_date',            label: 'تاريخ الاستحقاق والصرف *',        labelEn: 'Due Date (YYYY-MM-DD, Required)',                             required: true,  type: 'date',         example: '2026-11-17' },
+      { key: 'amount',              label: 'المبلغ *',                        labelEn: 'Amount (Required, > 0)',                                      required: true,  type: 'number',       example: '5000' },
+      { key: 'payee_type',          label: 'نوع المستفيد *',                  labelEn: 'Payee Type: supplier | general',                              required: true,  type: 'select',       options: ['supplier', 'general'], example: 'supplier', note: 'supplier = شيك لمورد | general = شيك بدون مورد' },
+      { key: 'supplier_code',       label: 'كود أو اسم المورد',               labelEn: 'Supplier Code or Name (Required for supplier type)',          required: false, type: 'text',         example: 'SUPP-001',   note: 'مطلوب في حال اختيار نوع المستفيد supplier' },
+      { key: 'payee_name',          label: 'اسم المستفيد (لأمر من)',          labelEn: 'Payee / Beneficiary Name (Required for general type)',        required: false, type: 'text',         example: 'شركة التوريدات الحديثة' },
+      { key: 'bank_name',           label: 'البنك المسحوب منه (الخزينة/البنك) *', labelEn: 'Drawn Bank / Payment Method Name (Required)',            required: true,  type: 'text',         example: 'البنك الأهلي المصري', note: 'اسم البنك أو طريقة السداد البنكية المسجلة بالنظام' },
+      { key: 'credit_account_code', label: 'كود حساب أوراق الدفع (الدائن) *', labelEn: 'Notes Payable Account Code (Required)',                      required: true,  type: 'account_code', example: '210102',     note: 'حساب أوراق الدفع / الشيكات الصادرة بدليل الحسابات' },
+      { key: 'debit_account_code',  label: 'كود الحساب المدين',               labelEn: 'Debit Account Code (Required for general type)',              required: false, type: 'account_code', example: '210101',     note: 'مطلوب في حالة الشيك بدون مورد (حساب المصروف أو الأصل أو المستفيد)' },
+      { key: 'description',         label: 'البيان / الغرض',                  labelEn: 'Description',                                                 required: false, type: 'text',         example: 'دفعة تحت حساب التوريدات' },
+      { key: 'notes',               label: 'ملاحظات إضافية',                  labelEn: 'Notes',                                                       required: false, type: 'text',         example: 'شيك مؤجل الدفع' },
+    ]
+  },
+
+  // ── الشيكات الواردة (أوراق القبض) ──────────────────────────────────
+  received_cheques: {
+    nameAr: 'الشيكات الواردة',
+    dbTable: 'received_cheques',
+    uniqueKey: 'cheque_number',
+    columns: [
+      { key: 'receipt_number',      label: 'رقم الحافظة / الإيصال',           labelEn: 'Receipt Voucher Number (Optional, auto-generated if blank)',  required: false, type: 'text',         example: 'REC-00001' },
+      { key: 'cheque_number',       label: 'رقم الشيك *',                     labelEn: 'Cheque Number (Required)',                                    required: true,  type: 'text',         example: 'CHQ-77881',  note: 'رقم الشيك الورقي المستلم' },
+      { key: 'receive_date',        label: 'تاريخ الاستلام *',                labelEn: 'Receive Date (YYYY-MM-DD, Required)',                         required: true,  type: 'date',         example: '2026-10-17' },
+      { key: 'due_date',            label: 'تاريخ الاستحقاق *',               labelEn: 'Due Date (YYYY-MM-DD, Required)',                             required: true,  type: 'date',         example: '2026-11-15' },
+      { key: 'amount',              label: 'المبلغ *',                        labelEn: 'Amount (Required, > 0)',                                      required: true,  type: 'number',       example: '10000' },
+      { key: 'payer_type',          label: 'نوع الجهة الساحبة *',             labelEn: 'Payer Type: customer | general',                              required: true,  type: 'select',       options: ['customer', 'general'], example: 'customer', note: 'customer = شيك من عميل | general = شيك بدون عميل' },
+      { key: 'customer_code',       label: 'كود أو اسم العميل',               labelEn: 'Customer Code or Name (Required for customer type)',          required: false, type: 'text',         example: 'CUST-001',   note: 'مطلوب في حال اختيار نوع الساحب customer' },
+      { key: 'payer_name',          label: 'اسم الساحب / المحرر',             labelEn: 'Payer / Issuer Name (Required for general type)',             required: false, type: 'text',         example: 'شركة الأمل للتجارة' },
+      { key: 'bank_name',           label: 'اسم البنك المسحوب عليه *',        labelEn: 'Drawn Bank Name (Required)',                                  required: true,  type: 'text',         example: 'البنك التجاري الدولي CIB', note: 'اسم البنك المسحوب عليه الشيك' },
+      { key: 'debit_account_code',  label: 'كود حساب أوراق القبض (المدين) *', labelEn: 'Notes Receivable Account Code (Required)',                    required: true,  type: 'account_code', example: '110202',     note: 'حساب أوراق القبض / شيكات برسم التحصيل بدليل الحسابات' },
+      { key: 'credit_account_code', label: 'كود الحساب الدائن',               labelEn: 'Credit Account Code (Required for general type)',             required: false, type: 'account_code', example: '110201',     note: 'مطلوب في حالة الشيك بدون عميل (حساب الإيراد أو الجهة الدائنة)' },
+      { key: 'description',         label: 'البيان / الغرض',                  labelEn: 'Description',                                                 required: false, type: 'text',         example: 'تحصيل دفعة بشيك مؤجل' },
+      { key: 'notes',               label: 'ملاحظات إضافية',                  labelEn: 'Notes',                                                       required: false, type: 'text',         example: 'حافظة شيكات واردة' },
+    ]
   }
 };
 
@@ -370,6 +413,12 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
     if (expRes.rows[0]) sampleExp = expRes.rows[0];
   } catch (e) { /* non-fatal */ }
 
+  let sampleBankPm = samplePm;
+  try {
+    const bankRes = await pool.query(`SELECT name, type FROM payment_methods WHERE company_id = $1 AND (type = 'bank' OR bank_name IS NOT NULL) ORDER BY id LIMIT 1`, [companyId]);
+    if (bankRes.rows[0]) sampleBankPm = bankRes.rows[0];
+  } catch (e) { /* non-fatal */ }
+
   const custAccCode = findAccCode(a => a.required_sub_account && (a.name.includes('عملاء') || a.name.toLowerCase().includes('customer')), '111');
   const suppAccCode = findAccCode(a => a.required_sub_account && (a.name.includes('مورد') || a.name.toLowerCase().includes('supplier')), '211');
   const cashAccCode = findAccCode(a => a.name.includes('خزين') || a.name.includes('صندوق') || a.name.includes('نقد') || a.code === '1101' || a.code === '101', '1101');
@@ -378,6 +427,8 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
   const expAccCode  = findAccCode(a => a.name.includes('مصروف') || a.code === '511', '511');
   const invAccCode  = findAccCode(a => a.name.includes('مخزون') || a.name.includes('بضاعة') || a.code === '1115', '1115');
   const capAccCode  = findAccCode(a => a.name.includes('رأس المال') || a.name.includes('افتتاحي') || a.name.includes('أرباح') || a.code === '31', '31');
+  const notesPayableAccCode = findAccCode(a => a.account_usage === 'notes_payable' || a.name.includes('أوراق دفع') || a.name.includes('اوراق دفع') || a.code === '210102', '210102');
+  const notesReceivableAccCode = findAccCode(a => a.account_usage === 'notes_receivable' || a.name.includes('أوراق قبض') || a.name.includes('اوراق قبض') || a.code === '110202', '110202');
 
   let exampleRows: any[][] = [];
 
@@ -639,6 +690,80 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
     ];
   }
 
+  if (moduleName === 'issued_cheques') {
+    // مثالان توضيحيان: 1- شيك صادر لمورد  2- شيك صادر بدون مورد (مصروفات / جهات أخرى)
+    exampleRows = [
+      // 1. شيك صادر لمورد (يتم ترحيل قيد أوراق الدفع تلقائياً)
+      [
+        'CHQ-100251',
+        '2026-10-17',
+        '2026-11-17',
+        5000,
+        'supplier',
+        sampleSupp.code,
+        sampleSupp.name,
+        sampleBankPm.name,
+        notesPayableAccCode,
+        suppAccCode,
+        'مثال توضيحي: شيك صادر لمورد (احذف هذا الصف قبل الرفع)',
+        'دفعة تحت حساب التوريدات'
+      ],
+      // 2. شيك صادر بدون مورد (شيك عام / مصروف إيجار أو جهة أخرى)
+      [
+        'CHQ-100252',
+        '2026-10-17',
+        '2026-12-01',
+        3000,
+        'general',
+        '',
+        'مصلحة الضرائب / مالك العقار',
+        sampleBankPm.name,
+        notesPayableAccCode,
+        expAccCode,
+        'مثال توضيحي: شيك صادر بدون مورد لمصروف إيجار (احذف هذا الصف قبل الرفع)',
+        'سداد إيجار المقر بشيك مؤجل'
+      ]
+    ];
+  }
+
+  if (moduleName === 'received_cheques') {
+    // مثالان توضيحيان: 1- شيك مستلم من عميل  2- شيك مستلم بدون عميل (إيرادات / جهات أخرى)
+    exampleRows = [
+      // 1. شيك مستلم من عميل (أوراق قبض - عملاء)
+      [
+        'REC-00001',
+        'CHQ-77881',
+        '2026-10-17',
+        '2026-11-15',
+        10000,
+        'customer',
+        sampleCust.code,
+        sampleCust.name,
+        'البنك التجاري الدولي CIB',
+        notesReceivableAccCode,
+        custAccCode,
+        'مثال توضيحي: استلام شيك من عميل سداد دفعة (احذف هذا الصف قبل الرفع)',
+        'شيك مسحوب على CIB'
+      ],
+      // 2. شيك مستلم بدون عميل (أوراق قبض - إيرادات أخرى / جهة عامة)
+      [
+        'REC-00002',
+        'CHQ-77882',
+        '2026-10-17',
+        '2026-12-01',
+        4500,
+        'general',
+        '',
+        'مستأجر فرع المعادي',
+        'بنك قطر الوطني QNB',
+        notesReceivableAccCode,
+        revAccCode,
+        'مثال توضيحي: استلام شيك بدون عميل إيراد إيجار (احذف هذا الصف قبل الرفع)',
+        'إيراد إيجار مقدم'
+      ]
+    ];
+  }
+
   // ── Data Sheet: Header on Row 0, Example Rows follow directly from Row 1 ──
   const arabicHeaders = config.columns.map(c => c.label);
   const wsData: any[][] = [arabicHeaders, ...exampleRows];
@@ -705,7 +830,7 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
   // ── Additional Reference Sheets ──────────────────────────────
   try {
     // 1. العملاء
-    if (['journal_entries', 'receipt_vouchers', 'payment_vouchers', 'customer_discounts'].includes(moduleName)) {
+    if (['journal_entries', 'receipt_vouchers', 'payment_vouchers', 'customer_discounts', 'received_cheques'].includes(moduleName)) {
       const custRes = await pool.query(`SELECT code, name FROM customers WHERE company_id = $1 ORDER BY code`, [companyId]);
       if (custRes.rows.length > 0) {
         const cData = [['كود العميل', 'اسم العميل'], ...custRes.rows.map(c => [c.code, c.name])];
@@ -716,7 +841,7 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
     }
 
     // 2. الموردين
-    if (['journal_entries', 'receipt_vouchers', 'payment_vouchers', 'supplier_discounts'].includes(moduleName)) {
+    if (['journal_entries', 'receipt_vouchers', 'payment_vouchers', 'supplier_discounts', 'issued_cheques'].includes(moduleName)) {
       const suppRes = await pool.query(`SELECT code, name FROM suppliers WHERE company_id = $1 ORDER BY code`, [companyId]);
       if (suppRes.rows.length > 0) {
         const sData = [['كود المورد', 'اسم المورد'], ...suppRes.rows.map(s => [s.code, s.name])];
@@ -727,7 +852,7 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
     }
 
     // 3. طرق السداد والخزن
-    if (['journal_entries', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers'].includes(moduleName)) {
+    if (['journal_entries', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers', 'issued_cheques'].includes(moduleName)) {
       const pmRes = await pool.query(`SELECT name, type FROM payment_methods WHERE company_id = $1 ORDER BY name`, [companyId]);
       if (pmRes.rows.length > 0) {
         const pmData = [['اسم طريقة السداد / الخزينة', 'النوع'], ...pmRes.rows.map(p => [p.name, p.type])];
@@ -785,7 +910,8 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
   // ── Instructions Sheet ────────────────────────────────────────
   const hasExampleRow = [
     'journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods',
-    'opening_stock_balances', 'stock_adjustments', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers', 'customer_discounts', 'supplier_discounts'
+    'opening_stock_balances', 'stock_adjustments', 'receipt_vouchers', 'payment_vouchers', 'cash_transfers', 'customer_discounts', 'supplier_discounts',
+    'issued_cheques', 'received_cheques'
   ].includes(moduleName);
 
   const instructions = [
@@ -858,6 +984,24 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
       ['6. كود حساب الخصم المكتسب يجب أن يكون مسجلاً بدليل الحسابات (راجع ورقة "دليل الحسابات")'],
       ['7. يتم إنشاء قيد الخصم المكتسب تلقائياً (مدين: حساب المورد، دائن: حساب الخصم المكتسب)'],
       ['8. تنسيق التواريخ: YYYY-MM-DD (مثال: 2026-10-17)'],
+    ] : moduleName === 'issued_cheques' ? [
+      ['4. رقم الشيك وتاريخ التحرير وتاريخ الاستحقاق والمبلغ إجبارية'],
+      ['5. نوع المستفيد: اختر supplier (شيك لمورد) أو general (شيك بدون مورد / جهات أخرى)'],
+      ['6. في حالة شيك لمورد (supplier): كود أو اسم المورد إجباري ويجب أن يطابق مورداً مسجلاً بالنظام (راجع ورقة "الموردين")'],
+      ['7. في حالة شيك بدون مورد (general): اسم المستفيد وكود الحساب المدين إجباريان (راجع ورقة "دليل الحسابات")'],
+      ['8. البنك المسحوب منه: اسم طريقة السداد أو البنك المسجل بالنظام المسحوب منه الشيك (راجع ورقة "طرق السداد والخزن")'],
+      ['9. كود حساب أوراق الدفع (الدائن): كود حساب أوراق الدفع بدليل الحسابات (مثل 210102)'],
+      ['10. يتم إنشاء قيد إصدار الشيك المحاسبي (أوراق الدفع) وحفظ الشيك بحالة "صادر" آلياً فور التنفيذ'],
+      ['11. تنسيق التواريخ: YYYY-MM-DD (مثال: 2026-10-17)'],
+    ] : moduleName === 'received_cheques' ? [
+      ['4. رقم الحافظة / الإيصال اختياري؛ إذا تركته فارغاً سيتم توليده تلقائياً'],
+      ['5. رقم الشيك وتاريخ الاستلام وتاريخ الاستحقاق والمبلغ واسم بنك الساحب إجبارية'],
+      ['6. نوع الجهة الساحبة: اختر customer (شيك من عميل) أو general (شيك بدون عميل / إيرادات أخرى)'],
+      ['7. في حالة شيك من عميل (customer): كود أو اسم العميل إجباري ويجب أن يطابق عميلاً مسجلاً بالنظام (راجع ورقة "العملاء")'],
+      ['8. في حالة شيك بدون عميل (general): اسم الساحب/المحرر وكود الحساب الدائن إجباريان (راجع ورقة "دليل الحسابات")'],
+      ['9. كود حساب أوراق القبض (المدين): كود حساب أوراق القبض بدليل الحسابات (مثل 110202)'],
+      ['10. يتم إنشاء قيد إثبات استلام الشيكات وحافظة أوراق القبض بحالة "مستلم بالحافظة" آلياً فور التنفيذ'],
+      ['11. تنسيق التواريخ: YYYY-MM-DD (مثال: 2026-10-17)'],
     ] : [
       ['4. الأكواد يجب أن تكون فريدة وغير مكررة'],
       ['5. أعمدة "كود الحساب" يجب إدخال كود الحساب الموجود في دليل الحسابات'],
@@ -957,6 +1101,11 @@ router.post('/import/validate/:module', authenticateToken, upload.single('file')
                s.includes('tr-000001') ||
                s.includes('cdisc-00001') ||
                s.includes('sdisc-00001') ||
+               s.includes('chq-100251') ||
+               s.includes('chq-100252') ||
+               s.includes('chq-77881') ||
+               s.includes('chq-77882') ||
+               s.includes('chq-example') ||
                s.includes('opb-example') ||
                s.includes('adj-example') ||
                s.includes('rv-example') ||
@@ -1766,6 +1915,309 @@ router.post('/import/validate/:module', authenticateToken, upload.single('file')
             rowData.supplier_id = supp.id;
             rowData.supplier_name = supp.name;
             rowData.counter_account_id = supp.account_id;
+          }
+        }
+
+        if (errors.length > 0) {
+          rowsWithErrors.push({ rowNumber, data: rowData, errors });
+        } else {
+          validatedRows.push({ rowNumber, data: rowData });
+        }
+      }
+
+      return res.json({
+        total:       dataRowsWithIdx.length,
+        valid:       validatedRows.length,
+        errors:      rowsWithErrors.length,
+        validRows:   validatedRows,
+        errorRows:   rowsWithErrors,
+        columns:     config.columns.map(c => ({ key: c.key, label: c.label, type: c.type })),
+        moduleConfig: { nameAr: config.nameAr, uniqueKey: config.uniqueKey }
+      });
+    }
+
+    // ================================================================
+    // 7: ISSUED CHEQUES VALIDATION (الشيكات الصادرة)
+    // ================================================================
+    if (moduleName === 'issued_cheques') {
+      const accountsRes = await pool.query('SELECT id, code, name FROM accounts WHERE company_id = $1', [companyId]);
+      const accMap: Record<string, { id: string; code: string; name: string }> = {};
+      accountsRes.rows.forEach(a => { accMap[String(a.code).trim()] = a; });
+
+      const suppRes = await pool.query('SELECT id, code, name, account_id FROM suppliers WHERE company_id = $1', [companyId]);
+      const suppMap: Record<string, any> = {};
+      suppRes.rows.forEach(s => {
+        if (s.code) suppMap[String(s.code).trim().toLowerCase()] = s;
+        if (s.name) suppMap[String(s.name).trim().toLowerCase()] = s;
+      });
+
+      const pmRes = await pool.query('SELECT id, name, type, bank_name, account_id FROM payment_methods WHERE company_id = $1', [companyId]);
+      const pmMapByName: Record<string, any> = {};
+      pmRes.rows.forEach(p => {
+        pmMapByName[String(p.name).trim().toLowerCase()] = p;
+        if (p.bank_name) pmMapByName[String(p.bank_name).trim().toLowerCase()] = p;
+      });
+      const firstBankPm = pmRes.rows.find((p: any) => p.type === 'bank' || p.bank_name) || pmRes.rows[0];
+
+      const validatedRows: { rowNumber: number; data: Record<string, any> }[] = [];
+      const rowsWithErrors: { rowNumber: number; data: Record<string, any>; errors: string[] }[] = [];
+
+      for (const item of dataRowsWithIdx) {
+        const rawRow = item.rawRow;
+        const rowNumber = item.originalRowNumber;
+        const errors: string[] = [];
+        const rowData: Record<string, any> = {};
+
+        for (let colIdx = 0; colIdx < config.columns.length; colIdx++) {
+          const colDef = config.columns[colIdx];
+          let val = rawRow[colIdx];
+          if (typeof val === 'string') val = val.trim();
+
+          if (colDef.type === 'date' && typeof val === 'number') {
+            try {
+              const d = XLSX.SSF.parse_date_code(val);
+              if (d) val = `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
+            } catch { /* ignore */ }
+          }
+
+          const isEmpty = val === undefined || val === null || val === '';
+          if (colDef.required && isEmpty) {
+            errors.push(`الحقل "${colDef.label.replace(' *', '')}" مطلوب`);
+            rowData[colDef.key] = null;
+            continue;
+          }
+          if (isEmpty) {
+            rowData[colDef.key] = colDef.type === 'number' ? 0 : null;
+            continue;
+          }
+
+          if (colDef.type === 'number') {
+            const num = Number(val);
+            if (isNaN(num)) errors.push(`"${colDef.label.replace(' *', '')}" يجب أن يكون رقماً`);
+            else val = num;
+          }
+
+          if (colDef.type === 'date') {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(String(val))) {
+              errors.push(`تاريخ "${val}" يجب أن يكون بتنسيق YYYY-MM-DD`);
+            }
+          }
+
+          rowData[colDef.key] = val;
+        }
+
+        const amount = Number(rowData.amount) || 0;
+        if (amount <= 0) errors.push('مبلغ الشيك يجب أن يكون أكبر من صفر');
+
+        if (rowData.issue_date && rowData.due_date && rowData.due_date < rowData.issue_date) {
+          errors.push(`تاريخ استحقاق الشيك (${rowData.due_date}) لا يمكن أن يكون قبل تاريخ التحرير (${rowData.issue_date})`);
+        }
+
+        // Bank / payment method
+        const bankInput = String(rowData.bank_name || '').trim().toLowerCase();
+        let matchedPm = pmMapByName[bankInput];
+        if (!matchedPm && bankInput) {
+          matchedPm = pmRes.rows.find((p: any) => 
+            p.name.toLowerCase().includes(bankInput) || (p.bank_name && p.bank_name.toLowerCase().includes(bankInput))
+          );
+        }
+        if (!matchedPm) matchedPm = firstBankPm;
+
+        if (matchedPm) {
+          rowData.bank_account_id = matchedPm.id;
+          rowData.bank_name = matchedPm.name;
+        } else {
+          errors.push(`البنك / طريقة السداد "${rowData.bank_name}" غير مسجلة في طرق السداد بالنظام`);
+        }
+
+        // Credit account (Notes Payable)
+        const creditCode = String(rowData.credit_account_code || '').trim();
+        const creditAcc = accMap[creditCode];
+        if (!creditAcc) {
+          errors.push(`حساب أوراق الدفع "${rowData.credit_account_code}" غير موجود بدليل الحسابات`);
+        } else {
+          rowData.credit_account_id = creditAcc.id;
+          rowData.credit_account_name = creditAcc.name;
+        }
+
+        // Payee validation: supplier vs general
+        const payeeType = rowData.payee_type === 'general' ? 'general' : 'supplier';
+        rowData.payee_type = payeeType;
+
+        if (payeeType === 'supplier') {
+          const suppCode = String(rowData.supplier_code || '').trim().toLowerCase();
+          const supp = suppMap[suppCode];
+          if (!supp) {
+            errors.push(`كود أو اسم المورد "${rowData.supplier_code}" غير مسجل بالنظام (مطلوب لشيكات الموردين)`);
+          } else {
+            rowData.supplier_id = supp.id;
+            rowData.supplier_name = supp.name;
+            if (!rowData.payee_name) rowData.payee_name = supp.name;
+
+            // Debit account for supplier
+            const debitCode = String(rowData.debit_account_code || '').trim();
+            if (debitCode && accMap[debitCode]) {
+              rowData.debit_account_id = accMap[debitCode].id;
+              rowData.debit_account_name = accMap[debitCode].name;
+            } else if (supp.account_id) {
+              const suppAcc = accountsRes.rows.find((a: any) => a.id === supp.account_id);
+              rowData.debit_account_id = supp.account_id;
+              rowData.debit_account_name = suppAcc?.name || 'حساب الموردين';
+            } else {
+              errors.push(`المورد "${supp.name}" غير مربوط بحساب محاسبي، يرجى إدخال "كود الحساب المدين" في الملف`);
+            }
+          }
+        } else {
+          // General cheque (without supplier)
+          if (!rowData.payee_name || String(rowData.payee_name).trim() === '') {
+            errors.push('اسم المستفيد مطلوب للشيكات الصادرة بدون مورد');
+          }
+          const debitCode = String(rowData.debit_account_code || '').trim();
+          const debitAcc = accMap[debitCode];
+          if (!debitAcc) {
+            errors.push(`كود الحساب المدين "${rowData.debit_account_code}" غير موجود بدليل الحسابات (إجباري للشيك بدون مورد)`);
+          } else {
+            rowData.debit_account_id = debitAcc.id;
+            rowData.debit_account_name = debitAcc.name;
+          }
+        }
+
+        if (errors.length > 0) {
+          rowsWithErrors.push({ rowNumber, data: rowData, errors });
+        } else {
+          validatedRows.push({ rowNumber, data: rowData });
+        }
+      }
+
+      return res.json({
+        total:       dataRowsWithIdx.length,
+        valid:       validatedRows.length,
+        errors:      rowsWithErrors.length,
+        validRows:   validatedRows,
+        errorRows:   rowsWithErrors,
+        columns:     config.columns.map(c => ({ key: c.key, label: c.label, type: c.type })),
+        moduleConfig: { nameAr: config.nameAr, uniqueKey: config.uniqueKey }
+      });
+    }
+
+    // ================================================================
+    // 8: RECEIVED CHEQUES VALIDATION (الشيكات الواردة)
+    // ================================================================
+    if (moduleName === 'received_cheques') {
+      const accountsRes = await pool.query('SELECT id, code, name FROM accounts WHERE company_id = $1', [companyId]);
+      const accMap: Record<string, { id: string; code: string; name: string }> = {};
+      accountsRes.rows.forEach(a => { accMap[String(a.code).trim()] = a; });
+
+      const custRes = await pool.query('SELECT id, code, name, account_id FROM customers WHERE company_id = $1', [companyId]);
+      const custMap: Record<string, any> = {};
+      custRes.rows.forEach(c => {
+        if (c.code) custMap[String(c.code).trim().toLowerCase()] = c;
+        if (c.name) custMap[String(c.name).trim().toLowerCase()] = c;
+      });
+
+      const validatedRows: { rowNumber: number; data: Record<string, any> }[] = [];
+      const rowsWithErrors: { rowNumber: number; data: Record<string, any>; errors: string[] }[] = [];
+
+      for (const item of dataRowsWithIdx) {
+        const rawRow = item.rawRow;
+        const rowNumber = item.originalRowNumber;
+        const errors: string[] = [];
+        const rowData: Record<string, any> = {};
+
+        for (let colIdx = 0; colIdx < config.columns.length; colIdx++) {
+          const colDef = config.columns[colIdx];
+          let val = rawRow[colIdx];
+          if (typeof val === 'string') val = val.trim();
+
+          if (colDef.type === 'date' && typeof val === 'number') {
+            try {
+              const d = XLSX.SSF.parse_date_code(val);
+              if (d) val = `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
+            } catch { /* ignore */ }
+          }
+
+          const isEmpty = val === undefined || val === null || val === '';
+          if (colDef.required && isEmpty) {
+            errors.push(`الحقل "${colDef.label.replace(' *', '')}" مطلوب`);
+            rowData[colDef.key] = null;
+            continue;
+          }
+          if (isEmpty) {
+            rowData[colDef.key] = colDef.type === 'number' ? 0 : null;
+            continue;
+          }
+
+          if (colDef.type === 'number') {
+            const num = Number(val);
+            if (isNaN(num)) errors.push(`"${colDef.label.replace(' *', '')}" يجب أن يكون رقماً`);
+            else val = num;
+          }
+
+          if (colDef.type === 'date') {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(String(val))) {
+              errors.push(`تاريخ "${val}" يجب أن يكون بتنسيق YYYY-MM-DD`);
+            }
+          }
+
+          rowData[colDef.key] = val;
+        }
+
+        const amount = Number(rowData.amount) || 0;
+        if (amount <= 0) errors.push('مبلغ الشيك يجب أن يكون أكبر من صفر');
+
+        if (rowData.receive_date && rowData.due_date && rowData.due_date < rowData.receive_date) {
+          errors.push(`تاريخ استحقاق الشيك (${rowData.due_date}) لا يمكن أن يكون قبل تاريخ الاستلام (${rowData.receive_date})`);
+        }
+
+        // Debit account (Notes Receivable)
+        const debitCode = String(rowData.debit_account_code || '').trim();
+        const debitAcc = accMap[debitCode];
+        if (!debitAcc) {
+          errors.push(`حساب أوراق القبض "${rowData.debit_account_code}" غير موجود بدليل الحسابات`);
+        } else {
+          rowData.debit_account_id = debitAcc.id;
+          rowData.debit_account_name = debitAcc.name;
+        }
+
+        // Payer validation: customer vs general
+        const payerType = rowData.payer_type === 'general' ? 'general' : 'customer';
+        rowData.payer_type = payerType;
+
+        if (payerType === 'customer') {
+          const custCode = String(rowData.customer_code || '').trim().toLowerCase();
+          const cust = custMap[custCode];
+          if (!cust) {
+            errors.push(`كود أو اسم العميل "${rowData.customer_code}" غير مسجل بالنظام (مطلوب لشيكات العملاء)`);
+          } else {
+            rowData.customer_id = cust.id;
+            rowData.customer_name = cust.name;
+            if (!rowData.payer_name) rowData.payer_name = cust.name;
+
+            // Credit account for customer
+            const creditCode = String(rowData.credit_account_code || '').trim();
+            if (creditCode && accMap[creditCode]) {
+              rowData.credit_account_id = accMap[creditCode].id;
+              rowData.credit_account_name = accMap[creditCode].name;
+            } else if (cust.account_id) {
+              const custAcc = accountsRes.rows.find((a: any) => a.id === cust.account_id);
+              rowData.credit_account_id = cust.account_id;
+              rowData.credit_account_name = custAcc?.name || 'حساب العملاء';
+            } else {
+              errors.push(`العميل "${cust.name}" غير مربوط بحساب محاسبي، يرجى إدخال "كود الحساب الدائن" في الملف`);
+            }
+          }
+        } else {
+          // General cheque (without customer)
+          if (!rowData.payer_name || String(rowData.payer_name).trim() === '') {
+            errors.push('اسم الساحب / المحرر مطلوب للشيكات الواردة بدون عميل');
+          }
+          const creditCode = String(rowData.credit_account_code || '').trim();
+          const creditAcc = accMap[creditCode];
+          if (!creditAcc) {
+            errors.push(`كود الحساب الدائن "${rowData.credit_account_code}" غير موجود بدليل الحسابات (إجباري للشيك بدون عميل)`);
+          } else {
+            rowData.credit_account_id = creditAcc.id;
+            rowData.credit_account_name = creditAcc.name;
           }
         }
 
@@ -2635,6 +3087,186 @@ router.post('/import/execute/:module', authenticateToken, async (req: AuthReques
             uuidv4(), jeId, companyId, data.account_id, data.account_name || 'حساب الخصم المكتسب',
             amount, `خصم مكتسب - إشعار رقم ${dNum} - ${data.supplier_name}`
           ]
+        );
+
+        count++;
+      }
+
+      await client.query('COMMIT');
+      return res.json({ success: true, inserted: count, updated: 0, total: rows.length });
+    }
+
+    // ── ISSUED CHEQUES EXECUTE (الشيكات الصادرة) ──────────────────────
+    if (moduleName === 'issued_cheques') {
+      let count = 0;
+      for (const { data } of rows) {
+        const docId = uuidv4();
+        const issueDateStr = data.issue_date || new Date().toISOString().split('T')[0];
+        const dueDateStr = data.due_date || issueDateStr;
+        const serialNum = await ensureUniqueSequenceNumber(client, companyId || '', 'issued_cheques', issueDateStr);
+        const amount = Math.round(Number(data.amount) * 100) / 100;
+        const chequeNo = String(data.cheque_number || '').trim();
+        const beneficiary = data.payee_name || data.supplier_name || 'المستفيد';
+        const desc = data.description || `إصدار شيك رقم ${chequeNo} لصالح ${beneficiary}`;
+
+        await client.query(
+          `INSERT INTO "issued_cheques" (
+            id, company_id, serial_number, cheque_number, cheque_type,
+            supplier_id, supplier_name, payee_name, bank_account_id, bank_name,
+            amount, currency, exchange_rate, issue_date, due_date, status,
+            description, notes, debit_account_id, debit_account_name,
+            credit_account_id, credit_account_name, created_by, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'EGP', 1.0, $12, $13, 'ISSUED', $14, $15, $16, $17, $18, $19, $20, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+          [
+            docId, companyId, serialNum, chequeNo, data.payee_type === 'supplier' ? 'supplier' : 'other',
+            data.supplier_id || null, data.supplier_name || null, beneficiary,
+            data.bank_account_id, data.bank_name || null,
+            amount, issueDateStr, dueDateStr, desc, data.notes || null,
+            data.debit_account_id, data.debit_account_name || null,
+            data.credit_account_id, data.credit_account_name || null,
+            req.user?.id || 'system'
+          ]
+        );
+
+        const jeId = uuidv4();
+        const entryNumber = await ensureUniqueSequenceNumber(client, companyId || '', 'journal_entries', issueDateStr);
+
+        await client.query(
+          `INSERT INTO "journal_entries" (
+            id, company_id, entry_number, date, description,
+            reference_id, reference_type, reference_number,
+            total_debit, total_credit, status, created_by, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'posted', $11, CURRENT_TIMESTAMP)`,
+          [
+            jeId, companyId, entryNumber, issueDateStr, desc,
+            docId, 'issued_cheque', chequeNo,
+            amount, amount, req.user?.id || 'system'
+          ]
+        );
+
+        // الطرف المدين (حساب المورد أو الحساب المدين)
+        await client.query(
+          `INSERT INTO "journal_entry_lines" (
+            id, journal_entry_id, company_id, account_id,
+            supplier_id, supplier_name, debit, credit, description,
+            sub_account_id, sub_account_type, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10, CURRENT_TIMESTAMP)`,
+          [
+            uuidv4(), jeId, companyId, data.debit_account_id,
+            data.supplier_id || null, data.supplier_name || null,
+            amount, `إصدار شيك رقم ${chequeNo} - لصالح ${beneficiary}`,
+            data.supplier_id || null, data.supplier_id ? 'supplier' : null
+          ]
+        );
+
+        // الطرف الدائن (أوراق الدفع)
+        await client.query(
+          `INSERT INTO "journal_entry_lines" (
+            id, journal_entry_id, company_id, account_id, account_name,
+            supplier_id, supplier_name, debit, credit, description, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, CURRENT_TIMESTAMP)`,
+          [
+            uuidv4(), jeId, companyId, data.credit_account_id, data.credit_account_name || 'أوراق دفع',
+            data.supplier_id || null, data.supplier_name || null,
+            amount, `أوراق دفع - شيك رقم ${chequeNo} (استحقاق ${dueDateStr})`
+          ]
+        );
+
+        await client.query(
+          `UPDATE "issued_cheques" SET issue_journal_entry_id = $1 WHERE id = $2`,
+          [jeId, docId]
+        );
+
+        count++;
+      }
+
+      await client.query('COMMIT');
+      return res.json({ success: true, inserted: count, updated: 0, total: rows.length });
+    }
+
+    // ── RECEIVED CHEQUES EXECUTE (الشيكات الواردة) ────────────────────
+    if (moduleName === 'received_cheques') {
+      let count = 0;
+      for (const { data } of rows) {
+        const docId = uuidv4();
+        const receiveDateStr = data.receive_date || new Date().toISOString().split('T')[0];
+        const dueDateStr = data.due_date || receiveDateStr;
+        const receiptNum = data.receipt_number && String(data.receipt_number).trim() !== ''
+          ? String(data.receipt_number).trim()
+          : await ensureUniqueSequenceNumber(client, companyId || '', 'receipt_vouchers', receiveDateStr);
+        const serialNum = `${receiptNum}-${String(count + 1).padStart(2, '0')}`;
+        const amount = Math.round(Number(data.amount) * 100) / 100;
+        const chequeNo = String(data.cheque_number || '').trim();
+        const payer = data.payer_name || data.customer_name || 'العميل / الساحب';
+        const desc = data.description || `استلام شيك رقم ${chequeNo} من ${payer}`;
+
+        await client.query(
+          `INSERT INTO "received_cheques" (
+            id, company_id, receipt_number, serial_number, cheque_number, cheque_type,
+            customer_id, customer_name, payer_name, bank_name,
+            amount, currency, exchange_rate, receive_date, due_date, status,
+            description, notes, debit_account_id, debit_account_name,
+            credit_account_id, credit_account_name, created_by, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'EGP', 1.0, $12, $13, 'RECEIVED', $14, $15, $16, $17, $18, $19, $20, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+          [
+            docId, companyId, receiptNum, serialNum, chequeNo, data.payer_type === 'customer' ? 'customer' : 'other',
+            data.customer_id || null, data.customer_name || null, payer, data.bank_name || null,
+            amount, receiveDateStr, dueDateStr, desc, data.notes || null,
+            data.debit_account_id, data.debit_account_name || null,
+            data.credit_account_id, data.credit_account_name || null,
+            req.user?.id || 'system'
+          ]
+        );
+
+        const jeId = uuidv4();
+        const entryNumber = await ensureUniqueSequenceNumber(client, companyId || '', 'journal_entries', receiveDateStr);
+
+        await client.query(
+          `INSERT INTO "journal_entries" (
+            id, company_id, entry_number, date, description,
+            reference_id, reference_type, reference_number,
+            total_debit, total_credit, status, created_by, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'posted', $11, CURRENT_TIMESTAMP)`,
+          [
+            jeId, companyId, entryNumber, receiveDateStr, desc,
+            docId, 'received_cheque', receiptNum || chequeNo,
+            amount, amount, req.user?.id || 'system'
+          ]
+        );
+
+        // الطرف المدين (أوراق القبض)
+        await client.query(
+          `INSERT INTO "journal_entry_lines" (
+            id, journal_entry_id, company_id, account_id, account_name,
+            customer_id, customer_name, debit, credit, description,
+            sub_account_id, sub_account_type, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, $9, $10, CURRENT_TIMESTAMP)`,
+          [
+            uuidv4(), jeId, companyId, data.debit_account_id, data.debit_account_name || 'أوراق قبض',
+            data.customer_id || null, data.customer_name || null,
+            amount, `أوراق قبض - استلام شيك رقم ${chequeNo} من ${payer}`,
+            data.customer_id || null, data.customer_id ? 'customer' : null
+          ]
+        );
+
+        // الطرف الدائن (حساب العميل أو الحساب الدائن)
+        await client.query(
+          `INSERT INTO "journal_entry_lines" (
+            id, journal_entry_id, company_id, account_id,
+            customer_id, customer_name, debit, credit, description,
+            sub_account_id, sub_account_type, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, $9, $10, CURRENT_TIMESTAMP)`,
+          [
+            uuidv4(), jeId, companyId, data.credit_account_id,
+            data.customer_id || null, data.customer_name || null,
+            amount, `سداد بشيك رقم ${chequeNo} - ${payer}`,
+            data.customer_id || null, data.customer_id ? 'customer' : null
+          ]
+        );
+
+        await client.query(
+          `UPDATE "received_cheques" SET receive_journal_entry_id = $1 WHERE id = $2`,
+          [jeId, docId]
         );
 
         count++;

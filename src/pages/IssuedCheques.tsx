@@ -20,6 +20,7 @@ import { ChequeCancelModal } from '../components/issued-cheques/ChequeCancelModa
 import { ChequesDashboardTab } from '../components/issued-cheques/ChequesDashboardTab';
 import { ChequesReportsTab } from '../components/issued-cheques/ChequesReportsTab';
 import { AttachmentPreviewModal, ChequeAttachmentData } from '../components/common/AttachmentPreviewModal';
+import { ExcelImportWizard } from '../components/ExcelImportWizard';
 
 interface IssuedChequesProps {
   initialTab?: 'dashboard' | 'all' | 'create' | 'create_supplier' | 'create_other' | 'due' | 'reports';
@@ -61,6 +62,7 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
   const [selectedChequeForPostpone, setSelectedChequeForPostpone] = useState<IssuedCheque | null>(null);
   const [selectedChequeForReturn, setSelectedChequeForReturn] = useState<IssuedCheque | null>(null);
   const [selectedChequeForCancel, setSelectedChequeForCancel] = useState<IssuedCheque | null>(null);
+  const [showImportWizard, setShowImportWizard] = useState(false);
 
   // Attachment Preview Modal State
   const [selectedPreviewAttachment, setSelectedPreviewAttachment] = useState<ChequeAttachmentData | null>(null);
@@ -315,6 +317,15 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
         </button>
 
         <button
+          onClick={() => setShowImportWizard(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+          title={isAr ? 'استيراد الشيكات الصادرة من ملف Excel' : 'Import Issued Cheques from Excel'}
+        >
+          <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+          <span>{isAr ? 'استيراد Excel' : 'Import Excel'}</span>
+        </button>
+
+        <button
           onClick={() => { setActiveTab('dashboard'); setCurrentPage(1); }}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
             activeTab === 'dashboard'
@@ -466,6 +477,15 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
               <option value="30days">{isAr ? 'خلال 30 يوم' : 'Within 30 Days'}</option>
               <option value="overdue">{isAr ? 'متأخر الصرف' : 'Overdue'}</option>
             </select>
+
+            <button
+              onClick={() => setShowImportWizard(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 text-xs font-bold transition-colors cursor-pointer"
+              title={isAr ? 'استيراد الشيكات الصادرة من Excel' : 'Import Issued Cheques from Excel'}
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span>{isAr ? 'استيراد Excel' : 'Import Excel'}</span>
+            </button>
 
             <button
               onClick={fetchData}
@@ -790,6 +810,20 @@ export const IssuedCheques: React.FC<IssuedChequesProps> = ({ initialTab = 'all'
         onClose={() => setIsPreviewOpen(false)}
         attachment={selectedPreviewAttachment}
       />
+
+      {/* Excel Import Wizard Modal */}
+      {showImportWizard && (
+        <ExcelImportWizard
+          module="issued_cheques"
+          moduleNameAr="الشيكات الصادرة"
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={() => {
+            setShowImportWizard(false);
+            fetchData();
+            window.dispatchEvent(new Event('db-change'));
+          }}
+        />
+      )}
 
     </div>
   );

@@ -21,6 +21,7 @@ import { ReceivedChequesDashboardTab } from '../components/received-cheques/Rece
 import { ReceivedChequesReportsTab } from '../components/received-cheques/ReceivedChequesReportsTab';
 import { EGYPTIAN_BANKS_DATA, BankLogoBadge } from '../data/egyptianBanks';
 import { AttachmentPreviewModal, ChequeAttachmentData } from '../components/common/AttachmentPreviewModal';
+import { ExcelImportWizard } from '../components/ExcelImportWizard';
 
 interface ReceivedChequesProps {
   initialTab?: 'dashboard' | 'all' | 'receive_customer' | 'receive_other' | 'due' | 'reports';
@@ -65,6 +66,7 @@ export const ReceivedCheques: React.FC<ReceivedChequesProps> = ({ initialTab = '
   const [selectedChequeForPostpone, setSelectedChequeForPostpone] = useState<ReceivedCheque | null>(null);
   const [selectedChequeForReturn, setSelectedChequeForReturn] = useState<ReceivedCheque | null>(null);
   const [selectedChequeForCancel, setSelectedChequeForCancel] = useState<ReceivedCheque | null>(null);
+  const [showImportWizard, setShowImportWizard] = useState(false);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -296,6 +298,15 @@ export const ReceivedCheques: React.FC<ReceivedChequesProps> = ({ initialTab = '
         </button>
 
         <button
+          onClick={() => setShowImportWizard(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-300/80 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50"
+          title={isAr ? 'استيراد الشيكات الواردة من ملف Excel' : 'Import Received Cheques from Excel'}
+        >
+          <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+          <span>{isAr ? 'استيراد Excel' : 'Import Excel'}</span>
+        </button>
+
+        <button
           onClick={() => { setActiveTab('dashboard'); setCurrentPage(1); }}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
             activeTab === 'dashboard'
@@ -432,6 +443,15 @@ export const ReceivedCheques: React.FC<ReceivedChequesProps> = ({ initialTab = '
               <option value="30days">{isAr ? 'خلال 30 يوماً' : 'Next 30 Days'}</option>
               <option value="overdue">{isAr ? 'متأخر التحصيل' : 'Overdue'}</option>
             </select>
+
+            <button
+              onClick={() => setShowImportWizard(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-blue-300 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 text-xs font-bold transition-colors cursor-pointer"
+              title={isAr ? 'استيراد الشيكات الواردة من Excel' : 'Import Received Cheques from Excel'}
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
+              <span>{isAr ? 'استيراد Excel' : 'Import Excel'}</span>
+            </button>
 
             <button
               onClick={fetchData}
@@ -744,6 +764,20 @@ export const ReceivedCheques: React.FC<ReceivedChequesProps> = ({ initialTab = '
         onClose={() => setIsPreviewOpen(false)}
         attachment={selectedPreviewAttachment}
       />
+
+      {/* Excel Import Wizard Modal */}
+      {showImportWizard && (
+        <ExcelImportWizard
+          module="received_cheques"
+          moduleNameAr="الشيكات الواردة"
+          onClose={() => setShowImportWizard(false)}
+          onSuccess={() => {
+            setShowImportWizard(false);
+            fetchData();
+            window.dispatchEvent(new Event('db-change'));
+          }}
+        />
+      )}
 
     </div>
   );
