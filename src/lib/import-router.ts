@@ -223,9 +223,205 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
 
   const wb = XLSX.utils.book_new();
 
-  // ── Data Sheet: Header on Row 0 ONLY, user enters data directly from Row 1 (Row 2 in Excel) ──
+  // Helper to find account code
+  const findAccCode = (predicate: (a: { code: string; name: string; required_sub_account: boolean }) => boolean, fallback: string) => {
+    const found = accountsRef.find(predicate);
+    return found ? found.code : fallback;
+  };
+
+  let sampleCust = { code: 'CUST-001', name: 'شركة الأمل للتجارة' };
+  let sampleSupp = { code: 'SUPP-001', name: 'شركة التوريدات الحديثة' };
+  let samplePm   = { name: 'الخزينة الرئيسية', type: 'cash' };
+
+  try {
+    const cRes = await pool.query(`SELECT code, name FROM customers WHERE company_id = $1 ORDER BY id LIMIT 1`, [companyId]);
+    if (cRes.rows[0]) sampleCust = cRes.rows[0];
+    const sRes = await pool.query(`SELECT code, name FROM suppliers WHERE company_id = $1 ORDER BY id LIMIT 1`, [companyId]);
+    if (sRes.rows[0]) sampleSupp = sRes.rows[0];
+    const pmRes = await pool.query(`SELECT name, type FROM payment_methods WHERE company_id = $1 ORDER BY id LIMIT 1`, [companyId]);
+    if (pmRes.rows[0]) samplePm = pmRes.rows[0];
+  } catch (e) { /* non-fatal */ }
+
+  const custAccCode = findAccCode(a => a.required_sub_account && (a.name.includes('عملاء') || a.name.toLowerCase().includes('customer')), '111');
+  const suppAccCode = findAccCode(a => a.required_sub_account && (a.name.includes('مورد') || a.name.toLowerCase().includes('supplier')), '211');
+  const cashAccCode = findAccCode(a => a.name.includes('خزين') || a.name.includes('صندوق') || a.name.includes('نقد') || a.code === '1101' || a.code === '101', '1101');
+  const revAccCode  = findAccCode(a => a.name.includes('إيراد') || a.name.includes('مبيعات') || a.code === '41', '41');
+  const costAccCode = findAccCode(a => a.name.includes('تكلفة') || a.code === '51', '51');
+  const expAccCode  = findAccCode(a => a.name.includes('مصروف') || a.code === '511', '511');
+
+  let exampleRows: any[][] = [];
+
+  if (moduleName === 'journal_entries') {
+    // قيدان متوازنان يوضحان الحسابات الفرعية للعملاء، الموردين، والخزائن مع تكرار بيانات القيد
+    exampleRows = [
+      // 1. القيد الأول: تحصيل نقدي من عميل بالخزينة (طرف الخزينة مدين)
+      [
+        'Ref-000001',
+        '2026-10-17',
+        'مثال توضيحي: تحصيل نقدي من عميل بالخزينة (احذف هذا المثال قبل الرفع)',
+        cashAccCode,
+        samplePm.name,
+        'payment_method',
+        5000,
+        0,
+        'local',
+        1,
+        0,
+        '',
+        '',
+        '',
+        'تحصيل نقدي بالخزينة'
+      ],
+      // 1. القيد الأول: طرف العميل دائن
+      [
+        'Ref-000001',
+        '2026-10-17',
+        'مثال توضيحي: تحصيل نقدي من عميل بالخزينة (احذف هذا المثال قبل الرفع)',
+        custAccCode,
+        sampleCust.code,
+        'customer',
+        0,
+        5000,
+        'local',
+        1,
+        0,
+        '',
+        '',
+        '',
+        'سداد من حساب العميل'
+      ],
+      // 2. القيد الثاني: سداد دفعة نقدية لمورد من الخزينة (طرف المورد مدين)
+      [
+        'Ref-000002',
+        '2026-10-17',
+        'مثال توضيحي: سداد لمورد نقداً من الخزينة (احذف هذا المثال قبل الرفع)',
+        suppAccCode,
+        sampleSupp.code,
+        'supplier',
+        3000,
+        0,
+        'local',
+        1,
+        0,
+        '',
+        '',
+        '',
+        'سداد مستحقات المورد'
+      ],
+      // 2. القيد الثاني: طرف الخزينة دائن
+      [
+        'Ref-000002',
+        '2026-10-17',
+        'مثال توضيحي: سداد لمورد نقداً من الخزينة (احذف هذا المثال قبل الرفع)',
+        cashAccCode,
+        samplePm.name,
+        'payment_method',
+        0,
+        3000,
+        'local',
+        1,
+        0,
+        '',
+        '',
+        '',
+        'صرف من الخزينة لسداد المورد'
+      ]
+    ];
+  } else if (moduleName === 'customers') {
+    exampleRows = [
+      [
+        'CUST-EXAMPLE',
+        '1001',
+        'مثال توضيحي: شركة الأمل للتجارة (احذف هذا الصف قبل الرفع)',
+        '0501234567',
+        'customer@example.com',
+        'الرياض، شارع الملك فهد',
+        '300123456789003',
+        custAccCode,
+        '31',
+        5000,
+        '2026-01-01',
+        50000,
+        'credit',
+        30,
+        0
+      ]
+    ];
+  } else if (moduleName === 'suppliers') {
+    exampleRows = [
+      [
+        'SUPP-EXAMPLE',
+        '2001',
+        'مثال توضيحي: شركة التوريدات الحديثة (احذف هذا الصف قبل الرفع)',
+        '0509876543',
+        'supplier@example.com',
+        'جدة، المنطقة الصناعية',
+        '300987654321003',
+        suppAccCode,
+        '31',
+        10000,
+        '2026-01-01',
+        100000,
+        'credit',
+        60,
+        0
+      ]
+    ];
+  } else if (moduleName === 'products') {
+    exampleRows = [
+      [
+        'PROD-EXAMPLE',
+        '3001',
+        'مثال توضيحي: لابتوب ديل للأعمال (احذف هذا الصف قبل الرفع)',
+        'product',
+        '6281234567890',
+        'قطعة',
+        'معالج Core i7 - ذاكرة 16GB',
+        2500,
+        2000,
+        5,
+        revAccCode,
+        costAccCode,
+        '1115',
+        '2221',
+        '1181',
+        '2221',
+        14,
+        'WAC',
+        'EG-123456789-PROD01',
+        'EGS',
+        '',
+        'EGS',
+        'نشط',
+        '',
+        ''
+      ]
+    ];
+  } else if (moduleName === 'expense_categories') {
+    exampleRows = [
+      [
+        'EXP-EXAMPLE',
+        'مثال توضيحي: إيجار المقر الشهري (احذف هذا الصف قبل الرفع)',
+        expAccCode,
+        'مصروفات إيجار المقر والفرع الرئيسي'
+      ]
+    ];
+  } else if (moduleName === 'payment_methods') {
+    exampleRows = [
+      [
+        'مثال توضيحي: الخزينة الرئيسية (احذف هذا الصف قبل الرفع)',
+        'cash',
+        cashAccCode,
+        '',
+        '',
+        'الخزينة النقدية الرئيسية للمقر'
+      ]
+    ];
+  }
+
+  // ── Data Sheet: Header on Row 0, Example Rows follow directly from Row 1 ──
   const arabicHeaders = config.columns.map(c => c.label);
-  const wsData: any[][] = [arabicHeaders];
+  const wsData: any[][] = [arabicHeaders, ...exampleRows];
   const ws = XLSX.utils.aoa_to_sheet(wsData);
 
   // Style header row (Row 0 – Arabic header: green background, white bold text)
@@ -241,8 +437,25 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
     }
   }
 
+  // Style example rows in red font
+  for (let r = 1; r <= exampleRows.length; r++) {
+    for (let c = 0; c < colCount; c++) {
+      const cellRef = XLSX.utils.encode_cell({ r, c });
+      if (ws[cellRef]) {
+        ws[cellRef].s = {
+          font: { color: { rgb: 'B91C1C' }, sz: 10, italic: true },
+          alignment: { horizontal: 'center', vertical: 'center' }
+        };
+      }
+    }
+  }
+
+  const rowHeights = [{ hpt: 30 }];
+  for (let i = 0; i < exampleRows.length; i++) {
+    rowHeights.push({ hpt: 24 });
+  }
   ws['!cols'] = config.columns.map(() => ({ wch: 26 }));
-  ws['!rows'] = [{ hpt: 30 }];
+  ws['!rows'] = rowHeights;
   XLSX.utils.book_append_sheet(wb, ws, config.nameAr);
 
   // ── Dropdown Values Sheet ─────────────────────────────────────
@@ -307,22 +520,28 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
   }
 
   // ── Instructions Sheet ────────────────────────────────────────
+  const hasExampleRow = ['journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods'].includes(moduleName);
   const instructions = [
     ['تعليمات الاستيراد - ' + config.nameAr],
-    [''],
+    ...(hasExampleRow ? [
+      ['⚠️ تنبيه هام باللون الأحمر: تم وضع صفوف كأمثلة توضيحية داخل هذا الملف لمساعدتك (تظهر باللون الأحمر).'],
+      ['   يجب حذف صفوف المثال بالكامل قبل رفع الملف إلى النظام وإدخال بياناتك الفعلية بدلاً منها.'],
+      [''],
+    ] : []),
     ['1. لا تحذف أو تعدل صف رؤوس الأعمدة (الصف الأول)'],
-    ['2. ابدأ إدخال البيانات مباشرة من أول الجدول (الصف الثاني بعد رؤوس الأعمدة)'],
+    ['2. ابدأ إدخال بياناتك مباشرة من أول الجدول (الصف الثاني بعد رؤوس الأعمدة) بعد حذف صفوف المثال التوضيحي'],
     ['3. الحقول المعلمة بـ (*) إجبارية'],
     ...(moduleName === 'journal_entries' ? [
       ['4. العمود الأول "رقم المرجع *" يحدد القيد الذي ينتمي له كل سطر (مثال: Ref-000001)'],
-      ['5. يمكن إدخال قيد واحد أو عدة قيود في نفس الملف مع تكرار رقم المرجع لأسطر نفس القيد'],
-      ['6. يجب تكرار بيانات القيد (رقم المرجع، التاريخ، البيان) في كل سطر يحتوي على القيد'],
-      ['7. يجب أن يتساوى إجمالي المدين مع إجمالي الدائن لكل قيد (توازن القيد)'],
-      ['8. يجب أن يحتوي كل قيد على سطرين على الأقل (طرف مدين وطرف دائن)'],
-      ['9. لا يتم الرفع في حالة أن الحسابات غير صحيحة، وإذا كان الحساب يلزم له حساب فرعي فيجب إدخال الحساب الفرعي'],
-      ['   → راجع ورقة "دليل الحسابات" لمعرفة الحسابات التي يلزم لها حساب فرعي'],
+      ['5. تم تضمين مثالين في النموذج: تحصيل من عميل بالخزينة (عملاء وخزائن) وسداد لمورد (موردين وخزائن)'],
+      ['6. يمكن إدخال قيد واحد أو عدة قيود في نفس الملف مع تكرار رقم المرجع لأسطر نفس القيد'],
+      ['7. يجب تكرار بيانات القيد (رقم المرجع، التاريخ، البيان) في كل سطر يحتوي على القيد'],
+      ['8. يجب أن يتساوى إجمالي المدين مع إجمالي الدائن لكل قيد (توازن القيد)'],
+      ['9. يجب أن يحتوي كل قيد على سطرين على الأقل (طرف مدين وطرف دائن)'],
+      ['10. لا يتم الرفع في حالة أن الحسابات غير صحيحة، وإذا كان الحساب يلزم له حساب فرعي فيجب إدخال الحساب الفرعي'],
+      ['   → راجع ورقة "دليل الحسابات" لمعرفة الحسابات التي يلزم لها حساب فرعي (عمود "يلزم حساب فرعي")'],
       ['   → يمكن إدخال كود أو اسم العميل / المورد / الخزينة في عمود الحساب الفرعي'],
-      ['10. تنسيق التواريخ: YYYY-MM-DD (مثال: 2026-01-01)'],
+      ['11. تنسيق التواريخ: YYYY-MM-DD (مثال: 2026-01-01)'],
     ] : [
       ['4. الأكواد يجب أن تكون فريدة وغير مكررة'],
       ['5. أعمدة "كود الحساب" يجب إدخال كود الحساب الموجود في دليل الحسابات'],
@@ -339,6 +558,10 @@ router.get('/import/template/:module', authenticateToken, async (req: AuthReques
     ]),
   ];
   const wsInst = XLSX.utils.aoa_to_sheet(instructions);
+  if (hasExampleRow && wsInst['A2'] && wsInst['A3']) {
+    wsInst['A2'].s = { font: { bold: true, color: { rgb: 'B91C1C' }, sz: 12 } };
+    wsInst['A3'].s = { font: { bold: true, color: { rgb: 'B91C1C' }, sz: 11 } };
+  }
   wsInst['!cols'] = [{ wch: 80 }];
   XLSX.utils.book_append_sheet(wb, wsInst, 'التعليمات');
 
@@ -400,15 +623,39 @@ router.post('/import/validate/:module', authenticateToken, upload.single('file')
       }
     }
 
+    // Helper to detect if a row is an illustrative example row (if user forgot to delete it)
+    const isExampleRow = (r: any[]) => {
+      return r.some(cell => {
+        if (cell === null || cell === undefined) return false;
+        const s = String(cell).trim().toLowerCase();
+        return s.includes('مثال توضيحي') ||
+               s.includes('احذف هذا') ||
+               s.includes('cust-example') ||
+               s.includes('supp-example') ||
+               s.includes('prod-example') ||
+               s.includes('exp-example');
+      });
+    };
+
     const dataRowsWithIdx: { rawRow: any[]; originalRowNumber: number }[] = [];
+    let skippedExamplesCount = 0;
     for (let idx = startIdx; idx < rawRows.length; idx++) {
       const r = rawRows[idx];
       if (r && r.some(cell => cell !== undefined && cell !== null && String(cell).trim() !== '')) {
+        if (isExampleRow(r)) {
+          skippedExamplesCount++;
+          continue;
+        }
         dataRowsWithIdx.push({ rawRow: r, originalRowNumber: idx + 1 });
       }
     }
 
     if (dataRowsWithIdx.length === 0) {
+      if (skippedExamplesCount > 0) {
+        return res.status(400).json({
+          error: 'الملف يحتوي فقط على صفوف الأمثلة التوضيحية! يرجى حذف صفوف الأمثلة التوضيحية وكتابة بياناتك الفعلية بدلاً منها قبل الرفع.'
+        });
+      }
       return res.status(400).json({ error: 'الملف لا يحتوي على أي صفوف بيانات للإدخال' });
     }
 

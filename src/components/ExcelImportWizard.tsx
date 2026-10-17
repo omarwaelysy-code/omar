@@ -217,12 +217,38 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
                   </button>
                 </div>
 
+                {/* تنبيه باللون الأحمر بحذف المثال */}
+                {['journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods'].includes(module) && (
+                  <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
+                    <AlertTriangle className="text-red-600 shrink-0 mt-0.5" size={22} />
+                    <div className="text-sm text-red-800 space-y-1">
+                      <p className="font-black text-red-900 text-base flex items-center gap-1.5">
+                        <span>⚠️</span>
+                        <span>تنبيه هام جداً: حذف صفوف الأمثلة التوضيحية</span>
+                      </p>
+                      <p className="leading-relaxed font-semibold">
+                        تم وضع صفوف كأمثلة توضيحية داخل نموذج الـ Excel المرفق لمساعدتك على معرفة طريقة ملء البيانات
+                        {module === 'journal_entries' ? ' (يشمل أمثلة للحسابات الفرعية للعملاء، الموردين، والخزائن مع توازن الطرفين المدين والدائن)' : ''}.
+                        <span className="font-black text-red-950 underline mx-1">
+                          يجب حذف صفوف المثال التوضيحي بالكامل
+                        </span>
+                        قبل حفظ الملف ورفعه إلى النظام، وكتابة بياناتك الفعلية بدلاً منها.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
                   <div className="flex items-start gap-3">
                     <Info className="text-amber-500 shrink-0 mt-0.5" size={18} />
                     <div className="text-sm text-amber-800 space-y-1">
                       <p className="font-bold">تعليمات مهمة:</p>
-                      <ul className="list-disc list-inside space-y-0.5 text-amber-700">
+                      <ul className="list-disc list-inside space-y-1 text-amber-700">
+                        {['journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods'].includes(module) && (
+                          <li className="text-red-600 font-black">
+                            ⚠️ احذف صفوف المثال التوضيحي المرفقة بالنموذج قبل حفظ الملف ورفعه إلى النظام
+                          </li>
+                        )}
                         <li>لا تحذف أو تعدّل صف رؤوس الأعمدة (الصف الأول)</li>
                         <li>ابدأ إدخال البيانات مباشرة من أول الجدول (الصف الثاني بعد رؤوس الأعمدة)</li>
                         <li>الحقول المعلمة بـ (*) إجبارية</li>
@@ -260,6 +286,12 @@ export const ExcelImportWizard: React.FC<Props> = ({ module, moduleNameAr, onClo
             {/* ── STEP 2: Upload ── */}
             {step === 'upload' && (
               <motion.div key="upload" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
+                {['journal_entries', 'customers', 'suppliers', 'products', 'expense_categories', 'payment_methods'].includes(module) && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-black text-red-700">
+                    <AlertTriangle className="text-red-600 shrink-0" size={18} />
+                    <span>تذكير: تأكد من حذف صفوف الأمثلة التوضيحية من ملف Excel قبل رفعه حتى لا يتم إدخال بيانات تجريبية.</span>
+                  </div>
+                )}
                 <div
                   onDrop={handleDrop}
                   onDragOver={e => e.preventDefault()}
