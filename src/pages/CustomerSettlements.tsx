@@ -2480,41 +2480,10 @@ export const CustomerSettlements: React.FC = () => {
                     </table>
                   </div>
                 </div>
-              )}xs"
-                                    value={m.settled_amount || ''}
-                                    placeholder="0.00"
-                                    onChange={(e) => handleDebitAmountChange(m.id, parseFloat(e.target.value) || 0)}
-                                  />
-                                ) : '-'}
-                              </td>
-
-                              {/* Credit columns */}
-                              <td className="p-1 px-2 border border-zinc-200 text-right bg-emerald-50/5 text-emerald-600 font-semibold">
-                                {!m.isDebit ? formatNumber(m.open_amount) : '-'}
-                              </td>
-                              <td className="p-0.5 border border-zinc-200 text-right bg-emerald-50/5">
-                                {!m.isDebit ? (
-                                  <input 
-                                    type="number"
-                                    step="any"
-                                    className="w-full px-2 py-1 bg-transparent border-0 text-right font-black text-emerald-600 focus:ring-1 focus:ring-emerald-500 outline-none text-xs"
-                                    value={m.settled_amount || ''}
-                                    placeholder="0.00"
-                                    onChange={(e) => handleCreditAmountChange(m.id, parseFloat(e.target.value) || 0)}
-                                  />
-                                ) : '-'}
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
               )}
 
               {/* Attachments Section */}
-              <div className="bg-white p-3 rounded-2xl border border-zinc-200 shadow-sm">
+              <div className="bg-white p-2.5 rounded-2xl border border-zinc-200 shadow-2xs">
                 <AttachmentsManager
                   attachments={attachments}
                   onChange={setAttachments}
@@ -2522,30 +2491,46 @@ export const CustomerSettlements: React.FC = () => {
               </div>
 
               {/* Summary Bottom Actions Card */}
-              <div className="bg-slate-900 p-3.5 rounded-2xl text-white flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg">
-                <div className="flex flex-wrap items-center gap-5">
+              <div className="bg-slate-900 p-3 rounded-2xl text-white flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-lg">
+                <div className="flex flex-wrap items-center gap-4">
                   <div className="space-y-0.5">
                     <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{language === 'ar' ? 'إجمالي المدين المسوى' : 'Total Settled Debit'}</span>
-                    <p className="text-base font-bold text-red-400">{formatMoney(totalSettledDebit)} {t('common.currency')}</p>
+                    <p className="text-base font-bold text-red-400 font-mono">{formatMoney(totalSettledDebit)} {t('common.currency')}</p>
                   </div>
-                  <div className="w-px h-8 bg-zinc-800 hidden md:block" />
+                  <div className="w-px h-7 bg-zinc-800 hidden md:block" />
                   <div className="space-y-0.5">
                     <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{language === 'ar' ? 'إجمالي الدائن المسوى' : 'Total Settled Credit'}</span>
-                    <p className="text-base font-bold text-emerald-400">{formatMoney(totalSettledCredit)} {t('common.currency')}</p>
+                    <p className="text-base font-bold text-emerald-400 font-mono">{formatMoney(totalSettledCredit)} {t('common.currency')}</p>
                   </div>
-                  <div className="w-px h-8 bg-zinc-800 hidden md:block" />
+                  <div className="w-px h-7 bg-zinc-800 hidden md:block" />
                   <div className="space-y-0.5">
                     <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{language === 'ar' ? 'الفرق' : 'Difference'}</span>
-                    <p className={`text-base font-bold ${difference === 0 ? 'text-emerald-400' : 'text-yellow-400'}`}>
+                    <p className={`text-base font-bold font-mono ${difference <= 0.01 || (forexCalculation.hasForex && Math.abs(difference - Math.abs(forexCalculation.netGainLoss)) <= 0.05) ? 'text-emerald-400' : 'text-amber-400'}`}>
                       {formatMoney(difference)} {t('common.currency')}
                     </p>
                   </div>
+
+                  {forexCalculation.hasForex && (
+                    <>
+                      <div className="w-px h-7 bg-zinc-800 hidden md:block" />
+                      <div className="space-y-0.5">
+                        <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider">{language === 'ar' ? 'فروق العملة المحققة' : 'Realized Forex'}</span>
+                        <p className={`text-base font-bold font-mono ${forexCalculation.isGain ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {forexCalculation.isGain ? '+' : ''}{formatMoney(forexCalculation.netGainLoss)} {t('common.currency')}
+                        </p>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div>
                   <button
                     onClick={handleSaveSettlement}
-                    disabled={difference > 0.01 || totalSettledDebit === 0}
+                    disabled={
+                      (!forexCalculation.hasForex && difference > 0.01) ||
+                      (forexCalculation.hasForex && Math.abs(difference - Math.abs(forexCalculation.netGainLoss)) > 0.05) ||
+                      totalSettledDebit === 0
+                    }
                     className="w-full md:w-auto px-4 py-2 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition-all shadow-md shadow-emerald-500/20 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 text-xs"
                   >
                     <Check size={16} />

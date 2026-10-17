@@ -2548,33 +2548,6 @@ export const SupplierSettlements: React.FC = () => {
                 </div>
               </div>
             </div>
-          ) : (      </div>
-                  <div className="w-px h-8 bg-zinc-800 hidden md:block" />
-                  <div className="space-y-0.5">
-                    <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{language === 'ar' ? 'إجمالي الدائن المسوى' : 'Total Settled Credit'}</span>
-                    <p className="text-base font-bold text-emerald-400">{formatMoney(totalSettledCredit)} {t('common.currency')}</p>
-                  </div>
-                  <div className="w-px h-8 bg-zinc-800 hidden md:block" />
-                  <div className="space-y-0.5">
-                    <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{language === 'ar' ? 'الفرق' : 'Difference'}</span>
-                    <p className={`text-base font-bold ${difference === 0 ? 'text-emerald-400' : 'text-yellow-400'}`}>
-                      {formatMoney(difference)} {t('common.currency')}
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <button
-                    onClick={handleSaveSettlement}
-                    disabled={difference > 0.01 || totalSettledDebit === 0}
-                    className="w-full md:w-auto px-4 py-2 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition-all shadow-md shadow-emerald-500/20 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 text-xs"
-                  >
-                    <Check size={16} />
-                    {language === 'ar' ? 'تثبيت وحفظ التسوية' : 'Commit & Save Settlement'}
-                  </button>
-                </div>
-              </div>
-            </div>
           ) : (
             <div className="bg-white rounded-2xl border border-zinc-200 p-8 text-center text-zinc-400 shadow-sm flex flex-col items-center gap-3">
               <Info size={36} className="text-zinc-300" />
